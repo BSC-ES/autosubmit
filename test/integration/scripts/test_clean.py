@@ -30,7 +30,7 @@ from autosubmit.scripts.autosubmit import main
 def test_clean_plots(autosubmit_exp, mocker):
     """Test cleaning plots in an Autosubmit experiment.
 
-    The test case contains five files, four plots, and one statistics files.
+    The test case contains five files, four plots, and one statistics file.
 
     Cleaning plots without specifying the ``--stats`` results in only plot files
     deleted (anything that contains "statistics" in the name is kept).
@@ -54,7 +54,7 @@ def test_clean_plots(autosubmit_exp, mocker):
 
     plots = list(plots_dir.iterdir())
 
-    # keeps statistics file, and two newest plot files
+    # keeps the statistics file and two newest plot files
     assert len(plots) == 3
     assert Path(plots_dir / 'plot_c.pdf').exists()
     assert Path(plots_dir / 'plot_d.pdf').exists()
@@ -63,7 +63,7 @@ def test_clean_plots(autosubmit_exp, mocker):
 def test_clean_stats(autosubmit_exp, mocker):
     """Test cleaning statistics files in an Autosubmit experiment.
 
-    The test case contains five files, four plots, and one statistics files.
+    The test case contains five files, four plots, and one statistics file.
 
     Cleaning statistics files without specifying the ``-plots`` results
     in only statistics files deleted (anything that contains "statistics"
@@ -89,7 +89,7 @@ def test_clean_stats(autosubmit_exp, mocker):
 
     plots = list(plots_dir.iterdir())
 
-    # keeps plot files, and two newest statistics files
+    # keeps plot files and two newest statistics files
     assert len(plots) == 6
     assert Path(plots_dir / f'{exp.expid}_statistics_2.pdf').exists()
     assert Path(plots_dir / f'{exp.expid}_statistics_3.pdf').exists()
@@ -182,7 +182,7 @@ def test_clean_git_project(
         }
     })
 
-    Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR).mkdir(exist_ok=True)
+    Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, ).mkdir(exist_ok=True)
 
     plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f'{exp.expid}/plot/')
 

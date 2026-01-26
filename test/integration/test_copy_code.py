@@ -29,14 +29,12 @@ import pytest
 
 from autosubmit.log.log import AutosubmitCritical
 
-_EXPID = 't000'
-
 
 def test_copy_code_local_project_destination_is_file(autosubmit_exp):
     """Test that Autosubmit fails to copy the project, as the destination is an existing file."""
     existing_file = str(Path(__file__).resolve())
     with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit_exp(_EXPID, experiment_data={
+        autosubmit_exp(experiment_data={
             'PROJECT': {
                 'PROJECT_TYPE': 'LOCAL',
                 'PROJECT_DESTINATION': 'local_project'
@@ -53,7 +51,7 @@ def test_copy_code_local_project_destination_is_file(autosubmit_exp):
 def test_copy_code_local_project_destination_is_not_specified(autosubmit_exp):
     """Test that Autosubmit fails to copy the project, as the destination is an existing file."""
     with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit_exp(_EXPID, experiment_data={
+        autosubmit_exp(experiment_data={
             'PROJECT': {
                 'PROJECT_TYPE': 'LOCAL',
                 'PROJECT_DESTINATION': 'local_project'
@@ -69,7 +67,7 @@ def test_copy_code_local_project_destination_is_not_specified(autosubmit_exp):
 def test_copy_code_local_project_destination_is_an_empty_string(autosubmit_exp):
     """Test that Autosubmit fails to copy the project, as the destination is an existing file."""
     with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit_exp(_EXPID, experiment_data={
+        autosubmit_exp(experiment_data={
             'PROJECT': {
                 'PROJECT_TYPE': 'LOCAL',
                 'PROJECT_DESTINATION': 'local_project'
@@ -88,7 +86,7 @@ def test_copy_code_local_project_local_destination_does_not_exist(autosubmit_exp
     project_path.mkdir()
     with (project_path / 'ROBOTS.txt') as f:
         f.write_text('test')
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'LOCAL',
             'PROJECT_DESTINATION': 'local_project'
@@ -114,7 +112,7 @@ def test_copy_code_local_project_local_destination_does_not_exist(autosubmit_exp
 
     rmtree(local_destination)
 
-    exp.autosubmit.create(_EXPID, noplot=True, hide=True)
+    exp.autosubmit.create(exp.expid, noplot=True, hide=True)
 
     assert Path(local_destination, 'AGENTS.txt').exists()
 
@@ -126,25 +124,28 @@ def test_copy_code_local_project_cp_error(autosubmit_exp, tmp_path, mocker):
     with (project_path / 'ROBOTS.txt') as f:
         f.write_text('test')
 
+    exp = autosubmit_exp(experiment_data={
+        'PROJECT': {
+            'PROJECT_TYPE': 'LOCAL',
+            'PROJECT_DESTINATION': 'local_project'
+        },
+        'LOCAL': {
+            'PROJECT_PATH': str(project_path)
+        }
+    },
+    create=False)
+
     mocker.patch(
         'autosubmit.autosubmit.subprocess.check_output', side_effect=CalledProcessError(1, 'test')
     )
 
     with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit_exp(_EXPID, experiment_data={
-            'PROJECT': {
-                'PROJECT_TYPE': 'LOCAL',
-                'PROJECT_DESTINATION': 'local_project'
-            },
-            'LOCAL': {
-                'PROJECT_PATH': str(project_path)
-            }
-        })
+        exp.autosubmit.refresh(exp.expid, None, None)
 
     assert 'Cannot copy' in str(cm.value.message)
 
-    # Failing to copy the contents, results in the proj folder being deleted for a fresh try.
-    proj_dir = Path(tmp_path, _EXPID, 'proj')
+    # Failing to copy the contents results in the proj folder being deleted for a fresh try.
+    proj_dir = Path(tmp_path, exp.expid, 'proj')
     assert proj_dir.exists
     assert not Path(proj_dir, 'local_project').exists()
 
@@ -155,7 +156,7 @@ def test_copy_code_local_project_local_destination_exists_force(autosubmit_exp, 
     project_path.mkdir()
     with (project_path / 'ROBOTS.txt') as f:
         f.write_text('test')
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'LOCAL',
             'PROJECT_DESTINATION': 'local_project'
@@ -181,14 +182,14 @@ def test_copy_code_local_project_local_destination_exists_force(autosubmit_exp, 
 
     # Create does not force the sync.
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-    exp.autosubmit.create(_EXPID, noplot=True, hide=True)
+    exp.autosubmit.create(exp.expid, noplot=True, hide=True)
     assert not Path(local_destination, 'AGENTS.txt').exists()
     # And since the folder already exists, we should have informed the user nothing was synced.
     # There will be a few calls to ``Log.info``, but here we confirm that at least one is right.
     assert any(['will not sync' in call[0][0] for call in mocked_log.info.call_args_list])
 
     # Refresh does.
-    exp.autosubmit.refresh(_EXPID, None, None)
+    exp.autosubmit.refresh(exp.expid, None, None)
     assert Path(local_destination, 'AGENTS.txt').exists()
 
 
@@ -198,7 +199,7 @@ def test_copy_code_local_project_rsync_error(autosubmit_exp, tmp_path, mocker):
     project_path.mkdir()
     with (project_path / 'ROBOTS.txt') as f:
         f.write_text('test')
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'LOCAL',
             'PROJECT_DESTINATION': 'local_project'
@@ -220,13 +221,13 @@ def test_copy_code_local_project_rsync_error(autosubmit_exp, tmp_path, mocker):
     )
 
     with pytest.raises(AutosubmitCritical) as cm:
-        exp.autosubmit.refresh(_EXPID, None, None)
+        exp.autosubmit.refresh(exp.expid, None, None)
 
     assert not Path(local_destination, 'AGENTS.txt').exists()
     assert 'Cannot rsync' in str(cm.value.message)
 
     # Failing to rsync the contents, the proj folder is left as-is.
-    proj_dir = Path(tmp_path, _EXPID, 'proj')
+    proj_dir = Path(tmp_path, exp.expid, 'proj')
     assert proj_dir.exists
     assert Path(proj_dir, 'local_project').exists()
     assert Path(proj_dir, 'local_project', 'ROBOTS.txt').exists()

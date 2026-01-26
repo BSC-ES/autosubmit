@@ -27,21 +27,19 @@ from autosubmit.scripts.autosubmit import main
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-_EXPID = "t111"
-
 
 @pytest.mark.parametrize("force", [True, False])
 def test_pklfix_bypass_prompt_confirmation(autosubmit_exp, mocker: 'MockerFixture', force: bool):
     """Test if the --force option bypasses the prompt confirmation."""
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
 
     as_conf = exp.as_conf
 
     # Create empty pkl files
-    exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(_EXPID)
+    exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(exp.expid)
     pkl_folder_path = exp_path.joinpath("pkl")
-    current_pkl_path = pkl_folder_path.joinpath(f"job_list_{_EXPID}.pkl")
-    backup_pkl_path = pkl_folder_path.joinpath(f"job_list_{_EXPID}_backup.pkl")
+    current_pkl_path = pkl_folder_path.joinpath(f"job_list_{exp.expid}.pkl")
+    backup_pkl_path = pkl_folder_path.joinpath(f"job_list_{exp.expid}_backup.pkl")
 
     with open(current_pkl_path, "w") as f:
         f.write("some big content here")
@@ -49,7 +47,7 @@ def test_pklfix_bypass_prompt_confirmation(autosubmit_exp, mocker: 'MockerFixtur
         f.write("some big content here")
 
     # Mock command line arguments
-    passed_args = ["autosubmit", "pklfix"] + (["-f"] if force else []) + [_EXPID]
+    passed_args = ["autosubmit", "pklfix"] + (["-f"] if force else []) + [exp.expid]
     mocker.patch("sys.argv", passed_args)
 
     mock_user_yes_no_query = mocker.patch("autosubmit.autosubmit.Autosubmit._user_yes_no_query")

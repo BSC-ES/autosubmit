@@ -39,16 +39,6 @@ if TYPE_CHECKING:
 # TODO expand the tests (Ecplatform, PJM) whenever possible
 # TODO The db check could be improved to check everything not only the job_data table
 
-# --- Fixtures.
-@pytest.fixture(autouse=True, scope="function")
-def set_debug_log_level() -> None:
-    """
-    Set the console log level to DEBUG for all tests in the session.
-    """
-    from autosubmit.log.log import Log
-    Log.set_console_level("DEBUG")
-
-
 @pytest.fixture
 def prepare_scratch(tmp_path: Path) -> Any:
     """
@@ -114,8 +104,7 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
 
 
 def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> Thread:
-    """
-    Run the given target function in a separate thread.
+    """Run the given target function in a separate thread.
 
     :param target: The function to execute in the thread.
     :type target: Callable[..., Any]
