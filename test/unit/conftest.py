@@ -130,7 +130,6 @@ def autosubmit_config(
         # in ``BasicConfig``. For some reason, some platforms use variables like ``LOCAL_ROOT_DIR``
         # from the configuration object, instead of using ``BasicConfig``.
         if include_basic_config:
-
             for k, v in {k: v for k, v in BasicConfig.__dict__.items() if not k.startswith('__')}.items():
                 config.experiment_data[k] = v
 
