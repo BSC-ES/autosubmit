@@ -1,12 +1,16 @@
+from multiprocessing import Process
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from time import sleep
-
 from ruamel.yaml import YAML
+
 from autosubmit.config.basicconfig import BasicConfig
-from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, _assert_db_fields, _assert_files_recovered, run_in_thread
+from test.integration.commands.run.conftest import (
+    _check_db_fields, _assert_exit_code, _check_files_recovered,
+    _assert_db_fields, _assert_files_recovered
+)
+from test.integration.test_utils.misc import wait_locker
 
 
 # -- Tests
@@ -140,10 +144,17 @@ def test_run_interrupted(
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
     as_conf.set_last_as_command('run')
 
-    # Run the experiment
-    # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
-    run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
-    sleep(2)
+    # Run the experiment. This was not being interrupted, so we run it in a
+    # child process and then stop it to simulate the interruption.
+    process = Process(target=as_exp.autosubmit.run_experiment, args=(as_exp.expid,))
+    process.start()
+
+    max_waiting_time_seconds = 30
+
+    # Wait until the process starts (we wait until the file lock is locked).
+    lock_file = tmp_path / 'autosubmit.lock'
+    wait_locker(lock_file, expect_locked=True, timeout=max_waiting_time_seconds)
+
     current_statuses = 'SUBMITTED, QUEUING, RUNNING'
     as_exp.autosubmit.stop(
         all_expids=False,
@@ -153,6 +164,14 @@ def test_run_interrupted(
         force=True,
         force_all=True,
         status='FAILED')
+
+    # Ensure the AS run process is done
+    process.join(timeout=max_waiting_time_seconds)
+    if process.is_alive():
+        process.terminate()
+        process.join()
+    # Wait until the process stops (we wait until the file lock is unlocked).
+    wait_locker(lock_file, expect_locked=False, timeout=max_waiting_time_seconds)
 
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
 

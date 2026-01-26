@@ -24,7 +24,6 @@ from psutil import Process
 
 from autosubmit.scripts.autosubmit import main
 
-_EXPID = 't000'
 
 def test_autosubmit_commands_help(autosubmit_exp, mocker):
     """Test that the monitor is called for stats with a simple job list.
@@ -32,7 +31,7 @@ def test_autosubmit_commands_help(autosubmit_exp, mocker):
     It must produce three PNG files. One with the job summary, one with the
     section summary, and one with the general statistics.
     """
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'JOBS': {
             'SIM': {
                 'RUNNING': 'once',
@@ -48,7 +47,7 @@ def test_autosubmit_commands_help(autosubmit_exp, mocker):
         'run')
 
     processes_before_run = Process().children(recursive=True)
-    assert 0 == exp.autosubmit.run_experiment(_EXPID)
+    assert 0 == exp.autosubmit.run_experiment(exp.expid)
     processes_after_run = Process().children(recursive=True)
 
     before = time()
@@ -62,10 +61,10 @@ def test_autosubmit_commands_help(autosubmit_exp, mocker):
         sleep(1)
 
     mocker.patch('sys.argv', ['autosubmit', 'stats', '-o', 'png', '--section_summary',
-                              '--jobs_summary', '--hide', _EXPID])
+                              '--jobs_summary', '--hide', exp.expid])
     assert 0 == main()
 
-    stats_folder = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, 'stats')
+    stats_folder = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, 'stats')
     stats_files = list(stats_folder.iterdir())
 
     assert len(stats_files) == 3

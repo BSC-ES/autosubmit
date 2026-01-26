@@ -44,12 +44,10 @@ if TYPE_CHECKING:
     from test.integration.conftest import AutosubmitExperimentFixture
     from contextlib import AbstractContextManager
 
-_EXPID = 't000'
-
 
 def test__init_logs_config_file_not_found(autosubmit, autosubmit_exp, mocker, monkeypatch):
     """Test that an error is raised when the ``BasicConfig.CONFIG_FILE_FOUND`` returns ``False``."""
-    autosubmit_exp(_EXPID)
+    autosubmit_exp()
 
     args = mocker.MagicMock()
     args.logconsole = 'DEBUG'
@@ -66,7 +64,7 @@ def test__init_logs_config_file_not_found(autosubmit, autosubmit_exp, mocker, mo
 
 def test__init_logs_sqlite_db_path_not_found(autosubmit, autosubmit_exp, mocker, monkeypatch, tmp_path):
     """Test that an error is raised when the SQLite file cannot be located."""
-    exp = autosubmit_exp(_EXPID)
+    exp = autosubmit_exp()
 
     args = mocker.MagicMock()
     args.expid = exp.expid
@@ -85,7 +83,7 @@ def test__init_logs_sqlite_db_path_not_found(autosubmit, autosubmit_exp, mocker,
 
 def test__init_logs_sqlite_db_not_readable(autosubmit, autosubmit_exp, mocker, monkeypatch):
     """Test that an error is raised when the SQLite file is not readable."""
-    exp = autosubmit_exp(_EXPID)
+    exp = autosubmit_exp()
 
     args = mocker.MagicMock()
     args.expid = exp.expid
@@ -108,7 +106,7 @@ def test__init_logs_sqlite_db_not_readable(autosubmit, autosubmit_exp, mocker, m
 
 def test__init_logs_sqlite_db_not_writable(autosubmit, autosubmit_exp, mocker, monkeypatch):
     """Test that an error is raised when the SQLite file is not writable."""
-    exp = autosubmit_exp(_EXPID)
+    exp = autosubmit_exp()
 
     args = mocker.MagicMock()
     args.expid = exp.expid
@@ -131,7 +129,7 @@ def test__init_logs_sqlite_db_not_writable(autosubmit, autosubmit_exp, mocker, m
 
 def test__init_logs_sqlite_exp_path_does_not_exist(autosubmit, autosubmit_exp, mocker, monkeypatch):
     """Test that an error is raised when the experiment path does not exist and SQLite is used."""
-    autosubmit_exp(_EXPID)
+    autosubmit_exp()
 
     args = mocker.MagicMock()
     args.expid = '0000'
@@ -150,7 +148,7 @@ def test__init_logs_sqlite_exp_path_does_not_exist(autosubmit, autosubmit_exp, m
 def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(autosubmit, autosubmit_exp, mocker, monkeypatch):
     """Test that a new experiment is created for Postgres when the directory is empty,
     but an error is raised when the experiment data is empty."""
-    autosubmit_exp(_EXPID)
+    autosubmit_exp()
 
     args = mocker.MagicMock()
     args.expid = '0000'
@@ -170,7 +168,7 @@ def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(autosubmit, au
 def test__init_logs_sqlite_mismatch_as_version_upgrade_it(autosubmit, autosubmit_exp, mocker):
     """Test that setting an invalid AS version but passing the arg to update version results in the command
     being called correctly."""
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'CONFIG': {
             'AUTOSUBMIT_VERSION': 'bright-opera'
         }
@@ -193,7 +191,7 @@ def test__init_logs_sqlite_mismatch_as_version_upgrade_it(autosubmit, autosubmit
 
 def test__init_logs_sqlite_mismatch_as_version(autosubmit, autosubmit_exp, mocker):
     """Test that an Autosubmit command ran with the wrong AS version results in an error."""
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'CONFIG': {
             'AUTOSUBMIT_VERSION': 'bright-opera'
         }
@@ -259,7 +257,7 @@ def test_install_postgres_create_db_fails(monkeypatch, autosubmit, mocker):
 @pytest.mark.postgres
 def test_update_version(as_db: str, autosubmit, autosubmit_exp, mocker):
     wrong_version = 'bright-opera'
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'CONFIG': {
             'AUTOSUBMIT_VERSION': wrong_version
         }
@@ -283,7 +281,7 @@ def test_update_version(as_db: str, autosubmit, autosubmit_exp, mocker):
 @pytest.mark.postgres
 def test_update_description(as_db: str, autosubmit, autosubmit_exp, mocker):
     wrong_version = 'bright-opera'
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'CONFIG': {
             'AUTOSUBMIT_VERSION': wrong_version
         }
@@ -302,7 +300,7 @@ def test_update_description(as_db: str, autosubmit, autosubmit_exp, mocker):
 
 
 def test_autosubmit_pklfix_no_backup(autosubmit_exp, mocker, tmp_path):
-    exp = autosubmit_exp(_EXPID)
+    exp = autosubmit_exp()
     mocker.patch('sys.argv', ['autosubmit', 'pklfix', exp.expid])
 
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
@@ -314,7 +312,7 @@ def test_autosubmit_pklfix_no_backup(autosubmit_exp, mocker, tmp_path):
 
 
 def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
-    exp = autosubmit_exp(_EXPID, include_jobs=True)
+    exp = autosubmit_exp(include_jobs=True)
 
     pkl_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, 'pkl')
     current = pkl_path / f'job_list_{exp.expid}.pkl'
@@ -453,7 +451,7 @@ def test_check_wrappers_and_as_exit(
     This function ``check_wrappers`` should probably be moved to another place in the future,
     to simplify the 6K+ lines ``autosubmit.py``.
     """
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     as_conf: AutosubmitConfig = exp.as_conf
 
     job_list: JobList = mocker.MagicMock(spec=JobList)
@@ -471,7 +469,7 @@ def test_check_wrappers_and_as_exit(
     Autosubmit.exit = _exit
 
     t: tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]] = \
-        autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, _EXPID)
+        autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, exp.expid)
     jobs_to_check, _ = t
 
     assert len(jobs_to_check) == expected_jobs_to_check

@@ -24,13 +24,11 @@ from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packages import JobPackageVertical
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
-_EXPID = 't000'
-
 
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_load_save_load(as_db: str, autosubmit_exp):
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'JOBS': {
             '1': {
                 'PLATFORM': 'TEST_SLURM_PLATFORM',

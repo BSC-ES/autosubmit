@@ -36,15 +36,13 @@ if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
 
-_EXPID = 't0123'
-
 
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
     """Test history database manager using the old (SQLite) and new (SQLAlchemy) implementations."""
-    _EXPID = "test_schema_history"
-    options = {"expid": _EXPID}
+    expid = "test_schema_history"
+    options = {"expid": expid}
     is_sqlalchemy = as_db != "sqlite"
     tmp_test_dir = os.path.join(str(tmp_path), "test_experiment_history_db_manager")
     os.mkdir(tmp_test_dir)
@@ -139,7 +137,7 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
 
 
 def test_sqlite_initialize_no_db(autosubmit_exp, mocker, tmp_path):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     wrong_folder = tmp_path / 'wrong-folder'
     wrong_folder.mkdir()
     db_manager = create_experiment_history_db_manager(
@@ -158,9 +156,9 @@ def test_sqlite_initialize_no_db(autosubmit_exp, mocker, tmp_path):
 
 
 def test_sqlite_initialize_wrong_version(autosubmit_exp, mocker, tmp_path, monkeypatch):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder / f'job_data_{_EXPID}.db'
+    db_file = data_folder / f'job_data_{exp.expid}.db'
     Path(db_file).touch()
     db_manager = create_experiment_history_db_manager(
         'sqlite',
@@ -184,9 +182,9 @@ def test_sqlite_initialize_wrong_version(autosubmit_exp, mocker, tmp_path, monke
 
 
 def test_sqlite_initialize_db_exists(autosubmit_exp, mocker, tmp_path):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder / f'job_data_{_EXPID}.db'
+    db_file = data_folder / f'job_data_{exp.expid}.db'
     Path(db_file).touch()
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
@@ -204,9 +202,9 @@ def test_sqlite_initialize_db_exists(autosubmit_exp, mocker, tmp_path):
 
 
 def test_sqlite_is_current_version_db_exists(autosubmit_exp, tmp_path):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder / f'job_data_{_EXPID}.db'
+    db_file = data_folder / f'job_data_{exp.expid}.db'
     Path(db_file).touch()
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
@@ -219,7 +217,7 @@ def test_sqlite_is_current_version_db_exists(autosubmit_exp, tmp_path):
 
 
 def test_sqlite_is_current_version_no_db(autosubmit_exp, tmp_path):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     data_folder = Path(tmp_path, 'metadata/data')
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
@@ -232,7 +230,7 @@ def test_sqlite_is_current_version_no_db(autosubmit_exp, tmp_path):
 
 
 def test_sqlite_is_header_ready_db_version_db_exists(autosubmit_exp, tmp_path):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     data_folder = Path(tmp_path, 'metadata/data')
     db_file = data_folder
     Path(db_file).touch()
@@ -247,7 +245,7 @@ def test_sqlite_is_header_ready_db_version_db_exists(autosubmit_exp, tmp_path):
 
 
 def test_sqlite_is_header_ready_db_version_no_db(autosubmit_exp, tmp_path):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     data_folder = Path(tmp_path, 'metadata/data')
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
@@ -261,7 +259,7 @@ def test_sqlite_is_header_ready_db_version_no_db(autosubmit_exp, tmp_path):
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_get_job_data_by_job_id_name(as_db: str, autosubmit_exp):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
 
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
@@ -300,7 +298,7 @@ def test_get_job_data_by_job_id_name(as_db: str, autosubmit_exp):
 @pytest.mark.postgres
 def test_get_job_data_max_counter(as_db: str, job_name: str, counters: list[int], autosubmit_exp):
     """Persists the job data for the given optional job name, and its counters to verify the max counter."""
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
 
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
@@ -335,7 +333,7 @@ def test_get_job_data_max_counter(as_db: str, job_name: str, counters: list[int]
 @pytest.mark.postgres
 def test_get_all_last_job_data_dcs(as_db: str, lasts: list[bool], request, autosubmit_exp):
     """Persists the job data for the given optional job name, and its counters to verify the max counter."""
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
 
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
@@ -371,7 +369,7 @@ def test_get_all_last_job_data_dcs(as_db: str, lasts: list[bool], request, autos
 @pytest.mark.postgres
 def test_get_job_data_dcs_last_by_wrapper_code(as_db: str, wrapper_code: int, number_of_expected: int, autosubmit_exp):
     """Tests that we retrieve the expected number of entries (only when ``wrapper_code`` is greater than 2)."""
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
 
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
@@ -397,7 +395,7 @@ def test_get_job_data_dcs_last_by_wrapper_code(as_db: str, wrapper_code: int, nu
 @pytest.mark.postgres
 def test_get_job_data_dc_unique_latest_by_job_name(as_db: str, autosubmit_exp):
     """Tests that we retrieve the expected number of entries (only when ``wrapper_code`` is greater than 2)."""
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
 
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
@@ -425,7 +423,7 @@ def test_get_job_data_dc_unique_latest_by_job_name(as_db: str, autosubmit_exp):
 @pytest.mark.postgres
 def test_update_job_data_dc_by_job_id_name(as_db: str, autosubmit_exp):
     """Tests that we retrieve the expected number of entries (only when ``wrapper_code`` is greater than 2)."""
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
 
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
@@ -458,7 +456,7 @@ def test_update_job_data_dc_by_job_id_name(as_db: str, autosubmit_exp):
 @pytest.mark.postgres
 def test_update_list_job_data_dc_by_each_id(as_db: str, autosubmit_exp):
     """Tests that we retrieve the expected number of entries (only when ``wrapper_code`` is greater than 2)."""
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
 
     db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         as_db,
@@ -501,9 +499,9 @@ def test_update_list_job_data_dc_by_each_id(as_db: str, autosubmit_exp):
 
 
 def test_sqlite_pragma_version(autosubmit_exp, tmp_path: 'LocalPath'):
-    exp = autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder / f'job_data_{_EXPID}.db'
+    db_file = data_folder / f'job_data_{exp.expid}.db'
     Path(db_file).touch()
     db_manager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
         'sqlite',
