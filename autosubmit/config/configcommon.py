@@ -290,22 +290,6 @@ class AutosubmitConfig(object):
         """
         return str(self.get_section([section, 'MEMORY_PER_TASK'], ""))
 
-    def get_migrate_user_to(self, section: str) -> str:
-        """Returns the user to change to from platform config file.
-
-        :return: migrate user to
-        :rtype: str
-        """
-        return self.get_section([section, 'USER_TO'], "")
-
-    def get_migrate_duplicate(self, section: str) -> str:
-        """Returns the user to change to from platform config file.
-
-        :return: migrate user to
-        :rtype: str
-        """
-        return str(self.get_section([section, 'SAME_USER'], "false")).lower()
-
     def get_current_user(self, section: str) -> str:
         """Returns the user to be changed from platform config file.
 
@@ -387,22 +371,6 @@ class AutosubmitConfig(object):
                 'HOST_TO:.*', content_to_mod).group(0)[1:], "HOST_TO: " + old_host)
         open(self._platforms_parser_file, 'w').write(content)
         open(self._platforms_parser_file, 'a').write(content_to_mod)
-
-    def get_migrate_project_to(self, section: str) -> str:
-        """Returns the project to change to from platform config file.
-
-        :return: migrate project to
-        :rtype: str
-        """
-        return self.get_section([section, 'PROJECT_TO'], "")
-
-    def get_migrate_host_to(self, section: str) -> str:
-        """Returns the host to change to from platform config file.
-
-        :return: host_to
-        :rtype: str
-        """
-        return self.get_section([section, 'HOST_TO'], "")
 
     def set_new_project(self, section: str, new_project: str) -> None:
         """Sets new project for given platform
