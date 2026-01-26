@@ -100,7 +100,7 @@ def get_next_expid(tmp_path_factory: 'TempPathFactory') -> Callable[[], str]:
     """Returns a factory to retrieve the next Autosubmit experiment ID.
 
     The returned experiment ID by the factory function is guaranteed to
-    be uniquely throughout the whole test session, even with multiple
+    be unique throughout the whole test session, even with multiple
     pytest-xdist processes.
     """
 

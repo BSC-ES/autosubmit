@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
-
     EXPERIMENT:
         NUMCHUNKS: '3'
     JOBS:

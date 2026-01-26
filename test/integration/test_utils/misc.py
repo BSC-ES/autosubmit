@@ -17,9 +17,12 @@
 
 """Miscellaneous utilities for integration tests."""
 
-from time import sleep
-
+from contextlib import suppress
+from pathlib import Path
+from time import sleep, time
 from typing import TYPE_CHECKING
+
+from portalocker import Lock, AlreadyLocked
 
 if TYPE_CHECKING:
     pass
@@ -32,7 +35,7 @@ __all__ = [
 def wait_child(timeout, retry=3):
     """A parametrized fixture that will retry function X amount of times waiting for a child process to be executed.
 
-    In case it still fails after X retries an exception is thrown."""
+    In case it still fails after X retries, an exception is thrown."""
 
     def the_real_decorator(function):
         def wrapper(*args, **kwargs):
@@ -50,3 +53,32 @@ def wait_child(timeout, retry=3):
         return wrapper
 
     return the_real_decorator
+
+
+def wait_locker(file_lock: Path, expect_locked: bool, timeout: int, interval=0.05) -> None:
+    """Waits until a file is locked or unlocked."""
+    start = time()
+    while True:
+        elapsed = time() - start
+        if elapsed > timeout:
+            raise TimeoutError(f"File lock {'not ' if expect_locked else ''}acquired at {file_lock} "
+                               f"({timeout}s timeout, {elapsed:.2f}s elapsed)")
+
+        if expect_locked:
+            # Check if the file is locked by attempting to acquire it non-blocking
+            try:
+                with Lock(str(file_lock)):
+                    # Lock acquired, so it's NOT locked — keep waiting
+                    pass
+            except AlreadyLocked:
+                return  # Lock is held
+        else:
+            # Wait for the lock to be released
+            with suppress(AlreadyLocked):
+                try:
+                    with Lock(str(file_lock), timeout=0.01):
+                        return  # Lock released
+                except AlreadyLocked:
+                    pass
+
+        sleep(interval)

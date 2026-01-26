@@ -27,12 +27,10 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
 
-_EXPID = 't000'
-
 
 @pytest.fixture
 def setup_job_list(autosubmit_exp, tmpdir, mocker):
-    as_exp = autosubmit_exp(_EXPID)
+    as_exp = autosubmit_exp()
     as_conf = as_exp.as_conf
     as_conf.experiment_data = dict()
     as_conf.experiment_data["JOBS"] = dict()
@@ -41,7 +39,7 @@ def setup_job_list(autosubmit_exp, tmpdir, mocker):
     basic_config = as_conf.basic_config
 
     with patch('autosubmit.job.job_list_persistence.BasicConfig', basic_config):
-        job_list = JobList(_EXPID, basic_config, YAMLParserFactory(), JobListPersistenceDb(_EXPID))
+        job_list = JobList(as_exp.expid, basic_config, YAMLParserFactory(), JobListPersistenceDb(as_exp.expid))
 
     dummy_serial_platform = mocker.MagicMock()
     dummy_serial_platform.name = 'serial'
