@@ -50,6 +50,7 @@ jobs:
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
+            --verbose --verbosity="2" --trace --full-trace \
             test/unit -m "not postgres"
 
       - name: Coverage report

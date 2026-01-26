@@ -28,19 +28,18 @@ from autosubmit.experiment.detail_updater import (
     create_experiment_details_repository,
 )
 
-_EXPID = 't000'
-
 
 def test_create_experiment_details_repository_invalid_db_engine():
     with pytest.raises(ValueError):
         create_experiment_details_repository('csv')
 
 
-def test_details_properties(mocker):
+def test_details_properties(autosubmit_exp, mocker):
     # TODO: mocked create_experiment_details_repository as it fails intermittently with
     #       sqlite3.OperationalError: unable to open database file
     mocker.patch('autosubmit.experiment.detail_updater.create_experiment_details_repository')
-    exp_details = ExperimentDetails(_EXPID, init_reload=False)
+    exp = autosubmit_exp()
+    exp_details = ExperimentDetails(exp.expid, init_reload=False)
 
     exp_details.exp_id = 0
 
