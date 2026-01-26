@@ -132,25 +132,35 @@ def test_ini_to_yaml_lists(tmp_path: 'LocalPath'):
     assert yaml['marenostrum4']['HOST'] == '"[mn1.bsc.es, mn2.bsc.s]"'
 
 
-def test_upgrade_scripts(autosubmit_exp):
-    as_exp = autosubmit_exp(experiment_data={})
+def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath'):
+    temp_project = tmp_path / 'temp_project'
+    as_exp = autosubmit_exp(experiment_data={
+        'PROJECT': {
+            'PROJECT_TYPE': 'LOCAL',
+            'PROJECT_DESTINATION': 'local_project'
+        },
+        'LOCAL': {
+            'PROJECT_PATH': str(temp_project)
+        }
+    }, create=False)
 
     exp_dir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR, as_exp.expid)
 
-    as3_jobs_file = exp_dir / f'jobs_{as_exp.expid}.conf'
+    as3_jobs_file = exp_dir / f'conf/jobs_{as_exp.expid}.conf'
+    as3_jobs_file.parent.mkdir(exist_ok=True)
     as3_jobs_file.touch()
     as3_jobs_file.write_text(dedent('''\
     [LOCAL_SETUP]
     FILE = templates/local_setup.sh
-    PLATFORM = marenostrum4
+    PLATFORM = marenostrum4-test
     RUNNING = once
     NOTIFY_ON = FAILED COMPLETED
     '''))
 
-    as3_platforms_file = exp_dir / 'platforms.conf'
+    as3_platforms_file = exp_dir / 'conf/platforms.conf'
     as3_platforms_file.touch()
     as3_platforms_file.write_text(dedent('''\
-    [marenostrum4]
+    [marenostrum4-test]
     TYPE = slurm
     HOST = mn1.bsc.es
     PROJECT = bsc32
@@ -163,4 +173,21 @@ def test_upgrade_scripts(autosubmit_exp):
     PROCESSORS_PER_NODE = 48
     '''))
 
-    assert upgrade_scripts(as_exp.expid, files="*.conf")
+    as3_script_template = temp_project / 'templates/local_setup.sh'
+    as3_script_template.parent.mkdir(exist_ok=True, parents=True)
+    as3_script_template.touch()
+    as3_script_template.write_text(dedent('''\
+    #!/bin/bash
+    
+    echo "The job name is %JOBNAME%"
+    '''))
+
+    assert as_exp.autosubmit.create(as_exp.expid, force=True, noplot=True, hide=True) == 0
+
+    assert upgrade_scripts(as_exp.expid, files=[])
+
+    assert as_exp.autosubmit.create(as_exp.expid, force=True, noplot=True, hide=True) == 0
+    assert as_exp.autosubmit.inspect(as_exp.expid, lst='', filter_chunks='', filter_status='', filter_section='')
+
+    inspect_generated_script = exp_dir / 'tmp/t001_LOCAL_SETUP.cmd'
+    assert f'The job name is {as_exp.expid}_LOCAL_SETUP' in inspect_generated_script.read_text()

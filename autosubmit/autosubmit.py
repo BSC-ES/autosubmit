@@ -688,7 +688,7 @@ class Autosubmit:
             # update proj files
             subparser = subparsers.add_parser('upgrade', description='Updates autosubmit 3 proj files to autosubmit 4')
             subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('-f', '--files', default='', type=str, help='list of files')
+            subparser.add_argument('-f', '--files', nargs='+', default=[], type=str, help='list of files')
             # Readme
             subparsers.add_parser('readme', description='show readme')
 

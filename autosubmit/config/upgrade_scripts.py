@@ -22,6 +22,7 @@ import os
 import re
 import shutil
 from pathlib import Path
+from typing import Optional
 
 from configobj import ConfigObj
 from ruamel.yaml import YAML
@@ -42,8 +43,8 @@ __all__ = [
 ]
 
 
-def ini_to_yaml(root_dir: Path, ini_file: Path) -> Path:
-    ini_file = Path(ini_file)
+def ini_to_yaml(ini_file: Path) -> Path:
+    root_dir = ini_file.parent
     # Read the file name from command line argument
     input_file = str(ini_file)
     backup_path = root_dir / Path(ini_file.name + "_AS_v3_backup")
@@ -105,11 +106,11 @@ def _update_dict(original_dict: dict, updated_dict: dict) -> dict:
     return original_dict
 
 
-def upgrade_scripts(expid: str, files="") -> bool:
+def upgrade_scripts(expid: str, files: Optional[list[str]] = None) -> bool:
     """Upgrade scripts from Autosubmit 3 to 4."""
 
     if not files:
-        files = ('*.yml', '*.yaml', '*.conf')
+        files = ('*.conf', '*.CONF')
 
     Log.info("Checking if experiment exists...")
     check_ownership(expid, raise_error=True)
@@ -119,18 +120,31 @@ def upgrade_scripts(expid: str, files="") -> bool:
     as_conf.load_parameters()
 
     as_version = get_version()
-    Log.info(f"Changing {expid} experiment version from {as_conf.get_version()} to {as_version}")
+    Log.info(f"Changing experiment {expid} version from {as_conf.get_version()} to {as_version}")
 
     exp_conf_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf"
-    _update_scripts_to_yaml(exp_conf_dir)
-    _convert_ini_to_yaml(exp_conf_dir)
+    ini_files = {f for pattern in files for f in exp_conf_dir.rglob(pattern)}
+
+    # TODO: Use tqdm to show the user the progress?
+    Log.info(f"Converting {len(ini_files)} INI files (.conf) into YAML files (.yml)")
+    yaml_files = []
+    for ini_file in ini_files:
+        yaml_file = Path(ini_file.stem + ".yml")
+        if yaml_file.exists():
+            Log.debug(f'INI file {ini_file} not upgraded. YAML file already exists: {yaml_file}')
+            continue
+
+        Log.debug(f'Converting INI file {ini_file} into YAML file: {yaml_file}')
+        try:
+            ini_to_yaml(ini_file)
+            yaml_files.append(yaml_file)
+        except Exception as e:
+            Log.warning(f'Failed to convert INI file {ini_file} into {yaml_file}: {e}')
 
     # Update files in conf/ folder.
-    warnings: list[str] = []
-    substituted: list[str] = []
-    exp_project_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / expid / "conf"
-    Log.info("Looking for %_% variables inside conf files")
-    for f in _get_files(exp_project_dir, files):
+    exp_project_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / expid / "proj"
+    Log.info(f"Fixing placeholder variables (%_%) inside the new {len(yaml_files)} YAML files")
+    for yaml_file in yaml_files:
         template_path = exp_project_dir / Path(f).name
         try:
             w, s = _update_old_script(exp_project_dir, template_path, as_conf)
@@ -141,13 +155,9 @@ def upgrade_scripts(expid: str, files="") -> bool:
         except Exception as e:
             Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
 
-    _print_warnings_substituted(warnings, substituted)
-
     # Update files in proj/ folder.
     exp_project_dir = Path(as_conf.get_project_dir())
     template_path = Path()
-    warnings: list[str] = []
-    substituted: list[str] = []
 
     Log.info("Looking for %_% variables inside templates")
     for section, value in as_conf.jobs_data.items():
@@ -161,63 +171,11 @@ def upgrade_scripts(expid: str, files="") -> bool:
         except Exception as e:
             Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
 
-    _print_warnings_substituted(warnings, substituted)
-
     # Commit.
     as_conf.set_version(as_version)
     update_experiment_description_version(expid, version=as_version)
 
     return True
-
-
-def _update_scripts_to_yaml(folder: Path) -> None:
-    """Update scripts to YAML format.
-
-    Tries to update every YAML file treating it as being
-    possibly being invalid. When the parser fails to load
-    the YAML, we call the function that converts INI to
-    YAML.
-    """
-    factory = YAMLParserFactory()
-    for f in folder.rglob("*.yml"):
-        # Tries to convert an invalid yml to correct one
-        try:
-            parser = factory.create_parser()
-            parser.load(Path(f))
-        except Exception as e:
-            Log.error(f"Failed loading the file {str(f)}: {str(e)}")
-            try:
-                ini_to_yaml(f.parent, Path(f))
-            except Exception as e2:
-                Log.error(f"Couldn't convert conf file {str(f)} to yml {f.parent}: {str(e2)}")
-                raise e2
-
-
-def _convert_ini_to_yaml(exp_conf_folder: Path) -> None:
-    """Convert an Autosubmit 3 INI file to an Autosubmit 4 YAML file."""
-    Log.info("Converting all .conf files into .yml")
-    for f in exp_conf_folder.rglob("*.conf"):
-        if not Path(f.stem + ".yml").exists():
-            try:
-                ini_to_yaml(Path(f).parent, Path(f))
-            except Exception as e:
-                Log.warning(f"Couldn't convert conf file to yml {Path(f).parent}: {str(e)}")
-
-
-def _get_files(root_dir_: Path, extensions, files_filter="") -> list[Path]:
-    """Get the list of files by extension and filters."""
-    all_files = []
-    if len(files_filter) > 0:
-        for ext in extensions:
-            all_files.extend(root_dir_.rglob(ext))
-    else:
-        if ',' in files_filter:
-            files_filter = files_filter.split(',')
-        elif ' ' in files_filter:
-            files_filter = files_filter.split(' ')
-        for file in files_filter:
-            all_files.append(file)
-    return all_files
 
 
 def _update_old_script(
@@ -228,6 +186,8 @@ def _update_old_script(
     """Backs up the configuration and tries to update them.
 
     Returns a tuple with warnings, and substituted values.
+
+    Lower case variables are replaced by upper case variables.
 
     :return: A tuple with a list of warnings and substituted values.
     """
@@ -271,19 +231,10 @@ def _update_old_script(
         if template_path.name.lower().find("autosubmit") > -1:
             template_content = re.sub('(?m)^( )*(EXPID:)( )*[a-zA-Z0-9._-]*(\n)*', "", template_content, flags=re.I)
         # Write final result
-        open(template_path, "w").write(template_content)
+        with open(template_path, "w") as f:
+            f.write(template_content)
 
     if not warnings and not substituted:
         Log.result(f"Completed check for {template_path}.\nNo %_% variables found.")
     else:
         Log.result(f"Completed check for {template_path}")
-
-    return warnings, substituted
-
-
-def _print_warnings_substituted(warnings: list[str], substituted: list[str]) -> None:
-    if substituted:
-        Log.printlog(os.linesep.join(substituted), Log.RESULT)
-
-    if warnings:
-        Log.printlog(os.linesep.join(warnings), Log.ERROR)
