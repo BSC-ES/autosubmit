@@ -642,7 +642,7 @@ class ParamikoPlatform(Platform):
         try:
             self._ftpChannel.remove(str(remote_file))
             return True
-        except IOError as e:
+        except IOError:
             return False
         except Exception as e:
             # Change to Path
