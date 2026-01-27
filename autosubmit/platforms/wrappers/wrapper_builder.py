@@ -18,6 +18,7 @@ import os
 import random
 import string
 import textwrap
+import re
 from autosubmit.log.log import AutosubmitCritical
 
 from typing import List
@@ -146,6 +147,10 @@ class FluxWrapperBuilder(WrapperBuilder):
     def build_main(self):
         if not self.job_scripts:
             raise AutosubmitCritical("No job scripts found for building the Flux wrapper.")
+
+        # TODO: [ENGINES] REMOVE. Jobs should come here already sorted
+        # Sort job scripts by their names
+        self.job_scripts = self._sorted_job_scripts(self.job_scripts)
         
         # Get an unique identifier for the script name
         unique_part = '_'.join(self.wrapper_name.split('_')[2:])
@@ -166,6 +171,45 @@ class FluxWrapperBuilder(WrapperBuilder):
         # Instantiate Flux within the allocated resources and run the jobs
         srun --cpu-bind=none flux start --verbose=2 python {2}
         """).format(self._generate_flux_script(), self._custom_environmet_setup(), script_name)
+
+    # TODO: [ENGINES] REMOVE. Jobs should come here already sorted
+    @staticmethod
+    def _sorted_job_scripts(job_scripts):
+        """Return a deterministically sorted job_scripts.
+
+        Supports a flat list of strings or a nested list of lists of strings. The objective is to
+        artificially order of the joblist to avoid the hybrid wrapper bug to make the workflow fail.
+        """
+        if not isinstance(job_scripts, list):
+            raise AutosubmitCritical("Invalid job_scripts type for Flux wrapper. Expected list.")
+
+        def _numerical_key(val):
+            """
+            Numerical sorting key which splits digits to compare.
+            
+            Numbers can appear appended to chars (i.e. "fc0"), so we split both numbers and 
+            undercase chars.
+            """
+            s = str(val)
+            parts = re.split(r'(\d+)', s)
+            key = []
+            for p in parts:
+                if p.isdigit():
+                    key.append(int(p))
+                else:
+                    key.append(p.lower())
+            return tuple(key)
+
+        # Nested list case
+        if isinstance(job_scripts[0], (list, tuple)):
+            ordered = []
+            for group in job_scripts:
+                ordered.append(sorted(list(group), key=_numerical_key))
+
+            return ordered
+        
+        # Flat list case
+        return sorted(job_scripts, key=_numerical_key)
     
     def _generate_flux_script(self):
         """
