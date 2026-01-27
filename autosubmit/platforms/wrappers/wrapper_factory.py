@@ -51,7 +51,7 @@ class WrapperFactory(object):
             kwargs['tasks'] = self.tasks(wrapper_data.tasks)
             kwargs["custom_directives"] = self.custom_directives(wrapper_data.custom_directives)
             kwargs['queue'] = self.queue(wrapper_data.queue)
-            kwargs['threads'] = self.threads(wrapper_data.threads)
+            kwargs['threads'] = self.threads(str(wrapper_data.threads))
             kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
         kwargs["executable"] = wrapper_data.executable
@@ -204,16 +204,16 @@ class SlurmWrapperFactory(WrapperFactory):
     def exclusive_directive(self, exclusive):
         return '#SBATCH --exclusive'
 
-    def tasks_directive(self, tasks):
+    def tasks_directive(self, tasks) -> str:
         return f'#SBATCH --ntasks-per-node={tasks}'
 
     def nodes_directive(self, nodes):
         return f'#SBATCH -N {nodes}'
 
     def processors_directive(self, processors):
-        return f'#SBATCH -n {processors}'
+       return f'#SBATCH -n {processors}'
 
-    def threads_directive(self, threads):
+    def threads_directive(self, threads) -> str:
         return f'#SBATCH --cpus-per-task={threads}'
 
 
