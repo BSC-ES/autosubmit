@@ -1561,6 +1561,9 @@ class ParamikoPlatform(Platform):
             if hasattr(self.header, 'get_threads_per_task'):
                 header = header.replace(
                     '%THREADS_PER_TASK_DIRECTIVE%', self.header.get_threads_per_task(job, parameters))
+            if hasattr(self.header, 'get_wallclock_directive'):
+                header = header.replace(
+                    '%WALLCLOCK_DIRECTIVE%', self.header.get_wallclock_directive(job, parameters))
             if job.x11:
                 header = header.replace(
                     '%X11%', "SBATCH --x11=batch")
