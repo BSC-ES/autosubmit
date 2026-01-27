@@ -14,7 +14,8 @@ def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
 
 def reset(as_exp_, target="WAITING"):
     job_list_ = as_exp_.autosubmit.load_job_list(
-        as_exp_.expid, as_exp_.as_conf, new=False)
+        as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
+        check_failed_jobs=True)
 
     job_names = " ".join([job.name for job in job_list_.get_job_list()])
     do_setstatus(as_exp_, fl=job_names, target=target)
@@ -42,7 +43,8 @@ def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=Non
         detail=False
     )
     return as_exp_.autosubmit.load_job_list(
-        as_exp_.expid, as_exp_.as_conf, new=False)
+        as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
+        check_failed_jobs=True)
 
 
 @pytest.mark.docker
