@@ -1,14 +1,32 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
+import pytest
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.job.job_common import Status
-
-import pytest
-from autosubmit.log.log import AutosubmitCritical
-
 from autosubmit.history.database_managers.experiment_history_db_manager import SqlAlchemyExperimentHistoryDbManager
+from autosubmit.job.job_common import Status
+from autosubmit.log.log import AutosubmitCritical
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -97,7 +115,7 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
     db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
     db_manager.initialize()
     # Save fails if platform is not set ( in 4.2 this is not the case )
-    submitter = as_exp.autosubmit._get_submitter(as_exp.as_conf)
+    submitter = ParamikoSubmitter(as_conf=as_exp.as_conf)
     submitter.load_platforms(as_exp.as_conf)
     platforms = submitter.platforms
 

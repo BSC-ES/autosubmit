@@ -11,6 +11,13 @@
 
 ### 4.1.16: Unreleased
 
+**Bug fixes:**
+
+- Fixed bug where placeholder variables were not removed when they referenced
+  `HPC*` variables (e.g. `%HPC_DN_SERVER%` of a user platform) #2574
+
+### 4.1.16: Unreleased
+
 This release adds support to Postgres using SQLAlchemy, without removing the
 SQLite support. By default, Autosubmit will use SQLite. Postgres support is
 experimental and not recommended for production yet.

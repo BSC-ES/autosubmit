@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -16,10 +16,12 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import cProfile
+import os
 import pstats
+import re
 import shutil
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,9 +31,10 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from test.regression.config.conftest import prepare_yaml_files
 
-PROFILE = False  # Enable/disable profiling ( speed up the tests )
+PROFILE = False
+"""Enable/disable profiling ( speed up the tests )."""
 
-as_conf_content: Dict[str, Any] = {
+as_conf_content: dict[str, Any] = {
     "job": {
         "FOR": {
             "NAME": "%var%"
@@ -69,10 +72,9 @@ as_conf_content: Dict[str, Any] = {
 }
 
 
-def prepare_custom_config_tests(default_yaml_file: Dict[str, Any], project_yaml_files: Dict[str, Dict[str, str]],
-                                temp_folder: Path) -> Dict[str, Any]:
-    """
-    Prepare custom configuration tests by creating necessary YAML files.
+def prepare_custom_config_tests(default_yaml_file: dict[str, Any], project_yaml_files: dict[str, dict[str, str]],
+                                temp_folder: Path) -> dict[str, Any]:
+    """Prepare custom configuration tests by creating necessary YAML files.
 
     :param default_yaml_file: Default YAML file content.
     :type default_yaml_file: Dict[str, Any]
@@ -122,8 +124,8 @@ def deep_check_all_keys_uppercase(data: dict) -> bool:
                             "VARW": "variableZ",
                             "JOB_VARIABLEX_PATH": "variableX/test.yml",
                             "JOB_VARIABLEY_PATH": "variableY/test.yml"})])
-def test_custom_config_for(temp_folder: Path, default_yaml_file: Dict[str, Any],
-                           project_yaml_files: Dict[str, Dict[str, str]], expected_data: Dict[str, str],
+def test_custom_config_for(temp_folder: Path, default_yaml_file: dict[str, Any],
+                           project_yaml_files: dict[str, dict[str, str]], expected_data: dict[str, str],
                            mocker) -> None:
     """
     Test custom configuration and "FOR" for the given YAML files.
@@ -204,7 +206,6 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
     """
     Test the destine workflow (a1q2) hardcoded until CI/CD.
     """
-    import os
     profiler = cProfile.Profile()
     os.environ["AS_ENV_PLATFORMS_PATH"] = "test"
     os.environ["AS_ENV_SSH_CONFIG_PATH"] = "test2"
@@ -243,8 +244,8 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
 
     parameters = as_conf.deep_parameters_export(as_conf.experiment_data, as_conf.default_parameters)
     for key in list(parameters.keys()):
-        if key.endswith(".NAME") and not key.startswith(
-                "MODEL"):  # Added in this branch, so it is not in the reference file, the model.NAME has to not be hardcoded #todo
+        # TODO added in this branch, so it is not in the reference file, the model.NAME has to not be hardcoded
+        if key.endswith(".NAME") and not key.startswith("MODEL"):
             parameters.pop(key)
 
     parameters_ref = as_conf.deep_parameters_export(reference_experiment_data, as_conf.default_parameters)
@@ -269,11 +270,12 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
 
     # Check that all parameters are being substituted
     parameters_values = ' '.join(map(str, parameters.values()))
-    import re
     placeholders = re.findall(r"%\w+%", parameters_values)
     substituted_during_update_parameters = ['%HPCARCH%', '%HPCLOGDIR%', '%HPCROOTDIR%']
-    placeholders_in_parameters = [placeholder for placeholder in placeholders if
-                                  placeholder.strip("%") in parameters.keys() and placeholder not in substituted_during_update_parameters]
+    placeholders_in_parameters = [
+        placeholder for placeholder in placeholders if
+        placeholder.strip("%") in parameters.keys() and placeholder not in substituted_during_update_parameters
+    ]
 
     assert not placeholders_in_parameters
 

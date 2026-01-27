@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -1387,8 +1387,7 @@ class Job(object):
         return None
 
     def _time_in_seconds_and_margin(self, wallclock: datetime.timedelta) -> int:
-        """
-        Calculate the total wallclock time in seconds and the wallclock time with a margin.
+        """Calculate the total wallclock time in seconds and the wallclock time with a margin.
 
         This method increases the given wallclock time by 30%.
         It then converts the total wallclock time to seconds and returns both the total
@@ -1414,7 +1413,8 @@ class Job(object):
 
     @staticmethod
     def parse_time(wallclock):
-        if not isinstance(wallclock, str):  # TODO This is a workaround for the time being, just defined for tests passing without more issues
+        # TODO This is a workaround for the time being, just defined for tests passing without more issues
+        if type(wallclock) is not str:
             return datetime.timedelta(24 * 60 * 60)
         regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
         parts = regex.match(wallclock)
@@ -1427,14 +1427,10 @@ class Job(object):
                 time_params[name] = int(param)
         return datetime.timedelta(**time_params)
 
-    # TODO Duplicated for wrappers and jobs to fix in 4.1.X but in wrappers is called _is_over_wallclock for unknown reasons
-    def is_over_wallclock(self):
-        """
-        Check if the job is over the wallclock time, it is an alternative method to avoid platform issues
-
-        :return:
-        :rtype: bool
-        """
+    # TODO: Duplicated for wrappers and jobs to fix in 4.1.X but in wrappers is called
+    #       _is_over_wallclock for unknown reasons.
+    def is_over_wallclock(self) -> bool:
+        """Check if the job is over the wallclock time, it is an alternative method to avoid platform issues."""
         elapsed = datetime.datetime.now() - self.start_time
         if int(elapsed.total_seconds()) > self.wallclock_in_seconds:
             Log.warning(f"Job {self.name} is over wallclock time, Autosubmit will check if it is completed")
@@ -1511,13 +1507,6 @@ class Job(object):
                 )
 
         return self.status
-
-    @staticmethod
-    def _get_submitter(as_conf):
-        """
-        Returns the submitter corresponding to the communication defined on Autosubmit's config file
-        """
-        return ParamikoSubmitter(as_conf=as_conf)
 
     def update_children_status(self):
         children = list(self.children)
@@ -1625,12 +1614,8 @@ class Job(object):
 
         return parameters
 
-    def process_scheduler_parameters(self, job_platform, chunk):
-        """
-        Parsers yaml data stored in the dictionary and calculates the components of the heterogeneous job if any
-
-        :return:
-        """
+    def process_scheduler_parameters(self, job_platform: 'Platform', chunk: int) -> None:
+        """Parsers yaml data stored in the dictionary and calculates the components of the heterogeneous job if any."""
         if type(self.processors) is list:
             hetsize = (len(self.processors))
         else:
@@ -2157,7 +2142,7 @@ class Job(object):
             self.x11 = False if str(parameters.get("CURRENT_X11", False)).lower() == "false" else True
             self.notify_on = parameters.get("CURRENT_NOTIFY_ON", [])
             self.update_stat_file()
-            if self.checkpoint:  # To activate placeholder sustitution per <empty> in the template
+            if self.checkpoint:  # To activate placeholder substitution per <empty> in the template
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
 
@@ -2292,7 +2277,7 @@ class Job(object):
             self.update_dict_parameters(as_conf)
         self.init_platform(as_conf)
         parameters = as_conf.load_parameters()
-        # TODO: This shouldn't be neccesary aims to fix 2432 issue
+        # TODO: This shouldn't be necessary aims to fix 2432 issue
         as_conf.load_current_hpcarch_parameters(parameters)
         parameters = self.update_current_parameters(as_conf, parameters)
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)
