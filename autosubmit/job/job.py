@@ -2490,7 +2490,8 @@ class Job(object):
         :return: The full path of the file to be sent.
         :rtype: str
         """
-        real_name = str(f"{Path(file_name).stem}_{self.name}")
+        file_path = Path(file_name)
+        real_name = str(f"{file_path.stem}_{self.name}{file_path.suffix}")
         real_name = real_name.replace(f"{self.expid}_", "")
         return real_name
 

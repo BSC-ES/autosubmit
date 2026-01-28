@@ -1047,9 +1047,9 @@ def test_pytest_check_script(mocker):
 @pytest.mark.parametrize(
     "file_name,job_name,expid,expected",
     [
-        ("testfile.txt", "job1", "exp123", "testfile_job1"),
-        ("exp123_testfile.txt", "job2", "exp123", "testfile_job2"),
-        ("anotherfile.py", "job3", "exp999", "anotherfile_job3"),
+        ("testfile.txt", "job1", "exp123", "testfile_job1.txt"),
+        ("exp123_testfile.txt", "job2", "exp123", "testfile_job2.txt"),
+        ("anotherfile.py", "job3", "exp999", "anotherfile_job3.py"),
     ]
 )
 def test_construct_real_additional_file_name(file_name: str, job_name: str, expid: str, expected: str) -> None:

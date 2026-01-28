@@ -165,3 +165,11 @@ def test_cancel_jobs(create_job_list):
 )
 def test_get_split_size_unit(data, result):
     assert get_split_size_unit(data, 'TEST') == result
+
+def test_construct_real_additional_file_name_same_name_different_extension() -> None:
+    """Test that if the user has two files with the same stem different extensions, we identify both."""
+    job = Job(name="abc")
+    job.expid = "a000"
+    left = job.construct_real_additional_file_name("aqua_analysis.yml")
+    right = job.construct_real_additional_file_name("aqua_analysis.sh")
+    assert left != right
