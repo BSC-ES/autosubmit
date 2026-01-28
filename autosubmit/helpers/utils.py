@@ -18,6 +18,7 @@
 import os
 import pwd
 import re
+import sys
 from contextlib import suppress
 from itertools import zip_longest
 from pathlib import Path
@@ -266,8 +267,8 @@ class NaturalSort:
         return False
 
 
-def strtobool(val):
-    """Convert a string representation of truth to true (1) or false (0).
+def strtobool(val: str) -> bool:
+    """Convert a string representation of truth to ``True`` or ``False``.
 
     True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
     are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
@@ -277,9 +278,9 @@ def strtobool(val):
     """
     val = val.lower()
     if val in ('y', 'yes', 't', 'true', 'on', '1'):
-        return 1
+        return True
     elif val in ('n', 'no', 'f', 'false', 'off', '0'):
-        return 0
+        return False
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
@@ -310,3 +311,20 @@ def get_rc_path(machine: bool, local: bool) -> Path:
         rc_path = Path.home()
 
     return Path(rc_path) / '.autosubmitrc'
+
+
+def user_yes_no_query(question: str) -> bool:
+    """Utility function to ask user a yes/no question.
+
+    :param question: question to ask
+    :return: True if answer is yes, False if it is no
+    """
+    sys.stdout.write(f'{question} [y/n]\n')
+    while True:
+        try:
+            answer = input()
+            return strtobool(answer.lower())
+        except EOFError as e:
+            raise AutosubmitCritical("No input detected, the experiment will not be erased.", 7011, str(e))
+        except ValueError:
+            sys.stdout.write('Please respond with \'y\' or \'n\'.\n')
