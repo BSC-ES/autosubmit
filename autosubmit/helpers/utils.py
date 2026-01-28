@@ -18,10 +18,11 @@
 import os
 import pwd
 import re
+import sys
 from contextlib import suppress
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import Iterable, Optional, Union, TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -51,6 +52,7 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: Op
             raise AutosubmitCritical(f"Templates directory {templates_dir} is not a directory", 7011)
 
         # Check if all files in jobs_data exist or only current section
+        jobs_data: Iterable
         if current_section_name:
             jobs_data = [as_conf.jobs_data.get(current_section_name, {})]
         else:
@@ -73,7 +75,7 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: Op
 
 
 def check_experiment_ownership(
-        expid: str, basic_config: BasicConfig, raise_error=False, logger: Log = None
+        expid: str, basic_config: BasicConfig, raise_error=False, logger: Optional[Log] = None
 ) -> tuple[bool, bool, str]:
     # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available
     my_user_id = os.getuid()
@@ -266,8 +268,8 @@ class NaturalSort:
         return False
 
 
-def strtobool(val):
-    """Convert a string representation of truth to true (1) or false (0).
+def strtobool(val: str) -> bool:
+    """Convert a string representation of truth to ``True`` or ``False``.
 
     True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
     are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
@@ -277,9 +279,9 @@ def strtobool(val):
     """
     val = val.lower()
     if val in ('y', 'yes', 't', 'true', 'on', '1'):
-        return 1
+        return True
     elif val in ('n', 'no', 'f', 'false', 'off', '0'):
-        return 0
+        return False
     else:
         raise ValueError("invalid truth value %r" % (val,))
 
@@ -302,6 +304,7 @@ def get_rc_path(machine: bool, local: bool) -> Path:
     if 'AUTOSUBMIT_CONFIGURATION' in os.environ:
         return Path(os.environ['AUTOSUBMIT_CONFIGURATION'])
 
+    rc_path: Union[str, Path]
     if machine:
         rc_path = '/etc'
     elif local:
@@ -310,3 +313,20 @@ def get_rc_path(machine: bool, local: bool) -> Path:
         rc_path = Path.home()
 
     return Path(rc_path) / '.autosubmitrc'
+
+
+def user_yes_no_query(question: str) -> bool:
+    """Utility function to ask user a yes/no question.
+
+    :param question: question to ask
+    :return: True if answer is yes, False if it is no
+    """
+    sys.stdout.write(f'{question} [y/n]\n')
+    while True:
+        try:
+            answer = input()
+            return strtobool(answer.lower())
+        except ValueError:
+            sys.stdout.write('Please respond with \'y\' or \'n\'.\n')
+        except Exception as e:
+            raise AutosubmitCritical("No input detected, the experiment will not be erased.", 7011, str(e))

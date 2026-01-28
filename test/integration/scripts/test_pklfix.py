@@ -50,7 +50,7 @@ def test_pklfix_bypass_prompt_confirmation(autosubmit_exp, mocker: 'MockerFixtur
     passed_args = ["autosubmit", "pklfix"] + (["-f"] if force else []) + [exp.expid]
     mocker.patch("sys.argv", passed_args)
 
-    mock_user_yes_no_query = mocker.patch("autosubmit.autosubmit.Autosubmit._user_yes_no_query")
+    mock_user_yes_no_query = mocker.patch("autosubmit.autosubmit.user_yes_no_query")
     mock_user_yes_no_query.return_value = False
 
     assert main() == 0

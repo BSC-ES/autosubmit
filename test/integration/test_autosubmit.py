@@ -324,7 +324,7 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
 
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
 
-    mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
+    mocker.patch('autosubmit.autosubmit.user_yes_no_query', return_value=True)
 
     assert 0 == main()
 

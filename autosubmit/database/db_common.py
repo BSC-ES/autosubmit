@@ -286,7 +286,7 @@ def last_name_used(test=False, operational=False, evaluation=False):
 
 def delete_experiment(experiment_id):
     """
-    Removes experiment from database. Anti-lock version.  
+    Removes experiment from database. Anti-lock version.
 
     :param experiment_id: experiment identifier
     :type experiment_id: str
