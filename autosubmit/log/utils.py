@@ -27,7 +27,7 @@ GZIP_MAGIC = "1F 8B"
 
 def compress_xz(
     input_path: Union[Path, str],
-    output_path: Union[Path, str] = None,
+    output_path: Optional[Union[Path, str]] = None,
     preset: int = 6,
     extreme: bool = False,
     keep_input: bool = True,
@@ -60,7 +60,7 @@ def compress_xz(
 
 def compress_gzip(
     input_path: str,
-    output_path: str = None,
+    output_path: Optional[str] = None,
     compression_level: int = 9,
     keep_input: bool = True,
 ):

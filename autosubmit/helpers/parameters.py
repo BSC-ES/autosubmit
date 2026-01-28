@@ -18,7 +18,7 @@
 import functools
 import inspect
 from collections import defaultdict
-from typing import Any
+from typing import Any, Optional
 
 
 PARAMETERS: dict[str, Any] = defaultdict(defaultdict)
@@ -70,7 +70,7 @@ def autosubmit_parameters(cls=None, *, parameters: dict):
     return wrap
 
 
-def autosubmit_parameter(func=None, *, name, group=None):
+def autosubmit_parameter(func=None, *, name, group: Optional[str] = None):
     """Decorator for Autosubmit configuration parameters.
 
     Used to annotate properties of classes
@@ -82,7 +82,7 @@ def autosubmit_parameter(func=None, *, name, group=None):
     """
     if group is None:
         stack = inspect.stack()
-        group: str = stack[1][0].f_locals['__qualname__'].rsplit('.', 1)[-1]
+        group = stack[1][0].f_locals['__qualname__'].rsplit('.', 1)[-1]
 
     group = group.upper()
 
@@ -98,15 +98,15 @@ def autosubmit_parameter(func=None, *, name, group=None):
             PARAMETERS[group][parameter_name] = None
 
     def parameter_decorator(wrapped_func):
-        parameter_group = parameter_decorator.__group
-        parameter_names = parameter_decorator.__names
+        parameter_group = getattr(parameter_decorator, "__group")
+        parameter_names = getattr(parameter_decorator, "__names")
         for p_name in parameter_names:
             if wrapped_func.__doc__:
                 PARAMETERS[parameter_group][p_name] = wrapped_func.__doc__.strip().split('\n')[0]
 
         # Delete the members created as we are not using them hereafter
-        del parameter_decorator.__group
-        del parameter_decorator.__names
+        delattr(parameter_decorator, "__group")
+        delattr(parameter_decorator, "__names")
 
         @functools.wraps(wrapped_func)
         def wrapper(*args, **kwargs):
@@ -114,7 +114,7 @@ def autosubmit_parameter(func=None, *, name, group=None):
 
         return wrapper
 
-    parameter_decorator.__group = group
-    parameter_decorator.__names = names
+    setattr(parameter_decorator, "__group", group)
+    setattr(parameter_decorator, "__names", names)
 
     return parameter_decorator

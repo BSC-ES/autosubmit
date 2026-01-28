@@ -13,12 +13,14 @@
   `HPC*` variables (e.g. `%HPC_DN_SERVER%` of a user platform) #2574
 - Used a Shell trap-function to detect when an Autosubmit job is signalled to stop
   and to handle non-zero exit codes writing the `_STAT` files (for GUI/metrics) #2788 #2807
+- Do not print warning if an experiment has been successfully deleted #2334 #2793
 
 **Enhancements:**
 
 - Fix intermittent failures of unit tests, and enable print of AS exceptions.
   Changes and improvements to fixtures and pytest organisation and setup #2745
 - Removed broken migrate command #2617
+- Allow users to delete multiple experiments #1216 #2793
 
 ### 4.1.16: Unreleased
 
