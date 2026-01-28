@@ -32,7 +32,6 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 
-_EXPID = 't000'
 _DESCRIPTION = "for testing"
 _VERSION = "test-version"
 
@@ -45,13 +44,13 @@ _VERSION = "test-version"
     ]
 )
 def test_copy_experiment(type_flag: str, autosubmit_exp: Callable, autosubmit: Autosubmit):
-    """Test that we can copy experiment using flags for operational and evaluation experiment types.
+    """Test that we can copy the experiment using flags for operational and evaluation experiment types.
 
     :param type_flag: Variable to check which kind of flag it is.
     :type type_flag: bool
-    :param autosubmit_exp: Autosubmit interface that instantiate with an experiment.
+    :param autosubmit_exp: Autosubmit interface that instantiates with an experiment.
     :type autosubmit_exp: Callable
-    :param autosubmit: Autosubmit interface that instantiate with no experiment.
+    :param autosubmit: Autosubmit interface that instantiates with no experiment.
     :type autosubmit: Autosubmit
 
     :return: None
@@ -84,7 +83,7 @@ def test_expid_mutually_exclusive_arguments(type_flag: str, autosubmit: Autosubm
     """Test for issue 2280, where mutually exclusive arguments like op/ev flags and min were not working.
 
     :param type_flag: Variable to check which kind of flag it is.
-    :param autosubmit: Autosubmit interface that instantiate with no experiment.
+    :param autosubmit: Autosubmit interface that instantiates with no experiment.
     """
     autosubmit.install()
     is_operational = type_flag == 'op'
@@ -112,8 +111,8 @@ def test_copy_minimal(has_min_yaml: bool, autosubmit: Autosubmit):
     """Test for issue 2280, ensure autosubmit expid -min --copy expid_id cannot be used if the experiment
     does not have an expid_id/conf/minimal.yml file
 
-    :param has_min_yaml: Variable to simulate if experiment has minimal or not.
-    :param autosubmit: Autosubmit interface that instantiate with no experiment.
+    :param has_min_yaml: Variable to simulate if the experiment has minimal or not.
+    :param autosubmit: Autosubmit interface that instantiates with no experiment.
     """
     autosubmit.install()
     expid = autosubmit.expid(
@@ -150,7 +149,7 @@ def test_create_expid_default_hpc(autosubmit: Autosubmit):
 
         autosubmit expid -d "test descript"
 
-    :param autosubmit: Autosubmit interface that instantiate with no experiment.
+    :param autosubmit: Autosubmit interface that instantiates with no experiment.
     """
     autosubmit.install()
 
@@ -181,7 +180,7 @@ def test_create_expid_flag_hpc(fake_hpc: str, expected_hpc: str, autosubmit: Aut
 
     :param fake_hpc: The value for the -H flag (hpc value).
     :param expected_hpc: The value it is expected for the variable hpc.
-    :param autosubmit: Autosubmit interface that instantiate with no experiment.
+    :param autosubmit: Autosubmit interface that instantiates with no experiment.
     """
     # create default expid with know hpc
     autosubmit.install()
@@ -346,8 +345,8 @@ def _build_db_mock(current_experiment_id, mock_db_common, mocker):
     mock_db_common.check_experiment_exists = mocker.Mock(return_value=False)
 
 
-def test_autosubmit_generate_config(mocker, autosubmit: Autosubmit, tmp_path):
-    expid = 'ff99'
+def test_autosubmit_generate_config(mocker, autosubmit: Autosubmit, tmp_path, get_next_expid: Callable[[], str]):
+    expid = get_next_expid()
     original_local_root_dir = BasicConfig.LOCAL_ROOT_DIR
     read_files_mock = mocker.patch('autosubmit.autosubmit.read_files')
 
@@ -464,74 +463,74 @@ def test_autosubmit_generate_config_resource_listdir_order(autosubmit, mocker):
 
 def test_expid_generated_correctly(tmp_path, autosubmit_exp, autosubmit):
     autosubmit.install()
-    as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
+    as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
-    autosubmit.inspect(expid=f'{_EXPID}', check_wrapper=True, force=True, lst=None, filter_chunks=None,
+    autosubmit.inspect(expid=f'{as_exp.expid}', check_wrapper=True, force=True, lst=None, filter_chunks=None,
                        filter_status=None, filter_section=None)
-    assert f"{_EXPID}_DEBUG.cmd" in [Path(f).name for f in
-                                     Path(f"{run_dir}/{_EXPID}/tmp").iterdir()]
+    assert f"{as_exp.expid}_DEBUG.cmd" in [Path(f).name for f in
+                                     Path(f"{run_dir}/{as_exp.expid}/tmp").iterdir()]
     # Consult if the expid is in the database
     db_path = Path(f"{run_dir}/tests.db")
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute(f"SELECT name FROM experiment WHERE name='{_EXPID}'")
+        cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")
         assert cursor.fetchone() is not None
         cursor.close()
 
 
 def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosubmit):
     autosubmit.install()
-    as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
+    as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
     mocker.patch("autosubmit.autosubmit.process_id", return_value=None)
-    autosubmit.delete(expid=f'{_EXPID}', force=True)
-    assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}").iterdir())
-    assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
-    assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
-    assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/structures").iterdir())
+    autosubmit.delete(expid=f'{as_exp.expid}', force=True)
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}").iterdir())
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/structures").iterdir())
     # Consult if the expid is not in the database
     db_path = Path(f"{run_dir}/tests.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute(f"SELECT name FROM experiment WHERE name='{_EXPID}'")
+    cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")
     assert cursor.fetchone() is None
     cursor.close()
     # Test doesn't exist
     with pytest.raises(AutosubmitCritical):
-        autosubmit.delete(expid=f'{_EXPID}', force=True)
+        autosubmit.delete(expid=f'{as_exp.expid}', force=True)
 
 
 def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmit: Autosubmit):
     autosubmit.install()
-    as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
+    as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
     mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
     mocker.patch('pwd.getpwuid', side_effect=TypeError)
     mocker.patch("autosubmit.autosubmit.process_id", return_value=None)
-    _, _, current_owner = autosubmit._check_ownership(_EXPID)
+    _, _, current_owner = autosubmit._check_ownership(as_exp.expid)
     assert current_owner is None
     # test not owner not eadmin
     _user = getuser()
     mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership",
                  return_value=(False, False, _user))
     with pytest.raises(AutosubmitCritical):
-        autosubmit.delete(expid=f'{_EXPID}', force=True)
+        autosubmit.delete(expid=f'{as_exp.expid}', force=True)
     # test eadmin
     mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership",
                  return_value=(False, True, _user))
     with pytest.raises(AutosubmitCritical):
-        autosubmit.delete(expid=f'{_EXPID}', force=False)
+        autosubmit.delete(expid=f'{as_exp.expid}', force=False)
     # test eadmin force
-    autosubmit.delete(expid=f'{_EXPID}', force=True)
-    assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}").iterdir())
-    assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
-    assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
-    assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/structures").iterdir())
+    autosubmit.delete(expid=f'{as_exp.expid}', force=True)
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}").iterdir())
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/structures").iterdir())
     # Consult if the expid is not in the database
     db_path = Path(f"{run_dir}/tests.db")
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute(f"SELECT name FROM experiment WHERE name='{_EXPID}'")
+        cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")
         assert cursor.fetchone() is None
         cursor.close()
 
@@ -546,7 +545,7 @@ def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmi
     ]
 )
 def test_delete_expid(mocker, tmp_path, autosubmit_exp, autosubmit, expid_value):
-    as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
+    as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
     mocker.patch('autosubmit.autosubmit.Autosubmit._perform_deletion', return_value="error")
     expid_value = as_exp.expid if expid_value == "as_exp.expid" else expid_value
     if expid_value in ["..", "", "."]:
@@ -562,17 +561,17 @@ def test_delete_expid(mocker, tmp_path, autosubmit_exp, autosubmit, expid_value)
 
 
 def test_perform_deletion(mocker, tmp_path, autosubmit_exp, autosubmit):
-    as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
+    as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
     mocker.patch("shutil.rmtree", side_effect=FileNotFoundError)
     mocker.patch("os.remove", side_effect=FileNotFoundError)
     basic_config = as_exp.as_conf.basic_config
-    experiment_path = Path(f"{basic_config.LOCAL_ROOT_DIR}/{_EXPID}")
-    structure_db_path = Path(f"{basic_config.STRUCTURES_DIR}/structure_{_EXPID}.db")
-    job_data_db_path = Path(f"{basic_config.JOBDATA_DIR}/job_data_{_EXPID}")
+    experiment_path = Path(f"{basic_config.LOCAL_ROOT_DIR}/{as_exp.expid}")
+    structure_db_path = Path(f"{basic_config.STRUCTURES_DIR}/structure_{as_exp.expid}.db")
+    job_data_db_path = Path(f"{basic_config.JOBDATA_DIR}/job_data_{as_exp.expid}")
     if all("tmp" not in path for path in [str(experiment_path), str(structure_db_path), str(job_data_db_path)]):
         raise AutosubmitCritical("tmp not in path")
     mocker.patch("autosubmit.autosubmit.delete_experiment", side_effect=FileNotFoundError)
-    err_message = autosubmit._perform_deletion(experiment_path, structure_db_path, job_data_db_path, _EXPID)
+    err_message = autosubmit._perform_deletion(experiment_path, structure_db_path, job_data_db_path, as_exp.expid)
     assert all(x in err_message for x in
                ["Cannot delete experiment entry", "Cannot delete directory", "Cannot delete structure",
                 "Cannot delete job_data"])

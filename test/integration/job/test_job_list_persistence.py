@@ -24,9 +24,6 @@ from pathlib import Path
 from autosubmit.autosubmit import Autosubmit
 
 
-_EXPID = 't000'
-
-
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_job_list_persistence(as_db: str, autosubmit_exp):
@@ -42,8 +39,8 @@ def test_job_list_persistence(as_db: str, autosubmit_exp):
         experiment_data['STORAGE'] = {
             'TYPE': 'db'
         }
-    exp = autosubmit_exp(_EXPID, experiment_data=experiment_data)
-    exp_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID)
+    exp = autosubmit_exp(experiment_data=experiment_data)
+    exp_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid)
 
     job_list_pers = Autosubmit._get_job_list_persistence('job_list_persistence_postgres', exp.as_conf)
 

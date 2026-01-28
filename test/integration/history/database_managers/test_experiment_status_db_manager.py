@@ -36,8 +36,6 @@ if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from _pytest._py.path import LocalPath
 
-_EXPID = 't099'
-
 
 def test_create_experiment_status_db_manager_invalid_value():
     with pytest.raises(ValueError):
@@ -46,8 +44,9 @@ def test_create_experiment_status_db_manager_invalid_value():
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str):
-    options = {"expid": _EXPID}
+def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, get_next_expid):
+    expid = get_next_expid()
+    options = {"expid": expid}
     tmp_test_dir = tmp_path / "test_status"
     tmp_test_dir.mkdir()
 
@@ -93,8 +92,9 @@ def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str):
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, autosubmit_exp):
-    options = {"expid": _EXPID}
+def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, autosubmit_exp, get_next_expid):
+    expid = get_next_expid()
+    options = {"expid": expid}
 
     is_sqlalchemy = as_db == "sqlite"
     if is_sqlalchemy:
@@ -106,10 +106,10 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
 
     # An error as there is no such experiment ID in the database
     with pytest.raises(ValueError):
-        database_manager.get_experiment_status_row_by_expid(_EXPID)
+        database_manager.get_experiment_status_row_by_expid(expid)
 
     # Create the experiment, but it still will not have any experiment status
-    exp = autosubmit_exp(_EXPID, include_jobs=True)
+    exp = autosubmit_exp(expid=expid, include_jobs=True)
     experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
     assert experiment_status_row is None
 

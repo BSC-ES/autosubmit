@@ -19,22 +19,20 @@
 
 from pathlib import Path
 
-_EXPID = 't000'
 
-
-def check_profile(run_tmpdir) -> bool:
+def check_profile(expid: str, run_tmpdir: str) -> bool:
     """
     Initialize the run, writing the jobs.yml file and creating the experiment.
     """
     # write jobs_data
-    profile_path = Path(f"{run_tmpdir}/{_EXPID}/tmp/profile/")
+    profile_path = Path(f"{run_tmpdir}/{expid}/tmp/profile/")
     if profile_path.exists():
         return True
     return False
 
 
 def test_run_profile(autosubmit_exp, tmp_path):
-    as_exp = autosubmit_exp(_EXPID, experiment_data={
+    as_exp = autosubmit_exp(experiment_data={
         'JOBS': {
             'job': {
                 'SCRIPT': 'echo "Hello World with id=Success"',
@@ -60,4 +58,4 @@ def test_run_profile(autosubmit_exp, tmp_path):
         as_exp.expid,
         'run')
     as_exp.autosubmit.run_experiment(expid=as_exp.expid, profile=True)
-    assert check_profile(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+    assert check_profile(as_exp.expid, as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)

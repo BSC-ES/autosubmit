@@ -30,10 +30,6 @@ from autosubmit.monitor.monitor import (
     Monitor
 )
 
-# noinspection PyProtectedMember
-
-_EXPID = 't000'
-
 
 @pytest.mark.parametrize(
     "output_format,show,display_error,error_raised",
@@ -58,11 +54,11 @@ def test_generate_output(
     """Test that monitor generates its output in different formats."""
     mocked_log = mocker.patch('autosubmit.monitor.monitor.Log')
 
-    exp = autosubmit_exp(_EXPID, experiment_data={})
-    exp_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
+    exp = autosubmit_exp(experiment_data={})
+    exp_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / exp.expid
 
-    job_list_persistence = exp.autosubmit._get_job_list_persistence(_EXPID, exp.as_conf)
-    job_list = JobList(_EXPID, exp.as_conf, YAMLParserFactory(), job_list_persistence)
+    job_list_persistence = exp.autosubmit._get_job_list_persistence(exp.expid, exp.as_conf)
+    job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory(), job_list_persistence)
     date_list = exp.as_conf.get_date_list()
     # TODO: we can probably simplify our code, so that ``date_format`` is calculated more easily...
     date_format = ''
@@ -93,9 +89,9 @@ def test_generate_output(
     if error_raised:
         with pytest.raises(error_raised):
             monitor.generate_output(
-                expid=_EXPID,
+                expid=exp.expid,
                 joblist=job_list.get_job_list(),
-                path=str(exp_path / f'tmp/LOG_{_EXPID}'),
+                path=str(exp_path / f'tmp/LOG_{exp.expid}'),
                 output_format=output_format,
                 show=show,
                 groups=None,
@@ -107,9 +103,9 @@ def test_generate_output(
             mock_display_file.side_effect = display_error
 
         monitor.generate_output(
-            expid=_EXPID,
+            expid=exp.expid,
             joblist=job_list.get_job_list(),
-            path=str(exp_path / f'tmp/LOG_{_EXPID}'),
+            path=str(exp_path / f'tmp/LOG_{exp.expid}'),
             output_format=output_format,
             show=show,
             groups=None,
@@ -136,4 +132,3 @@ def test_generate_output(
         #       So txt format gives less information to the user, thus the 0 size.
         if output_format != 'txt':
             assert plots[0].stat().st_size > 0
-
