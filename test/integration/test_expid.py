@@ -26,10 +26,14 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from autosubmit.config.basicconfig import BasicConfig
 
 from autosubmit.autosubmit import Autosubmit
-from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
+from autosubmit.config.basicconfig import BasicConfig
+# noinspection PyProtectedMember
+from autosubmit.experiment.experiment_common import (
+    check_ownership, copy_experiment, delete_experiment,
+    _delete_expid, new_experiment, _perform_deletion
+)
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 
 _EXPID = 't000'
@@ -483,8 +487,8 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosub
     autosubmit.install()
     as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
-    mocker.patch("autosubmit.autosubmit.process_id", return_value=None)
-    autosubmit.delete(expid=f'{_EXPID}', force=True)
+    mocker.patch("autosubmit.experiment.experiment_common.process_id", return_value=None)
+    delete_experiment(expid=f'{_EXPID}', force=True)
     assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}").iterdir())
     assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
     assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
@@ -498,31 +502,31 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosub
     cursor.close()
     # Test doesn't exist
     with pytest.raises(AutosubmitCritical):
-        autosubmit.delete(expid=f'{_EXPID}', force=True)
+        delete_experiment(expid=f'{_EXPID}', force=True)
 
 
 def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmit: Autosubmit):
     autosubmit.install()
     as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
-    mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
+    mocker.patch('autosubmit.experiment.experiment_common.user_yes_no_query', return_value=True)
     mocker.patch('pwd.getpwuid', side_effect=TypeError)
-    mocker.patch("autosubmit.autosubmit.process_id", return_value=None)
-    _, _, current_owner = autosubmit._check_ownership(_EXPID)
+    mocker.patch("autosubmit.experiment.experiment_common.process_id", return_value=None)
+    _, _, current_owner = check_ownership(_EXPID)
     assert current_owner is None
     # test not owner not eadmin
     _user = getuser()
-    mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership",
+    mocker.patch("autosubmit.experiment.experiment_common.check_ownership",
                  return_value=(False, False, _user))
     with pytest.raises(AutosubmitCritical):
-        autosubmit.delete(expid=f'{_EXPID}', force=True)
+        delete_experiment(expid=f'{_EXPID}', force=True)
     # test eadmin
-    mocker.patch("autosubmit.autosubmit.Autosubmit._check_ownership",
+    mocker.patch("autosubmit.experiment.experiment_common.check_ownership",
                  return_value=(False, True, _user))
     with pytest.raises(AutosubmitCritical):
-        autosubmit.delete(expid=f'{_EXPID}', force=False)
+        delete_experiment(expid=f'{_EXPID}', force=False)
     # test eadmin force
-    autosubmit.delete(expid=f'{_EXPID}', force=True)
+    delete_experiment(expid=f'{_EXPID}', force=True)
     assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}").iterdir())
     assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
     assert all(_EXPID not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
@@ -547,18 +551,18 @@ def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmi
 )
 def test_delete_expid(mocker, tmp_path, autosubmit_exp, autosubmit, expid_value):
     as_exp = autosubmit_exp(_EXPID, _get_experiment_data(tmp_path))
-    mocker.patch('autosubmit.autosubmit.Autosubmit._perform_deletion', return_value="error")
+    mocker.patch('autosubmit.experiment.experiment_common._perform_deletion', return_value="error")
     expid_value = as_exp.expid if expid_value == "as_exp.expid" else expid_value
     if expid_value in ["..", "", "."]:
         with pytest.raises(AutosubmitCritical) as exc_info:
-            autosubmit._delete_expid(expid_value, force=True)
+            _delete_expid(expid_value, force=True)
             assert exc_info.value.code == 7001
     else:
         with pytest.raises(AutosubmitError):
-            autosubmit._delete_expid(as_exp.expid, force=True)
+            _delete_expid(as_exp.expid, force=True)
     mocker.stopall()
-    autosubmit._delete_expid(as_exp.expid, force=True)
-    assert not autosubmit._delete_expid(as_exp.expid, force=True)
+    _delete_expid(as_exp.expid, force=True)
+    assert not _delete_expid(as_exp.expid, force=True)
 
 
 def test_perform_deletion(mocker, tmp_path, autosubmit_exp, autosubmit):
@@ -566,13 +570,13 @@ def test_perform_deletion(mocker, tmp_path, autosubmit_exp, autosubmit):
     mocker.patch("shutil.rmtree", side_effect=FileNotFoundError)
     mocker.patch("os.remove", side_effect=FileNotFoundError)
     basic_config = as_exp.as_conf.basic_config
-    experiment_path = Path(f"{basic_config.LOCAL_ROOT_DIR}/{_EXPID}")
-    structure_db_path = Path(f"{basic_config.STRUCTURES_DIR}/structure_{_EXPID}.db")
-    job_data_db_path = Path(f"{basic_config.JOBDATA_DIR}/job_data_{_EXPID}")
+    experiment_path = Path(basic_config.LOCAL_ROOT_DIR, _EXPID)
+    structure_db_path = Path(basic_config.STRUCTURES_DIR, f'structure_{_EXPID}.db')
+    job_data_db_path = Path(basic_config.JOBDATA_DIR, f'job_data_{_EXPID}')
     if all("tmp" not in path for path in [str(experiment_path), str(structure_db_path), str(job_data_db_path)]):
         raise AutosubmitCritical("tmp not in path")
-    mocker.patch("autosubmit.autosubmit.delete_experiment", side_effect=FileNotFoundError)
-    err_message = autosubmit._perform_deletion(experiment_path, structure_db_path, job_data_db_path, _EXPID)
+    mocker.patch("autosubmit.database.db_common.delete_experiment", side_effect=FileNotFoundError)
+    err_message = _perform_deletion(experiment_path, structure_db_path, job_data_db_path, _EXPID)
     assert all(x in err_message for x in
                ["Cannot delete experiment entry", "Cannot delete directory", "Cannot delete structure",
                 "Cannot delete job_data"])

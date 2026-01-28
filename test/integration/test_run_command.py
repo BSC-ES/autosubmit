@@ -50,7 +50,7 @@ def set_up_test(
     )
 
     if 'delete' in command:
-        mocker.patch('autosubmit.autosubmit.Autosubmit._user_yes_no_query', return_value=True)
+        mocker.patch('autosubmit.autosubmit.user_yes_no_query', return_value=True)
 
     command = [c.format(expid=expid) for c in command]
 
