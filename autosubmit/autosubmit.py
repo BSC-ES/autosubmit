@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -73,7 +73,6 @@ from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
-from autosubmit.migrate.migrate import Migrate
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
@@ -793,7 +792,7 @@ class Autosubmit:
         elif args.command == 'describe':
             return Autosubmit.describe(args.expid, args.user)
         elif args.command == 'migrate':
-            return Autosubmit.migrate(args.expid, args.offer, args.pickup, args.onlyremote)
+            raise AutosubmitCritical('The command migrate was removed and will be added again in a future release')
         elif args.command == 'create':
             return Autosubmit.create(args.expid, args.noplot, args.hide, args.output, args.group_by, args.expand,
                                      args.expand_status, args.check_wrapper, args.detail, args.profile, args.force)
@@ -903,11 +902,6 @@ class Autosubmit:
             if args.all or args.force_all:
                 expid_less.append("stop")
         global_log_command = ["delete", "archive", "upgrade"]
-        if "offer" in args:
-            if args.offer:
-                global_log_command.append("migrate")  # offer
-            else:
-                expid_less.append("migrate")  # pickup
         import platform
         fullhost = platform.node()
         if "." in fullhost:
@@ -1824,14 +1818,13 @@ class Autosubmit:
         :return: Nothing\n
         :rtype: \n
         """
-        Log.warning("Generating the auxiliary job_list used for the -CW flag.")
+        Log.warning("Generating the auxiliary job_list used for the -cw flag.")
         job_list._job_list = jobs_filtered
         job_list._persistence_file = job_list._persistence_file + "_cw_flag"
         as_conf.load_parameters()
         date_list = as_conf.get_date_list()
         if len(date_list) != len(set(date_list)):
-            raise AutosubmitCritical(
-                'There are repeated start dates!', 7014)
+            raise AutosubmitCritical('There are repeated start dates!', 7014)
         num_chunks = as_conf.get_num_chunks()
         chunk_ini = as_conf.get_chunk_ini()
         member_list = as_conf.get_member_list()
@@ -1850,8 +1843,11 @@ class Autosubmit:
                 continue
             wrapper_jobs[wrapper_section] = as_conf.get_wrapper_jobs(wrapper_data)
         Log.warning("Aux Job_list was generated successfully")
+
+        # Load platforms.
         submitter = ParamikoSubmitter(as_conf=as_conf)
         hpcarch = as_conf.get_platform()
+
         Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
         platforms_to_test = set()
         for job in job_list.get_job_list():
@@ -3229,44 +3225,6 @@ class Autosubmit:
         except Exception as e:
             Log.warning(f"An error has occurred while generating the detailed view of the jobs after recovery. Trace: {str(e)}")
 
-        return True
-
-    @staticmethod
-    def migrate(experiment_id: str, offer: bool, pickup: bool, only_remote: bool) -> bool:
-        """Migrates experiment files from current to other user.
-        It takes mapping information for new user from config files.
-
-        :param experiment_id: experiment identifier:
-        :param pickup:
-        :param offer:
-        :param only_remote:
-        """
-        migrate = Migrate(experiment_id, only_remote)
-        if offer:
-            Autosubmit._check_ownership(experiment_id, raise_error=True)
-            migrate.migrate_offer_remote()
-            if not only_remote:  # Local migrate
-                try:
-                    if not Autosubmit.archive(experiment_id, True, True):
-                        raise AutosubmitCritical("Error archiving the experiment", 7014)
-                    Log.result("The experiment has been successfully offered.")
-                except Exception as e:
-                    # todo put the IO error code
-                    raise AutosubmitCritical(f"[LOCAL] Error offering the experiment: {str(e)}\n"
-                                             f"Please, try again", 7000)
-            migrate.migrate_offer_jobdata()
-        elif pickup:
-            Log.info(f'Pickup experiment {experiment_id}')
-            if not only_remote:  # Local pickup
-                if not os.path.exists(os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)):
-                    Log.info("Moving local files/dirs")
-                    if not Autosubmit.unarchive(experiment_id, True, False):
-                        if not Path(os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)).exists():
-                            raise AutosubmitCritical(
-                                "The experiment cannot be picked up", 7012)
-                    Log.info("Local files/dirs have been successfully picked up")
-            migrate.migrate_pickup()
-            migrate.migrate_pickup_jobdata()
         return True
 
     @staticmethod
@@ -5660,12 +5618,8 @@ class Autosubmit:
         return data
 
     @staticmethod
-    def _get_submitter(as_conf):
-        """Returns the submitter corresponding to the communication defined on autosubmit's config file.
-
-        :return: submitter
-        :rtype: Submitter
-        """
+    def _get_submitter(as_conf) -> ParamikoSubmitter:
+        """Returns the submitter corresponding to the communication defined on autosubmit's config file."""
         return ParamikoSubmitter(as_conf=as_conf)
 
     @staticmethod

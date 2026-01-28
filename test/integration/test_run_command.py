@@ -72,7 +72,7 @@ def set_up_test(
         ['autosubmit', 'inspect', '{expid}', '--notransitive'],  # TODO
         ['autosubmit', 'report', '{expid}'],  # TODO
         ['autosubmit', 'describe', '{expid}'],
-        ['autosubmit', 'migrate', '-fs', 'Any', '{expid}'],
+        # ['autosubmit', 'migrate', '-fs', 'Any', '{expid}'],
         ['autosubmit', 'create', '{expid}', '--hide'],
         ['autosubmit', 'setstatus', '{expid}', '-t', 'READY', '-fs', 'WAITING', '--hide'],  # TODO
         ['autosubmit', 'testcase', '-dm', '-H', 'local', '-d', 'Tutorial', '-c', '1', '-m', 'fc0', '-s', '19651101'],
@@ -99,7 +99,7 @@ def set_up_test(
         'inspect',
         'report',
         'describe',
-        'migrate',
+        # 'migrate',
         'create',
         'setstatus',
         'testcase',

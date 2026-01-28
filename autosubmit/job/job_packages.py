@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -178,14 +178,16 @@ class JobPackageBase(object):
         Log.debug("Building scripts")
         self._create_scripts(configuration)
 
-    def submit(self, configuration: 'AutosubmitConfig', parameters: Optional[dict] = None, only_generate: bool = False, hold: bool = False):
+    def submit(self, configuration: 'AutosubmitConfig', parameters: Optional[dict] = None,
+               only_generate: bool = False, hold: bool = False):
         """
         :param hold:
         :param configuration: Autosubmit basic configuration
         :type configuration: AutosubmitConfig object
-        :param parameters; Parameters from joblist
-        :type parameters: JobList,parameters
-        :param only_generate: True if coming from generate_scripts_andor_wrappers(). If true, only generates scripts; otherwise, submits.
+        :param parameters; Parameters from job list
+        :type parameters: JobList parameters
+        :param only_generate: True if coming from generate_scripts_andor_wrappers().
+            If true, only generates scripts; otherwise, submits.
         :type only_generate: Boolean
         """
         if parameters is None:

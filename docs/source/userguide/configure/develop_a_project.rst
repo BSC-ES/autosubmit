@@ -251,7 +251,7 @@ Platform configuration
 Proj configuration
 ==================
 
-After filling the experiment configuration and prompt ``autosubmit create <EXPID> -np`` create, user can go into ``proj`` which has a copy of the model.
+After completing the experiment configuration, run ``autosubmit create <EXPID> -np``. Then navigate to ``proj``, where a copy of the model is stored.
 
 The experiment project contains the scripts specified in ``jobs_<EXPID>.yml`` and a copy of model source code and data specified in ``expdef_xxxx.yml``.
 

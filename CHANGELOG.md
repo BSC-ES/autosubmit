@@ -1,9 +1,24 @@
 ### 4.1.17: Unreleased
 
+**Bug fixes:**
+
+- Removing the generation of SLURM HEADERS with --cpus-per-task when 1, 0 or none is set #2380
+- The `migrate` command was removed as it had been broken since the release of
+  AS 4. This command will be reintroduced in the future with updated syntax and
+  with new tests and documentation.
+
 **Enhancements:**
 
 - Fix intermittent failures of unit tests, and enable print of AS exceptions.
   Changes and improvements to fixtures and pytest organisation and setup #2745
+- Removed broken migrate command #2617
+
+### 4.1.16: Unreleased
+
+**Bug fixes:**
+
+- Fixed bug where placeholder variables were not removed when they referenced
+  `HPC*` variables (e.g. `%HPC_DN_SERVER%` of a user platform) #2574
 
 ### 4.1.16: Unreleased
 

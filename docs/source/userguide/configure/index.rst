@@ -37,7 +37,9 @@ For more information on adding a new platform to the experiment configuration, s
 
 
 Once all file parameters have been tuned, an experiment can be created. Refer to the method page :meth:`autosubmit.autosubmit.Autosubmit.create` for syntax details.
-In sumamry, ``autosubmit create`` uses the ``expdef_<EXPID>.yml`` file to generate the experiment and related workfow. The experiment workflow, which contains all the jobs and its dependencies, will be saved as a *pkl* file. More info on pickle can be found at http://docs.python.org/library/pickle.html.
+``autosubmit create`` will make use of the ``expdef_<EXPID>.yml`` file to generate the experiment and related workflow.
+The experiment workflow, which contains all the jobs and its dependencies, will be saved as a *pkl* file.
+More info on pickle can be found at http://docs.python.org/library/pickle.html.
 
 In order to understand more the grouping options, which are used for visualization purposes, please check :ref:`grouping`.
 
