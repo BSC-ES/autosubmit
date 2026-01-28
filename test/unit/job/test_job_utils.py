@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
+from pathlib import Path
 from typing import Any, Callable, Dict, List
 
 import pytest
@@ -165,3 +165,26 @@ def test_cancel_jobs(create_job_list):
 )
 def test_get_split_size_unit(data, result):
     assert get_split_size_unit(data, 'TEST') == result
+
+
+def test_construct_real_additional_file_name_same_name_different_extension(tmp_path) -> None:
+    """Test that if the user has two files with the same stem different extensions, we identify both."""
+    job = Job(name="abc")
+
+    Path(job._tmp_path).mkdir(parents=True, exist_ok=True)
+
+    job._write_additional_file("aqua_analysis.yaml", "test", "utf-8")
+    job._write_additional_file("aqua_analysis.yml", "test", "utf-8")
+    job._write_additional_file("aqua_analysis.sh", "test", "utf-8")
+
+    file = Path(job._tmp_path).joinpath("aqua_analysis")
+    second_file = Path(job._tmp_path).joinpath("aqua_analysis_1")
+    third_file = Path(job._tmp_path).joinpath("aqua_analysis_2")
+
+    file.open("w").close()
+    second_file.open("w").close()
+    third_file.open("w").close()
+
+    assert file.exists()
+    assert second_file.exists()
+    assert third_file.exists()
