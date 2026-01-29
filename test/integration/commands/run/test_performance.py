@@ -8,6 +8,8 @@ import pytest
 from autosubmit.config.basicconfig import BasicConfig
 
 
+# Temporal path ( just to use the current fixtures )
+
 # https://github.com/BSC-ES/autosubmit/issues/1332
 
 def prepare_yml(members, chunks, splits) -> dict:
@@ -178,20 +180,20 @@ def parse_metrics(as_exp: BasicConfig, run_id: str, tmp_path: Path, overwrite_re
         path = Path(__file__).parent / "ref_metrics.csv"
         if not path.exists():
             with open(path, "w") as file:
-                file.write(header+"\n")
+                file.write(header + "\n")
         else:
             with open(path, "r") as file:
                 header_line = file.readline()
             if not header_line.strip() == header:
                 with open(path, "w") as file:
-                    file.write(file.write(header+"\n"))
+                    file.write(file.write(header + "\n"))
         with open(path, "a") as file:
             file.write(
                 f"{run_id},{time_taken},{memory_consumption},{metadata_size:.2f},{db_size:.2f},{total_jobs},{total_dependencies}\n")
     else:
         path = Path(__file__).parent / "new_metrics.csv"
         with open(path, "w") as file:
-            file.write(file.write(header+"\n"))
+            file.write(file.write(header + "\n"))
             file.write(
                 f"{run_id},{time_taken},{memory_consumption},{metadata_size:.2f},{db_size:.2f},{total_jobs},{total_dependencies}\n")
 
@@ -239,7 +241,7 @@ def compare_metrics_with_reference(current_id, error_threadhold):
             pytest.fail(f"Metric {key} exceeded error threshold: {error:.4f} > {error_threadhold}")
 
 
-@pytest.mark.performance
+@pytest.mark.asprofile
 @pytest.mark.parametrize("members,chunks,splits,error_threadhold", [
     ("fc0", "1", "1", 0.1),
 ], ids=[
@@ -259,11 +261,12 @@ def test_autosubmit_create_profile_metrics(tmp_path: Path, autosubmit_exp, prepa
 
     parse_metrics(as_exp, run_id=current_id, tmp_path=tmp_path, overwrite_ref=overwrite_ref)
 
+    # Manual only comparison
     if not overwrite_ref:
         compare_metrics_with_reference(current_id, error_threadhold)
 
 
-@pytest.mark.performance
+@pytest.mark.asprofile
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -288,3 +291,21 @@ def test_autosubmit_run_profile_metrics(tmp_path: Path, autosubmit_exp, prepare_
 
     if not overwrite_ref:
         compare_metrics_with_reference(current_id, error_threadhold)
+
+
+@pytest.mark.monitor
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.parametrize("members,chunks,splits", [
+    ("fc0 fc1", "2", "5"),
+], ids=[
+    "2members_2chunks_2splits",
+])
+def test_autosubmit_run_benchmark(tmp_path: Path, autosubmit_exp, prepare_scratch, general_data, members, chunks, splits, slurm_server):
+    """Integration performance test for `autosubmit run`"""
+    yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
+    as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=False)
+    as_exp.as_conf.set_last_as_command('run')
+
+    as_exp.autosubmit.run_experiment(as_exp.expid, profile=False)

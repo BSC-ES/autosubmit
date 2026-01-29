@@ -88,6 +88,8 @@ tests = [
     "pytest-timeout",
     "types-requests",
     "typing_extensions==4.*",
+    "pytest-monitor",
+    "pytest-benchmark"
 ]
 docs = [
     "livereload",
