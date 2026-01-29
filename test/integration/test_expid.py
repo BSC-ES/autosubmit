@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Tests for ``autosubmit expid``."""
-
 import sqlite3
 import tempfile
 from collections.abc import Callable
@@ -26,15 +25,62 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from autosubmit.config.basicconfig import BasicConfig
+from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 
 _EXPID = 't000'
 _DESCRIPTION = "for testing"
 _VERSION = "test-version"
+
+
+def test_copying_experiment_and_job_configuration(autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
+    """Test to validate if values are being properly copied/erased from one project to another."""  # TODO: Complete set of tests
+
+    yaml = YAML(typ='rt')
+    base_experiment = autosubmit_exp(_EXPID, experiment_data={})
+
+    yaml_data = yaml.load(open(tmp_path / "t000/conf/aaaaaabasic_structure.yml", 'r+'))
+    yaml_data['DEFAULT'] = {'EXPID': 't000', 'HPCARCH': 'MN5', 'CUSTOM_CONFIG': 'test'}
+    yaml_data['MAIL'] = {'NOTIFICATIONS': True, 'TO': 'uhu@uhu.com'}
+    yaml_data['JOBS'] = {'LOCAL_SEND_INITIAL': {'CHUNKS_FROM': {1: {'CHUNKS_TO': 1}}}}
+    yaml_data['LOCAL'] = {'PROJECT_PATH': 'haha'}
+    yaml_data['GIT'] = {'PROJECT_ORIGIN': 'origin_test','PROJECT_BRANCH': 'branch_test'}
+    yaml.dump(yaml_data, open(tmp_path / "t000/conf/aaaaaabasic_structure.yml", 'w+'))
+
+    autosubmit.expid(
+        'test',
+        hpc='local',
+        copy_id=base_experiment.expid
+    )
+
+    yaml_data = yaml.load(open(tmp_path / "t001/conf/aaaaaabasic_structure.yml"))
+    assert yaml_data['DEFAULT']['EXPID'] == "t001"
+    assert yaml_data['DEFAULT']['HPCARCH'] == "local"
+    assert yaml_data['MAIL']['NOTIFICATIONS']
+    assert yaml_data['MAIL']['TO'] == ""
+    assert yaml_data['JOBS']['LOCAL_SEND_INITIAL']['CHUNKS_FROM'][1]['CHUNKS_TO'] == 1
+    assert yaml_data['LOCAL']['PROJECT_PATH'] == ""
+    assert yaml_data['GIT']['PROJECT_ORIGIN'] == ""
+    assert yaml_data['GIT']['PROJECT_BRANCH'] == ""
+
+
+def test_as_conf_default_values(autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
+    """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
+    autosubmit_exp(_EXPID, experiment_data={})
+    autosubmit.as_conf_default_values('t000', 'MN5', False, 'test', 'test', 'test')
+
+    yaml = YAML(typ='rt')
+    yaml_data = yaml.load(open(tmp_path / "t000/conf/aaaaaabasic_structure.yml", 'r+'))
+
+    assert yaml_data['DEFAULT']['HPCARCH'] == "MN5"
+    assert yaml_data['DEFAULT']['EXPID'] == "t000"
+    assert yaml_data['LOCAL']['PROJECT_PATH'] == "test"
+    assert yaml_data['GIT']['PROJECT_ORIGIN'] == "test"
+    assert yaml_data['GIT']['PROJECT_BRANCH'] == "test"
 
 
 @pytest.mark.parametrize(
@@ -123,7 +169,7 @@ def test_copy_minimal(has_min_yaml: bool, autosubmit: Autosubmit):
     )
     minimal_file = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf" / "minimal.yml"
     if has_min_yaml:
-        minimal_file.write_text("test")
+        minimal_file.write_text("test: test")
         expid2 = autosubmit.expid(
             minimal_configuration=True,
             copy_id=expid,
@@ -131,7 +177,7 @@ def test_copy_minimal(has_min_yaml: bool, autosubmit: Autosubmit):
         assert expid2
         minimal2 = Path(BasicConfig.LOCAL_ROOT_DIR) / expid2 / "conf" / "minimal.yml"
         content = minimal2.read_text()
-        assert content == "test", f"Unexpected content: {content}"
+        assert content == "test: test\n", f"Unexpected content: {content}"
     else:
         minimal_file.unlink()
         with pytest.raises(AutosubmitCritical) as exc_info:
@@ -200,8 +246,8 @@ def test_create_expid_flag_hpc(fake_hpc: str, expected_hpc: str, autosubmit: Aut
 
 
 @pytest.mark.parametrize("experiment_hpc,expected_hpc", [
-    ("local","mn5"),
-    ("mn5","marenostrum"), ])
+    ("local", "mn5"),
+    ("mn5", "marenostrum"), ])
 def test_copy_expid_with_flag_hpc(tmp_path: Path, autosubmit: Autosubmit, experiment_hpc, expected_hpc):
     """Create expid using the flag -H. Defining a value for the flag and not defining any value for that flag.
 
@@ -217,7 +263,7 @@ def test_copy_expid_with_flag_hpc(tmp_path: Path, autosubmit: Autosubmit, experi
     autosubmit.install()
 
     exp_id = autosubmit.expid('experiment', hpc=experiment_hpc, minimal_configuration=True)
-    copy_exp = autosubmit.expid('copy', hpc=expected_hpc , copy_id=exp_id, minimal_configuration=True)
+    copy_exp = autosubmit.expid('copy', hpc=expected_hpc, copy_id=exp_id, minimal_configuration=True)
 
     describe = autosubmit.describe(exp_id)
     hpc_experiment = describe[4].lower()

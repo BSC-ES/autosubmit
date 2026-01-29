@@ -1257,12 +1257,11 @@ class Autosubmit:
 
     @staticmethod
     def copy_as_config(exp_id, copy_id):
-        for conf_file in os.listdir(os.path.join(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf")):
+        for conf_file in os.listdir(Path(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf")):
             # Copy only relevant files
             if conf_file.endswith((".conf", ".yml", ".yaml")):
-                shutil.copy(os.path.join(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf", conf_file),
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf",
-                                         conf_file.replace(copy_id, exp_id)))
+                shutil.copy(Path(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf", conf_file),
+                            Path(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf", conf_file.replace(copy_id, exp_id)))
             # if ends with .conf convert it to AS4 yaml file
             if conf_file.endswith(".conf"):
                 try:
@@ -1278,7 +1277,7 @@ class Autosubmit:
             dummy: bool=False,
             minimal_configuration: bool=False,
             local: bool=False,
-            parameters: dict[str, Union[dict, list, str]] = None
+            parameters: Optional[dict[str, Union[dict, list, str]]] = None
     ) -> None:
         """Retrieve the configuration from autosubmit.config package.
 
@@ -1373,22 +1372,6 @@ class Autosubmit:
                     _add_comments_to_yaml(yaml_data, parameter_comments)
                     yaml.dump(yaml_data, output)
 
-    @staticmethod
-    def replace_parameter_inside_section(content, parameter, new_value, section):
-        # same but for any section any parameter, not only EXPID case insensitive
-        # Find the any section
-        if section:
-            section_match = re.search(rf'({section}:[\s\S]*?{parameter}:.*?)(?=\n|$)', content, re.IGNORECASE)
-            if section_match:
-                section = section_match.group(1)
-                # Replace parameter in the section
-                new_section = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', section)
-                # Replace the old section
-                content = content.replace(section, new_section)
-        else:
-            # replace only the parameter
-            content = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', content)
-        return content
 
     @staticmethod
     def as_conf_default_values(exp_id:str, hpc:str = "local", minimal_configuration:bool = False, git_repo:str = "",
@@ -1405,54 +1388,40 @@ class Autosubmit:
         """
         # the var hpc was hardcoded in the header of the function
 
+
         # open and replace values
         for as_conf_file in Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp_id}/conf").iterdir():
             if as_conf_file.name.endswith(".yml") or as_conf_file.name.endswith(".yaml"):
-                with open(as_conf_file, 'r+') as f:
-                    # Copied files could not have default names.
-                    content = f.read()
-                    search = re.search('AUTOSUBMIT_VERSION: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), f"AUTOSUBMIT_VERSION: \""
-                                                                   f"{Autosubmit.autosubmit_version}\"")
-                    search = re.search('NOTIFICATIONS: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), "NOTIFICATIONS: False")
-                    search = re.search('TO: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), "TO: \"\"")
-                    content = Autosubmit.replace_parameter_inside_section(content, "EXPID", exp_id, "DEFAULT")
-                    search = re.search('HPCARCH: .*', content, re.MULTILINE)
-                    if search is not None:
-                        x = search.group(0).split(":")
-                        # clean blank space, quotes and double quote
-                        aux = x[1].strip(' "\'')
-                        # hpc in config is empty && -H has a value-> write down hpc value
-                        if hpc != "":
-                            content = content.replace(search.group(0), f"HPCARCH: \"{hpc}\"")
-                        elif len(aux) > 0:
-                            content = content.replace(search.group(0), f"HPCARCH: \"{aux}\"")
-                        else:
-                            content = content.replace(search.group(0), "HPCARCH: \"local\"")
-                        # the other case is aux!=0 that we dont care about val(hpc) because its a copyExpId
-                    if minimal_configuration:
-                        search = re.search('CUSTOM_CONFIG: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0),
-                                                      "CUSTOM_CONFIG: \"%PROJDIR%/" + git_as_conf + "\"")
-                        search = re.search('PROJECT_ORIGIN: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_ORIGIN: \"{git_repo}\"")
-                        search = re.search('PROJECT_PATH: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_PATH: \"{git_repo}\"")
-                        search = re.search('PROJECT_BRANCH: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_BRANCH: \"{git_branch}\"")
+                yaml = YAML(typ='rt')
+                with open(as_conf_file, 'r+') as file:
+                    yaml_data = yaml.load(file)
+                    if 'CONFIG' in yaml_data:
+                        yaml_data['CONFIG']['AUTOSUBMIT_VERSION'] = Autosubmit.autosubmit_version
 
-                    f.seek(0)
-                    f.write(content)
-                    f.truncate()
+                    if 'MAIL' in yaml_data:
+                        yaml_data['MAIL']['NOTIFICATIONS'] = False
+                        yaml_data['MAIL']['TO'] = ""
+
+                    if 'DEFAULT' in yaml_data:
+                        yaml_data['DEFAULT']['EXPID'] = exp_id
+                        if hpc != "":
+                            yaml_data['DEFAULT']['HPCARCH'] = hpc
+                        elif yaml_data['DEFAULT']['HPCARCH'] is None or yaml_data['DEFAULT']['HPCARCH'] == "":
+                            yaml_data['DEFAULT']['HPCARCH'] = "local"
+
+                    if 'LOCAL' in yaml_data:
+                        yaml_data['LOCAL']['PROJECT_PATH'] = f'{git_repo}'
+
+                    if 'GIT' in yaml_data:
+                        yaml_data['GIT']['PROJECT_ORIGIN'] = f'{git_repo}'
+                        yaml_data['GIT']['PROJECT_BRANCH'] = f'{git_branch}'
+
+                    if minimal_configuration:
+                        if 'DEFAULT' in yaml_data:
+                            yaml_data['DEFAULT']['CUSTOM_CONFIG'] = f'"%PROJDIR%/{git_as_conf}"'
+
+                yaml.dump(yaml_data, as_conf_file)
+
 
     @staticmethod
     def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False,
