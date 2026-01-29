@@ -347,7 +347,7 @@ jobs:
           git config --global user.email "test@bsc.es"
           git config --global user.name "GitHub Actions"
 
-      - name: Benchamark
+      - name: Benchmark
         run: |
           pytest -p pytest_monitor -n 0 test/integration -m "monitor" --benchmark-only
 
