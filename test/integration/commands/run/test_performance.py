@@ -13,6 +13,11 @@ from autosubmit.config.basicconfig import BasicConfig
 def prepare_yml(members, chunks, splits) -> dict:
     """Fixture to prepare a jobs.yml file for testing."""
     return {
+        "CONFIG": {
+            'MAXWAITINGJOBS': 1000,
+            'TOTALJOBS': 1000,
+            'SAFETYSLEEPTIME': 0,
+        },
         "DEFAULT": {
             "HPCARCH": "TEST_SLURM",
         },
@@ -167,25 +172,28 @@ def parse_metrics(as_exp: BasicConfig, run_id: str, tmp_path: Path, overwrite_re
     print(f"Disk Usage (historical): {metadata_size:.2f} MiB")
     print(f"Total jobs: {total_jobs}")
     print(f'Total dependencies: {total_dependencies}')
+    header = "ID, Time Taken, Memory consumption, Disk Usage(Historical), Disk Usage(Joblist), Total Jobs, Total Dependencies"
     # Export to csv
     if overwrite_ref:
         path = Path(__file__).parent / "ref_metrics.csv"
         if not path.exists():
             with open(path, "w") as file:
-                file.write("ID, Time Taken, Memory consumption, Disk Usage(Historical) Disk Usage(Joblist) Total Jobs, Total Dependencies\n")
+                file.write(header+"\n")
         else:
             with open(path, "r") as file:
                 header_line = file.readline()
-            if not header_line.strip() == "ID, Time Taken, Memory consumption, Disk Usage(Historical) Disk Usage(Joblist) Total Jobs, Total Dependencies":
+            if not header_line.strip() == header:
                 with open(path, "w") as file:
-                    file.write("ID, Time Taken, Memory consumption, Disk Usage(Historical) Disk Usage(Joblist) Total Jobs, Total Dependencies\n")
+                    file.write(file.write(header+"\n"))
         with open(path, "a") as file:
-            file.write(f"{run_id},{time_taken},{memory_consumption},{metadata_size:.2f},{db_size:.2f},{total_jobs},{total_dependencies}\n")
+            file.write(
+                f"{run_id},{time_taken},{memory_consumption},{metadata_size:.2f},{db_size:.2f},{total_jobs},{total_dependencies}\n")
     else:
         path = Path(__file__).parent / "new_metrics.csv"
         with open(path, "w") as file:
-            file.write("ID, Time Taken, Memory consumption, Disk Usage(Historical) Disk Usage(Joblist) Total Jobs, Total Dependencies\n")
-            file.write(f"{run_id},{time_taken},{memory_consumption},{metadata_size:.2f},{db_size:.2f},{total_jobs},{total_dependencies}\n")
+            file.write(file.write(header+"\n"))
+            file.write(
+                f"{run_id},{time_taken},{memory_consumption},{metadata_size:.2f},{db_size:.2f},{total_jobs},{total_dependencies}\n")
 
     print(f"Metrics saved to {path}")
 
@@ -219,7 +227,8 @@ def compare_metrics_with_reference(current_id, error_threadhold):
 
     # compare values
     ref_metrics, new_metrics = metrics_data
-    for key in ["memory", "disk_usage_historical", "disk_usage_joblist", "total_jobs", "total_dependencies", "time_taken"]:
+    for key in ["memory", "disk_usage_historical", "disk_usage_joblist", "total_jobs", "total_dependencies",
+                "time_taken"]:
         ref_value = ref_metrics[key]
         new_value = new_metrics[key]
         if ref_value == 0:
@@ -236,7 +245,8 @@ def compare_metrics_with_reference(current_id, error_threadhold):
 ], ids=[
     "1member_1chunk_1split",
 ])
-def test_autosubmit_create_profile_metrics(tmp_path: Path, autosubmit_exp, prepare_scratch, general_data, members, chunks, splits, error_threadhold):
+def test_autosubmit_create_profile_metrics(tmp_path: Path, autosubmit_exp, prepare_scratch, general_data, members,
+                                           chunks, splits, error_threadhold):
     """Integration/performance test for `autosubmit create` with profiling enabled.
     """
     overwrite_ref = False
@@ -246,6 +256,33 @@ def test_autosubmit_create_profile_metrics(tmp_path: Path, autosubmit_exp, prepa
     as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=False)
 
     as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, profile=True)
+
+    parse_metrics(as_exp, run_id=current_id, tmp_path=tmp_path, overwrite_ref=overwrite_ref)
+
+    if not overwrite_ref:
+        compare_metrics_with_reference(current_id, error_threadhold)
+
+
+@pytest.mark.performance
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.parametrize("members,chunks,splits,error_threadhold", [
+    ("fc0 fc1 fc2 fc3", "2", "5", 0.1),
+], ids=[
+    "4members_2chunks_5splits",
+])
+def test_autosubmit_run_profile_metrics(tmp_path: Path, autosubmit_exp, prepare_scratch, general_data, members, chunks,
+                                        splits, error_threadhold, slurm_server):
+    """Integration/performance test for `autosubmit create` with profiling enabled."""
+    overwrite_ref = True
+    current_id = f"run_{members}_{chunks}_{splits}"
+
+    yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
+    as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=False)
+    as_exp.as_conf.set_last_as_command('run')
+
+    as_exp.autosubmit.run_experiment(as_exp.expid, profile=True)
 
     parse_metrics(as_exp, run_id=current_id, tmp_path=tmp_path, overwrite_ref=overwrite_ref)
 
