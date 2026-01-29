@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import re
+from typing import Any
 
 import pytest
 
@@ -144,73 +145,89 @@ def parse_metrics(as_exp: BasicConfig, run_id: str, tmp_path: Path, overwrite_re
     memory_pattern = r"MEMORY CONSUMPTION: (\d+\.\d+) MiB."
     memory_match = re.search(memory_pattern, text)
     memory_consumption = memory_match.group(1) if memory_match else None
+
+    # Disk usage (sqlite only for now)
+
+    db_path = Path(tmp_path / as_exp.expid / "db" / "job_list.db")
+    metadata_db = Path(tmp_path / "metadata" / "data" / f"job_data_{as_exp.expid}.db")
+
+    if db_path.exists():
+        db_size = db_path.stat().st_size / (1024 * 1024)  # in MiB
+    else:
+        db_size = 0
+
+    if metadata_db.exists():
+        metadata_size = metadata_db.stat().st_size / (1024 * 1024)  # in MiB
+    else:
+        metadata_size = 0
+
     print(f"Time taken: {time_taken} seconds")
     print(f"Memory consumption: {memory_consumption} MiB")
-
+    print(f"Disk Usage (Joblist): {db_size:.2f} MiB")
+    print(f"Disk Usage (historical): {metadata_size:.2f} MiB")
     print(f"Total jobs: {total_jobs}")
     print(f'Total dependencies: {total_dependencies}')
     # Export to csv
     if overwrite_ref:
         path = Path(__file__).parent / "ref_metrics.csv"
-        with open(path, "r") as file:
-            header_line = file.readline()
-        if not header_line.strip() == "ID, Memory consumption, Total jobs, Total Dependencies, Time Taken":
+        if not path.exists():
             with open(path, "w") as file:
-                file.write("ID, Memory consumption, Total jobs, Total Dependencies, Time Taken\n")
+                file.write("ID, Time Taken, Memory consumption, Disk Usage(Historical) Disk Usage(Joblist) Total Jobs, Total Dependencies\n")
+        else:
+            with open(path, "r") as file:
+                header_line = file.readline()
+            if not header_line.strip() == "ID, Time Taken, Memory consumption, Disk Usage(Historical) Disk Usage(Joblist) Total Jobs, Total Dependencies":
+                with open(path, "w") as file:
+                    file.write("ID, Time Taken, Memory consumption, Disk Usage(Historical) Disk Usage(Joblist) Total Jobs, Total Dependencies\n")
         with open(path, "a") as file:
-            file.write(f"{run_id}, {time_taken},{memory_consumption},{total_jobs},{total_dependencies}\n")
+            file.write(f"{run_id},{time_taken},{memory_consumption},{metadata_size:.2f},{db_size:.2f},{total_jobs},{total_dependencies}\n")
     else:
         path = Path(__file__).parent / "new_metrics.csv"
         with open(path, "w") as file:
-            file.write("ID, Memory consumption, Total jobs, Total Dependencies, Time Taken\n")
-            file.write(f"{run_id}, {time_taken},{memory_consumption},{total_jobs},{total_dependencies}\n")
+            file.write("ID, Time Taken, Memory consumption, Disk Usage(Historical) Disk Usage(Joblist) Total Jobs, Total Dependencies\n")
+            file.write(f"{run_id},{time_taken},{memory_consumption},{metadata_size:.2f},{db_size:.2f},{total_jobs},{total_dependencies}\n")
 
     print(f"Metrics saved to {path}")
 
+
 def compare_metrics_with_reference(current_id, error_threadhold):
-    ref_path = Path(__file__).parent / "ref_metrics.csv"
-    new_path = Path(__file__).parent / "new_metrics.csv"
+    """Compare the metrics with reference metrics."""
 
-    if not ref_path.exists():
-        pytest.fail("Reference metrics file does not exist. Please run the test with overwrite_ref=True to create it.")
+    metric_paths = [Path(__file__).parent / "ref_metrics.csv", Path(__file__).parent / "new_metrics.csv"]
 
-    ref_metrics = {}
-    with open(ref_path, "r") as file:
-        for line in file[1:]:
-            parts = line.strip().split(", ")
-            ref_metrics[parts[0]] = {
-                "memory": float(parts[1]),
-                "total_jobs": int(parts[2]),
-                "total_dependencies": int(parts[3]),
-                "time_taken": float(parts[4]),
-            }
+    if not all(path.exists() for path in metric_paths):
+        pytest.fail("Reference or new metrics file does not exist.")
 
-    new_metrics = {}
-    with open(new_path, "r") as file:
-        next(file)  # Skip header
-        for line in file:
-            parts = line.strip().split(", ")
-            new_metrics[parts[0]] = {
-                "memory": float(parts[1]),
-                "total_jobs": int(parts[2]),
-                "total_dependencies": int(parts[3]),
-                "time_taken": float(parts[4]),
-            }
+    metrics_data: list[dict[str, Any]] = []
 
-    if current_id not in ref_metrics or current_id not in new_metrics:
-        pytest.fail(f"Metrics for ID {current_id} not found in reference or new metrics.")
+    for path in metric_paths:
+        with open(path, "r") as file:
+            lines = file.readlines()
+        for line in lines[::-1]:
+            if current_id in line:
+                parts = line.strip().split(",")
+                metrics_data.append({
+                    "id": parts[0],
+                    "time_taken": float(parts[1]),
+                    "memory": float(parts[2]),
+                    "disk_usage_historical": float(parts[3]),
+                    "disk_usage_joblist": float(parts[4]),
+                    "total_jobs": int(parts[5]),
+                    "total_dependencies": int(parts[6]),
+                })
+                break
 
-    ref = ref_metrics[current_id]
-    new = new_metrics[current_id]
-
-    for key in ["memory", "time_taken"]:
-        ref_value = ref[key]
-        new_value = new[key]
+    # compare values
+    ref_metrics, new_metrics = metrics_data
+    for key in ["memory", "disk_usage_historical", "disk_usage_joblist", "total_jobs", "total_dependencies", "time_taken"]:
+        ref_value = ref_metrics[key]
+        new_value = new_metrics[key]
         if ref_value == 0:
-            pytest.fail(f"Reference value for {key} is zero, cannot compute relative error.")
-        relative_error = abs(new_value - ref_value) / ref_value
-        if relative_error > error_threadhold:
-            pytest.fail(f"{key} for ID {current_id} exceeds error threshold: {relative_error:.2%} > {error_threadhold:.2%}")
+            continue
+        error = abs(new_value - ref_value) / ref_value
+        print(f"Comparing {key}: reference={ref_value}, new={new_value}, error={error:.4f}")
+        if error > error_threadhold:
+            pytest.fail(f"Metric {key} exceeded error threshold: {error:.4f} > {error_threadhold}")
 
 
 @pytest.mark.performance
@@ -222,6 +239,7 @@ def compare_metrics_with_reference(current_id, error_threadhold):
 def test_autosubmit_create_profile_metrics(tmp_path: Path, autosubmit_exp, prepare_scratch, general_data, members, chunks, splits, error_threadhold):
     """Integration/performance test for `autosubmit create` with profiling enabled.
     """
+    overwrite_ref = False
     current_id = f"create_{members}_{chunks}_{splits}"
 
     yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
@@ -229,13 +247,7 @@ def test_autosubmit_create_profile_metrics(tmp_path: Path, autosubmit_exp, prepa
 
     as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, profile=True)
 
-    parse_metrics(as_exp, run_id=current_id, tmp_path=tmp_path, overwrite_ref=False)
-    compare_metrics_with_reference(current_id, error_threadhold)
+    parse_metrics(as_exp, run_id=current_id, tmp_path=tmp_path, overwrite_ref=overwrite_ref)
 
-
-
-# @pytest.mark.docker
-# @pytest.mark.xdist_group("slurm")
-# @pytest.mark.slurm
-# @pytest.mark.ssh
-# @pytest.mark.timeout(300)
+    if not overwrite_ref:
+        compare_metrics_with_reference(current_id, error_threadhold)
