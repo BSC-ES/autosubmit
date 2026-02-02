@@ -51,7 +51,7 @@ jobs:
           # TODO: for a separate issue, try pushing it
           push: false
           load: true
-          tags: autosubmit/autosubmit
+          tags: autosubmit/autosubmit:latest
 
       - name: Test the image
         run: |
@@ -61,18 +61,21 @@ jobs:
 
       - name: Collect docker logs on failure
         if: failure()
-        uses: jwalton/gh-docker-logs@v2
-        with:
-          dest: './docker-logs'
+        run: |
+          # pick the first Docker name in the list
+          docker_name="$(docker ps --format="{{.Names}}")"
+          # copy back the remote cylc-run dir
+          docker exec $(docker ps --format="{{.Names}}") bash -c "mkdir -p /app/autosubmit/extract/; cp -f -r /app/autosubmit/experiments/* /app/autosubmit/extract"
+          docker cp ${docker_name}:/app/autosubmit/extract/ ./experiment_data_log/
 
       - name: Tar logs
         if: failure()
-        run: tar cvzf ./docker-logs.tgz ./docker-logs
+        run: tar cvzf ./experiment_data_log.tgz ./experiment_data_log
 
       - name: Upload logs to GitHub
         if: failure()
         uses: actions/upload-artifact@master
         with:
-          name: docker-logs.tgz
-          path: docker-logs.tgz
+          name: experiment_data_log.tgz
+          path: experiment_data_log.tgz
           retention-days: 7
