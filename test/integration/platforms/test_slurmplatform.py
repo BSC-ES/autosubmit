@@ -100,7 +100,7 @@ def test_create_platform_slurm(
     {
         'JOBS': {
             'SIM': {
-                'PLATFORM': _PLATFORM_NAME,
+                'PLATFORM': '_PLATFORM_NAME',
                 'RUNNING': 'once',
                 'SCRIPT': 'echo "This is job ${SLURM_JOB_ID} EOM"',
             },
@@ -129,7 +129,7 @@ def test_create_platform_slurm(
                 'SCRIPT': 'echo "0"',
             },
             'SIM_2': {
-                'PLATFORM': _PLATFORM_NAME,
+                'PLATFORM': '_PLATFORM_NAME',
                 'RUNNING': 'chunk',
                 'SCRIPT': 'echo "0"',
                 'DEPENDENCIES': 'SIM',
@@ -192,7 +192,7 @@ def test_run_simple_workflow_slurm(
                 'WALLCLOCK': '00:03',
                 'RUNNING': 'chunk',
                 'CHECK': 'on_submission',
-                'PLATFORM': _PLATFORM_NAME,
+                'PLATFORM': '_PLATFORM_NAME',
             },
             'TA': {
                 'DEPENDENCIES': {
