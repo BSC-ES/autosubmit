@@ -146,6 +146,24 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
+      - name: Collect docker logs on failure
+        if: failure()
+        uses: jwalton/gh-docker-logs@v2
+        with:
+          dest: './integration-logs'
+
+      - name: Tar logs
+        if: failure()
+        run: tar cvzf ./integration-logs.tgz ./integration-logs
+
+      - name: Upload logs to GitHub
+        if: failure()
+        uses: actions/upload-artifact@master
+        with:
+          name: integration-logs.tgz
+          path: ./container-integration.tgz
+          retention-days: 7
+
   test-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -193,6 +211,24 @@ jobs:
         with:
           name: coverage_regression_py-${{ matrix.python-version }}
           path: coverage.xml
+          retention-days: 7
+
+      - name: Collect docker logs on failure
+        if: failure()
+        uses: jwalton/gh-docker-logs@v2
+        with:
+          dest: './regression-logs'
+
+      - name: Tar logs
+        if: failure()
+        run: tar cvzf ./container-regression.tgz ./container-regression
+
+      - name: Upload logs to GitHub
+        if: failure()
+        uses: actions/upload-artifact@master
+        with:
+          name: container-regression.tgz
+          path: ./container-regression.tgz
           retention-days: 7
 
   test-slurm:
@@ -246,6 +282,24 @@ jobs:
         with:
           name: coverage_slurm_py-${{ matrix.python-version }}
           path: coverage.xml
+          retention-days: 7
+
+      - name: Collect docker logs on failure
+        if: failure()
+        uses: jwalton/gh-docker-logs@v2
+        with:
+          dest: './slurm-logs'
+
+      - name: Tar logs
+        if: failure()
+        run: tar cvzf ./slurm-regression.tgz ./slurm-regression
+
+      - name: Upload logs to GitHub
+        if: failure()
+        uses: actions/upload-artifact@master
+        with:
+          name: slurm-regression.tgz
+          path: ./slurm-regression.tgz
           retention-days: 7
 
   # NOTE: The docs are already built on ReadTheDocs. We perform another quick build,Add commentMore actions
