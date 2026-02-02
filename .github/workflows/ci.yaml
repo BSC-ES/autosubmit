@@ -146,6 +146,20 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
+      - name: Tar logs
+        if: failure()
+        run: |
+          tar cvzf container_logs_integration.tgz ./container_logs
+
+      - name: Upload logs to GitHub
+        if: failure()
+        uses: actions/upload-artifact@master
+        with:
+          name: container_logs_integration.tgz
+          path: |
+            container_logs_integration.tgz
+          retention-days: 1
+
   test-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -194,6 +208,20 @@ jobs:
           name: coverage_regression_py-${{ matrix.python-version }}
           path: coverage.xml
           retention-days: 7
+
+      - name: Tar logs
+        if: failure()
+        run: |
+          tar cvzf container_logs_regression.tgz ./container_logs
+
+      - name: Upload logs to GitHub
+        if: failure()
+        uses: actions/upload-artifact@master
+        with:
+          name: container_logs_regression.tgz
+          path: |
+            container_logs_regression.tgz
+          retention-days: 1
 
   test-slurm:
     runs-on: ubuntu-latest
@@ -247,6 +275,20 @@ jobs:
           name: coverage_slurm_py-${{ matrix.python-version }}
           path: coverage.xml
           retention-days: 7
+
+      - name: Tar logs
+        if: failure()
+        run: |
+          tar cvzf container_logs_slurm.tgz ./container_logs
+
+      - name: Upload logs to GitHub
+        if: failure()
+        uses: actions/upload-artifact@master
+        with:
+          name: container_logs_slurm.tgz
+          path: |
+            container_logs_slurm.tgz
+          retention-days: 1
 
   # NOTE: The docs are already built on ReadTheDocs. We perform another quick build,Add commentMore actions
   #       without checking or deploying the produced HTML, just to i) verify that

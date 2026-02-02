@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Utilities for Docker."""
-
 from getpass import getuser
 from os import environ
 from pathlib import Path
