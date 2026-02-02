@@ -840,9 +840,9 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
     ],
 )
 def test_simple_workflow_compress_logs_slurm(
-    autosubmit_exp: "AutosubmitExperimentFixture",
-    experiment_data: dict,
-    slurm_server: "DockerContainer",
+        autosubmit_exp: "AutosubmitExperimentFixture",
+        experiment_data: dict,
+        slurm_server: "DockerContainer",
 ):
     """Test compressing remote logs in a simple workflow using Slurm."""
     with_wrapper = "WRAPPERS" in experiment_data
@@ -937,10 +937,10 @@ def test_simple_workflow_compress_logs_slurm(
     ],
 )
 def test_compress_log_missing_tool(
-    experiment_data: dict,
-    autosubmit_exp: "AutosubmitExperimentFixture",
-    slurm_server: "DockerContainer",
-    mocker,
+        experiment_data: dict,
+        autosubmit_exp: "AutosubmitExperimentFixture",
+        slurm_server: "DockerContainer",
+        mocker,
 ):
     exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False)
     _create_slurm_platform(exp.expid, exp.as_conf)
@@ -1024,10 +1024,10 @@ def test_compress_log_missing_tool(
     ],
 )
 def test_compress_log_fail_command(
-    experiment_data: dict,
-    autosubmit_exp: "AutosubmitExperimentFixture",
-    slurm_server: "DockerContainer",
-    mocker,
+        experiment_data: dict,
+        autosubmit_exp: "AutosubmitExperimentFixture",
+        slurm_server: "DockerContainer",
+        mocker,
 ):
     exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
@@ -1101,9 +1101,9 @@ def test_compress_log_fail_command(
     ],
 )
 def test_remove_files_on_transfer_slurm(
-    experiment_data: dict,
-    autosubmit_exp: "AutosubmitExperimentFixture",
-    slurm_server: "Container",
+        experiment_data: dict,
+        autosubmit_exp: "AutosubmitExperimentFixture",
+        slurm_server: "Container",
 ):
     exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
@@ -1130,8 +1130,8 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     exp = autosubmit_exp(experiment_data={})
     platform_config = {
         "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
-        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'exp_tmp_dir'),
-        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'aslogs_dir')
+        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'exp_tmp_dir'),
+        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'aslogs_dir')
     }
     platform = SlurmPlatform(exp.expid, "wrappers_test", platform_config)
 
