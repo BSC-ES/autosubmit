@@ -97,20 +97,38 @@ def new_experiment(description, version, test=False, operational=False, evaluati
                                  7011) from e
 
 
-def delete_experiment(expid: str, force: bool) -> bool:
+def delete_experiment(expids: str, force: bool) -> bool:
     """Deletes an experiment from the database,
     the experiment's folder database entry and all the related metadata files.
 
-    :param expid: Identifier of the experiment to delete.
-    :type expid: str
-    :param force: If True, does not ask for confirmation.
-    :type force: bool
-
-    :returns: True if successful, False otherwise.
-    :rtype: bool
-
+    :param expids: List of experiment IDs to delete.
+    :param force: Ask for confirmation if ``False``.
+    :returns: ``True`` if successful, ``False`` otherwise.
     :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
     """
+    # expid will come from argparse, which provides nix-style comma-separated values,
+    # so here we parse the comma-separated values. ``.fromkeys`` keeps order and removes
+    # duplicates.
+    expid_list = expids.replace(',', ' ').split(' ')
+    expid_list = [expid.lower() for expid in filter(lambda x: x, expid_list)]
+
+    failed: list[str] = []
+
+    for expid in expid_list:
+        try:
+            _delete_experiment(expid, force)
+        except Exception as e:
+            Log.error(f'Failed to delete experiment {expid}: {str(e)}')
+            failed.append(expid)
+
+    if failed:
+        Log.error(f"Deletion failed for experiments: {', '.join(failed)}")
+        return False
+
+    return True
+
+
+def _delete_experiment(expid: str, force: bool) -> None:
     if process_id(expid) is not None:
         raise AutosubmitCritical("Ensure no processes are running in the experiment directory", 7076)
 
@@ -121,7 +139,8 @@ def delete_experiment(expid: str, force: bool) -> bool:
     confirm_removal = force or user_yes_no_query(f"Do you want to delete {expid} ?")
 
     if not confirm_removal:
-        return False
+        Log.info(f'Experiment {expid} deletion cancelled by user')
+        return
 
     Log.info(f'Deleting experiment {expid}')
 
@@ -133,12 +152,13 @@ def delete_experiment(expid: str, force: bool) -> bool:
         raise
 
     try:
-        return _delete_expid(expid, force)
+        _delete_expid(expid, force)
+        Log.info(f'Experiment {expid} has been deleted')
     except Exception as e:
         raise AutosubmitCritical("Seems that something went wrong, please check the trace", 7012, str(e))
 
 
-def _delete_expid(expid_delete: str, force: bool = False) -> bool:
+def _delete_expid(expid_delete: str, force: bool = False) -> None:
     """Removes an experiment from the path and database.
     If the current user is eadmin and the -f flag has been sent, it deletes regardless of experiment owner.
 
@@ -173,7 +193,7 @@ def _delete_expid(expid_delete: str, force: bool = False) -> bool:
 
     if not experiment_path.exists():
         Log.printlog("Experiment directory does not exist.", Log.WARNING)
-        return False
+        return
 
     owner, eadmin, _ = check_ownership(expid_delete)
     if not (owner or (force and eadmin)):
@@ -208,8 +228,6 @@ def _delete_expid(expid_delete: str, force: bool = False) -> bool:
             "If there are I/O issues, wait until they're solved and then use this command again.\n",
             6004, error_message
         )
-
-    return not bool(error_message)  # if there is a non-empty error, return False
 
 
 def _perform_deletion(experiment_path: Path, structure_db_path: Path, job_data_db_path: Path,

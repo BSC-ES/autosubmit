@@ -662,7 +662,7 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosub
     as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
     mocker.patch("autosubmit.experiment.experiment_common.process_id", return_value=None)
-    delete_experiment(expid=f'{as_exp.expid}', force=True)
+    delete_experiment(expids=f'{as_exp.expid}', force=True)
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
@@ -676,7 +676,7 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosub
     cursor.close()
     # Test doesn't exist
     with pytest.raises(AutosubmitCritical):
-        delete_experiment(expid=f'{as_exp.expid}', force=True)
+        delete_experiment(expids=f'{as_exp.expid}', force=True)
 
 
 def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmit: Autosubmit):
@@ -693,14 +693,14 @@ def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmi
     mocker.patch("autosubmit.experiment.experiment_common.check_ownership",
                  return_value=(False, False, _user))
     with pytest.raises(AutosubmitCritical):
-        delete_experiment(expid=f'{as_exp.expid}', force=True)
+        delete_experiment(expids=f'{as_exp.expid}', force=True)
     # test eadmin
     mocker.patch("autosubmit.experiment.experiment_common.check_ownership",
                  return_value=(False, True, _user))
     with pytest.raises(AutosubmitCritical):
-        delete_experiment(expid=f'{as_exp.expid}', force=False)
+        delete_experiment(expids=f'{as_exp.expid}', force=False)
     # test eadmin force
-    delete_experiment(expid=f'{as_exp.expid}', force=True)
+    delete_experiment(expids=f'{as_exp.expid}', force=True)
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())

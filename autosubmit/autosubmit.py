@@ -38,7 +38,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import Generator, Optional, Union
+from typing import cast, Generator, Optional, Union
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -244,7 +244,8 @@ class Autosubmit:
             # Delete
             subparser = subparsers.add_parser(
                 'delete', description="delete specified experiment")
-            subparser.add_argument('expid', help='experiment identifier')
+            subparser.add_argument('expid', help='experiment identifiers separated by commas',
+                               nargs='?')
             subparser.add_argument(
                 '-f', '--force', action='store_true', help='deletes experiment without confirmation')
             subparser.add_argument('-v', '--update_version', action='store_true',
@@ -710,7 +711,7 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'stop', description='Completely stops an autosubmit run process')
             group = subparser.add_mutually_exclusive_group(required=True)
-            group.add_argument('expid', help='experiment identifier, stops each of the listed expid separated by ","',
+            group.add_argument('expid', help='experiment identifiers separated by commas',
                                nargs='?')
             subparser.add_argument('-f', '--force', default=False, action='store_true',
                                    help='Forces to stop autosubmit process, equivalent to kill -9')
@@ -900,7 +901,7 @@ class Autosubmit:
         if args.command == "stop":
             if args.all or args.force_all:
                 expid_less.append("stop")
-        global_log_command = ["delete", "archive", "upgrade"]
+        global_log_command = ["archive", "upgrade"]
         import platform
         fullhost = platform.node()
         if "." in fullhost:
@@ -929,7 +930,9 @@ class Autosubmit:
                 args.command]):
                 raise AutosubmitCritical(message, 7071)
         if (expid != 'None' and expid) and args.command not in expid_less and args.command not in global_log_command:
-            if "," in expid:
+            if isinstance(expid, list):
+                expids = cast(list[str], expid)
+            elif "," in expid:
                 expids = expid.split(",")
             else:
                 expids = expid.split(" ")
@@ -964,12 +967,12 @@ class Autosubmit:
                 os.mkdir(tmp_path)
             if not os.path.exists(aslogs_path):
                 os.mkdir(aslogs_path)
-            if args.command == "stop":
+            if args.command in ['stop', 'delete']:
                 exp_id = "_".join(expids)
                 Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                          args.command + exp_id + '.log'), "out", log_level)
+                                          args.command + '_' + exp_id + '.log'), "out", log_level)
                 Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                          args.command + exp_id + '_err.log'), "err")
+                                          args.command + '_' + exp_id + '_err.log'), "err")
             else:
                 if owner:
                     os.chmod(tmp_path, 0o775)
@@ -1024,7 +1027,9 @@ class Autosubmit:
                                                      f"\nOr with the -v parameter: autosubmit {args.command} {expid} "
                                                      f"-v ", 7014)
         else:
-            if expid == 'None' or not expid:
+            if isinstance(expid, list):
+                exp_id = '_'.join(expid)
+            elif expid == 'None' or not expid:
                 exp_id = ""
             else:
                 exp_id = "_" + expid
