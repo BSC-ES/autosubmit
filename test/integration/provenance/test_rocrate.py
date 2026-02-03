@@ -31,8 +31,6 @@ from autosubmit.provenance.rocrate import (
     create_rocrate_archive
 )
 
-_EXPID = 'zzzz'
-"""Experiment ID used in all the tests."""
 _PROJECT_URL = 'https://earth.bsc.es/gitlab/es/autosubmit.git'
 """Project URL used in all the tests. This is not actually cloned."""
 _PROJECT_PATH = str(Path(__file__).parent.joinpath('../../../'))
@@ -55,7 +53,7 @@ def test_custom_config_loaded_file(autosubmit_exp, tmp_path):
 
     project_destination = 'local_project'
 
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_DESTINATION': project_destination,
             'PROJECT_TYPE': 'LOCAL'
@@ -127,7 +125,7 @@ def test_rocrate(tmp_path, autosubmit_exp):
     for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
         Path(project_path, output_file).touch()
 
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'CONFIG': {
             'PRE': [
                 '%PROJ%/conf/bootstrap/include.yml'
@@ -185,7 +183,7 @@ def test_rocrate_invalid_project(autosubmit_exp, tmp_path, mocker):
     for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
         Path(project_path, output_file).touch()
 
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_DESTINATION': 'local_project',
             'PROJECT_TYPE': 'LOCAL'
@@ -239,7 +237,7 @@ def test_rocrate_invalid_parameter_type(autosubmit_exp, tmp_path):
     for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
         Path(project_path, output_file).touch()
     with pytest.raises(RepresenterError) as cm:
-        autosubmit_exp(_EXPID, experiment_data={
+        autosubmit_exp(experiment_data={
             'PROJECT': {
                 'PROJECT_DESTINATION': '',
                 'PROJECT_TYPE': 'GIT'
@@ -259,7 +257,7 @@ def test_rocrate_invalid_parameter_type(autosubmit_exp, tmp_path):
 def test_no_duplicate_ids(autosubmit_exp, tmp_path):
     """Test that there are no duplicated ID's.
 
-    We must not have duplicate ID's, as they are unique for JSON-LD terms."""
+    We must not have duplicate IDs as they are unique for JSON-LD terms."""
     project_path = Path(tmp_path, 'project')
     project_path.mkdir()
 
@@ -270,7 +268,7 @@ def test_no_duplicate_ids(autosubmit_exp, tmp_path):
     custom_config.touch()
     custom_config.write_text('CUSTOM_CONFIG_LOADED: True')
 
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'CONFIG': {
             'PRE': [
                 str(project_conf)
@@ -331,7 +329,7 @@ def test_rocrate_main(autosubmit_exp, tmp_path):
     for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
         Path(project_path, output_file).touch()
 
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_DESTINATION': '',
             'PROJECT_TYPE': 'LOCAL'
@@ -360,7 +358,7 @@ def test_rocrate_main(autosubmit_exp, tmp_path):
     }, include_jobs=True)
 
     autosubmit = exp.autosubmit
-    r = autosubmit.rocrate(_EXPID, path=tmp_path)
+    r = autosubmit.rocrate(exp.expid, path=tmp_path)
     assert r
 
 
@@ -375,7 +373,7 @@ def test_do_not_include_other_crates(autosubmit_exp, tmp_path):
     for output_file in ['graph_1.png', 'graph_2.gif', 'graph_3.gif', 'graph.jpg']:
         Path(project_path, output_file).touch()
 
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_DESTINATION': '',
             'PROJECT_TYPE': 'LOCAL'

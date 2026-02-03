@@ -26,63 +26,68 @@ _AS_BASH_HEADER = dedent("""\
 ###################
 # Autosubmit header
 ###################
-set -xvu
+set -xuve -o pipefail
 declare locale_to_set
-locale_to_set=$(locale -a | grep ^C.)
+locale_to_set=$(locale -a | grep ^C. || true)
 export job_name_ptrn='%CURRENT_LOGDIR%/%JOBNAME%'
 
-r=0
-bash -e <<'__AS_CMD__'
-set -xve
-if [ -z "$locale_to_set" ] ; then
+if [ -n "$locale_to_set" ] ; then
     # locale installed...
-    export LC_ALL=$locale_to_set
+    export LC_ALL="$locale_to_set"
 else
     # locale not installed...
-    locale_to_set=$(locale -a | grep ^en_GB.utf8)
-    if [ -z "$locale_to_set" ] ; then
-        export LC_ALL=$locale_to_set
+    locale_to_set=$(locale -a | grep -i '^en_GB.utf8' || true)
+    if [ -n "$locale_to_set" ] ; then
+        export LC_ALL="$locale_to_set"
     else
         export LC_ALL=C
     fi 
 fi
-echo $(date +%s) > ${job_name_ptrn}_STAT_%FAIL_COUNT%
+echo "$(date +%s)" > "${job_name_ptrn}_STAT_%FAIL_COUNT%"
 
 ################### 
-# AS CHECKPOINT FUNCTION
+# AS TRAP FUNCTION
 ###################
+# This function will be called on EXIT, ensuring the STAT file is always created
+function as_exit_handler {
+    local exit_code=$?
+    # Write the finish time in the job _STAT_
+    echo "$(date +%s)" >> "${job_name_ptrn}_STAT_%FAIL_COUNT%"
+    
+    if [ "$exit_code" -eq 0 ]; then
+        %EXTENDED_TAILER%
+        touch "${job_name_ptrn}_COMPLETED"
+        # If the user-provided script failed, we exit here with the same exit code;
+        # otherwise, we let the execution of the tailer happen, where the _COMPLETED
+        # file will be created.
+    fi
+    
+    exit $exit_code
+}
+
+########################
+# AS CHECKPOINT FUNCTION
+########################
 # Creates a new checkpoint file upon call based on the current numbers of calls to the function
 function as_checkpoint {
     AS_CHECKPOINT_CALLS=$((AS_CHECKPOINT_CALLS+1))
-    touch ${job_name_ptrn}_CHECKPOINT_${AS_CHECKPOINT_CALLS}
+    touch "${job_name_ptrn}_CHECKPOINT_${AS_CHECKPOINT_CALLS}"
 }
 AS_CHECKPOINT_CALLS=0
-        %EXTENDED_HEADER%
-set -u
-        """)
+
+# Set up the exit trap to ensure exit code always runs
+trap as_exit_handler EXIT
+
+%EXTENDED_HEADER%
+""")
 """Autosubmit Bash header."""
 
 _AS_BASH_TAILER = dedent("""\
-__AS_CMD__
-r=$?
-
-# Write the finish time in the job _STAT_
-echo $(date +%s) >> ${job_name_ptrn}_STAT_%FAIL_COUNT%
-
-# If the user-provided script failed, we exit here with the same exit code;
-# otherwise, we let the execution of the tailer happen, where the _COMPLETED
-# file will be created.
-if [ $r -ne 0 ]; then
-    exit $r
-fi
-%EXTENDED_TAILER%
 ###################
 # Autosubmit tailer
 ###################
-set -xuve
-touch ${job_name_ptrn}_COMPLETED
-exit 0
-
+# Job completed successfully
+# The exit trap will handle the tailer
 """)
 """Autosubmit Bash tailer."""
 
@@ -101,11 +106,10 @@ def as_header(platform_header: str, executable: str) -> str:
 
 def as_body(body: str) -> str:
     return dedent(f"""\
-###################
+################
 # Autosubmit job
-###################
+################
 {body}
-
 """)
 
 

@@ -32,10 +32,11 @@ from subprocess import check_output
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 from time import time_ns
-from typing import cast, Any, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Any, Generator, Iterator, Optional, Protocol, Union, TYPE_CHECKING, Callable
 
 import paramiko  # type: ignore
 import pytest
+from _pytest.tmpdir import TempPathFactory
 from ruamel.yaml import YAML
 from sqlalchemy import Connection, create_engine, text
 from testcontainers.core.container import DockerContainer  # type: ignore
@@ -45,6 +46,7 @@ from testcontainers.postgres import PostgresContainer  # type: ignore
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.experiment.experiment_common import next_experiment_id
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
@@ -102,6 +104,33 @@ class AutosubmitExperimentFixture(Protocol):
             **kwargs: Any
     ) -> AutosubmitExperiment:
         ...
+
+
+@pytest.fixture(scope='session')
+def get_next_expid(tmp_path_factory: 'TempPathFactory') -> Callable[[], str]:
+    """Returns a factory to retrieve the next Autosubmit experiment ID.
+
+    The returned experiment ID by the factory function is guaranteed to
+    be unique throughout the whole test session, even with multiple
+    pytest-xdist processes.
+    """
+
+    shared_tmp_dir = tmp_path_factory.getbasetemp()
+    expid_file = shared_tmp_dir / "expid_current.txt"
+    if expid_file.exists():
+        expid_file.unlink()
+
+    def _get_next_expid() -> str:
+        current_expid = 't000'
+        if expid_file.exists():
+            current_expid = expid_file.read_text()
+
+        next_expid = next_experiment_id(current_id=current_expid)
+        expid_file.write_text(next_expid)
+
+        return next_expid
+
+    return _get_next_expid
 
 
 @pytest.fixture

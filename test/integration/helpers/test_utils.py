@@ -24,12 +24,10 @@ import pytest
 from autosubmit.helpers.utils import check_jobs_file_exists
 from autosubmit.log.log import AutosubmitCritical
 
-_EXPID = 't000'
-
 
 def test_check_jobs_file_exists_dummy(autosubmit_exp):
-    """Test that we ignore completely if the project is dummy."""
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    """Test that we ignore completely if the project is a dummy project."""
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'none'
         }
@@ -44,7 +42,7 @@ def test_check_jobs_file_exists_missing_templates_dir(autosubmit_exp, tmp_path):
     project_path = tmp_path / 'project'
     project_path.mkdir()
     Path(project_path, 'dummy.sh').touch()
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',
             'PROJECT_DESTINATION': 'git_project'
@@ -75,7 +73,7 @@ def test_check_jobs_file_exists_template_dir_is_file(autosubmit_exp, tmp_path):
     project_path = tmp_path / 'project'
     project_path.mkdir()
     Path(project_path, 'dummy.sh').touch()
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',
             'PROJECT_DESTINATION': 'git_project'
@@ -109,7 +107,7 @@ def test_check_jobs_file_exists_section_does_not_exist(autosubmit_exp, tmp_path)
     project_path = tmp_path / 'project'
     project_path.mkdir()
     Path(project_path, 'dummy.sh').touch()
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',
             'PROJECT_DESTINATION': 'git_project'
@@ -134,7 +132,7 @@ def test_check_jobs_file_exists_missing_script(autosubmit_exp, tmp_path):
     project_path = tmp_path / 'project'
     project_path.mkdir()
     Path(project_path, 'dummy.sh').touch()
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',
             'PROJECT_DESTINATION': 'git_project'
@@ -162,7 +160,7 @@ def test_check_jobs_file_exists_all_good(autosubmit_exp, tmp_path):
     project_path = tmp_path / 'project'
     project_path.mkdir()
     Path(project_path, 'dummy.sh').touch()
-    exp = autosubmit_exp(_EXPID, experiment_data={
+    exp = autosubmit_exp(experiment_data={
         'PROJECT': {
             'PROJECT_TYPE': 'local',
             'PROJECT_DESTINATION': 'git_project'
