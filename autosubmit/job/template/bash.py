@@ -53,7 +53,6 @@ function as_exit_handler {
     local exit_code=$?
     
     if [ "$exit_code" -eq 0 ]; then
-        %EXTENDED_TAILER%
         touch "${job_name_ptrn}_COMPLETED"
         # If the user-provided script failed, we exit here with the same exit code;
         # otherwise, we let the execution of the tailer happen, where the _COMPLETED
@@ -87,6 +86,7 @@ _AS_BASH_TAILER = dedent("""\
 ###################
 # Autosubmit tailer
 ###################
+%EXTENDED_TAILER%
 # Job completed successfully
 # The exit trap will handle the tailer
 """)
