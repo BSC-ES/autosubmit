@@ -53,7 +53,7 @@ def test_error_line_numbering(tmp_path: 'LocalPath'):
 
     result = run([the_script_path], capture_output=True, text=True)
 
-    assert result.returncode == 1
+    assert result.returncode == 127  # 127 is nix exit code for cmd not found (d_echo)
 
     # stdout = result.stdout
     stderr = result.stderr
