@@ -44,13 +44,18 @@ jobs:
           python -m pip install --upgrade pip packaging setuptools twine
           pip install --upgrade -e .[all]
 
+      # NOTE: We used `--trace --full-trace` with pytest but had strange
+      #       bugs in unit tests with py3.11:
+      #       - TypeError: 'list' object is not callable
+      #       - TypeError: 'traceback' object is not callable
+      #       It appeared to be a bug in Python3.11, pdb, pytest-xdist.
       - name: Unit tests
         run: |
           pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
-            --verbose --verbosity="2" --trace --full-trace \
+            --verbose --verbosity="2" \
             test/unit -m "not postgres"
 
       - name: Coverage report
@@ -149,7 +154,7 @@ jobs:
       matrix:
         # NOTE: We use 3.11 and not the latest 3.12 as the debugger of 3.12 is buggy
         #       and 3.11 is the current version used at the BSC ES department.
-        python-version: ["3.9", "3.12"]
+        python-version: ["3.9", "3.11"]
 
     steps:
       - name: Checkout code
