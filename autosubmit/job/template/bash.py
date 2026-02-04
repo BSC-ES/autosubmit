@@ -51,8 +51,6 @@ echo "$(date +%s)" > "${job_name_ptrn}_STAT_%FAIL_COUNT%"
 # This function will be called on EXIT, ensuring the STAT file is always created
 function as_exit_handler {
     local exit_code=$?
-    # Write the finish time in the job _STAT_
-    echo "$(date +%s)" >> "${job_name_ptrn}_STAT_%FAIL_COUNT%"
     
     if [ "$exit_code" -eq 0 ]; then
         %EXTENDED_TAILER%
@@ -61,6 +59,9 @@ function as_exit_handler {
         # otherwise, we let the execution of the tailer happen, where the _COMPLETED
         # file will be created.
     fi
+    
+    # Write the finish time in the job _STAT_
+    echo "$(date +%s)" >> "${job_name_ptrn}_STAT_%FAIL_COUNT%"
     
     exit $exit_code
 }
