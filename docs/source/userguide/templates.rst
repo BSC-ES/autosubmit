@@ -176,3 +176,44 @@ In case that your script needs lines, the yaml specification allows to do so wit
 
 Also, for debugging purposes, if PROJECT_TYPE is set to NONE (see :ref:`develproject`), the SCRIPT directive will overwrite Autosubmit's self-contained dummy templates.
 
+Script error handling
+=====================
+
+Autosubmit scripts contain the header, body, and tailer. The code is executed in this order,
+and in the case of Bash Shell, a failure somewhere in the body or extended header may result
+in the rest of the script not running. That includes the tailer.
+
+In the tailer of an Autosubmit-generated script there are important files generated: ``_STAT``
+files, used by Autosubmit and API for metrics and reporting on status of jobs, and ``_COMPLETED``
+files which mark when a job has successfully completed.
+
+If the user script fails mid-way, and the tailer never produces a ``_COMPLETED`` file, that does
+not cause any issues as a ``_COMPLETED`` file is not expected upon failures. However, the missing
+``_STAT`` file may result in incorrect values reported in Autosubmit commands and API/GUI.
+
+For that reason, Autosubmit 4.1.16+ adopted `Bash shell trap functions`_. The script
+watches for ``EXIT``, and for the following signals:
+
+* ``SIGHUP``
+* ``SIGINT``
+* ``SIGQUIT``
+* ``SIGTERM``
+* ``SIGXCPU``
+* ``SIGXFSZ``
+
+If a command fails in the user-provided template, the ``EXIT`` function will make
+sure the ``_STAT`` file is generated, and the script exits with the same return code
+of the failing function.
+
+If any of the signals above happen and are captured by the script, then the trap-function
+will set the exit code to failure (``128`` + the signal value) and will write the
+``_STAT`` file.
+
+The files are not generated if the process running the script receives a ``SIGKILL``
+(as that cannot be captured) or if the script receives a signal like ``SIGTERM``, emitted
+by Slurm upon wall time limit (seconds before it emits a ``SIGKILL``) but the script
+is executing a long-running command (e.g., ``sleep 10000``, or compiling a model).
+
+In these cases, neither ``_COMPLETED`` nor ``_STAT`` files are generated.
+
+.. _Bash shell trap functions: https://www.gnu.org/software/bash/manual/html_node/Bourne-Shell-Builtins.html#index-trap
