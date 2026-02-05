@@ -32,13 +32,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.log.utils import is_gzip_file, is_xz_file
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
@@ -652,6 +652,9 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
     exp = autosubmit_exp(experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, "t001")
+    Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {
             'DATELIST': '20000101',
@@ -1135,12 +1138,12 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     }
     platform = SlurmPlatform(exp.expid, "wrappers_test", platform_config)
 
-    job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory())
     for i in range(3):
         job = Job(f"job{i}", i, Status.READY, 0)
         job.section = f"SECTION{i}"
         job.platform = platform
-        job_list._job_list.append(job)
+        job_list.add_job(job)
 
     packager = JobPackager(exp.as_conf, platform, job_list)
     packager.wallclock = "01:00"
@@ -1163,6 +1166,7 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     assert check and len(job_result) == 3
 
 
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -1251,4 +1255,5 @@ def test_run_bug_save_wrapper_crashes(
     #       this fails showing the same exception reported by users,
     #       ``AttributeError: 'list' object has no attribute 'status'``. But only after it
     #       failed to save the wrappers (which is why we are mocking it above).
+    JobList.save_wrappers = real_save_wrappers  # restore original
     assert exp.autosubmit.run_experiment(expid=exp.expid) == 0

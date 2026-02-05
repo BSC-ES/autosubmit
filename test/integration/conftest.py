@@ -397,7 +397,6 @@ def ssh_fixture(request):
         return request.getfixturevalue(request.param)
     return None
 
-
 @pytest.fixture(scope='session', autouse=True)
 def postgres_server(request: 'FixtureRequest') -> Generator[Optional[PostgresContainer], None, None]:
     """Fixture to set up and tear down a Postgres database for testing.
@@ -429,7 +428,6 @@ def postgres_server(request: 'FixtureRequest') -> Generator[Optional[PostgresCon
                 conn.commit()
 
             yield container
-
 
 @pytest.fixture(params=['postgres', 'sqlite'])
 def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPath', postgres_server: 'DockerContainer',
