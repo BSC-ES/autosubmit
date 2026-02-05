@@ -9,19 +9,16 @@
 - Replaced regex by YAML parsing/writing when copying experiments to avoid edge 
   cases when replacing values (e.g. NOTIFY.TO, CHUNKS_TO) #2665
 - Fix experiment not being copied when running `testcase` command #2799
+- Fixed bug where placeholder variables were not removed when they referenced
+  `HPC*` variables (e.g. `%HPC_DN_SERVER%` of a user platform) #2574
+- Used a Shell trap-function to detect when an Autosubmit job is signalled to stop
+  and to handle non-zero exit codes writing the `_STAT` files (for GUI/metrics) #2788 #2807
 
 **Enhancements:**
 
 - Fix intermittent failures of unit tests, and enable print of AS exceptions.
   Changes and improvements to fixtures and pytest organisation and setup #2745
 - Removed broken migrate command #2617
-
-### 4.1.16: Unreleased
-
-**Bug fixes:**
-
-- Fixed bug where placeholder variables were not removed when they referenced
-  `HPC*` variables (e.g. `%HPC_DN_SERVER%` of a user platform) #2574
 
 ### 4.1.16: Unreleased
 
