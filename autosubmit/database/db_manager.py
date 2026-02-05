@@ -32,6 +32,9 @@ from autosubmit.database.tables import get_table_from_name
 if TYPE_CHECKING:
     from autosubmit.database.tables import Table
 
+if TYPE_CHECKING:
+    from autosubmit.database.tables import Table
+
 
 class DbManager:
     """A database manager using SQLAlchemy.

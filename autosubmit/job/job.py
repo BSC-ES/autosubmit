@@ -2310,7 +2310,6 @@ class Job(object):
         if not self.submitter:
             self.submitter = ParamikoSubmitter(as_conf=as_conf)
 
-
         if not self.platform:
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
