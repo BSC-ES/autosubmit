@@ -78,6 +78,7 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
+from autosubmit.utils import as_conf_default_values
 
 dialog = None
 
@@ -1257,12 +1258,11 @@ class Autosubmit:
 
     @staticmethod
     def copy_as_config(exp_id, copy_id):
-        for conf_file in os.listdir(os.path.join(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf")):
+        for conf_file in os.listdir(Path(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf")):
             # Copy only relevant files
             if conf_file.endswith((".conf", ".yml", ".yaml")):
-                shutil.copy(os.path.join(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf", conf_file),
-                            os.path.join(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf",
-                                         conf_file.replace(copy_id, exp_id)))
+                shutil.copy(Path(BasicConfig.LOCAL_ROOT_DIR, copy_id, "conf", conf_file),
+                            Path(BasicConfig.LOCAL_ROOT_DIR, exp_id, "conf", conf_file.replace(copy_id, exp_id)))
             # if ends with .conf convert it to AS4 yaml file
             if conf_file.endswith(".conf"):
                 try:
@@ -1278,7 +1278,7 @@ class Autosubmit:
             dummy: bool=False,
             minimal_configuration: bool=False,
             local: bool=False,
-            parameters: dict[str, Union[dict, list, str]] = None
+            parameters: Optional[dict[str, Union[dict, list, str]]] = None
     ) -> None:
         """Retrieve the configuration from autosubmit.config package.
 
@@ -1373,86 +1373,6 @@ class Autosubmit:
                     _add_comments_to_yaml(yaml_data, parameter_comments)
                     yaml.dump(yaml_data, output)
 
-    @staticmethod
-    def replace_parameter_inside_section(content, parameter, new_value, section):
-        # same but for any section any parameter, not only EXPID case insensitive
-        # Find the any section
-        if section:
-            section_match = re.search(rf'({section}:[\s\S]*?{parameter}:.*?)(?=\n|$)', content, re.IGNORECASE)
-            if section_match:
-                section = section_match.group(1)
-                # Replace parameter in the section
-                new_section = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', section)
-                # Replace the old section
-                content = content.replace(section, new_section)
-        else:
-            # replace only the parameter
-            content = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', content)
-        return content
-
-    @staticmethod
-    def as_conf_default_values(exp_id:str, hpc:str = "local", minimal_configuration:bool = False, git_repo:str = "",
-                               git_branch:str = "main", git_as_conf:str = "") -> None:
-        """Replace default values in as_conf files.
-
-        :param exp_id: experiment id
-        :param hpc: platform
-        :param minimal_configuration: minimal configuration
-        :param git_repo: path to project git repository
-        :param git_branch: main branch
-        :param git_as_conf: path to as_conf file in git repository
-        :return: None
-        """
-        # the var hpc was hardcoded in the header of the function
-
-        # open and replace values
-        for as_conf_file in Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp_id}/conf").iterdir():
-            if as_conf_file.name.endswith(".yml") or as_conf_file.name.endswith(".yaml"):
-                with open(as_conf_file, 'r+') as f:
-                    # Copied files could not have default names.
-                    content = f.read()
-                    search = re.search('AUTOSUBMIT_VERSION: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), f"AUTOSUBMIT_VERSION: \""
-                                                                   f"{Autosubmit.autosubmit_version}\"")
-                    search = re.search('NOTIFICATIONS: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), "NOTIFICATIONS: False")
-                    search = re.search('TO: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), "TO: \"\"")
-                    content = Autosubmit.replace_parameter_inside_section(content, "EXPID", exp_id, "DEFAULT")
-                    search = re.search('HPCARCH: .*', content, re.MULTILINE)
-                    if search is not None:
-                        x = search.group(0).split(":")
-                        # clean blank space, quotes and double quote
-                        aux = x[1].strip(' "\'')
-                        # hpc in config is empty && -H has a value-> write down hpc value
-                        if hpc != "":
-                            content = content.replace(search.group(0), f"HPCARCH: \"{hpc}\"")
-                        elif len(aux) > 0:
-                            content = content.replace(search.group(0), f"HPCARCH: \"{aux}\"")
-                        else:
-                            content = content.replace(search.group(0), "HPCARCH: \"local\"")
-                        # the other case is aux!=0 that we dont care about val(hpc) because its a copyExpId
-                    if minimal_configuration:
-                        search = re.search('CUSTOM_CONFIG: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0),
-                                                      "CUSTOM_CONFIG: \"%PROJDIR%/" + git_as_conf + "\"")
-                        search = re.search('PROJECT_ORIGIN: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_ORIGIN: \"{git_repo}\"")
-                        search = re.search('PROJECT_PATH: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_PATH: \"{git_repo}\"")
-                        search = re.search('PROJECT_BRANCH: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_BRANCH: \"{git_branch}\"")
-
-                    f.seek(0)
-                    f.write(content)
-                    f.truncate()
 
     @staticmethod
     def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False,
@@ -1548,7 +1468,7 @@ class Autosubmit:
             raise AutosubmitCritical(f"Error while creating the experiment configuration: {str(e)}", 7011)
         # Change template values by default values specified from the commandline
         try:
-            Autosubmit.as_conf_default_values(exp_id, hpc, minimal_configuration, git_repo, git_branch, git_as_conf)
+            as_conf_default_values(Autosubmit.autosubmit_version, exp_id, hpc, minimal_configuration, git_repo, git_branch, git_as_conf)
         except Exception as e:
             try:
                 Autosubmit._delete_expid(exp_id, True)
@@ -5696,9 +5616,8 @@ class Autosubmit:
         raise AutosubmitCritical('Storage type not known', 7014)
 
     @staticmethod
-    def testcase(description, chunks=None, member=None, start_date=None, hpc=None, copy_id=None,
-                 minimal_configuration=False, git_repo=None, git_branch=None, git_as_conf=None,
-                 use_local_minimal=False):
+    def testcase(description, hpc=None, copy_id=None, minimal_configuration=False, git_repo=None, git_branch=None,
+                 git_as_conf=None, use_local_minimal=False):
         """Method to conduct a test for a given experiment. It creates a new experiment for a given experiment with a
         given number of chunks with a random start date and a random member to be run on a random HPC.
         :param description: description of the experiment
