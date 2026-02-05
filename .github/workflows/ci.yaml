@@ -203,6 +203,26 @@ jobs:
             --cov-report=xml:test/coverage.xml --cov-append \
             test/regression \
             -m ''
+          echo "$(docker ps)"
+          echo "$(docker ps -q)"
+          echo "$(docker image ls)"
+          echo "$(docker image ls -a)"
+          echo "$(docker container ls)"
+          echo "$(docker container ls -a)"
+          docker exec $(docker ps --format="{{.Names}}") bash -c "mkdir -p /app/autosubmit/extract/; cp -f -r /app/autosubmit/experiments/* /app/autosubmit/extract"
+          docker cp ${docker_name}:/app/autosubmit/extract/ ./experiment_data_log/
+
+      - name: Tar logs
+        if: failure()
+        run: tar cvzf ./experiment_data_log.tgz ./experiment_data_log
+
+      - name: Upload logs to GitHub
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: experiment_data_log.tgz
+          path: experiment_data_log.tgz
+          retention-days: 7
 
       - name: Coverage report
         run: |
@@ -214,27 +234,6 @@ jobs:
         with:
           name: coverage_regression_py-${{ matrix.python-version }}
           path: coverage.xml
-          retention-days: 7
-
-      - name: Collect docker logs on failure
-        if: failure()
-        run: |
-          # pick the first Docker name in the list
-          docker_name="$(docker ps --format="{{.Names}}")"
-          # copy back the remote cylc-run dir
-          docker exec $(docker ps --format="{{.Names}}") bash -c "mkdir -p /app/autosubmit/extract/; cp -f -r /app/autosubmit/experiments/* /app/autosubmit/extract"
-          docker cp ${docker_name}:/app/autosubmit/extract/ ./experiment_data_log/
-
-      - name: Tar logs
-        if: failure()
-        run: tar cvzf ./experiment_data_log.tgz ./experiment_data_log
-
-      - name: Upload logs to GitHub
-        if: failure()
-        uses: actions/upload-artifact@master
-        with:
-          name: experiment_data_log.tgz
-          path: experiment_data_log.tgz
           retention-days: 7
 
   test-slurm:
