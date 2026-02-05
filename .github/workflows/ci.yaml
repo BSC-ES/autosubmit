@@ -146,26 +146,19 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
-      - name: Collect docker logs on failure
-        if: failure()
-        run: |
-          # pick the first Docker name in the list
-          docker_name="$(docker ps --format="{{.Names}}")"
-          # copy back the remote cylc-run dir
-          docker exec $(docker ps --format="{{.Names}}") bash -c "mkdir -p /app/autosubmit/extract/; cp -f -r /app/autosubmit/experiments/* /app/autosubmit/extract"
-          docker cp ${docker_name}:/app/autosubmit/extract/ ./experiment_data_log/
-
       - name: Tar logs
         if: failure()
-        run: tar cvzf ./experiment_data_log.tgz ./experiment_data_log
+        run: |
+          tar cvzf container_logs.tgz ./container_logs
 
       - name: Upload logs to GitHub
         if: failure()
         uses: actions/upload-artifact@master
         with:
-          name: experiment_data_log.tgz
-          path: experiment_data_log.tgz
-          retention-days: 7
+          name: container_logs.tgz
+          path: |
+            container_logs.tgz
+          retention-days: 1
 
   test-regression:
     runs-on: ubuntu-latest
@@ -216,26 +209,19 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
-      - name: Collect docker logs on failure
-        if: failure()
-        run: |
-          # pick the first Docker name in the list
-          docker_name="$(docker ps --format="{{.Names}}")"
-          # copy back the remote cylc-run dir
-          docker exec $(docker ps --format="{{.Names}}") bash -c "mkdir -p /app/autosubmit/extract/; cp -f -r /app/autosubmit/experiments/* /app/autosubmit/extract"
-          docker cp ${docker_name}:/app/autosubmit/extract/ ./experiment_data_log/
-
       - name: Tar logs
         if: failure()
-        run: tar cvzf ./experiment_data_log.tgz ./experiment_data_log
+        run: |
+          tar cvzf container_logs.tgz ./container_logs
 
       - name: Upload logs to GitHub
         if: failure()
         uses: actions/upload-artifact@master
         with:
-          name: experiment_data_log.tgz
-          path: experiment_data_log.tgz
-          retention-days: 7
+          name: container_logs.tgz
+          path: |
+            container_logs.tgz
+          retention-days: 1
 
   test-slurm:
     runs-on: ubuntu-latest
@@ -290,26 +276,19 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
-      - name: Collect docker logs on failure
-        if: failure()
-        run: |
-          # pick the first Docker name in the list
-          docker_name="$(docker ps --format="{{.Names}}")"
-          # copy back the remote cylc-run dir
-          docker exec $(docker ps --format="{{.Names}}") bash -c "mkdir -p /app/autosubmit/extract/; cp -f -r /app/autosubmit/experiments/* /app/autosubmit/extract"
-          docker cp ${docker_name}:/app/autosubmit/extract/ ./experiment_data_log/
-
       - name: Tar logs
         if: failure()
-        run: tar cvzf ./experiment_data_log.tgz ./experiment_data_log
+        run: |
+          tar cvzf container_logs.tgz ./container_logs
 
       - name: Upload logs to GitHub
         if: failure()
         uses: actions/upload-artifact@master
         with:
-          name: experiment_data_log.tgz
-          path: experiment_data_log.tgz
-          retention-days: 7
+          name: container_logs.tgz
+          path: |
+            container_logs.tgz
+          retention-days: 1
 
   # NOTE: The docs are already built on ReadTheDocs. We perform another quick build,Add commentMore actions
   #       without checking or deploying the produced HTML, just to i) verify that

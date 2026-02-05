@@ -17,8 +17,10 @@
 
 """Fixtures for integration tests."""
 import configparser
+import io
 import multiprocessing
 import os
+import tarfile
 from contextlib import suppress
 from dataclasses import dataclass
 from importlib.metadata import version, PackageNotFoundError
@@ -321,7 +323,7 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
 
 
 @pytest.fixture(scope="function")
-def git_server(tmp_path) -> tuple['Container', Path, str]:
+def git_server(tmp_path) -> Generator[tuple['DockerContainer', Path, str], Any, None]:
     # Start a container to server it -- otherwise, we would have to use
     # `git -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
@@ -347,7 +349,7 @@ def ps_platform() -> PsPlatform:
 
 
 @pytest.fixture(scope='function')
-def ssh_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
+def ssh_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
     """Start a single Docker container serving SSH for integration tests."""
     container, ssh_port = get_ssh_container(mfa=False, x11=False)
     with container:
@@ -356,7 +358,7 @@ def ssh_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
+def ssh_x11_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
     """Get a running SSH server with X11 enabled (no MFA)."""
     container, ssh_port = get_ssh_container(mfa=False, x11=True)
     with container:
@@ -365,7 +367,7 @@ def ssh_x11_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_mfa_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
+def ssh_x11_mfa_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
     """Get a running SSH server with X11 and MFA enabled."""
     container, ssh_port = get_ssh_container(mfa=True, x11=True)
     with container:
@@ -374,7 +376,7 @@ def ssh_x11_mfa_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Conta
 
 
 @pytest.fixture(scope="function")
-def slurm_server(tmp_path, mocker) -> 'Container':
+def slurm_server(request, tmp_path, mocker) -> 'Container':
     """Session fixture that creates a singleton Slurm server container."""
     container, ssh_port = get_slurm_container()
     # TODO: Needed? If so, explain why.
@@ -385,6 +387,7 @@ def slurm_server(tmp_path, mocker) -> 'Container':
     with container:
         prepare_and_test_slurm_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
+        copy_content_from_containers_fixture(request)
 
 
 @pytest.fixture
@@ -521,3 +524,19 @@ def setup_as_logs_pytest(tmp_path: 'LocalPath') -> None:
         str(Path(tmp_path, 'as_log_status_failed.txt')),
         'status_failed'
     )
+
+
+def copy_content_from_containers_fixture(request):
+    """Copy data from experiment from within the container to export
+    """
+    container_in_use: 'Container' = request.node.funcargs['slurm_server']
+    if container_in_use and request.session.testsfailed:
+        stream, _ = container_in_use.get_archive('tmp/scratch/group/root/')
+        fileobj = io.BytesIO()
+
+        for chunk in stream:
+            fileobj.write(chunk)
+        fileobj.seek(0)
+
+        with tarfile.open(fileobj=fileobj) as tar:
+            tar.extractall(path=f"/container_logs/{request.node.name}/")
