@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'wait_child',
+    'wait_locker'
 ]
 
 
