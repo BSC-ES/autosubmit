@@ -316,6 +316,9 @@ class PBSPlatform(ParamikoPlatform):
             return None
         if self.send_command(cmd):
             job_id = self.get_submitted_job_id(self.get_ssh_output())
+            if job and len(job_id) > 0:
+                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: "
+                           f"{job.workflow_commit}")
             return job_id
         return None
 
@@ -341,7 +344,6 @@ class PBSPlatform(ParamikoPlatform):
             except Exception:
                 raise
             jobs_id = self.get_submitted_job_id(self.get_ssh_output())
-
             return jobs_id
         except IOError as e:
             raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e)) from e
