@@ -122,6 +122,33 @@ def test_git_local_dirty(
         check_unpushed_changes(expid, as_conf)
 
 
+def create_git_repository_and_server(
+        tmp_path,
+        autosubmit_exp,
+        git_server,
+        get_next_expid,
+        git_name
+):
+    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str  # type: ignore
+
+    git_repo = git_repos_path / git_name
+    create_git_repository(git_repo, bare=True)
+
+    git_repo_url = f'{git_url}/{git_repo.name}'
+
+    experiment_data = _get_experiment_data(tmp_path)
+    experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
+    experiment_data['GIT']['PROJECT_ORIGIN'] = git_repo_url
+
+    as_exp = autosubmit_exp(get_next_expid(), experiment_data)
+    as_conf = as_exp.as_conf
+    proj_dir = Path(as_conf.get_project_dir())
+
+    Path(proj_dir / 'not_committed.txt').touch()
+
+    return as_conf
+
+
 @pytest.mark.parametrize(
     "commit_git,push_git,commit_submodule,push_submodule,expid,expected",
     [
@@ -338,22 +365,7 @@ def test_clean_git_not_committed(
         get_next_expid: Callable[[], str]
 ):
     """Test that cleaning Git fails when the project directory has new files not committed yet."""
-    _, git_repos_path, git_url = git_server  # type: Container, Path, str  # type: ignore
-
-    git_repo = git_repos_path / test_clean_git_not_committed.__name__
-    create_git_repository(git_repo, bare=True)
-
-    git_repo_url = f'{git_url}/{git_repo.name}'
-
-    experiment_data = _get_experiment_data(tmp_path)
-    experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
-    experiment_data['GIT']['PROJECT_ORIGIN'] = git_repo_url
-
-    as_exp = autosubmit_exp(get_next_expid(), experiment_data)
-    as_conf = as_exp.as_conf
-    proj_dir = Path(as_conf.get_project_dir())
-
-    Path(proj_dir / 'not_committed.txt').touch()
+    as_conf = create_git_repository_and_server(tmp_path, autosubmit_exp, git_server, get_next_expid, test_clean_git_not_committed.__name__)
 
     with pytest.raises(AutosubmitCritical) as cm:
         clean_git(as_conf)
@@ -370,22 +382,9 @@ def test_clean_git_not_pushed(
         get_next_expid: Callable[[], str]
 ):
     """Test that cleaning Git fails when the project directory has staged changed not pushed."""
-    _, git_repos_path, git_url = git_server  # type: Container, Path, str  # type: ignore
+    as_conf = create_git_repository_and_server(tmp_path, autosubmit_exp, git_server, get_next_expid, test_clean_git_not_pushed.__name__)
 
-    git_repo = git_repos_path / test_clean_git_not_pushed.__name__
-    create_git_repository(git_repo, bare=True)
-
-    git_repo_url = f'{git_url}/{git_repo.name}'
-
-    experiment_data = _get_experiment_data(tmp_path)
-    experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
-    experiment_data['GIT']['PROJECT_ORIGIN'] = git_repo_url
-
-    as_exp = autosubmit_exp(get_next_expid(), experiment_data)
-    as_conf = as_exp.as_conf
     proj_dir = Path(as_conf.get_project_dir())
-
-    Path(proj_dir / 'not_committed.txt').touch()
     git_commit_all_in_dir(proj_dir, push=False)
 
     with pytest.raises(AutosubmitCritical) as cm:
@@ -403,22 +402,9 @@ def test_clean_git(
         get_next_expid: Callable[[], str]
 ):
     """Test that cleaning Git fails when the project commit cannot be recorded."""
-    _, git_repos_path, git_url = git_server  # type: Container, Path, str  # type: ignore
-
-    git_repo = git_repos_path / test_clean_git.__name__
-    create_git_repository(git_repo, bare=True)
-
-    git_repo_url = f'{git_url}/{git_repo.name}'
-
-    experiment_data = _get_experiment_data(tmp_path)
-    experiment_data['PROJECT']['PROJECT_TYPE'] = 'git'
-    experiment_data['GIT']['PROJECT_ORIGIN'] = git_repo_url
-
-    as_exp = autosubmit_exp(get_next_expid(), experiment_data)
-    as_conf = as_exp.as_conf
+    as_conf = create_git_repository_and_server(tmp_path, autosubmit_exp, git_server, get_next_expid, test_clean_git.__name__)
 
     proj_dir = Path(as_conf.get_project_dir())
-    Path(proj_dir / 'not_committed.txt').touch()
     git_commit_all_in_dir(proj_dir, push=True)
 
     assert proj_dir.exists()
