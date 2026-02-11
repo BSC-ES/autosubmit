@@ -22,8 +22,6 @@ from pytest_mock import MockerFixture
 
 from autosubmit.scripts.autosubmit import main
 
-_EXPID = "t111"
-
 
 @pytest.mark.parametrize("force_yes", [True, False])
 def test_stop_bypass_prompt_confirmation(
@@ -32,10 +30,10 @@ def test_stop_bypass_prompt_confirmation(
     """
     Test if the -y option bypasses the prompt confirmation
     """
-    autosubmit_exp(_EXPID, experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
 
     # Mock command line arguments
-    passed_args = ["autosubmit", "stop"] + (["-y"] if force_yes else []) + [_EXPID]
+    passed_args = ["autosubmit", "stop"] + (["-y"] if force_yes else []) + [exp.expid]
     mocker.patch("sys.argv", passed_args)
 
     mock_input = mocker.patch("autosubmit.autosubmit.input")

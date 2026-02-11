@@ -12,11 +12,6 @@ use it without a failure, but there will be a warning displayed asking you to
 update your command line. This argument will be completely removed on a later
 release.
 
-**Known issues:**
-
-- Due to a new heredoc blocks to handle failures in the templates, `script.cmd.err` line numbers are offset by ~5 lines (e.g. reported line 10 → actual line 15). #2694 #2718
-- Please adjust accordingly when debugging.
-
 **Bug fixes:**
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
@@ -45,6 +40,8 @@ release.
 - Fixed an issue with additional files not being sent to the remote platform when using wrappers #1484
 - Fixed an issue with MIXED and STRICT wrapper policies raising the error prematurely #2770
 - Fixed an issue with undefined variables inside a list #2773
+- Used a Shell trap-function to detect when an Autosubmit job is signalled to stop
+  and to handle non-zero exit codes writing the `_STAT` files (for GUI/metrics) #2788 #2807
 
 **Enhancements:**
 

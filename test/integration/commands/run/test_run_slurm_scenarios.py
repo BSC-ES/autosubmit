@@ -149,7 +149,7 @@ def test_run_uninterrupted(
         wrapper_type,
         slurm_server: 'DockerContainer',
         prepare_scratch,
-        general_data,
+        general_data
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
@@ -770,7 +770,8 @@ def test_wrapper_config(
         templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
         asthread_files = list(templates_dir.rglob("*ASThread*"))
         if run_type == "run" or run_type == "inspect":
-            assert len(asthread_files) == 2 + 2  # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
+            # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
+            assert len(asthread_files) == 2 + 2
 
 
 def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture'):

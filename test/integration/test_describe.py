@@ -17,7 +17,7 @@
 
 from getpass import getuser
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 import pytest
 from pytest_mock import MockerFixture
@@ -25,28 +25,44 @@ from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
 
-_EXPIDS = ['z000', 'z001']
-
 
 @pytest.mark.parametrize(
-    'input_experiment_list,get_from_user,not_described',
+    'expid_len,spaces,not_described',
     [
-        (' '.join(_EXPIDS), '', False),  # It accepts expids separated by spaces,
-        (','.join(_EXPIDS), '', False),  # or by commas,
-        (_EXPIDS[0], '', False),  # or a single experiment ID.
-        ('zzzz', '', True),  # An expid that does not exist.
-        ('', '', True),  # If nothing is provided.
+        (2, True, False),  # It accepts expids separated by spaces,
+        (2, False, False),  # or by commas,
+        (1, True, False),  # or a single experiment ID.
+        (None, True, True),  # An expid that does not exist.
+        (0, True, True),  # If nothing is provided.
     ]
 )
 def test_describe(
-        input_experiment_list,
-        get_from_user,
-        not_described,
+        expid_len: Optional[int],
+        spaces: bool,
+        not_described: bool,
         autosubmit_exp: Callable,
-        mocker: MockerFixture) -> None:
+        mocker: MockerFixture,
+        get_next_expid: Callable[[], str]) -> None:
+    """Test the ``describe`` command.
+
+    The ``expid_len`` defines how many expids we will provide to the command.
+    If the value is ``None``, then we will use a non-existent expid.
+    If the value is ``0``, then we will not provide any expid (i.e., empty).
+
+    ``not_described`` defines whether the command should return an error or not.
+    """
+    input_experiment_list = ''
+    provided_expids = []
+    if expid_len is None:
+        input_experiment_list = 'zzzzzzzz'  # A non-existent expid. In theory, valid.
+    elif expid_len > 0:
+        provided_expids = [get_next_expid() for _ in range(expid_len)]
+        separator = ' ' if spaces else ','
+        input_experiment_list = separator.join(provided_expids)
+
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
 
-    expids = filter(lambda e: e in _EXPIDS, input_experiment_list.replace(',', ' ').split(' '))
+    expids = filter(lambda e: e in provided_expids, input_experiment_list.replace(',', ' ').split(' '))
 
     exps = []
 
@@ -68,7 +84,7 @@ def test_describe(
 
     Autosubmit.describe(
         input_experiment_list=input_experiment_list,
-        get_from_user=get_from_user
+        get_from_user=''
     )
 
     # Log.printlog is only called when an experiment is not described
@@ -94,16 +110,14 @@ def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
     ``sys.argv`` is mocked to return what ``argparse`` would parse for a command
     such as ``autosubmit -lc ERROR -lf WARNING describe z000``.
     
-    This triggers the log initialization, and verifies that log levels work too,
+    This triggers the log initialization and verifies that log levels work too,
     as documented.
 
     `Ref <https://github.com/BSC-ES/autosubmit/issues/2412>`_.
     """
     fake_jobs: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-jobs.yml")
     fake_platforms: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-platforms.yml")
-    exp = autosubmit_exp(
-        _EXPIDS[0],
-        experiment_data={
+    exp = autosubmit_exp(experiment_data={
             'DEFAULT': {
                 'HPCARCH': 'TEST_SLURM'
             },
