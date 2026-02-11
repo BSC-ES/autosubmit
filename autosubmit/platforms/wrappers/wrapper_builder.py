@@ -18,6 +18,7 @@
 import random
 import string
 import textwrap
+from autosubmit.log.log import AutosubmitCritical
 
 from typing import List
 
@@ -62,6 +63,7 @@ class WrapperBuilder(object):
         self.machinefiles_name = ''
         self.machinefiles_indent = 0
         self.exit_thread = ''
+        self.custom_env_setup = kwargs['wrapper_data'].custom_env_setup
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
         self.working_dir = kwargs.get('working_dir', '')
@@ -123,6 +125,119 @@ class WrapperBuilder(object):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
 
+class ParslWrapperBuilder(WrapperBuilder):
+    # TODO: [ENGINES] Is it necessary to pass the run_id to the inner jobs?
+    """
+    The ParslWrapperBuilder is the responsible for generating the wrapper script
+    that will be submitted to Slurm to initialize submit the inner jobs to the platform
+    using the Parsl workflow manager inside the allocation.
+    
+    This is a special implementation because we use Parsl as a wrapper engine inside 
+    allocations, not as a platform.
+    """
+    def build_imports(self):
+        return textwrap.dedent("""
+        import parsl
+        from parsl import bash_app, Config
+        from parsl.executors import HighThroughputExecutor
+        from parsl.providers import LocalProvider
+        from parsl.launchers import SimpleLauncher
+        import subprocess
+        import sys, traceback
+        """)
+    
+    def build_job_thread(self):
+        return ""
+    
+    def build_main(self):
+        if not self.job_scripts:
+            raise AutosubmitCritical("No job scripts found for building the Parsl wrapper.")
+        env_setup = self.custom_env_setup or ""
+        return textwrap.dedent("""
+        # Run the environment configuration instructions under an interactive-like shell
+        env_setup = {0}
+        if env_setup.strip():
+            completed = subprocess.run(["bash", "-lc", env_setup])
+            raise SystemExit(completed.returncode)
+
+        # Parsl configuration
+        {1}
+        parsl.load(config)
+
+        # Tasks definition
+        {2}
+                               
+        # Running tasks with Parsl
+        try:
+            {3}
+        except Exception as e:
+            print(f"An error occurred: {{e}}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            exit(1)
+        finally:
+            parsl.dfk().cleanup()   # Stop executors and terminate workers
+            parsl.clear()           # Clear Parsl config
+        """).format(repr(env_setup), self._generate_parsl_config(), self._generate_tasks(), self._generate_parsl_script())
+    
+    def _generate_parsl_config(self):
+        """
+        Generates the Parsl configuration for the wrapper script.
+        """
+        return textwrap.dedent("""
+        config = Config(
+            executors=[
+                HighThroughputExecutor(
+                    label='marenostrum5_htex',
+                    cores_per_worker=12,        # TODO: [ENGINES] Make this configurable
+                    max_workers_per_node=6,     # TODO: [ENGINES] Make this configurable
+                    working_dir='.',            # TODO: [ENGINES] Make this configurable
+                    provider=LocalProvider(
+                        nodes_per_block=2,      # TODO: [ENGINES] Make this configurable
+                        init_blocks=1,
+                        max_blocks=1,
+                        launcher=SimpleLauncher()
+                    )
+                )
+            ]
+        )
+        """).format(12, 6) # TODO: [ENGINES] Delete hardcoded values
+    
+    def _generate_tasks(self):  # TODO: [ENGINES] Implement _generate_tasks
+        """
+        Generates the Parsl tasks for the wrapper script according to job sections.
+        """
+        return textwrap.dedent("""
+        @bash_app(executors=['marenostrum5_htex'])
+        def task(jobname: str, n_cores: int) -> str:
+            return f"srun -n {{n_cores}} ./{{jobname}}"
+        """)
+    
+    def _generate_parsl_script(self):
+        """
+        Each Parsl wrapper type implements its own script given the dependencies
+        of its inner jobs.
+        """
+        pass  # pragma: no cover
+
+class ParslVerticalWrapperBuilder(ParslWrapperBuilder):
+    def _generate_parsl_script(self):   # TODO: [ENGINES] Implement vertical parsl script
+        return textwrap.dedent("""
+        """).format(self.job_scripts, self.retrials)
+    
+class ParslHorizontalWrapperBuilder(ParslWrapperBuilder):
+    def _generate_parsl_script(self):   # TODO: [ENGINES] Implement horizontal parsl script
+        return textwrap.dedent("""
+        """).format(self.job_scripts)
+
+class ParslVerticalHorizontalWrapperBuilder(ParslWrapperBuilder):
+    def _generate_parsl_script(self):   # TODO: [ENGINES] Implement vertical-horizontal parsl script
+        return textwrap.dedent("""
+        """).format(self.job_scripts)
+
+class ParslHorizontalVerticalWrapperBuilder(ParslWrapperBuilder):
+    def _generate_parsl_script(self):   # TODO: [ENGINES] Implement horizontal-vertical parsl script
+        return textwrap.dedent("""
+        """).format(self.job_scripts)
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self,letters_count, digits_count):
