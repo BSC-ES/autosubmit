@@ -1160,8 +1160,8 @@ CONFIGURATION:
     TRANSFER: 'False'
   DATA_PORTFOLIO: production
   DQC_PROFILE: lowres
-  DQC_PROFILE_PATH: '/gpfs/scratch/ehpc01/<to-be-overloaded-in-user-conf>/LOG_a000/profiles/ifs-nemo'
-  DQC_PROFILE_ROOT: '/gpfs/scratch/ehpc01/<to-be-overloaded-in-user-conf>/LOG_a000/profiles'
+  DQC_PROFILE_PATH: '/gpfs/scratch/ehpc01/<to-be-overloaded-in-user-conf>/a000/profiles/ifs-nemo'
+  DQC_PROFILE_ROOT: '/gpfs/scratch/ehpc01/<to-be-overloaded-in-user-conf>/a000/profiles'
   IFS:
     EXPVER: hz9m
     GTYPE: tco

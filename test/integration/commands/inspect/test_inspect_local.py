@@ -130,7 +130,7 @@ JOBS:
 """)),
 ], ids=[
     "HPC*_TEST_SCRIPT",
-    "HPC*_TEST_FILE"
+    "HPC*_TEST_FILE",
 ])
 def test_inspect(
         tmp_path,
@@ -138,15 +138,8 @@ def test_inspect(
         additional_data: str,
         general_data: dict[str, Any],
 ):
-    """Test inspect command for local platform.
-
-    Test it with different job types to see that HPC parameters
-    are correctly set in the job scripts.
-    """
+    """Test inspect command for local platform with different job types to see that HPC parameters are correctly set in the job scripts."""
     yaml = YAML(typ='rt')
-    general_data['DEFAULT']['HPCARCH'] = 'TEST_PS'
-    general_data['PLATFORMS']['TEST_PS']['CUSTOM_DIR'] = 'test'
-    general_data['PLATFORMS']['TEST_PS']['CUSTOM_DIR_POINTS_TO_OTHER_DIR'] = '%TEST_REFERENCE%'
 
     if 'FILE' in additional_data:
         general_data['PROJECT']['PROJECT_TYPE'] = 'local'
@@ -158,29 +151,47 @@ def test_inspect(
         script_file.write_text(_TEMPLATE_CONTENT)
         script_file.chmod(0o755)
 
-    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
-    as_conf = as_exp.as_conf
-    as_conf.set_last_as_command('inspect')
+    # TODO: This should be 'local' but we can't customaize LOCAL platform yet, also scratch_dir, user, host, project shouldn't be modificable at all
+    general_data['PLATFORMS']['LOCAL'] = {'TYPE': 'ps', 'HOST': "127.0.0.1", 'SCRATCH_DIR': str(tmp_path), 'USER': ""}
 
-    # Run the experiment
-    as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True,
-                              filter_chunks=None, filter_section=None, filter_status=None, quick=False)
+    for hpcarch in ['TEST_PS', 'TEST_SLURM', 'LOCAL']:
+        general_data['DEFAULT']['HPCARCH'] = hpcarch
+        general_data['PLATFORMS'][hpcarch]['CUSTOM_DIR'] = 'test'
+        general_data['PLATFORMS'][hpcarch]['CUSTOM_DIR_POINTS_TO_OTHER_DIR'] = '%TEST_REFERENCE%'
+        as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
 
-    hpcarch_info = as_conf.experiment_data.get('PLATFORMS', {}).get('TEST_PS', {})
-    expected_hpcrootdir = Path(
-        hpcarch_info.get('SCRATCH_DIR', ''),
-        hpcarch_info.get('PROJECT', ''),
-        hpcarch_info.get('USER', '')
-    )
-    expected_hpclogdir = expected_hpcrootdir / f"LOG_{as_exp.expid}"
-    templates_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_exp.expid / BasicConfig.LOCAL_TMP_DIR
-    for file in templates_dir.glob(f"{as_exp.expid}*.cmd"):
-        content = file.read_text()
-        assert "HPCARCH=TEST_PS" in content
-        assert f"HPCPLATFORM={as_conf.experiment_data['HPCARCH']}" in content
-        assert f"HPCHOST={hpcarch_info['HOST']}" in content
-        assert "HPCARCH=TEST_PS" in content
-        assert "HPCCUSTOM_DIR=test" in content
-        assert "HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR=OK" in content
-        assert f"HPCROOTDIR={str(expected_hpcrootdir)}" in content
-        assert f"HPCLOGDIR={str(expected_hpclogdir)}" in content
+        # TODO: This shouldn't be needed but we can't customaize LOCAL platform yet
+        if hpcarch == 'LOCAL':
+            general_data['PLATFORMS'][hpcarch]['PROJECT'] = as_exp.expid
+
+        as_conf = as_exp.as_conf
+        as_conf.set_last_as_command('inspect')
+        hpcarch_info = as_conf.experiment_data.get('PLATFORMS', {}).get('TEST_PS', {})
+
+        # TODO: This shouldn't be needed 'local' platform info should be inyected in the memory of the experiment_data when creating the experiment
+        if hpcarch == 'LOCAL':
+            expected_hpcrootdir = Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid / Path(BasicConfig.LOCAL_TMP_DIR)
+            expected_hpclogdir = expected_hpcrootdir / f"LOG_{as_exp.expid}"
+        else:
+            expected_hpcrootdir = Path(hpcarch_info.get('SCRATCH_DIR', '')) / hpcarch_info.get('PROJECT', '') / hpcarch_info.get('USER', '') / as_exp.expid
+            expected_hpclogdir = expected_hpcrootdir / f"LOG_{as_exp.expid}"
+
+        templates_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_exp.expid / BasicConfig.LOCAL_TMP_DIR
+
+        # Inspect the experiment
+        as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
+        assert as_exp.as_conf.experiment_data["HPCARCH"] == hpcarch
+        assert as_exp.as_conf.experiment_data["HPCROOTDIR"] == str(expected_hpcrootdir)
+        assert as_exp.as_conf.experiment_data["HPCLOGDIR"] == str(expected_hpclogdir)
+
+        assert as_exp.expid in str(expected_hpclogdir)
+
+        for file in templates_dir.glob(f"{as_exp.expid}*.cmd"):
+            content = file.read_text()
+            assert f"HPCARCH={hpcarch}" in content
+            assert f"HPCPLATFORM={hpcarch}" in content
+            assert f"HPCHOST={hpcarch_info['HOST']}" in content
+            assert "HPCCUSTOM_DIR=test" in content
+            assert "HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR=OK" in content
+            assert f"HPCROOTDIR={str(expected_hpcrootdir)}" in content
+            assert f"HPCLOGDIR={str(expected_hpclogdir)}" in content

@@ -2118,6 +2118,9 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
             "NUMCHUNKS": 1,
             "SPLITSIZEUNIT": "day",
         },
+        "CONFIG": {
+            "SAFE_PLACEHOLDERS": ["keep_format_as_INTRODUCED"]
+        },
         "HPCADD_PROJECT_TO_HOST": False,
         "HPCAPP_PARTITION": "gp_debug",
         "HPCARCH": "TEST_SLURM",
@@ -2185,7 +2188,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
                 "WALLCLOCK": "00:30",
                 "JOB_HAS_PRIO": "whatever",
                 "WRAPPER_HAS_PRIO": "%CURRENT_NOT_EXISTENT_PLACEHOLDER%",
-            }
+            },
         },
         "LIST_INT": [20200101],
         "TESTDATES": {
@@ -2216,6 +2219,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
                 "MAX_WALLCLOCK": "02:00",
                 "MODULES_PROFILE_PATH": None,
                 "OPA_CUSTOM_DIRECTIVES": "whatever",
+                "TEST_UNDEFINED_LIST": ['%UNDEFINED%'],
                 "OPA_EXCLUSIVE": False,
                 "OPA_MAX_PROC": 2,
                 "OPA_PROCESSORS": 112,
@@ -2239,6 +2243,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
         "PROJDIR": "bla",
         "PROJECT": {"PROJECT_DESTINATION": "git_project", "PROJECT_TYPE": "none"},
         "ROOTDIR": "bla",
+        "TIMEFORMAT": "%keep_format_as_INTRODUCED%",
         "SMTP_SERVER": "",
         "STARTDATES": ["20200101"],
         "STORAGE": {},
@@ -2253,6 +2258,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
         },
     }
     as_conf.experiment_data = as_conf.experiment_data | additional_experiment_data
+    as_conf.set_default_parameters()
     # Needed to monkeypatch reload to avoid overwriting experiment_data ( the files doesn't exist in a unit-test)
     monkeypatch.setattr(as_conf, 'reload', lambda: None)
     job = Job(_EXPID, '1', Status.WAITING, 0)
@@ -2268,7 +2274,13 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     for key, value in parameters.items():
         if isinstance(value, str):
             if value.startswith("%") and value.endswith("%") and key not in as_conf.default_parameters.keys():
-                placeholders_not_resolved.append(key)
+                if key != "TIMEFORMAT":  # TIMEFORMAT is a special case to keep the format introduced by the user
+                    placeholders_not_resolved.append(key)
+        elif isinstance(value, list):
+            for element in value:
+                if isinstance(element, str):
+                    if element.startswith("%") and element.endswith("%") and key not in as_conf.default_parameters.keys():
+                        placeholders_not_resolved.append(key)
     assert not placeholders_not_resolved, f"Placeholders not resolved: {placeholders_not_resolved}"
     assert parameters["CURRENT_NEVER_RESOLVED"] == ""
     assert parameters["CURRENT_JOB_HAS_PRIO"] == "whatever"
@@ -2284,6 +2296,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     assert parameters["TESTDATES.START_DATE_LIST"] == "20200101"
     assert parameters["TESTDATES.START_DATE_WITH_SPECIAL_LIST"] == "20200101"
     assert parameters["TESTDATES.START_DATE_INT"] == '[[20200101]]'
+    assert parameters["TIMEFORMAT"] == "%keep_format_as_INTRODUCED%"
 
 
 def test_process_scheduler_parameters(local):
