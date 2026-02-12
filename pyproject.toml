@@ -47,13 +47,13 @@ dependencies = [
     "xlib==0.21",
     "bscearth.utils<=0.5.2",
     "requests<=2.32.5",
-    "networkx<=3.2.1",
+    "networkx<=3.6.1",
     "portalocker<=3.2.0",
     "paramiko>=3.5.0",
-    "pyparsing==3.2.5",
-    "matplotlib<=3.9.4",
+    "pyparsing==3.3.1",
+    "matplotlib<=3.10.8",
     "typing_extensions==4.*",
-    "psutil<=7.1.3",
+    "psutil<=7.2.1",
     "py3dotplus==1.1.0",
     "numpy<3",
     "rocrate==0.*",
@@ -61,7 +61,7 @@ dependencies = [
     "setproctitle",
     "invoke>=2.0",
     "SQLAlchemy~=2.0.23",
-    "ruamel.yaml==0.18.17",
+    "ruamel.yaml==0.18.6",
     "configobj",
     "configparser",
     "types-requests"
@@ -81,7 +81,7 @@ postgres = ["psycopg2"]
 tests = [
     # TODO: remove mock by pytest-mock
     "mock",
-    "pytest>=8.2,<8.5",
+    "pytest>=8.2,<9.1",
     "pytest-cov",
     "pytest-mock",
     "ruff==0.14.10",
@@ -92,10 +92,10 @@ tests = [
 docs = [
     "livereload",
     "pydata-sphinx-theme>=0.16.1,<0.17",
-    "sphinx>=5,<9",
-    "sphinx-autobuild>=2021.3,<2024.11",
+    "sphinx>=5,<10",
+    "sphinx-autobuild>=2021.3,<2025.9",
     "sphinx_rtd_theme",
-    "sphinx-reredirects==0.1.*",
+    "sphinx-reredirects>=0.1,<1.2",
     "sphinx_design"
 ]
 all = [
