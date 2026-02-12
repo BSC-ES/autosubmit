@@ -146,11 +146,10 @@ class JobList(object):
         raise AttributeError("graph_dict is a dynamic view and cannot be directly modified.")
 
     @property
-    def job_list(self) -> list[Job]:
-        """Dynamically return a generator of all 'job' attributes from the graph nodes."""
+    def job_list(self) -> List[Job]:
+        """Dynamically return a list of all 'job' attributes from the graph nodes."""
         try:
-            for _, data in self.graph.nodes(data=True):
-                yield data["job"]
+            return [data['job'] for _, data in self.graph.nodes(data=True)]
         except BaseException as e:
             err_msg = ""
             for node in self.graph.nodes:
@@ -205,7 +204,7 @@ class JobList(object):
     def _delete_edgeless_jobs(self):
         """Deletes jobs that have no dependencies and are marked for deletion when edgeless."""
         # indices to delete
-        for job in self.job_list:
+        for job in self.job_list[:]:
             if job.dependencies is not None and job.dependencies not in ["{}", "[]"]:
                 if ((len(job.dependencies) > 0 and not job.has_parents() and not
                 job.has_children()) and str(job.delete_when_edgeless).casefold() ==
@@ -2693,7 +2692,7 @@ class JobList(object):
             )
         ]
         # update edges completion status before removing them
-        for job in jobs_to_unload:
+        for job in (job for job in jobs_to_unload):
             for child in job.children:
                 self.graph.edges[job.name, child.name]['completion_status'] = "COMPLETED"
             for parent in job.parents:
@@ -2701,9 +2700,8 @@ class JobList(object):
                     self.graph.edges[parent.name, job.name]['completion_status'] = "COMPLETED"
         if jobs_to_unload:
             self.save_edges()
-
-        for job in jobs_to_unload:
-            for child in list(job.children):
+        for job in (job for job in jobs_to_unload):
+            for child in job.children:
                 if self.graph.has_edge(job.name, child.name):
                     self.graph.remove_edge(job.name, child.name)
                 child.parents.discard(job)
@@ -3629,7 +3627,7 @@ class JobList(object):
         out = True
         # Implementing checking scripts feedback to the users in a minimum of 4 messages
         count = stage = 0
-        for job in self.job_list:
+        for job in (job for job in self.job_list):
             job.update_check_variables(as_conf)
             count += 1
             if (count >= len(self.job_list) / 4 * (stage + 1)) or count == len(self.job_list):
@@ -3738,7 +3736,7 @@ class JobList(object):
     def remove_rerun_only_jobs(self) -> None:
         """Removes all jobs to be run only in reruns. """
         flag = False
-        for job in self.job_list:
+        for job in self.job_list[:]:
             if job.rerun_only == "true":
                 self._remove_job(job)
                 flag = True
