@@ -25,13 +25,14 @@ if TYPE_CHECKING:
     EXPERIMENT:
         NUMCHUNKS: '3'
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 echo "Hello World with id=Success"
                 sleep 1
             PLATFORM: TEST_PS
             RUNNING: chunk
-            wallclock: 00:01
+            WALLCLOCK: 00:01
+            RETRIALS: 0
     """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
 
     # Failure
@@ -39,15 +40,14 @@ if TYPE_CHECKING:
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED"
             PLATFORM: TEST_PS
             RUNNING: chunk
-            wallclock: 00:01
-            retrials: 2  
-
+            WALLCLOCK: 00:01
+            RETRIALS: 2
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
 ], ids=["Success", "Failure"])
 def test_run_uninterrupted(
@@ -106,17 +106,16 @@ def test_run_uninterrupted(
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
-
         EXPERIMENT:
             NUMCHUNKS: '3'
         JOBS:
-            job:
+            JOB:
                 SCRIPT: |
                     echo "Hello World with id=Success"
-                    sleep 1
-                PLATFORM: LOCAL
+                PLATFORM: TEST_PS
                 RUNNING: chunk
-                wallclock: 00:01
+                WALLCLOCK: 00:01
+                RETRIALS: 0
         """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
 
     # Failure
@@ -130,9 +129,8 @@ def test_run_uninterrupted(
                     d_echo "Hello World with id=FAILED"
                 PLATFORM: TEST_PS
                 RUNNING: chunk
-                wallclock: 00:01
-                retrials: 2  
-
+                WALLCLOCK: 00:01
+                RETRIALS: 2
         """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
 ], ids=["Success", "Failure"])
 def test_run_interrupted(

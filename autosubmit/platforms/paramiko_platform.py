@@ -37,6 +37,7 @@ from typing import Optional, Union, TYPE_CHECKING
 
 import Xlib.support.connect as xlib_connect
 import paramiko
+from paramiko import ProxyCommand
 from paramiko.agent import Agent
 from paramiko.ssh_exception import (SSHException)
 
@@ -140,7 +141,7 @@ class ParamikoPlatform(Platform):
         :param auth_password: Optional password for 2FA.
         """
         Platform.__init__(self, expid, name, config, auth_password=auth_password)
-        self._proxy = None
+        self._proxy: Optional[ProxyCommand] = None
         self._ssh_output_err = ""
         self.connected = False
         self._default_queue = None
@@ -148,12 +149,12 @@ class ParamikoPlatform(Platform):
         self._ssh: Optional[paramiko.SSHClient] = None
         self._ssh_config = None
         self._ssh_output = None
-        self._host_config = None
+        self._host_config: Optional[dict] = None
         self._host_config_id = None
         self.submit_cmd = ""
         self._ftpChannel: Optional[paramiko.SFTPClient] = None
         self.transport: Optional[paramiko.Transport] = None
-        self.channels = {}
+        self.channels: dict = {}
         if sys.platform != "linux":
             self.poller = select.kqueue()
         else:
@@ -718,7 +719,7 @@ class ParamikoPlatform(Platform):
             return None
 
     def get_job_energy_cmd(self, job_id):
-        return self.get_ssh_output()
+        raise NotImplementedError  # pragma: no cover
 
     def check_job_energy(self, job_id):
         """Checks job energy and return values. Defined in child classes.
@@ -1169,7 +1170,7 @@ class ParamikoPlatform(Platform):
                             del self.channels[fd]
 
     def exec_command(
-            self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False
+            self, command, bufsize=-1, timeout=30, retries=3, x11=False
     ) -> Union[tuple[paramiko.Channel, paramiko.Channel, paramiko.Channel], tuple[bool, bool, bool]]:
         """Execute a command on the SSH server.
 

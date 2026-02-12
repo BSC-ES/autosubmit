@@ -18,81 +18,91 @@
 
 from . import platform_utils as utils
 
+
 class SlurmMonitorItem:
-  def __init__(self, name, status, ncpus, nnodes, submit, start, finish, energy="0", MaxRSS=0.0, AveRSS=0.0):
-    self.name = str(name)
-    self.status = str(status)
-    self.ncpus = int(ncpus)
-    self.nnodes = int(nnodes)    
-    self.submit = utils.try_parse_time_to_timestamp(submit)
-    self.start = utils.try_parse_time_to_timestamp(start)
-    self.finish = utils.try_parse_time_to_timestamp(finish)
-    self.energy_str = energy
-    self.energy = utils.parse_output_number(energy)
-    self.MaxRSS = utils.parse_output_number(MaxRSS)
-    self.AveRSS = utils.parse_output_number(AveRSS)
-  
-  @property
-  def is_header(self):
-    return not self.is_detail
+    def __init__(self, name, status, ncpus, nnodes, submit, start, finish, energy="0", MaxRSS=0.0, AveRSS=0.0):
+        self.name = str(name)
+        self.status = str(status)
+        self.ncpus = int(ncpus)
+        self.nnodes = int(nnodes)
+        self.submit = utils.try_parse_time_to_timestamp(submit)
+        self.start = utils.try_parse_time_to_timestamp(start)
+        self.finish = utils.try_parse_time_to_timestamp(finish)
+        self.energy_str = energy
+        self.energy = utils.parse_output_number(energy)
+        self.MaxRSS = utils.parse_output_number(MaxRSS)
+        self.AveRSS = utils.parse_output_number(AveRSS)
 
-  @property
-  def is_detail(self):
-    if self.name.find(".") >= 0:
-      return True
-    return False
-    
-  @property
-  def is_extern(self):
-    if self.name.find(".ext") >= 0:
-      return True
-    return False
-  
-  @property
-  def is_batch(self):
-    if self.name.find(".bat") >= 0:
-      return True
-    return False
-  
-  @property
-  def step_number(self):
-    if self.is_step is True:
-      point_loc = self.name.find(".")
-      return int(self.name[point_loc+1:])
-    return -1
-  
-  @property
-  def is_step(self):
-    if self.name.find(".") >= 0 and self.is_batch is False and self.is_extern is False:
-      return True
-    return False
-    
-  @classmethod
-  def from_line(cls, line):
-    line = line.strip().split()
-    if len(line) < 2:
-      raise Exception("Slurm parser found a line too short {0}".format(line))
-    new_item = cls(line[0],
-                  line[1],
-                  str(line[2]) if len(line) > 2 else 0,
-                  str(line[3]) if len(line) > 3 else 0,
-                  str(line[4]) if len(line) > 4 else 0,
-                  str(line[5]) if len(line) > 5 else 0,
-                  str(line[6]) if len(line) > 6 else 0,
-                  str(line[7]) if len(line) > 7 else 0,
-                  str(line[8]) if len(line) > 8 else 0,
-                  str(line[9]) if len(line) > 9 else 0)
-    return new_item
 
-  def get_as_dict(self):    
-    return {"ncpus": self.ncpus,
-            "nnodes": self.nnodes,
-            "submit": self.submit,
-            "start": self.start,
-            "finish": self.finish,
-            "energy": self.energy,
-            "MaxRSS": self.MaxRSS,
-            "AveRSS": self.AveRSS}
-  
-  def __str__(self):
-    return f"Name {self.name}, Status {self.status}, NCpus {self.ncpus}, NNodes {self.nnodes}, Submit {self.submit}, Start {self.start}, Finish {self.finish}, Energy {self.energy}, MaxRSS {self.MaxRSS}, AveRSS {self.AveRSS} [Energy Str {self.energy_str}]"
+    @property
+    def is_header(self):
+        return not self.is_detail
+
+
+    @property
+    def is_detail(self):
+        if self.name.find(".") >= 0:
+            return True
+        return False
+
+
+    @property
+    def is_extern(self):
+        if self.name.find(".ext") >= 0:
+            return True
+        return False
+
+
+    @property
+    def is_batch(self):
+        if self.name.find(".bat") >= 0:
+            return True
+        return False
+
+
+    @property
+    def step_number(self):
+        if self.is_step is True:
+            point_loc = self.name.find(".")
+            return int(self.name[point_loc + 1:])
+        return -1
+
+
+    @property
+    def is_step(self):
+        if self.name.find(".") >= 0 and self.is_batch is False and self.is_extern is False:
+            return True
+        return False
+
+
+    @classmethod
+    def from_line(cls, line):
+        line = line.strip().split()
+        if len(line) < 2:
+            raise Exception("Slurm parser found a line too short {0}".format(line))
+        new_item = cls(line[0],
+                       line[1],
+                       str(line[2]) if len(line) > 2 else 0,
+                       str(line[3]) if len(line) > 3 else 0,
+                       str(line[4]) if len(line) > 4 else 0,
+                       str(line[5]) if len(line) > 5 else 0,
+                       str(line[6]) if len(line) > 6 else 0,
+                       str(line[7]) if len(line) > 7 else 0,
+                       str(line[8]) if len(line) > 8 else 0,
+                       str(line[9]) if len(line) > 9 else 0)
+        return new_item
+
+
+    def get_as_dict(self):
+        return {"ncpus": self.ncpus,
+                "nnodes": self.nnodes,
+                "submit": self.submit,
+                "start": self.start,
+                "finish": self.finish,
+                "energy": self.energy,
+                "MaxRSS": self.MaxRSS,
+                "AveRSS": self.AveRSS}
+
+
+    def __str__(self):
+        return f"Name {self.name}, Status {self.status}, NCpus {self.ncpus}, NNodes {self.nnodes}, Submit {self.submit}, Start {self.start}, Finish {self.finish}, Energy {self.energy}, MaxRSS {self.MaxRSS}, AveRSS {self.AveRSS} [Energy Str {self.energy_str}]"

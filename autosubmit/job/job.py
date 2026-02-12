@@ -28,7 +28,7 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 
@@ -152,7 +152,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit'
+        '_log_recovered', 'packed_during_building', 'workflow_commit', 'thread_write_finish'
     )
 
     def __setstate__(self, state):
@@ -296,6 +296,7 @@ class Job(object):
         self._custom_directives = None
         self.packed_during_building = False
         self.workflow_commit = None
+        self.thread_write_finish = None
         if loaded_data:
             self.__setstate__(loaded_data)
             self.status = Status.WAITING if self.status in [Status.DELAYED,
@@ -1296,13 +1297,12 @@ class Job(object):
                     log_recovered = False
         return log_recovered
 
-    def retrieve_internal_retrials_logfiles(self) -> Tuple[int, bool]:
-        """
-        Retrieves internal retrials log files for the given platform.
+    def retrieve_internal_retrials_logfiles(self) -> tuple[int, bool]:
+        """Retrieves internal retrials log files for the given platform.
         This function is used when the job is inside a vertical wrapper.
 
-        Returns:
-            int: The last retrial index where logs were successfully retrieved.
+        :return: The last retrial index where logs were successfully retrieved.
+        :rtype: tuple[int, bool]
         """
         log_recovered = False
         last_retrial = 0
@@ -1378,6 +1378,8 @@ class Job(object):
                 Log.result(
                     f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
         self.log_recovered = log_recovered
+        while self.platform.type.lower() == 'slurm' and self.thread_write_finish.is_alive():
+            sleep(1)
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
@@ -2666,14 +2668,12 @@ class Job(object):
         self.write_end_time(self.status == Status.COMPLETED, count=count)
 
     def write_end_time(self, completed, count=-1):
-        """
-        Writes end timestamp to TOTAL_STATS file and jobs_data.db
+        """Writes end timestamp to TOTAL_STATS file and jobs_data.db
         :param completed: True if the job has been completed, False otherwise
         :type completed: bool
         :param count: number of retrials
         :type count: int
         """
-
         end_time = self.check_end_time(count)
         if end_time > 0:
             self.finish_time_timestamp = int(end_time)
@@ -2698,12 +2698,12 @@ class Job(object):
                                                     job_id=self.id, out_file=out, err_file=err)
 
         # Launch second as threaded function only for slurm
-        if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
-            thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                                  historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish,
-                                         args=(job_data_dc, self.platform))
-            thread_write_finish.name = "JOB_data_{}".format(self.name)
-            thread_write_finish.start()
+        if job_data_dc and self.platform and self.platform.type == "slurm":
+            self.thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
+                                                historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish,
+                                              daemon=False, args=(job_data_dc, self.platform))
+            self.thread_write_finish.name = "JOB_data_{}".format(self.name)
+            self.thread_write_finish.start()
 
     def check_started_after(self, date_limit):
         """
