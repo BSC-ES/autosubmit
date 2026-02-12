@@ -837,7 +837,7 @@ class Autosubmit:
         elif args.command == 'updateversion':
             return Autosubmit.update_version(args.expid)
         elif args.command == 'upgrade':
-            return Autosubmit.upgrade_scripts(args.expid, files=args.files)
+            return Autosubmit.upgrade_scripts(args.expid)
         elif args.command == 'provenance':
             return Autosubmit.provenance(args.expid, rocrate=args.rocrate)
         elif args.command == 'archive':
@@ -3897,7 +3897,7 @@ class Autosubmit:
         return warn, substituted
 
     @staticmethod
-    def upgrade_scripts(expid: str, files="") -> bool:
+    def upgrade_scripts(expid: str) -> bool:
         def get_files(root_dir_, extensions, files=""):
             all_files = []
             if len(files) > 0:
