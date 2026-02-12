@@ -550,7 +550,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             with conn.begin():
                 if BasicConfig.DATABASE_BACKEND != "sqlite":
                     conn.execute(CreateSchema(self.schema, if_not_exists=True))
-                conn.execute(CreateTable(get_table_with_schema(self.schema, ExperimentRunTable.name), if_not_exists=True))
+                conn.execute(CreateTable(get_table_with_schema(self.schema, ExperimentRunTable), if_not_exists=True))
                 conn.execute(CreateTable(get_table_with_schema(self.schema, JobDataTable), if_not_exists=True))
             # TODO: implement db migrations?
             # self._set_historical_pragma_version(CURRENT_DB_VERSION)
@@ -856,7 +856,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         )
         with self.engine.connect() as conn:
             result = conn.execute(query).first()
-        return JobData.from_model(result)
+            return JobData.from_model(result)
 
     def get_job_data_max_counter(self, job_name: str = None):
         """ The max counter is the maximum count value for the count column in job_data. """

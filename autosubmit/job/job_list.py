@@ -2193,7 +2193,7 @@ class JobList(object):
         return str_date
 
     def __len__(self):
-        return len(self.graph.nodes())
+        return self.job_list.__len__()
 
     def get_date_list(self):
         """Get inner date list.
@@ -2673,7 +2673,7 @@ class JobList(object):
                 job.submitter = self.submitter
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
                         self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
-        Log.debug(f"Jobs loaded: {len(self.graph.nodes())}")
+        Log.debug(f"Jobs loaded: {len(self.job_list)}")
         Log.debug(f"Edges loaded: {len(self.graph_dict)}")
         self.update_wrappers_references()
         return len(self.get_active()) > 0
