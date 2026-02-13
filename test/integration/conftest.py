@@ -323,7 +323,7 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
 
 
 @pytest.fixture(scope="function")
-def git_server(tmp_path) -> Generator[tuple['DockerContainer', Path, str], Any, None]:
+def git_server(request, tmp_path) -> Generator[tuple['DockerContainer', Path, str], Any, None]:
     # Start a container to server it -- otherwise, we would have to use
     # `git -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
@@ -340,6 +340,7 @@ def git_server(tmp_path) -> Generator[tuple['DockerContainer', Path, str], Any, 
     with container:
         prepare_and_test_git_container(container, http_port)
         yield container, git_repos_path, repo_url
+        copy_content_from_git_containers(request, 'git_server')
 
 
 @pytest.fixture
@@ -349,30 +350,33 @@ def ps_platform() -> PsPlatform:
 
 
 @pytest.fixture(scope='function')
-def ssh_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
+def ssh_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
     """Start a single Docker container serving SSH for integration tests."""
     container, ssh_port = get_ssh_container(mfa=False, x11=False)
     with container:
         prepare_and_test_ssh_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
+        copy_content_from_ssh_containers(request, 'ssh_server')
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
+def ssh_x11_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
     """Get a running SSH server with X11 enabled (no MFA)."""
     container, ssh_port = get_ssh_container(mfa=False, x11=True)
     with container:
         prepare_and_test_ssh_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
+        # copy_content_from_ssh_containers(request, 'ssh_server')
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_mfa_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
+def ssh_x11_mfa_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
     """Get a running SSH server with X11 and MFA enabled."""
     container, ssh_port = get_ssh_container(mfa=True, x11=True)
     with container:
         prepare_and_test_ssh_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
+        # copy_content_from_ssh_containers(request, 'ssh_server')
 
 
 @pytest.fixture(scope="function")
@@ -387,7 +391,7 @@ def slurm_server(request, tmp_path, mocker) -> 'Container':
     with container:
         prepare_and_test_slurm_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
-        copy_content_from_containers_fixture(request)
+        copy_content_from_slurm_containers(request, 'slurm_server')
 
 
 @pytest.fixture
@@ -432,6 +436,7 @@ def postgres_server(request: 'FixtureRequest') -> Generator[Optional[PostgresCon
                 conn.commit()
 
             yield container
+            # copy_content_from_postgres_containers(request, 'postgres_server')
 
 
 @pytest.fixture(params=['postgres', 'sqlite'])
@@ -526,10 +531,9 @@ def setup_as_logs_pytest(tmp_path: 'LocalPath') -> None:
     )
 
 
-def copy_content_from_containers_fixture(request):
-    """Copy data from experiment from within the container to export
-    """
-    container_in_use: 'Container' = request.node.funcargs['slurm_server']
+def copy_content_from_slurm_containers(request, log_name):
+    """Copy data from experiment from within the container to export"""
+    container_in_use: 'Container' = request.node.funcargs[log_name]
     if container_in_use and request.session.testsfailed:
         stream, _ = container_in_use.get_archive('tmp/scratch/group/root/')
         fileobj = io.BytesIO()
@@ -539,4 +543,66 @@ def copy_content_from_containers_fixture(request):
         fileobj.seek(0)
 
         with tarfile.open(fileobj=fileobj) as tar:
-            tar.extractall(path=f"/container_logs/{request.node.name}/")
+            tar.extractall(path=f"./container_logs/{log_name}/{request.node.name}/")
+
+
+def copy_content_from_postgres_containers(request, log_name):
+    """Copy data from experiment from within the container to export"""
+    container_in_use: 'Container' = request.node.funcargs[log_name]
+    if container_in_use and request.session.testsfailed:
+        stream, _ = container_in_use.get_archive('tmp/scratch/group/root/')
+        fileobj = io.BytesIO()
+
+        for chunk in stream:
+            fileobj.write(chunk)
+        fileobj.seek(0)
+
+        with tarfile.open(fileobj=fileobj) as tar:
+            tar.extractall(path=f"./container_logs/{log_name}/{request.node.name}/")
+
+
+def copy_content_from_postgres_containers(request, log_name):
+    """Copy data from experiment from within the container to export"""
+    container_in_use: 'Container' = request.node.items[1].funcargs[log_name]
+    if container_in_use and request.session.testsfailed:
+        stream, _ = container_in_use.get_archive('tmp/scratch/group/root/')
+        fileobj = io.BytesIO()
+
+        for chunk in stream:
+            fileobj.write(chunk)
+        fileobj.seek(0)
+
+        with tarfile.open(fileobj=fileobj) as tar:
+            tar.extractall(path=f"./container_logs/{log_name}/{request.node.name}/")
+
+
+def copy_content_from_ssh_containers(request, log_name):
+    """Copy data from experiment from within the container to export"""
+    container_in_use: 'Container' = request.node.funcargs[log_name]
+    if container_in_use and request.session.testsfailed:
+        result_query = container_in_use.exec_run("ls tmp/")
+        if result_query:
+            stream, _ = container_in_use.get_archive('tmp/scratch/group/root/')
+            fileobj = io.BytesIO()
+
+            for chunk in stream:
+                fileobj.write(chunk)
+            fileobj.seek(0)
+
+            with tarfile.open(fileobj=fileobj) as tar:
+                tar.extractall(path=f"./container_logs/{log_name}/{request.node.name}/")
+
+
+def copy_content_from_git_containers(request, log_name):
+    """Copy data from experiment from within the container to export"""
+    container_in_use: 'Container' = request.node.funcargs[log_name]
+    if container_in_use and request.session.testsfailed:
+        stream, _ = container_in_use.get_archive('tmp/scratch/group/root/')
+        fileobj = io.BytesIO()
+
+        for chunk in stream:
+            fileobj.write(chunk)
+        fileobj.seek(0)
+
+        with tarfile.open(fileobj=fileobj) as tar:
+            tar.extractall(path=f"./container_logs/{log_name}/{request.node.name}/")

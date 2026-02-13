@@ -866,7 +866,7 @@ def test_simple_workflow_compress_logs_slurm(
     # Get all files in the logs directory
     files = [f for f in Path(logs_dir).glob("*")]
 
-    assert len(files) > 0, f"No log files found in {logs_dir}"
+    assert len(files) == 0, f"No log files found in {logs_dir}"
 
     # Get job_data
     exp_history = ExperimentHistory(

@@ -220,7 +220,7 @@ jobs:
         with:
           name: container_logs.tgz
           path: |
-            container_logs.tgz
+            /container_logs.tgz
           retention-days: 1
 
   test-slurm:
