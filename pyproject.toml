@@ -89,6 +89,11 @@ tests = [
     "types-requests",
     "typing_extensions==4.*",
 ]
+benchmark = [
+    "pandas",
+    "matplotlib",
+    "tabulate"
+]
 docs = [
     "livereload",
     "pydata-sphinx-theme>=0.16.1,<0.17",
@@ -102,7 +107,8 @@ docs = [
 all = [
     "autosubmit[tests]",
     "autosubmit[docs]",
-    "autosubmit[postgres]"
+    "autosubmit[postgres]",
+    "autosubmit[benchmark]"
 ]
 
 [tool.setuptools.packages.find]

@@ -1112,7 +1112,8 @@ class Job(object):
             fail_count = fail_count
             logname = os.path.join(self._tmp_path, f"{self.stat_file}{fail_count}")
         if os.path.exists(logname):
-            lines = open(logname).readlines()
+            with open(logname) as f:
+                lines = f.readlines()
             if len(lines) >= index + 1:
                 return int(lines[index])
             else:
@@ -1192,7 +1193,9 @@ class Job(object):
         if os.path.exists(log_name):
             already_completed = False
             # Read lines of the TOTAL_STATS file starting from last
-            for retrial in reversed(open(log_name).readlines()):
+            with open(log_name) as f:
+                lines = f.readlines()
+            for retrial in reversed(lines):
                 retrial_fields: list = retrial.split()
                 if Job.is_a_completed_retrial(retrial_fields):
                     # It's a COMPLETED run
@@ -2310,7 +2313,6 @@ class Job(object):
         if not self.submitter:
             self.submitter = ParamikoSubmitter(as_conf=as_conf)
 
-
         if not self.platform:
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
@@ -2322,7 +2324,11 @@ class Job(object):
             if as_conf.get_project_type().lower() == "none":
                 template = "%DEFAULT.EXPID%"
             else:
-                template = open(os.path.join(as_conf.get_project_dir(), file), 'r').read()
+                if (Path(as_conf.get_project_dir()) / file).exists():
+                    with open(Path(as_conf.get_project_dir()) / file, 'r') as f:
+                        template = f.read()
+                else:
+                    raise AutosubmitCritical(f"Additional file {file} not found in the project directory.", 6001)
             additional_templates += [template]
         return additional_templates
 
@@ -2521,8 +2527,8 @@ class Job(object):
                 '%(?<!%%)' + variable + '%(?!%%)', '', template_content, flags=re.I)
         template_content = template_content.replace("%%", "%")
         script_name = f'{self.name}.{wrapper_tag}.cmd'
-        open(os.path.join(self._tmp_path, script_name),
-             'w').write(template_content)
+        with open(Path(self._tmp_path) / script_name, 'w', encoding='utf-8') as f:
+            f.write(template_content)
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
         return script_name
 

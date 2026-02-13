@@ -204,6 +204,9 @@ class Autosubmit:
                                    help='Sets members allowed on this run.')
             subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
                                    help='Prints performance parameters of the execution of this command.')
+            subparser.add_argument('-t', '--trace', action='store_true', default=False, required=False,
+                                   help='Enables trace output for profiling (requires --profile).')
+
 
             # Expid
             subparser = subparsers.add_parser(
@@ -738,8 +741,10 @@ class Autosubmit:
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
         if args.command == 'run':
+            if args.trace and not args.profile:
+                raise AutosubmitCritical('Tracing is only available with profiling. Please add -p/--profile flag to run with tracing.', 7012)
             return Autosubmit.run_experiment(args.expid, args.start_time, args.start_after, args.run_only_members,
-                                             args.profile)
+                                             args.profile, args.trace)
         elif args.command == 'expid':
             return Autosubmit.expid(args.description, args.HPC, args.copy, args.dummy, args.minimal_configuration,
                                     args.git_repo, args.git_branch, args.git_as_conf, args.operational, args.testcase,
@@ -2009,10 +2014,11 @@ class Autosubmit:
         try:
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, new=False, full_load=False, submitter=submitter,
-                check_failed_jobs=True)
+                check_failed_jobs=True, run_mode=False)
             # New runs, reset failed status to waiting
-            if not recover:
-                job_list.reset_jobs_on_first_run()
+            # TODO: Fix this, I think we also need to check the status in the db if all logs are updated etc...
+            # if not recover:
+            #     job_list.reset_jobs_on_first_run()
 
         except IOError as e:
             raise AutosubmitError(
@@ -2121,7 +2127,7 @@ class Autosubmit:
 
     @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
-                       run_only_members: Optional[str] = None, profile=False) -> int:
+                       run_only_members: Optional[str] = None, profile: bool = False, trace: bool = False) -> int:
         """Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
 
         :param expid: the experiment id
@@ -2129,14 +2135,18 @@ class Autosubmit:
         :param start_after: the expid after which the experiment should start
         :param run_only_members: the members to run
         :param profile: if True, the function will be profiled
+        :param trace_enabled: if True, the function will be traced
         :return: exit status
 
         """
         # Start profiling if the flag has been used
         if profile:
             from .profiler.profiler import Profiler
-            profiler = Profiler(expid)
+            profiler = Profiler(expid, trace_enabled=trace)
             profiler.start()
+            profiler.iteration_checkpoint(0,0)
+        else:
+            profiler = None
 
         # Initialize common folders'
         try:
@@ -2167,8 +2177,6 @@ class Autosubmit:
                     Log.warning('Git operational check disabled by user')
 
                 Log.debug("Running main running loop")
-                Log.warning("Known issue: Due to recent changes in Autosubmit's script generation, error line numbers in "
-                            "`script.cmd.err` files may be offset by ~5 lines. Please adjust accordingly when debugging.")
                 #########################
                 # AUTOSUBMIT - MAIN LOOP
                 #########################
@@ -2193,6 +2201,8 @@ class Autosubmit:
                 # Save metadata.
                 as_conf.save()
                 while job_list.continue_run():
+                    if profile:
+                        profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))
                     try:
                         if Autosubmit.exit:
                             if len(job_list.get_failed_from_db()) > 0:
@@ -2357,6 +2367,8 @@ class Autosubmit:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
                     Log.result("Run successful")
+                    if profile:
+                        profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))
                     # Updating finish time for job data header
                     # Database is locked, may be related to my local db todo 4.1.1
                     try:
@@ -4377,7 +4389,7 @@ class Autosubmit:
 
     @staticmethod
     def detail(job_list):
-        current_length = len(job_list.get_job_list())
+        current_length = len(job_list.graph.nodes())
         if current_length > 1000:
             Log.warning(
                 "-d option: Experiment has too many jobs to be printed in the terminal. Maximum job quantity is 1000, your experiment has " + str(

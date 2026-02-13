@@ -670,11 +670,11 @@ def _create_db_pg() -> bool:
 
     try:
         with _get_sqlalchemy_conn() as conn:
-            for table in tables_to_create:
-                conn.execute(CreateTable(table, if_not_exists=True))
-            conn.execute(delete(tables.DBVersionTable))
-            conn.execute(insert(tables.DBVersionTable).values({"version": 1}))
-            conn.commit()
+            with conn.begin():
+                for table in tables_to_create:
+                    conn.execute(CreateTable(table, if_not_exists=True))
+                conn.execute(delete(tables.DBVersionTable))
+                conn.execute(insert(tables.DBVersionTable).values({"version": 1}))
     except Exception as exc:
         raise AutosubmitCritical(f"Database can not be created: {str(exc)}", 7004, str(exc))
 
@@ -684,14 +684,13 @@ def _create_db_pg() -> bool:
 def _save_experiment_sqlalchemy(name: str, description: str, version: str) -> bool:
     with _get_sqlalchemy_conn() as conn:
         try:
-            conn.execute(
-                insert(tables.ExperimentTable).values(
-                    name=name, description=description, autosubmit_version=version
+            with conn.begin():
+                conn.execute(
+                    insert(tables.ExperimentTable).values(
+                        name=name, description=description, autosubmit_version=version
+                    )
                 )
-            )
-            conn.commit()
         except Exception as exc:
-            conn.rollback()
             raise AutosubmitCritical("Could not register experiment", 7005, str(exc))
     return True
 
@@ -747,8 +746,8 @@ def _update_experiment_description_version_sqlalchemy(
     query = query.values(vals)
 
     with _get_sqlalchemy_conn() as conn:
-        result = conn.execute(query)
-        conn.commit()
+        with conn.begin():
+            result = conn.execute(query)
 
     if result.rowcount == 0:
         raise AutosubmitCritical(f"Update on experiment {name} failed.", 7005)
@@ -811,26 +810,24 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
         return True
 
     with _get_sqlalchemy_conn() as conn:
-        # Delete from experiment table
-        query = delete(tables.ExperimentTable).where(
-            tables.ExperimentTable.c.name == experiment_id  # type: ignore
-        )
-        result = conn.execute(query)
-        conn.commit()
-
-        # Drop schema
-        conn.execute(text(f'DROP SCHEMA IF EXISTS "{experiment_id}" CASCADE'))
-        conn.commit()
-
-        # Delete from experiment_status table
-        try:
-            query = delete(tables.ExperimentStatusTable).where(
-                tables.ExperimentStatusTable.c.name == experiment_id  # type: ignore
+        with conn.begin():
+            # Delete from experiment table
+            query = delete(tables.ExperimentTable).where(
+                tables.ExperimentTable.c.name == experiment_id  # type: ignore
             )
-            conn.execute(query)
-            conn.commit()
-        except Exception as e:
-            Log.debug(f"The experiment {experiment_id} has no status: {str(e)}")
+            result = conn.execute(query)
+
+            # Drop schema
+            conn.execute(text(f'DROP SCHEMA IF EXISTS "{experiment_id}" CASCADE'))
+
+            # Delete from experiment_status table
+            try:
+                query = delete(tables.ExperimentStatusTable).where(
+                    tables.ExperimentStatusTable.c.name == experiment_id  # type: ignore
+                )
+                conn.execute(query)
+            except Exception as e:
+                Log.debug(f"The experiment {experiment_id} has no status: {str(e)}")
 
         if cast(int, result.rowcount) > 0:
             Log.debug(f"The experiment {experiment_id} has been deleted!!!")
