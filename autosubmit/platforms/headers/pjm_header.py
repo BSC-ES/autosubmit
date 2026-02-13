@@ -25,8 +25,7 @@ class PJMHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_queue_directive(self, job, parameters):
-        """
-        Returns queue directive for the specified job
+        """Returns queue directive for the specified job
 
         :param job: job to create queue directive for
         :type job: Job
@@ -41,8 +40,7 @@ class PJMHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_account_directive(self, job, parameters):
-        """
-        Returns account directive for the specified job
+        """Returns account directive for the specified job
 
         :param job: job to create account directive for
         :type job: Job
@@ -55,8 +53,8 @@ class PJMHeader(object):
         return ""
 
     def get_nodes_directive(self, job, parameters):
-        """
-        Returns nodes directive for the specified job
+        """Returns nodes directive for the specified job
+
         :param job: job to create nodes directive for
         :type job: Job
         :return: nodes directive
@@ -70,8 +68,7 @@ class PJMHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_directive(self, job, parameters):
-        """
-        Returns memory directive for the specified job
+        """Returns memory directive for the specified job
 
         :param job: job to create memory directive for
         :type job: Job
@@ -84,8 +81,7 @@ class PJMHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_per_task_directive(self, job, parameters):
-        """
-        Returns memory per task directive for the specified job
+        """Returns memory per task directive for the specified job
 
         :param job: job to create memory per task directive for
         :type job: Job
@@ -98,8 +94,7 @@ class PJMHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_custom_directives(self, job, parameters):
-        """
-        Returns custom directives for the specified job
+        """Returns custom directives for the specified job
 
         :param job: job to create custom directive for
         :type job: Job
@@ -112,8 +107,8 @@ class PJMHeader(object):
         return ""
 
     def get_shape_directive(self, job, parameters):
-        """
-        Returns shape directive for the specified job
+        """Returns shape directive for the specified job
+
         :param job:
         :return:
         """
@@ -122,8 +117,7 @@ class PJMHeader(object):
         return ""
 
     def get_tasks_per_node(self, job, parameters):
-        """
-        Returns tasks per node directive for the specified job
+        """Returns tasks per node directive for the specified job
 
         :param job: job to create tasks per node directive for
         :type job: Job
@@ -135,8 +129,7 @@ class PJMHeader(object):
         return ""
 
     def get_threads_per_task(self, job, parameters, het=-1):
-        """
-        Returns threads per task directive for the specified job
+        """Returns threads per task directive for the specified job
 
         :param job: job to create threads per task directive for
         :type job: Job

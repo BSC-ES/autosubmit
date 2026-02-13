@@ -28,6 +28,7 @@ from time import time_ns
 from typing import cast, Any, Callable, Generator, Iterator, Optional, Protocol, TYPE_CHECKING
 
 import pytest
+from _pytest.tmpdir import TempPathFactory
 from ruamel.yaml import YAML
 from sqlalchemy import create_engine
 from testcontainers.postgres import PostgresContainer  # type: ignore
