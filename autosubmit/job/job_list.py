@@ -256,17 +256,13 @@ class JobList(object):
         )
 
         if not force:
-            changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs, monitor=monitor)
+            changes = self._load_graph(True, load_failed_jobs=check_failed_jobs, monitor=monitor)
 
-        if changes or not self.run_mode:
+        if changes or new:
             Log.info("Checking for new jobs...")
             self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
-
-        if not monitor and (changes or new):
             Log.info("Initializing new jobs...")
-            self._initialize_new_jobs(changes, new)
-
-        if changes or not self.run_mode:
+            self._initialize_new_jobs(new)
             Log.info("Saving the workflow state...")
             self._save_workflow_state(full_load, new)
 
@@ -534,14 +530,17 @@ class JobList(object):
         if len(self.graph.edges) > 0:
             self._delete_edgeless_jobs()
 
-    def _initialize_new_jobs(self, changes: bool, new: bool) -> None:
+    def _initialize_new_jobs(self, new: bool) -> None:
         """Initializes new jobs in the workflow graph.
-        :param changes: If True, resets the fail count for all jobs.
         :param new: If True, initializes new jobs.
         """
         for job in self.job_list:
-            if changes:
-                job._fail_count = 0
+            if not self.run_mode:
+                if new:
+                    job._fail_count = 0
+                elif job.status == Status.FAILED and job._fail_count >= job.retrials:
+                    job._fail_count = 0
+            # called from autosubmit create
             if new:
                 job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
             else:
@@ -3295,10 +3294,10 @@ class JobList(object):
 
         for job in [job for job in self.job_list if job.status in
                                                     [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED, Status.FAILED]]:
-            job.fail_count = 0
             if job.status == Status.FAILED:
                 job.status = Status.WAITING
                 Log.debug(f"Resetting job: {job.name} status to: WAITING on first run...")
+                job.fail_count = 0
 
     def _handle_special_checkpoint_jobs(self) -> Tuple[bool, bool]:
         """Set jobs that fulfill special checkpoint conditions to READY.

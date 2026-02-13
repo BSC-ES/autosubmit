@@ -2014,10 +2014,11 @@ class Autosubmit:
         try:
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, new=False, full_load=False, submitter=submitter,
-                check_failed_jobs=True)
+                check_failed_jobs=True, run_mode=False)
             # New runs, reset failed status to waiting
-            if not recover:
-                job_list.reset_jobs_on_first_run()
+            # TODO: Fix this, I think we also need to check the status in the db if all logs are updated etc...
+            # if not recover:
+            #     job_list.reset_jobs_on_first_run()
 
         except IOError as e:
             raise AutosubmitError(
@@ -2176,8 +2177,6 @@ class Autosubmit:
                     Log.warning('Git operational check disabled by user')
 
                 Log.debug("Running main running loop")
-                Log.warning("Known issue: Due to recent changes in Autosubmit's script generation, error line numbers in "
-                            "`script.cmd.err` files may be offset by ~5 lines. Please adjust accordingly when debugging.")
                 #########################
                 # AUTOSUBMIT - MAIN LOOP
                 #########################
