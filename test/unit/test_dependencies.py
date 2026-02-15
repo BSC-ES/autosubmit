@@ -1,17 +1,16 @@
+from datetime import datetime
+
 import mock
 import pytest
-from datetime import datetime
-from mock.mock import MagicMock
-from networkx import DiGraph
+from networkx import DiGraph  # type: ignore
+from typing_extensions import Tuple
 
-from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_utils import Dependency
-from autosubmit.config.yamlparser import YAMLParserFactory
 
 _MEMBER_LIST = ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6", "fc7", "fc8", "fc9", "fc10"]
 _CHUNK_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -130,8 +129,7 @@ def joblist(tmp_path):
     as_conf.experiment_data["JOBS"] = dict()
     as_conf.jobs_data = as_conf.experiment_data["JOBS"]
     as_conf.experiment_data["PLATFORMS"] = dict()
-    job_list_persistence = JobListPersistenceDb(_EXPID)
-    joblist = JobList(experiment_id, as_conf, YAMLParserFactory(), job_list_persistence)
+    joblist = JobList(experiment_id, as_conf, YAMLParserFactory())
     joblist._date_list = _DATE_LIST
     joblist._member_list = _MEMBER_LIST
     joblist._chunk_list = _CHUNK_LIST
@@ -366,7 +364,8 @@ def test_check_dates(joblist, test_job, relationships_dates, relationships_chunk
         "DATES_TO": "20020201",
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
-        "SPLITS_TO": "1"
+        "SPLITS_TO": "1",
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -379,7 +378,8 @@ def test_check_dates(joblist, test_job, relationships_dates, relationships_chunk
         "DATES_TO": "none",
         "MEMBERS_TO": "none",
         "CHUNKS_TO": "none",
-        "SPLITS_TO": "none"
+        "SPLITS_TO": "none",
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -401,7 +401,8 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "DATES_TO": "20020201",
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
-        "SPLITS_TO": "1"
+        "SPLITS_TO": "1",
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -412,7 +413,9 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "DATES_TO": "20020201",
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
-        "SPLITS_TO": "1"
+        "SPLITS_TO": "1",
+        "MIN_TRIGGER_STATUS": "COMPLETED"
+
     }
     assert result == expected_output
 
@@ -424,7 +427,8 @@ def test_check_members(joblist, test_job, relationships_members, relationships_c
         "DATES_TO": "none",
         "MEMBERS_TO": "none",
         "CHUNKS_TO": "none",
-        "SPLITS_TO": "none"
+        "SPLITS_TO": "none",
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
 
@@ -447,7 +451,8 @@ def test_check_splits(joblist, test_job, relationships_splits):
         "DATES_TO": "20020201",
         "MEMBERS_TO": "fc2",
         "CHUNKS_TO": "all",
-        "SPLITS_TO": "1"
+        "SPLITS_TO": "1",
+        "MIN_TRIGGER_STATUS": "COMPLETED"
     }
     assert result == expected_output
     test_job.split = 2
@@ -475,7 +480,7 @@ def test_check_chunks(joblist, test_job, relationships_chunks):
     }
 
     result = joblist._check_chunks(chunks, test_job)
-    expected_output = {'SPLITS_TO': '4'}
+    expected_output = {'SPLITS_TO': '4', "MIN_TRIGGER_STATUS": "COMPLETED"}
 
     assert result == expected_output
     chunks = {
@@ -485,7 +490,8 @@ def test_check_chunks(joblist, test_job, relationships_chunks):
     }
 
     result = joblist._check_chunks(chunks, test_job)
-    expected_output = {'DATES_TO': 'none', 'MEMBERS_TO': 'none', 'CHUNKS_TO': 'none', 'SPLITS_TO': 'none'}
+    expected_output = {'DATES_TO': 'none', 'MEMBERS_TO': 'none', 'CHUNKS_TO': 'none', 'SPLITS_TO': 'none',
+                       "MIN_TRIGGER_STATUS": "COMPLETED"}
     assert result == expected_output
 
     test_job.chunk = 2
@@ -517,45 +523,59 @@ def test_check_general(joblist, test_job, relationships_general):
 
 def test_check_relationship(joblist):
     relationships = {'MEMBERS_FROM': {
-        'TestMember,   TestMember2,TestMember3   ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None,
-                                                     'MEMBERS_TO': 'None', 'STATUS': None}}}
+        'TestMember,   TestMember2,TestMember3   ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0,
+                                                     'MEMBERS_TO': 'None', 'MIN_TRIGGER_STATUS': 'COMPLETED'}}}
     level_to_check = "MEMBERS_FROM"
     value_to_check = "TestMember"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': "COMPLETED"}]
     assert result == expected_output
     value_to_check = "TestMember2"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "TestMember3"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "TestMember   "
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
     value_to_check = "   TestMember"
     result = joblist._check_relationship(relationships, level_to_check, value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': None}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
     relationships = {'DATES_FROM': {
-        '20000101, 20000102, 20000103 ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None,
-                                          'MEMBERS_TO': 'None', 'STATUS': True}}}
+        '20000101, 20000102, 20000103 ': {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0,
+                                          'MEMBERS_TO': 'None', 'MIN_TRIGGER_STATUS': 'COMPLETED'}}}
     value_to_check = datetime(2000, 1, 1)
     result = joblist._check_relationship(relationships, "DATES_FROM", value_to_check)
     expected_output = [
-        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': None, 'MEMBERS_TO': 'None', 'STATUS': True}]
+        {'CHUNKS_TO': 'None', 'DATES_TO': 'None', 'FROM_STEP': 0, 'MEMBERS_TO': 'None',
+         'MIN_TRIGGER_STATUS': 'COMPLETED'}]
     assert result == expected_output
 
 
-def test_add_special_conditions(mocker, joblist):
+@pytest.fixture()
+def _init_special_conditions(joblist: JobList) -> Tuple[Job, Job, Job, dict, JobList]:
+    """
+    Initialize a JobList with a job and its parents, and add special conditions to the job.
+    This is used to test the add_special_conditions method.
+    :param joblist: JobList instance to use for the test
+    :return: A tuple containing the job, its parents, special conditions, and the job
+
+    """
     # Method from job_list
     job = Job("child", 1, Status.READY, 1)
     job.section = "child_one"
@@ -565,8 +585,9 @@ def test_add_special_conditions(mocker, joblist):
     job.split = 1
     job.splits = 1
     job.max_checkpoint_step = 0
-    special_conditions = {"STATUS": "RUNNING", "FROM_STEP": "2"}
-    filters_to_apply = {"DATES_TO": "all", "MEMBERS_TO": "all", "CHUNKS_TO": "all", "SPLITS_TO": "all"}
+    job.status = Status.WAITING
+    special_conditions = {"MIN_TRIGGER_STATUS": "RUNNING", "FROM_STEP": "2", "FAIL_OK": False}
+
     parent = Job("parent", 1, Status.READY, 1)
     parent.section = "parent_one"
     parent.date = datetime.strptime("20200128", "%Y%m%d")
@@ -575,117 +596,39 @@ def test_add_special_conditions(mocker, joblist):
     parent.split = 1
     parent.splits = 1
     parent.max_checkpoint_step = 0
-    job.status = Status.READY
-    job_list = mocker.Mock(wraps=joblist)
-    job_list._job_list = [job, parent]
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
-    # joblist.jobs_edges
-    # job.edges = joblist.jobs_edges[job.name]
-    # assert
-    assert job.max_checkpoint_step == 2
-    value = job.edge_info.get("RUNNING", "").get("parent", ())
-    assert (value[0].name, value[1]) == (parent.name, "2")
-    assert len(job.edge_info.get("RUNNING", "")) == 1
 
-    assert str(job_list.jobs_edges.get("RUNNING", ())) == str({job})
     parent2 = Job("parent2", 1, Status.READY, 1)
     parent2.section = "parent_two"
     parent2.date = datetime.strptime("20200128", "%Y%m%d")
     parent2.member = "fc0"
     parent2.chunk = 1
+    joblist.graph = DiGraph()
+    joblist.add_job(job)
+    joblist.add_job(parent)
+    joblist.add_job(parent2)
+    joblist.graph.add_edge(parent.name, job.name)
+    joblist.graph.add_edge(parent2.name, job.name)
+    joblist.add_special_conditions(job, special_conditions, parent)
+    special_conditions = {"MIN_TRIGGER_STATUS": "FAILED", "FROM_STEP": 0, "FAIL_OK": False}
+    joblist.add_special_conditions(job, special_conditions, parent2)
+    return job, parent, parent2, special_conditions, joblist
 
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent2)
-    value = job.edge_info.get("RUNNING", "").get("parent2", ())
-    assert len(job.edge_info.get("RUNNING", "")) == 2
-    assert (value[0].name, value[1]) == (parent2.name, "2")
-    assert str(job_list.jobs_edges.get("RUNNING", ())) == str({job})
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent2)
-    assert len(job.edge_info.get("RUNNING", "")) == 2
 
+def test_add_special_conditions(mocker, _init_special_conditions):
+    job, parent, parent2, special_conditions, joblist = _init_special_conditions
 
-def test_add_special_conditions_chunks_to_once(mocker, joblist):
-    # Method from job_list
-    job = Job("child", 1, Status.WAITING, 1)
-    job.section = "child_one"
-    job.date = datetime.strptime("20200128", "%Y%m%d")
-    job.member = "fc0"
-    job.chunk = 1
-    job.split = 1
-    job.splits = 1
-    job.max_checkpoint_step = 0
+    edge = joblist.graph.edges[parent.name, job.name]
+    assert job.max_checkpoint_step == 2
+    assert edge.get("from_step") == 2
+    assert edge.get("min_trigger_status") == "RUNNING"
+    assert not edge.get("fail_ok")
 
-    job_two = Job("child", 1, Status.WAITING, 1)
-    job_two.section = "child_one"
-    job_two.date = datetime.strptime("20200128", "%Y%m%d")
-    job_two.member = "fc0"
-    job_two.chunk = 2
-    job_two.split = 1
-    job_two.splits = 1
-    job_two.max_checkpoint_step = 0
-
-    special_conditions = {"STATUS": "RUNNING", "FROM_STEP": "1"}
-    special_conditions_two = {"STATUS": "RUNNING", "FROM_STEP": "2"}
-
-    parent = Job("parent", 1, Status.RUNNING, 1)
-    parent.section = "parent_one"
-    parent.date = datetime.strptime("20200128", "%Y%m%d")
-    parent.member = None
-    parent.chunk = None
-    parent.split = None
-    parent.splits = None
-    parent.max_checkpoint_step = 0
-    job.status = Status.WAITING
-    job_two.status = Status.WAITING
-
-    job_list = mocker.Mock(wraps=joblist)
-    job_list._job_list = [job, job_two, parent]
-
-    dependency = MagicMock()
-    dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1'}, '2': {'FROM_STEP': '2'}, },
-                                'STATUS': 'RUNNING'}
-    filters_to_apply = job_list.get_filters_to_apply(job, dependency)
-    filters_to_apply_two = job_list.get_filters_to_apply(job_two, dependency)
-
-    assert filters_to_apply == {}
-    assert filters_to_apply_two == {}
-
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
-    job_list.add_special_conditions(job_two, special_conditions_two, filters_to_apply_two, parent)
-
-    dependency = MagicMock()
-    dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1', 'CHUNKS_TO': 'natural'},
-                                                '2': {'FROM_STEP': '2', 'CHUNKS_TO': 'natural'}, },
-                                'STATUS': 'RUNNING'}
-    filters_to_apply = job_list.get_filters_to_apply(job, dependency)
-    filters_to_apply_two = job_list.get_filters_to_apply(job_two, dependency)
-
-    assert filters_to_apply == {}
-    assert filters_to_apply_two == {}
-
-    job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
-    job_list.add_special_conditions(job_two, special_conditions_two, filters_to_apply_two, parent)
-
-    assert job.max_checkpoint_step == 1
-    assert job_two.max_checkpoint_step == 2
-
-    value = job.edge_info.get("RUNNING", "").get("parent", ())
-    assert (value[0].name, value[1]) == (parent.name, "1")
-    assert len(job.edge_info.get("RUNNING", "")) == 1
-
-    value_two = job_two.edge_info.get("RUNNING", "").get("parent", ())
-    assert (value_two[0].name, value_two[1]) == (parent.name, "2")
-    assert len(job_two.edge_info.get("RUNNING", "")) == 1
-
-    dependency = MagicMock()
-    dependency.relationships = {
-        'CHUNKS_FROM': {'1': {'FROM_STEP': '1', 'CHUNKS_TO': 'natural', 'DATES_TO': "dummy"},
-                        '2': {'FROM_STEP': '2', 'CHUNKS_TO': 'natural', 'DATES_TO': "dummy"}, },
-        'STATUS': 'RUNNING'}
-    filters_to_apply = job_list.get_filters_to_apply(job, dependency)
-    filters_to_apply_two = job_list.get_filters_to_apply(job_two, dependency)
-
-    assert filters_to_apply == {'CHUNKS_TO': 'natural', 'DATES_TO': 'dummy'}
-    assert filters_to_apply_two == {'CHUNKS_TO': 'natural', 'DATES_TO': 'dummy'}
+    edge = joblist.graph.edges[parent2.name, job.name]
+    # Still 2 because it is the MAX value between all dependencies
+    assert job.max_checkpoint_step == 2
+    assert edge.get("from_step") == 0
+    assert edge.get("min_trigger_status") == "FAILED"
+    assert not edge.get("fail_ok")
 
 
 def test_job_dict_get_jobs_filtered(mocker, joblist):
@@ -695,7 +638,7 @@ def test_job_dict_get_jobs_filtered(mocker, joblist):
     as_conf.experiment_data = {
         'CONFIG': {'AUTOSUBMIT_VERSION': '4.1.2', 'MAXWAITINGJOBS': 20, 'TOTALJOBS': 20, 'SAFETYSLEEPTIME': 10,
                    'RETRIALS': 0}, 'MAIL': {'NOTIFICATIONS': False, 'TO': None},
-        'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
+        'STORAGE': {'TYPE': 'sqlite', 'COPY_REMOTE_LOGS': True},
         'DEFAULT': {'EXPID': 'a03b', 'HPCARCH': 'marenostrum4'},
         'EXPERIMENT': {'DATELIST': '20000101', 'MEMBERS': 'fc0', 'CHUNKSIZEUNIT': 'month', 'CHUNKSIZE': 4,
                        'NUMCHUNKS': 5, 'CHUNKINI': '', 'CALENDAR': 'standard'},
@@ -736,8 +679,6 @@ def test_job_dict_get_jobs_filtered(mocker, joblist):
         'ROOTDIR': '/home/dbeltran/new_autosubmit/a03b', 'PROJDIR': '/home/dbeltran/new_autosubmit/a03b/proj/'}
     as_conf.jobs_data = as_conf.experiment_data["JOBS"]
     as_conf.last_experiment_data = as_conf.experiment_data
-    as_conf.detailed_deep_diff = mocker.Mock()
-    as_conf.detailed_deep_diff.return_value = {}
     dictionary = DicJobs(_DATE_LIST, _MEMBER_LIST, _CHUNK_LIST, "", default_retrials=0,
                          as_conf=as_conf)
     dictionary.read_section("SIM", 1, "bash")
@@ -750,7 +691,7 @@ def test_job_dict_get_jobs_filtered(mocker, joblist):
     job.splits = 2
     job.max_checkpoint_step = 0
     job_list = mocker.Mock(wraps=joblist)
-    job_list._job_list = [job]
+    job_list.job_list = [job]
     filters_to = {'SPLITS_TO': "1*\\1"}
     filters_to_of_parent = {'SPLITS_TO': 'previous'}
     natural_chunk = 1
@@ -766,8 +707,7 @@ def test_normalize_auto_keyword(as_conf, mocker):
     job_list = JobList(
         as_conf.expid,
         as_conf,
-        YAMLParserFactory(),
-        Autosubmit._get_job_list_persistence(as_conf.expid, as_conf)
+        YAMLParserFactory()
     )
     dependency = Dependency("test")
 

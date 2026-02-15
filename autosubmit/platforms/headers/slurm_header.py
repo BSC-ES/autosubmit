@@ -220,7 +220,7 @@ class SlurmHeader(object):
             if job.het['RESERVATION'][het] != '':
                 return "SBATCH --reservation={0}".format(job.het['RESERVATION'][het])
         else:
-            if parameters['RESERVATION'] != '':
+            if parameters['RESERVATION']:
                 return "SBATCH --reservation={0}".format(parameters['RESERVATION'])
         return ""
 

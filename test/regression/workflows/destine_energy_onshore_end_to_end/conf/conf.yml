@@ -49,14 +49,14 @@ JOBS:
     DEPENDENCIES:
       SIM:
         STATUS: RUNNING
-        ANY_FINAL_STATUS_IS_VALID: true
+        OPTIONAL: true
       DN:
         SPLITS_FROM:
           ALL:
             SPLITS_TO: previous
       APP_ENERGY_ONSHORE-1:
         STATUS: FAILED
-        ANY_FINAL_STATUS_IS_VALID: false
+        OPTIONAL: false
     RUNNING: chunk
     WALLCLOCK: 02:00
     PLATFORM: TEST_SLURM
@@ -119,7 +119,7 @@ JOBS:
     DEPENDENCIES:
       SIM:
         STATUS: RUNNING
-        ANY_FINAL_STATUS_IS_VALID: true
+        OPTIONAL: true
     RUNNING: chunk
     WALLCLOCK: 00:30
     CHECK: on_submission

@@ -131,8 +131,14 @@ class EcPlatform(ParamikoPlatform):
                             self.remote_log_dir + "/")
 
     def check_all_jobs(self, job_list, as_conf, retries=5):
-        for job, prev_status in job_list:
+        save = False
+        for job in job_list:
             self.check_job(job)
+            if job.new_status != job.status:
+                job.update_status(as_conf)
+                save = True
+
+        return save
 
     def parse_job_output(self, output):
         job_state = output.split('\n')

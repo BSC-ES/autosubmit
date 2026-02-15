@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import textwrap
 from pathlib import Path
 from typing import Optional, Protocol, cast
@@ -43,9 +42,12 @@ class ExperimentStatusDbManager(DatabaseManager):
             local_root_dir_path: str = DEFAULT_LOCAL_ROOT_DIR
     ):
         super(ExperimentStatusDbManager, self).__init__(expid, local_root_dir_path=local_root_dir_path)
-        self._as_times_file_path = os.path.join(db_dir_path, BasicConfig.AS_TIMES_DB)
-        self._ecearth_file_path = os.path.join(db_dir_path, main_db_name)
-        self._pkl_file_path = os.path.join(local_root_dir_path, self.expid, "pkl", f"job_list_{self.expid}.pkl")
+        db_dir = Path(db_dir_path)
+        local_root = Path(local_root_dir_path)
+
+        self._as_times_file_path = db_dir / BasicConfig.AS_TIMES_DB
+        self._ecearth_file_path = db_dir / main_db_name
+        self._db_file_path = local_root / self.expid / "db" / f"job_list_{self.expid}.db"
         self._validate_status_database()
 
     def _validate_status_database(self):

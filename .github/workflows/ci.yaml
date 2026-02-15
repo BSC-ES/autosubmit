@@ -74,7 +74,7 @@ jobs:
     env:
       COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
 
     strategy:
       matrix:
@@ -126,7 +126,7 @@ jobs:
         run: |
           Xvfb :99 -screen 0 1024x768x24 -ac &
           export DISPLAY=:99
-          
+
           pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \

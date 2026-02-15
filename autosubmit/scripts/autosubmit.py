@@ -116,7 +116,7 @@ def main():
                 expid = f"<{args.expid}>"
                 with suppress(BaseException):
                     as_conf = AutosubmitConfig(args.expid)
-                    as_conf.reload()
+                    as_conf.load_starter_conf()
                     version = f"{as_conf.experiment_data.get('CONFIG', {}).get('AUTOSUBMIT_VERSION', 'unknown')}"
         Log.error(f"Arguments provided: {str(args)}")
         Log.error(f"This is the experiment: {expid} which had an issue with the command: {command} and it is currently using the Autosubmit Version: {version}.")

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 # -- Tests
 
 @pytest.mark.docker
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.timeout(300)

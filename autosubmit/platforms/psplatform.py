@@ -97,9 +97,14 @@ class PsPlatform(ParamikoPlatform):
     def get_check_job_cmd(self, job_id):
         return self.get_pscall(job_id)
 
-    def check_all_jobs(self, job_list, as_conf, retries=5):
-        for job, prev_status in job_list:
+    def check_all_jobs(self, job_list, as_conf, retries=5) -> bool:
+        save = False
+        for job in job_list:
             self.check_job(job)
+            if job.new_status != job.status:
+                job.update_status(as_conf)
+                save = True
+        return save
 
     def check_remote_permissions(self) -> bool:
         try:

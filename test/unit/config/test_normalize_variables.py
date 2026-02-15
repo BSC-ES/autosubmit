@@ -44,6 +44,9 @@ from autosubmit.log.log import AutosubmitCritical
                         "CUSTOM_DIRECTIVES": ["directive1", "directive2"],
                         "FILE": "file1 file2"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -68,6 +71,9 @@ from autosubmit.log.log import AutosubmitCritical
                         "FILE": "file1",
                         "ADDITIONAL_FILES": ["file2"]
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -77,11 +83,17 @@ from autosubmit.log.log import AutosubmitCritical
             {
                 "WRAPPERS": {
                     "wrapper1": "job1 job2"
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
                 "WRAPPERS": {
                     "WRAPPER1": "job1 job2"
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             False,
@@ -93,6 +105,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "job1": {
                         "DEPENDENCIES": "job2 job3"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -102,6 +117,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'ADDITIONAL_FILES': [],
                         "DEPENDENCIES": {"JOB2": {}, "JOB3": {}}
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -111,6 +129,9 @@ from autosubmit.log.log import AutosubmitCritical
             {
                 "JOBS": {
                     "job1": {}
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -120,6 +141,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'ADDITIONAL_FILES': [],
                         'DEPENDENCIES': {},
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -131,6 +155,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "JOB": {
                         "PROCESSORS": 30
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -138,6 +165,9 @@ from autosubmit.log.log import AutosubmitCritical
                     'JOB': {
                         'PROCESSORS': 30
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             False,
@@ -149,6 +179,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "job1": {
                         "CUSTOM_DIRECTIVES": "directive1 directive2"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -159,6 +192,9 @@ from autosubmit.log.log import AutosubmitCritical
                         "ADDITIONAL_FILES": [],
                         "DEPENDENCIES": {}
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -170,6 +206,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "job1": {
                         "CUSTOM_DIRECTIVES": "directive1 directive2"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -177,6 +216,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "JOB1": {
                         "CUSTOM_DIRECTIVES": "directive1 directive2",
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             False,
@@ -188,6 +230,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "job1": {
                         "CUSTOM_DIRECTIVES": ["directive1", "directive2"]
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -195,6 +240,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "JOB1": {
                         "CUSTOM_DIRECTIVES": "['directive1', 'directive2']",
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             False,
@@ -206,6 +254,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "job1": {
                         "FILE": "file1, file2, file3"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -215,6 +266,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'ADDITIONAL_FILES': ['file2', 'file3'],
                         'DEPENDENCIES': {},
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -226,6 +280,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "job1": {
                         "FILE": "file1, file2, file3"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -234,6 +291,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'FILE': 'file1',
                         'ADDITIONAL_FILES': ['file2', 'file3'],
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             False,
@@ -245,6 +305,9 @@ from autosubmit.log.log import AutosubmitCritical
                     "job1": {
                         "FILE": ["file1", "file2", "file3"]
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -254,6 +317,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'ADDITIONAL_FILES': ['file2', 'file3'],
                         'DEPENDENCIES': {},
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -265,19 +331,23 @@ from autosubmit.log.log import AutosubmitCritical
                     "job1": {
                         "FILE": "FILE1",
                         "DEPENDENCIES": {
-                            "job2": {"STATUS": "FAILED"},
-                            "job3": {"STATUS": "FAILED?"},
-                            "job4": {"STATUS": "RUNNING"},
-                            "job5": {"STATUS": "COMPLETED"},
-                            "job6": {"STATUS": "SKIPPED"},
-                            "job7": {"STATUS": "READY"},
-                            "job8": {"STATUS": "DELAYED"},
-                            "job9": {"STATUS": "PREPARED"},
-                            "job10": {"STATUS": "QUEUING"},
-                            "job11": {"STATUS": "SUBMITTED"},
-                            "job12": {"STATUS": "HELD"},
+                            "job2": {"MIN_TRIGGER_STATUS": "FAILED"},
+                            "job3": {"MIN_TRIGGER_STATUS": "FAILED?"},
+                            "job4": {"MIN_TRIGGER_STATUS": "RUNNING"},
+                            "job5": {"MIN_TRIGGER_STATUS": "COMPLETED"},
+                            "job6": {"MIN_TRIGGER_STATUS": "SKIPPED"},
+                            "job7": {"MIN_TRIGGER_STATUS": "READY"},
+                            "job8": {"MIN_TRIGGER_STATUS": "DELAYED"},
+                            "job9": {"MIN_TRIGGER_STATUS": "PREPARED"},
+                            "job10": {"MIN_TRIGGER_STATUS": "QUEUING"},
+                            "job11": {"MIN_TRIGGER_STATUS": "SUBMITTED"},
+                            "job12": {"MIN_TRIGGER_STATUS": "HELD"},
+                            "job13": {"MIN_TRIGGER_STATUS": "RUNNING?"},
                         },
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -286,19 +356,23 @@ from autosubmit.log.log import AutosubmitCritical
                         'FILE': 'FILE1',
                         'ADDITIONAL_FILES': [],
                         'DEPENDENCIES': {
-                            'JOB2': {'STATUS': 'FAILED', 'ANY_FINAL_STATUS_IS_VALID': False},
-                            'JOB3': {'STATUS': 'FAILED', 'ANY_FINAL_STATUS_IS_VALID': True},
-                            'JOB4': {'STATUS': 'RUNNING', 'ANY_FINAL_STATUS_IS_VALID': True},
-                            'JOB5': {'STATUS': 'COMPLETED', 'ANY_FINAL_STATUS_IS_VALID': False},
-                            'JOB6': {'STATUS': 'SKIPPED', 'ANY_FINAL_STATUS_IS_VALID': False},
-                            'JOB7': {'STATUS': 'READY', 'ANY_FINAL_STATUS_IS_VALID': False},
-                            'JOB8': {'STATUS': 'DELAYED', 'ANY_FINAL_STATUS_IS_VALID': False},
-                            'JOB9': {'STATUS': 'PREPARED', 'ANY_FINAL_STATUS_IS_VALID': False},
-                            'JOB10': {'STATUS': 'QUEUING', 'ANY_FINAL_STATUS_IS_VALID': True},
-                            'JOB11': {'STATUS': 'SUBMITTED', 'ANY_FINAL_STATUS_IS_VALID': True},
-                            'JOB12': {'STATUS': 'HELD', 'ANY_FINAL_STATUS_IS_VALID': True},
+                            'JOB2': {'MIN_TRIGGER_STATUS': 'FAILED', 'FAIL_OK': False},
+                            'JOB3': {'MIN_TRIGGER_STATUS': 'FAILED', 'FAIL_OK': True},
+                            'JOB4': {'MIN_TRIGGER_STATUS': 'RUNNING', 'FAIL_OK': False},
+                            'JOB5': {'MIN_TRIGGER_STATUS': 'COMPLETED', 'FAIL_OK': False},
+                            'JOB6': {'MIN_TRIGGER_STATUS': 'SKIPPED', 'FAIL_OK': False},
+                            'JOB7': {'MIN_TRIGGER_STATUS': 'READY', 'FAIL_OK': False},
+                            'JOB8': {'MIN_TRIGGER_STATUS': 'DELAYED', 'FAIL_OK': False},
+                            'JOB9': {'MIN_TRIGGER_STATUS': 'PREPARED', 'FAIL_OK': False},
+                            'JOB10': {'MIN_TRIGGER_STATUS': 'QUEUING', 'FAIL_OK': False},
+                            'JOB11': {'MIN_TRIGGER_STATUS': 'SUBMITTED', 'FAIL_OK': False},
+                            'JOB12': {'MIN_TRIGGER_STATUS': 'HELD', 'FAIL_OK': False},
+                            'JOB13': {'MIN_TRIGGER_STATUS': 'RUNNING', 'FAIL_OK': True},
                         },
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -311,6 +385,9 @@ from autosubmit.log.log import AutosubmitCritical
                         "FILE": "FILE1",
                         "NOTIFY_ON": ["running", "COmpLETED"]
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -321,6 +398,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'DEPENDENCIES': {},
                         'NOTIFY_ON': ['RUNNING', 'COMPLETED'],
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -333,6 +413,9 @@ from autosubmit.log.log import AutosubmitCritical
                         "FILE": "FILE1",
                         "NOTIFY_ON": "running, COmpLETED"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -343,6 +426,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'DEPENDENCIES': {},
                         'NOTIFY_ON': ['RUNNING', 'COMPLETED'],
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -355,6 +441,9 @@ from autosubmit.log.log import AutosubmitCritical
                         "FILE": "FILE1",
                         "NOTIFY_ON": "running COmpLETED"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -365,6 +454,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'DEPENDENCIES': {},
                         'NOTIFY_ON': ['RUNNING', 'COMPLETED'],
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -377,6 +469,9 @@ from autosubmit.log.log import AutosubmitCritical
                         "FILE": "FILE1",
                         "NOTIFY_ON": "running"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -387,6 +482,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'DEPENDENCIES': {},
                         'NOTIFY_ON': ['RUNNING'],
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -399,6 +497,9 @@ from autosubmit.log.log import AutosubmitCritical
                         "FILE": "FILE1",
                         "WALLCLOCK": "00:20:00"
                     }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             {
@@ -409,6 +510,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'DEPENDENCIES': {},
                         'WALLCLOCK': "00:20",
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
