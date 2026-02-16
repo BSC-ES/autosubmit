@@ -2302,14 +2302,14 @@ def wrapper_data():
 
 def test_build_imports(wrapper_data):
     kwargs:dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
-                   'num_processors_value': True, 'expid': True, 'wrapper_data': wrapper_data}
+                   'num_processors_value': True, 'expid': True, 'wrapper_data': wrapper_data, 'name': "test"}
     vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_imports()
     assert type(vh_wrapper) is str and '("t" "e" "s" "t" )' in vh_wrapper
 
 
 def test_build_srun_launcher(wrapper_data):
     kwargs:dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
-                   'num_processors_value': True, 'expid': True, 'wrapper_data': wrapper_data}
+                   'num_processors_value': True, 'expid': True, 'wrapper_data': wrapper_data, 'name': "test"}
     vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_srun_launcher("job1, job2, job3, job4, job5")
     assert type(vh_wrapper) is str and "job1, job2, job3, job4, job5" in vh_wrapper
 
