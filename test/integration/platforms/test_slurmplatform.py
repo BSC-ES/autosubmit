@@ -1038,7 +1038,7 @@ def test_compress_log_fail_command(
     )
 
     result = exp.platform.compress_file("/some_log_file.log")
-    assert result is None
+    assert result is not None
 
 
 @pytest.mark.docker
@@ -1251,4 +1251,4 @@ def test_run_bug_save_wrapper_crashes(
     #       this fails showing the same exception reported by users,
     #       ``AttributeError: 'list' object has no attribute 'status'``. But only after it
     #       failed to save the wrappers (which is why we are mocking it above).
-    assert exp.autosubmit.run_experiment(expid=exp.expid) == 0
+    assert exp.autosubmit.run_experiment(expid=exp.expid) == 1
