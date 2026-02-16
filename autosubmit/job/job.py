@@ -28,13 +28,13 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, Tuple, TYPE_CHECKING, Any
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
+from autosubmit.helpers.parameters import autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
@@ -129,38 +129,29 @@ class Job(object):
     """
 
     __slots__ = (
-        'rerun_only', 'delay_end', 'wrapper_type', '_wrapper_queue',
-        '_platform', '_queue', '_partition', 'retry_delay', '_section',
-        '_wallclock', 'wchunkinc', '_tasks', '_nodes',
-        '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
-        '_member', 'date', 'date_split', '_splits', '_split', '_delay',
-        '_frequency', '_synchronize', 'skippable', 'repacked', '_long_name',
-        'date_format', 'type', '_name',
-        'undefined_variables', 'log_retries', 'id',
-        'file', 'additional_files', 'executable', '_local_logs',
-        '_remote_logs', 'script_name', 'stat_file', '_status', 'prev_status',
-        'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
-        'parameters', '_tmp_path', '_log_path', '_platform', 'check',
-        'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
-        '_dependencies', 'running', 'start_time', 'ext_header_path', 'ext_tailer_path',
-        'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
-        'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
-        'delete_when_edgeless', 'het', 'updated_log',
-        'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
-        '_script', '_log_recovery_retries', 'ready_date', 'wrapper_name',
-        'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_processors_per_node',
-        'ec_queue', 'platform_name', '_serial_platform',
-        'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
-        '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit'
+        'rerun_only', 'delay_end', 'wrapper_type', '_wrapper_queue', '_platform', '_queue', '_partition', 'retry_delay',
+        '_section', '_wallclock', 'wchunkinc', '_tasks', '_nodes', '_threads', '_processors', '_memory',
+        '_memory_per_task', '_chunk', '_member', 'date', 'date_split', '_splits', '_split', '_delay', '_frequency',
+        '_synchronize', 'skippable', 'repacked', '_long_name', 'date_format', 'type', '_name', 'undefined_variables',
+        'log_retries', 'id', 'file', 'additional_files', 'executable', '_local_logs', '_remote_logs', 'script_name',
+        'stat_file', '_status', 'prev_status', 'new_status', 'priority', '_parents', '_children', '_fail_count',
+        'expid', 'parameters', '_tmp_path', '_log_path', 'check', 'check_warnings', '_packed', 'hold',
+        'distance_weight', 'level', '_export', '_dependencies', 'running', 'start_time', 'ext_header_path',
+        'ext_tailer_path', 'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
+        'current_checkpoint_step', 'max_checkpoint_step', 'reservation', 'delete_when_edgeless', 'het', 'updated_log',
+        'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp', '_script', '_log_recovery_retries',
+        'ready_date', 'wrapper_name', 'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_processors_per_node',
+        'ec_queue', 'platform_name', '_serial_platform', 'submitter', '_shape', '_x11', '_x11_options',
+        '_hyperthreading', '_scratch_free_space', '_delay_retrials', '_custom_directives', '_log_recovered',
+        'packed_during_building', 'workflow_commit'
     )
 
-    def __setstate__(self, state):
+    def __setstate__(self, state) -> None:
         for slot, value in state.items():
             if slot in self.__slots__:
                 setattr(self, slot, value)
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Optional[Any]]:
         return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
 
     CHECK_ON_SUBMISSION = 'on_submission'
@@ -174,13 +165,13 @@ class Job(object):
     # def __eq__(self, other):
     #     return self.name == other.name and self.id == other.id
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.name} STATUS: {self.status}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.name} STATUS: {self.status}"
 
-    def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
+    def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None) -> None:
 
         if loaded_data:
             name = loaded_data['_name']
@@ -190,9 +181,9 @@ class Job(object):
 
         self.rerun_only = False
         self.delay_end = None
-        self.wrapper_type = None
+        self.wrapper_type: str = ''
         self._wrapper_queue = None
-        self._platform = None
+        self._platform: Optional['Platform'] = None
         self._queue = None
         self._partition = None
         self.retry_delay = None
@@ -200,16 +191,16 @@ class Job(object):
         self._section: Optional[str] = None
         self._wallclock: Optional[str] = None
         self.wchunkinc = None
-        self._tasks = None
-        self._nodes = None
-        self._threads = None
-        self._processors = None
-        self._memory = None
-        self._memory_per_task = None
+        self._tasks: Optional[str] = None
+        self._nodes: Optional[str] = None
+        self._threads: Optional[str] = None
+        self._processors: Optional[str] = None
+        self._memory: Optional[str] = None
+        self._memory_per_task: Optional[str] = None
         self._chunk = None
         self._member = None
         self.date = None
-        self.date_split = None
+        self.date_split: Optional[datetime.datetime] = None
         self._splits = None
         self._split = None
         self._delay = None
@@ -221,74 +212,73 @@ class Job(object):
         self._long_name = None
         self.date_format = ''
         self.type = Language.BASH
-        self.undefined_variables = None
+        self.undefined_variables: list[str] = []
         self.log_retries = 5
         self.id = job_id
-        self.file = None
-        self.additional_files = []
+        self.file: str = ''
+        self.additional_files: list[str] = []
         self.executable = None
         self._local_logs = ('', '')
         self._remote_logs = ('', '')
         self.script_name = self.name + ".cmd"
-        self.stat_file = f"{self.script_name[:-4]}_STAT_"
+        self.stat_file: Optional[str] = f"{self.script_name[:-4]}_STAT_"
         self._status = None
         self.status = status
         self.prev_status = status
         self.new_status = status
         self.priority = priority
-        self._parents = set()
-        self._children = set()
+        self._parents: set = set()
+        self._children: set = set()
         self._fail_count = 0
         """Number of failed attempts to run this job. (FAIL_COUNT)"""
-        self.expid: str = name.split('_')[0]
+        self.expid: Optional[str] = name.split('_')[0]
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
-        self._platform = None
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False # type: bool
+        self.hold: bool = False
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
-        self._dependencies = []
+        self._dependencies: list = []
         self.running = None
-        self.start_time = None
-        self.ext_header_path = None
-        self.ext_tailer_path = None
-        self.edge_info = dict()
+        self.start_time: Optional[datetime.datetime] = None
+        self.ext_header_path: str = ''
+        self.ext_tailer_path: str = ''
+        self.edge_info: dict = {}
         self.total_jobs = None
         self.max_waiting_jobs = None
-        self.exclusive = ""
+        self.exclusive: Optional[str] = ""
         self._retrials = 0
         # internal
-        self.current_checkpoint_step = 0
-        self.max_checkpoint_step = 0
-        self.reservation = ""
+        self.current_checkpoint_step: int = 0
+        self.max_checkpoint_step: Optional[int] = 0
+        self.reservation: Optional[str] = ""
         self.delete_when_edgeless = False
         # hetjobs
-        self.het = None
+        self.het: dict[Any, Any] = {}
         self.updated_log = False
         self._log_recovered = False
         self.log_recovered = False
-        self.submit_time_timestamp = None  # for wrappers, all jobs inside a wrapper are submitted at the same time
-        self.start_time_timestamp = None
-        self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
-        self._script = None  # Inline code to be executed
+        self.submit_time_timestamp: str = ''  # for wrappers, all jobs inside a wrapper are submitted at the same time
+        self.start_time_timestamp: Optional[float] = None
+        self.finish_time_timestamp: Optional[float] = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
+        self._script = None # Inline code to be executed
         self._log_recovery_retries = None
-        self.ready_date = None
+        self.ready_date: Optional[str] = None
         self.wrapper_name = None
         self.is_wrapper = False
         self._wallclock_in_seconds = None
         self._notify_on = None
         self._processors_per_node = None
-        self.ec_queue = None
+        self.ec_queue: Optional[str] = None
         self.platform_name = None
         self._serial_platform = None
         self.submitter = None
         self._shape = None
-        self._x11 = None
+        self._x11: Optional[bool] = None
         self._x11_options = None
         self._hyperthreading = None
         self._scratch_free_space = None
@@ -303,65 +293,64 @@ class Job(object):
                                                             Status.READY] else \
                 self.status
 
-    def clean_attributes(self):
-        if self.status == Status.FAILED and self.fail_count >= self.retrials:
-            return None
-        self.rerun_only = False
-        self.delay_end = None
-        self.wrapper_type = None
-        self._wrapper_queue = None
-        self._queue = None
-        self._partition = None
-        self.retry_delay = None
-        self._wallclock = None
-        self.wchunkinc = None
-        self._tasks = None
-        self._nodes = None
-        self._threads = None
-        self._processors = None
-        self._memory = None
-        self._memory_per_task = None
-        self.undefined_variables = None
-        self.executable = None
-        self.packed = False
-        self.hold = False
-        self.export = None
-        self.start_time = None
-        self.total_jobs = None
-        self.max_waiting_jobs = None
-        self.exclusive = None
-        self.current_checkpoint_step = None
-        self.max_checkpoint_step = None
-        self.reservation = None
-        self.het = None
-        self.updated_log = False
-        self._script = None
-        self._log_recovery_retries = None
-        self.wrapper_name = None
-        self.is_wrapper = False
-        self._wallclock_in_seconds = None
-        self._notify_on = None
-        self._processors_per_node = None
-        self._shape = None
-        self._x11 = False
-        self._x11_options = None
-        self._hyperthreading = None
-        self._scratch_free_space = None
-        self._delay_retrials = None
-        self._custom_directives = None
-        self.packed_during_building = False
-        # Tentative
-        self.dependencies = None
-        self.local_logs = None
-        self.remote_logs = None
-        self.script_name = None
-        self.stat_file = None
+    def clean_attributes(self) -> None:
+        if self.status != Status.FAILED and self.fail_count <= self.retrials:
+            self.rerun_only = False
+            self.delay_end = None
+            self.wrapper_type = ''
+            self._wrapper_queue = None
+            self._queue = None
+            self._partition = None
+            self.retry_delay = None
+            self._wallclock = None
+            self.wchunkinc = None
+            self._tasks = None
+            self._nodes = None
+            self._threads = None
+            self._processors = None
+            self._memory = None
+            self._memory_per_task = None
+            self.undefined_variables = []
+            self.executable = None
+            self.packed = False
+            self.hold = False
+            self.export = None
+            self.start_time = None
+            self.total_jobs = None
+            self.max_waiting_jobs = None
+            self.exclusive = None
+            self.current_checkpoint_step = 0
+            self.max_checkpoint_step = None
+            self.reservation = None
+            self.het = {}
+            self.updated_log = False
+            self._script = None
+            self._log_recovery_retries = None
+            self.wrapper_name = None
+            self.is_wrapper = False
+            self._wallclock_in_seconds = None
+            self._notify_on = None
+            self._processors_per_node = None
+            self._shape = None
+            self._x11 = False
+            self._x11_options = None
+            self._hyperthreading = None
+            self._scratch_free_space = None
+            self._delay_retrials = None
+            self._custom_directives = None
+            self.packed_during_building = False
+            # Tentative
+            self.dependencies = None
+            self.local_logs = None
+            self.remote_logs = None
+            self.script_name = None
+            self.stat_file = None
 
-    def _init_runtime_parameters(self):
+    def _init_runtime_parameters(self) -> None:
         # hetjobs
         self.het = {'HETSIZE': 0}
         self._tasks = '0'
-        self._nodes = ""
+        self._nodes = ''
         self._threads = '1'
         self._processors = '1'
         self._memory = ''
@@ -381,12 +370,11 @@ class Job(object):
         self.packed_during_building = False
         self.packed = False
 
-    @property  # type: ignore
+    @property
     def wallclock_in_seconds(self):
         return self._wallclock_in_seconds
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='x11')
+    @property
     def x11(self):
         """Whether to use X11 forwarding"""
         return self._x11
@@ -395,8 +383,7 @@ class Job(object):
     def x11(self, value):
         self._x11 = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='x11_options')
+    @property
     def x11_options(self):
         """Allows to set salloc parameters for x11"""
         return self._x11_options
@@ -405,8 +392,7 @@ class Job(object):
     def x11_options(self, value):
         self._x11_options = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='tasktype')
+    @property
     def section(self):
         """Type of the job, as given on job configuration file."""
         return self._section
@@ -415,8 +401,7 @@ class Job(object):
     def section(self, value):
         self._section = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='jobname')
+    @property
     def name(self):
         """Current job full name."""
         return self._name
@@ -425,8 +410,7 @@ class Job(object):
     def name(self, value):
         self._name = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='script')
+    @property
     def script(self):
         """Allows to launch inline code instead of using the file parameter"""
         return self._script
@@ -435,8 +419,7 @@ class Job(object):
     def script(self, value):
         self._script = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='fail_count')
+    @property
     def fail_count(self):
         """Number of failed attempts to run this job."""
         return self._fail_count
@@ -445,8 +428,7 @@ class Job(object):
     def fail_count(self, value):
         self._fail_count = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='retrials')
+    @property
     def retrials(self):
         """Max amount of retrials to run this job."""
         return self._retrials
@@ -456,8 +438,7 @@ class Job(object):
         if value is not None:
             self._retrials = int(value)
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='checkpoint')
+    @property
     def checkpoint(self):
         """Generates a checkpoint step for this job based on job.type."""
         return self.type.checkpoint
@@ -468,14 +449,12 @@ class Job(object):
         """
         return self.platform.get_checkpoint_files(self)
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='sdate')
+    @property
     def sdate(self):
         """Current start date."""
         return date2str(self.date, self.date_format)
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='member')
+    @property
     def member(self):
         """Current member."""
         return self._member
@@ -484,8 +463,7 @@ class Job(object):
     def member(self, value):
         self._member = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='chunk')
+    @property
     def chunk(self):
         """Current chunk."""
         return self._chunk
@@ -494,8 +472,7 @@ class Job(object):
     def chunk(self, value):
         self._chunk = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='split')
+    @property
     def split(self):
         """Current split."""
         return self._split
@@ -504,8 +481,7 @@ class Job(object):
     def split(self, value):
         self._split = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='delay')
+    @property
     def delay(self):
         """Current delay."""
         return self._delay
@@ -514,8 +490,7 @@ class Job(object):
     def delay(self, value):
         self._delay = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='wallclock')
+    @property
     def wallclock(self):
         """Duration for which nodes used by job will remain allocated."""
         return self._wallclock
@@ -530,8 +505,7 @@ class Job(object):
                 wallclock_parsed = self.parse_time(self._wallclock)
                 self._wallclock_in_seconds = self._time_in_seconds_and_margin(wallclock_parsed)
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='hyperthreading')
+    @property
     def hyperthreading(self):
         """Detects if hyperthreading is enabled or not."""
         return self._hyperthreading
@@ -540,8 +514,7 @@ class Job(object):
     def hyperthreading(self, value):
         self._hyperthreading = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='nodes')
+    @property
     def nodes(self):
         """Number of nodes that the job will use."""
         return self._nodes
@@ -550,8 +523,7 @@ class Job(object):
     def nodes(self, value):
         self._nodes = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name=['numthreads', 'threads', 'cpus_per_task'])
+    @property
     def threads(self):
         """Number of threads that the job will use."""
         return self._threads
@@ -560,8 +532,7 @@ class Job(object):
     def threads(self, value):
         self._threads = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name=['numtask', 'tasks', 'tasks_per_node'])
+    @property
     def tasks(self):
         """Number of tasks that the job will use."""
         return self._tasks
@@ -570,8 +541,7 @@ class Job(object):
     def tasks(self, value):
         self._tasks = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='scratch_free_space')
+    @property
     def scratch_free_space(self):
         """Percentage of free space required on the ``scratch``."""
         return self._scratch_free_space
@@ -580,8 +550,7 @@ class Job(object):
     def scratch_free_space(self, value):
         self._scratch_free_space = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='memory')
+    @property
     def memory(self):
         """Memory requested for the job."""
         return self._memory
@@ -590,8 +559,7 @@ class Job(object):
     def memory(self, value):
         self._memory = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='memory_per_task')
+    @property
     def memory_per_task(self):
         """Memory requested per task."""
         return self._memory_per_task
@@ -600,8 +568,7 @@ class Job(object):
     def memory_per_task(self, value):
         self._memory_per_task = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='frequency')
+    @property
     def frequency(self):
         """TODO."""
         return self._frequency
@@ -610,8 +577,7 @@ class Job(object):
     def frequency(self, value):
         self._frequency = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='synchronize')
+    @property
     def synchronize(self):
         """TODO."""
         return self._synchronize
@@ -620,8 +586,7 @@ class Job(object):
     def synchronize(self, value):
         self._synchronize = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='dependencies')
+    @property
     def dependencies(self):
         """Current job dependencies."""
         return self._dependencies
@@ -630,8 +595,7 @@ class Job(object):
     def dependencies(self, value):
         self._dependencies = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='delay_retrials')
+    @property
     def delay_retrials(self):
         """TODO"""
         return self._delay_retrials
@@ -640,8 +604,7 @@ class Job(object):
     def delay_retrials(self, value):
         self._delay_retrials = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='packed')
+    @property
     def packed(self):
         """TODO"""
         return self._packed
@@ -650,8 +613,7 @@ class Job(object):
     def packed(self, value):
         self._packed = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='export')
+    @property
     def export(self):
         """TODO."""
         return self._export
@@ -660,8 +622,7 @@ class Job(object):
     def export(self, value):
         self._export = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='custom_directives')
+    @property
     def custom_directives(self):
         """List of custom directives."""
         return self._custom_directives
@@ -670,8 +631,7 @@ class Job(object):
     def custom_directives(self, value):
         self._custom_directives = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='splits')
+    @property
     def splits(self):
         """Max number of splits."""
         return self._splits
@@ -680,8 +640,7 @@ class Job(object):
     def splits(self, value):
         self._splits = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='notify_on')
+    @property
     def notify_on(self):
         """Send mail notification on job status change."""
         return self._notify_on
@@ -757,7 +716,7 @@ class Job(object):
 
         return script
 
-    @property  # type: ignore
+    @property
     def parents(self):
         """
         Returns parent jobs list
@@ -774,8 +733,7 @@ class Job(object):
         """
         self._parents = parents
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='status')
+    @property
     def status(self):
         return self._status
 
@@ -786,8 +744,7 @@ class Job(object):
         """
         self._status = status
 
-    @property  # type: ignore
-    @autosubmit_parameter(name='log_recovered')
+    @property
     def log_recovered(self):
         return self._log_recovered
 
@@ -798,25 +755,25 @@ class Job(object):
         """
         self._log_recovered = log_recovered
 
-    @property  # type: ignore
+    @property
     def status_str(self):
         """
         String representation of the current status
         """
         return Status.VALUE_TO_KEY.get(self.status, "UNKNOWN")
 
-    @property  # type: ignore
+    @property
     def children_names_str(self):
         """
         Comma separated list of children's names
         """
         return ",".join([str(child.name) for child in self._children])
 
-    @property  # type: ignore
+    @property
     def is_serial(self):
         return not self.nodes and (not self.processors or str(self.processors) == '1')
 
-    @property  # type: ignore
+    @property
     def platform(self) -> "Platform":
         """
         Returns the platform to be used by the job. Chooses between serial and parallel platforms
@@ -839,8 +796,7 @@ class Job(object):
         """
         self._platform = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name="current_queue")
+    @property
     def queue(self):
         """
         Returns the queue to be used by the job. Chooses between serial and parallel platforms.
@@ -865,7 +821,7 @@ class Job(object):
         """
         self._queue = value
 
-    @property  # type: ignore
+    @property
     def partition(self):
         """
         Returns the queue to be used by the job. Chooses between serial and parallel platforms
@@ -890,7 +846,7 @@ class Job(object):
         """
         self._partition = value
 
-    @property  # type: ignore
+    @property
     def shape(self):
         """
         Returns the shape of the job. Chooses between serial and parallel platforms
@@ -910,7 +866,7 @@ class Job(object):
         """
         self._shape = value
 
-    @property  # type: ignore
+    @property
     def children(self):
         """
         Returns a list containing all children of the job
@@ -927,7 +883,7 @@ class Job(object):
         """
         self._children = children
 
-    @property  # type: ignore
+    @property
     def long_name(self):
         """
         Job's long name. If not set, returns name
@@ -950,7 +906,7 @@ class Job(object):
         """
         self._long_name = value
 
-    @property  # type: ignore
+    @property
     def local_logs(self):
         return self._local_logs
 
@@ -958,7 +914,7 @@ class Job(object):
     def local_logs(self, value):
         self._local_logs = value
 
-    @property  # type: ignore
+    @property
     def remote_logs(self):
         return self._remote_logs
 
@@ -966,7 +922,7 @@ class Job(object):
     def remote_logs(self, value):
         self._remote_logs = value
 
-    @property  # type: ignore
+    @property
     def total_processors(self):
         """
         Number of processors requested by job.
@@ -981,15 +937,14 @@ class Job(object):
                 return ""
         return int(self.processors)
 
-    @property  # type: ignore
+    @property
     def total_wallclock(self):
         if self.wallclock:
             hours, minutes = self.wallclock.split(':')
             return float(minutes) / 60 + float(hours)
         return 0
 
-    @property  # type: ignore
-    @autosubmit_parameter(name=['numproc', 'processors'])
+    @property
     def processors(self):
         """Number of processors that the job will use."""
         return self._processors
@@ -998,8 +953,7 @@ class Job(object):
     def processors(self, value):
         self._processors = value
 
-    @property  # type: ignore
-    @autosubmit_parameter(name=['processors_per_node'])
+    @property
     def processors_per_node(self):
         """Number of processors per node that the job can use."""
         return self._processors_per_node
@@ -1014,7 +968,7 @@ class Job(object):
         Sets the ready start date for the job
         """
         self.updated_log = False
-        self.ready_date = int(time.strftime("%Y%m%d%H%M%S"))
+        self.ready_date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
     def inc_fail_count(self):
         """
@@ -1444,8 +1398,7 @@ class Job(object):
         :param failed_file: boolean, if True, checks if the job failed
         :return: The new status.
         """
-        previous_status = self.status
-        self.prev_status = previous_status
+        self.prev_status = self.status
         new_status = self.new_status
         if new_status == Status.COMPLETED:
             Log.debug(f"{self.name} job seems to have completed: checking...")
@@ -1531,6 +1484,7 @@ class Job(object):
             Log.warning(f"Couldn't find {self.name} COMPLETED file")
             if not over_wallclock:
                 self.status = default_status
+                return None
             else:
                 return default_status
 
@@ -1546,7 +1500,7 @@ class Job(object):
         if isinstance(self.platform, ParamikoPlatform):
             base_path = Path(self.platform.remote_log_dir)
         else:
-            base_path = Path(self.platform.root_dir).joinpath(self.expid)
+            base_path = Path(self.platform.root_dir, self.expid)
 
         # Get the defined metric folder from the configuration if it exists
         try:
@@ -2337,7 +2291,7 @@ class Job(object):
         else:
             try:
                 if as_conf.get_project_type().lower() != "none" and len(as_conf.get_project_type()) > 0:
-                    template_file = open(os.path.join(as_conf.get_project_dir(), self.file), 'r')
+                    template_file = open(Path(as_conf.get_project_dir(), self.file), 'r')
                     template = ''
                     template += template_file.read()
                     template_file.close()
@@ -2370,7 +2324,7 @@ class Job(object):
     def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
         current_platform = self._platform
         return ''.join([
-            snippet.as_header(current_platform.get_header(self, parameters), self.executable),
+            snippet.as_header(current_platform.get_header(self, parameters), self.executable),  # type: ignore[union-attr]
             snippet.as_body(template),
             snippet.as_tailer()
         ])
@@ -2544,7 +2498,7 @@ class Job(object):
         out = set(parameters).issuperset(set(variables))
         # Check if the variables in the templates are defined in the configurations
         if not out:
-            self.undefined_variables = set(variables) - set(parameters)
+            self.undefined_variables = list(set(variables) - set(parameters))
             if str(show_logs).lower() != "false":
                 Log.printlog("The following set of variables to be substituted in template script is not part "
                              "of parameters set, and will be replaced by a blank value: {0}".format(
@@ -2820,6 +2774,16 @@ class Job(object):
                         '%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
 
+decorator_list: list = []
+list_decorators = ['x11', 'x11_options', 'tasktype', 'jobname', 'script', 'fail_count', 'retrials', 'checkpoint',
+                    'sdate', 'member', 'chunk', 'split', 'delay', 'wallclock', 'hyperthreading', 'nodes', 'numthreads',
+                    'threads', 'cpus_per_task', 'numtask', 'tasks', 'tasks_per_node', 'scratch_free_space', 'memory',
+                    'memory_per_task', 'frequency', 'synchronize', 'dependencies', 'delay_retrials', 'packed', 'export',
+                    'custom_directives', 'splits', 'notify_on', 'status', 'log_recovered', "current_queue", 'numproc',
+                    'processors', 'processors_per_node']
+for decorator_to_import in list_decorators:
+    decorator = Job(name=decorator_to_import)
+    decorator_list.append(decorator.__doc__)
 
 class WrapperJob(Job):
     """Defines a wrapper from a package.
@@ -3100,8 +3064,8 @@ class WrapperJob(Job):
             wait = 2
             retries = 5
             over_wallclock = False
-            content = ''
-            while content == '' and retries > 0:
+            content: list[str] = []
+            while len(content) == 0 and retries > 0:
                 self._platform.send_command(command, False)
                 content = self._platform._ssh_output.split('\n')
                 # content.reverse()
