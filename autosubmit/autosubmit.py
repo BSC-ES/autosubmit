@@ -38,7 +38,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import cast, Generator, Optional, Union
+from typing import cast, Generator, Optional, Union, TYPE_CHECKING
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -80,6 +80,10 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.utils import as_conf_default_values
+
+
+if TYPE_CHECKING:
+    from rocrate.rocrate import ROCrate
 
 dialog = None
 
@@ -3986,7 +3990,7 @@ class Autosubmit:
             return False
 
     @staticmethod
-    def rocrate(expid: str, path: Path) -> bool:
+    def rocrate(expid: str, path: Path) -> Optional['ROCrate']:
         """Produces an RO-Crate archive for an Autosubmit experiment.
 
         Skips other crate ZIP archive files in ``tmp/ASLOGS``. It ignores
@@ -4067,11 +4071,10 @@ class Autosubmit:
             end_time = exp_stats.jobs_stat[0].finish_time.replace(microsecond=0).isoformat()
 
         from autosubmit.provenance.rocrate import create_rocrate_archive
-        crate = create_rocrate_archive(as_conf, rocrate_json, jobs, start_time, end_time, path)
-        return crate is not None
+        return create_rocrate_archive(as_conf, rocrate_json, jobs, start_time, end_time, path)
 
     @staticmethod
-    def provenance(expid: str, rocrate: bool = False) -> None:
+    def provenance(expid: str, rocrate: bool = False) -> bool:
         """Create the experiment provenance archive.
 
         :param expid: experiment identifier
@@ -4092,8 +4095,9 @@ class Autosubmit:
         )
 
         try:
-            Autosubmit.rocrate(expid, Path(aslogs_folder))
+            r = Autosubmit.rocrate(expid, Path(aslogs_folder))
             Log.info('RO-Crate ZIP file created!')
+            return r is not None
         except Exception as e:
             raise AutosubmitCritical(f"Error creating RO-Crate ZIP file: {str(e)}", 7012)
 

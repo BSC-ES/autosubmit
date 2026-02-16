@@ -86,8 +86,9 @@ tests = [
     "pytest-xdist",
     "testcontainers",
     "pytest-timeout",
+    "roc-validator",
     "types-requests",
-    "typing_extensions==4.*",
+    "typing_extensions==4.*"
 ]
 docs = [
     "livereload",

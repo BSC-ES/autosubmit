@@ -551,6 +551,8 @@ def create_rocrate_archive(
 
     # Write RO-Crate ZIP.
     date = datetime.datetime.today().strftime('%Y%m%d-%H%M%S-%f')
-    crate.write_zip(Path(path, f"{expid}-crate-{date}.zip"))
+    crate_path = Path(path, f"{expid}-crate-{date}.zip")
+    crate.write_zip(crate_path)
+    crate.source = crate_path
     Log.info(f'RO-Crate archive written to {experiment_path}')
     return crate

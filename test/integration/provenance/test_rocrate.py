@@ -24,6 +24,7 @@ from zipfile import ZipFile
 import pytest
 from rocrate.rocrate import File  # type: ignore
 from ruamel.yaml.representer import RepresenterError
+from rocrate_validator import services, models
 
 from autosubmit.log.log import AutosubmitCritical
 # noinspection PyProtectedMember
@@ -445,3 +446,60 @@ def test_do_not_include_other_crates(autosubmit_exp, tmp_path):
     assert len(zip_files) == 2
     for zip_file in zip_files:
         _assert_does_not_contain_zip(zip_file)
+
+
+def test_rocrate_validator(autosubmit_exp, tmp_path):
+    project_path = Path(tmp_path, 'project')
+    project_path.mkdir()
+    # some outputs
+    for output_file in ['graph_1.png', 'graph_2.gif']:
+        Path(project_path, output_file).touch()
+
+    exp = autosubmit_exp(experiment_data={
+        'PROJECT': {
+            'PROJECT_DESTINATION': '',
+            'PROJECT_TYPE': 'LOCAL'
+        },
+        'LOCAL': {
+            'PROJECT_PATH': str(project_path)
+        },
+        'APP': {
+            'INPUT_1': 1
+        },
+        'ROCRATE': {
+            'INPUTS': ['APP'],
+            'OUTPUTS': [
+                'graph_*.gif'
+            ],
+            'PATCH': json.dumps({
+                '@graph': [
+                    {
+                        '@id': './',
+                        "license": "Apache-2.0"
+                    }
+                ]
+            })
+        }
+    }, include_jobs=True)
+
+    autosubmit = exp.autosubmit
+    r = autosubmit.rocrate(exp.expid, path=tmp_path)
+    assert r
+
+    # TODO: remove when Python 3.9 is dropped, check if 3.10 supports roc_validator>=0.8.0
+    if 'data_path' in services.ValidationSettings.__dataclass_fields__:  # type: ignore[attr]
+        settings = services.ValidationSettings(
+            data_path=r.source,
+            rocrate_uri=r.source,
+            profile_identifier='workflow-ro-crate-1.0',
+            requirement_severity=models.Severity.REQUIRED,
+        )
+    else:
+        settings = services.ValidationSettings(
+            rocrate_uri=r.source,
+            profile_identifier='workflow-ro-crate-1.0',
+            requirement_severity=models.Severity.REQUIRED,
+        )
+
+    result = services.validate(settings)
+    assert not result.has_issues(), result.get_issues()
