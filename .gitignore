@@ -27,3 +27,4 @@ dockerfiles/id_rsa*
 dockerfiles/authorized_keys
 
 venv/
+.ipynb_checkpoints

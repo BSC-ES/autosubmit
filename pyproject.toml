@@ -86,8 +86,9 @@ tests = [
     "pytest-xdist",
     "testcontainers",
     "pytest-timeout",
+    "roc-validator",
     "types-requests",
-    "typing_extensions==4.*",
+    "typing_extensions==4.*"
 ]
 docs = [
     "livereload",
@@ -123,6 +124,13 @@ package-data = { "autosubmit" = [
     "docs/autosubmit.pdf"
 ] }
 include-package-data = true
+
+[[tool.mypy.overrides]]
+module = [
+    "rocrate.*",
+    "rocrate_validator.*"
+]
+ignore_missing_imports = true
 
 [tool.vulture]
 exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]

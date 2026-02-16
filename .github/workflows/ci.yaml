@@ -371,6 +371,6 @@ jobs:
           flags: fast-tests
           fail_ci_if_error: true
           verbose: true
-          # Token not required for public repos, but avoids upload failure due
+          # Token is not required for public repositories but avoids upload failure due
           # to rate-limiting (but not for PRs opened from forks)
           token: ${{ secrets.CODECOV_TOKEN }}

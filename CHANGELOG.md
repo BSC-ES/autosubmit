@@ -7,6 +7,10 @@
 **Enhancements:**
 
 - Fix characters escaped in regexes #2526
+- Fixed RO-Crate validation issues with the latest `rocrate-validator`,
+  now Autosubmit crates conform to RO-Crate 1.1, process 0.5, workflow run
+  crate 0.5, and workflow ro crate 1.0. A new integration test has been
+  added to check that we produce valid crates with the `rocrate-validator` #2816
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
