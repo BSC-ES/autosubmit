@@ -1,3 +1,9 @@
+### 4.1.17: unreleased
+
+**Enhancements:**
+
+- Now Autosubmit supports the 'Flux' wrapping method, submitting the jobs to a Flux instance running inside a Slurm allocation [#2697](https://github.com/BSC-ES/autosubmit/issues/2697)
+
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
 This release adds support to Postgres using SQLAlchemy, without removing the
