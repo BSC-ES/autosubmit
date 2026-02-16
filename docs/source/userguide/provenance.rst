@@ -36,11 +36,13 @@ profiles to package computational workflows. From the `RO-Crate`_ website,
 
 Autosubmit `conforms`_ to the following RO-Crate profiles:
 
-* Process Run Crate
+* `RO-Crate 1.1`_
 
-* Workflow Run Crate
+* `Process Run Crate 0.5`_
 
-* Workflow RO-Crate
+* `Workflow Run Crate 0.5`_
+
+* `Workflow RO-Crate 1.0`_
 
 Experiments archived as RO-Crate can also be uploaded to `Zenodo`_ and
 to `WorkflowHub`_. The Autosubmit team worked with the WorkflowHub team
@@ -60,3 +62,11 @@ experiments referenced in papers and other documents.
 .. _WorkflowHub: https://workflowhub.eu/
 
 .. _DOI: https://en.wikipedia.org/wiki/Digital_object_identifier
+
+.. _RO-Crate 1.1: https://www.researchobject.org/ro-crate/specification/1.1/index.html
+
+.. _Process Run Crate 0.5: https://www.researchobject.org/workflow-run-crate/profiles/0.5/process_run_crate/
+
+.. _Workflow Run Crate 0.5: https://www.researchobject.org/workflow-run-crate/profiles/0.5/workflow_run_crate/
+
+.. _Workflow RO-Crate 1.0: https://about.workflowhub.eu/Workflow-RO-Crate/

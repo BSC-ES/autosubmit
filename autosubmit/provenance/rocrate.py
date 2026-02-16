@@ -22,18 +22,18 @@ focused on reproducibility.
 For more about RO-Crate: https://www.researchobject.org/ro-crate/
 """
 
-import datetime
 import json
 import mimetypes
 import os
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Callable, Optional, Union, cast
 
-from rocrate.model.contextentity import ContextEntity  # type: ignore
-from rocrate.rocrate import ROCrate, File  # type: ignore
-from rocrate.utils import iso_now  # type: ignore
+from rocrate.model.contextentity import ContextEntity
+from rocrate.rocrate import File, ROCrate
+from rocrate.utils import iso_now
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -46,16 +46,16 @@ from autosubmit.log.log import Log, AutosubmitCritical
 as graph context."""
 PROFILES = [
     {
-        "@id": "https://w3id.org/ro/wfrun/process/0.1",
+        "@id": "https://w3id.org/ro/wfrun/process/0.5",
         "@type": "CreativeWork",
         "name": "Process Run Crate",
-        "version": "0.1"
+        "version": "0.5"
     },
     {
-        "@id": "https://w3id.org/ro/wfrun/workflow/0.1",
+        "@id": "https://w3id.org/ro/wfrun/workflow/0.5",
         "@type": "CreativeWork",
         "name": "Workflow Run Crate",
-        "version": "0.1"
+        "version": "0.5"
     },
     {
         "@id": "https://w3id.org/workflowhub/workflow-ro-crate/1.0",
@@ -79,7 +79,7 @@ PARAMETER_TYPES_MAP = {
 }
 
 # These are the default keys exported as FormalParameters automatically.
-# Others are added depending on the workflow configuration, and what the
+# Others are added depending on the workflow configuration and what the
 # user has requested to export.
 DEFAULT_EXPORTED_KEYS = [
     'DEFAULT',
@@ -95,11 +95,11 @@ def _add_files(crate: ROCrate, base_path: Path, relative_path: str, expid: str,
 
     Ignores existing crate archives.
 
-    :param crate: the RO-Crate instance.
-    :param base_path: the base path for the files being added.
-    :param relative_path: the relative path (to the ``base_path``).
-    :param expid: the experiment identifier, used to exclude previously created RO-Crate archives.
-    :param encoding_format: the encoding format (if any).
+    :param crate: The RO-Crate instance.
+    :param base_path: The base path for the files being added.
+    :param relative_path: The relative path (to the ``base_path``).
+    :param expid: The experiment identifier, used to exclude previously created RO-Crate archives.
+    :param encoding_format: The encoding format (if any).
     """
     folder = Path(base_path, relative_path)
     for root, dirs, files in os.walk(folder, topdown=True):
@@ -114,23 +114,30 @@ def _add_file(crate: ROCrate, base_path: Optional[Path], file_path: Path, encodi
               use_uri: bool = False, **args: Any) -> Any:
     """Add a file into the RO-Crate.
 
-    :param crate: the RO-Crate instance.
-    :param base_path: the base path for the files being added. Optional.
-    :param file_path: the path for the file being added.
-    :param encoding_format: the encoding format (if any).
-    :param use_uri: whether to use the Path as a URI or as a source directly. Defaults to ``False``.
-    :return: the object returned by ro-crate-py
+    :param crate: The RO-Crate instance.
+    :param base_path: The base path for the files being added. Optional.
+    :param file_path: The path for the file being added.
+    :param encoding_format: The encoding format (if any).
+    :param use_uri: Whether to use the Path as a URI or as a source directly. Defaults to ``False``.
+    :return: The object returned by ro-crate-py
     :rtype: Any
     """
+    date_modified = datetime.fromtimestamp(
+        file_path.stat().st_mtime, tz=timezone.utc
+    ).replace(microsecond=0).isoformat()
     properties = {
         "name": file_path.name,
         "sdDatePublished": iso_now(),
-        "dateModified": datetime.datetime.utcfromtimestamp(file_path.stat().st_mtime).replace(
-            microsecond=0).isoformat(),
+        "dateModified": date_modified,
         "contentSize": file_path.stat().st_size,
         **args
     }
-    encoding_format = encoding_format if encoding_format is not None else mimetypes.guess_type(file_path)[0]
+    guessed_mime_type: Optional[str] = _guess_mime(file_path)
+    if not guessed_mime_type and not encoding_format:
+        Log.warning(f"Could not guess the MIME type of {file_path}")
+    else:
+        encoding_format = guessed_mime_type
+
     if encoding_format is not None:
         # N.B.: We must not write ``None``'s or other missing or empty values
         #       to the encoding format if none found.
@@ -148,7 +155,7 @@ def _add_file(crate: ROCrate, base_path: Optional[Path], file_path: Path, encodi
                 validate_url=False,
                 properties=properties)
     # This is to prevent ``metadata/experiment_data.yml`` to be added twice.
-    # Once as the workflow main file, and twice when scanning the experiment
+    # Once as the workflow main file and twice when scanning the experiment
     # ``conf`` folder for YAML files.
     # See: https://github.com/ResearchObject/ro-crate-py/issues/165
     if file.id not in [x['@id'] for x in crate.data_entities]:
@@ -165,8 +172,8 @@ def _add_file(crate: ROCrate, base_path: Optional[Path], file_path: Path, encodi
 def _get_action_status(jobs: list[Job]) -> str:
     """Get the status of the workflow action.
 
-    :param jobs: list of jobs, used to infer the current workflow/action status.
-    :return: a valid RO-Crate and Schema.org action status.
+    :param jobs: A list of jobs, used to infer the current workflow/action status.
+    :return: A valid RO-Crate and Schema.org action status.
     """
     if not jobs:
         return 'PotentialActionStatus'
@@ -285,6 +292,37 @@ def _create_parameter(crate, parameter_name, parameter_value, formal_parameter, 
     return crate.add(ContextEntity(crate, properties=properties))
 
 
+def _init_mimetypes() -> None:
+    """Initialize the MIME types library.
+
+    We add extra types for files commonly found in Autosubmit experiments.
+    """
+    mimetypes.init()
+    mimetypes.add_type("text/x-sh", ".cmd")
+    mimetypes.add_type("text/x-sh", ".sh")
+    mimetypes.add_type("application/octet-stream", ".lock")
+    mimetypes.add_type("text/plain", ".log")
+    mimetypes.add_type("text/plain", ".err")
+    mimetypes.add_type("text/plain", ".out")
+    mimetypes.add_type("text/plain", ".bak")
+    mimetypes.add_type("application/x-python-pickle", ".pkl")
+    mimetypes.add_type("application/vnd.sqlite3", ".db")
+    mimetypes.add_type("application/yaml", ".yml")
+    mimetypes.add_type("application/yaml", ".yaml")
+
+
+def _guess_mime(path: Path) -> Optional[str]:
+    """Guess the MIME type of the file."""
+    suffix = path.suffix
+
+    # Autosubmit stats files have the format .STAT_0, .STAT_1, ad infinitum.
+    if suffix.startswith(".STAT_"):
+        return "application/x-stat-file"
+
+    mime, _ = mimetypes.guess_type(path)
+    return mime
+
+
 def create_rocrate_archive(
         as_conf: AutosubmitConfig,
         rocrate_json: dict[str, Any],
@@ -294,7 +332,7 @@ def create_rocrate_archive(
         path: Path) -> ROCrate:
     """Create an RO-Crate archive using the ro-crate-py library.
 
-    It uses the Autosubmit configuration for the prospective provenance, and also
+    It uses the Autosubmit configuration for the prospective provenance and also
     to locate the directories with perspective provenance.
 
     :param as_conf: Autosubmit configuration
@@ -303,56 +341,47 @@ def create_rocrate_archive(
     :param start_time: Workflow run start time
     :param end_time: Workflow run end time
     :param path: path to save the RO-Crate in
-    :return: ``True`` is the archive was created successful, ``False`` otherwise
+    :return: ``True`` if the archive was created successfully, ``False`` otherwise
     """
     workflow_configuration = as_conf.experiment_data
     expid = workflow_configuration['DEFAULT']['EXPID']
     as_version = get_autosubmit_version(expid)
     experiment_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid)
     unified_yaml_configuration = experiment_path / "conf/metadata/experiment_data.yml"
+    if not unified_yaml_configuration.is_file():
+        raise ValueError(f"Main entity file not found: {unified_yaml_configuration}")
 
-    root_profiles = [
+    conforming_profiles = [
         {"@id": profile["@id"]} for profile in PROFILES
     ]
-    rocrate_metadata_json_profiles = [
-        # Graph context.
-        {
-            "@id": "https://w3id.org/ro/crate/1.1"
-        },
-        {
-            "@id": "https://w3id.org/workflowhub/workflow-ro-crate/1.0"
-        }
-    ]
 
-    mimetypes.init()
+    _init_mimetypes()
 
-    crate = ROCrate()
-    crate.root_dataset.properties().update({
-        'name': expid,
-        'conformsTo': root_profiles
-    })
+    crate = ROCrate(gen_preview=True)
+    crate.name = expid
+    # Fetch the experiment description from the main database
+    crate.description = get_experiment_description(expid)[0][0]
     for profile in PROFILES:
         crate.add(ContextEntity(crate, properties=profile))
+    crate.conformsTo = conforming_profiles
+    crate.root_dataset['conformsTo'] = conforming_profiles
 
     Log.info('Creating RO-Crate archive...')
 
-    # Add original YAML configuration.
-    crate.add_dataset(source=Path(experiment_path, "conf"), dest_path="conf")
+    # Add all configuration files.
+    _add_files(crate, experiment_path, "conf", expid)
 
-    # Create workflow configuration (prospective provenance)
+    # Create the workflow configuration (prospective provenance)
+    experiment_data_id = str(unified_yaml_configuration.relative_to(experiment_path))
+    crate.delete(experiment_data_id)
     main_entity = crate.add_workflow(
         source=unified_yaml_configuration,
+        dest_path=experiment_data_id,
         main=True,
         lang="Autosubmit",
         lang_version=as_version,
         gen_cwl=False
     )
-    crate.metadata.properties().update({
-        'conformsTo': rocrate_metadata_json_profiles
-    })
-
-    # Fetch the experiment description from the main database
-    crate.description = get_experiment_description(expid)[0][0]
 
     # Add files generated after its execution (retrospective provenance)
     # Some external files could have been loaded too. That's why we use the
@@ -380,9 +409,9 @@ def create_rocrate_archive(
     # Add status files.
     _add_files(crate, experiment_path, "status", expid, "text/plain")
     # Add SQLite DB and pickle files.
-    _add_files(crate, experiment_path, "pkl", expid, "application/octet-stream")
+    _add_files(crate, experiment_path, "pkl", expid)
 
-    # Register Workflow Run RO-Crate (WRROC) profile. This code was adapted from COMPSs and StreamFlow.
+    # Register the Workflow Run RO-Crate (WRROC) profile. This code was adapted from COMPSs and StreamFlow.
     #
     # See: https://gitlab.bsc.es/wdc/compss/framework/-/blob/9cc5a8a5ba76457cf9b71d698bb77b8fa0aa0c9c/compss/runtime/
     #      scripts/system/provenance/generate_COMPSs_RO-Crate.py
@@ -407,9 +436,8 @@ def create_rocrate_archive(
     create_action = crate.add(
         ContextEntity(crate, '#create-action', create_action_properties)
     )
-    crate.root_dataset.properties().update({
-        'mentions': {'@id': create_action.id}
-    })
+    create_action['instrument'] = {'@id': main_entity.id}
+    crate.root_dataset.append_to('mentions', {'@id': create_action.id})
 
     # Here we add the Autosubmit project as ``SoftwareCode``, and as part (``isPartOf``)
     # of the RO-Crate main ``SoftwareCode`` entity.
@@ -489,8 +517,8 @@ def create_rocrate_archive(
             # The formal parameters are added to the workflow (main entity).
             additional_type = PARAMETER_TYPES_MAP[python_type]
             # If the ``additional_type`` returned from the dictionary ``PARAMETER_TYPES_MAP`` is
-            # a string, this mean we found a type that must be string-ized (e.g. a dict or a list).
-            # Otherwise, RO-Crate library will complain it cannot figure out how to serialize it.
+            # a string, this means we found a type that must be string-ized (e.g., a dict or a list).
+            # Otherwise, the RO-Crate library will complain it cannot figure out how to serialize it.
             if additional_type is str:
                 e_v = cast(Callable, additional_type)(e_v)
                 additional_type = 'Text'
@@ -542,7 +570,7 @@ def create_rocrate_archive(
     # Merge with user provided values.
     # NOTE: It is important that this call happens after the JSON-LD has
     #       been constructed by ro-crate-py, as methods like ``add`` will
-    #       replace entries (i.e. if we added before ro-crate-py, then we
+    #       replace entries (i.e., if we added before ro-crate-py, then we
     #       could have our values replaced by newly added values).
     if 'PATCH' in rocrate_json and '@graph' in rocrate_json['PATCH']:
         patch = json.loads(rocrate_json['PATCH'])
@@ -550,7 +578,9 @@ def create_rocrate_archive(
             crate.add_or_update_jsonld(jsonld_node)
 
     # Write RO-Crate ZIP.
-    date = datetime.datetime.today().strftime('%Y%m%d-%H%M%S-%f')
-    crate.write_zip(Path(path, f"{expid}-crate-{date}.zip"))
+    date = datetime.today().strftime('%Y%m%d-%H%M%S-%f')
+    crate_path = Path(path, f"{expid}-crate-{date}.zip")
+    crate.source = crate_path
+    crate.write_zip(crate_path)
     Log.info(f'RO-Crate archive written to {experiment_path}')
     return crate

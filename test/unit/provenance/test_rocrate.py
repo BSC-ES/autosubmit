@@ -94,7 +94,7 @@ def test_add_files_set_encoding(empty_rocrate: ROCrate, tmp_path):
     files_dir = tmp_path / 'files'
     files_dir.mkdir(parents=True)
 
-    file = files_dir / 'file.txt'
+    file = files_dir / 'file.jpg'
     file.touch()
     file.write_text('hello')
 
@@ -108,7 +108,7 @@ def test_add_files_set_encoding(empty_rocrate: ROCrate, tmp_path):
     assert 1 == len(empty_rocrate.data_entities)
 
     for entity in empty_rocrate.data_entities:
-        if entity.source.name == 'file.txt':
+        if entity.source.name == 'file.jpg':
             properties = entity.properties()
             assert properties['sdDatePublished']
             assert properties['dateModified']
