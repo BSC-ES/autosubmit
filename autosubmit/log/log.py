@@ -20,7 +20,7 @@ import os
 import sys
 from datetime import datetime
 from time import sleep
-from typing import Any, Union
+from typing import cast, Any, Union
 
 
 class AutosubmitError(Exception):
@@ -82,7 +82,7 @@ class AutosubmitCritical(Exception):
         return msg
 
 
-class LogFormatter:
+class LogFormatter(logging.Formatter):
     """
     Class to format log output.
 
@@ -103,6 +103,7 @@ class LogFormatter:
 
         :param to_file: Whether to write it to a file or not.
         """
+        super().__init__()
         self._file = to_file
         if self._file:
             self._formatter = logging.Formatter('%(asctime)s %(message)s')
@@ -260,6 +261,8 @@ class Log:
                     os.remove(os.path.join(directory, files[0]))
                 file_path = os.path.join(
                     directory, Log.date + filename)
+
+                custom_filter: logging.Filter
                 if type == 'out':
                     file_handler = logging.FileHandler(file_path, 'w')
                     file_handler.setLevel(level)
@@ -307,6 +310,7 @@ class Log:
         """
         try:
             # test = Log.log.handlers
+            custom_filter: logging.Filter
             if type == 'status':
                 while len(Log.log.handlers) > 3:
                     Log.log.handlers.pop()
@@ -337,7 +341,7 @@ class Log:
         """
         if type(level) is str:
             level = getattr(Log, level)
-        Log.console_handler.level = level
+        Log.console_handler.level = cast(int, level)
 
     @staticmethod
     def _verify_args_message(msg: str, *args):

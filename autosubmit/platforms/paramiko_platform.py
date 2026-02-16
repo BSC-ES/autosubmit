@@ -1172,7 +1172,7 @@ class ParamikoPlatform(Platform):
 
     def exec_command(
             self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False
-    ) -> Union[tuple[paramiko.Channel, paramiko.Channel, paramiko.Channel], tuple[bool, bool, bool]]:
+    ) -> Union[tuple[paramiko.ChannelFile, paramiko.ChannelFile, paramiko.ChannelFile], tuple[bool, bool, bool]]:
         """Execute a command on the SSH server.
 
         A new ``.Channel`` is open and the requested command is executed.

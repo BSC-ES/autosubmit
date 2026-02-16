@@ -224,7 +224,7 @@ TABLES = (
 """The tables available in the Autosubmit databases."""
 
 
-def get_table_with_schema(schema: Optional[str], table: Table) -> Table:
+def get_table_with_schema(schema: Optional[str], table: Optional[Table]) -> Table:
     """Get the ``Table`` instance with the metadata modified.
     The metadata will use the given container. This means you can
     have table ``A`` with no schema, then call this function with
