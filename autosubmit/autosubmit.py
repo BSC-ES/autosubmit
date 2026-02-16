@@ -1189,6 +1189,86 @@ class Autosubmit:
                     _add_comments_to_yaml(yaml_data, parameter_comments)
                     yaml.dump(yaml_data, output)
 
+    @staticmethod
+    def replace_parameter_inside_section(content, parameter, new_value, section):
+        # same but for any section any parameter, not only EXPID case insensitive
+        # Find the any section
+        if section:
+            section_match = re.search(rf'({section}:[\s\S]*?{parameter}:.*?)(?=\n|$)', content, re.IGNORECASE)
+            if section_match:
+                section = section_match.group(1)
+                # Replace parameter in the section
+                new_section = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', section)
+                # Replace the old section
+                content = content.replace(section, new_section)
+        else:
+            # replace only the parameter
+            content = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', content)
+        return content
+
+    @staticmethod
+    def as_conf_default_values(exp_id:str, hpc:str = "local", minimal_configuration:bool = False, git_repo:str = "",
+                               git_branch:str = "main", git_as_conf:str = "") -> None:
+        """Replace default values in as_conf files.
+
+        :param exp_id: experiment id
+        :param hpc: platform
+        :param minimal_configuration: minimal configuration
+        :param git_repo: path to project git repository
+        :param git_branch: main branch
+        :param git_as_conf: path to as_conf file in git repository
+        :return: None
+        """
+        # the var hpc was hardcoded in the header of the function
+
+        # open and replace values
+        for as_conf_file in Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp_id}/conf").iterdir():
+            if as_conf_file.name.endswith(".yml") or as_conf_file.name.endswith(".yaml"):
+                with open(as_conf_file, 'r+') as f:
+                    # Copied files could not have default names.
+                    content = f.read()
+                    search = re.search('AUTOSUBMIT_VERSION: .*', content, re.MULTILINE)
+                    if search is not None:
+                        content = content.replace(search.group(0), f"AUTOSUBMIT_VERSION: \""
+                                                                   f"{Autosubmit.autosubmit_version}\"")
+                    search = re.search('NOTIFICATIONS: .*', content, re.MULTILINE)
+                    if search is not None:
+                        content = content.replace(search.group(0), "NOTIFICATIONS: False")
+                    search = re.search('TO: .*', content, re.MULTILINE)
+                    if search is not None:
+                        content = content.replace(search.group(0), "TO: \"\"")
+                    content = Autosubmit.replace_parameter_inside_section(content, "EXPID", exp_id, "DEFAULT")
+                    search = re.search('HPCARCH: .*', content, re.MULTILINE)
+                    if search is not None:
+                        x = search.group(0).split(":")
+                        # clean blank space, quotes and double quote
+                        aux = x[1].strip(' "\'')
+                        # hpc in config is empty && -H has a value-> write down hpc value
+                        if hpc != "":
+                            content = content.replace(search.group(0), f"HPCARCH: \"{hpc}\"")
+                        elif len(aux) > 0:
+                            content = content.replace(search.group(0), f"HPCARCH: \"{aux}\"")
+                        else:
+                            content = content.replace(search.group(0), "HPCARCH: \"local\"")
+                        # the other case is aux!=0 that we dont care about val(hpc) because its a copyExpId
+                    if minimal_configuration:
+                        search = re.search('CUSTOM_CONFIG: .*', content, re.MULTILINE)
+                        if search is not None:
+                            content = content.replace(search.group(0),
+                                                      "CUSTOM_CONFIG: \"%PROJDIR%/" + git_as_conf + "\"")
+                        search = re.search('PROJECT_ORIGIN: .*', content, re.MULTILINE)
+                        if search is not None:
+                            content = content.replace(search.group(0), f"PROJECT_ORIGIN: \"{git_repo}\"")
+                        search = re.search('PROJECT_PATH: .*', content, re.MULTILINE)
+                        if search is not None:
+                            content = content.replace(search.group(0), f"PROJECT_PATH: \"{git_repo}\"")
+                        search = re.search('PROJECT_BRANCH: .*', content, re.MULTILINE)
+                        if search is not None:
+                            content = content.replace(search.group(0), f"PROJECT_BRANCH: \"{git_branch}\"")
+
+                    f.seek(0)
+                    f.write(content)
+                    f.truncate()
 
     @staticmethod
     def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False,
@@ -2381,33 +2461,38 @@ class Autosubmit:
                                                inspect=inspect, only_wrappers=only_wrappers)
                 )
                 wrapper_errors.update(packager.wrappers_with_error)
-                # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
-
-                if not inspect and len(valid_packages_to_submit) > 0:
-                    job_list.save()
                 save_2 = False
+                # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
                 if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
                     # Process the script generated in submit_ready_jobs
                     save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
                                                                                          failed_packages,
                                                                                          error_message="")
-                    if not inspect and len(valid_packages_to_submit) > 0:
-                        job_list.save()
+                if not inspect and len(valid_packages_to_submit) > 0:
+                    job_list.save()
                 # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code
                 job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf, packages_persistence,
                                        hold=hold, inspect=inspect)
                 if error_message != "":
                     raise AutosubmitCritical(f"Submission Failed due wrong configuration:{error_message}", 7014)
-
-            if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
-                # Deadlock situation
-                err_msg = ""
-                for wrapper in wrapper_errors:
-                    err_msg += f"wrapped_jobs:{wrapper} in {wrapper_errors[wrapper]}\n"
-                raise AutosubmitCritical(err_msg, 7014)
+            Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
             return save_1 or save_2
         except Exception:
             raise
+
+    @staticmethod
+    def check_deadlock(wrapper_errors: dict, any_job_submitted: bool, job_list: JobList) -> None:
+        """Check for deadlock situations and raise an exception if detected.
+        :param wrapper_errors: Dictionary of wrapper errors.
+        :param any_job_submitted: Boolean indicating if any job was submitted.
+        :param job_list: JobList object containing the jobs.
+        """
+        if wrapper_errors and not any_job_submitted and len(job_list.get_in_queue()) == 0:
+            # Deadlock situation
+            err_msg = ""
+            for wrapper in wrapper_errors:
+                err_msg += f"wrapped_jobs:{wrapper} in {wrapper_errors[wrapper]}\n"
+            raise AutosubmitCritical(err_msg, 7014)
 
     @staticmethod
     def monitor(expid: str, file_format: str, lst: str, filter_chunks: str, filter_status: str, filter_section: str,

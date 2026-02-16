@@ -1273,7 +1273,7 @@ class Job(object):
         remote_logs = tuple(remote_logs)
 
         # Retrieve remote logs
-        Log.debug(f"Retrieving log files {remote_logs} for job {self.name}")
+        Log.debug(f"Retrieving log files {remote_logs[0]} and .err")
         self.platform.get_logs_files(self.expid, remote_logs)
 
         # Update local logs
@@ -2240,9 +2240,23 @@ class Job(object):
 
         # Only replace CURRENT_ placeholders when requested and dynamic_variables exists.
         if replace_by_empty:
-            for key in as_conf.dynamic_variables.keys():
-                parameters[key] = ""
-            as_conf.dynamic_variables = dict()
+            placeholder_pattern = re.compile(r'%[^%]+%')
+            for key, value in as_conf.dynamic_variables.items():
+                if isinstance(value, str):
+                    for placeholder in re.findall(placeholder_pattern, value):
+                        if placeholder not in as_conf.default_parameters.values():
+                            value = value.replace(placeholder, "")
+                    parameters[key] = value
+                elif isinstance(value, list):
+                    cleaned_list = []
+                    for item in value:
+                        if isinstance(item, str):
+                            for placeholder in re.findall(placeholder_pattern, item):
+                                if placeholder not in as_conf.default_parameters.values():
+                                    item = item.replace(placeholder, "")
+                        cleaned_list.append(item)
+                    parameters[key] = cleaned_list
+            as_conf.dynamic_variables = {}
 
         return parameters
 
@@ -2285,7 +2299,6 @@ class Job(object):
                                                                 set_attributes)
         parameters = self.update_wrapper_parameters(as_conf, parameters)
         parameters = self.update_placeholders(as_conf, parameters, replace_by_empty=True)
-        parameters.update(as_conf.default_parameters)
         if set_attributes:
             self.update_job_variables_final_values(parameters)
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
@@ -2563,7 +2576,6 @@ class Job(object):
         for i, log_file in enumerate(self.local_logs):
             for ext in compress_ext:
                 _aux_path = Path(self._tmp_path, f"LOG_{self.expid}").joinpath(log_file + ext)
-                Log.debug(f"Checking existence of log file: {_aux_path}")
                 if _aux_path.exists():
                     Log.debug(f"Found compressed log file: {_aux_path}")
                     _aux_local_logs[i] += ext

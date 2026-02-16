@@ -73,11 +73,8 @@ class AutosubmitConfig(object):
         self.starter_conf: dict = {}
         self.misc_files = []
         self.misc_data: dict = {}
-        self.default_parameters = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%',
-                                   'M': '%M%', 'M_': '%M_%', 'm': '%m%', 'm_': '%m_%'}
-
+        self.default_parameters = {}
         self.metadata_folder = Path(self.conf_folder_yaml) / "metadata"
-
         self._platforms_parser = None
         self._platforms_parser_file = None
         self._exp_parser_file = None
@@ -1875,6 +1872,25 @@ class AutosubmitConfig(object):
 
             self.load_workflow_commit()
             self.dynamic_variables = {}
+            self.set_default_parameters()
+
+    def set_default_parameters(self) -> None:
+        """Sets the default parameters for the experiment."""
+        self.default_parameters: dict = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%', 'M': '%M%', 'M_': '%M_%',
+                                         'm': '%m%', 'm_': '%m_%'}
+        user_defined = self.experiment_data.get("CONFIG", {}).get("SAFE_PLACEHOLDERS", [])
+
+        if isinstance(user_defined, str):
+            if "," in user_defined:
+                user_defined = [param.strip() for param in user_defined.split(",")]
+            else:
+                user_defined = [param.strip() for param in user_defined.split(" ")]
+
+        elif not isinstance(user_defined, list):
+            raise AutosubmitCritical("CONFIG.SAFE_PLACEHOLDERS must be a list of placeholders names or a string.")
+
+        for param in (p for p in user_defined if p not in self.default_parameters.keys()):
+            self.default_parameters[param] = f"%{param}%"
 
     def _add_autosubmit_dict(self) -> None:
         """Add the AUTOSUBMIT namespace to the experiment data."""
@@ -1922,12 +1938,11 @@ class AutosubmitConfig(object):
         user = hpcarch_data.get("USER", "")
 
         if scratch and project and user:
-            base = Path(scratch) / project / user
-            target["HPCROOTDIR"] = base / f"LOG_{self.expid}"
+            target["HPCROOTDIR"] = Path(scratch) / project / user / self.expid
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
         # Default local paths.
         elif hpcarch.upper() == "LOCAL":
-            target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR) / BasicConfig.LOCAL_TMP_DIR / f"LOG_{self.expid}"
+            target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid / BasicConfig.LOCAL_TMP_DIR
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
 
         if target.get("HPCROOTDIR", None) and target.get("HPCLOGDIR", None):
