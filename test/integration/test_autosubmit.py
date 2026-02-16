@@ -363,19 +363,19 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
     'Missing WALLCLOCK in FOR',
     'Correct FOR',
 ])
-def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict,
-                          context_mgr: 'AbstractContextManager'):
+def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
     with context_mgr:
         autosubmit_exp('t000', experiment_data, create=False, include_jobs=False)
 
 
 def test_submit_ready_jobs(autosubmit_exp, mocker):
+
     exp = autosubmit_exp('a000', experiment_data={})
 
     platform_config = {
         "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
-        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'exp_tmp_dir'),
-        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'aslogs_dir')
+        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'exp_tmp_dir'),
+        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'aslogs_dir')
     }
     platform = Platform('a000', "Platform", platform_config)
 
@@ -410,24 +410,24 @@ def test_submit_ready_jobs(autosubmit_exp, mocker):
     '_exit,job_previous_status,expected_jobs_to_check',
     [
         (
-                True,
-                Status.FAILED,
-                0
+            True,
+            Status.FAILED,
+            0
         ),
         (
-                True,
-                Status.RUNNING,
-                0
+            True,
+            Status.RUNNING,
+            0
         ),
         (
-                False,
-                Status.FAILED,
-                0
+            False,
+            Status.FAILED,
+            0
         ),
         (
-                False,
-                Status.RUNNING,
-                1
+            False,
+            Status.RUNNING,
+            1
         ),
     ],
     ids=[
