@@ -10,7 +10,7 @@ platform does not support wrappers anymore (it was used for testing).
 The `--notransitive` argument has been deprecated in all commands. You may still
 use it without a failure, but there will be a warning displayed asking you to
 update your command line. This argument will be completely removed on a later
-release.
+release. 
 
 **Bug fixes:**
 
