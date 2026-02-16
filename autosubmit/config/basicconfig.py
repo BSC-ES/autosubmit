@@ -19,6 +19,7 @@ import inspect
 import os
 from configparser import ConfigParser
 from pathlib import Path
+from typing import Union
 
 
 class BasicConfig:
@@ -60,8 +61,8 @@ class BasicConfig:
     DEFAULT_JOBS_CONF = ''
     SMTP_SERVER = ''
     MAIL_FROM = ''
-    ALLOWED_HOSTS = ''
-    DENIED_HOSTS = ''
+    ALLOWED_HOSTS: Union[str, dict] = ''
+    DENIED_HOSTS: Union[str, dict] = ''
     CONFIG_FILE_FOUND = False
     DATABASE_BACKEND = "sqlite"
     DATABASE_CONN_URL = ""
@@ -107,7 +108,7 @@ class BasicConfig:
         else:
             BasicConfig.CONFIG_FILE_FOUND = True
         parser = ConfigParser()
-        parser.optionxform = str
+        parser.optionxform = str  # type: ignore[assignment]
         parser.read(file_path)
 
         if parser.has_option('database', 'path'):
@@ -133,8 +134,7 @@ class BasicConfig:
         if parser.has_option('mail', 'mail_from'):
             BasicConfig.MAIL_FROM = parser.get('mail', 'mail_from')
         if parser.has_option('hosts', 'authorized'):
-            list_command_allowed = parser.get('hosts', 'authorized')
-            list_command_allowed = list_command_allowed.split('] ')
+            list_command_allowed = parser.get('hosts', 'authorized').split('] ')
             i = 0
             for _ in list_command_allowed:
                 list_command_allowed[i] = list_command_allowed[i].strip('[]')
@@ -155,8 +155,7 @@ class BasicConfig:
                         restrictions[command_allowed[0]] = [command_allowed[1]]
             BasicConfig.ALLOWED_HOSTS = restrictions
         if parser.has_option('hosts', 'forbidden'):
-            list_command_allowed = parser.get('hosts', 'forbidden')
-            list_command_allowed = list_command_allowed.split('] ')
+            list_command_allowed = parser.get('hosts', 'forbidden').split('] ')
             i = 0
             for _ in list_command_allowed:
                 list_command_allowed[i] = list_command_allowed[i].strip('[]')

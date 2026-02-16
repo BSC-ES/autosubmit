@@ -17,7 +17,7 @@
 
 """Contains code to manage a database via SQLAlchemy."""
 
-from typing import Any, Optional, cast
+from typing import cast, Any, Optional
 
 from sqlalchemy import Engine, delete, func, insert, select
 from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
@@ -88,7 +88,7 @@ class DbManager:
         table = get_table_from_name(schema=self.schema, table_name=table_name)
         with self.engine.connect() as conn:
             row = conn.execute(select(func.count()).select_from(table))
-            return row.scalar()
+            return cast(int, row.scalar())
 
     def delete_all(self, table_name: str) -> int:
         table = get_table_from_name(schema=self.schema, table_name=table_name)
