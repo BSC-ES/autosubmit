@@ -538,8 +538,8 @@ class JobList(object):
             if not self.run_mode:
                 if new:
                     job._fail_count = 0
-                elif job.status == Status.FAILED and job._fail_count >= job.retrials:
-                    job._fail_count = 0
+                # elif job.status == Status.FAILED and job._fail_count >= job.retrials:
+                #     job._fail_count = 0
             # called from autosubmit create
             if new:
                 job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
@@ -2959,7 +2959,6 @@ class JobList(object):
                     try:
                         new_status = self._stat_val.retval(status_str)
                         job.status = new_status
-                        job._fail_count = 0
                         Log.result(f"Updated job '{job_name}' to status '{status_str}'")
                     except (ValueError, AttributeError) as e:
                         Log.warning(f"Invalid status '{status_str}' for job '{job_name}' (line {line_num}): {e}")
@@ -3151,9 +3150,11 @@ class JobList(object):
         :param new_run: If True, also mark the job as updated for a new run.
         :type new_run: bool
         """
+        # TODO: This only works properly if the job was failed. But what if it was already submitted?
+        # I think we need to look for the fail_count
         if new_run:
             # load all jobs without updated_log from db
-            jobs_to_recover = self.load_jobs(full_load=True, only_finished=True)
+            jobs_to_recover = self.load_jobs(full_load=True)
             for job in jobs_to_recover:
                 ref_fail_count = copy.copy(job.fail_count)
                 # Updated_log indicates the last downloaded log
@@ -3294,10 +3295,10 @@ class JobList(object):
 
         for job in [job for job in self.job_list if job.status in
                                                     [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED, Status.FAILED]]:
+            job.fail_count = 0
             if job.status == Status.FAILED:
                 job.status = Status.WAITING
                 Log.debug(f"Resetting job: {job.name} status to: WAITING on first run...")
-                job.fail_count = 0
 
     def _handle_special_checkpoint_jobs(self) -> Tuple[bool, bool]:
         """Set jobs that fulfill special checkpoint conditions to READY.
