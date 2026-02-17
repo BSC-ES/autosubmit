@@ -166,7 +166,7 @@ def test_run_interrupted(
     process = Process(target=as_exp.autosubmit.run_experiment, args=(as_exp.expid,))
     process.start()
 
-    max_waiting_time_seconds = 60
+    max_waiting_time_seconds = 30
 
     # Wait until the process starts (we wait until the file lock is locked).
     lock_file = tmp_path / 'autosubmit.lock'

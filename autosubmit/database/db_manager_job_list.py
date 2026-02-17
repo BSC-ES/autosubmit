@@ -91,7 +91,6 @@ class JobsDbManager(DbManager):
             self,
             full_load: bool = False,
             load_failed_jobs: bool = False,
-            only_with_logs: bool = False,
             members: Optional[List[Any]] = None
     ) -> List[Dict[str, Any]]:
         """Return a  list of jobs loaded from the database.
@@ -106,27 +105,13 @@ class JobsDbManager(DbManager):
         """
         table: Table = self.tables[JobsTable.name]
         self.create_table(table.name)
-        if only_with_logs:
-            job_list = self.select_jobs_with_logs()
-        elif full_load:
+        if full_load:
             job_list = self.select_all_jobs()
         else:
             job_list = self.select_active_jobs(include_failed=load_failed_jobs, members=members)
             job_list.extend(self.select_children_jobs(job_list, members=members))
             job_list = set(job_list)  # remove duplicates
 
-        return [dict(job) for job in job_list]
-
-    def select_jobs_with_logs(self) -> List[Dict[str, Any]]:
-        """Return the jobs from the database that have finished."""
-        table: Table = self.tables[JobsTable.name]
-
-        self.create_table(table.name)
-        condition = or_(
-            table.c.status.in_([Status.COMPLETED, Status.FAILED]),
-            table.c.updated_log > 0
-        )
-        job_list = self.select_where_with_columns(table, condition)
         return [dict(job) for job in job_list]
 
     def load_job_by_name(self, job_name: str) -> dict[str, Any]:

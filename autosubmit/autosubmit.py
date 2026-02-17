@@ -2009,16 +2009,13 @@ class Autosubmit:
         # Could also load a backup from previous iteration.
         # The submit ready functions will cancel all job submitted if one submitted in that iteration had issues,
         # so it should be safe to recover from a backup without losing job ids
+
         if recover:
             Log.info("Recovering job_list")
         try:
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, new=False, full_load=False, submitter=submitter,
                 check_failed_jobs=True, run_mode=False)
-            # New runs, reset failed status to waiting
-            # TODO: Fix this, I think we also need to check the status in the db if all logs are updated etc...
-            # if not recover:
-            #     job_list.reset_jobs_on_first_run()
 
         except IOError as e:
             raise AutosubmitError(
@@ -2197,10 +2194,8 @@ class Autosubmit:
                                                                                       3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
-                job_list.recover_logs(new_run=True)
                 # Save metadata.
                 as_conf.save()
-                job_list._load_graph(full_load=False)
                 while job_list.continue_run():
                     if profile:
                         profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))

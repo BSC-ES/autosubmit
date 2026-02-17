@@ -535,12 +535,8 @@ class JobList(object):
         :param new: If True, initializes new jobs.
         """
         for job in self.job_list:
-            if not self.run_mode:
-                if new:
-                    job._fail_count = 0
-                # elif job.status == Status.FAILED and job._fail_count >= job.retrials:
-                #     job._fail_count = 0
-            # called from autosubmit create
+            if not self.run_mode and new:
+                job.fail_count = 0
             if new:
                 job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
             else:
@@ -2692,6 +2688,7 @@ class JobList(object):
         ]
         # update edges completion status before removing them
         for job in (job for job in jobs_to_unload):
+            job.fail_count = 0
             for child in job.children:
                 self.graph.edges[job.name, child.name]['completion_status'] = "COMPLETED"
             for parent in job.parents:
@@ -2704,7 +2701,6 @@ class JobList(object):
                 if self.graph.has_edge(job.name, child.name):
                     self.graph.remove_edge(job.name, child.name)
                 child.parents.discard(job)
-
 
             for parent in list(job.parents):
                 if self.graph.has_edge(parent.name, job.name):
@@ -2828,8 +2824,7 @@ class JobList(object):
                 self.dbmanager.save_jobs(jobs_to_save)
             Log.info("Jobs saved.")
 
-    def load_jobs(self, full_load: bool = False, load_failed_jobs: bool = False,
-                  only_with_logs: bool = False) -> list[Job]:
+    def load_jobs(self, full_load: bool = False, load_failed_jobs: bool = False) -> list[Job]:
         """Load jobs from the database.
 
         Load job nodes from persistent storage into memory and return them as a list
@@ -2838,14 +2833,11 @@ class JobList(object):
         :param full_load: If ``True``, load all jobs and edges; otherwise load only the
             subset necessary for continued execution.
         :param load_failed_jobs: If ``True``, include jobs in failed states when loading.
-        :param only_with_logs: If ``True``, load only finished jobs (completed, failed or skipped).
         :return: A list of loaded ``Job`` objects.
         :rtype: List[Job]
         :raises Exception: If a database access error occurs while loading jobs.
         """
-        nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs,
-                                         only_with_logs=only_with_logs,
-                                         members=self.run_members)
+        nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs, members=self.run_members)
         self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
         return nodes
 
@@ -3137,45 +3129,21 @@ class JobList(object):
         else:
             # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
             job.write_submit_time()
-            try:
-                job.platform.add_job_to_log_recover(job)
-            except Exception as e:
-                pass
+            job.platform.add_job_to_log_recover(job)
 
         job.log_recovery_call_count += 1
 
-    def recover_logs(self, new_run: bool = False):
+    def recover_logs(self):
         """Update jobs' log recovered status.
 
         Iterate over the current job list and mark jobs whose stdout/stderr logs
         have been recovered.
 
-        :param new_run: If True, also mark the job as updated for a new run.
-        :type new_run: bool
         """
-        # TODO: This only works properly if the job was failed. But what if it was already submitted?
-        # I think we need to look for the fail_count
-        if new_run:
-            # load all jobs without updated_log from db
-            jobs_dict: list[dict] = self.load_jobs(only_with_logs=True)
-            for job_dict in jobs_dict:
-                # load job
-                job = self.load_job_by_name(job_dict['name'])
-                ref_fail_count = copy.copy(job_dict['updated_log'])
-                # Updated_log indicates the last downloaded log
-                # Failed jobs could missed some log in between if run was force stopped
-                job.fail_count = copy.copy(job_dict['updated_log'])
-                job.assign_platform(self.submitter, False, False)
-                for i in range(job_dict['updated_log'], ref_fail_count):
-                    self._recover_log(job)
-                    job.fail_count += 1
-                job.fail_count = ref_fail_count
-
-        else:
-            jobs_to_recover = [job for job in self.job_list if
-                               not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
-            for job in jobs_to_recover:
-                self._recover_log(job)
+        jobs_to_recover = [job for job in self.job_list if
+                           not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
+        for job in jobs_to_recover:
+            self._recover_log(job)
 
     def check_completed_jobs_after_recovery(self):
         for job in (job for job in self.job_list if job.status == Status.COMPLETED):
@@ -3295,15 +3263,6 @@ class JobList(object):
                 job.status = Status.FAILED
                 save = True
         return save
-
-    def reset_jobs_on_first_run(self) -> None:
-        """Reset fail count for jobs in WAITING, READY, DELAYED, or PREPARED status."""
-
-        for job in [job for job in self.job_list if job.status in
-                                                    [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED, Status.FAILED]]:
-            if job.status == Status.FAILED:
-                job.status = Status.WAITING
-                Log.debug(f"Resetting job: {job.name} status to: WAITING on first run...")
 
     def _handle_special_checkpoint_jobs(self) -> Tuple[bool, bool]:
         """Set jobs that fulfill special checkpoint conditions to READY.
