@@ -2200,6 +2200,7 @@ class Autosubmit:
                 job_list.recover_logs(new_run=True)
                 # Save metadata.
                 as_conf.save()
+                job_list._load_graph(full_load=False)
                 while job_list.continue_run():
                     if profile:
                         profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))
@@ -5079,8 +5080,6 @@ class Autosubmit:
                 performed_changes = {}
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")
                 for job in final_list:
-                    if final_status in [Status.WAITING, Status.PREPARED, Status.DELAYED, Status.READY]:
-                        job.fail_count = 0
                     if job.status in [Status.QUEUING, Status.RUNNING,
                                       Status.SUBMITTED] and job.platform.name not in definitive_platforms:
                         Log.printlog(f"JOB: [{job.platform.name}] is ignored as the [{job.name}] platform is currently"

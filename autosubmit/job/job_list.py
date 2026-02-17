@@ -2829,7 +2829,7 @@ class JobList(object):
             Log.info("Jobs saved.")
 
     def load_jobs(self, full_load: bool = False, load_failed_jobs: bool = False,
-                  only_finished: bool = False) -> list[Job]:
+                  only_with_logs: bool = False) -> list[Job]:
         """Load jobs from the database.
 
         Load job nodes from persistent storage into memory and return them as a list
@@ -2838,13 +2838,13 @@ class JobList(object):
         :param full_load: If ``True``, load all jobs and edges; otherwise load only the
             subset necessary for continued execution.
         :param load_failed_jobs: If ``True``, include jobs in failed states when loading.
-        :param only_finished: If ``True``, load only finished jobs (completed, failed or skipped).
+        :param only_with_logs: If ``True``, load only finished jobs (completed, failed or skipped).
         :return: A list of loaded ``Job`` objects.
         :rtype: List[Job]
         :raises Exception: If a database access error occurs while loading jobs.
         """
         nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs,
-                                         only_finished=only_finished,
+                                         only_with_logs=only_with_logs,
                                          members=self.run_members)
         self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
         return nodes
@@ -3137,7 +3137,10 @@ class JobList(object):
         else:
             # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
             job.write_submit_time()
-            job.platform.add_job_to_log_recover(job)
+            try:
+                job.platform.add_job_to_log_recover(job)
+            except Exception as e:
+                pass
 
         job.log_recovery_call_count += 1
 
@@ -3154,13 +3157,16 @@ class JobList(object):
         # I think we need to look for the fail_count
         if new_run:
             # load all jobs without updated_log from db
-            jobs_to_recover = self.load_jobs(full_load=True)
-            for job in jobs_to_recover:
-                ref_fail_count = copy.copy(job.fail_count)
+            jobs_dict: list[dict] = self.load_jobs(only_with_logs=True)
+            for job_dict in jobs_dict:
+                # load job
+                job = self.load_job_by_name(job_dict['name'])
+                ref_fail_count = copy.copy(job_dict['updated_log'])
                 # Updated_log indicates the last downloaded log
                 # Failed jobs could missed some log in between if run was force stopped
-                job.fail_count = copy.copy(job.updated_log)
-                for i in range(job.updated_log, ref_fail_count):
+                job.fail_count = copy.copy(job_dict['updated_log'])
+                job.assign_platform(self.submitter, False, False)
+                for i in range(job_dict['updated_log'], ref_fail_count):
                     self._recover_log(job)
                     job.fail_count += 1
                 job.fail_count = ref_fail_count
@@ -3295,7 +3301,6 @@ class JobList(object):
 
         for job in [job for job in self.job_list if job.status in
                                                     [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED, Status.FAILED]]:
-            job.fail_count = 0
             if job.status == Status.FAILED:
                 job.status = Status.WAITING
                 Log.debug(f"Resetting job: {job.name} status to: WAITING on first run...")

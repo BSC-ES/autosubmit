@@ -91,7 +91,7 @@ class JobsDbManager(DbManager):
             self,
             full_load: bool = False,
             load_failed_jobs: bool = False,
-            only_finished: bool = False,
+            only_with_logs: bool = False,
             members: Optional[List[Any]] = None
     ) -> List[Dict[str, Any]]:
         """Return a  list of jobs loaded from the database.
@@ -100,14 +100,14 @@ class JobsDbManager(DbManager):
 
         :param full_load: If True, load all jobs.
         :param load_failed_jobs: If True, include failed jobs when loading active jobs.
-        :param only_finished: If True, load only finished jobs.
+        :param only_with_logs: If True, load only finished jobs.
         :param members: Optional list of member identifiers to filter jobs.
         :return: A list of job dictionaries.
         """
         table: Table = self.tables[JobsTable.name]
         self.create_table(table.name)
-        if only_finished:
-            job_list = self.select_finished_jobs()
+        if only_with_logs:
+            job_list = self.select_jobs_with_logs()
         elif full_load:
             job_list = self.select_all_jobs()
         else:
@@ -117,13 +117,16 @@ class JobsDbManager(DbManager):
 
         return [dict(job) for job in job_list]
 
-    def select_finished_jobs(self) -> List[Dict[str, Any]]:
-        """Return the jobs from the database that have finished.
-        """
+    def select_jobs_with_logs(self) -> List[Dict[str, Any]]:
+        """Return the jobs from the database that have finished."""
         table: Table = self.tables[JobsTable.name]
 
         self.create_table(table.name)
-        job_list = self.select_where_with_columns(table, {'status': [Status.COMPLETED, Status.FAILED, Status.SKIPPED]})
+        condition = or_(
+            table.c.status.in_([Status.COMPLETED, Status.FAILED]),
+            table.c.updated_log > 0
+        )
+        job_list = self.select_where_with_columns(table, condition)
         return [dict(job) for job in job_list]
 
     def load_job_by_name(self, job_name: str) -> dict[str, Any]:

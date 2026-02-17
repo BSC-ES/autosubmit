@@ -739,8 +739,8 @@ def test_delete_expid(mocker, tmp_path, autosubmit_exp, autosubmit, expid_value)
 
 def test_perform_deletion(mocker, tmp_path, autosubmit_exp, autosubmit):
     as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
-    mocker.patch("shutil.rmtree", side_effect=FileNotFoundError)
-    mocker.patch("os.remove", side_effect=FileNotFoundError)
+    mocker.patch("shutil.rmtree", side_effect=Exception)
+    mocker.patch("os.remove", side_effect=Exception)
     basic_config = as_exp.as_conf.basic_config
     experiment_path = Path(f"{basic_config.LOCAL_ROOT_DIR}/{as_exp.expid}")
     structure_db_path = Path(f"{basic_config.STRUCTURES_DIR}/structure_{as_exp.expid}.db")
