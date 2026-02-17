@@ -29,7 +29,7 @@ from contextlib import suppress
 from datetime import timedelta
 from pathlib import Path
 from threading import Thread
-from typing import Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import sum_str_hours
 
@@ -246,6 +246,16 @@ class JobPackageBase(object):
     def _do_submission(self, job_scripts=None, hold: bool = False):
         """ Submit package to the platform. """
         pass  # pragma: no cover
+    
+    def _assign_wrapper_method_to_jobs(self, jobs: List[Job], wrapper_method: str) -> None:
+        """
+        Assign the wrapper method to each job in the list.
+
+        :param jobs: List of jobs.
+        :param wrapper_method: Wrapper method to be assigned.
+        """
+        for job in jobs:
+            job.wrapper_method = wrapper_method
 
     def process_jobs_to_submit(self, job_id: str, hold: bool = False) -> None:
         for i, job in enumerate(self.jobs):
@@ -271,6 +281,9 @@ class JobPackageSimple(JobPackageBase):
         # TODO: This should be possible, but it crashes across the code.
         #  Add a property that defines what is a package with wrappers
         # self.name = "simple_package"
+
+        # Simple jobs may have been in a wrapper previously, so we reset the wrapper method.
+        self._assign_wrapper_method_to_jobs(jobs, None)
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
         for job in self.jobs:
@@ -341,7 +354,7 @@ class JobPackageSimpleWrapped(JobPackageSimple):
         super(JobPackageSimpleWrapped, self)._do_submission(job_scripts, hold=hold)
 
 
-class JobPackageArray(JobPackageBase):
+class JobPackageArray(JobPackageBase): # TODO: [ENGINES] Never used?
     """
     Class to manage an array-based package of jobs to be submitted by autosubmit
     """
@@ -457,6 +470,7 @@ class JobPackageThread(JobPackageBase):
             self.wrapper_method = wrapper_info[2]
             self.jobs_in_wrapper = wrapper_info[3]
             self.extensible_wallclock = wrapper_info[4]
+            self.custom_env_setup = wrapper_info[5]
         else:
             self.wrapper_type = None
             self.wrapper_policy = None
@@ -469,8 +483,7 @@ class JobPackageThread(JobPackageBase):
         self._common_script = None
         self.executable = None
 
-        self._wallclock = '00:00'
-        # depends on the type of wrapper
+        self._wallclock = '00:00' # depends on the type of wrapper
 
         self._jobs_resources = jobs_resources
         self._wrapper_factory = self.platform.wrapper
@@ -569,6 +582,9 @@ class JobPackageThread(JobPackageBase):
         self.parameters['TASKS'] = self.tasks
         self.parameters["EXECUTABLE"] = self.executable  # have to look
         self.method = method
+
+        # Assign wrapper method to jobs so that they can be assigned their platform or the wrapper engine later
+        self._assign_wrapper_method_to_jobs(jobs, method)
 
     @property
     def name(self):
@@ -786,13 +802,12 @@ class JobPackageVertical(JobPackageThread):
     :type jobs:
     :param: dependency:
     """
-
     def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
+                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None, method: str = 'ASThread'):
         if wrapper_info is None:
             wrapper_info = []
         super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
-                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info)
+                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info, method=method)
         for job in jobs:
             if int(job.processors) >= int(self._num_processors):
                 self._num_processors = job.processors
@@ -879,9 +894,9 @@ class JobPackageHorizontal(JobPackageThread):
     Class to manage a horizontal thread-based package of jobs to be submitted by autosubmit
     """
     def __init__(self, jobs: list[Job], dependency=None, jobs_resources: dict = None, method: str = 'ASThread',
-                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS"):
+                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS", wrapper_info: Optional[list] = None):
         super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources, configuration=configuration,
-                                                   wrapper_section=wrapper_section)
+                                                   wrapper_section=wrapper_section, wrapper_info=wrapper_info, method=method)
         self.method = method
         self._queue = self.queue
         for job in jobs:
@@ -908,17 +923,17 @@ class JobPackageHorizontal(JobPackageThread):
 
 class JobPackageHybrid(JobPackageThread):
     """
-        Class to manage a hybrid (horizontal and vertical) thread-based package of jobs to be submitted by autosubmit
-        """
+    Class to manage a hybrid (horizontal and vertical) thread-based package of jobs to be submitted by autosubmit
+    """
 
     def __init__(self, jobs: list[list[Job]], num_processors: str, total_wallclock, dependency=None,
-                 jobs_resources: Optional[dict] = None, method: str = "ASThread",
-                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS"):
+                 jobs_resources: Optional[dict] = None, method: str = "ASThread", configuration: Optional['AutosubmitConfig'] = None,
+                 wrapper_section="WRAPPERS", wrapper_info: Optional[list] = None):
         all_jobs = [item for sublist in jobs for item in sublist]  # flatten list
         if jobs_resources is None:
             jobs_resources = {}
-        super(JobPackageHybrid, self).__init__(all_jobs, dependency, jobs_resources, method,
-                                               configuration=configuration, wrapper_section=wrapper_section)
+        super(JobPackageHybrid, self).__init__(all_jobs, dependency, jobs_resources, method, configuration=configuration, 
+                                               wrapper_section=wrapper_section, wrapper_info=wrapper_info)
         self.jobs_lists = jobs
         self.method = method
         self._num_processors = int(num_processors)

@@ -41,8 +41,10 @@ from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, 
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import get_template_snippet, Language
 from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.platforms.fluxoverslurm import FluxOverSlurmPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.wrappers.flux_yaml_generator import FluxYAMLGenerator
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform
@@ -129,7 +131,7 @@ class Job(object):
     """
 
     __slots__ = (
-        'rerun_only', 'delay_end', 'wrapper_type', '_wrapper_queue',
+        'rerun_only', 'delay_end', 'wrapper_type', 'wrapper_method', '_wrapper_queue',
         '_platform', '_queue', '_partition', 'retry_delay', '_section',
         '_wallclock', 'wchunkinc', '_tasks', '_nodes',
         '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
@@ -140,7 +142,7 @@ class Job(object):
         'file', 'additional_files', 'executable', '_local_logs',
         '_remote_logs', 'script_name', 'stat_file', '_status', 'prev_status',
         'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
-        'parameters', '_tmp_path', '_log_path', '_platform', 'check',
+        'parameters', '_tmp_path', '_log_path', 'check',
         'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
         '_dependencies', 'running', 'start_time', 'ext_header_path', 'ext_tailer_path',
         'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
@@ -191,6 +193,7 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
+        self.wrapper_method = None
         self._wrapper_queue = None
         self._platform = None
         self._queue = None
@@ -244,7 +247,6 @@ class Job(object):
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
-        self._platform = None
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
@@ -309,6 +311,7 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
+        self.wrapper_method = None
         self._wrapper_queue = None
         self._queue = None
         self._partition = None
@@ -1605,6 +1608,7 @@ class Job(object):
                 "min_wrapped_h",
                 "min_wrapped_v",
                 "policy"
+                "custom_env_setup"
             ]:
                 parameters[f"CURRENT_{key.upper()}"] = value
 
@@ -2368,12 +2372,20 @@ class Job(object):
         return self._get_paramiko_template(snippet, template, parameters)
 
     def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
-        current_platform = self._platform
+        if self.wrapper_method == 'flux':
+            current_platform = FluxOverSlurmPlatform()
+            yaml_generator = FluxYAMLGenerator(parameters)
+            full_template = self._compose_template_from_snippet(snippet, template, parameters, current_platform)
+            return yaml_generator.generate_template(full_template)
+        else:
+            return self._compose_template_from_snippet(snippet, template, parameters, self._platform)
+
+    def _compose_template_from_snippet(self, snippet: 'TemplateSnippet', template, parameters, current_platform) -> str:
         return ''.join([
-            snippet.as_header(current_platform.get_header(self, parameters), self.executable),
-            snippet.as_body(template),
-            snippet.as_tailer()
-        ])
+                snippet.as_header(current_platform.get_header(self, parameters), self.executable),
+                snippet.as_body(template),
+                snippet.as_tailer()
+            ])
 
     def queuing_reason_cancel(self, reason):
         try:
