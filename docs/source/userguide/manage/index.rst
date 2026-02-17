@@ -84,7 +84,8 @@ To delete the experiment, use the command:
 
     autosubmit delete <EXPID>
 
-*<EXPID>* is the experiment identifier.
+*<EXPID>* is the experiment identifier. You can pass a single
+identifier, or a comma-separated list of identifiers.
 
 .. warning:: DO NOT USE THIS COMMAND IF YOU ARE NOT SURE !
     It deletes the experiment from database and experiment’s folder.

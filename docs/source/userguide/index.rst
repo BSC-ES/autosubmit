@@ -38,7 +38,7 @@ Command list
 * recovery  Recover specified experiment
 * clean  Clean specified experiment
 * refresh  Refresh project directory for an experiment
-* delete  Delete specified experiment
+* delete  Delete specified experiments
 * configure  Configure database and path for autosubmit
 * install  Install database for Autosubmit on the configured folder
 * archive  Clean, compress and remove from the experiments' folder a finalized experiment
