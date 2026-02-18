@@ -2081,7 +2081,7 @@ class Autosubmit:
             from .profiler.profiler import Profiler
             profiler = Profiler(expid, trace_enabled=trace_enabled, max_checkpoints=profile_max_iterations)
             profiler.start()
-            profiler.iteration_checkpoint(0,0)
+            profiler.iteration_checkpoint(0, 0)
         else:
             profiler = None
 
@@ -2141,9 +2141,9 @@ class Autosubmit:
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
                 while job_list.get_active():
-                    if profile:
-                        profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph.edges()))
                     try:
+                        if profile:
+                            Autosubmit.exit = profiler.iteration_checkpoint(len(job_list.get_job_list()), len(job_list.jobs_edges.get("ALL", [])))
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             if job_list.get_failed():
@@ -2332,7 +2332,7 @@ class Autosubmit:
                 else:
                     Log.result("Run successful")
                     if profile:
-                        profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))
+                        profiler.iteration_checkpoint(len(job_list.get_job_list()), len(job_list.jobs_edges.get("ALL", [])))
                     # Updating finish time for job data header
                     # Database is locked, may be related to my local db todo 4.1.1
                     try:

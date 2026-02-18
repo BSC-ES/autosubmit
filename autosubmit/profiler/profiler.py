@@ -30,6 +30,7 @@ from pstats import SortKey
 
 from psutil import Process
 
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitCritical
 
@@ -122,8 +123,13 @@ class Profiler:
         if self._trace_enabled and not tracemalloc.is_tracing():
             tracemalloc.start()
 
-    def iteration_checkpoint(self, loaded_jobs: int, loaded_edges: int):
-        """Record metrics at the checkpoint of an iteration."""
+    def iteration_checkpoint(self, loaded_jobs: int, loaded_edges: int) -> bool:
+        """Record metrics at the checkpoint of an iteration.
+        :param loaded_jobs: The number of jobs loaded in the current iteration.
+        :param loaded_edges: The number of edges loaded in the current iteration.
+        :return: True if the maximum number of checkpoints has been reached, False otherwise.
+        :rtype: bool
+        """
         gc.collect()
         self._mem_iteration.append(_get_current_memory())
         self._obj_iteration.append(_get_current_object_count())
@@ -144,7 +150,8 @@ class Profiler:
             self.checkpoints += 1
             if self.checkpoints > self.max_checkpoints:
                 # send signal so Autosubmit.exit is 1
-                os.kill(os.getpid(), signal.SIGTERM)
+                return True
+        return False
 
     def stop(self) -> None:
         """Finish the profiling process and generate reports.
