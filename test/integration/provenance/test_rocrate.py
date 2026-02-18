@@ -23,8 +23,8 @@ from zipfile import ZipFile
 
 import pytest
 from rocrate.rocrate import File  # type: ignore
-from ruamel.yaml.representer import RepresenterError
 from rocrate_validator import services, models
+from ruamel.yaml.representer import RepresenterError
 
 from autosubmit.log.log import AutosubmitCritical
 # noinspection PyProtectedMember

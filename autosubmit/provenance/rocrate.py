@@ -22,17 +22,17 @@ focused on reproducibility.
 For more about RO-Crate: https://www.researchobject.org/ro-crate/
 """
 
-import datetime
 import json
 import mimetypes
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Callable, Optional, Union, cast
 
 from rocrate.model.contextentity import ContextEntity  # type: ignore
-from rocrate.rocrate import ROCrate, File  # type: ignore
+from rocrate.rocrate import Dataset, File, ROCrate  # type: ignore
 from rocrate.utils import iso_now  # type: ignore
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -46,16 +46,16 @@ from autosubmit.log.log import Log, AutosubmitCritical
 as graph context."""
 PROFILES = [
     {
-        "@id": "https://w3id.org/ro/wfrun/process/0.1",
+        "@id": "https://w3id.org/ro/wfrun/process/0.5",
         "@type": "CreativeWork",
         "name": "Process Run Crate",
-        "version": "0.1"
+        "version": "0.5"
     },
     {
-        "@id": "https://w3id.org/ro/wfrun/workflow/0.1",
+        "@id": "https://w3id.org/ro/wfrun/workflow/0.5",
         "@type": "CreativeWork",
         "name": "Workflow Run Crate",
-        "version": "0.1"
+        "version": "0.5"
     },
     {
         "@id": "https://w3id.org/workflowhub/workflow-ro-crate/1.0",
@@ -110,6 +110,25 @@ def _add_files(crate: ROCrate, base_path: Path, relative_path: str, expid: str,
             _add_file(crate, base_path, file_path, encoding_format)
 
 
+def _add_directory(crate: ROCrate, base_path: Path, dir_path: Path) -> None:
+    """Add a directory to the crate, recursively.
+
+    Does not add the directory contents (i.e., subdirectories or files).
+    """
+    for parent in reversed(dir_path.parents):
+        if str(parent) == '.':
+            continue
+
+        dir_id = f'{str(parent)}/'
+
+        if dir_id not in [e.id for e in crate.data_entities]:
+            dest_path = dir_path.parent.relative_to(base_path)
+            crate.add_dataset(
+                source=dir_id,
+                dest_path=dest_path
+            )
+
+
 def _add_file(crate: ROCrate, base_path: Optional[Path], file_path: Path, encoding_format: Optional[str] = None,
               use_uri: bool = False, **args: Any) -> Any:
     """Add a file into the RO-Crate.
@@ -125,7 +144,7 @@ def _add_file(crate: ROCrate, base_path: Optional[Path], file_path: Path, encodi
     properties = {
         "name": file_path.name,
         "sdDatePublished": iso_now(),
-        "dateModified": datetime.datetime.utcfromtimestamp(file_path.stat().st_mtime).replace(
+        "dateModified": datetime.utcfromtimestamp(file_path.stat().st_mtime).replace(
             microsecond=0).isoformat(),
         "contentSize": file_path.stat().st_size,
         **args
@@ -152,6 +171,7 @@ def _add_file(crate: ROCrate, base_path: Optional[Path], file_path: Path, encodi
     # ``conf`` folder for YAML files.
     # See: https://github.com/ResearchObject/ro-crate-py/issues/165
     if file.id not in [x['@id'] for x in crate.data_entities]:
+        _add_directory(crate, base_path, file_path.parent)
         return crate.add_file(
             source=source,
             dest_path=dest_path,
@@ -311,33 +331,21 @@ def create_rocrate_archive(
     experiment_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid)
     unified_yaml_configuration = experiment_path / "conf/metadata/experiment_data.yml"
 
-    root_profiles = [
+    conforming_profiles = [
         {"@id": profile["@id"]} for profile in PROFILES
-    ]
-    rocrate_metadata_json_profiles = [
-        # Graph context.
-        {
-            "@id": "https://w3id.org/ro/crate/1.1"
-        },
-        {
-            "@id": "https://w3id.org/workflowhub/workflow-ro-crate/1.0"
-        }
     ]
 
     mimetypes.init()
 
-    crate = ROCrate()
-    crate.root_dataset.properties().update({
-        'name': expid,
-        'conformsTo': root_profiles
-    })
+    crate = ROCrate(gen_preview=True)
+    crate.name = expid
+    crate.conformsTo = conforming_profiles
+    # Fetch the experiment description from the main database
+    crate.description = get_experiment_description(expid)[0][0]
     for profile in PROFILES:
         crate.add(ContextEntity(crate, properties=profile))
 
     Log.info('Creating RO-Crate archive...')
-
-    # Add original YAML configuration.
-    crate.add_dataset(source=Path(experiment_path, "conf"), dest_path="conf")
 
     # Create workflow configuration (prospective provenance)
     main_entity = crate.add_workflow(
@@ -347,12 +355,9 @@ def create_rocrate_archive(
         lang_version=as_version,
         gen_cwl=False
     )
-    crate.metadata.properties().update({
-        'conformsTo': rocrate_metadata_json_profiles
-    })
 
-    # Fetch the experiment description from the main database
-    crate.description = get_experiment_description(expid)[0][0]
+    # Add original YAML configuration.
+    crate.add_dataset(source=Path(experiment_path, "conf"), dest_path="conf")
 
     # Add files generated after its execution (retrospective provenance)
     # Some external files could have been loaded too. That's why we use the
@@ -550,9 +555,9 @@ def create_rocrate_archive(
             crate.add_or_update_jsonld(jsonld_node)
 
     # Write RO-Crate ZIP.
-    date = datetime.datetime.today().strftime('%Y%m%d-%H%M%S-%f')
+    date = datetime.today().strftime('%Y%m%d-%H%M%S-%f')
     crate_path = Path(path, f"{expid}-crate-{date}.zip")
-    crate.write_zip(crate_path)
     crate.source = crate_path
+    crate.write_zip(crate_path)
     Log.info(f'RO-Crate archive written to {experiment_path}')
     return crate
