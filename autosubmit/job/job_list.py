@@ -256,7 +256,7 @@ class JobList(object):
         )
 
         if not force:
-            changes = self._load_graph(True, load_failed_jobs=check_failed_jobs, monitor=monitor)
+            changes = self._load_graph(False, load_failed_jobs=check_failed_jobs, monitor=monitor)
 
         if changes or new:
             Log.info("Checking for new jobs...")
