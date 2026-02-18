@@ -20,6 +20,7 @@ import gc
 import io
 import os
 import pstats
+import signal
 import sys
 import tracemalloc
 from datetime import datetime
@@ -44,7 +45,7 @@ class ProfilerState(Enum):
 class Profiler:
     """Class to profile the execution of experiments."""
 
-    def __init__(self, expid: str, trace_enabled: bool = False):
+    def __init__(self, expid: str, trace_enabled: bool = False, max_checkpoints: int = 0):
         """Initialize the profiler with an experiment ID.
 
         :param expid: The experiment identifier.
@@ -56,6 +57,8 @@ class Profiler:
         # Memory profiling variables
         self._mem_init = 0.0
         self._mem_final = 0.0
+        self.max_checkpoints = max_checkpoints
+        self.checkpoints = 0
 
         # Error handling
         self._state = ProfilerState.STOPPED
@@ -122,7 +125,6 @@ class Profiler:
     def iteration_checkpoint(self, loaded_jobs: int, loaded_edges: int):
         """Record metrics at the checkpoint of an iteration."""
         gc.collect()
-
         self._mem_iteration.append(_get_current_memory())
         self._obj_iteration.append(_get_current_object_count())
         self._fd_iteration.append(_get_current_open_fds())
@@ -138,6 +140,11 @@ class Profiler:
 
         self._mem_iteration[-1] -= sys.getsizeof(self._mem_iteration) + sys.getsizeof(self._obj_iteration) + sys.getsizeof(self._fd_iteration) + sys.getsizeof(
             self._jobs_iteration) + sys.getsizeof(self._edges_iteration)
+        if self.max_checkpoints != 0:
+            self.checkpoints += 1
+            if self.checkpoints > self.max_checkpoints:
+                # send signal so Autosubmit.exit is 1
+                os.kill(os.getpid(), signal.SIGTERM)
 
     def stop(self) -> None:
         """Finish the profiling process and generate reports.
