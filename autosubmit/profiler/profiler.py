@@ -20,6 +20,7 @@ import gc
 import io
 import os
 import pstats
+import signal
 import sys
 import tracemalloc
 from datetime import datetime
@@ -29,6 +30,7 @@ from pstats import SortKey
 
 from psutil import Process
 
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitCritical
 
@@ -44,7 +46,7 @@ class ProfilerState(Enum):
 class Profiler:
     """Class to profile the execution of experiments."""
 
-    def __init__(self, expid: str, trace_enabled: bool = False):
+    def __init__(self, expid: str, trace_enabled: bool = False, max_checkpoints: int = 0):
         """Initialize the profiler with an experiment ID.
 
         :param expid: The experiment identifier.
@@ -56,6 +58,8 @@ class Profiler:
         # Memory profiling variables
         self._mem_init = 0.0
         self._mem_final = 0.0
+        self.max_checkpoints = max_checkpoints
+        self.checkpoints = 0
 
         # Error handling
         self._state = ProfilerState.STOPPED
@@ -119,8 +123,13 @@ class Profiler:
         if self._trace_enabled and not tracemalloc.is_tracing():
             tracemalloc.start()
 
-    def iteration_checkpoint(self, loaded_jobs: int, loaded_edges: int):
-        """Record metrics at the checkpoint of an iteration."""
+    def iteration_checkpoint(self, loaded_jobs: int, loaded_edges: int) -> bool:
+        """Record metrics at the checkpoint of an iteration.
+        :param loaded_jobs: The number of jobs loaded in the current iteration.
+        :param loaded_edges: The number of edges loaded in the current iteration.
+        :return: True if the maximum number of checkpoints has been reached, False otherwise.
+        :rtype: bool
+        """
         gc.collect()
 
         self._mem_iteration.append(_get_current_memory())
@@ -138,6 +147,12 @@ class Profiler:
 
         self._mem_iteration[-1] -= sys.getsizeof(self._mem_iteration) + sys.getsizeof(self._obj_iteration) + sys.getsizeof(self._fd_iteration) + sys.getsizeof(
             self._jobs_iteration) + sys.getsizeof(self._edges_iteration)
+        if self.max_checkpoints != 0:
+            self.checkpoints += 1
+            if self.checkpoints > self.max_checkpoints:
+                # send signal so Autosubmit.exit is 1
+                return True
+        return False
 
     def stop(self) -> None:
         """Finish the profiling process and generate reports.

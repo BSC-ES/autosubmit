@@ -258,29 +258,31 @@ def test_autosubmit_create_profile_metrics(tmp_path: Path, autosubmit_exp, gener
     parse_metrics(as_exp, run_id=current_id, tmp_path=tmp_path)
 
 
-@pytest.mark.parametrize("members,chunks,splits",
+@pytest.mark.parametrize("members,chunks,splits,max_iterations",
                          [
-                             # pytest.param("fc0", "1", "1", marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1", "2", "2", marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             # pytest.param("fc0 fc1 fc2 fc3", "2", "5", marks=[pytest.mark.profilelong]),
-                             # pytest.param("fc0 fc1 fc2 fc3", "2", "10", marks=[pytest.mark.profilelong]),
+                             # pytest.param("fc0", "1", "1", 0, marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             # pytest.param("fc0 fc1", "2", "2", 0, marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             # pytest.param("fc0 fc1 fc2 fc3", "2", "5", 0, marks=[pytest.mark.profilelong]),
+                             # pytest.param("fc0 fc1 fc2 fc3", "2", "10", 0, marks=[pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "5", "100", 10, marks=[pytest.mark.profile, pytest.mark.profilelong]),
                          ],
                          ids=[
                              # "1member_1chunk_1split",
-                             "2members_2chunks_2splits",
+                             # "2members_2chunks_2splits",
                              # "4members_2chunks_5splits",
                              # "4members_2chunks_10splits",
+                             "MEM_TEST"
                          ],
                          )
 def test_autosubmit_run_profile_metrics(tmp_path: Path, autosubmit_exp, general_data, members, chunks,
-                                        splits, slurm_server):
+                                        splits, max_iterations, slurm_server):
     """Integration/performance test for `autosubmit create` with profiling enabled."""
     members_name = members.replace(" ", "_")
     current_id = f"run_{members_name}_{chunks}_{splits}"
     yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
     as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=True)
     as_exp.as_conf.set_last_as_command('run')
-    as_exp.autosubmit.run_experiment(as_exp.expid, profile=True, trace=False)
+    as_exp.autosubmit.run_experiment(as_exp.expid, profile=True, trace=False, profile_max_iterations=max_iterations)
     parse_metrics(as_exp, run_id=current_id, tmp_path=tmp_path)
 
 
