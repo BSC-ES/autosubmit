@@ -25,7 +25,6 @@ import textwrap
 import time
 from collections import OrderedDict
 from functools import reduce
-from itertools import count
 from pathlib import Path
 from threading import Thread
 from time import sleep
@@ -2492,12 +2491,11 @@ class Job(object):
         """
         tmp_path = Path(self._tmp_path)
         full_path = tmp_path.joinpath(self.construct_real_additional_file_name(additional_file))
-        base_path = full_path
 
-        for i in count(1):
-            if not full_path.exists():
-                break
-            full_path = base_path.with_name(f'{base_path.stem}_{i}{base_path.suffix}')
+        if full_path.exists():
+            Log.warning(f"A file named {full_path.name} already exists."
+                        f"If multiple files share the same name, ignoring the extension, only the data from the last file will be saved."
+                        f"This behavior will be updated in a future release.")
 
         with full_path.open('wb') as f:
             f.write(content.encode(lang))

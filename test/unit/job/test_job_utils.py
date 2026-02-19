@@ -174,17 +174,10 @@ def test_construct_real_additional_file_name_same_name_different_extension(tmp_p
     Path(job._tmp_path).mkdir(parents=True, exist_ok=True)
 
     job._write_additional_file("aqua_analysis.yaml", "test", "utf-8")
-    job._write_additional_file("aqua_analysis.yml", "test", "utf-8")
-    job._write_additional_file("aqua_analysis.sh", "test", "utf-8")
+    job._write_additional_file("aqua_analysis.yml", "test_1", "utf-8")
+    job._write_additional_file("aqua_analysis.sh", "test_2", "utf-8")
 
-    file = Path(job._tmp_path).joinpath("aqua_analysis")
-    second_file = Path(job._tmp_path).joinpath("aqua_analysis_1")
-    third_file = Path(job._tmp_path).joinpath("aqua_analysis_2")
-
-    file.open("w").close()
-    second_file.open("w").close()
-    third_file.open("w").close()
+    file = Path(job._tmp_path).joinpath(f"aqua_analysis_{job.name}")
 
     assert file.exists()
-    assert second_file.exists()
-    assert third_file.exists()
+    assert file.read_text() == "test_2"
