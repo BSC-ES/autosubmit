@@ -23,7 +23,7 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import cancel_jobs, get_split_size_unit
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
 
 """Tests for ``autosubmit.job.job_utils``."""
 
@@ -167,24 +167,19 @@ def test_get_split_size_unit(data, result):
     assert get_split_size_unit(data, 'TEST') == result
 
 
-def test_construct_real_additional_file_name_same_name_different_extension(tmp_path) -> None:
+def test_construct_real_additional_file_name_same_name_different_extension(tmp_path, mocker) -> None:
     """Test that if the user has two files with the same stem different extensions, we identify both."""
     job = Job(name="abc")
-
-    Path(job._tmp_path).mkdir(parents=True, exist_ok=True)
+    folder_path = Path(job._tmp_path)
+    folder_path.mkdir(parents=True, exist_ok=True)
+    mocker.patch.object(Log, "warning")
 
     job._write_additional_file("aqua_analysis.yaml", "test", "utf-8")
-    job._write_additional_file("aqua_analysis.yml", "test", "utf-8")
-    job._write_additional_file("aqua_analysis.sh", "test", "utf-8")
+    job._write_additional_file("aqua_analysis.yml", "test_1", "utf-8")
+    job._write_additional_file("aqua_analysis.sh", "test_2", "utf-8")
 
-    file = Path(job._tmp_path).joinpath("aqua_analysis")
-    second_file = Path(job._tmp_path).joinpath("aqua_analysis_1")
-    third_file = Path(job._tmp_path).joinpath("aqua_analysis_2")
-
-    file.open("w").close()
-    second_file.open("w").close()
-    third_file.open("w").close()
+    file = Path(job._tmp_path).joinpath(f"aqua_analysis_{job.name}")
 
     assert file.exists()
-    assert second_file.exists()
-    assert third_file.exists()
+    assert file.read_text() == "test_2"
+    Log.warning.assert_called()

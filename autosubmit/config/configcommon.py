@@ -1445,7 +1445,6 @@ class AutosubmitConfig(object):
         else:
             if not parser.get('DEFAULT').get('EXPID', ""):
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT.EXPID parameter is invalid"]]
-
             self.hpcarch = parser['DEFAULT'].get('HPCARCH', "").upper()
             if not self.hpcarch:
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT.HPCARCH parameter is invalid"]]
@@ -1481,30 +1480,23 @@ class AutosubmitConfig(object):
                     self.wrong_config["Expdef"] += [['GIT', "Mandatory GIT section doesn't exists"]]
                 else:
                     if not parser['GIT'].get('PROJECT_ORIGIN', ""):
-                        self.wrong_config["Expdef"] += [['git',
-                                                         "PROJECT_ORIGIN parameter is invalid"]]
+                        self.wrong_config["Expdef"] += [['git', "PROJECT_ORIGIN parameter is invalid"]]
                     if not parser['GIT'].get('PROJECT_BRANCH', ""):
-                        self.wrong_config["Expdef"] += [['git',
-                                                         "PROJECT_BRANCH parameter is invalid"]]
-
+                        self.wrong_config["Expdef"] += [['git', "PROJECT_BRANCH parameter is invalid"]]
             elif project_type == 'svn':
                 if parser.get('SVN', "") == "":
                     self.wrong_config["Expdef"] += [['SVN', "Mandatory SVN section doesn't exists"]]
                 else:
                     if not parser['SVN'].get('PROJECT_URL', ""):
-                        self.wrong_config["Expdef"] += [['svn',
-                                                         "PROJECT_URL parameter is invalid"]]
+                        self.wrong_config["Expdef"] += [['svn', "PROJECT_URL parameter is invalid"]]
                     if not parser['SVN'].get('PROJECT_REVISION', ""):
-                        self.wrong_config["Expdef"] += [['svn',
-                                                         "PROJECT_REVISION parameter is invalid"]]
+                        self.wrong_config["Expdef"] += [['svn', "PROJECT_REVISION parameter is invalid"]]
             elif project_type == 'local':
                 if parser.get('LOCAL', "") == "":
                     self.wrong_config["Expdef"] += [['LOCAL', "Mandatory LOCAL section doesn't exists"]]
                 else:
-
-                    if not parser['LOCAL'].get('PROJECT_PATH', ""):
-                        self.wrong_config["Expdef"] += [['local',
-                                                         "PROJECT_PATH parameter is invalid"]]
+                    if parser['LOCAL'].get('PROJECT_PATH', "") == "":
+                        self.wrong_config["Expdef"] += [['local', "PROJECT_PATH parameter is invalid"]]
             elif project_type == 'none':  # debug proposes
                 self.ignore_file_path = False
         if "Expdef" not in self.wrong_config:

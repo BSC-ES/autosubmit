@@ -1313,22 +1313,6 @@ class Autosubmit:
                     _add_comments_to_yaml(yaml_data, parameter_comments)
                     yaml.dump(yaml_data, output)
 
-    @staticmethod
-    def replace_parameter_inside_section(content, parameter, new_value, section):
-        # same but for any section any parameter, not only EXPID case insensitive
-        # Find the any section
-        if section:
-            section_match = re.search(rf'({section}:[\s\S]*?{parameter}:.*?)(?=\n|$)', content, re.IGNORECASE)
-            if section_match:
-                section = section_match.group(1)
-                # Replace parameter in the section
-                new_section = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', section)
-                # Replace the old section
-                content = content.replace(section, new_section)
-        else:
-            # replace only the parameter
-            content = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', content)
-        return content
 
     @staticmethod
     def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False,
@@ -4471,7 +4455,7 @@ class Autosubmit:
                     Log.info("Local project destination already exists, will not sync project files.")
 
         return True
-    
+
     @staticmethod
     def change_status(final, final_status, job, save):
         """Set job status to final.
@@ -4716,7 +4700,7 @@ class Autosubmit:
             section_name = section.strip().split("[")[0].strip().upper()
             if valid_sections is not None and section_name not in valid_sections and section_name != "ANY":
                 validation_message += f"\n\tSpecified section not found: {section_name}."
-            
+
             if '[' not in section and ']' not in section:
                 if len(section.split()) > 1:
                     validation_message += f"\n\tMalformed section/split entry: {section}. "
@@ -4881,7 +4865,7 @@ class Autosubmit:
                 if job.splits and int(job.splits) >= 2 and job.split is not None
             }
         )
-        
+
         for section in filter_section_splits:
             section_name = section.strip().split("[")[0].strip()
             section_name_upper = section_name.upper()
@@ -4928,7 +4912,7 @@ class Autosubmit:
                     if j.section.upper() == section_name_upper
                     and Autosubmit._split_match(j, job_splits)
                 ]
-            
+
             section_matching_jobs.extend(filtered_jobs)
             # Deduplicate
             section_matching_jobs = list(dict.fromkeys(section_matching_jobs))
@@ -5019,7 +5003,7 @@ class Autosubmit:
                             final_list.append(job)
 
         return list(set(final_list))
-    
+
     @staticmethod
     def _filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list[Job]:
         """Select jobs from *job_list* according to *filter_chunks* specification.
