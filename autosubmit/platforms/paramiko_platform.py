@@ -970,7 +970,6 @@ class ParamikoPlatform(Platform):
         job_list_cmd = self.parse_job_list(job_list)
         cmd = self.get_check_all_jobs_cmd(job_list_cmd)
         sleep_time = 5
-        sleep(sleep_time)
         slurm_error = False
         e_msg = ""
         try:
