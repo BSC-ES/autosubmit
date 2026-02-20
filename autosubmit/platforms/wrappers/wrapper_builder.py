@@ -232,6 +232,7 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
         import os
         import flux
         import flux.job
+        from pathlib import Path
 
         handle = flux.Flux()
         job_scripts={self.job_scripts}
@@ -242,20 +243,20 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
         print(subprocess.check_output(["flux", "resource", "info"], text=True))
 
         for job_script in job_scripts:
-            fail_count=0
-            completed=0
-            completed_path = job_script.replace('.cmd', '_COMPLETED')
-            failed_path = job_script.replace('.cmd', '_FAILED')
+            fail_count = 0
+            completed = False
+            completed_path = os.path.join(os.getcwd(), job_script.replace('.cmd', '_COMPLETED'))
+            failed_path = os.path.join(os.getcwd(), job_script.replace('.cmd', '_FAILED'))
             jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
             jobspec.environment = os.environ.copy()
 
-            while fail_count <= max_retries and completed == 0:
+            while fail_count <= max_retries and not completed:
                 # Submit the job
                 jobspec.stdout = job_script + ".out." + str(fail_count)
                 jobspec.stderr =  job_script + ".err." + str(fail_count)
                 job_id = flux.job.submit(handle, jobspec, waitable=True, debug=True)
 
-                # TODO: [ENGINES] Debug info, remove later
+                # Debug info
                 for event in flux.job.event_watch(handle, job_id):
                     print("Event: " + str(event))
                 print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
@@ -263,28 +264,44 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
 
                 # Do stuff in the meantime
                 stat_filename = job_script.replace('.cmd', f'_STAT_{{fail_count}}')
+                stat_path_tmp = os.path.join(os.getcwd(),f"{{stat_filename}}.tmp")
 
                 # Wait for the job to finish
                 flux.job.wait(handle, job_id)
 
-                # Create the STAT file
+                # Create the temporal stat file
                 job_meta = flux.job.get_job(handle, job_id)
                 start_time = int(job_meta.get('t_run', 0))
                 finish_time = int(job_meta.get('t_cleanup', 0))
-                with open(stat_filename, 'w') as stat_file:
+                with open(stat_path_tmp, 'w') as stat_file:
                     stat_file.write(f"{{start_time}}\\n{{finish_time}}")
 
                 # Check if the job completed successfully
                 if os.path.exists(completed_path):
                     print("The job " + job_script + " has been COMPLETED")
-                    completed = 1
+                    completed = True
                 else:
                     print("The job " + job_script + " has FAILED")
                     fail_count += 1
 
-            if completed == 0:
-                open(failed_path,'w').close()
-                open("WRAPPER_FAILED",'w').close()
+            # Generate definitive stat files for all retries
+            fail_count = 0
+            while fail_count < max_retries:
+                stat_filename = job_script.replace('.cmd', f'_STAT_{{fail_count}}')
+                stat_path = os.path.join(os.getcwd(), stat_filename)
+                stat_path_tmp = os.path.join(os.getcwd(), f"{{stat_filename}}.tmp")
+                if os.path.exists(stat_path_tmp):
+                    try:
+                        Path(stat_path_tmp).replace(stat_path)
+                    except Exception as e:
+                        print(f"Couldn't create the stat file {{stat_path}} from {{stat_path_tmp}}: {{e}}")
+                else:
+                    break
+                fail_count += 1
+
+            if not completed:
+                open(failed_path,'wb').close()
+                open("WRAPPER_FAILED",'wb').close()
                 exit(1)
 
         exit(0)
