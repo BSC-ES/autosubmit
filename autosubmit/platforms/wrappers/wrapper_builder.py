@@ -154,23 +154,28 @@ class FluxWrapperBuilder(WrapperBuilder):
         
         # Get an unique identifier for the script name
         unique_part = '_'.join(self.wrapper_name.split('_')[2:])
-        script_name = f"flux_runner_{unique_part}.py"
-        
-        return textwrap.dedent(f"""
-        # Flux script generation
-        cat << 'EOF' > {script_name}
-        {self._generate_flux_script()}
-        EOF
 
-        # Grant execution permission to the generated script
-        chmod +x {script_name}
+        template = textwrap.dedent("""
+            # Flux script generation
+            cat << 'EOF' > {script_name}
+            {flux_script}
+            EOF
 
-        # Load user environment
-        {self._custom_environmet_setup()}
+            # Grant execution permission to the generated script
+            chmod +x {script_name}
 
-        # Instantiate Flux within the allocated resources and run the jobs
-        srun --cpu-bind=none flux start --verbose=2 python {script_name}
-        """)
+            # Load user environment
+            {env_setup}
+
+            # Instantiate Flux within the allocated resources and run the jobs
+            srun --cpu-bind=none flux start --verbose=2 python {script_name}
+            """)
+
+        return template.format(
+            script_name = f"flux_runner_{unique_part}.py",
+            flux_script = self._generate_flux_script(),
+            env_setup = self._custom_environmet_setup()
+        )
 
     # TODO: [ENGINES] REMOVE. Jobs should come here already sorted
     @staticmethod
@@ -222,13 +227,11 @@ class FluxWrapperBuilder(WrapperBuilder):
         commands = self.custom_env_setup
         if commands == '':
             commands = "# No commands provided"
-        return textwrap.dedent(f"""\
-            {commands}
-            """)
+        return textwrap.dedent(commands)
 
 class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
-        return textwrap.dedent(f"""
+        return textwrap.dedent(f"""\
         import os
         import flux
         import flux.job
