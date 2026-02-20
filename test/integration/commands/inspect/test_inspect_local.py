@@ -151,7 +151,7 @@ def test_inspect(
         script_file.write_text(_TEMPLATE_CONTENT)
         script_file.chmod(0o755)
 
-    # TODO: This should be 'local' but we can't customaize LOCAL platform yet, also scratch_dir, user, host, project shouldn't be modificable at all
+    # TODO: This should be 'local' but we can't customaize LOCAL platform yet, also scratch_dir, user, host, project shouldn't be modifiable at all
     general_data['PLATFORMS']['LOCAL'] = {'TYPE': 'ps', 'HOST': "127.0.0.1", 'SCRATCH_DIR': str(tmp_path), 'USER': ""}
 
     for hpcarch in ['TEST_PS', 'TEST_SLURM', 'LOCAL']:

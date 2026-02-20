@@ -2582,7 +2582,6 @@ class AutosubmitConfig(object):
                     original_dict[k] = updated_dict[k]
             return original_dict
 
-        ini_file = Path(ini_file)
         # Read the file name from command line argument
         input_file = str(ini_file)
         backup_path = root_dir / Path(ini_file.name + "_AS_v3_backup")

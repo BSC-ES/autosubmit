@@ -25,8 +25,7 @@ class LocalHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_queue_directive(self, job, parameters):
-        """
-        Returns queue directive for the specified job
+        """Returns queue directive for the specified job
 
         :param job: job to create queue directive for
         :type job: Job
