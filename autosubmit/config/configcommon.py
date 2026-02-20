@@ -33,7 +33,7 @@ from typing import Any, Optional, Union, Iterable
 
 from bscearth.utils.date import parse_date
 from configobj import ConfigObj
-from pyparsing import nestedExpr
+from pyparsing import nested_expr
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -2298,7 +2298,7 @@ class AutosubmitConfig(object):
                 string = f'[{date_value}]'
             else:
                 string = date_value
-            split_string = nestedExpr('[', ']').parseString(string).asList()
+            split_string = nested_expr('[', ']').parse_string(string).asList()
             string_date = None
             for split in split_string[0]:
                 if type(split) is list:
@@ -2373,7 +2373,7 @@ class AutosubmitConfig(object):
             return member_list
         elif not string.startswith("["):
             string = f'[{string}]'
-        split_string = nestedExpr('[', ']').parseString(string).asList()
+        split_string = nested_expr('[', ']').parse_string(string).asList()
         string_member = None
         for split in split_string[0]:
             if type(split) is list:

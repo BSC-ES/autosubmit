@@ -88,8 +88,8 @@ def test_copying_experiment_with_hpc_in_command(autosubmit_exp: Callable, autosu
     assert yaml_data['MAIL']['TO'] == ""
     assert yaml_data['JOBS']['LOCAL_SEND_INITIAL']['CHUNKS_FROM']['1']['CHUNKS_TO'] == '1'
     assert yaml_data['LOCAL']['PROJECT_PATH'] == ""
-    assert yaml_data['GIT']['PROJECT_ORIGIN'] == ""
-    assert yaml_data['GIT']['PROJECT_BRANCH'] == ""
+    assert yaml_data['GIT']['PROJECT_ORIGIN'] == "origin_test"
+    assert yaml_data['GIT']['PROJECT_BRANCH'] == "branch_test"
 
 
 def test_copying_experiment_without_hpc_in_command(autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
@@ -190,8 +190,20 @@ def test_copying_experiment_with_hpc_in_file(autosubmit_exp: Callable, autosubmi
     yaml_data = yaml.load(open(tmp_path / f"{exp_id}/conf/metadata/experiment_data.yml"))
     assert yaml_data['DEFAULT']['HPCARCH'] == "MN5"
 
-
-def test_as_conf_default_values(autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
+@pytest.mark.parametrize(
+    'git_command,git_session',
+    [
+        (['', ''], ['', '']),
+        (['test_1', 'test_2'], ['', '']),
+        (['', 'test_2'], ['', '']),
+        (['test_1', ''], ['', '']),
+        (['', ''], ['test_3', 'test_4']),
+        (['test_1', 'test_2'], ['test_3', 'test_4']),
+        (['', 'test_2'], ['test_3', 'test_4']),
+        (['test_1', ''], ['test_3', 'test_4']),
+    ],
+)
+def test_as_conf_default_values(git_command, git_session, autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
     """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
     exp = autosubmit_exp(experiment_data={
         'JOBS': {
@@ -203,8 +215,12 @@ def test_as_conf_default_values(autosubmit_exp: Callable, autosubmit: Autosubmit
                 }
             }
         },
+        'GIT': {
+            'PROJECT_ORIGIN': f'{git_session[0]}',
+            'PROJECT_BRANCH': f'{git_session[1]}'
+        },
     })
-    as_conf_default_values(autosubmit.autosubmit_version, exp.expid, 'MN5', True, 'test_1', 'test_2', 'test_3')
+    as_conf_default_values(autosubmit.autosubmit_version, exp.expid, 'MN5', True, git_command[0], git_command[1], 'test_3')
 
     yaml = YAML(typ='rt')
     assert autosubmit.create(exp.expid, noplot=True, hide=True) == 0
@@ -213,8 +229,26 @@ def test_as_conf_default_values(autosubmit_exp: Callable, autosubmit: Autosubmit
     assert yaml_data['DEFAULT']['EXPID'] == exp.expid
     assert yaml_data['DEFAULT']['CUSTOM_CONFIG'] == f'"{tmp_path}/{exp.expid}/proj/test_3"'
     assert yaml_data['LOCAL']['PROJECT_PATH'] == ""
-    assert yaml_data['GIT']['PROJECT_ORIGIN'] == "test_1"
-    assert yaml_data['GIT']['PROJECT_BRANCH'] == "test_2"
+
+    if git_command[0] != '':
+        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_command[0]
+    else:
+        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_session[0]
+
+    if git_command[1] != '':
+        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_command[1]
+    else:
+        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_session[1]
+
+    if git_session[0] != '' and git_command[0] == '':
+        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_session[0]
+    else:
+        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_command[0]
+
+    if git_session[1] != '' and git_command[1] == '':
+        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_session[1]
+    else:
+        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_command[1]
 
 
 @pytest.mark.parametrize(
