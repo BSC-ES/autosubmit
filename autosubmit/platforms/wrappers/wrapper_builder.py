@@ -156,21 +156,21 @@ class FluxWrapperBuilder(WrapperBuilder):
         unique_part = '_'.join(self.wrapper_name.split('_')[2:])
         script_name = f"flux_runner_{unique_part}.py"
         
-        return textwrap.dedent("""
+        return textwrap.dedent(f"""
         # Flux script generation
-        cat << 'EOF' > {2}
-        {0}
+        cat << 'EOF' > {script_name}
+        {self._generate_flux_script()}
         EOF
 
         # Grant execution permission to the generated script
-        chmod +x {2}
+        chmod +x {script_name}
 
         # Load user environment
-        {1}
+        {self._custom_environmet_setup()}
 
         # Instantiate Flux within the allocated resources and run the jobs
-        srun --cpu-bind=none flux start --verbose=2 python {2}
-        """).format(self._generate_flux_script(), self._custom_environmet_setup(), script_name)
+        srun --cpu-bind=none flux start --verbose=2 python {script_name}
+        """)
 
     # TODO: [ENGINES] REMOVE. Jobs should come here already sorted
     @staticmethod
@@ -222,20 +222,20 @@ class FluxWrapperBuilder(WrapperBuilder):
         commands = self.custom_env_setup
         if commands == '':
             commands = "# No commands provided"
-        return textwrap.dedent("""\
-            {0}
-            """).format(commands, '\n'.ljust(0))
+        return textwrap.dedent(f"""\
+            {commands}
+            """)
 
 class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
-        return textwrap.dedent("""
+        return textwrap.dedent(f"""
         import os
         import flux
         import flux.job
 
         handle = flux.Flux()
-        job_scripts={0}
-        max_retries={1}
+        job_scripts={self.job_scripts}
+        max_retries={self.retrials}
 
         # TODO: [ENGINES] Debug info, remove later
         import subprocess
@@ -288,17 +288,17 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
                 exit(1)
 
         exit(0)
-        """).format(self.job_scripts, self.retrials)
+        """)
     
 class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
-        return textwrap.dedent("""
+        return textwrap.dedent(f"""
         import os
         import flux
         import flux.job
 
         handle = flux.Flux()
-        job_scripts={0}
+        job_scripts={self.job_scripts}
         job_ids = {{}}
 
         # TODO: [ENGINES] Debug info, remove later
@@ -335,17 +335,17 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
             exit(1)
 
         exit(0)
-        """).format(self.job_scripts)
+        """)
 
 class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
-        return textwrap.dedent("""
+        return textwrap.dedent(f"""
         import os
         import flux
         import flux.job
         from threading import Thread
 
-        job_scripts={0}
+        job_scripts={self.job_scripts}
 
         # TODO: [ENGINES] Debug info, remove later
         import subprocess
@@ -398,17 +398,17 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
             thread.join()
 
         exit(0)
-        """).format(self.job_scripts)
+        """)
 
 class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
     def _generate_flux_script(self):
-        return textwrap.dedent("""
+        return textwrap.dedent(f"""
         import os
         import flux
         import flux.job
 
         handle = flux.Flux()
-        job_scripts={0}
+        job_scripts={self.job_scripts}
         job_ids = {{}}
 
         # TODO: [ENGINES] Debug info, remove later
@@ -454,7 +454,7 @@ class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
                 exit(1)
 
         exit(0)
-        """).format(self.job_scripts)
+        """)
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self, letters_count, digits_count):
