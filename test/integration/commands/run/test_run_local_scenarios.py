@@ -167,7 +167,6 @@ def test_run_interrupted(
     process.start()
 
     max_waiting_time_seconds = 60
-    # TODO: This is not working on daniel laptop
     # # Wait until the process starts (we wait until the file lock is locked).
     lock_file = tmp_path / 'autosubmit.lock'
     wait_locker(lock_file, expect_locked=True, timeout=max_waiting_time_seconds)
