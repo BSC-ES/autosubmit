@@ -82,7 +82,7 @@ tests = [
     "pytest>=8.2,<9.1",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.15.1",
+    "ruff==0.15.2",
     "pytest-xdist",
     "testcontainers",
     "pytest-timeout",
