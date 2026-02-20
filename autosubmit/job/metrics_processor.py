@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy.schema import CreateTable, CreateSchema
-from sqlalchemy import insert, select, delete
+from sqlalchemy import insert, delete
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig

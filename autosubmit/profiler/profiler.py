@@ -20,7 +20,6 @@ import gc
 import io
 import os
 import pstats
-import signal
 import sys
 import tracemalloc
 from datetime import datetime
@@ -30,7 +29,6 @@ from pstats import SortKey
 
 from psutil import Process
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitCritical
 

@@ -27,7 +27,7 @@ from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
-from autosubmit.database.tables import get_table_from_name, TABLES, get_table_with_schema
+from autosubmit.database.tables import get_table_from_name, TABLES
 
 if TYPE_CHECKING:
     from autosubmit.database.tables import Table
