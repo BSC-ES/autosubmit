@@ -17,6 +17,7 @@
 
 """Fixtures for integration tests."""
 import configparser
+import io
 import multiprocessing
 import os
 from contextlib import suppress
@@ -321,7 +322,7 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
 
 
 @pytest.fixture(scope="function")
-def git_server(tmp_path) -> tuple['Container', Path, str]:
+def git_server(request, tmp_path) -> Generator[tuple['DockerContainer', Path, str], Any, None]:
     # Start a container to server it -- otherwise, we would have to use
     # `git -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
@@ -338,6 +339,7 @@ def git_server(tmp_path) -> tuple['Container', Path, str]:
     with container:
         prepare_and_test_git_container(container, http_port)
         yield container, git_repos_path, repo_url
+        copy_content_from_containers(request, 'git_server', '/opt/git-server')
 
 
 @pytest.fixture
@@ -347,34 +349,37 @@ def ps_platform() -> PsPlatform:
 
 
 @pytest.fixture(scope='function')
-def ssh_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
+def ssh_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
     """Start a single Docker container serving SSH for integration tests."""
     container, ssh_port = get_ssh_container(mfa=False, x11=False)
     with container:
         prepare_and_test_ssh_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
+        copy_content_from_containers(request, 'ssh_server', 'app/')
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
+def ssh_x11_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
     """Get a running SSH server with X11 enabled (no MFA)."""
     container, ssh_port = get_ssh_container(mfa=False, x11=True)
     with container:
         prepare_and_test_ssh_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
+        copy_content_from_containers(request, 'ssh_server', 'app/')
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_mfa_server(tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
+def ssh_x11_mfa_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
     """Get a running SSH server with X11 and MFA enabled."""
     container, ssh_port = get_ssh_container(mfa=True, x11=True)
     with container:
         prepare_and_test_ssh_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
+        copy_content_from_containers(request, 'ssh_server', 'app/')
 
 
 @pytest.fixture(scope="function")
-def slurm_server(tmp_path, mocker) -> 'Container':
+def slurm_server(request, tmp_path, mocker) -> 'Container':
     """Session fixture that creates a singleton Slurm server container."""
     container, ssh_port = get_slurm_container()
     # TODO: Needed? If so, explain why.
@@ -385,6 +390,7 @@ def slurm_server(tmp_path, mocker) -> 'Container':
     with container:
         prepare_and_test_slurm_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
+        copy_content_from_containers(request, 'slurm_server', 'tmp/scratch/group/root/')
 
 
 @pytest.fixture
@@ -521,3 +527,25 @@ def setup_as_logs_pytest(tmp_path: 'LocalPath') -> None:
         str(Path(tmp_path, 'as_log_status_failed.txt')),
         'status_failed'
     )
+
+
+def copy_content_from_containers(request, log_name, path_to_docker=""):
+    """Copy data from experiment from within the container to export"""
+    if request.session.testsfailed and request.node.funcargs[log_name]:
+        if log_name == 'git_server':
+            container_in_use: 'Container' = request.node.funcargs[log_name][0].get_wrapped_container()
+        else:
+            container_in_use: 'Container' = request.node.funcargs[log_name]
+
+        if "No such file" not in str(container_in_use.exec_run(f"ls {path_to_docker}").output):
+            stream = (container_in_use.get_archive(path_to_docker))[0]
+            fileobj = io.BytesIO()
+
+            for chunk in stream:
+                fileobj.write(chunk)
+            fileobj.seek(0)
+
+            target_path = Path(f"../container_logs_{log_name}/")
+            target_path.mkdir(parents=True, exist_ok=True)
+            with open(target_path/f"{request.node.name}.tar.gz",'w') as f:
+                f.buffer.write(fileobj.read())

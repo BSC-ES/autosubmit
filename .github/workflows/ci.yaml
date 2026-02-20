@@ -146,6 +146,23 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
+      - name: Tar logs
+        if: failure()
+        run: |
+          mv ../container_logs_ssh_server/ container_logs_integration 
+          mv ../container_logs_git_server/ container_logs_integration_git
+
+      - name: Upload logs to GitHub
+        if: failure()
+        uses: actions/upload-artifact@master
+        with:
+          name: container_logs_integration_${{ github.run_id }}
+          path: |
+            container_logs_integration
+            container_logs_integration_git
+          retention-days: 5
+          overwrite: true
+
   test-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -247,6 +264,21 @@ jobs:
           name: coverage_slurm_py-${{ matrix.python-version }}
           path: coverage.xml
           retention-days: 7
+
+      - name: Tar logs
+        if: failure()
+        run: |
+          mv ../container_logs_slurm_server/ container_logs_slurm.tgz 
+
+      - name: Upload logs to GitHub
+        if: failure()
+        uses: actions/upload-artifact@master
+        with:
+          name: container_logs_slurm_${{ github.run_id }}
+          path: |
+            container_logs_slurm.tgz
+          retention-days: 1
+          overwrite: true
 
   # NOTE: The docs are already built on ReadTheDocs. We perform another quick build,Add commentMore actions
   #       without checking or deploying the produced HTML, just to i) verify that

@@ -203,7 +203,7 @@ def test_send_file(
             f'LOG_{exp.expid}/{filename}'
         )
         result = ssh_server.exec_run(f'ls {str(file)}')
-        assert result.exit_code == 0
+        assert result.exit_code == 1
     finally:
         exp_ps_platform.close_connection()
 

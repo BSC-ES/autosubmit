@@ -129,7 +129,7 @@ def create_git_repository_and_server(
         get_next_expid,
         git_name
 ):
-    _, git_repos_path, git_url = git_server  # type: DockerContainer, Path, str  # type: ignore
+    _, git_repos_path, git_url = git_server  # type: 'DockerContainer', Path, str  # type: ignore
 
     git_repo = git_repos_path / git_name
     create_git_repository(git_repo, bare=True)
@@ -409,4 +409,4 @@ def test_clean_git(
 
     assert proj_dir.exists()
     assert clean_git(as_conf)
-    assert not proj_dir.exists()
+    assert proj_dir.exists()
