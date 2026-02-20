@@ -105,6 +105,7 @@ release.
   Changes and improvements to fixtures and pytest organisation and setup #2745
 - Removed broken migrate command #2617
 - Allow users to delete multiple experiments #1216 #2793
+- Copying git session of an experiment #2828
 
 ### 4.1.15: Bug fixes, enhancements, and new features
 
