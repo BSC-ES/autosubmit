@@ -1,0 +1,267 @@
+name: metrics
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+jobs:
+  metrics:
+    if: >
+      github.event.issue.pull_request &&
+      (
+      contains(github.event.comment.body, '/metrics_markdown') ||
+      contains(github.event.comment.body, '/metrics_plot') ||
+      contains(github.event.comment.body, '/metrics_full_markdown') ||
+      contains(github.event.comment.body, '/metrics_full_plot') ||
+      contains(github.event.comment.body, '/metrics') ||
+      contains(github.event.comment.body, '/metrics_upload') ||
+      contains(github.event.comment.body, '/metrics_full')
+      )
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.autosubmit_version.outputs.version }}
+      head_ref: ${{ steps.pr.outputs.head_ref }}
+      head_repo: ${{ steps.pr.outputs.head_repo }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+      test_type: ${{ steps.determine_test_type.outputs.test_type }}
+
+    steps:
+      - name: Get PR info
+        id: pr
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput('head_ref', pr.data.head.ref);
+            core.setOutput('head_repo', pr.data.head.repo.full_name);
+            core.setOutput('head_sha', pr.data.head.sha);
+
+      - name: Determine test type
+        id: determine_test_type
+        run: |
+          comment_body="${{ github.event.comment.body }}"
+          if [[ "$comment_body" == *"/metrics_full"* ]]; then
+            echo "test_type=profilelong" >> "$GITHUB_OUTPUT"
+            echo "Running full profile tests (profilelong)"
+          else
+            echo "test_type=profile" >> "$GITHUB_OUTPUT"
+            echo "Running quick profile tests (profile)"
+          fi
+
+      - name: Checkout PR code
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ steps.pr.outputs.head_repo }}
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[all]
+
+      - name: Get Autosubmit version
+        id: autosubmit_version
+        run: |
+          version=$(cat VERSION)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Run profile tests
+        run: |
+          pytest -m "${{ steps.determine_test_type.outputs.test_type }}" -n 0 test/integration
+          # rename the file to include the enviroment used for testing
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-metrics-${{ steps.autosubmit_version.outputs.version }}
+          path: .benchmarks/artifacts
+          retention-days: 7
+
+      - name: Commit and push test results
+        if: >
+          github.event.issue.pull_request && contains(github.event.comment.body, '/metrics_upload')
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          mkdir -p .benchmarks/reference
+          cp .benchmarks/artifacts/* .benchmarks/reference/
+          git add .benchmarks/reference
+          git commit -m "Add benchmark results for version ${{ steps.autosubmit_version.outputs.version }} (${{ steps.determine_test_type.outputs.test_type }})"
+          git push
+
+  metrics_markdown:
+    needs: metrics
+    if: >
+      github.event.issue.pull_request &&
+      (
+      contains(github.event.comment.body, '/metrics_markdown') ||
+      contains(github.event.comment.body, '/metrics_full_markdown') ||
+      contains(github.event.comment.body, '/metrics') ||
+      contains(github.event.comment.body, '/metrics_full')
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ needs.metrics.outputs.head_repo }}
+          ref: ${{ needs.metrics.outputs.head_ref }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[all]
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: performance-metrics-${{ needs.metrics.outputs.version }}
+          path: .benchmarks/artifacts
+
+      - name: Generate markdown summary
+        run: |
+          python .benchmarks/generate_markdown.py --version "${{ needs.metrics.outputs.version }}"
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary_${{ needs.metrics.outputs.version }}_${{ needs.metrics.outputs.test_type }}.md
+          path: .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.md
+          retention-days: 7
+
+      - name: Comment results
+        uses: actions/github-script@v8
+        if: ${{ !env.ACT }}
+        with:
+          script: |
+            const fs = require('fs');
+            const version = '${{ needs.metrics.outputs.version }}';
+            const testType = '${{ needs.metrics.outputs.test_type }}';
+            const summaryPath = `.benchmarks/artifacts/summary_${version}.md`;
+            const summary = fs.readFileSync(summaryPath, 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `## Benchmark Results (${testType})`,
+                '',
+                summary,
+                '',
+                'Artifacts: see the workflow run summary for download.'
+              ].join('\n')
+            });
+
+      - name: Display results (ACT)
+        if: ${{ env.ACT }}
+        run: |
+            echo "Benchmark Results (Local Run - ${{ needs.metrics.outputs.test_type }})"
+            echo "================================"
+            cat .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.md
+            echo ""
+
+  metrics_plot:
+    needs: metrics
+    if: >
+      github.event.issue.pull_request &&
+      (
+      contains(github.event.comment.body, '/metrics_plot') ||
+      contains(github.event.comment.body, '/metrics_full_plot') ||
+      contains(github.event.comment.body, '/metrics') ||
+      contains(github.event.comment.body, '/metrics_full')
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ needs.metrics.outputs.head_repo }}
+          ref: ${{ needs.metrics.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[all]
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: performance-metrics-${{ needs.metrics.outputs.version }}
+          path: .benchmarks/artifacts
+
+      - name: Generate plot summary
+        run: |
+          python .benchmarks/generate_plot.py --version "${{ needs.metrics.outputs.version }}"
+
+      - name: Upload plot artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary_${{ needs.metrics.outputs.version }}_${{ needs.metrics.outputs.test_type }}.png
+          path: .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.png
+          retention-days: 7
+
+      - name: Comment results
+        uses: actions/github-script@v8
+        if: ${{ !env.ACT }}
+        with:
+          script: |
+            const fs = require('fs');
+            const version = '${{ needs.metrics.outputs.version }}';
+            const testType = '${{ needs.metrics.outputs.test_type }}';
+            const plotSummaryPath = `.benchmarks/artifacts/summary_${version}.png`;
+            const plotSummary = fs.readFileSync(plotSummaryPath, { encoding: 'base64' });
+            const plotUri = `![Plot Results](data:image/png;base64,${plotSummary})`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `## Plot Results (${testType})`,
+                '',
+                plotUri,
+                '',
+                'Artifacts: see the workflow run summary for download.'
+              ].join('\n')
+            });
+
+      - name: Display results (ACT)
+        if: ${{ env.ACT }}
+        run: |
+            echo "Plot Results (Local Run - ${{ needs.metrics.outputs.test_type }})"
+            echo "================================"
+            echo "plot image saved to .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.png"
+            echo "================================"
