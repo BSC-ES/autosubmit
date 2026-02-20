@@ -258,15 +258,11 @@ class JobList(object):
         if not force:
             changes = self._load_graph(full_load, load_failed_jobs=check_failed_jobs, monitor=monitor)
 
-        if changes or not self.run_mode:
+        if changes or new:
             Log.info("Checking for new jobs...")
             self._create_and_add_jobs(show_log, default_job_type, date_list, member_list)
-
-        if not monitor and (changes or new):
             Log.info("Initializing new jobs...")
-            self._initialize_new_jobs(changes, new)
-
-        if changes or not self.run_mode:
+            self._initialize_new_jobs(new)
             Log.info("Saving the workflow state...")
             self._save_workflow_state(full_load, new)
 
@@ -534,14 +530,13 @@ class JobList(object):
         if len(self.graph.edges) > 0:
             self._delete_edgeless_jobs()
 
-    def _initialize_new_jobs(self, changes: bool, new: bool) -> None:
+    def _initialize_new_jobs(self, new: bool) -> None:
         """Initializes new jobs in the workflow graph.
-        :param changes: If True, resets the fail count for all jobs.
         :param new: If True, initializes new jobs.
         """
         for job in self.job_list:
-            if changes:
-                job._fail_count = 0
+            if not self.run_mode and new:
+                job.fail_count = 0
             if new:
                 job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
             else:
@@ -697,7 +692,6 @@ class JobList(object):
                 7014,
                 str(e),
             )
-
 
     def clear_generate(self):
         self.dependency_map = {}
@@ -1326,7 +1320,6 @@ class JobList(object):
                 relationships.pop("SPLITS_FROM", None)
                 filters_to_apply = relationships
         return filters_to_apply
-
 
     def add_special_conditions(
             self,
@@ -2102,7 +2095,6 @@ class JobList(object):
                         # Important to note that the only differentiating factor would be chunk
                         # OR num_chunks
 
-
                         # Bringing back original job if identified
                         for idx in range(0, len(jobs_to_sort)):
                             # Test if it is a fake job
@@ -2125,7 +2117,7 @@ class JobList(object):
                 dict_jobs[date][member].sort(
                     key=lambda job: (int(job.chunk) if sections_running_type_map.get(
                         job.section, 'once') == 'chunk' and job.chunk is not None else
-                        num_chunks))
+                                     num_chunks))
 
         return dict_jobs
 
@@ -2365,7 +2357,7 @@ class JobList(object):
         :rtype: list
         """
         unsubmitted = [job for job in self.job_list if (platform is None or
-                                                         job.platform.name == platform.name) and (
+                                                        job.platform.name == platform.name) and (
                                job.status != Status.SUBMITTED and
                                job.status != Status.QUEUING and job.status != Status.RUNNING)]
 
@@ -2696,6 +2688,7 @@ class JobList(object):
         ]
         # update edges completion status before removing them
         for job in (job for job in jobs_to_unload):
+            job.fail_count = 0
             for child in job.children:
                 self.graph.edges[job.name, child.name]['completion_status'] = "COMPLETED"
             for parent in job.parents:
@@ -2707,13 +2700,16 @@ class JobList(object):
             for child in job.children:
                 if self.graph.has_edge(job.name, child.name):
                     self.graph.remove_edge(job.name, child.name)
-            for parent in job.parents:
+                child.parents.discard(job)
+
+            for parent in list(job.parents):
                 if self.graph.has_edge(parent.name, job.name):
                     self.graph.remove_edge(parent.name, job.name)
-            job.children = set()
-            job.parents = set()
+                parent.children.discard(job)
+            job.children.clear()
+            job.parents.clear()
+            job.platform = None
             self.graph.remove_node(job.name)
-            del job
 
     def get_active(self, platform=None, wrapper=False):
         """Returns a list of active jobs (In platforms queue + Ready).
@@ -2784,7 +2780,6 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
-
     def sort_by_name(self):
         """Returns a list of jobs sorted by name.
 
@@ -2829,8 +2824,7 @@ class JobList(object):
                 self.dbmanager.save_jobs(jobs_to_save)
             Log.info("Jobs saved.")
 
-    def load_jobs(self, full_load: bool = False, load_failed_jobs: bool = False,
-                  only_finished: bool = False) -> list[Job]:
+    def load_jobs(self, full_load: bool = False, load_failed_jobs: bool = False) -> list[Job]:
         """Load jobs from the database.
 
         Load job nodes from persistent storage into memory and return them as a list
@@ -2839,14 +2833,11 @@ class JobList(object):
         :param full_load: If ``True``, load all jobs and edges; otherwise load only the
             subset necessary for continued execution.
         :param load_failed_jobs: If ``True``, include jobs in failed states when loading.
-        :param only_finished: If ``True``, load only finished jobs (completed, failed or skipped).
         :return: A list of loaded ``Job`` objects.
         :rtype: List[Job]
         :raises Exception: If a database access error occurs while loading jobs.
         """
-        nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs,
-                                         only_finished=only_finished,
-                                         members=self.run_members)
+        nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs, members=self.run_members)
         self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
         return nodes
 
@@ -2960,7 +2951,6 @@ class JobList(object):
                     try:
                         new_status = self._stat_val.retval(status_str)
                         job.status = new_status
-                        job._fail_count = 0
                         Log.result(f"Updated job '{job_name}' to status '{status_str}'")
                     except (ValueError, AttributeError) as e:
                         Log.warning(f"Invalid status '{status_str}' for job '{job_name}' (line {line_num}): {e}")
@@ -3143,32 +3133,17 @@ class JobList(object):
 
         job.log_recovery_call_count += 1
 
-    def recover_logs(self, new_run: bool = False):
+    def recover_logs(self):
         """Update jobs' log recovered status.
 
         Iterate over the current job list and mark jobs whose stdout/stderr logs
         have been recovered.
 
-        :param new_run: If True, also mark the job as updated for a new run.
-        :type new_run: bool
         """
-        if new_run:
-            # load all jobs without updated_log from db
-            jobs_to_recover = self.load_jobs(full_load=True, only_finished=True)
-            for job in jobs_to_recover:
-                ref_fail_count = copy.copy(job.fail_count)
-                # Updated_log indicates the last downloaded log
-                # Failed jobs could missed some log in between if run was force stopped
-                job.fail_count = copy.copy(job.updated_log)
-                for i in range(job.updated_log, ref_fail_count):
-                    self._recover_log(job)
-                    job.fail_count += 1
-                job.fail_count = ref_fail_count
-
-        else:
-            jobs_to_recover = [job for job in self.job_list if not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
-            for job in jobs_to_recover:
-                self._recover_log(job)
+        jobs_to_recover = [job for job in self.job_list if
+                           not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
+        for job in jobs_to_recover:
+            self._recover_log(job)
 
     def check_completed_jobs_after_recovery(self):
         for job in (job for job in self.job_list if job.status == Status.COMPLETED):
@@ -3234,7 +3209,6 @@ class JobList(object):
             job.packed = True
         return job.packed
 
-
     def _update_failed_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """
         Update failed jobs, retrying them if possible or marking as FAILED.
@@ -3289,16 +3263,6 @@ class JobList(object):
                 job.status = Status.FAILED
                 save = True
         return save
-
-    def reset_jobs_on_first_run(self) -> None:
-        """Reset fail count for jobs in WAITING, READY, DELAYED, or PREPARED status."""
-
-        for job in [job for job in self.job_list if job.status in
-                                                    [Status.WAITING, Status.READY, Status.DELAYED, Status.PREPARED, Status.FAILED]]:
-            job.fail_count = 0
-            if job.status == Status.FAILED:
-                job.status = Status.WAITING
-                Log.debug(f"Resetting job: {job.name} status to: WAITING on first run...")
 
     def _handle_special_checkpoint_jobs(self) -> Tuple[bool, bool]:
         """Set jobs that fulfill special checkpoint conditions to READY.
@@ -3389,7 +3353,6 @@ class JobList(object):
                 return False
         return True
 
-
     def _skip_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """Skip jobs that meet the skipping criteria.
 
@@ -3413,7 +3376,7 @@ class JobList(object):
                                         job.platform.send_command(job.platform.cancel_cmd +
                                                                   " " + str(job.id), ignore_log=True)
                                 except Exception:
-                                        pass  # jobid finished already
+                                    pass  # jobid finished already
                                 job.status = Status.SKIPPED
                                 save = True
                     elif job.running == 'member':
@@ -3427,7 +3390,7 @@ class JobList(object):
                                         job.platform.send_command(job.platform.cancel_cmd +
                                                                   " " + str(job.id), ignore_log=True)
                                 except Exception:
-                                        pass  # job_id finished already
+                                    pass  # job_id finished already
                                 job.status = Status.SKIPPED
                                 save = True
         return save
@@ -4139,9 +4102,6 @@ class JobList(object):
             # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
             if not jobs_ran_atleast_once:
                 job.updated_log = True
-
-
-
 
     def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None, return_only_names=False) -> Union[List[str], List["Job"]]:
         """Return jobs filtered by status and/or platform as names or Job objects.

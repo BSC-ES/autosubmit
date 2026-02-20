@@ -867,7 +867,6 @@ class ParamikoPlatform(Platform):
                 f'check_job() The job id ({job_id}) is not an integer neither a string.')
             job.new_status = job_status
         sleep_time = 5
-        sleep(2)
         self.send_command(self.get_check_job_cmd(job_id))
         while self.get_ssh_output().strip(" ") == "" and retries > 0:
             retries = retries - 1
@@ -970,7 +969,6 @@ class ParamikoPlatform(Platform):
         job_list_cmd = self.parse_job_list(job_list)
         cmd = self.get_check_all_jobs_cmd(job_list_cmd)
         sleep_time = 5
-        sleep(sleep_time)
         slurm_error = False
         e_msg = ""
         try:
