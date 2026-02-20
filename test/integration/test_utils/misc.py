@@ -68,7 +68,7 @@ def wait_locker(file_lock: Path, expect_locked: bool, timeout: int, interval=0.0
         if expect_locked:
             # Check if the file is locked by attempting to acquire it non-blocking
             try:
-                with Lock(str(file_lock)):
+                with Lock(str(file_lock), timeout=0):
                     # Lock acquired, so it's NOT locked — keep waiting
                     pass
             except AlreadyLocked:
