@@ -168,19 +168,23 @@ def test_compress_file(
 
 
 @pytest.mark.parametrize(
-    "sendmail_error, expected_log_message",
+    "new_status,sendmail_error,expected_log_message,attachment",
     [
         # Normal case: No errors, should not log anything
         # No logs are expected, everything works fine
-        (None, None),
+        (Status.VALUE_TO_KEY[Status.FAILED], None, None, False),
 
         # Log connection error: Simulate an error while sending email
-        (Exception("SMTP server error"),
-         'Trace:SMTP server error\nAn error has occurred while sending a warning mail about remote_platform')
+        (Status.VALUE_TO_KEY[Status.FAILED], Exception("SMTP server error"),
+         'Trace:SMTP server error\nAn error has occurred while sending a mail for the job Job1', True),
+
+        # Job is now failing
+        (Status.VALUE_TO_KEY[Status.COMPLETED], None, None, False)
     ],
     ids=[
         "Normal case: No errors",
-        "Log connection error (SMTP server error)"
+        "Log connection error (SMTP server error)",
+        "No notification needed"
     ]
 )
 def test_notify_status_change(
@@ -188,28 +192,30 @@ def test_notify_status_change(
         mock_smtp,
         mocker,
         mail_notifier,
+        new_status: str,
         sendmail_error: Optional[Exception],
-        expected_log_message):
-    exp_id = 'a123'
-    job_name = 'Job1'
-    prev_status = Status.VALUE_TO_KEY[Status.RUNNING]
-    status = Status.VALUE_TO_KEY[Status.COMPLETED]
-    mail_to = ['recipient@example.com']
+        expected_log_message,
+        attachment):
 
-    mock_smtp = mocker.patch(
-        'autosubmit.notifications.mail_notifier.smtplib.SMTP')
+    job_name = 'Job1'
+    expid = 'a123'
+    mock_basic_config.ATTACHMENT = attachment
+
+    path_to_attach = mock_basic_config.expid_aslog_dir(expid)
+    path_to_attach.mkdir(parents=True, exist_ok=True)
+    path_to_attach.joinpath('test_run.log').touch(mode=0o666, exist_ok=True)
+
     if sendmail_error:
         mock_smtp.side_effect = sendmail_error
     mock_printlog = mocker.patch.object(Log, 'printlog')
 
-    mail_notifier.notify_status_change(
-        exp_id, job_name, prev_status, status, mail_to)
+    mail_notifier.notify_status_change(exp_id=expid, job_name=job_name, prev_status=Status.VALUE_TO_KEY[Status.RUNNING],
+                                       status=new_status, mail_to=['recipient@example.com'])
 
-    message_text = "Generated message"
-    message = MIMEText(message_text)
+    message = MIMEText("Generated message")
     message['From'] = email.utils.formataddr(
         ('Autosubmit', mail_notifier.config.MAIL_FROM))
-    message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {str(status)}'
+    message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {new_status}'
     message['Date'] = email.utils.formatdate(localtime=True)
 
     if expected_log_message:
