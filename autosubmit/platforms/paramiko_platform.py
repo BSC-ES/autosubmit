@@ -1213,7 +1213,7 @@ class ParamikoPlatform(Platform):
                 stdout = chan.makefile('rb', bufsize)
                 stderr = chan.makefile_stderr('rb', bufsize)
                 return stdin, stdout, stderr
-            except (paramiko.SSHException, ConnectionError, socket.error) as e:
+            except (paramiko.SSHException, ConnectionError, socket.error, IOError) as e:
                 Log.warning(f'A networking error occurred while executing command [{command}]: {str(e)}')
                 if not self.connected or not self.transport or not self.transport.active:
                     self.restore_connection(None)

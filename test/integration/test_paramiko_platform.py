@@ -538,12 +538,14 @@ def test_exec_command_ssh_session_not_active(
     [
         paramiko.ssh_exception.NoValidConnectionsError({'192.168.0.1': ValueError('failed')}),  # type: ignore
         ConnectionError('Someone unplugged the networking cable.'),
-        socket.error('A random socket error occurred!')
+        socket.error('A random socket error occurred!'),
+        IOError('Someone plugged the cable off.')
     ],
     ids=[
         'paramiko ssh exception',
         'connection error',
-        'socket error'
+        'socket error',
+        'io error'
     ]
 )
 @pytest.mark.ssh
