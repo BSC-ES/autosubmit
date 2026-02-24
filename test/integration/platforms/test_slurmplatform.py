@@ -871,8 +871,6 @@ def test_simple_workflow_compress_logs_slurm(
     # Get job_data
     exp_history = ExperimentHistory(
         exp.expid,
-        exp.as_conf.basic_config.JOBDATA_DIR,
-        exp.as_conf.basic_config.HISTORICAL_LOG_DIR,
     )
     last_job_data = exp_history.manager.get_all_last_job_data_dcs()
     assert len(last_job_data) > 0, "No job data found after running the experiment."
@@ -966,8 +964,6 @@ def test_compress_log_missing_tool(
     # Get job_data
     exp_history = ExperimentHistory(
         exp.expid,
-        exp.as_conf.basic_config.JOBDATA_DIR,
-        exp.as_conf.basic_config.HISTORICAL_LOG_DIR,
     )
     last_job_data = exp_history.manager.get_all_last_job_data_dcs()
     assert len(last_job_data) > 0, "No job data found after running the experiment."

@@ -1489,9 +1489,7 @@ class Job(object):
             # Read and store metrics here
             try:
                 exp_history = ExperimentHistory(
-                    self.expid,
-                    jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                    historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR,
+                    self.expid
                 )
                 last_run_id = (
                     exp_history.manager.get_experiment_run_dc_with_max_id().run_id
@@ -2598,8 +2596,7 @@ class Job(object):
                 f.write(self.submit_time_timestamp)
 
         # Writing database
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+        exp_history = ExperimentHistory(self.expid)
         exp_history.write_submit_time(self.name, submit=data_time[1],
                                       status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
                                       wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member,
@@ -2657,8 +2654,7 @@ class Job(object):
         # noinspection PyTypeChecker
         f.write(date2str(datetime.datetime.fromtimestamp(self.start_time_timestamp), 'S'))
         # Writing database
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+        exp_history = ExperimentHistory(self.expid)
         exp_history.write_start_time(self.name, start=self.start_time_timestamp,
                                      status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), qos=self.queue,
                                      job_id=self.id, wrapper_queue=self._wrapper_queue,
@@ -2704,15 +2700,13 @@ class Job(object):
                 stat_file.write('FAILED')
         out, err = self.local_logs
         # Launch first as simple non-threaded function
-        exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+        exp_history = ExperimentHistory(self.expid)
         job_data_dc = exp_history.write_finish_time(self.name, finish=self.finish_time_timestamp, status=final_status,
                                                     job_id=self.id, out_file=out, err_file=err)
 
         # Launch second as threaded function only for slurm
         if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
-            thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                                  historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish,
+            thread_write_finish = Thread(target=ExperimentHistory(self.expid).write_platform_data_after_finish,
                                          args=(job_data_dc, self.platform))
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()

@@ -3414,8 +3414,7 @@ class JobList(object):
             finished_jobs: list["Job"] = self._get_jobs_by_name(status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
         # Recover job_id and log name if missing
         if finished_jobs:
-            exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                            historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
+            exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
             jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in finished_jobs])
             # Only if we have information already stored, otherwise the job will be downloaded later
             for job in [job for job in finished_jobs if job.name in jobs_data]:
@@ -3460,8 +3459,7 @@ class JobList(object):
 
         job_names: list[str] = self._get_jobs_by_name(platform=platform, return_only_names=True)
         if job_names:
-            exp_history = ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                            historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR, force_sql_alchemy=True)
+            exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
             jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
             return {name for name, data in jobs_data.items() if data["status"] == "COMPLETED"}
 

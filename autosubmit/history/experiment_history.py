@@ -21,7 +21,6 @@ import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.database_managers.database_manager import DEFAULT_JOBDATA_DIR, DEFAULT_HISTORICAL_LOGS_DIR
 from autosubmit.history.database_managers.experiment_history_db_manager import create_experiment_history_db_manager, \
     ExperimentHistoryDatabaseManager
 from autosubmit.history.internal_logging import Logging
@@ -35,7 +34,7 @@ SECONDS_WAIT_PLATFORM = 60
 
 
 class ExperimentHistory:
-    def __init__(self, expid, jobdata_dir_path=DEFAULT_JOBDATA_DIR, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR, force_sql_alchemy=False):
+    def __init__(self, expid, force_sql_alchemy=False):
         # Unused arguments, but I didn't want to change every call to this class in this PR
         self.expid = expid
         BasicConfig.read()

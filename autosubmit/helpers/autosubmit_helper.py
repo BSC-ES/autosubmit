@@ -20,7 +20,6 @@ import sys
 from time import sleep
 from typing import Union, Any
 
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database.db_common import check_experiment_exists
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -78,8 +77,7 @@ def handle_start_after(start_after: str, expid: str) -> None:
             return
         # Historical Database: We use the historical database to retrieve the current progress
         # data of the supplied expid (start_after)
-        exp_history = ExperimentHistory(start_after, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+        exp_history = ExperimentHistory(start_after)
         if exp_history.is_header_ready() is False:
             Log.critical(
                 f"Experiment {start_after} is running a database version which is not supported by the completion "

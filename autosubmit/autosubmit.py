@@ -1798,8 +1798,7 @@ class Autosubmit:
         exp_history = None
         try:
             # Historical Database: Can create a new run if there is a difference in the number of jobs or if the current run does not exist.
-            exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                            historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+            exp_history = ExperimentHistory(expid)
             exp_history.initialize_database()
             exp_history.process_status_changes(job_list.get_job_list(), as_conf.get_chunk_size_unit(),
                                                as_conf.get_chunk_size(),
@@ -1830,8 +1829,7 @@ class Autosubmit:
         :return: an ExperimentHistory object.
         """
 
-        exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+        exp_history = ExperimentHistory(expid)
         if len(job_changes_tracker) > 0:
             exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
             Autosubmit.database_backup(expid)
@@ -2304,8 +2302,7 @@ class Autosubmit:
                     Log.warning(
                         f"Autosubmit couldn't recover the following job logs: {[job.name for job in job_list.get_completed_failed_without_logs()]}")
                 try:
-                    exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                    historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+                    exp_history = ExperimentHistory(expid)
                     exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
                     Autosubmit.database_backup(expid)
                 except Exception:
@@ -3967,8 +3964,7 @@ class Autosubmit:
                 time.sleep(1)
                 Log.info("Original database moved.")
             try:
-                exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+                exp_history = ExperimentHistory(expid)
                 Log.info("Restoring from sql")
                 os.popen(bash_command).read()
                 exp_history.initialize_database()
@@ -3977,8 +3973,7 @@ class Autosubmit:
             except Exception:
                 Log.warning("It was not possible to restore the jobs_data.db file... , a new blank db will be created")
 
-                exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+                exp_history = ExperimentHistory(expid)
                 exp_history.initialize_database()
                 return False
         except Exception as exp:
@@ -4419,8 +4414,7 @@ class Autosubmit:
                     # Setting up job historical database header. Must create a new run.
                     # Historical Database: Setup new run
                     try:
-                        exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                        historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+                        exp_history = ExperimentHistory(expid)
                         exp_history.initialize_database()
 
                         # exp_history.create_new_experiment_run(as_conf.get_chunk_size_unit(), as_conf.get_chunk_size(), as_conf.get_full_config_as_json(), job_list.get_job_list())
@@ -5247,8 +5241,7 @@ class Autosubmit:
                     job_list.save()
                     end = time.time()
                     Log.info(f"JobList saved in {end - start:.2f} seconds.")
-                    exp_history = ExperimentHistory(expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR,
-                                                    historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR)
+                    exp_history = ExperimentHistory(expid)
                     exp_history.initialize_database()
                     exp_history.process_status_changes(job_list.get_job_list(),
                                                        chunk_unit=as_conf.get_chunk_size_unit(),
