@@ -134,8 +134,6 @@ Autosubmit configuration
         # DELAY_RETRY_TIME:*11 # will wait 11,110,1110,11110...
         # Default output type for CREATE, MONITOR, SET STATUS, RECOVERY. Available options: pdf, svg, png, ps, txt
         # Default:pdf
-        # This parameter is used to enable the use of threads in autosubmit for the wrappers. # Default False
-        ENABLE_WRAPPER_THREADS: False
         OUTPUT:pdf
         WRAPPERS_WALLCLOCK: 48:00  # Default max_wallclock for wrappers before getting killed
         JOB_WALLCLOCK: 24:00  # Default max_wallclock for jobs before getting killed

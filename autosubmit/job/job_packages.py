@@ -19,7 +19,6 @@
 import datetime
 import json
 import locale
-import multiprocessing
 import os
 import random
 import re
@@ -52,7 +51,7 @@ def threaded(fn):
     return wrapper
 
 
-def jobs_in_wrapper_str(as_conf: 'AutosubmitConfig', current_wrapper: str) -> list[str]:
+def jobs_in_wrapper_str(as_conf: 'AutosubmitConfig', current_wrapper: str) -> str:
     """Transform to string with _ separator the jobs in the wrapper."""
     return "_".join(as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", []))
 
@@ -77,7 +76,7 @@ class JobPackageBase(object):
         try:
             self._tmp_path = jobs[0]._tmp_path
             self._platform = jobs[0]._platform
-            self._custom_directives = set()
+            self._custom_directives: set = set()
             for job in jobs:
                 if job._platform.name != self._platform.name or job.platform is None:
                     raise Exception('Only one valid platform per package')
@@ -106,29 +105,6 @@ class JobPackageBase(object):
         """
         return self._platform
 
-    @threaded
-    def check_scripts(self, jobs: list[Job], configuration: 'AutosubmitConfig', only_generate: bool = False):
-        for job in jobs:
-            if only_generate and not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
-                break
-            elif not os.path.exists(os.path.join(configuration.get_project_dir(), job.file)):
-                if configuration.get_project_type().lower() != "none" and len(configuration.get_project_type()) > 0:
-                    raise AutosubmitCritical(f"Job script:{job.file} does not exists", 7014)
-            if not job.check_script(configuration, show_logs=job.check_warnings):
-                Log.warning(
-                    f'Script {job.name} has some empty variables. An empty value has substituted these variables')
-            else:
-                Log.result(f"Script {job.name} OK")
-            # looking for directives on jobs
-            self._custom_directives = self._custom_directives | set(job.custom_directives)
-
-    @threaded
-    def _create_scripts_threaded(self, jobs: list[Job], configuration: 'AutosubmitConfig'):
-        for i in range(0, len(jobs)):
-            self._job_scripts[jobs[i].name] = jobs[i].create_script(configuration)
-
-    def _create_common_script(self, filename: str = ""):
-        pass  # pragma: no cover
 
     def check_job_files_exists(self, configuration: 'AutosubmitConfig', only_generate: bool) -> None:
         """ Check that all job files exist in the project directory.
@@ -190,38 +166,9 @@ class JobPackageBase(object):
             If true, only generates scripts; otherwise, submits.
         :type only_generate: Boolean
         """
-        if parameters is None:
-            parameters = {}
-        thread_number = multiprocessing.cpu_count()
-        if len(self.jobs) > 2500:
-            thread_number = thread_number * 2
-        elif len(self.jobs) > 5000:
-            thread_number = thread_number * 3
-        elif len(self.jobs) > 7500:
-            thread_number = thread_number * 4
-        elif len(self.jobs) > 10000:
-            thread_number = thread_number * 5
-        chunksize = int((len(self.jobs) + thread_number - 1) / thread_number)
         try:
-            if len(self.jobs) < thread_number or str(
-                    configuration.experiment_data.get("CONFIG", {}).get("ENABLE_WRAPPER_THREADS",
-                                                                        "False")).lower() == "false":
-                self.check_job_files_exists(configuration, only_generate)
-                self.build_scripts(configuration)
-            else:
-                # TODO: Not related to this PR, but this probably is not working correctly (nobody is using it)
-                lhandle = list()
-                for i in range(0, len(self.jobs), chunksize):
-                    lhandle.append(
-                        self.check_scripts(self.jobs[i:i + chunksize], configuration, parameters, only_generate, hold))
-                for dataThread in lhandle:
-                    dataThread.join()
-                for i in range(0, len(self.jobs), chunksize):
-                    Log.debug("Creating Scripts")
-                    lhandle.append(self._create_scripts_threaded(self.jobs[i:i + chunksize], configuration))
-                for dataThread in lhandle:
-                    dataThread.join()
-                self._common_script = self._create_common_script()
+            self.check_job_files_exists(configuration, only_generate)
+            self.build_scripts(configuration)
         except AutosubmitCritical:
             raise
         except BaseException:
@@ -348,8 +295,8 @@ class JobPackageArray(JobPackageBase):
 
     def __init__(self, jobs: list[Job]):
         self.name = None
-        self._job_inputs = {}
-        self._job_scripts = {}
+        self._job_inputs: dict = dict()
+        self._job_scripts: dict = dict()
         self._common_script = None
         self._array_size_id = "[1-" + str(len(jobs)) + "]"
         self._wallclock = '00:00'
@@ -392,7 +339,7 @@ class JobPackageArray(JobPackageBase):
             self.platform.send_file(self._job_inputs[job.name])
         self.platform.send_file(self._common_script)
 
-    def _do_submission(self, job_scripts: dict[str, str] = None, hold: bool = False) -> None:
+    def _do_submission(self, job_scripts: Optional[dict[str, str]] = None, hold: bool = False) -> None:
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
@@ -463,7 +410,7 @@ class JobPackageThread(JobPackageBase):
             self.wrapper_method = None
             self.jobs_in_wrapper = None
             self.extensible_wallclock = 0
-        self._job_scripts = {}
+        self._job_scripts: dict = dict()
         # Seems like this one is not used at all in the class
         self._job_dependency = dependency
         self._common_script = None
@@ -628,7 +575,6 @@ class JobPackageThread(JobPackageBase):
     def _send_files(self):
         Log.debug("Check remote dir")
         self.platform.check_remote_log_dir()
-        compress_type = "w"
         output_filepath = 'wrapper_scripts.tar'
         if callable(getattr(self.platform, 'remove_multiple_files')):
             filenames = str()
@@ -637,7 +583,7 @@ class JobPackageThread(JobPackageBase):
             self.platform.remove_multiple_files(filenames)
         tar_path = os.path.join(self._tmp_path, output_filepath)
         Log.debug("Compressing multiple_files")
-        with tarfile.open(tar_path, compress_type) as tar:
+        with tarfile.open(tar_path, "w") as tar:
             for job in self.jobs:
                 jfile = os.path.join(self._tmp_path, self._job_scripts[job.name])
                 with open(jfile, 'rb') as f:
@@ -655,7 +601,7 @@ class JobPackageThread(JobPackageBase):
                 real_name = job.construct_real_additional_file_name(f)
                 self.platform.send_file(real_name)
 
-    def _do_submission(self, job_scripts: dict[str, str] = None, hold: bool = False) -> None:
+    def _do_submission(self, job_scripts: Optional[dict[str, str]] = None, hold: bool = False) -> None:
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
@@ -701,7 +647,7 @@ class JobPackageThreadWrapped(JobPackageThread):
     def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
                  wrapper_section="WRAPPERS"):
         super(JobPackageThreadWrapped, self).__init__(jobs, configuration)
-        self._name = None
+        self._name: Optional[str] = None
         self._job_scripts = {}
         self._job_dependency = dependency
         self._common_script = None
@@ -741,6 +687,8 @@ class JobPackageThreadWrapped(JobPackageThread):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
         self._common_script = self._create_common_script()
 
+
+    #TODO: I believe this might not be working as intended since _common_script_content is not defined (code from 31/03/2017)
     def _create_common_script(self, filename: str = ""):
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
@@ -753,7 +701,7 @@ class JobPackageThreadWrapped(JobPackageThread):
             self.platform.send_file(self._job_scripts[job.name])
         self.platform.send_file(self._common_script)
 
-    def _do_submission(self, job_scripts: dict[str, str] = None, hold: bool = False) -> None:
+    def _do_submission(self, job_scripts: Optional[dict[str, str]] = None, hold: bool = False) -> None:
         """
         Submits jobs to the platform, cleans previous run logs, and updates job status.
 
@@ -878,8 +826,8 @@ class JobPackageHorizontal(JobPackageThread):
     """
     Class to manage a horizontal thread-based package of jobs to be submitted by autosubmit
     """
-    def __init__(self, jobs: list[Job], dependency=None, jobs_resources: dict = None, method: str = 'ASThread',
-                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS"):
+    def __init__(self, jobs: list[Job], dependency: Optional[str] = None, jobs_resources: Optional[dict] = None,
+                 method: str = 'ASThread', configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS"):
         super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources, configuration=configuration,
                                                    wrapper_section=wrapper_section)
         self.method = method
