@@ -62,6 +62,7 @@ release.
 - Fixed an issue with MIXED and STRICT wrapper policies raising the error prematurely #2770
 - Do not print warning if an experiment has been successfully deleted #2334 #2793
 - Fixed an issue with undefined variables inside a list #2773
+- Fixed an issue with --minimal flag of `autosubmit create` not working correctly #2845
 
 **Enhancements:**
 
