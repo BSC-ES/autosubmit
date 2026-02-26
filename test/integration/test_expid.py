@@ -227,7 +227,7 @@ def test_as_conf_default_values(git_command, git_session, autosubmit_exp: Callab
     yaml_data = yaml.load(open(tmp_path / f"{exp.expid}/conf/metadata/experiment_data.yml"))
     assert yaml_data['DEFAULT']['HPCARCH'] == "MN5"
     assert yaml_data['DEFAULT']['EXPID'] == exp.expid
-    assert yaml_data['DEFAULT']['CUSTOM_CONFIG'] == f'"{tmp_path}/{exp.expid}/proj/test_3"'
+    assert yaml_data['DEFAULT']['CUSTOM_CONFIG'] == f"{tmp_path}/{exp.expid}/proj/test_3"
     assert yaml_data['LOCAL']['PROJECT_PATH'] == ""
 
     if git_command[0] != '':
