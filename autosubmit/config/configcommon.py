@@ -582,7 +582,7 @@ class AutosubmitConfig(object):
         normalized_data = dict()
         with suppress(Exception):
             for key, val in data.items():
-                normalized_key = str(key).upper()
+                normalized_key = _preserve_prov(key, str(key).upper())
                 if isinstance(val, collections.abc.Mapping):
                     normalized_data[normalized_key] = self.deep_normalize(val)
                 elif isinstance(val, list):
@@ -829,10 +829,10 @@ class AutosubmitConfig(object):
         aux_dependencies = {}
         if isinstance(dependencies, str):
             for dependency in dependencies.upper().split(" "):
-                aux_dependencies[dependency] = {}
+                aux_dependencies[_preserve_prov(dependencies, dependency)] = {}
         elif isinstance(dependencies, dict):
             for dependency, dependency_data in dependencies.items():
-                aux_dependencies[dependency.upper()] = dependency_data
+                aux_dependencies[_preserve_prov(dependency, dependency.upper())] = dependency_data
                 if isinstance(dependency_data, dict) and dependency_data.get("STATUS", None):
                     status_orig = dependency_data["STATUS"]
                     status_upper = _preserve_prov(status_orig, status_orig.upper())
