@@ -52,120 +52,62 @@ from ruamel.yaml import YAML
 # instead of "# no provenance".
 # ---------------------------------------------------------------------------
 try:
-    from yaml_provenance._wrapper import (
-        ProvenanceClassForTheUnsubclassable as _PCSForUnsubclassable,
-        wrapper_with_provenance_factory as _wp_factory,
+    from yaml_provenance import (
+        wrap_computed,
+        transfer_provenance,
+        annotate_dict,
+        ProvenanceJSONEncoder as _LibProvenanceJSONEncoder,
     )
     _HAS_YAML_PROVENANCE = True
 except ImportError:
-    _PCSForUnsubclassable = None   # type: ignore[assignment,misc]
-    _wp_factory = None             # type: ignore[assignment,misc]
+    wrap_computed = None           # type: ignore[assignment]
+    transfer_provenance = None     # type: ignore[assignment]
+    annotate_dict = None           # type: ignore[assignment]
+    _LibProvenanceJSONEncoder = None  # type: ignore[assignment]
     _HAS_YAML_PROVENANCE = False
 
 
 def _wrap_with_source(value: Any, source: str) -> Any:
-    """Wrap *value* with a provenance annotation pointing to *source*.
+    """Wrap *value* with provenance pointing to *source*.
 
-    Used to give meaningful provenance comments to values that are injected
-    programmatically (not loaded from a YAML file), such as BasicConfig
-    attributes, environment variables, computed HPC parameters, and git refs.
-
-    When yaml-provenance is not installed the value is returned unchanged so
-    the function is always safe to call unconditionally.
-
-    The *source* string is placed in the ``yaml_file`` field of the provenance
-    dict.  The ``dump_yaml`` formatter renders it as::
-
-        KEY: value  # <source>,line:0,col:0
-
-    Suggested *source* formats:
-    - ``"autosubmit.config.BasicConfig.ATTR_NAME"`` — for BasicConfig.props()
-    - ``"environment:$VAR_NAME"``                  — for os.environ lookups
-    - ``"computed:PLATFORMS.ARCH.PARAM"``           — for HPC* derived values
-    - ``"git:<project_dir>/.git/HEAD"``             — for workflow commit
-    - ``"computed:BasicConfig.LOCAL_ROOT_DIR/<expid>"`` — for ROOTDIR/PROJDIR
-
-    :param value: The value to annotate.
-    :param source: Human-readable source description.
-    :return: Provenance-wrapped value, or the original value if the library
-        is unavailable.
+    Thin wrapper around ``yaml_provenance.wrap_computed`` that gracefully
+    degrades when the library is not installed.
     """
-    if not _HAS_YAML_PROVENANCE or _wp_factory is None:
+    if not _HAS_YAML_PROVENANCE:
         return value
-    provenance = {'yaml_file': source, 'line': 0, 'col': 0,
-                  'category': None, 'subcategory': None}
     try:
-        return _wp_factory(value, provenance)
+        return wrap_computed(value, source)
     except Exception:
         return value
 
 
 def _preserve_prov(original: Any, result: Any) -> Any:
-    """Return *result* wrapped with the provenance of *original*.
+    """Return *result* with *original*'s provenance re-attached.
 
-    Used when a string operation (``str.upper()``, ``str.strip()``, etc.)
-    produces a plain ``str`` from a ``WithProvenance`` subclass, discarding
-    the provenance.  This helper re-attaches the original provenance to the
-    new value so the transformation is transparent in experiment_data.yml.
-
-    When yaml-provenance is not installed, or *original* has no provenance,
-    the function returns *result* unchanged — always safe to call.
-
-    :param original: The WithProvenance source value (before the operation).
-    :param result: The plain-str result of the operation.
-    :return: *result* with *original*'s provenance, or *result* as-is.
+    Thin wrapper around ``yaml_provenance.transfer_provenance`` that
+    gracefully degrades when the library is not installed.
     """
-    if not _HAS_YAML_PROVENANCE or _wp_factory is None:
+    if not _HAS_YAML_PROVENANCE:
         return result
-    prov = getattr(original, 'provenance', None)
-    if not prov:
-        return result
-    try:
-        return _wp_factory(result, prov[-1])
-    except Exception:
-        return result
+    return transfer_provenance(original, result)
 
 
 def _wrap_dict_with_source(d: dict, source_prefix: str) -> dict:
-    """Wrap every scalar leaf of *d* with a per-key provenance source in-place.
+    """Wrap every scalar leaf of *d* with per-key provenance.
 
-    For each key ``K``, the source annotation is ``<source_prefix>.<K>`` so
-    that the resulting comment is e.g.
-    ``# autosubmit.config.BasicConfig.DB_DIR,line:0,col:0``.
-
-    Recurses into nested dicts (using the same prefix, not extending it, so
-    that nested BasicConfig dicts are still attributed to the top-level class).
-    Leaves that already carry provenance are left untouched.
-
-    :param d: Dict to annotate (modified in-place and returned).
-    :param source_prefix: Base source string (e.g. ``"autosubmit.config.BasicConfig"``).
-    :return: The annotated dict.
+    Thin wrapper around ``yaml_provenance.annotate_dict`` that gracefully
+    degrades when the library is not installed.
     """
     if not _HAS_YAML_PROVENANCE:
         return d
-    for key, value in d.items():
-        if isinstance(value, dict):
-            _wrap_dict_with_source(value, source_prefix)
-        elif not hasattr(value, 'provenance'):
-            d[key] = _wrap_with_source(value, f"{source_prefix}.{key}")
-    return d
+    return annotate_dict(d, source_prefix)
 
 
-class _ProvenanceJSONEncoder(json.JSONEncoder):
-    """JSON encoder that handles yaml-provenance wrapper types.
-
-    ``BoolWithProvenance`` (and ``NoneWithProvenance``) are subclasses of
-    ``ProvenanceClassForTheUnsubclassable`` rather than ``bool`` / ``NoneType``,
-    so the standard json encoder doesn't recognise them.  This encoder handles
-    them explicitly.  All other WithProvenance types (StrWithProvenance,
-    IntWithProvenance, …) are genuine subclasses of their native types and are
-    handled transparently by the default encoder.
-    """
-    def default(self, obj):
-        if _PCSForUnsubclassable is not None and isinstance(obj, _PCSForUnsubclassable):
-            # BoolWithProvenance.value → True/False; NoneWithProvenance.value → None
-            return obj.value
-        return super().default(obj)
+# For JSON serialization — use library encoder or fallback to standard
+if _HAS_YAML_PROVENANCE:
+    _ProvenanceJSONEncoder = _LibProvenanceJSONEncoder
+else:
+    _ProvenanceJSONEncoder = json.JSONEncoder
 
 
 from autosubmit.config.basicconfig import BasicConfig
