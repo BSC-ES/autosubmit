@@ -61,6 +61,7 @@ dependencies = [
     "invoke>=2.0",
     "SQLAlchemy~=2.0.23",
     "ruamel.yaml==0.19.1",
+    "yaml-provenance>=0.1.0",
     "configobj",
     "configparser"
 ]
