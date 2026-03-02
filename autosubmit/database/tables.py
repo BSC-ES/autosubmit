@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import datetime
 from typing import cast, List, Optional
 
 from sqlalchemy import (
@@ -25,13 +26,11 @@ from sqlalchemy import (
     Table,
     Text,
     Float,
-    LargeBinary,
     UniqueConstraint,
     Column,
-)
+    Boolean, ForeignKey)
 
 metadata_obj = MetaData()
-
 
 ExperimentTable = Table(
     "experiment",
@@ -51,15 +50,6 @@ DBVersionTable = Table(
     Column("version", Integer, nullable=False, primary_key=True),
 )
 
-ExperimentStructureTable = Table(
-    "experiment_structure",
-    metadata_obj,
-    Column("e_from", Text, nullable=False, primary_key=True),
-    Column("e_to", Text, nullable=False, primary_key=True),
-    UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
-)
-"""Table that holds the structure of the experiment jobs."""
-
 ExperimentStatusTable = Table(
     "experiment_status",
     metadata_obj,
@@ -70,31 +60,6 @@ ExperimentStatusTable = Table(
     Column("modified", Text, nullable=False),
 )
 """Stores the status of the experiments."""
-
-JobPackageTable = Table(
-    "job_package",
-    metadata_obj,
-    Column("exp_id", Text),
-    Column("package_name", Text),
-    Column("job_name", Text),
-    Column("wallclock", Text)
-)
-"""Stores a mapping between the wrapper name and the actual job in SLURM."""
-
-WrapperJobPackageTable = Table(
-    "wrapper_job_package",
-    metadata_obj,
-    Column("exp_id", Text),
-    Column("package_name", Text),
-    Column("job_name", Text),
-    Column("wallclock", Text)
-)
-"""It is a replication.
-It is only created/used when using inspect and create or monitor
-with flag -cw in Autosubmit.
-This replication is used to not interfere with the current
-autosubmit run of that experiment since wrapper_job_package
-will contain a preview, not the real wrapper packages."""
 
 # NOTE: The column ``metadata`` has a name that is reserved in
 #       SQLAlchemy ORM. It works for SQLAlchemy Core, here, but
@@ -121,6 +86,18 @@ ExperimentRunTable = Table(
     Column("metadata", Text),
 )
 
+DetailsTable = Table(
+    "details",
+    metadata_obj,
+    Column("exp_id", Integer, primary_key=True),
+    Column("user", Text, nullable=False),
+    Column("created", Text, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("branch", Text, nullable=False),
+    Column("hpc", Text, nullable=False),
+)
+
+"""Table that holds the structure of the experiment jobs."""
 JobDataTable = Table(
     "job_data",
     metadata_obj,
@@ -156,45 +133,117 @@ JobDataTable = Table(
     Column("children", Text, nullable=True),
     Column("platform_output", Text, nullable=True),
     Column("workflow_commit", Text, nullable=True),
+    Column("split", Text, nullable=True),
+    Column("splits", Text, nullable=True),
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
-JobListTable = Table(
-    "job_list",
+# TODO this doesn't work in POSTGRESQL
+# JobStatusEnum = Enum(
+#     "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING",
+#     "SKIPPED", "FAILED", "UNKNOWN", "COMPLETED", "SUSPENDED",
+#     name="job_status_enum"
+# )
+
+"""All these tables will go inside the $expid/db/job_list.db."""
+# Jobs table
+"""Table that holds the minium neccesary info about the experiment jobs."""
+JobsTable = Table(
+    "jobs",
     metadata_obj,
-    Column("name", String, primary_key=True),
+    Column("name", String, nullable=False, primary_key=True),
     Column("id", Integer),
-    Column("status", Integer),
+    Column("script_name", String),
     Column("priority", Integer),
-    Column("section", String),
-    Column("date", String),
-    Column("member", String),
+    Column("status", Text, nullable=False, index=True),  # Should be job_status_enum
+    Column("frequency", String),  # TODO move to Section table ?
+    Column("synchronize", Boolean),  # TODO move to Section table ?
+    Column("section", String, ForeignKey("sections.name")),
     Column("chunk", Integer),
+    Column("member", Text),
+    Column("splits", Integer),
     Column("split", Integer),
-    Column("local_out", String),
-    Column("local_err", String),
-    Column("remote_out", String),
-    Column("remote_err", String),
+    Column("date", String),
+    Column("date_split", String),
+    Column("max_checkpoint_step", Integer, nullable=False, default=0),
+    Column("start_time", String),
+    Column("start_time_timestamp", Integer),
+    Column("submit_time_timestamp", Integer),
+    Column("finish_time_timestamp", Integer),
+    Column("ready_date", String),
+    Column("local_logs_out", String),  # tuple, to modify double value in two
+    Column("local_logs_err", String),  # tuple, to modify double value in two
+    Column("remote_logs_out", String),
+    Column("remote_logs_err", String),
+    Column("updated_log", Integer),
+    Column("packed", Boolean),
+    Column("current_checkpoint_step", Integer, nullable=False, default=0),
+    Column("platform_name", String),
+    Column("created", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
+    Column("modified", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
 )
 
-JobPklTable = Table(
-    "job_pkl",
+"""Table that holds the structure of the experiment jobs."""
+ExperimentStructureTable = Table(
+    "experiment_structure",
     metadata_obj,
-    Column("expid", String, primary_key=True),
-    Column("pkl", LargeBinary),
-    Column("modified", String),
+    Column("e_from", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True, index=True),
+    Column("e_to", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True, index=True),
+    Column("min_trigger_status", String),
+    Column("completion_status", String),
+    Column("from_step", Integer),
+    Column("fail_ok", Boolean),
+    UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
 )
 
-DetailsTable = Table(
-    "details",
+SectionsStructureTable = Table(
+    "sections",
     metadata_obj,
-    Column("exp_id", Integer, primary_key=True),
-    Column("user", Text, nullable=False),
-    Column("created", Text, nullable=False),
-    Column("model", Text, nullable=False),
-    Column("branch", Text, nullable=False),
-    Column("hpc", Text, nullable=False),
+    Column("name", String, nullable=False, primary_key=True),
+    Column("splits", Integer, nullable=True),
+    Column("dependencies", String, nullable=True),
+    Column("datelist", String, nullable=True),
+    Column("members", String, nullable=True),
+    Column("numchunks", Integer, nullable=True),
+    Column("expid", String, nullable=True),
 )
+
+
+def create_wrapper_tables(name, metadata_obj_):
+    """Create a wrapper table for the given name."""
+    table_package_info = Table(
+        f"{name}_info",
+        metadata_obj_,
+        Column("name", String, nullable=False, primary_key=True),
+        Column("id", Integer),
+        Column("script_name", String),
+        Column("status", Text, nullable=False),  # Should be job_status_enum
+        Column("local_logs_out", String),  # TODO: We should recover the log from the remote at some point
+        Column("local_logs_err", String),  # TODO: We should recover the log from the remote at some point
+        Column("remote_logs_out", String),  # TODO: We should recover the log from the remote at some point
+        Column("remote_logs_err", String),  # TODO: We should recover the log from the remote at some point
+        Column("updated_log", Integer),  # TODO: We should recover the log from the remote at some point
+        Column("platform_name", String),
+        Column("wallclock", String),
+        Column("num_processors", Integer),
+        Column("type", Text),
+        Column("sections", Text),
+        Column("method", Text),
+    )
+
+    table_jobs_inside_wrapper = Table(
+        f"{name}_jobs",
+        metadata_obj_,
+        Column("package_id", Integer, ForeignKey("{name}_info.id"), nullable=False, primary_key=True),
+        Column("package_name", String, ForeignKey(f"{name}_info.name"), nullable=False, primary_key=True),
+        Column("job_name", String, ForeignKey("jobs.name"), nullable=False, primary_key=True),
+        Column("timestamp", String, nullable=True),
+    )
+    return table_package_info, table_jobs_inside_wrapper
+
+
+WrapperInfoTable, WrapperJobsTable = create_wrapper_tables("wrappers", metadata_obj)
+PreviewWrapperInfoTable, PreviewWrapperJobsTable = create_wrapper_tables("preview_wrappers", metadata_obj)
 
 UserMetricsTable = Table(
     "user_metrics",
@@ -207,20 +256,28 @@ UserMetricsTable = Table(
     Column("modified", Text),
 )
 
-TABLES = (
+GENERALTABLES = (
     ExperimentTable,
     ExperimentStatusTable,
-    ExperimentStructureTable,
     ExperimentRunTable,
     DBVersionTable,
-    JobPackageTable,
     JobDataTable,
-    JobListTable,
-    WrapperJobPackageTable,
-    JobPklTable,
     DetailsTable,
     UserMetricsTable,
 )
+
+JOBLISTTABLES = (
+    JobsTable,
+    ExperimentStructureTable,
+    WrapperInfoTable,
+    WrapperJobsTable,
+    PreviewWrapperInfoTable,
+    PreviewWrapperJobsTable,
+    SectionsStructureTable,
+)
+
+TABLES = GENERALTABLES + JOBLISTTABLES
+
 """The tables available in the Autosubmit databases."""
 
 
