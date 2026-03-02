@@ -25,6 +25,24 @@ from autosubmit.config.configcommon import AutosubmitConfig
 if TYPE_CHECKING:
     pass
 
+
+# ---------------------------------------------------------------------------
+# yaml-provenance helpers — available when the library is installed.
+# ---------------------------------------------------------------------------
+try:
+    from yaml_provenance import wrap_computed
+
+    _HAS_YAML_PROVENANCE = True
+except ImportError:  # pragma: no cover
+    wrap_computed = None  # type: ignore[assignment]
+    _HAS_YAML_PROVENANCE = False
+
+# Marker that skips a test when yaml-provenance is not installed.
+requires_yaml_provenance = pytest.mark.skipif(
+    not _HAS_YAML_PROVENANCE,
+    reason="yaml-provenance library is not installed",
+)
+
 """A small configuration example."""
 AS_CONF_SMALL = {
     "CONFIG": {
