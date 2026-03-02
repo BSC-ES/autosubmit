@@ -35,7 +35,7 @@ from bscearth.utils.date import sum_str_hours
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -232,6 +232,8 @@ class JobPackageBase(object):
                 self._send_files()
                 Log.debug("Submitting")
                 self._do_submission(hold=hold)
+        except AutosubmitError:
+            raise
         except AutosubmitCritical:
             raise
         except BaseException as e:
