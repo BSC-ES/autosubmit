@@ -26,6 +26,7 @@ from autosubmit.job.job_list_persistence import JobListPersistenceDb
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
 from autosubmit.job.job_packages import jobs_in_wrapper_str
 from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.log.log import AutosubmitError, AutosubmitCritical
 
 
 @pytest.fixture
@@ -199,43 +200,77 @@ def test_jobs_in_wrapper_str(autosubmit_config):
     assert result == "job1_job2_job3"
 
 
-def test_job_package_submission(mocker, local, tmp_path):
-    # N.B.: AS only calls ``_create_scripts`` if you have less jobs than threads.
-    # So we simply set threads to be greater than the amount of jobs.
+@pytest.mark.parametrize(
+    "error, target_function",
+    [
+        (None, None),
+        (AutosubmitError, "_create_scripts"),
+        (AutosubmitCritical, "_create_scripts"),
+        (AutosubmitError, "_send_files"),
+        (AutosubmitCritical, "_send_files"),
+        (AutosubmitError, "_do_submission"),
+        (AutosubmitCritical, "_do_submission"),
+    ],
+    ids=[
+        "no_error",
+        "autosubmit_error_on_create_scripts",
+        "autosubmit_critical_on_create_scripts",
+        "autosubmit_error_on_send_files",
+        "autosubmit_critical_on_send_files",
+        "autosubmit_error_on_do_submission",
+        "autosubmit_critical_on_do_submission",
+    ],
+)
+def test_job_package_submission(mocker, local, tmp_path, error, target_function) -> None:
+    """Verify submit succeeds normally and propagates AutosubmitError or AutosubmitCritical."""
     jobs = [
         Job("job1", "1", Status.READY, 0),
         Job("job2", "2", Status.READY, 0),
-        Job("job3", "3", Status.READY, 0)
+        Job("job3", "3", Status.READY, 0),
     ]
     for job in jobs:
         job.platform = local
-
-    mocker.patch('multiprocessing.cpu_count', return_value=len(jobs) + 1)
-    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value={})
-    mocker.patch('autosubmit.job.job.Job._get_paramiko_template', return_value="empty")
-
-    for job in jobs:
         job._tmp_path = tmp_path
         job.file = tmp_path / "fake-file"
         job.custom_directives = []
         job.file.write_text("echo 'Hello World'")
 
+    mocker.patch("multiprocessing.cpu_count", return_value=len(jobs) + 1)
+    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value={})
+    mocker.patch("autosubmit.job.job.Job._get_paramiko_template", return_value="empty")
 
     job_package = JobPackageSimple(jobs)
+    mock_create_scripts = mocker.patch.object(job_package, "_create_scripts")
+    mock_send_files = mocker.patch.object(job_package, "_send_files")
+    mock_do_submission = mocker.patch.object(job_package, "_do_submission")
 
-    job_package._create_scripts = MagicMock()
-    job_package._send_files = MagicMock()
-    job_package._do_submission = MagicMock()
-    configuration = MagicMock()
-    configuration.get_project_dir = MagicMock()
+    method_mocks = {
+        "_create_scripts": mock_create_scripts,
+        "_send_files": mock_send_files,
+        "_do_submission": mock_do_submission,
+    }
+
+    configuration = mocker.MagicMock()
     configuration.get_project_dir.return_value = "fake-proj-dir"
-    # act
-    job_package.submit(configuration, 'fake-params')
-    # assert
-    for job in jobs:
-        # Should be called once for each job, but currently it needs two calls (for additional files) to change the code
-        job.update_parameters.assert_called()
 
-    job_package._create_scripts.is_called_once_with()
-    job_package._send_files.is_called_once_with()
-    job_package._do_submission.is_called_once_with()
+    if error:
+        method_mocks[target_function].side_effect = error
+
+        with pytest.raises(error):
+            job_package.submit(configuration, "fake-params")
+
+        methods_after_failure = {
+            "_create_scripts": [],
+            "_send_files": ["_create_scripts"],
+            "_do_submission": ["_create_scripts", "_send_files"],
+        }
+        for skipped in methods_after_failure[target_function]:
+            method_mocks[skipped].assert_called_once()
+        for skipped in set(method_mocks) - set(methods_after_failure[target_function]) - {target_function}:
+            method_mocks[skipped].assert_not_called()
+    else:
+        job_package.submit(configuration, "fake-params")
+
+        mock_create_scripts.assert_called_once()
+        mock_send_files.assert_called_once()
+        mock_do_submission.assert_called_once()
