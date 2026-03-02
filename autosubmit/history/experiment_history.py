@@ -342,10 +342,6 @@ class ExperimentHistory:
         experiment_run_dc.total = status_counts["TOTAL"]
         return self.manager.update_experiment_run_dc_by_id(experiment_run_dc)
 
-    def save_structure_data(self):
-        run_id = self.manager.get_experiment_run_dc_with_max_id().run_id
-        structure_data_dcs = self.manager.get_structure_data_dcs_by_run_id(run_id)
-
     def finish_current_experiment_run(self):
         if self.manager.is_there_a_last_experiment_run():
             current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()

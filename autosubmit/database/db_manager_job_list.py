@@ -241,25 +241,32 @@ class JobsDbManager(DbManager):
         pkeys = ['e_from', 'e_to']
         self.upsert_many(table.name, graph, pkeys)
 
-    def load_edges(self, job_list: List[dict[str, Any]], full_load: bool) -> List[dict[str, Any]]:
+    def load_edges(self, job_list: List[dict[str, Any]] = None, full_load: bool = True, remove_unused_edges: bool = True) -> List[dict[str, Any]]:
         table: Table = self.tables[ExperimentStructureTable.name]
 
         self.create_table(table.name)
         if full_load:
-            graph = self.select_edges(job_list)
-            self.delete_unused_edges(graph)
-            self.save_edges(graph)
+            graph = self.select_edges()
+            if remove_unused_edges:
+                self.delete_unused_edges(graph)
+                self.save_edges(graph)
         else:
             graph = self.select_edges(job_list)
         return graph
 
-    def select_edges(self, job_list: List[dict[str, Any]], only_parents: bool = False) -> List[dict[str, Any]]:
-        """
-        Return the edges from the database.
+    def select_edges(self, job_list: Optional[List[dict[str, Any]]] = None, only_parents: bool = False) -> List[dict[str, Any]]:
+        """Return edges from the database, optionally filtered by job list.
+
+        :param job_list: Optional list of jobs to filter edges by. If None, all edges are returned.
+        :param only_parents: If True, return only parent edges (e_from).
+        :return: List of edge dictionaries.
         """
         table: Table = self.tables[ExperimentStructureTable.name]
-
         self.create_table(table.name)
+
+        if not job_list:
+            return [dict(edge) for edge in self.select_all_with_columns(table.name)]
+
         graph = set()
         for job in job_list:
             graph.update(self.select_where_with_columns(table, {'e_from': job['name']}))
@@ -330,36 +337,6 @@ class JobsDbManager(DbManager):
                 self.insert_many(innerjobs_table.name, inner_jobs)
             except IntegrityError as e:
                 Log.warning(f"Unique constraint failed when inserting inner jobs: {e}")
-
-    def select_latest_inner_jobs(
-            self,
-            innerjobs_table: Table,
-            job_names: Optional[List[str]] = None
-    ) -> List[Dict[str, object]]:
-        """
-        Select the row with the latest timestamp for each job_name from the inner jobs table.
-        If job_names is provided, filter only those job_names.
-
-        :param innerjobs_table: SQLAlchemy Table object for the inner jobs.
-        :type innerjobs_table: Table
-        :param job_names: Optional list of job_name values to filter by.
-        :type job_names: Optional[List[str]]
-        :return: List of dictionaries with the latest row per job_name.
-        :rtype: List[Dict[str, object]]
-        """
-        row_number = func.row_number().over(
-            partition_by=innerjobs_table.c.job_name,
-            order_by=desc(innerjobs_table.c.timestamp)
-        ).label('row_number')
-
-        stmt = select(*innerjobs_table.c, row_number)
-        if job_names:
-            stmt = stmt.where(innerjobs_table.c.job_name.in_(job_names))
-        subquery = stmt.alias('subq')
-        query = select(*(col for col in subquery.c if col.name != 'row_number')).where(subquery.c.row_number == 1)
-        with self.engine.connect() as conn:
-            result = conn.execute(query)
-            return [dict(row) for row in result.mappings().all()]
 
     def load_wrappers(self, preview: bool = False, job_list: Any = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Load the wrapper jobs and their associated information from the database.
