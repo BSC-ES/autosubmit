@@ -776,9 +776,8 @@ def test_delete_expid(mocker, tmp_path, autosubmit_exp, autosubmit, expid_value)
     mocker.patch('autosubmit.experiment.experiment_common._perform_deletion', return_value="error")
     expid_value = as_exp.expid if expid_value == "as_exp.expid" else expid_value
     if expid_value in ["..", "", ".", " "]:
-        with pytest.raises(AutosubmitCritical) as exc_info:
+        with pytest.raises(AutosubmitCritical):
             _delete_expid(expid_value, force=True)
-            assert exc_info.value.code == 7001
     else:
         with pytest.raises(AutosubmitError):
             _delete_expid(as_exp.expid, force=True)
