@@ -138,6 +138,20 @@ JobDataTable = Table(
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
+"""Table that holds the Historical structure of the experiment jobs."""
+StructureDataTable = Table(
+    "structure_data",
+    metadata_obj,
+    Column("run_id", Integer, ForeignKey("experiment_run.run_id"), nullable=False, primary_key=True, index=True),
+    Column("e_from", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True, index=True),
+    Column("e_to", String, ForeignKey("jobs.job_name"), nullable=False, primary_key=True, index=True),
+    Column("min_trigger_status", String),
+    Column("completion_status", String),
+    Column("from_step", Integer),
+    Column("fail_ok", Boolean),
+    UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
+)
+
 # TODO this doesn't work in POSTGRESQL
 # JobStatusEnum = Enum(
 #     "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING",
@@ -262,6 +276,7 @@ GENERALTABLES = (
     ExperimentRunTable,
     DBVersionTable,
     JobDataTable,
+    StructureDataTable,
     DetailsTable,
     UserMetricsTable,
 )

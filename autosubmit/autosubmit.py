@@ -1786,12 +1786,10 @@ class Autosubmit:
         :param expid: a string with the experiment id.
         :return: an ExperimentHistory object.
         """
-
         exp_history = ExperimentHistory(expid)
         if len(job_changes_tracker) > 0:
             exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
             Autosubmit.database_backup(expid)
-        return exp_history
 
     @staticmethod
     def prepare_run(
@@ -2103,8 +2101,7 @@ class Autosubmit:
                             for job in [job for job in job_list.get_job_list() if job.prev_status is not None and job.prev_status != job.status]:
                                 job_changes_tracker[job.name] = (Status.VALUE_TO_KEY[job.prev_status], Status.VALUE_TO_KEY[job.status])
 
-                            exp_history = Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker,
-                                                                                       expid)
+                            Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
                         except BaseException:
                             Log.printlog("Historic database seems corrupted, AS will repair it and resume the run",
                                          Log.INFO)
@@ -2202,13 +2199,7 @@ class Autosubmit:
                         p.cleanup_event.set()  # Send cleanup event
                         p.log_recovery_process.join()
 
-                try:
-                    exp_history = ExperimentHistory(expid)
-                    if exp_history:
-                        exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
-                        Autosubmit.database_backup(expid)
-                except Exception as e:
-                    Log.warning(f"{str(e)}")
+                Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
 
                 for p in platforms_to_test:
                     p.close_connection()
@@ -2219,10 +2210,8 @@ class Autosubmit:
                     if profile:
                         profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))
                     # Updating finish time for job data header
-                    # Database is locked, may be related to my local db todo 4.1.1
                     try:
-                        if exp_history is not None:
-                            exp_history.finish_current_experiment_run()
+                        Autosubmit.finish_current_experiment_run(expid)
                     except Exception:
                         Log.warning("Database is locked")
                 rocrate_data = as_conf.experiment_data.get("ROCRATE", None)
@@ -2245,6 +2234,17 @@ class Autosubmit:
             if len(job_list.get_failed_from_db()) > 0:
                 return 1
         return 0
+
+    @staticmethod
+    def finish_current_experiment_run(expid):
+        """Update the finish time of the current experiment run in the database.
+
+        :param expid: a string with the experiment id
+        :return: None
+        """
+        exp_history = ExperimentHistory(expid)
+        exp_history.save_structure_data()
+        exp_history.finish_current_experiment_run()
 
     # TODO: move to utils
     @staticmethod
