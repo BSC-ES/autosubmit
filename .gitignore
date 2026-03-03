@@ -27,9 +27,3 @@ dockerfiles/id_rsa*
 dockerfiles/authorized_keys
 
 venv/
-.github/agents/
-.github/plans/
-.github/skills/
-
-prov-implementation/
-
