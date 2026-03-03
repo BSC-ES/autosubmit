@@ -37,44 +37,31 @@ from pyparsing import nested_expr
 from ruamel.yaml import YAML
 
 # ---------------------------------------------------------------------------
-# Optional yaml-provenance integration
+# yaml-provenance integration
 # ---------------------------------------------------------------------------
-# When yaml-provenance is installed (see yamlparser.py for install notes)
 # WithProvenance leaf values (StrWithProvenance, IntWithProvenance, etc.) are
 # transparent subclasses of their native types and carry provenance metadata
-# independently. No container-level changes are needed here.
-# The flag is kept so get_value_provenance() can guard its behaviour, and
-# _ProvenanceJSONEncoder is used in get_full_config_as_json().
+# independently.  No container-level changes are needed here.
+# ProvenanceJSONEncoder is used in get_full_config_as_json().
 #
 # _wrap_with_source() / _wrap_dict_with_source() annotate programmatically
 # injected values (BasicConfig props, environment vars, computed HPC params,
 # git commit) so they appear with meaningful comments in experiment_data.yml
 # instead of "# no provenance".
 # ---------------------------------------------------------------------------
-try:
-    from yaml_provenance import (
-        wrap_computed,
-        transfer_provenance,
-        annotate_dict,
-        ProvenanceJSONEncoder as _LibProvenanceJSONEncoder,
-    )
-    _HAS_YAML_PROVENANCE = True
-except ImportError:
-    wrap_computed = None           # type: ignore[assignment]
-    transfer_provenance = None     # type: ignore[assignment]
-    annotate_dict = None           # type: ignore[assignment]
-    _LibProvenanceJSONEncoder = None  # type: ignore[assignment]
-    _HAS_YAML_PROVENANCE = False
+from yaml_provenance import (
+    wrap_computed,
+    transfer_provenance,
+    annotate_dict,
+    ProvenanceJSONEncoder as _ProvenanceJSONEncoder,
+)
 
 
 def _wrap_with_source(value: Any, source: str) -> Any:
     """Wrap *value* with provenance pointing to *source*.
 
-    Thin wrapper around ``yaml_provenance.wrap_computed`` that gracefully
-    degrades when the library is not installed.
+    Thin wrapper around ``yaml_provenance.wrap_computed``.
     """
-    if not _HAS_YAML_PROVENANCE:
-        return value
     try:
         return wrap_computed(value, source)
     except Exception:
@@ -84,30 +71,17 @@ def _wrap_with_source(value: Any, source: str) -> Any:
 def _preserve_prov(original: Any, result: Any) -> Any:
     """Return *result* with *original*'s provenance re-attached.
 
-    Thin wrapper around ``yaml_provenance.transfer_provenance`` that
-    gracefully degrades when the library is not installed.
+    Thin wrapper around ``yaml_provenance.transfer_provenance``.
     """
-    if not _HAS_YAML_PROVENANCE:
-        return result
     return transfer_provenance(original, result)
 
 
 def _wrap_dict_with_source(d: dict, source_prefix: str) -> dict:
     """Wrap every scalar leaf of *d* with per-key provenance.
 
-    Thin wrapper around ``yaml_provenance.annotate_dict`` that gracefully
-    degrades when the library is not installed.
+    Thin wrapper around ``yaml_provenance.annotate_dict``.
     """
-    if not _HAS_YAML_PROVENANCE:
-        return d
     return annotate_dict(d, source_prefix)
-
-
-# For JSON serialization — use library encoder or fallback to standard
-if _HAS_YAML_PROVENANCE:
-    _ProvenanceJSONEncoder = _LibProvenanceJSONEncoder
-else:
-    _ProvenanceJSONEncoder = json.JSONEncoder
 
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -293,10 +267,9 @@ class AutosubmitConfig(object):
         are present only when ``ProvenanceConfig(track_history=True)`` is set
         (which is the default in ``yamlparser.py``).
 
-        Returns an empty list when the value is not found, when
-        ``yaml-provenance`` is not installed, or when the value is a plain
-        Python object without provenance metadata (e.g. a value that was
-        synthesised internally rather than read from a file).
+        Returns an empty list when the value is not found or when the value
+        is a plain Python object without provenance metadata (e.g. a value
+        that was synthesised internally rather than read from a file).
 
         Usage example::
 
@@ -311,8 +284,6 @@ class AutosubmitConfig(object):
         :return: List of provenance dicts (empty when unavailable).
         :rtype: list[dict]
         """
-        if not _HAS_YAML_PROVENANCE:
-            return []
         value = self.get_section(section)
         provenance = getattr(value, "provenance", None)
         if provenance is None:
@@ -2194,16 +2165,11 @@ class AutosubmitConfig(object):
 
             try:
                 with open(self.metadata_folder.joinpath("experiment_data.yml"), 'w') as stream:
-                    if _HAS_YAML_PROVENANCE:
-                        # dump_yaml writes inline provenance comments (file/line/col)
-                        # and correctly serialises NoneWithProvenance as empty YAML
-                        # values rather than ruamel anchor/alias references (*id001).
-                        from yaml_provenance import dump_yaml
-                        dump_yaml(self.experiment_data, stream=stream)
-                    else:
-                        # Fallback: plain ruamel dump (no provenance annotations).
-                        # Not using typ="safe" to preserve readability.
-                        YAML().dump(self.experiment_data, stream)
+                    # dump_yaml writes inline provenance comments (file/line/col)
+                    # and correctly serialises NoneWithProvenance as empty YAML
+                    # values rather than ruamel anchor/alias references (*id001).
+                    from yaml_provenance import dump_yaml
+                    dump_yaml(self.experiment_data, stream=stream)
                 self.metadata_folder.joinpath("experiment_data.yml").chmod(0o755)
             except Exception as e:
                 Log.warning(f"Failed to save experiment_data.yml: {str(e)}")

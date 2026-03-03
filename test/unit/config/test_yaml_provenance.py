@@ -17,10 +17,6 @@
 
 """Tests for the yaml-provenance integration in ``yamlparser.py`` and the
 module-level helper functions in ``configcommon.py``.
-
-Every test that requires the ``yaml-provenance`` library is guarded with the
-``requires_yaml_provenance`` marker defined in the config conftest so that
-the test suite degrades gracefully when the library is not installed.
 """
 
 import json
@@ -29,7 +25,6 @@ from pathlib import Path
 import pytest
 
 from autosubmit.config.configcommon import (
-    _HAS_YAML_PROVENANCE,
     _preserve_prov,
     _ProvenanceJSONEncoder,
     _wrap_dict_with_source,
@@ -37,15 +32,12 @@ from autosubmit.config.configcommon import (
 )
 from autosubmit.config.yamlparser import YAMLParser
 
-from test.unit.config.conftest import requires_yaml_provenance
-
 
 # ---------------------------------------------------------------------------
 # YAMLParser.load() — provenance path
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestYAMLParserProvenance:
     """Verify that ``YAMLParser.load()`` returns provenance-bearing values."""
 
@@ -98,27 +90,11 @@ class TestYAMLParserProvenance:
         assert hasattr(deep_val, "provenance")
 
 
-class TestYAMLParserFallback:
-    """Verify fallback behaviour when provenance is unavailable."""
-
-    def test_fallback_returns_plain_dict(self, tmp_path, mocker):
-        mocker.patch("autosubmit.config.yamlparser._HAS_YAML_PROVENANCE", False)
-        yaml_file = tmp_path / "plain.yml"
-        yaml_file.write_text("FOO: bar\n")
-        parser = YAMLParser()
-        data = parser.load(yaml_file)
-
-        assert isinstance(data, dict)
-        assert data["FOO"] == "bar"
-        assert not hasattr(data["FOO"], "provenance")
-
-
 # ---------------------------------------------------------------------------
 # _wrap_with_source()
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestWrapWithSource:
     def test_wraps_string(self):
         result = _wrap_with_source("hello", "computed:FOO")
@@ -136,19 +112,12 @@ class TestWrapWithSource:
         assert result == 42
         assert result.provenance[-1]["yaml_file"] == "computed:BAR"
 
-    def test_degrades_without_library(self, mocker):
-        mocker.patch("autosubmit.config.configcommon._HAS_YAML_PROVENANCE", False)
-        result = _wrap_with_source("hello", "computed:FOO")
-        assert result == "hello"
-        assert not hasattr(result, "provenance")
-
 
 # ---------------------------------------------------------------------------
 # _preserve_prov()
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestPreserveProv:
     def test_transfers_metadata_on_upper(self):
         original = _wrap_with_source("hello", "src:file.yml")
@@ -174,7 +143,6 @@ class TestPreserveProv:
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestWrapDictWithSource:
     def test_wraps_flat_dict(self):
         d = {"A": 1, "B": "two"}
@@ -194,20 +162,12 @@ class TestWrapDictWithSource:
         assert inner_val == "val"
         assert hasattr(inner_val, "provenance")
 
-    def test_degrades_without_library(self, mocker):
-        mocker.patch("autosubmit.config.configcommon._HAS_YAML_PROVENANCE", False)
-        d = {"X": 10}
-        result = _wrap_dict_with_source(d, "prefix")
-        assert result["X"] == 10
-        assert not hasattr(result["X"], "provenance")
-
 
 # ---------------------------------------------------------------------------
 # _ProvenanceJSONEncoder
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestProvenanceJSONEncoder:
     def test_encodes_with_provenance_value(self):
         wrapped = _wrap_with_source("hello", "computed:TEST")
