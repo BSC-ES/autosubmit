@@ -17,37 +17,26 @@
 
 
 from ruamel.yaml import YAML
+from yaml_provenance import (
+    load_yaml,
+    configure,
+    ProvenanceConfig,
+    register_pickle_reducers,
+    register_yaml_representers,
+)
 
 # ---------------------------------------------------------------------------
-# Optional yaml-provenance integration
+# yaml-provenance integration
 # ---------------------------------------------------------------------------
-# When the ``yaml-provenance`` library is installed every value loaded from a
-# YAML file becomes a ``WithProvenance`` subclass of its native type (str, int,
-# …).  This means any downstream code can inspect *which* file, line and column
-# a value originated from without any changes to the rest of Autosubmit.
+# Every value loaded from a YAML file becomes a ``WithProvenance`` subclass of
+# its native type (str, int, …).  This means any downstream code can inspect
+# *which* file, line and column a value originated from without any changes to
+# the rest of Autosubmit.
 #
-# Install (from the feature branch until merged to main):
-#   pip install "yaml-provenance @ git+https://github.com/esm-tools/yaml-provenance.git@feat/yaml_dumper"
-#
-# If the library is not installed, loading falls back silently to the standard
-# ruamel.yaml behaviour so nothing breaks.
+# Enable full provenance history so merges across multiple YAML files preserve
+# a complete chain of origin information.
 # ---------------------------------------------------------------------------
-try:
-    from yaml_provenance import (
-        load_yaml,
-        configure,
-        ProvenanceConfig,
-        register_pickle_reducers,
-        register_yaml_representers,
-    )
-
-    # Enable full provenance history so merges across multiple YAML files
-    # preserve a complete chain of origin information.
-    configure(ProvenanceConfig(track_history=True))
-
-    _HAS_YAML_PROVENANCE = True
-except ImportError:
-    _HAS_YAML_PROVENANCE = False
+configure(ProvenanceConfig(track_history=True))
 
 
 class YAMLParserFactory:

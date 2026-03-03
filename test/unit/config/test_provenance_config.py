@@ -32,7 +32,6 @@ from autosubmit.config.configcommon import (
     _preserve_prov,
     _wrap_with_source,
 )
-from test.unit.config.conftest import requires_yaml_provenance
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +59,6 @@ def _has_provenance(value, expected_source: str = None) -> bool:
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestGetValueProvenance:
     """Tests for ``AutosubmitConfig.get_value_provenance()``."""
 
@@ -92,23 +90,12 @@ class TestGetValueProvenance:
         prov = as_conf.get_value_provenance(["NONEXISTENT"])
         assert prov == []
 
-    def test_returns_empty_without_library(self, autosubmit_config, mocker):
-        mocker.patch("autosubmit.config.configcommon._HAS_YAML_PROVENANCE", False)
-        experiment_data = {
-            "EXPERIMENT": {
-                "DATELIST": _wrap_with_source("20000101", "expdef.yml"),
-            }
-        }
-        as_conf = autosubmit_config(expid="t000", experiment_data=experiment_data)
-        assert as_conf.get_value_provenance(["EXPERIMENT", "DATELIST"]) == []
-
 
 # ---------------------------------------------------------------------------
 # deep_normalize() — provenance preservation
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestDeepNormalizeProvenance:
     """Verify that ``deep_normalize()`` preserves provenance on keys and values."""
 
@@ -145,7 +132,6 @@ class TestDeepNormalizeProvenance:
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestDictReplaceValueProvenance:
     """Verify that ``dict_replace_value()`` preserves provenance."""
 
@@ -194,7 +180,6 @@ class TestDictReplaceValueProvenance:
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestNormalizeNotifyOnProvenance:
     def test_split_tokens_carry_provenance(self, autosubmit_config):
         notify_str = _wrap_with_source("completed, failed", "src:jobs.yml")
@@ -216,7 +201,6 @@ class TestNormalizeNotifyOnProvenance:
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestNormalizeDependenciesProvenance:
     def test_string_deps_uppercased_with_provenance(self, autosubmit_config):
         deps = _wrap_with_source("ini sim", "src:jobs.yml")
@@ -249,7 +233,6 @@ class TestNormalizeDependenciesProvenance:
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestNormalizeJobsSectionProvenance:
     def test_file_preserves_provenance(self, autosubmit_config):
         file_val = _wrap_with_source("templates/sim.sh", "src:jobs.yml")
@@ -291,7 +274,6 @@ class TestNormalizeJobsSectionProvenance:
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestLoadEnvVariablesProvenance:
     def test_env_vars_carry_provenance(self, monkeypatch):
         monkeypatch.setenv("AS_ENV_TEST_VAR", "my_value")
@@ -318,7 +300,6 @@ class TestLoadEnvVariablesProvenance:
 # ---------------------------------------------------------------------------
 
 
-@requires_yaml_provenance
 class TestSaveWithProvenance:
     def test_save_writes_provenance_comments(self, autosubmit_config, tmp_path, monkeypatch):
         """When yaml-provenance is installed, ``save()`` should write inline
@@ -343,23 +324,3 @@ class TestSaveWithProvenance:
         content = yml_file.read_text()
         # dump_yaml writes provenance as end-of-line comments
         assert "expdef_t000.yml" in content
-
-    def test_save_fallback_without_library(self, autosubmit_config, tmp_path, mocker, monkeypatch):
-        """When yaml-provenance is NOT installed, ``save()`` should still write
-        a valid YAML file (without provenance comments)."""
-        monkeypatch.setenv("USER", Path(tmp_path).owner())
-        mocker.patch("autosubmit.config.configcommon._HAS_YAML_PROVENANCE", False)
-        experiment_data = {"DEFAULT": {"HPCARCH": "LOCAL"}}
-        as_conf = autosubmit_config(
-            expid="t000", experiment_data=experiment_data, include_basic_config=False
-        )
-        as_conf.experiment_data["ROOTDIR"] = str(
-            Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_conf.expid
-        )
-        as_conf.save()
-
-        yml_file = Path(as_conf.metadata_folder) / "experiment_data.yml"
-        assert yml_file.exists()
-        content = yml_file.read_text()
-        # Should contain config values but NOT provenance comments
-        assert "LOCAL" in content
