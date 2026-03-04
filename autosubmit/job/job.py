@@ -2439,8 +2439,6 @@ class Job(object):
             template_content, parameters, as_conf, self.undefined_variables
         )
 
-        if self.debug:
-            self._check_is_well_formed(template_content)
 
         script_name = f'{self.name}.cmd'
         self.script_name = script_name
@@ -2448,6 +2446,11 @@ class Job(object):
         with open(script_path, 'wb') as f:
             f.write(template_content.encode(lang))
         Path(script_path).chmod(0o755)
+
+        # Added here so the user can check the generated script
+
+        if self.debug:
+            self._check_is_well_formed(template_content, script_path)
         return script_name
 
     def _is_valid_python(self, content: str) -> bool:
@@ -2495,19 +2498,26 @@ class Job(object):
 
         return result.returncode == 0
 
-    def _check_is_well_formed(self, content: str) -> None:
+    def _check_is_well_formed(self, content: str, script_path: Path = None) -> None:
         """Check if the script content is syntactically correct depending on the language specified.
 
         :param content: The script content to check.
         :type content: str
+        :param script_path: The path to the generated script file.
+        :type script_path: Path
         :raises ValueError: If there are unsubstituted placeholders in the content.
         """
-        if self.type == Language.PYTHON2 or self.type == Language.PYTHON3 or self.type == Language.PYTHON:
-            self._is_valid_python(content)
-        elif self.type == Language.R:
-            self._is_valid_r(content)
-        elif self.type == Language.BASH:
-            self._is_valid_bash(content)
+        try:
+            if self.type == Language.PYTHON2 or self.type == Language.PYTHON3 or self.type == Language.PYTHON:
+                self._is_valid_python(content)
+            elif self.type == Language.R:
+                self._is_valid_r(content)
+            elif self.type == Language.BASH:
+                self._is_valid_bash(content)
+        except AutosubmitCritical as e:
+            if script_path:
+                e.message += f". Generated scripts are located in file://{script_path.parent} the current file is {script_path.name}"
+            raise e
 
     def _substitute_placeholders(
             self,
