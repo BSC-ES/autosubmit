@@ -44,6 +44,28 @@ The important part of this error is the message ``'%' must be followed by '%'``.
 This library is included in the python common libraries, so you shouldn't have any other version of it installed in your environment. Execute ``pip list``, if you see
 ``configparser`` in the list, then run ``pip uninstall configparser``. Then, try to create your experiment again.
 
+How to check if my script is syntactically correct for autosubmit
+==================================================================
+
+*Explanation*: If you are trying to use a script that is not compatible with autosubmit, it will fail to run.
+*Solution*: You can check if your script is compatible with autosubmit by running the following command: ``autosubmit inspect -f -q <EXPID>`` for jobs that run under ``DEBUG``.
+
+.. code-block:: yaml
+
+    JOBS:
+        JOB:
+            FILE: <path_to_your_script>
+            DEBUG: True  # This will check if your script is compatible with autosubmit and will print any errors.
+
+Example output of the command:
+
+.. code-block:: none
+
+    [CRITICAL] Syntax error in generated Python script for job t006_LOCAL_SETUP: unexpected indent (<string>, line 45) [eCode=7014]
+
+
+
+
 Other possible errors
 =====================
 
