@@ -37,6 +37,7 @@ from pyparsing import nested_expr
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.db_common import get_experiment_description
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 
@@ -401,7 +402,7 @@ class AutosubmitConfig(object):
                     normalized_data[normalized_key] = val
         return normalized_data
 
-    def deep_update(self, unified_config, new_dict):
+    def deep_update(self, unified_config: dict, new_dict: dict) -> dict:
         """Update a nested dictionary or similar mapping.
         Modify ``source`` in place.
         """
@@ -446,10 +447,8 @@ class AutosubmitConfig(object):
         if "HPCARCH" in default_section:
             data_fixed["DEFAULT"]["HPCARCH"] = default_section["HPCARCH"].upper()
         if "CUSTOM_CONFIG" in default_section:
-            try:
+            with suppress(Exception):
                 data_fixed["DEFAULT"]["CUSTOM_CONFIG"] = self.convert_list_to_string(default_section["CUSTOM_CONFIG"])
-            except Exception:
-                pass
 
     @staticmethod
     def _normalize_jobs_in_wrapper(
@@ -465,7 +464,7 @@ class AutosubmitConfig(object):
         :param wrapper: The name of the wrapper being normalized.
         :param wrapper_data: The data dictionary for the specific wrapper.
         :param job_sections: The valid job section names to check against.
-        :param raise_exception: If true, raise exception on errors. It is only True after all data is loaded.
+        :param raise_exception: If true, raise an exception on errors. It is only True after all data is loaded.
         :return: None
         """
         jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", None)
@@ -893,7 +892,7 @@ class AutosubmitConfig(object):
         if in_the_end:
             dynamic_variables.update(self.special_dynamic_variables)
         if parameters is None:
-            parameters = self.deep_parameters_export(self.experiment_data, self.default_parameters)
+            parameters = self.deep_parameters_export(self.experiment_data)
 
         if dict_keys_type == '':
             dict_keys_type = self.check_dict_keys_type(parameters)
@@ -1766,6 +1765,8 @@ class AutosubmitConfig(object):
                 starter_conf = self.unify_conf(starter_conf, self.load_config_file(starter_conf, Path(filename)))
             starter_conf = self.load_as_env_variables(starter_conf)
             starter_conf = self.load_common_parameters(starter_conf)
+            db_parameters = self._load_database_parameters()
+            self.deep_update(starter_conf, db_parameters)
             self.starter_conf = starter_conf
             # Same data without the minimal config ( if any ), need to be here due to current_loaded_files variable
             non_minimal_conf = {}
@@ -2001,9 +2002,9 @@ class AutosubmitConfig(object):
         return experiment_data
 
     @staticmethod
-    def deep_parameters_export(data, default_parameters):
+    def deep_parameters_export(data):
         """Export all variables of this experiment.
-        Resultant format will be Section.{subsections1...subsectionN} = Value.
+        The resultant format will be Section.{subsections1...subsectionN} = Value.
         In other words, it plain the dictionary into one level.
         """
         parameters_dict = dict()
@@ -2020,12 +2021,31 @@ class AutosubmitConfig(object):
 
         return parameters_dict
 
+    def _load_database_parameters(self) -> dict:
+        """Load data from the database to be exported in the parameters for jobs."""
+        # NOTE: at the moment this is the only bit of data loaded. If we need to load more,
+        #       it might be a good idea to think about a. better organizing the data layout,
+        #       b. using a single query instead of multiple, c. caching.
+        experiment_description: Union[str, list[list[str]]] = get_experiment_description(self.expid)
+        if experiment_description and experiment_description[0] and experiment_description[0][0]:
+            experiment_description = experiment_description[0][0]
+        else:
+            experiment_description = ''
+
+        return {
+            'DEFAULT': {
+                'DESCRIPTION': experiment_description
+            }
+        }
+
     def load_parameters(self):
         """Load all experiment data
         :return: a dictionary containing tuples [parameter_name, parameter_value]
         :rtype: dict
         """
-        return self.deep_parameters_export(self.experiment_data, self.default_parameters)
+        db_parameters = self._load_database_parameters()
+        self.deep_update(self.experiment_data, db_parameters)
+        return self.deep_parameters_export(self.experiment_data)
 
     def load_platform_parameters(self):
         """Load parameters from platform config files.
@@ -2750,7 +2770,7 @@ class AutosubmitConfig(object):
                 (branch is not None and len(str(branch)) > 0) or (commit is not None and len(str(commit)) > 0))
 
     def parse_githooks(self) -> None:
-        """Parse githooks section in configuration file."""
+        """Parse githooks section in the configuration file."""
         proj_dir = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_PROJ_DIR)
         # get project_name
@@ -2777,7 +2797,7 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def get_parser(parser_factory, file_path):
-        """Gets parser for given file.
+        """Gets parser for the given file.
 
         :param parser_factory:
         :param file_path: path to file to be parsed
