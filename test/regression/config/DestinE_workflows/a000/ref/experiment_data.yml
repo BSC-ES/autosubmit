@@ -1176,6 +1176,7 @@ DEFAULT:
   CUSTOM_CONFIG: /appl/AS/AUTOSUBMIT_DATA/a1sr/proj/git_project/conf/bootstrap/
   EXPID: a1sr
   HPCARCH: MARENOSTRUM5
+  DESCRIPTION: 'test experiment'
 ENERGY_OFFSHORE:
   '1':
     GSVREQUEST:
