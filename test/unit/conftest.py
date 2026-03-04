@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -258,3 +258,13 @@ def next_job_id() -> Callable[[], int]:
         return job_id
 
     return _next_job_id
+
+
+@pytest.fixture(scope='session', autouse=True)
+def experiment_config_fixture(session_mocker):
+    # TODO: There are unit tests that fail without this fixture. Those unit tests are good candidates
+    #       to be rewritten or made into integration tests without mocks.
+    session_mocker.patch(
+        'autosubmit.config.configcommon.get_experiment_description',
+        return_value=[['test experiment']]
+    )

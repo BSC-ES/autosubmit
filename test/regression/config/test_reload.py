@@ -242,13 +242,13 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
         as_conf.experiment_data.pop(key, None)
         reference_experiment_data.pop(key, None)
 
-    parameters = as_conf.deep_parameters_export(as_conf.experiment_data, as_conf.default_parameters)
+    parameters = as_conf.deep_parameters_export(as_conf.experiment_data)
     for key in list(parameters.keys()):
         # TODO added in this branch, so it is not in the reference file, the model.NAME has to not be hardcoded
         if key.endswith(".NAME") and not key.startswith("MODEL"):
             parameters.pop(key)
 
-    parameters_ref = as_conf.deep_parameters_export(reference_experiment_data, as_conf.default_parameters)
+    parameters_ref = as_conf.deep_parameters_export(reference_experiment_data)
     list_of_differences = check_differences(parameters, parameters_ref)
     basic_parameters = BasicConfig().props()
     # TODO Reference File has to be updated
@@ -266,7 +266,7 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
         for key, value, reference in list_of_differences:
             print(f"\n---Key---: {key}\n Value: {value}\n Reference: {reference}")
 
-    parameters = as_conf.deep_parameters_export(as_conf.experiment_data, as_conf.default_parameters)
+    parameters = as_conf.deep_parameters_export(as_conf.experiment_data)
 
     # Check that all parameters are being substituted
     parameters_values = ' '.join(map(str, parameters.values()))
