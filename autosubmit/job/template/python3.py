@@ -86,22 +86,23 @@ def as_header(platform_header: str, executable: str) -> str:
 
 
 def as_body(body: str) -> str:
-    return dedent(
-        f"""
-        ###################
-        # Autosubmit job
-        ###################
+    indented_body = "\n".join(f"    {line}" for line in body.splitlines())
 
-        try:
-            {body}
-        finally:
-            stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'a')
-            stat_file.write(f'{{int(time.time())}}\\n')
-            stat_file.close()
+    return dedent(f"""
+###################
+# Autosubmit job
+###################
 
-        # Now, we let the execution of the tailer happen, where the _COMPLETED
-        # file will be created.
-        """)
+try:
+    {indented_body}
+finally:
+    stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'a')
+    stat_file.write(f'{{int(time.time())}}\\n')
+    stat_file.close()
+
+# Now, we let the execution of the tailer happen, where the _COMPLETED
+# file will be created.
+""")
 
 
 def as_tailer() -> str:
