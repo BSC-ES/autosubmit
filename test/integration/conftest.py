@@ -26,7 +26,7 @@ from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import time_ns
-from typing import cast, Any, Callable, Generator, Iterator, Optional, Protocol, TYPE_CHECKING
+from typing import Any, Callable, Generator, Iterator, Optional, Protocol, TYPE_CHECKING
 
 import pytest
 from ruamel.yaml import YAML
@@ -300,7 +300,7 @@ def autosubmit_exp(
             platform=platform
         )
 
-    return cast(AutosubmitExperimentFixture, _create_autosubmit_exp)
+    return _create_autosubmit_exp
 
 
 @pytest.fixture
@@ -349,7 +349,7 @@ def ps_platform() -> PsPlatform:
 
 
 @pytest.fixture(scope='function')
-def ssh_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
+def ssh_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
     """Start a single Docker container serving SSH for integration tests."""
     container, ssh_port = get_ssh_container(mfa=False, x11=False)
     with container:
@@ -359,7 +359,7 @@ def ssh_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Cont
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
+def ssh_x11_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
     """Get a running SSH server with X11 enabled (no MFA)."""
     container, ssh_port = get_ssh_container(mfa=False, x11=True)
     with container:
@@ -369,7 +369,7 @@ def ssh_x11_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> '
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_mfa_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> 'Container':
+def ssh_x11_mfa_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') -> Generator['Container', Any, None]:
     """Get a running SSH server with X11 and MFA enabled."""
     container, ssh_port = get_ssh_container(mfa=True, x11=True)
     with container:
@@ -379,7 +379,7 @@ def ssh_x11_mfa_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') 
 
 
 @pytest.fixture(scope="function")
-def slurm_server(request, tmp_path, mocker) -> 'Container':
+def slurm_server(request, tmp_path, mocker) -> Generator['Container', Any, None]:
     """Session fixture that creates a singleton Slurm server container."""
     container, ssh_port = get_slurm_container()
     # TODO: Needed? If so, explain why.
@@ -462,7 +462,7 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
     os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc_file)
 
     if backend == 'postgres':
-        # Replace the backend by postgres (default is sqlite)
+        # Replace the backend with postgres (default is sqlite)
         user = postgres_server.env['POSTGRES_USER']
         password = postgres_server.env['POSTGRES_PASSWORD']
         port = postgres_server.ports[5432]
@@ -530,12 +530,14 @@ def setup_as_logs_pytest(tmp_path: 'LocalPath') -> None:
 
 
 def copy_content_from_containers(request, log_name, path_to_docker=""):
-    """Copy data from experiment from within the container to export"""
-    if request.session.testsfailed and request.node.funcargs[log_name]:
+    """Copy data from the experiment from within the container to export"""
+    has_failures = request.session.testsfailed
+    func_args = request.node.funcargs
+    if has_failures and log_name in func_args and func_args[log_name]:
         if log_name == 'git_server':
-            container_in_use: 'Container' = request.node.funcargs[log_name][0].get_wrapped_container()
+            container_in_use: 'Container' = func_args[log_name][0].get_wrapped_container()
         else:
-            container_in_use: 'Container' = request.node.funcargs[log_name]
+            container_in_use: 'Container' = func_args[log_name]
 
         if "No such file" not in str(container_in_use.exec_run(f"ls {path_to_docker}").output):
             stream = (container_in_use.get_archive(path_to_docker))[0]

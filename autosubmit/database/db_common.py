@@ -404,7 +404,7 @@ def _check_experiment_exists(name, error_on_inexistence=True):
     return True
 
 
-def get_experiment_description(expid: str):
+def get_experiment_description(expid: str) -> list[list[str]]:
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         return _get_experiment_description_sqlalchemy(expid)
 
@@ -421,6 +421,7 @@ def get_experiment_description(expid: str):
     conn.text_factory = str
     # get values
     cursor.execute(f"select description from experiment where name='{expid}'")
+    # TODO: This was updated AS-IS for Postgres, but it's probably better if we return an `str`.
     return [row for row in cursor]
 
 

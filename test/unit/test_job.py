@@ -170,7 +170,7 @@ class TestJob:
         assert initial_fail_count + 1 == incremented_fail_count
 
     @patch('autosubmit.config.basicconfig.BasicConfig')
-    def test_header_tailer(self, mocked_global_basic_config: Mock):
+    def test_header_tailer(self, mocked_global_basic_config: Mock, mocker):
         """Test if header and tailer are being properly substituted onto the final .cmd file without
         a bunch of mocks
 
@@ -350,7 +350,6 @@ CONFIG:
                         config.reload(True)
 
                         # act
-
                         parameters = config.load_parameters()
                         joblist_persistence = JobListPersistencePkl()
 

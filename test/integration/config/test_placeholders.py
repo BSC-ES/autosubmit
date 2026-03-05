@@ -42,11 +42,14 @@ def test_job_platform_is_a_placeholder(create_wrappers: bool, autosubmit_exp):
         },
         'JOBS': {
             'DN': {
-                'SCRIPT': 'echo "%DEFAULT.HPCARCH%"',
-                'PLATFORM': '%HPCOFFLINE_DN_PLATFORM%'
+                'SCRIPT': 'echo "%DEFAULT.HPCARCH% %DEFAULT.DESCRIPTION%"',
+                'PLATFORM': '%HPCOFFLINE_DN_PLATFORM%',
+                'EXPERIMENT_DESCRIPTION': '%default.description%'
             }
         }
     }, wrapper=create_wrappers)
 
-    assert exp.as_conf.jobs_data['DN']['SCRIPT'] == 'echo "MARENOSTRUM5"'
+    assert exp.as_conf.jobs_data['DN']['SCRIPT'].startswith('echo "MARENOSTRUM5')
+    assert 'Pytest' in exp.as_conf.jobs_data['DN']['SCRIPT']
     assert exp.as_conf.jobs_data['DN']['PLATFORM'].lower() == 'marenostrum5-transfer'
+    assert exp.as_conf.jobs_data['DN']['EXPERIMENT_DESCRIPTION'].lower().startswith('pytest')
