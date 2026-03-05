@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -99,7 +99,7 @@ def new_experiment(description, version, test=False, operational=False, evaluati
 
 def delete_experiment(expids: str, force: bool) -> bool:
     """Deletes an experiment from the database,
-    the experiment's folder database entry and all the related metadata files.
+    the experiment's folder database entry, and all the related metadata files.
 
     :param expids: List of experiment IDs to delete.
     :param force: Ask for confirmation if ``False``.
@@ -163,13 +163,8 @@ def _delete_expid(expid_delete: str, force: bool = False) -> None:
     If the current user is eadmin and the -f flag has been sent, it deletes regardless of experiment owner.
 
     :param expid_delete: Identifier of the experiment to delete.
-    :type expid_delete: str
     :param force: If True, does not ask for confirmation.
-    :type force: bool
-
     :returns: True if successfully deleted, False otherwise.
-    :rtype: bool
-
     :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
     """
 
@@ -319,14 +314,12 @@ def next_experiment_id(current_id):
     return next_id if is_valid_experiment_id(next_id) else ''
 
 
-def is_valid_experiment_id(name):
+def is_valid_experiment_id(name: str) -> bool:
     """
     Checks if it is a valid experiment identifier
 
     :param name: experiment identifier to check
-    :type name: str
-    :return: name if is valid, terminates program otherwise
-    :rtype: str
+    :return: ``True`` if it is valid, terminates the program otherwise
     """
     name = name.lower()
     if len(name) < 4 or not name.isalnum():
@@ -334,16 +327,13 @@ def is_valid_experiment_id(name):
     return True
 
 
-def base36encode(number, alphabet=string.digits + string.ascii_lowercase):
+def base36encode(number: int, alphabet: str=string.digits + string.ascii_lowercase) -> str:
     """
-    Convert positive integer to a base36 string.
+    Convert a positive integer to a base36 string.
 
-    :param number: number to convert
-    :type number: int
-    :param alphabet: set of characters to use
-    :type alphabet: str
-    :return: number's base36 string value
-    :rtype: str
+    :param number:Number to convert
+    :param alphabet: Set of characters to use
+    :return: Number's base36 string value
     """
     if not isinstance(number, int):
         raise TypeError('number must be an integer')
@@ -384,12 +374,12 @@ def create_required_folders(exp_id: str, exp_folder: Path) -> None:
 
     The newly created folders will be relative to the given experiment folder.
 
-    Each new folder with have the sme permission, ``755`` (important if you are
-    expecting something else, e.g. umask).
+    Each new folder with has the same permission, ``755`` (important if you are
+    expecting something else, e.g., umask).
 
-    :param exp_id: experiment identifier
-    :param exp_folder: experiment folder
-    :raises IOError: if there are errors creating the new experiment folders (permission, not found, etc.)
+    :param exp_id: Experiment identifier
+    :param exp_folder: Experiment folder
+    :raises IOError: If there are errors creating the new experiment folders (permission, not found, etc.)
     """
     dir_mode = 0o755
 
@@ -403,7 +393,7 @@ def create_required_folders(exp_id: str, exp_folder: Path) -> None:
 def check_ownership(expid: str, raise_error=False) -> tuple[bool, bool, Optional[str]]:
     """Check if the user owns and if it is eadmin.
 
-    :return: the owner, eadmin and current_owner
+    :return: The owner, eadmin, and current_owner
     """
     current_owner = None
     eadmin = False
