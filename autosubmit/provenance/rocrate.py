@@ -71,11 +71,16 @@ PROFILES = [
 # We need to convert those to string in order to serialize into JSON-LD.
 PARAMETER_TYPES_MAP = {
     'str': 'Text',
+    'ScalarString': 'Text',
     'int': 'Integer',
+    'ScalarInt': 'Integer',
     'float': 'Float',
+    'ScalarFloat': 'Float',
     'bool': 'Boolean',
     'dict': str,
-    'list': str
+    'CommentedMap': str,
+    'list': str,
+    'CommentedSeq': str,
 }
 
 # These are the default keys exported as FormalParameters automatically.
