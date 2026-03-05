@@ -59,11 +59,15 @@ _SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
 
 _GIT_DOCKER_IMAGE = 'githttpd/githttpd:latest'
 """The Git image used for tests where Autosubmit needs to clone a repository."""
+_SVN_DOCKER_IMAGE = 'elleflorio/svn-server:latest'
+"""The SVN image used for tests where Autosubmit needs to clone a repository."""
 
 _AS_SLURM_CONTAINER_LABEL = "pytest.slurm.singleton"
 """Docker container label key for Slurm singleton."""
 _AS_GIT_CONTAINER_LABEL = "pytest.git.singleton"
 """Docker container label key for Git singleton."""
+_AS_SVN_CONTAINER_LABEL = "pytest.svn.singleton"
+"""Docker container label key for SVN singleton."""
 _AS_SSH_CONTAINER_LABEL = "pytest.ssh.singleton"
 """Docker container label key for SSH singleton."""
 _AS_SSH_X11_CONTAINER_LABEL = "pytest.ssh_x11.singleton"
@@ -125,6 +129,54 @@ def get_git_container(git_repos_path: Path) -> tuple['DockerContainer', int]:
     http_port = get_free_port()
     # noinspection PyProtectedMember
     container_instance = _create_git_container(git_repos_path, http_port)
+    return container_instance, http_port
+
+
+def _create_svn_container(svn_repos_path: Path, http_port: int) -> DockerContainer:
+    """Start a Docker container with Git.
+
+    The repository will be available with the base name of the path given,
+    with the TCP/80 port mapped to the host ``http_port``.
+    """
+    docker_args = {
+        'labels': {
+            _AS_SVN_CONTAINER_LABEL: 'true',
+        }
+    }
+
+    docker_container = DockerContainer(
+        image=_SVN_DOCKER_IMAGE,
+        remove=True,
+        **docker_args
+    )
+
+    container = docker_container \
+        .with_bind_ports(80, http_port) \
+        .with_volume_mapping(str(svn_repos_path), '/home/svn', mode='rw')
+
+    # The docker image ``elleflorio/svn-server`` creates an HTTP server for SVN
+    # repositories, using the volume bound onto ``<TBC>`` as base
+    # for any subdirectory, the SVN URL becoming ``svn/{subdirectory-name}}``.
+    return container
+
+
+def prepare_and_test_svn_container(container: 'DockerContainer', http_port: int) -> None:
+    container.exec("htpasswd -b /etc/subversion/passwd svnadmin test")
+    container.exec("sed -i 's/= r/= rw/g' /etc/subversion/subversion-access-control")
+    container.exec("svnadmin create home/svn/svn-project")
+    container.exec("chown -R apache:apache /home/svn/svn-project")
+    container.exec("touch /home/svn/svn-project/LOCAL_SETUP.sh")
+    container.exec("touch /home/svn/svn-project/REMOTE_SETUP.sh")
+    container.exec("svn mkdir file:///home/svn/svn-project/trunk file:///home/svn/svn-project/branches file:///home/svn/svn-project/tags file:///home/svn/svn-project/LOCAL_SETUP.sh file:///home/svn/svn-project/REMOTE_SETUP.sh -m 'first commit'")
+
+    wait_for_tcp_port('localhost', http_port)
+
+
+def get_svn_container(svn_repos_path: Path) -> tuple['DockerContainer', int]:
+    """Get a running SVN container and its HTTP port."""
+    http_port = get_free_port()
+    # noinspection PyProtectedMember
+    container_instance = _create_svn_container(svn_repos_path, http_port)
     return container_instance, http_port
 
 

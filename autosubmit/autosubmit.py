@@ -4551,9 +4551,15 @@ class Autosubmit:
             Log.debug(f"The project folder {local_proj_dir} has been created.")
             Log.info(f"Checking out revision {svn_project_revision + ' ' + svn_project_url} into {local_proj_dir}")
             try:
-                output = subprocess.check_output("cd " + local_proj_dir + "; svn --force-interactive checkout -r " +
-                                                 svn_project_revision + " " + svn_project_url + " " +
-                                                 project_destination, shell=True)
+                cmd = ("cd " + local_proj_dir + "; svn --force-interactive checkout -r " + svn_project_revision + " " +
+                       svn_project_url + " " + project_destination)
+                user = as_conf.experiment_data.get("CUSTOM_CONFIG", "").get("USER")
+                if user is not None:
+                    cmd += " --username " + user
+                password = as_conf.experiment_data.get("CUSTOM_CONFIG", "").get("PASSWORD")
+                if password is not None:
+                    cmd += " --password " + password
+                output = subprocess.check_output(cmd, shell=True)
             except subprocess.CalledProcessError:
                 try:
                     shutil.rmtree(local_proj_dir, ignore_errors=True)
