@@ -21,7 +21,6 @@ import hashlib
 import locale
 import logging
 import os
-import random
 import re
 import select
 import socket
@@ -37,6 +36,7 @@ from typing import Optional, Union, TYPE_CHECKING
 
 import Xlib.support.connect as xlib_connect
 import paramiko
+from paramiko import SSHConfig
 from paramiko.agent import Agent
 from paramiko.ssh_exception import (SSHException)
 
@@ -146,14 +146,14 @@ class ParamikoPlatform(Platform):
         self._default_queue = None
         self.job_status: Optional[dict[str, list]] = None
         self._ssh: Optional[paramiko.SSHClient] = None
-        self._ssh_config = None
-        self._ssh_output = None
-        self._host_config = None
-        self._host_config_id = None
+        self._ssh_config: Optional['SSHConfig'] = None
+        self._ssh_output: Optional[str] = None
+        self._host_config: Optional[dict] = None
+        self._host_config_id: Optional[str] = None
         self.submit_cmd = ""
         self._ftpChannel: Optional[paramiko.SFTPClient] = None
         self.transport: Optional[paramiko.Transport] = None
-        self.channels = {}
+        self.channels: dict = dict()
         if sys.platform != "linux":
             self.poller = select.kqueue()
         else:
@@ -374,31 +374,25 @@ class ParamikoPlatform(Platform):
         :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
         :param log_recovery_process: Specifies if the call is made from the log retrieval process.
         """
+        timeout = 60
+        banner_timeout = 60
         try:
             self._init_local_x11_display()
 
-            is_current_real_user_owner = True if not as_conf else as_conf.is_current_real_user_owner
-
             ssh_config_path: Path = _get_user_config_file(
-                is_current_real_user_owner,
+                True if not as_conf else as_conf.is_current_real_user_owner,
                 self.config.get('AS_ENV_SSH_CONFIG_PATH', None),
                 self.config.get('AS_ENV_CURRENT_USER')
             )
 
             self._ssh_config = _load_ssh_config(ssh_config_path)
-
             self._ssh = _create_ssh_client()
-
             self._host_config = self._ssh_config.lookup(self.host)
-            if "," in self._host_config['hostname']:
-                if reconnect:
-                    self._host_config['hostname'] = random.choice(
-                        self._host_config['hostname'].split(',')[1:])
-                else:
-                    self._host_config['hostname'] = self._host_config['hostname'].split(',')[0]
-            if 'identityfile' in self._host_config:
-                self._host_config_id = self._host_config['identityfile']
+
+            self._host_config_id = None if 'identityfile' not in self._host_config \
+                                        else self._host_config['identityfile']
             port = int(self._host_config.get('port', 22))
+
             if not self.two_factor_auth:
                 # Agent Auth
                 if not self.agent_auth(port):
@@ -407,32 +401,34 @@ class ParamikoPlatform(Platform):
                         self._proxy = paramiko.ProxyCommand(self._host_config['proxycommand'])
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60,
-                                              banner_timeout=60)
+                                              key_filename=self._host_config_id, sock=self._proxy, timeout=timeout,
+                                              banner_timeout=banner_timeout)
                         except Exception as e:
                             Log.warning('SSH connect failed, will try again disabling RSA algorithms'
                                         f'sha-256 and sha-512, error: {str(e)}')
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60,
-                                              banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256',
-                                                                                                  'rsa-sha2-512']})
+                                              key_filename=self._host_config_id, sock=self._proxy, timeout=timeout,
+                                              banner_timeout=banner_timeout, disabled_algorithms={
+                                    'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                     else:
                         try:
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, timeout=60, banner_timeout=60)
+                                              key_filename=self._host_config_id, timeout=timeout,
+                                              banner_timeout=banner_timeout)
                         except Exception as e:
                             Log.warning(f'SSH connection to {self.user}@{self._host_config["hostname"]} -p {port} '
                                         f'failed (certificate: {self._host_config_id}), will try again '
                                         f'disabling RSA algorithms sha-256 and sha-512, error: {str(e)}')
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, timeout=60, banner_timeout=60,
+                                              key_filename=self._host_config_id, timeout=timeout,
+                                              banner_timeout=banner_timeout,
                                               disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                 self.transport = self._ssh.get_transport()
-                self.transport.banner_timeout = 60
+                self.transport.banner_timeout = banner_timeout
             else:
-                Log.warning("2FA is enabled, this is an experimental feature and it may not work as expected")
-                Log.warning("nohup can't be used as the password will be asked")
-                Log.warning("If you are using a token, please type the token code when asked")
+                Log.warning("2FA is enabled, this is an experimental feature and it may not work as expected"
+                            "\nnohup can't be used as the password will be asked"
+                            "\nIf you are using a token, please type the token code when asked")
                 if self.pw is None:
                     self.pw = getpass.getpass(f"Password for {self.name}: ")
                 if self.two_factor_method == "push":
@@ -446,7 +442,7 @@ class ParamikoPlatform(Platform):
                     raise
                 if self.transport.is_authenticated():
                     self._ssh._transport = self.transport
-                    self.transport.banner_timeout = 60
+                    self.transport.banner_timeout = banner_timeout
                 else:
                     self.transport.close()
                     raise SSHException
@@ -596,9 +592,9 @@ class ParamikoPlatform(Platform):
             # Remove file from remote if configured and checksum matches
             is_log_file = bool(re.match(r".*\.(out|err)(\.(xz|gz))?$", filename))
             if (
-                is_log_file
-                and self.remove_log_files_on_transfer
-                and self._checksum_validation(file_path, remote_path)
+                    is_log_file
+                    and self.remove_log_files_on_transfer
+                    and self._checksum_validation(file_path, remote_path)
             ):
                 try:
                     self._ftpChannel.remove(remote_path)
@@ -889,7 +885,7 @@ class ParamikoPlatform(Platform):
                 job_status = Status.UNKNOWN
         else:
             Log.error(
-                f" check_job(), job is not on the queue system. Output was: {self.get_check_job_cmd(job_id)}" )
+                f" check_job(), job is not on the queue system. Output was: {self.get_check_job_cmd(job_id)}")
             job_status = Status.UNKNOWN
             Log.error(
                 f'check_job() The job id ({job_id}) status is {job_status}.')
@@ -1683,7 +1679,7 @@ class ParamikoPlatform(Platform):
             Log.debug(f"Error getting file size for {src}: {str(e)}")
             return None
 
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: Optional[int] = None) -> Union[bytes, None]:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path

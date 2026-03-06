@@ -200,7 +200,7 @@ class Platform:
         self.two_factor_auth = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA", False)
         self.two_factor_method = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
         if not self.two_factor_auth:
-            self.pw = None
+            self.pw: Optional[str] = None
         elif auth_password is not None and self.two_factor_auth:
             if isinstance(auth_password, list):
                 self.pw = auth_password[0]
