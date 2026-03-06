@@ -216,12 +216,6 @@ def test_inspect(
 
 @pytest.mark.parametrize("additional_data", [
     (dedent(f"""\
-    EXPERIMENT:
-        NUMCHUNKS: '3'
-        CHUNKSIZE: '1'
-        CHUNKUNIT: 'month'
-        SPLITSIZE: '15'
-        SPLITSIZEUNIT: 'day'
     JOBS:
         test_auto:
             SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
@@ -231,14 +225,48 @@ def test_inspect(
             SPLITS: "auto"
             SPLITPOLICY: 'flexible'
     """)),
+    (dedent(f"""\
+    JOBS:
+        test_auto:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+            SPLITS: "auto"
+            SPLITPOLICY: 'flexible'
+            SPLITSIZE: '1'
+            SPLITSIZEUNIT: 'day'
+    """)),
+    (dedent(f"""\
+    JOBS:
+        test_auto:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+            SPLITS: "auto"
+            SPLITPOLICY: 'flexible'
+            SPLITSIZE: '1'
+            SPLITSIZEUNIT: 'hour'
+    """)),
+
 ], ids=[
-    "CALENDAR_SPLITS_AUTO_month(1)-days(5)",
+    "CALENDAR_SPLITS_AUTO_SPLITSIZE_15_DAY",
+    "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_DAY",
+    "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_HOUR",
 ])
 def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, Any], additional_data: str):
     """Test that auto splits are correctly calculated and injected in the script."""
 
     # init
     yaml = YAML(typ='rt')
+    general_data['EXPERIMENT'] = {
+        'NUMCHUNKS': '3',
+        'CHUNKSIZE': '1',
+        'CHUNKUNIT': 'month',
+        'SPLITSIZE': '15',
+        'SPLITSIZEUNIT': 'day',
+    }
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
     as_conf = as_exp.as_conf
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
