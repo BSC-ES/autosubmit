@@ -55,9 +55,11 @@ __all__ = [
     'get_mailhog_messages'
 ]
 
-_SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
+# Mirrored from Docker Hub: lscr.io/linuxserver/openssh-server:latest
+_SSH_DOCKER_IMAGE = 'ghcr.io/bsc-es/openssh-server:latest'
 """This is the vanilla image from LinuxServer.io, with OpenSSH. About 39MB."""
-_SSH_DOCKER_IMAGE_X11_MFA = 'autosubmit/linuxserverio-ssh-2fa-x11:latest'
+# Mirrored from Docker Hub: autosubmit/linuxserverio-ssh-2fa-x11:latest
+_SSH_DOCKER_IMAGE_X11_MFA = 'ghcr.io/bsc-es/linuxserverio-ssh-2fa-x11:latest'
 """This is our test image, built on top of LinuxServer.io's, but with MFA and X11. About 395MB."""
 _SSH_DOCKER_PASSWORD = 'password'
 """Common password used in SSH containers; we mock the SSH Client of Paramiko to avoid hassle with keys."""
@@ -65,7 +67,8 @@ _SSH_DOCKER_PASSWORD = 'password'
 _SLURM_DOCKER_IMAGE = 'giovtorres/slurm-docker:25.11.2-v0.1.7'
 """The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
 
-_GIT_DOCKER_IMAGE = 'githttpd/githttpd:latest'
+# Mirrored from Docker Hub: githttpd/githttpd:latest
+_GIT_DOCKER_IMAGE = 'ghcr.io/bsc-es/githttpd:latest'
 """The Git image used for tests where Autosubmit needs to clone a repository."""
 _SVN_DOCKER_IMAGE = 'elleflorio/svn-server:latest'
 """The SVN image used for tests where Autosubmit needs to clone a repository."""
