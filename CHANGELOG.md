@@ -2,7 +2,7 @@
 
 **Bug fixes:**
 
--
+- Fixes calendar splits issues with last split boundaries #2866 and last split not exported #2099.
 
 **Enhancements:**
 
