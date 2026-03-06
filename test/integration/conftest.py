@@ -531,7 +531,7 @@ def setup_as_logs_pytest(tmp_path: 'LocalPath') -> None:
 
 def copy_content_from_containers(request, log_name, path_to_docker=""):
     """Copy data from experiment from within the container to export"""
-    if request.session.testsfailed and request.node.funcargs[log_name]:
+    if request.session.testsfailed and log_name in request.node.funcargs and request.node.funcargs[log_name] is not None:
         if log_name == 'git_server':
             container_in_use: 'Container' = request.node.funcargs[log_name][0].get_wrapped_container()
         else:
