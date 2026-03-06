@@ -152,7 +152,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit'
+        '_log_recovered', 'packed_during_building', 'workflow_commit', '_debug'
     )
 
     def __setstate__(self, state):
@@ -248,7 +248,7 @@ class Job(object):
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False # type: bool
+        self.hold = False  # type: bool
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
@@ -302,6 +302,7 @@ class Job(object):
                                                             Status.PREPARED,
                                                             Status.READY] else \
                 self.status
+        self.debug = False
 
     def clean_attributes(self):
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
@@ -689,6 +690,16 @@ class Job(object):
     @notify_on.setter
     def notify_on(self, value):
         self._notify_on = value
+
+    @property
+    @autosubmit_parameter(name='debug')
+    def debug(self):
+        """Whether to print debug information about the job."""
+        return self._debug
+
+    @debug.setter
+    def debug(self, value):
+        self._debug = value
 
     def read_header_tailer_script(self, script_path: str, as_conf: AutosubmitConfig, is_header: bool):
         """
@@ -2143,6 +2154,7 @@ class Job(object):
             if self.checkpoint:  # To activate placeholder substitution per <empty> in the template
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
+            self.debug = parameters.get("CURRENT_DEBUG", False)
 
         parameters['JOBNAME'] = self.name
         parameters['FAIL_COUNT'] = str(self.fail_count)
@@ -2426,13 +2438,86 @@ class Job(object):
         template_content = self._substitute_placeholders(
             template_content, parameters, as_conf, self.undefined_variables
         )
+
+
         script_name = f'{self.name}.cmd'
         self.script_name = script_name
         script_path = Path(self._tmp_path) / script_name
         with open(script_path, 'wb') as f:
             f.write(template_content.encode(lang))
         Path(script_path).chmod(0o755)
+
+        # Added here so the user can check the generated script
+
+        if self.debug:
+            self._check_is_well_formed(template_content, script_path)
         return script_name
+
+    def _is_valid_python(self, content: str) -> bool:
+        """Check if the given content is valid Python code.
+
+        :param content: The script content to check.
+        :type content: str
+        :return: True if the content is valid Python code, False otherwise.
+        :rtype: bool
+        """
+        try:
+            compile(content, '<string>', 'exec')
+            return True
+        except (ValueError, SyntaxError) as e:
+            raise AutosubmitCritical(f"Syntax error in generated Python script for job {self.name}: {str(e)}", 7014)
+
+    def _is_valid_r(self, content: str) -> bool:
+        """Check if the given content is valid R code.
+
+        :param content: The script content to check.
+        :type content: str
+        :return: True if the content is valid R code, False otherwise.
+        :rtype: bool
+        """
+        Log.warning("Syntax check for R scripts is not implemented. Skipping syntax validation for R scripts.")
+        return True
+
+    def _is_valid_bash(self, content: str) -> bool:
+        """Check if the given content is valid Bash code.
+
+        :param content: The script content to check.
+        :type content: str
+        :return: True if the content is valid Bash code, False otherwise.
+        :rtype: bool
+        """
+        import subprocess
+        result = subprocess.run(
+            ['bash', '-n', '/dev/stdin'],
+            input=content,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode:
+            raise AutosubmitCritical(f"Syntax error in generated Bash script for job {self.name}: {result.stderr.strip()}", 7014)
+
+        return result.returncode == 0
+
+    def _check_is_well_formed(self, content: str, script_path: Path = None) -> None:
+        """Check if the script content is syntactically correct depending on the language specified.
+
+        :param content: The script content to check.
+        :type content: str
+        :param script_path: The path to the generated script file.
+        :type script_path: Path
+        :raises ValueError: If there are unsubstituted placeholders in the content.
+        """
+        try:
+            if self.type == Language.PYTHON2 or self.type == Language.PYTHON3 or self.type == Language.PYTHON:
+                self._is_valid_python(content)
+            elif self.type == Language.R:
+                self._is_valid_r(content)
+            elif self.type == Language.BASH:
+                self._is_valid_bash(content)
+        except AutosubmitCritical as e:
+            if script_path:
+                e.message += f". Generated scripts are located in file://{script_path.parent} the current file is {script_path.name}"
+            raise e
 
     def _substitute_placeholders(
             self,
