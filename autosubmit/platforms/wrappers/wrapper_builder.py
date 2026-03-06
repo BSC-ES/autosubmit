@@ -235,14 +235,14 @@ class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
         import os
         import flux
         import flux.job
+        import subprocess
         from pathlib import Path
 
         handle = flux.Flux()
         job_scripts={self.job_scripts}
         max_retries={self.retrials}
 
-        # TODO: [ENGINES] Debug info, remove later
-        import subprocess
+        # Debug info
         print(subprocess.check_output(["flux", "resource", "info"], text=True))
 
         for job_script in job_scripts:
@@ -316,13 +316,13 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
         import os
         import flux
         import flux.job
+        import subprocess
 
         handle = flux.Flux()
         job_scripts={self.job_scripts}
         job_ids = {{}}
 
-        # TODO: [ENGINES] Debug info, remove later
-        import subprocess
+        # Debug info
         print(subprocess.check_output(["flux", "resource", "info"], text=True))
 
         # Submit the jobs
@@ -331,7 +331,7 @@ class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
             jobspec.environment = os.environ.copy()
             job_ids[job_script] = flux.job.submit(handle, jobspec, waitable=True)
 
-            # TODO: [ENGINES] Debug info, remove later
+            # Debug info
             print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
             print("RESOURCES: " + str(jobspec.resources))
 
@@ -363,12 +363,12 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
         import os
         import flux
         import flux.job
+        import subprocess
         from threading import Thread
 
         job_scripts={self.job_scripts}
 
-        # TODO: [ENGINES] Debug info, remove later
-        import subprocess
+        # Debug info
         print(subprocess.check_output(["flux", "resource", "info"], text=True))
 
         class VerticalWrapperThread(Thread):
@@ -388,7 +388,7 @@ class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
                     completed_path = job_script.replace('.cmd', '_COMPLETED')
                     failed_path = job_script.replace('.cmd', '_FAILED')
 
-                    # TODO: [ENGINES] Debug info, remove later
+                    # Debug info
                     print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
                     print("RESOURCES: " + str(jobspec.resources))
 
@@ -426,13 +426,13 @@ class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
         import os
         import flux
         import flux.job
+        import subprocess
 
         handle = flux.Flux()
         job_scripts={self.job_scripts}
         job_ids = {{}}
 
-        # TODO: [ENGINES] Debug info, remove later
-        import subprocess
+        # Debug info
         print(subprocess.check_output(["flux", "resource", "info"], text=True))
 
         def run_horizontal_wrapper(jobs_list):
@@ -442,7 +442,7 @@ class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
                 jobspec.environment = os.environ.copy()
                 job_ids[job_script] = flux.job.submit(handle, jobspec, waitable=True)
 
-                # TODO: [ENGINES] Debug info, remove later
+                # Debug info
                 print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
                 print("RESOURCES: " + str(jobspec.resources))
 
