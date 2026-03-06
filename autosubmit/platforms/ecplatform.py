@@ -357,6 +357,7 @@ class EcPlatform(ParamikoPlatform):
         :return: List of job names with COMPLETED files.
         :rtype: List[str]
         """
+        # use ecaccess-mget
         final_job_names = []
         if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
             if not job_names:
@@ -376,6 +377,8 @@ class EcPlatform(ParamikoPlatform):
         :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
         :type job_names: List[str]
         """
+        # use ecaccess-mget
+
         if job_names:
             if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
                 job_name_str = ' -o -name '.join([f"'{name}_COMPLETED' -o -name '{name}_FAILED'" for name in job_names])
