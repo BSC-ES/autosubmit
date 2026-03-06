@@ -35,10 +35,18 @@ echo "HPCHOST=%HPCHOST%"
 echo "HPCCUSTOM_DIR=%HPCCUSTOM_DIR%"
 echo "HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR=%HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR%"
 """)
+
+_TEMPLATE_CONTENT_CALENDAR_SPLITS = dedent("""
+echo "SPLIT_START_DATE=%SPLIT_START_DATE%"
+echo "SPLIT_END_DATE=%SPLIT_SECOND_TO_LAST_DATE%"
+echo "CHUNK_START_DATE=%CHUNK_START_DATE%"
+echo "CHUNK_END_DATE=%CHUNK_END_DATE%"
+""")
+
 _TAB_SPACES = 4
 tabs = 4
 _SCRIPT_CONTENT = indent(_TEMPLATE_CONTENT, " " * tabs * _TAB_SPACES)
-
+_SCRIPT_CONTENT_CALENDAR_SPLITS = indent(_TEMPLATE_CONTENT_CALENDAR_SPLITS, " " * tabs * _TAB_SPACES)
 
 @pytest.mark.parametrize("additional_data", [
     (dedent(f"""\
@@ -195,3 +203,73 @@ def test_inspect(
             assert "HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR=OK" in content
             assert f"HPCROOTDIR={str(expected_hpcrootdir)}" in content
             assert f"HPCLOGDIR={str(expected_hpclogdir)}" in content
+
+
+@pytest.mark.parametrize("additional_data", [
+    (dedent(f"""\
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+        CHUNKSIZE: '1'
+        CHUNKUNIT: 'month'
+    JOBS:
+        test_auto:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+            SPLITS: "auto"
+            SPLITSIZE: '15'
+            SPLITUNIT: 'day'
+            SPLITPOLICY: 'strict'
+    """)),
+], ids=[
+    "CALENDAR_SPLITS_AUTO_month(1)-days(5)",
+])
+def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, Any], additional_data: str):
+    """Test that auto splits are correctly calculated and injected in the script."""
+
+    # init
+    yaml = YAML(typ='rt')
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
+    as_conf = as_exp.as_conf
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+
+    # Execute inspect
+    as_conf.set_last_as_command('inspect')
+    as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
+
+    # Parse result
+    splits_info = {}
+    for file in sorted(tmp_path.glob(f"{as_exp.expid}*.cmd")):
+        content = file.read_text()
+        parts = file.stem.split("_")
+        # e.g. t001_20000101_fc0_1_1_TEST_AUTO -> parts[3]=chunk, parts[4]=split
+        chunk = parts[3]
+        split = parts[4]
+        key = f"{chunk}_{split}"
+        split_start_date = content.split("SPLIT_START_DATE=")[1].splitlines()[0]
+        split_end_date = content.split("SPLIT_END_DATE=")[1].splitlines()[0]
+        chunk_start_date = content.split("CHUNK_START_DATE=")[1].splitlines()[0]
+        chunk_end_date = content.split("CHUNK_END_DATE=")[1].splitlines()[0]
+        splits_info[key] = {
+            "SPLIT_START_DATE": int(split_start_date.strip("'\"")),
+            "SPLIT_END_DATE": int(split_end_date.strip("'\"")),
+            "CHUNK_START_DATE": int(chunk_start_date.strip("'\"")),
+            "CHUNK_END_DATE": int(chunk_end_date.strip("'\"")),
+        }
+
+    assert splits_info, "No cmd files found"
+
+    lookup_errors = {}
+    # Assert that splits are correct
+    for key, info in splits_info.items():
+        split_start_date = info["SPLIT_START_DATE"]
+        split_end_date = info["SPLIT_END_DATE"]
+        chunk_start_date = info["CHUNK_START_DATE"]
+        chunk_end_date = info["CHUNK_END_DATE"]
+        if not (chunk_start_date < chunk_end_date and split_start_date < split_end_date and chunk_start_date <= split_start_date < split_end_date <= chunk_end_date):
+            lookup_errors[key] = info
+
+
+    assert not lookup_errors, f"Some splits have incorrect dates: {lookup_errors}"
