@@ -2,7 +2,7 @@
 
 **Bug fixes:**
 
--
+- Fixed issue with experiments running on LOCAL platform without a defined LOCAL entry in platforms.yml config file #1131
 
 **Enhancements:**
 

@@ -283,3 +283,69 @@ def test_is_valid_mail_address(email, expected):
             AutosubmitConfig.is_valid_mail_address(email)
     else:
         assert AutosubmitConfig.is_valid_mail_address(email) is expected
+
+
+def test_platforms_missing_hpcarch_local(autosubmit_config: "AutosubmitConfigFactory"):
+    """Test that if PLATFORMS is missing but DEFAULT.HPCARCH is LOCAL, we return an empty dictionary."""
+    as_conf: AutosubmitConfig = autosubmit_config(
+        expid="a000", experiment_data={"DEFAULT": {"HPCARCH": "LOCAL"}}
+    )
+    as_conf.experiment_data.pop("PLATFORMS", None)
+
+    assert as_conf.platforms_data == {}
+
+
+def test_platforms_missing_hpcarch_non_local(
+    autosubmit_config: "AutosubmitConfigFactory",
+):
+    """Test that if PLATFORMS is missing and DEFAULT.HPCARCH is not LOCAL, we raise an AutosubmitCritical."""
+    as_conf: AutosubmitConfig = autosubmit_config(
+        expid="a000", experiment_data={"DEFAULT": {"HPCARCH": "MARENOSTRUM5"}}
+    )
+    as_conf.experiment_data.pop("PLATFORMS", None)
+
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        _ = as_conf.platforms_data
+
+    assert exc_info.value.code == 7014
+    assert "PLATFORMS section not found in configuration file" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "platform_description",
+    [
+        {
+            "PYTEST-UNDEFINED": {
+                "host": "",
+                "user": "",
+                "project": "",
+                "scratch_dir": "",
+                "MAX_WALLCLOCK": "",
+                "DISABLE_RECOVERY_THREADS": True,
+            }
+        },
+        "not_a_dict",
+    ],
+)
+def test_platforms_not_dict(
+    autosubmit_config: "AutosubmitConfigFactory", platform_description
+):
+    """Test that if PLATFORMS is not a dictionary, we raise an AutosubmitCritical."""
+    as_conf: AutosubmitConfig = autosubmit_config(
+        expid="a000",
+        experiment_data={
+            "PLATFORMS": platform_description,
+            "DEFAULT": {"HPCARCH": "MARENOSTRUM5"},
+        },
+    )
+
+    if not isinstance(platform_description, dict):
+        with pytest.raises(AutosubmitCritical) as exc_info:
+            _ = as_conf.platforms_data
+
+        assert exc_info.value.code == 7014
+        assert "PLATFORMS section is malformed in configuration file" in str(
+            exc_info.value
+        )
+    else:
+        assert platform_description == as_conf.platforms_data
