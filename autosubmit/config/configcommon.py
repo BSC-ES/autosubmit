@@ -97,6 +97,10 @@ class AutosubmitConfig(object):
         try:
             return self.experiment_data["PLATFORMS"]
         except KeyError:
+            hpcarch = str(self.experiment_data.get("DEFAULT", {}).get("HPCARCH", "")).upper()
+            if hpcarch == "LOCAL":
+                # DEFAULT.HPCARCH is LOCAL and no defined platform
+                return {}
             raise AutosubmitCritical(
                 "PLATFORMS section not found in configuration file", 7014
             )
