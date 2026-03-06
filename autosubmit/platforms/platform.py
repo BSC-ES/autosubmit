@@ -22,6 +22,7 @@ import queue  # only for the exception
 import time
 import traceback
 from contextlib import suppress
+from multiprocessing.process import BaseProcess
 from multiprocessing.queues import Queue
 from multiprocessing.synchronize import Event
 # noinspection PyProtectedMember
@@ -41,7 +42,6 @@ if TYPE_CHECKING:
     from autosubmit.job.job import Job
     from autosubmit.job.job_list import JobList
     from autosubmit.job.job_package_persistence import JobPackagePersistence
-    from multiprocessing.process import BaseProcess
 
 
 def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
@@ -195,13 +195,10 @@ class Platform:
         self._checkhost_cmd = None
         self.cancel_cmd = None
         self.otp_timeout = None
-        self.two_factor_auth = None
         self.otp_timeout = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_TIMEOUT", 60 * 5)
         self.two_factor_auth = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA", False)
         self.two_factor_method = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
-        if not self.two_factor_auth:
-            self.pw = None
-        elif auth_password is not None and self.two_factor_auth:
+        if auth_password is not None and self.two_factor_auth:
             if isinstance(auth_password, list):
                 self.pw = auth_password[0]
             else:
@@ -737,7 +734,7 @@ class Platform:
         return False
 
     @autosubmit_parameter(name='current_logdir')
-    def get_files_path(self):
+    def get_files_path(self) -> str:
         """The platform's LOG directory.
 
         :return: platform's LOG directory
@@ -839,9 +836,9 @@ class Platform:
         This method sets the cleanup event to signal the log recovery process to finish,
         waits for the process to join with a timeout, and then resets all related variables.
         """
-        if self.cleanup_event is not None:
+        if self.cleanup_event:
             self.cleanup_event.set()  # Indicates to old child ( if reachable ) to finish.
-        if self.log_recovery_process is not None:
+        if self.log_recovery_process and self.log_recovery_process.is_alive():
             # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
             self.log_recovery_process.join(timeout=60)
         # Resets everything related to the log recovery process.
