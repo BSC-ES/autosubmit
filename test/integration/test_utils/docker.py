@@ -47,19 +47,19 @@ __all__ = [
     'stop_test_containers'
 ]
 
-_SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
+_SSH_DOCKER_IMAGE = 'ghcr.io/bsc-es/lscr.io/linuxserver/openssh-server:latest'
 """This is the vanilla image from LinuxServer.io, with OpenSSH. About 39MB."""
-_SSH_DOCKER_IMAGE_X11_MFA = 'autosubmit/linuxserverio-ssh-2fa-x11:latest'
+_SSH_DOCKER_IMAGE_X11_MFA = 'ghcr.io/bsc-es/autosubmit/linuxserverio-ssh-2fa-x11:latest'
 """This is our test image, built on top of LinuxServer.io's, but with MFA and X11. About 395MB."""
 _SSH_DOCKER_PASSWORD = 'password'
 """Common password used in SSH containers; we mock the SSH Client of Paramiko to avoid hassle with keys."""
 
-_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
+_SLURM_DOCKER_IMAGE = 'ghcr.io/bsc-es/autosubmit/slurm-openssh-container:25-05-0-1'
 """The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
 
-_GIT_DOCKER_IMAGE = 'githttpd/githttpd:latest'
+_GIT_DOCKER_IMAGE = 'ghcr.io/bsc-es/githttpd/githttpd:latest'
 """The Git image used for tests where Autosubmit needs to clone a repository."""
-_SVN_DOCKER_IMAGE = 'elleflorio/svn-server:latest'
+_SVN_DOCKER_IMAGE = 'ghcr.io/bsc-es/elleflorio/svn-server:latest'
 """The SVN image used for tests where Autosubmit needs to clone a repository."""
 
 _AS_SLURM_CONTAINER_LABEL = "pytest.slurm.singleton"
