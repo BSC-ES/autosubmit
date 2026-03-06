@@ -2062,10 +2062,10 @@ class Job(object):
             else:
                 parameters['SPLIT_FIRST'] = 'FALSE'
 
-            # if int(total_split) == int(self.split):
-            #     parameters['SPLIT_LAST'] = 'TRUE'
-            # else:
-            #     parameters['SPLIT_LAST'] = 'FALSE'
+            if int(self.splits) == int(self.split):
+                parameters['SPLIT_LAST'] = 'TRUE'
+            else:
+                parameters['SPLIT_LAST'] = 'FALSE'
 
         return parameters
 
