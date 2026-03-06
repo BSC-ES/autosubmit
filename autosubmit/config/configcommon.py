@@ -516,10 +516,10 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def _normalize_jobs_in_wrapper(
-        wrapper: str,
-        wrapper_data: dict[str, Any],
-        job_sections: Iterable[str],
-        raise_exception: bool,
+            wrapper: str,
+            wrapper_data: dict[str, Any],
+            job_sections: Iterable[str],
+            raise_exception: bool,
     ) -> None:
         """Normalize the JOBS_IN_WRAPPER field for a wrapper.
 
@@ -534,7 +534,8 @@ class AutosubmitConfig(object):
         jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", None)
 
         if raise_exception and not jobs_in_wrapper:
-            raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} is missing or empty. This is a mandatory parameter.", 7014)
+            raise AutosubmitCritical(
+                f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} is missing or empty. This is a mandatory parameter.", 7014)
 
         elif raise_exception and not isinstance(jobs_in_wrapper, list) and not isinstance(jobs_in_wrapper, str):
             raise AutosubmitCritical(
@@ -565,9 +566,13 @@ class AutosubmitConfig(object):
                 if not isinstance(element, str):
                     raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} must be a list of strings", 7014)
                 elif len(element) == 0:
-                    raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains empty job names ( check for double ,, or double && )", 7014)
+                    raise AutosubmitCritical(
+                        f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains empty job names ( check for double ,, or double && )",
+                        7014)
                 elif element not in job_sections:
-                    raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains job: {element} that is not defined in JOBS section", 7014)
+                    raise AutosubmitCritical(
+                        f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains job: {element} that is not defined in JOBS section",
+                        7014)
 
         wrapper_data["JOBS_IN_WRAPPER"] = sanitized_jobs_in_wrapper
 
@@ -581,11 +586,13 @@ class AutosubmitConfig(object):
         wrappers = data_fixed.get("WRAPPERS", {})
         for wrapper, wrapper_data in wrappers.items():
             if isinstance(wrapper_data, dict):
-                AutosubmitConfig._normalize_jobs_in_wrapper(wrapper, wrapper_data, data_fixed.get("JOBS", {}).keys(), raise_exception)
+                AutosubmitConfig._normalize_jobs_in_wrapper(wrapper, wrapper_data, data_fixed.get("JOBS", {}).keys(),
+                                                            raise_exception)
                 if "TYPE" in wrapper_data:
                     data_fixed["WRAPPERS"][wrapper]["TYPE"] = str(wrapper_data["TYPE"]).lower()
                 elif raise_exception:
-                    raise AutosubmitCritical(f"TYPE in WRAPPERS.{wrapper} is missing. This is a mandatory parameter.", 7014)
+                    raise AutosubmitCritical(f"TYPE in WRAPPERS.{wrapper} is missing. This is a mandatory parameter.",
+                                             7014)
 
     @staticmethod
     def _normalize_notify_on(data_fixed: dict, job_section) -> None:
@@ -1453,7 +1460,8 @@ class AutosubmitConfig(object):
                                             [section,
                                              f"FILE {section_file_path} doesn't exist and check parameter is not set on_submission value"]]
                                 else:
-                                    self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} doesn't exist"]]
+                                    self.wrong_config["Jobs"] += [[section,
+                                                                   f"FILE {os.path.join(self.get_project_dir(), section_file_path)} doesn't exist"]]
 
             dependencies = section_data.get('DEPENDENCIES', '')
             if dependencies != "":
@@ -1859,7 +1867,8 @@ class AutosubmitConfig(object):
                 BasicConfig.LOCAL_ROOT_DIR, self.expid)
             self.experiment_data['PROJDIR'] = self.get_project_dir()
             self.experiment_data.update(BasicConfig().props())
-            self.experiment_data = self.normalize_variables(self.experiment_data, must_exists=True, raise_exception=True)
+            self.experiment_data = self.normalize_variables(self.experiment_data, must_exists=True,
+                                                            raise_exception=True)
             self.experiment_data = self.deep_read_loops(self.experiment_data)
             self.experiment_data = self.substitute_dynamic_variables(self.experiment_data, in_the_end=True)
             self._add_autosubmit_dict()
@@ -2651,6 +2660,16 @@ class AutosubmitConfig(object):
         if wrapper is None:
             wrapper = {}
         return wrapper.get('POLICY', self.experiment_data.get("WRAPPERS", {}).get("POLICY", 'flexible'))
+
+    def get_custom_env_setup(self, wrapper=None):
+        """Returns custom environment setup commands for a wrapper that runs with a wrapper engine.
+
+        :return: wrapper type (or none)
+        :rtype: string
+        """
+        if wrapper is None:
+            wrapper = {}
+        return wrapper.get('CUSTOM_ENV_SETUP', self.experiment_data.get("WRAPPERS", {}).get("CUSTOM_ENV_SETUP", ''))
 
     def get_wrappers(self):
         """Returns the jobs that should be wrapped, configured in the autosubmit's config.

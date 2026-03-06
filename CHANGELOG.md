@@ -12,6 +12,7 @@
   crate 0.5, and workflow ro crate 1.0. A new integration test has been
   added to check that we produce valid crates with the `rocrate-validator` #2816
 - Changed Yaml load mode from 'safe' to 'rt' #2851
+- Now Autosubmit supports the 'Flux' wrapping method, submitting the jobs to a Flux instance running inside a Slurm allocation [#2697](https://github.com/BSC-ES/autosubmit/issues/2697)
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
