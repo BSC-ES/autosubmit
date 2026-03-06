@@ -2007,8 +2007,17 @@ class Job(object):
         # Calendar struct type numbered ( year, month, day, hour )
 
         job_data = as_conf.jobs_data.get(self.section, {})
-        if job_data.get("SPLITS", None) and self.running != "once":  # once jobs has no date
-            # total_split = int(self.splits)
+        if self.splits and self.running != "once":  # once jobs has no date
+            if int(self.split) == 1:
+                parameters['SPLIT_FIRST'] = 'TRUE'
+            else:
+                parameters['SPLIT_FIRST'] = 'FALSE'
+
+            if int(self.splits) == int(self.split):
+                parameters['SPLIT_LAST'] = 'TRUE'
+            else:
+                parameters['SPLIT_LAST'] = 'FALSE'
+
             split_unit = get_split_size_unit(as_conf.experiment_data, self.section)
             cal = str(parameters.get('EXPERIMENT.CALENDAR', "standard")).lower()
             split_length = get_split_size(as_conf.experiment_data, self.section)
@@ -2016,11 +2025,18 @@ class Job(object):
             if set_attributes and start_date:
                 self.date_split = datetime.datetime.strptime(start_date, "%Y%m%d")
             split_start = chunk_start_date(self.date_split, int(self.split), split_length, split_unit, cal)
-            split_end = chunk_end_date(split_start, split_length, split_unit, cal)
-            if split_unit == 'hour':
-                split_end_1 = split_end
+            if parameters["SPLIT_LAST"] != 'TRUE':
+                split_end = chunk_end_date(split_start, split_length, split_unit, cal)
+                if split_unit == 'hour':
+                    split_end_1 = split_end
+                else:
+                    split_end_1 = previous_day(split_end, cal)
             else:
-                split_end_1 = previous_day(split_end, cal)
+                split_end = datetime.datetime.strptime(parameters.get('CHUNK_END_DATE', None), "%Y%m%d")
+                if split_unit == 'hour':
+                    split_end_1 = split_end
+                else:
+                    split_end_1 = previous_day(split_end, cal)
 
             parameters['SPLIT'] = self.split
             parameters['SPLITSCALENDAR'] = cal
@@ -2047,15 +2063,6 @@ class Job(object):
             parameters['SPLIT_END_MONTH'] = str(split_end.month).zfill(2)
             parameters['SPLIT_END_DAY'] = str(split_end.day).zfill(2)
             parameters['SPLIT_END_HOUR'] = str(split_end.hour).zfill(2)
-            if int(self.split) == 1:
-                parameters['SPLIT_FIRST'] = 'TRUE'
-            else:
-                parameters['SPLIT_FIRST'] = 'FALSE'
-
-            if int(self.splits) == int(self.split):
-                parameters['SPLIT_LAST'] = 'TRUE'
-            else:
-                parameters['SPLIT_LAST'] = 'FALSE'
 
         return parameters
 
