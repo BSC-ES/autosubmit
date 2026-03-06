@@ -46,7 +46,7 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.integration.test_utils.docker import (
     get_git_container, get_slurm_container, get_ssh_container,
     prepare_and_test_slurm_container, prepare_and_test_ssh_container,
-    prepare_and_test_git_container
+    prepare_and_test_git_container, get_svn_container, prepare_and_test_svn_container
 )
 from test.integration.test_utils.networking import get_free_port
 from test.integration.test_utils.postgres import setup_pg_db
@@ -340,6 +340,27 @@ def git_server(request, tmp_path) -> Generator[tuple['DockerContainer', Path, st
         prepare_and_test_git_container(container, http_port)
         yield container, git_repos_path, repo_url
         copy_content_from_containers(request, 'git_server', '/opt/git-server')
+
+
+@pytest.fixture(scope="function")
+def svn_server(request, tmp_path) -> Generator[tuple['DockerContainer', Path, str], Any, None]:
+    # Start a container to server it -- otherwise, we would have to use
+    # `svn -c protocol.file.allow=always submodule ...`, and we cannot
+    # change how Autosubmit uses it in `autosubmit create` (due to bad
+    # code design choices).
+    base_path = tmp_path / 'svn_repos_base'
+    svn_repos_path = base_path / 'svn_repos'
+    svn_repos_path.mkdir(exist_ok=True, parents=True)
+
+    container, http_port = get_svn_container(svn_repos_path)
+    # http_port = int(container.ports['80/tcp'][0]['HostPort'])  # type: ignore
+
+    repo_url = f'http://localhost:{http_port}/svn'
+
+    with container:
+        prepare_and_test_svn_container(container, http_port)
+        yield container, svn_repos_path, repo_url
+        # copy_content_from_containers(request, 'svn_server', 'svn-project')
 
 
 @pytest.fixture

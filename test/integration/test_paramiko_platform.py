@@ -38,7 +38,6 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
     from autosubmit.platforms.psplatform import PsPlatform
-    from autosubmit.platforms.slurmplatform import SlurmPlatform
     from docker.models.containers import Container
     # noinspection PyProtectedMember
     from _pytest._py.path import LocalPath
