@@ -35,9 +35,26 @@ echo "HPCHOST=%HPCHOST%"
 echo "HPCCUSTOM_DIR=%HPCCUSTOM_DIR%"
 echo "HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR=%HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR%"
 """)
+
+_TEMPLATE_CONTENT_CALENDAR_SPLITS = dedent("""
+echo "SPLIT_START_DATE=%SPLIT_START_DATE%"
+echo "SPLIT_END_DATE=%SPLIT_SECOND_TO_LAST_DATE%"
+echo "CHUNK_START_DATE=%CHUNK_START_DATE%"
+echo "CHUNK_END_DATE=%CHUNK_END_DATE%"
+echo "SPLIT_FIRST=%SPLIT_FIRST%"
+echo "SPLIT_LAST=%SPLIT_LAST%"
+echo "CHUNK_FIRST=%CHUNK_FIRST%"
+echo "CHUNK_LAST=%CHUNK_LAST%"
+echo "CURRENT_SPLIT=%SPLIT%"
+echo "MAX_SPLITS=%SPLITS%"
+echo "CURRENT_CHUNK=%CHUNK%"
+echo "MAX_CHUNKS=%EXPERIMENT.NUMCHUNKS%"
+""")
+
 _TAB_SPACES = 4
 tabs = 4
 _SCRIPT_CONTENT = indent(_TEMPLATE_CONTENT, " " * tabs * _TAB_SPACES)
+_SCRIPT_CONTENT_CALENDAR_SPLITS = indent(_TEMPLATE_CONTENT_CALENDAR_SPLITS, " " * tabs * _TAB_SPACES)
 
 
 @pytest.mark.parametrize("additional_data", [
@@ -195,3 +212,132 @@ def test_inspect(
             assert "HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR=OK" in content
             assert f"HPCROOTDIR={str(expected_hpcrootdir)}" in content
             assert f"HPCLOGDIR={str(expected_hpclogdir)}" in content
+
+
+@pytest.mark.parametrize("additional_data", [
+    (dedent(f"""\
+    JOBS:
+        test_auto:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+            SPLITS: "auto"
+            SPLITPOLICY: 'flexible'
+    """)),
+    (dedent(f"""\
+    JOBS:
+        test_auto:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+            SPLITS: "auto"
+            SPLITPOLICY: 'flexible'
+            SPLITSIZE: '1'
+            SPLITSIZEUNIT: 'day'
+    """)),
+    (dedent(f"""\
+    JOBS:
+        test_auto:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+            SPLITS: "auto"
+            SPLITPOLICY: 'flexible'
+            SPLITSIZE: '1'
+            SPLITSIZEUNIT: 'hour'
+    """)),
+
+], ids=[
+    "CALENDAR_SPLITS_AUTO_SPLITSIZE_15_DAY",
+    "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_DAY",
+    "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_HOUR",
+])
+def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, Any], additional_data: str):
+    """Test that auto splits are correctly calculated and injected in the script."""
+
+    # init
+    yaml = YAML(typ='rt')
+    general_data['EXPERIMENT'] = {
+        'NUMCHUNKS': '3',
+        'CHUNKSIZE': '1',
+        'CHUNKUNIT': 'month',
+        'SPLITSIZE': '15',
+        'SPLITSIZEUNIT': 'day',
+    }
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
+    as_conf = as_exp.as_conf
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+
+    # Execute inspect
+    as_conf.set_last_as_command('inspect')
+    as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
+
+    # Parse result
+    splits_info = {}
+    for file in sorted(tmp_path.glob(f"{as_exp.expid}*.cmd")):
+        content = file.read_text()
+        parts = file.stem.split("_")
+        # e.g. t001_20000101_fc0_1_1_TEST_AUTO -> parts[3]=chunk, parts[4]=split
+        chunk = parts[3]
+        split = parts[4]
+        key = f"{chunk}_{split}"
+        split_start_date = content.split("SPLIT_START_DATE=")[1].splitlines()[0].strip("'\"")
+        split_end_date = content.split("SPLIT_END_DATE=")[1].splitlines()[0].strip("'\"")
+        chunk_start_date = content.split("CHUNK_START_DATE=")[1].splitlines()[0].strip("'\"")
+        chunk_end_date = content.split("CHUNK_END_DATE=")[1].splitlines()[0].strip("'\"")
+        split_first = content.split("SPLIT_FIRST=")[1].splitlines()[0].strip("'\"")
+        split_last = content.split("SPLIT_LAST=")[1].splitlines()[0].strip("'\"")
+        chunk_first = content.split("CHUNK_FIRST=")[1].splitlines()[0].strip("'\"")
+        chunk_last = content.split("CHUNK_LAST=")[1].splitlines()[0].strip("'\"")
+        split = content.split("CURRENT_SPLIT=")[1].splitlines()[0].strip("'\"")
+        max_splits = content.split("MAX_SPLITS=")[1].splitlines()[0].strip("'\"")
+        chunk = content.split("CURRENT_CHUNK=")[1].splitlines()[0].strip("'\"")
+        max_chunks = content.split("MAX_CHUNKS=")[1].splitlines()[0].strip("'\"")
+        splits_info[key] = {
+            "SPLIT_START_DATE": int(split_start_date),
+            "SPLIT_END_DATE": int(split_end_date),
+            "CHUNK_START_DATE": int(chunk_start_date),
+            "CHUNK_END_DATE": int(chunk_end_date),
+            "SPLIT_FIRST": True if split_first.lower() == 'true' else False,
+            "SPLIT_LAST": True if split_last.lower() == 'true' else False,
+            "CHUNK_FIRST": True if chunk_first.lower() == 'true' else False,
+            "CHUNK_LAST": True if chunk_last.lower() == 'true' else False,
+            "CURRENT_SPLIT": int(split),
+            "MAX_SPLITS": int(max_splits),
+            "CURRENT_CHUNK": int(chunk),
+            "MAX_CHUNKS": int(max_chunks),
+        }
+
+    assert splits_info, "No cmd files found"
+
+    lookup_date_errors = {}
+    lookup_first_last_errors = {}
+    # Assert that splits are correct
+    for key, info in splits_info.items():
+        # Check one
+        split_start_date = info["SPLIT_START_DATE"]
+        split_end_date = info["SPLIT_END_DATE"]
+        chunk_start_date = info["CHUNK_START_DATE"]
+        chunk_end_date = info["CHUNK_END_DATE"]
+        if not (chunk_start_date <= chunk_end_date and split_start_date <= split_end_date and chunk_start_date <= split_start_date <= split_end_date <= chunk_end_date):
+            lookup_date_errors[key] = {split_start_date, split_end_date, chunk_start_date, chunk_end_date}
+
+        # Check two
+        chunk = info["CURRENT_CHUNK"]
+        split = info["CURRENT_SPLIT"]
+        max_chunks = info["MAX_CHUNKS"]
+        max_splits = info["MAX_SPLITS"]
+        im_first_chunk: bool = info["CHUNK_FIRST"]
+        im_first_split: bool = info["SPLIT_FIRST"]
+        im_last_chunk: bool = info["CHUNK_LAST"]
+        im_last_split: bool = info["SPLIT_LAST"]
+
+        if im_first_chunk and chunk != 1:
+            lookup_first_last_errors[key] = {chunk, split, im_first_chunk, im_first_split, im_last_chunk, im_last_split, max_chunks, max_splits}
+
+    assert not lookup_first_last_errors, f"First/Last chunk/split errors found in splits: {lookup_first_last_errors}"
+    assert not lookup_date_errors, f"Date errors found in splits: {lookup_date_errors}"

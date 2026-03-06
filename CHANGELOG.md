@@ -2,7 +2,7 @@
 
 **Bug fixes:**
 
--
+- Calendar splits: last split boundaries #2866, last split not exported #2099 and splitsize not working at experiment level #2016.
 
 **Enhancements:**
 
