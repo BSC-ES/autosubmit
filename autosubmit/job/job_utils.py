@@ -211,9 +211,19 @@ def get_split_size_unit(data, section) -> str:
     return split_unit
 
 
-def get_split_size(as_conf, section) -> int:
-    job_data = as_conf.get('JOBS', {}).get(section, {})
-    return int(job_data.get("SPLITSIZE", 1))
+def get_split_size(as_conf: dict, section: str) -> int:
+    """Return the split size for a given job section.
+
+    Checks ``JOBS.<section>.SPLITSIZE`` first, then falls back to
+    ``EXPERIMENT.SPLITSIZE``, and finally defaults to ``1``.
+
+    :param as_conf: Experiment configuration dictionary.
+    :param section: Job section name.
+    :return: The resolved split size as an integer.
+    """
+    job_split_size = as_conf.get('JOBS', {}).get(section, {}).get('SPLITSIZE')
+    experiment_split_size = as_conf.get('EXPERIMENT', {}).get('SPLITSIZE')
+    return int(job_split_size or experiment_split_size or 1)
 
 
 def transitive_reduction(graph) -> DiGraph:

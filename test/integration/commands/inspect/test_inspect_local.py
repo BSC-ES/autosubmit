@@ -48,6 +48,7 @@ tabs = 4
 _SCRIPT_CONTENT = indent(_TEMPLATE_CONTENT, " " * tabs * _TAB_SPACES)
 _SCRIPT_CONTENT_CALENDAR_SPLITS = indent(_TEMPLATE_CONTENT_CALENDAR_SPLITS, " " * tabs * _TAB_SPACES)
 
+
 @pytest.mark.parametrize("additional_data", [
     (dedent(f"""\
     TEST_REFERENCE: "OK"
@@ -211,6 +212,8 @@ def test_inspect(
         NUMCHUNKS: '3'
         CHUNKSIZE: '1'
         CHUNKUNIT: 'month'
+        SPLITSIZE: '15'
+        SPLITSIZEUNIT: 'day'
     JOBS:
         test_auto:
             SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
@@ -218,9 +221,7 @@ def test_inspect(
             RUNNING: chunk
             wallclock: 00:01
             SPLITS: "auto"
-            SPLITSIZE: '15'
-            SPLITUNIT: 'day'
-            SPLITPOLICY: 'strict'
+            SPLITPOLICY: 'flexible'
     """)),
 ], ids=[
     "CALENDAR_SPLITS_AUTO_month(1)-days(5)",
@@ -270,6 +271,5 @@ def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, A
         chunk_end_date = info["CHUNK_END_DATE"]
         if not (chunk_start_date < chunk_end_date and split_start_date < split_end_date and chunk_start_date <= split_start_date < split_end_date <= chunk_end_date):
             lookup_errors[key] = info
-
 
     assert not lookup_errors, f"Some splits have incorrect dates: {lookup_errors}"
