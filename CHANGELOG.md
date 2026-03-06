@@ -2,12 +2,12 @@
 
 **Bug fixes:**
 
-- Fixes calendar splits issues with last split boundaries #2866 and last split not exported #2099.
 - Fix for energy data that was not being stored for the last job of the batch #2657 #2418
 - Reduce the frequency with which energy data was not being stored for the last job of the batch #2657 #2418
 - Fixed issue with experiments running on LOCAL platform without a defined LOCAL entry in platforms.yml config file #1131
 - Fixed an issue with the ECMWF platform not working with the new online recovery
 - Changed logic in Slurm submission to look for submitted messaged (hotfix) #2886" 
+- Calendar splits: last split boundaries #2866, last split not exported #2099 and splitsize not working at experiment level #2016.
 
 **Enhancements:**
 
