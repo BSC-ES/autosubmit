@@ -347,3 +347,37 @@ class EcPlatform(ParamikoPlatform):
         ###############################################################################
         """.format(filename, queue, project, wallclock, num_procs, expid, dependency, rootdir,
                    '\n'.ljust(13).join(str(s) for s in directives))
+
+
+    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        :param job_names: If provided, filters the results to include only these job names.
+        :type job_names: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        final_job_names = []
+        if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
+            if not job_names:
+                pattern = "-name '*_COMPLETED'"
+            else:
+                pattern = ' -o '.join([f"-name '{name}_COMPLETED'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {pattern} \\) -type f"
+            self.send_command(cmd)
+            output = self.get_ssh_output()
+            completed_files = output.strip().split('\n') if output else []
+            final_job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
+        return final_job_names
+
+    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+        """Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
+        :type job_names: List[str]
+        """
+        if job_names:
+            if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
+                job_name_str = ' -o -name '.join([f"'{name}_COMPLETED' -o -name '{name}_FAILED'" for name in job_names])
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( -name {job_name_str} \\) -type f -delete"
+                self.send_command(cmd)
