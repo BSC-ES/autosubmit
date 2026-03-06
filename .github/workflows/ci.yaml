@@ -12,6 +12,7 @@ on:
       - master
 permissions:
   contents: read
+  packages: read
 
 jobs:
   test-unit:
@@ -118,6 +119,13 @@ jobs:
           git --version
           git config --global user.email "test@bsc.es"
           git config --global user.name "GitHub Actions"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # In GitHub Actions we run all the integration tests, including those that require
       # dependencies such as Docker (see `-m ''`, which means all markers). Read the
@@ -243,6 +251,13 @@ jobs:
           git --version
           git config --global user.email "test@bsc.es"
           git config --global user.name "GitHub Actions"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Integration tests
         run: |
