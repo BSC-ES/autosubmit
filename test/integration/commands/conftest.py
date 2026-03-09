@@ -1,6 +1,25 @@
-import pytest
-from typing import Dict, Any
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+from getpass import getuser
 from pathlib import Path
+from typing import Dict, Any
+
+import pytest
 
 
 @pytest.fixture(scope="function")
@@ -41,7 +60,7 @@ def general_data(tmp_path: Path) -> dict[str, Any]:
                 'QUEUE': 'gp_debug',
                 'SCRATCH_DIR': '/tmp/scratch',
                 'TEMP_DIR': '',
-                'USER': 'root',
+                'USER': getuser(),
                 'PROCESSORS': '1',
                 'MAX_PROCESSORS': '128',
                 'PROCESSORS_PER_NODE': '128',
@@ -55,15 +74,15 @@ def general_data(tmp_path: Path) -> dict[str, Any]:
                 'QUEUE': 'gp_debug',
                 'SCRATCH_DIR': '/tmp/scratch',
                 'TEMP_DIR': '',
-                'USER': 'root',
+                'USER': getuser(),
                 'PROCESSORS': '1',
                 'MAX_PROCESSORS': '128',
                 'PROCESSORS_PER_NODE': '128',
             },
-            # TODO: Containarize ecaccess to be able to run these tests in CI/CD.
+            # TODO: Containerize ecaccess to be able to run these tests in CI/CD.
             'TEST_EC': {
                 'TYPE': 'ecaccess',  # enables the usage of ecaccess commands, requires a valid .eccert in ~/.eccert
-                'VERSION': 'slurm',  # HPC scheduler accesed via ecaccess commands
+                'VERSION': 'slurm',  # HPC scheduler accessed via ecaccess commands
                 'ADD_PROJECT_TO_HOST': 'False',
                 'HOST': 'hpc-login',  # Can only run locally with a valid .eccert, see https://gitlab.earth.bsc.es/es/auto-ecearth3/-/wikis/Running-on-ECMWF-HPC2020
                 'MAX_WALLCLOCK': '48:00',
@@ -169,7 +188,7 @@ def jobs_data(tmp_path: Path) -> Dict[str, object]:
     }
 
 
-def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> Dict[str, object]:
+def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> Dict[str, Any]:
     """Provides a `jobs_data` dictionary with wrapped jobs used by the
     integration tests in `commands`.
 

@@ -60,7 +60,7 @@ class PsPlatform(ParamikoPlatform):
         """Updates commands for platforms."""
         self.root_dir = os.path.join(self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
-        self.cancel_cmd = "kill -SIGINT"
+        self.cancel_cmd = "kill -2"
         self._checkhost_cmd = "echo 1"
         self.put_cmd = "scp"
         self.get_cmd = "scp"

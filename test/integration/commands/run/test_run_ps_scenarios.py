@@ -1,6 +1,25 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Tests that run diverse scenarios for Autosubmit run with a ``ps`` platform
+and checks the database for expected results."""
+
 from pathlib import Path
 from textwrap import dedent
-from time import sleep
 from typing import TYPE_CHECKING
 
 import pytest
@@ -9,6 +28,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
     _assert_db_fields, _assert_files_recovered, run_in_thread
+from test.integration.test_utils.misc import wait_locker
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -17,46 +37,50 @@ if TYPE_CHECKING:
 # -- Tests
 
 @pytest.mark.docker
-@pytest.mark.slurm
 @pytest.mark.ssh
-@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
-    # Success
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '3'
-    JOBS:
-        JOB:
-            SCRIPT: |
-                echo "Hello World with id=Success"
-                sleep 1
-            PLATFORM: TEST_PS
-            RUNNING: chunk
-            WALLCLOCK: 00:01
-            RETRIALS: 0
-    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
-
-    # Failure
-    (dedent("""\
-    EXPERIMENT:
-        NUMCHUNKS: '2'
-    JOBS:
-        JOB:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_PS
-            RUNNING: chunk
-            WALLCLOCK: 00:01
-            RETRIALS: 2
-    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-], ids=["Success", "Failure"])
+@pytest.mark.parametrize(
+    "jobs_data,expected_db_entries,final_status,wrapper_type", [
+        # Success
+        (
+                dedent("""\
+                EXPERIMENT:
+                    NUMCHUNKS: '3'
+                JOBS:
+                    JOB:
+                        SCRIPT: |
+                            echo "Hello World with id=Success"
+                            sleep 1
+                        PLATFORM: TEST_PS
+                        RUNNING: chunk
+                        WALLCLOCK: 00:01
+                        RETRIALS: 0
+                """), 3, "COMPLETED", "simple"
+        ),  # No wrappers, simple type
+        # Failure
+        (
+                dedent("""\
+                EXPERIMENT:
+                    NUMCHUNKS: '2'
+                JOBS:
+                    JOB:
+                        SCRIPT: |
+                            sleep 2
+                            d_echo "Hello World with id=FAILED"
+                        PLATFORM: TEST_PS
+                        RUNNING: chunk
+                        WALLCLOCK: 00:01
+                        RETRIALS: 2
+                """), (2 + 1) * 2, "FAILED", "simple"
+        ),  # No wrappers, simple type
+    ],
+    ids=["Success", "Failure"])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
         expected_db_entries,
         final_status,
         wrapper_type,
-        slurm_server: 'Container',
+        ssh_server: 'Container',
         prepare_scratch,
         general_data,
 ):
@@ -101,7 +125,6 @@ def test_run_uninterrupted(
 
 
 @pytest.mark.docker
-@pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
@@ -139,7 +162,7 @@ def test_run_interrupted(
         expected_db_entries,
         final_status,
         wrapper_type,
-        slurm_server: 'Container',
+        ssh_server: 'Container',
         prepare_scratch,
         general_data,
 ):
@@ -154,10 +177,19 @@ def test_run_interrupted(
 
     # Run the experiment
     # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
-    run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
-    sleep(2)
+    as_thread, exception, _ = run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
+    if exception:
+        pytest.fail(f"Exception raised: {exception}")
+    # Instead of using sleep(N), we wait until the file lock is confirmed by portalocker.
+    # Once locked, we know Autosubmit has started the main loop (context manager does it).
+    lock_file = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid, BasicConfig.LOCAL_TMP_DIR, "autosubmit.lock")
+    wait_locker(lock_file, expect_locked=True, timeout=20, interval=0.5)
+
+    # Here we issue an ``autosubmit stop`` and then join the thread where Autosubmit is running as, otherwise,
+    # we may get a timeout error where the thread stack printed shows Paramiko threads are still running
+    # (waiting on ``recv()``).
     current_statuses = 'SUBMITTED, QUEUING, RUNNING'
-    as_exp.autosubmit.stop(
+    assert as_exp.autosubmit.stop(
         all_expids=False,
         cancel=False,
         current_status=current_statuses,
@@ -165,6 +197,9 @@ def test_run_interrupted(
         force=True,
         force_all=True,
         status='FAILED')
+    as_thread.join(timeout=20)
+    assert not as_thread.is_alive(), "Autosubmit thread did not stop"
+    wait_locker(lock_file, expect_locked=False, timeout=20, interval=0.5)
 
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
 

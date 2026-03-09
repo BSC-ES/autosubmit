@@ -39,6 +39,7 @@
 - Every YAML file loaded is now printed in the debug log (use -lc DEBUG in the
   command line if you want this) #2879
 - Allow to set AS variables as lowercase/uppercase (,,/^^) #2504
+- Slurm tests in CICD are using a new container by @giovtorres #2871
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

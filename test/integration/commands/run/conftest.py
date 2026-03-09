@@ -28,7 +28,7 @@ import pwd
 import sqlite3
 from pathlib import Path
 from threading import Thread
-from typing import Any, Callable, TYPE_CHECKING
+from typing import cast, Any, Callable, Optional, TYPE_CHECKING
 
 import pytest
 
@@ -103,7 +103,7 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
                 print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
 
 
-def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> Thread:
+def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> tuple[Thread, Optional[Exception], int]:
     """Run the given target function in a separate thread.
 
     :param target: The function to execute in the thread.
@@ -115,9 +115,17 @@ def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> Thread:
     :return: The started Thread object.
     :rtype: Thread
     """
-    thread = Thread(target=target, args=args, kwargs=kwargs)
+    result = {"exit_code": -1, "exception": None}
+
+    def wrap_thread(*args, **kwargs) -> None:
+        try:
+            result["exit_code"] = target(*args, **kwargs)
+        except Exception as e:
+            result["exception"] = e  # type: ignore
+
+    thread = Thread(target=wrap_thread, args=args, kwargs=kwargs)
     thread.start()
-    return thread
+    return thread, result["exception"], cast(int, result["exit_code"])
 
 
 def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wrapper_type="simple") -> dict[str, (bool, str)]:

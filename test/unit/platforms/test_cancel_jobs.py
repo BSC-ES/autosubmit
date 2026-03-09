@@ -44,8 +44,8 @@ def test_cancel_jobs_empty_list_sends_no_command(
 @pytest.mark.parametrize("platform_fixture,job_id,expected_command", [
     ("slurm_platform", "42", "scancel 42"),
     ("ec_platform", "9001", "ecaccess-job-delete 9001"),
-    ("local_platform", "1234", "kill -SIGINT 1234"),
-    ("ps_platform", "5678", "kill -SIGINT 5678"),
+    ("local_platform", "1234", "kill -2 1234"),
+    ("ps_platform", "5678", "kill -2 5678"),
 ])
 def test_cancel_jobs_single_id(
         platform_fixture: str,
@@ -67,10 +67,10 @@ def test_cancel_jobs_single_id(
 @pytest.mark.parametrize("platform_fixture,job_ids,expected_command", [
     ("slurm_platform", ["1", "2", "3"], "scancel 1,2,3"),
     ("slurm_platform", ["100", "200"], "scancel 100,200"),
-    ("local_platform", ["100", "200", "300"], "kill -SIGINT 100 200 300"),
-    ("local_platform", ["10", "20"], "kill -SIGINT 10 20"),
-    ("ps_platform", ["10", "20", "30"], "kill -SIGINT 10 20 30"),
-    ("ps_platform", ["11", "22"], "kill -SIGINT 11 22"),
+    ("local_platform", ["100", "200", "300"], "kill -2 100 200 300"),
+    ("local_platform", ["10", "20"], "kill -2 10 20"),
+    ("ps_platform", ["10", "20", "30"], "kill -2 10 20 30"),
+    ("ps_platform", ["11", "22"], "kill -2 11 22"),
 ])
 def test_cancel_jobs_multiple_ids(
         platform_fixture: str,

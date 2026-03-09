@@ -3132,8 +3132,7 @@ class WrapperJob(Job):
             elif reason == '(JobHeldAdmin)':
                 Log.debug(
                     f"Job {self.name} Failed to be HELD, canceling... ", )
-                self._platform.send_command(
-                    self._platform.cancel_cmd + f" {self.id}")
+                self._platform.send_command(self._platform.cancel_cmd + f" {self.id}")
                 self.status = Status.WAITING
             else:
                 Log.info(f"Job {self.name} is QUEUING {reason}")

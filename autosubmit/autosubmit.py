@@ -29,6 +29,7 @@ import signal
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import warnings
 from collections import defaultdict
@@ -1940,7 +1941,10 @@ class Autosubmit:
             except BaseException as e:
                 raise AutosubmitCritical("Failure during setting the start time check trace for details", 7014, str(e))
             os.system('clear')
-            signal.signal(signal.SIGINT, signal_handler)
+            if threading.current_thread().name is threading.main_thread():
+                signal.signal(signal.SIGINT, signal_handler)
+            else:
+                Log.debug('Not setting signal handler: Autosubmit running within a thread.')
             # The time between running iterations, default to 10 seconds. Can be changed by the user
             safetysleeptime = as_conf.get_safetysleeptime()
             retrials = as_conf.get_retrials()
@@ -2126,6 +2130,7 @@ class Autosubmit:
         :return: exit status
 
         """
+        Autosubmit.exit = False
         # Start profiling if the flag has been used
         if profile is not None:
             from .profiler.profiler import Profiler
@@ -2999,6 +3004,10 @@ class Autosubmit:
         if save:
             offline_jobs = []
             for job in current_active_jobs:
+                if not job.id:
+                    Log.warning(f"Skipping cancellation of job with invalid ID: {job.id}")
+                    continue
+
                 if offline or not job.platform.connected:
                     offline_jobs.append(job.name)
                 else:

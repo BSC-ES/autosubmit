@@ -70,7 +70,7 @@ class LocalPlatform(ParamikoPlatform):
         """Updates commands for platforms."""
         self.root_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "tmp", 'LOG_' + self.expid)
-        self.cancel_cmd = "kill -SIGINT"
+        self.cancel_cmd = "kill -2"
         self._checkhost_cmd = "echo 1"
         self.put_cmd = "cp -p"
         self.get_cmd = "cp"
@@ -152,24 +152,41 @@ class LocalPlatform(ParamikoPlatform):
         for job, prev_job_status in job_list:
             self.check_job(job)
 
-    def send_command(self, command, ignore_log=False, x11=False) -> bool:
-
-        lang = locale.getlocale()[1]
-        if lang is None:
-            lang = locale.getdefaultlocale()[1]
-            if lang is None:
-                lang = 'UTF-8'
+    def send_command(self, command: str, ignore_log=False, x11=False) -> bool:
         try:
-            output = subprocess.check_output(command.encode(lang), shell=True)
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            self._ssh_output = result.stdout.strip()
+
+            if result.stderr and not ignore_log:
+                Log.warning(f"Command '{command}' succeeded with warning: {result.stderr.strip()}")
+
+            Log.debug(f"Sent command {command} successfully: {self._ssh_output}")
+
+            self._check_for_unrecoverable_errors()
+
+            return True
         except subprocess.CalledProcessError as e:
             if not ignore_log:
-                Log.error(f'Could not execute command {e.cmd} on {self.host}')
+                error_trace = (
+                    f"Execution failed on {self.host}\n"
+                    f"Command: {e.cmd}\n"
+                    f"Exit Code: {e.returncode}\n"
+                    f"Stdout: {e.stdout.strip() if e.stdout else 'None'}\n"
+                    f"Stderr: {e.stderr.strip() if e.stderr else 'None'}"
+                )
+                Log.error(error_trace)
+            self._ssh_output = e.stderr or e.stdout
             return False
-        self._ssh_output = output.decode(lang)
-        Log.debug(f"Command '{command}': {self._ssh_output}")
-        self._check_for_unrecoverable_errors()
-
-        return True
+        except Exception as e:
+            if not ignore_log:
+                Log.error(f"Unexpected error executing command: {str(e)}")
+            return False
 
     def send_file(self, filename: str, check: bool = True) -> bool:
         """Sends a file to a specified location using a command.
