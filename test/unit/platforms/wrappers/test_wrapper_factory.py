@@ -289,3 +289,47 @@ def test_ec_wrapper_factory(slurm_platform: SlurmPlatform, wrapper_builder_kwarg
     assert 'test a\ntest b' == wrapper_factory.get_custom_directives(['test a', 'test b'])
 
     assert '' == wrapper_factory.allocated_nodes()
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+def test_get_wrapper(slurm_platform: SlurmPlatform, wrapper_builder_kwargs: dict, mocker):
+    wrapper_builder_kwargs["method"] = 'srun'
+    wrapper_factory = SlurmWrapperFactory(slurm_platform)
+
+    wrapper_data = mocker.MagicMock()
+    wrapper_data.het = {
+        'HETSIZE': 2,
+        'CURRENT_QUEUE': {
+            2: 'debug',
+        },
+        'MEMORY': '34k',
+        'PARTITION': 'debug',
+        'CURRENT_PROJ': 'debug',
+        'MEMORY_PER_TASK': {
+            2: '50',
+        },
+        'NUMTHREADS': {
+            1: '2',
+            2: '2',
+        },
+        'NODES': {
+            2: '2',
+        },
+        'PROCESSORS': '',
+        'RESERVATION': {
+            2: '2',
+        },
+        'TASKS': {
+            2: '2',
+        },
+        'CUSTOM_DIRECTIVES': {
+            2: '2',
+        },
+    }
+    wallclock = '00:30'
+
+    wrapper_builder_kwargs['wrapper_data'] = wrapper_data
+    wrapper_builder_kwargs['wallclock'] = wallclock
+
+    wrapper_factory.get_wrapper(BashVerticalWrapperBuilder, **wrapper_builder_kwargs)

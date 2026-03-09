@@ -47,7 +47,7 @@ class SlurmHeader(object):
                 return f"SBATCH --qos={parameters['CURRENT_QUEUE']}"
         return ""
 
-    def get_processors_directive(self, job: 'Job', parameters, het: int = -1) -> str:
+    def get_processors_directive(self, job: 'Job', het: int = -1) -> str:
         """Returns processors directive for the specified job
 
         :param job: job to create processors directive for
@@ -73,9 +73,9 @@ class SlurmHeader(object):
         if job.processors == '' or job.processors == '1' and int(job_nodes) > 0:
             return ""
         else:
-            return "SBATCH -n {0}".format(job.processors)
+            return f"SBATCH -n {job.processors}"
 
-    def get_partition_directive(self, job: 'Job', parameters, het: int = -1) -> str:
+    def get_partition_directive(self, job: 'Job', het: int = -1) -> str:
         """Returns partition directive for the specified job
 
         :param job: job to create partition directive for
@@ -86,10 +86,10 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['PARTITION']) > 0:
             if job.het['PARTITION'][het] != '':
-                return "SBATCH --partition={0}".format(job.het['PARTITION'][het])
+                return f"SBATCH --partition={job.het['PARTITION'][het]}"
         else:
             if job.partition != '':
-                return "SBATCH --partition={0}".format(job.partition)
+                return f"SBATCH --partition={job.partition}"
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -106,10 +106,10 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['CURRENT_PROJ']) > 0:
             if job.het['CURRENT_PROJ'][het] != '':
-                return "SBATCH -A {0}".format(job.het['CURRENT_PROJ'][het])
+                return f"SBATCH -A {job.het['CURRENT_PROJ'][het]}"
         else:
             if parameters['CURRENT_PROJ'] != '':
-                return "SBATCH -A {0}".format(parameters['CURRENT_PROJ'])
+                return f"SBATCH -A {parameters['CURRENT_PROJ']}"
         return ""
 
     def get_exclusive_directive(self, job: 'Job', parameters, het=-1) -> str:
@@ -161,10 +161,10 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['MEMORY']) > 0:
             if job.het['MEMORY'][het] != '':
-                return "SBATCH --mem={0}".format(job.het['MEMORY'][het])
+                return f"SBATCH --mem={job.het['MEMORY'][het]}"
         else:
             if parameters['MEMORY'] != '':
-                return "SBATCH --mem={0}".format(parameters['MEMORY'])
+                return f"SBATCH --mem={parameters['MEMORY']}"
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -183,7 +183,7 @@ class SlurmHeader(object):
                 return "SBATCH --mem-per-cpu={0}".format(job.het['MEMORY_PER_TASK'][het])
         else:
             if parameters['MEMORY_PER_TASK'] != '':
-                return "SBATCH --mem-per-cpu={0}".format(parameters['MEMORY_PER_TASK'])
+                return f"SBATCH --mem-per-cpu={parameters['MEMORY_PER_TASK']}"
         return ""
 
     def get_threads_per_task(self, job: 'Job', parameters, het=-1):
@@ -218,10 +218,10 @@ class SlurmHeader(object):
 
         if het > -1 and len(job.het['RESERVATION']) > 0:
             if job.het['RESERVATION'][het] != '':
-                return "SBATCH --reservation={0}".format(job.het['RESERVATION'][het])
+                return f"SBATCH --reservation={job.het['RESERVATION'][het]}"
         else:
             if parameters['RESERVATION'] != '':
-                return "SBATCH --reservation={0}".format(parameters['RESERVATION'])
+                return f"SBATCH --reservation={parameters['RESERVATION']}"
         return ""
 
     def get_custom_directives(self, job: 'Job', parameters, het=-1) -> str:
@@ -255,10 +255,10 @@ class SlurmHeader(object):
         """
         if het > -1 and len(job.het['TASKS']) > 0:
             if int(job.het['TASKS'][het]):
-                return "SBATCH --ntasks-per-node={0}".format(job.het['TASKS'][het])
+                return f"SBATCH --ntasks-per-node={job.het['TASKS'][het]}"
         else:
             if int(parameters['TASKS']) > 1:
-                return "SBATCH --ntasks-per-node={0}".format(parameters['TASKS'])
+                return f"SBATCH --ntasks-per-node={parameters['TASKS']}"
         return ""
 
     def wrapper_header(self, **kwargs):
@@ -355,27 +355,27 @@ class SlurmHeader(object):
         header = self.hetjob_common_header(hetsize, wr_job)
         for components in range(hetsize):
             header = header.replace(
-                f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(wr_job, components))
+                f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(wr_job, None, hetsize))
             header = header.replace(
-                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(wr_job, components))
+                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(wr_job, hetsize))
             header = header.replace(
-                f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(wr_job, components))
+                f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(wr_job, None, hetsize))
             header = header.replace(
-                f'%MEMORY_DIRECTIVE_{components}%', self.get_memory_directive(wr_job, components))
+                f'%MEMORY_DIRECTIVE_{components}%', self.get_memory_directive(wr_job, None, hetsize))
             header = header.replace(
-                f'%MEMORY_PER_TASK_DIRECTIVE_{components}%', self.get_memory_per_task_directive(wr_job, components))
+                f'%MEMORY_PER_TASK_DIRECTIVE_{components}%', self.get_memory_per_task_directive(wr_job, None, hetsize))
             header = header.replace(
-                f'%THREADS_PER_TASK_DIRECTIVE_{components}%', self.get_threads_per_task(wr_job, components))
+                f'%THREADS_PER_TASK_DIRECTIVE_{components}%', self.get_threads_per_task(wr_job, None, hetsize))
             header = header.replace(
-                f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(wr_job, components))
+                f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(wr_job, None, hetsize))
             header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(wr_job, components))
+                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(wr_job, hetsize))
             header = header.replace(
-                f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(wr_job, components))
+                f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(wr_job, None, hetsize))
             header = header.replace(
-                f'%TASKS_PER_NODE_DIRECTIVE_{components}%', self.get_tasks_per_node(wr_job, components))
+                f'%TASKS_PER_NODE_DIRECTIVE_{components}%', self.get_tasks_per_node(wr_job, None, hetsize))
             header = header.replace(
-                f'%CUSTOM_DIRECTIVES_{components}%', self.get_custom_directives(wr_job, components))
+                f'%CUSTOM_DIRECTIVES_{components}%', self.get_custom_directives(wr_job, None, hetsize))
         header = header[:-len("#SBATCH hetjob\n")]  # last element
 
         return header
