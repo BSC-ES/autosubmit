@@ -2179,32 +2179,7 @@ class Job(object):
         parameters['DELETE_WHEN_EDGELESS'] = self.delete_when_edgeless
         parameters = self.calendar_chunk(parameters)
         parameters = self.calendar_split(as_conf, parameters, set_attributes)
-        # https://github.com/BSC-ES/autosubmit/issues/2101#issuecomment-4011405437
-        if parameters.get('CHUNK_START_DATE', None) and parameters.get('SPLIT_START_DATE', None):
-            parameters['JOB_START_DATE'] = parameters.get('SPLIT_START_DATE', parameters['CHUNK_START_DATE'])
-            parameters['JOB_END_DATE'] = parameters.get('SPLIT_END_DATE', parameters['CHUNK_START_DATE'])
-            parameters['JOB_START_YEAR'] = parameters.get('SPLIT_START_YEAR', parameters['CHUNK_START_YEAR'])
-            parameters['JOB_START_MONTH'] = parameters.get('SPLIT_START_MONTH', parameters['CHUNK_START_MONTH'])
-            parameters['JOB_START_DAY'] = parameters.get('SPLIT_START_DAY', parameters['CHUNK_START_DAY'])
-            parameters['JOB_START_HOUR'] = parameters.get('SPLIT_START_HOUR', parameters['CHUNK_START_HOUR'])
-            parameters['JOB_END_YEAR'] = parameters.get('SPLIT_END_YEAR', parameters['CHUNK_END_YEAR'])
-            parameters['JOB_END_MONTH'] = parameters.get('SPLIT_END_MONTH', parameters['CHUNK_END_MONTH'])
-            parameters['JOB_END_DAY'] = parameters.get('SPLIT_END_DAY', parameters['CHUNK_END_DAY'])
-            parameters['JOB_END_HOUR'] = parameters.get('SPLIT_END_HOUR', parameters['CHUNK_END_HOUR'])
-        elif parameters.get('CHUNK_START_DATE', None):
-            parameters['JOB_START_DATE'] = parameters['CHUNK_START_DATE']
-            parameters['JOB_END_DATE'] = parameters['CHUNK_END_DATE']
-            parameters['JOB_START_YEAR'] = parameters['CHUNK_START_YEAR']
-            parameters['JOB_START_MONTH'] = parameters['CHUNK_START_MONTH']
-            parameters['JOB_START_DAY'] = parameters['CHUNK_START_DAY']
-            parameters['JOB_START_HOUR'] = parameters['CHUNK_START_HOUR']
-            parameters['JOB_END_YEAR'] = parameters['CHUNK_END_YEAR']
-            parameters['JOB_END_MONTH'] = parameters['CHUNK_END_MONTH']
-            parameters['JOB_END_DAY'] = parameters['CHUNK_END_DAY']
-            parameters['JOB_END_HOUR'] = parameters['CHUNK_END_HOUR']
-
         parameters['NUMMEMBERS'] = len(as_conf.get_member_list())
-
         parameters['JOB_DEPENDENCIES'] = self.dependencies
         parameters['EXPORT'] = self.export
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()
