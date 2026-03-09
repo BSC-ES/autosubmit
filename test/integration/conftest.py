@@ -31,6 +31,7 @@ from typing import Any, Callable, Generator, Iterator, Optional, Protocol, TYPE_
 import pytest
 from ruamel.yaml import YAML
 from sqlalchemy import create_engine
+from testcontainers.core.container import DockerContainer  # type: ignore
 from testcontainers.postgres import PostgresContainer  # type: ignore
 
 from autosubmit.autosubmit import Autosubmit
@@ -59,7 +60,6 @@ if TYPE_CHECKING:
     from py._path.local import LocalPath  # type: ignore
     from pytest_mock import MockerFixture
     from pytest import FixtureRequest
-    from testcontainers.core.container import DockerContainer  # type: ignore
 
 _PG_USER = 'postgres'
 _PG_PASSWORD = 'postgres'
@@ -88,6 +88,7 @@ class AutosubmitExperimentFixture(Protocol):
             experiment_data: Optional[dict] = None,
             wrapper: Optional[bool] = False,
             create: Optional[bool] = True,
+            include_jobs: Optional[bool] = False,
             reload: Optional[bool] = True,
             mock_last_name_used: Optional[bool] = True,
             *args: Any,
@@ -155,6 +156,8 @@ def autosubmit_exp(
             wrapper: Optional[bool] = False,
             create: Optional[bool] = True,
             include_jobs: Optional[bool] = False,
+            reload: Optional[bool] = True,
+            mock_last_name_used: Optional[bool] = True,
             *_,
             **kwargs
     ) -> AutosubmitExperiment:
@@ -253,15 +256,15 @@ def autosubmit_exp(
             config.experiment_data['JOBS'] = {}
 
         # ensure that it is always the first file loaded by Autosubmit
-        with open(conf_dir / 'aaaaaabasic_structure.yml', 'w') as f:
-            YAML().dump(config.experiment_data, f)
+        with open(conf_dir / 'aaaaaabasic_structure.yml', 'w') as fh:
+            YAML().dump(config.experiment_data, fh)
 
         other_yaml = {
             k: v for k, v in experiment_data.items()
         }
         if other_yaml:
-            with open(conf_dir / 'additional_data.yml', 'w') as f:
-                YAML().dump(other_yaml, f)
+            with open(conf_dir / 'additional_data.yml', 'w') as fh:
+                YAML().dump(other_yaml, fh)
 
         config.reload(force_load=True)
 
@@ -380,17 +383,17 @@ def ssh_x11_mfa_server(request, tmp_path: 'LocalPath', mocker: 'MockerFixture') 
 
 @pytest.fixture(scope="function")
 def slurm_server(request, tmp_path, mocker) -> Generator['Container', Any, None]:
-    """Session fixture that creates a singleton Slurm server container."""
-    container, ssh_port = get_slurm_container()
+    """Function-scoped fixture that creates a Slurm server container per test."""
     # TODO: Needed? If so, explain why.
     mocker.patch(
         'autosubmit.platforms.platform.Platform.get_mp_context',
         return_value=multiprocessing.get_context('fork')
     )
+    container, ssh_port = get_slurm_container()
     with container:
         prepare_and_test_slurm_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
         yield container.get_wrapped_container()
-        copy_content_from_containers(request, 'slurm_server', 'tmp/scratch/group/root/')
+        copy_content_from_containers(request, 'slurm_server', '/tmp/scratch/group/root/')
 
 
 @pytest.fixture
@@ -530,10 +533,16 @@ def setup_as_logs_pytest(tmp_path: 'LocalPath') -> None:
 
 
 def copy_content_from_containers(request, log_name, path_to_docker=""):
-    """Copy data from the experiment from within the container to export"""
+    """Copy data from the experiment from within the container to export.
+
+    Only executed on GitHub Actions.
+    """
+    if 'GITHUB_ACTIONS' not in os.environ:
+        return
     has_failures = request.session.testsfailed
     func_args = request.node.funcargs
     if has_failures and log_name in func_args and func_args[log_name]:
+        container_in_use: 'Container'
         if log_name == 'git_server':
             container_in_use: 'Container' = func_args[log_name][0].get_wrapped_container()
         else:
@@ -541,13 +550,13 @@ def copy_content_from_containers(request, log_name, path_to_docker=""):
 
         if "No such file" not in str(container_in_use.exec_run(f"ls {path_to_docker}").output):
             stream = (container_in_use.get_archive(path_to_docker))[0]
-            fileobj = io.BytesIO()
+            file_object = io.BytesIO()
 
             for chunk in stream:
-                fileobj.write(chunk)
-            fileobj.seek(0)
+                file_object.write(chunk)
+            file_object.seek(0)
 
             target_path = Path(f"../container_logs_{log_name}/")
             target_path.mkdir(parents=True, exist_ok=True)
             with open(target_path/f"{request.node.name}.tar.gz",'w') as f:
-                f.buffer.write(fileobj.read())
+                f.buffer.write(file_object.read())

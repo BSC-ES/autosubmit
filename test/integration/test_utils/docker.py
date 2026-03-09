@@ -16,11 +16,11 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Utilities for Docker."""
+import multiprocessing
 from getpass import getuser
 from os import environ
 from pathlib import Path
 from pwd import getpwnam
-from textwrap import dedent
 from time import sleep, time
 from typing import TYPE_CHECKING
 
@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'get_container_by_id',
+    'get_containers_by_filter',
     'get_git_container',
     'prepare_and_test_git_container',
     'get_slurm_container',
@@ -54,7 +55,7 @@ _SSH_DOCKER_IMAGE_X11_MFA = 'autosubmit/linuxserverio-ssh-2fa-x11:latest'
 _SSH_DOCKER_PASSWORD = 'password'
 """Common password used in SSH containers; we mock the SSH Client of Paramiko to avoid hassle with keys."""
 
-_SLURM_DOCKER_IMAGE = 'autosubmit/slurm-openssh-container:25-05-0-1'
+_SLURM_DOCKER_IMAGE = 'giovtorres/slurm-docker:25.11.2-v0.1.7'
 """The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
 
 _GIT_DOCKER_IMAGE = 'githttpd/githttpd:latest'
@@ -82,6 +83,25 @@ def get_container_by_id(container_id: str) -> 'Container':
     """
     client = from_env()
     return client.containers.get(container_id)
+
+
+def get_containers_by_filter(filters: dict) -> list['Container']:
+    """Gets Docker containers by a filter.
+
+    The filter is passed down to ``.list(filters=*)``. Useful for
+    GitHub Actions, for instance, where the ``ancestor`` attribute
+    contains the image used.
+
+    E.g.,
+
+        {"ancestor": "giovtorres/slurm-docker:25.11.2-v0.1.5"}
+
+    :param: filters: dictionary with the filters to apply.
+    :return: The docker containers that match the filter.
+    """
+    client = from_env()
+    return client.containers.list(filters=filters)
+
 
 
 def _create_git_container(git_repos_path: Path, http_port: int) -> DockerContainer:
@@ -131,50 +151,58 @@ def get_git_container(git_repos_path: Path) -> tuple['DockerContainer', int]:
 def prepare_and_test_slurm_container(
         container: 'DockerContainer', ssh_port: int, ssh_path: Path, mocker: 'MockerFixture') -> None:
     # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
-    wait_for_logs(container, lambda logs: 'No fed_mgr state file' in logs)
+    wait_for_logs(container, lambda logs: 'All services started' in logs)
 
     container.exec('sinfo')
+    container.exec('mkdir -p /tmp/scratch/group/root')
 
-    sshd_config_text = dedent('''\
-        Include /etc/ssh/sshd_config.d/*.conf
+    user = getuser()
+    container.exec(['bash', '-c', f'useradd -m {user} 2>/dev/null || true'])
+    container.exec(['bash', '-c', f'echo "{user}:{_SSH_DOCKER_PASSWORD}" | chpasswd'])
+    container.exec(['bash', '-c', f'mkdir -p /tmp/scratch/group/{user} && chmod -R 777 /tmp/scratch'])
+    container.exec(['bash', '-c',
+                    f'mkdir -p /home/{user}/.ssh && chmod 700 /home/{user}/.ssh && chown -R {user} /home/{user}/.ssh'])
 
-        PasswordAuthentication yes
-        KbdInteractiveAuthentication no
-        UsePAM yes
-        X11Forwarding yes
-        PrintMotd no
-        AcceptEnv LANG LC_* COLORTERM NO_COLOR
-        Subsystem	sftp	/usr/lib/openssh/sftp-server
-        Port 2222
-        PermitRootLogin yes
-        # MaxStartups 10:0:10
-        LoginGraceTime 120
-        UseDNS no
-        ''')
-    sshd_config = Path(ssh_path, 'slurm_sshd_config')
-    sshd_config.parent.mkdir(parents=True, exist_ok=True)
-    sshd_config.touch()
-    sshd_config.write_text(sshd_config_text)
-    container.exec([
-        "sh", "-c",
-        "cat <<'EOF' > /etc/ssh/sshd_config\n"
-        f"{sshd_config_text}\n"
-        "EOF"
-    ])
+    # sshd_config_text = dedent('''\
+    #     Include /etc/ssh/sshd_config.d/*.conf
+    #
+    #     PasswordAuthentication yes
+    #     KbdInteractiveAuthentication no
+    #     UsePAM yes
+    #     X11Forwarding yes
+    #     PrintMotd no
+    #     AcceptEnv LANG LC_* COLORTERM NO_COLOR
+    #     Subsystem	sftp	/usr/lib/openssh/sftp-server
+    #     Port 2222
+    #     PermitRootLogin yes
+    #     # MaxStartups 10:0:10
+    #     LoginGraceTime 120
+    #     UseDNS no
+    #     ''')
+    # sshd_config = Path(ssh_path, 'slurm_sshd_config')
+    # sshd_config.parent.mkdir(parents=True, exist_ok=True)
+    # sshd_config.touch()
+    # sshd_config.write_text(sshd_config_text)
+    # container.exec([
+    #     "sh", "-c",
+    #     "cat <<'EOF' > /etc/ssh/sshd_config\n"
+    #     f"{sshd_config_text}\n"
+    #     "EOF"
+    # ])
 
     priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config_slurm')
 
-    ssh_authorized_keys = Path('/root/.ssh/authorized_keys')
-    # noinspection PyProtectedMember
-    exec_result = _write_authorized_keys(container._container, pubkey, ssh_authorized_keys)
-    exit_code = exec_result.exit_code
-
-    if exit_code != 0:
+    for authorized_keys_path in [Path('/root/.ssh/authorized_keys'), Path(f'/home/{user}/.ssh/authorized_keys')]:
         # noinspection PyProtectedMember
-        raise RuntimeError(f'Failed to write authorized_keys to test container {container._container.id}')
+        exec_result = _write_authorized_keys(container._container, pubkey, authorized_keys_path)
+        exit_code = exec_result.exit_code
 
-    container.exec('pkill sshd')
-    container.exec('/usr/sbin/sshd')
+        if exit_code != 0:
+            # noinspection PyProtectedMember
+            raise RuntimeError(f'Failed to write authorized_keys to test container {container._container.id}')
+
+    # container.exec('pkill sshd')
+    # container.exec('/usr/sbin/sshd')
 
     wait_for_ssh_port('localhost', ssh_port, timeout=30)
 
@@ -204,6 +232,7 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
     docker_args = {
         'cgroupns': 'host',
         'privileged': True,
+        'init': True,
         'labels': {
             _AS_SLURM_CONTAINER_LABEL: 'true',
         }
@@ -212,7 +241,7 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
     docker_container = DockerContainer(
         image=_SLURM_DOCKER_IMAGE,
         remove=True,
-        hostname='slurmctld',
+        hostname='slurmctl',
         **docker_args
     )
 
@@ -222,6 +251,12 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
 
     container = docker_container \
         .with_env('TZ', 'Etc/UTC') \
+        .with_env('MYSQL_USER', 'autosubmit') \
+        .with_env('MYSQL_PASSWORD', 'autosubmit') \
+        .with_env('ROOT_PASSWORD', 'autosubmit') \
+        .with_env('SSH_PORT', '2222') \
+        .with_env('SSH_PERMIT_ROOT_LOGIN', 'yes') \
+        .with_env('SSH_PASSWORD_AUTH', 'yes') \
         .with_bind_ports(2222, ssh_port)
 
     return container
@@ -253,6 +288,8 @@ def prepare_and_test_ssh_container(
     if exec_result.exit_code != 0:
         raise RuntimeError(f'Failed to run whoami on test container {container.get_wrapped_container().id}')
 
+    container.exec(['bash', '-c', f'mkdir -p /tmp/scratch/group/{getuser()} && chmod -R 777 /tmp/scratch'])
+
     ssh_path.mkdir()
 
     priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config')
@@ -266,6 +303,8 @@ def prepare_and_test_ssh_container(
     if exit_code != 0:
         raise RuntimeError(f'Failed to write authorized_keys to test container {container.get_wrapped_container().id}')
 
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context',
+                 return_value = multiprocessing.get_context('fork'))
     mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, mocker)
 
 
@@ -358,7 +397,7 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
             # from_env().containers.prune(
             #     filters={"label": f"{label}={_AS_SINGLETON_CONTAINER_VALUE}"}
             # )
-            containers: list['Container'] = from_env().containers.list(
+            containers = from_env().containers.list(
                 filters={
                     "status": "running",
                     "label": f"{label}=true"
@@ -381,7 +420,7 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
             # from_env().containers.prune(
             #     filters={"label": f"{label}={_AS_SINGLETON_CONTAINER_VALUE}"}
             # )
-            containers: list['Container'] = from_env().containers.list(
+            containers = from_env().containers.list(
                 filters={
                     "status": "running",
                     "label": f"{label}=true"

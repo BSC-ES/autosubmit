@@ -1,4 +1,6 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
+# This file is part of Autosubmit.
 #
 # Autosubmit is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -38,7 +40,6 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
     from autosubmit.platforms.psplatform import PsPlatform
-    from autosubmit.platforms.slurmplatform import SlurmPlatform
     from docker.models.containers import Container
     # noinspection PyProtectedMember
     from _pytest._py.path import LocalPath
@@ -131,7 +132,12 @@ class CreateJobParametersPlatformFixture(Protocol):
 @pytest.fixture
 def create_job_parameters_platform(
         autosubmit_exp, get_next_expid: Callable[[], str]) -> CreateJobParametersPlatformFixture:
-    def job_parameters_platform(experiment_data: Optional[dict]) -> JobParametersPlatform:
+    def job_parameters_platform(
+            experiment_data: Optional[dict] = None,
+            /,
+            *args: Any,
+            **kwargs: Any
+    ) -> JobParametersPlatform:
         exp = autosubmit_exp(get_next_expid(), experiment_data=experiment_data, include_jobs=True)
         slurm_platform: 'SlurmPlatform' = cast('SlurmPlatform', exp.platform)
 
@@ -443,6 +449,7 @@ def test_exec_command_invalid_command(
             # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
             assert expected == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
         else:
+            assert isinstance(stderr, ChannelFile)
             err_output = str(''.join([x.decode('UTF-8').strip() for x in stderr.readlines()]))
             # cmd not found error
             assert command in err_output
@@ -511,7 +518,7 @@ def test_exec_command_ssh_session_not_active(
         #       But while that's OK, we can also avoid mocking by simply
         #       closing the connection.
 
-        assert exp_ps_platform.transport
+        assert exp_ps_platform.transport is not None
         exp_ps_platform.transport.close()
 
         stdin, stdout, stderr = exp_ps_platform.exec_command(
@@ -524,6 +531,7 @@ def test_exec_command_ssh_session_not_active(
         assert isinstance(stdout, ChannelFile)
         assert stdin is not False
         assert stderr is not False
+        assert isinstance(stdout, ChannelFile)
         # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
         assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
     finally:

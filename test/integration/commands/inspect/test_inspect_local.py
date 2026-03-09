@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -155,7 +155,9 @@ def test_inspect(
         additional_data: str,
         general_data: dict[str, Any],
 ):
-    """Test inspect command for local platform with different job types to see that HPC parameters are correctly set in the job scripts."""
+    """Test inspect command for LOCAL platform.
+
+     Uses different job types to see that HPC parameters are correctly set in the job scripts."""
     yaml = YAML(typ='rt')
 
     if 'FILE' in additional_data:
@@ -168,7 +170,8 @@ def test_inspect(
         script_file.write_text(_TEMPLATE_CONTENT)
         script_file.chmod(0o755)
 
-    # TODO: This should be 'local' but we can't customaize LOCAL platform yet, also scratch_dir, user, host, project shouldn't be modificable at all
+    # TODO: This should be 'local' but we can't customize LOCAL platform yet,
+    #       also scratch_dir, user, host, project shouldn't be allowed to be modified.
     general_data['PLATFORMS']['LOCAL'] = {'TYPE': 'ps', 'HOST': "127.0.0.1", 'SCRATCH_DIR': str(tmp_path), 'USER': ""}
 
     for hpcarch in ['TEST_PS', 'TEST_SLURM', 'LOCAL']:
@@ -177,7 +180,7 @@ def test_inspect(
         general_data['PLATFORMS'][hpcarch]['CUSTOM_DIR_POINTS_TO_OTHER_DIR'] = '%TEST_REFERENCE%'
         as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
 
-        # TODO: This shouldn't be needed but we can't customaize LOCAL platform yet
+        # TODO: This shouldn't be needed but we can't customize LOCAL platform yet
         if hpcarch == 'LOCAL':
             general_data['PLATFORMS'][hpcarch]['PROJECT'] = as_exp.expid
 
@@ -185,7 +188,8 @@ def test_inspect(
         as_conf.set_last_as_command('inspect')
         hpcarch_info = as_conf.experiment_data.get('PLATFORMS', {}).get('TEST_PS', {})
 
-        # TODO: This shouldn't be needed 'local' platform info should be inyected in the memory of the experiment_data when creating the experiment
+        # TODO: This shouldn't be needed 'local' platform info should be injected in
+        #       the memory of the experiment_data when creating the experiment.
         if hpcarch == 'LOCAL':
             expected_hpcrootdir = Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid / Path(BasicConfig.LOCAL_TMP_DIR)
             expected_hpclogdir = expected_hpcrootdir / f"LOG_{as_exp.expid}"

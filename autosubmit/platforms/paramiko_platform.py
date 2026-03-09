@@ -884,7 +884,7 @@ class ParamikoPlatform(Platform):
             cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {pattern} \\) -type f"
             self.send_command(cmd)
             output = self.get_ssh_output()
-            completed_files = output.strip().split('\n') if output else []
+            completed_files = [f for f in output.strip().split("\n") if f]
             final_job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
         return final_job_names
 
@@ -1382,7 +1382,18 @@ class ParamikoPlatform(Platform):
                                     stdout_chunks.append(job_id[0].encode(lang))
                                     x11_exit = True
                     else:
-                        x11_exit = True
+                        # No stderr from the select() readq this iteration. Before declaring
+                        # x11_exit, drain any data Paramiko may have buffered internally
+                        # (select() can miss it due to timing). Only exit if the channel is
+                        # truly done (exit_status_ready), otherwise loop again to give the
+                        # remote command time to produce stderr output.
+                        if channel.recv_stderr_ready():
+                            aux_stderr.append(
+                                stderr.channel.recv_stderr(len(channel.in_stderr_buffer) or 4096)
+                            )
+                            x11_exit = True
+                        elif channel.exit_status_ready():
+                            x11_exit = True
                     if not x11_exit:
                         stderr_readlines = []
                     else:

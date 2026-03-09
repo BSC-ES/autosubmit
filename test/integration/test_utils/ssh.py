@@ -87,10 +87,10 @@ def make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union[
             kwargs['password'] = password
             kwargs['look_for_keys'] = False
             kwargs['allow_agent'] = False
+        args_list = list(args)
         if len(args) > 1:
             # tuple to list, and then replace the port...
-            args = [x for x in args]
-            args[1] = ssh_port
+            args_list[1] = ssh_port
 
         if key is not None:
             kwargs['key_filename'] = str(key)
@@ -99,7 +99,7 @@ def make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union[
         for timeout in ['banner_timeout', 'auth_timeout', 'channel_timeout']:
             kwargs[timeout] = ssh_timeout
 
-        return orig_ssh_client_connect(*args, **kwargs)
+        return orig_ssh_client_connect(*args_list, **kwargs)
 
     ssh_client.connect = _ssh_connect
     return ssh_client
@@ -127,6 +127,7 @@ def _generate_ssh_keypair(path: Path):
                                              format=serialization.PrivateFormat.OpenSSH,
                                              encryption_algorithm=serialization.NoEncryption())
     # print(private_key.decode())
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.touch()
     path.write_text(private_key.decode('utf-8'))
     path.chmod(0o600)

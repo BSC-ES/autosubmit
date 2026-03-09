@@ -74,7 +74,7 @@ jobs:
     env:
       COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     strategy:
       matrix:
@@ -147,13 +147,32 @@ jobs:
           retention-days: 7
 
       - name: Tar logs
+        id: tar_logs
         if: failure()
         run: |
-          mv ../container_logs_ssh_server/ container_logs_integration 
-          mv ../container_logs_git_server/ container_logs_integration_git
+          logs_found=false
+          
+          if [ -d ../container_logs_ssh_server ]; then
+            echo "Found container logs for SSH server, moving them to container_logs_integration"
+            mv ../container_logs_ssh_server/ container_logs_integration
+            logs_found=true
+          else
+            echo "No container logs found for SSH server"
+          fi
+          
+          if [ -d ../container_logs_git_server ]; then
+            echo "Found container logs for Git server, moving them to container_logs_integration_git"
+            mv ../container_logs_git_server/ container_logs_integration_git
+            logs_found=true
+          else
+            echo "No container logs found for Git server"
+          fi
+          
+          # Write the value to the GH Actions step output, so other steps can use it.
+          echo "logs_found=$logs_found" >> $GITHUB_OUTPUT
 
       - name: Upload logs to GitHub
-        if: failure()
+        if: failure() && steps.tar_logs.outputs.logs_found == 'true'
         uses: actions/upload-artifact@master
         with:
           name: container_logs_integration_${{ github.run_id }}
@@ -228,9 +247,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system dependencies
-        run: sudo apt-get install -y curl git graphviz rsync
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip packaging
@@ -246,8 +262,8 @@ jobs:
 
       - name: Integration tests
         run: |
-          pytest \
-            -n $(nproc) \
+          pytest -x \
+            -n 3 \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
@@ -266,17 +282,29 @@ jobs:
           retention-days: 7
 
       - name: Tar logs
+        id: tar_logs
         if: failure()
         run: |
-          mv ../container_logs_slurm_server/ container_logs_slurm.tgz 
+          logs_found=false
+          
+          if [ -d ../container_logs_slurm_server ]; then
+            echo "Found container logs for SLURM server, moving them to container_logs_slurm"
+            mv ../container_logs_slurm_server/ container_logs_slurm
+            logs_found=true
+          else
+            echo "No container logs found for SLURM server"
+          fi
+          
+          # Write the value to the GH Actions step output, so other steps can use it.
+          echo "logs_found=$logs_found" >> $GITHUB_OUTPUT
 
       - name: Upload logs to GitHub
-        if: failure()
+        if: failure() && steps.tar_logs.outputs.logs_found == 'true'
         uses: actions/upload-artifact@master
         with:
           name: container_logs_slurm_${{ github.run_id }}
           path: |
-            container_logs_slurm.tgz
+            container_logs_slurm
           retention-days: 1
           overwrite: true
 
@@ -352,6 +380,7 @@ jobs:
       - name: Validate citation file
         run: |
           cffconvert --validate -i CITATION.cff
+
 
   coverage:
     needs: [test-unit, test-integration, test-regression, test-slurm, test-docs]

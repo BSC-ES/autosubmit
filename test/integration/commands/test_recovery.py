@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from getpass import getuser
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
@@ -66,11 +67,11 @@ def prepare_scratch(as_exp, tmp_path: Path, job_list, job_names_to_recover, slur
     :type job_names_to_recover: Any
     :type slurm_server: Any
     """
-    slurm_root = f"/tmp/scratch/group/root/{as_exp.expid}/"
+    slurm_root = f"/tmp/scratch/group/{getuser()}/{as_exp.expid}/"
     log_dir = Path(slurm_root) / f'LOG_{as_exp.expid}/'
     local_completed_dir = tmp_path / as_exp.expid / "tmp" / f'LOG_{as_exp.expid}/'
     # combining this with the touch, makes the touch generates a folder instead of a file. I have no idea why.
-    slurm_server.exec_run(f'mkdir -p {log_dir}')
+    slurm_server.exec_run(['bash', '-c', f'mkdir -p {log_dir}'])
 
     cmds = []
     for name in job_names_to_recover:
@@ -80,7 +81,8 @@ def prepare_scratch(as_exp, tmp_path: Path, job_list, job_names_to_recover, slur
         else:
             cmds.append(f'touch {log_dir}/{name}_COMPLETED')
     full_cmd = " && ".join(cmds)
-    slurm_server.exec_run(full_cmd)
+    # exec_run with a string uses shlex.split which breaks shell operators like &&
+    slurm_server.exec_run(['bash', '-c', full_cmd])
 
 
 @pytest.fixture(scope="function")
@@ -102,19 +104,24 @@ def job_names_to_recover(job_list):
     "No_Active_jobs&Force == recover_all",
     "No_Active_jobs&No_Force == recover_all",
 ])
-def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_names_to_recover, active_jobs, force):
+def test_online_recovery(
+        as_exp,
+        prepare_scratch,
+        submitter,
+        slurm_server,
+        job_names_to_recover,
+        active_jobs: bool,
+        force: bool
+):
     """Test the recovery of an experiment.
 
     :param as_exp: The Autosubmit experiment object.
     :param prepare_scratch: Fixture to prepare the scratch directory.
-    :type as_exp: Any
-    :type prepare_scratch: Any
     """
-    job_list_ = as_exp.autosubmit.load_job_list(
-        as_exp.expid, as_exp.as_conf, new=False)
+    job_list_ = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
     db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
     db_manager.initialize()
-    # Save fails if platform is not set ( in 4.2 this is not the case )
+    # Save fails if the platform is not set. In 4.2 this will not happen.
     submitter = ParamikoSubmitter(as_conf=as_exp.as_conf)
     submitter.load_platforms(as_exp.as_conf)
     platforms = submitter.platforms
@@ -134,11 +141,11 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
         with pytest.raises(AutosubmitCritical):
             as_exp.autosubmit.recovery(
                 as_exp.expid,
-                noplot=False,  # Just test that is called without errors
+                noplot=False,
                 save=True,
                 all_jobs=True,
-                hide=True,  # Just test that is called without errors
-                group_by="date",  # Just test that is called without errors
+                hide=True,
+                group_by="date",
                 expand=[],
                 expand_status=[],
                 detail=True,
@@ -160,13 +167,12 @@ def test_online_recovery(as_exp, prepare_scratch, submitter, slurm_server, job_n
             offline=False
         )
 
-        job_list_ = as_exp.autosubmit.load_job_list(
-            as_exp.expid, as_exp.as_conf, new=False)
+        job_list_ = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
 
         completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
 
         for name in job_names_to_recover:
-            # 2nd split is not completed, so the 3º split was marked as COMPLETED ( file found) and then WAITING
+            # 2nd split is not completed, so the 3rd split was marked as the COMPLETED file was found, and then WAITING.
             split_number = name.split('_')[-2]
             if split_number == "3":
                 assert name not in completed_jobs

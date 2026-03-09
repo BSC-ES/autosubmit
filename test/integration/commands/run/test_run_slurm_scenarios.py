@@ -1,7 +1,27 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Tests that run diverse scenarios for Autosubmit run with a ``slurm`` platform
+and checks the database for expected results."""
+
 from getpass import getuser
 from pathlib import Path
 from textwrap import dedent
-from time import sleep
+from test.integration.test_utils.misc import wait_locker
 from typing import TYPE_CHECKING
 
 import pytest
@@ -344,8 +364,11 @@ def test_run_interrupted(
 
     # Run the experiment
     # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
-    run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
-    sleep(2)
+    lock_file = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid, BasicConfig.LOCAL_TMP_DIR, "autosubmit.lock")
+    as_thread, exception, _ = run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
+    if exception:
+        pytest.fail(f"Exception raised: {exception}")
+    wait_locker(lock_file, expect_locked=True, timeout=30, interval=0.5)
     current_statuses = 'SUBMITTED, QUEUING, RUNNING'
     as_exp.autosubmit.stop(
         all_expids=False,
@@ -355,6 +378,10 @@ def test_run_interrupted(
         force=True,
         force_all=True,
         status='FAILED')
+
+    as_thread.join(timeout=60)
+    assert not as_thread.is_alive(), "Autosubmit thread did not stop after stop() call"
+    wait_locker(lock_file, expect_locked=False, timeout=30, interval=0.5)
 
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
 
@@ -730,7 +757,7 @@ def test_run_with_additional_files(
     ),
 ])
 def test_wrapper_config(
-        wrappers: str,
+        wrappers: dict,
         run_type: str,
         autosubmit_exp,
         slurm_server: 'Container',
@@ -784,12 +811,12 @@ def test_wrapper_config(
             as_exp.as_conf.set_last_as_command('inspect')
             as_exp.autosubmit.inspect(
                 expid=as_exp.expid,
-                lst=None,
+                lst=None,  # type: ignore
                 check_wrapper=True,
                 force=True,
-                filter_chunks=None,
-                filter_section=None,
-                filter_status=None,
+                filter_chunks=None,  # type: ignore
+                filter_section=None,  # type: ignore
+                filter_status=None,  # type: ignore
                 quick=True if run_type == "quick-inspect" else False
             )
         templates_dir = Path(tmp_path) / as_exp.expid / "tmp"

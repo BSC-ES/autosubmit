@@ -65,6 +65,9 @@ def wait_locker(file_lock: Path, expect_locked: bool, timeout: int, interval=0.0
             raise TimeoutError(f"File lock {'not ' if expect_locked else ''}acquired at {file_lock} "
                                f"({timeout}s timeout, {elapsed:.2f}s elapsed)")
 
+        if not file_lock.exists():
+            continue
+
         if expect_locked:
             # Check if the file is locked by attempting to acquire it non-blocking
             try:
