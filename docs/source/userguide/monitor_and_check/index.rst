@@ -27,7 +27,7 @@ Example:
 How to use check in running time:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In ``jobs_<EXPID>.yml`` , you can set check(default true) to check the scripts during autosubmit run cxx.
+In ``jobs_<EXPID>.yml``, you can set check (default true) to check the scripts during autosubmit run.
 
 There are two parameters related to check:
 
@@ -286,7 +286,7 @@ TODO: Add ``group_chunk.png`` figure.
 
 Synchronize jobs
 
-If there are jobs synchronized between members or dates, then a connection between groups is shown:
+If jobs are synchronized between members or dates, then a connection between groups is shown:
 
 .. figure:: fig/group_synchronize.png
    :name: group_synchronize
@@ -347,7 +347,7 @@ If there are chunk jobs that are split, the splits can also be grouped.
 **Understanding the group status**
 
 If there are jobs with different status grouped together, the status of the group is determined as follows:
-If there is at least one job that failed, the status of the group will be FAILED. If there are no failures, but if there is at least one job running, the status will be RUNNING.
+If there is at least one job that failed, the status of the group will be FAILED. If there are no failures but there is at least one job running, the status will be RUNNING.
 The same idea applies following the hierarchy: SUBMITTED, QUEUING, READY, WAITING, SUSPENDED, UNKNOWN. If the group status is COMPLETED, it means that all jobs in the group were completed.
 
 **Automatic grouping**
@@ -524,7 +524,7 @@ CSV files are also generated with the same information, in the same directory as
 Custom statistics
 ~~~~~~~~~~~~~~~~~
 
-Although Autosubmit saves several statistics about your experiment, as the queueing time for each job, how many failures per job, etc.
+Although Autosubmit saves several statistics about your experiment, such as the queueing time for each job, how many failures per job, etc.,
 The user also might be interested in adding his particular statistics to the Autosubmit stats report (```autosubmit stats EXPID```).
 The allowed format for this feature is the same as the Autosubmit configuration files: INI style. For example:
 ::
@@ -539,7 +539,7 @@ The location where user can put this stats is in the file:
 
     <experiments_directory>/<EXPID>/tmp/<EXPID>_GENERAL_STATS
 
-.. hint:: If it is not yet created, you can manually create the file: ```expid_GENERAL_STATS``` inside the ```tmp``` folder.
+.. hint:: If it is not yet created, you can manually create the file: ``expid_GENERAL_STATS`` inside the ``tmp`` folder.
 
 .. _report:
 
@@ -569,7 +569,7 @@ Options:
 .. runcmd:: autosubmit report -h
 
 
-Autosubmit parameters are encapsulated by %_%, once you know how the parameter is called you can create a template similar to the one as follows:
+Autosubmit parameters are encapsulated by %_%. Once you know how the parameter is called, you can create a template similar to the one as follows:
 
 .. code-block:: ini
    :caption: Template format and example.
@@ -594,7 +594,7 @@ This will be understood by Autosubmit and the result would be similar to:
 
 Although it depends on the experiment.
 
-If the parameter doesn't exists, it will be returned as '-' while if the parameter is declared but empty it will remain empty
+If the parameter doesn't exist, it will be returned as '-', while if the parameter is declared but empty, it will remain empty.
 
 .. code-block:: ini
    :caption: List of all parameters example.

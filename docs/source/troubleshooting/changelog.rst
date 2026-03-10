@@ -4,7 +4,7 @@ Changelog
 
 This page shows the main changes from AS3 to AS4.
 
-Mayor mentions:
+Major changes:
 
 - Python version has changed to 3.7.3 instead of 2.7.
 - Configuration language has changed to YAML.
@@ -18,7 +18,7 @@ Mayor mentions:
 - New command added, upgrade. This command will update all the scripts and autosubmit configuration.
 - Wrapper definition has changed.
 - Tasks dependencies system has changed.
-- Added the parameter DELETE_WHEN_EDGELESS ( boolean ) to the section JOBS. This parameter allows to delete a job when it has no edges. ( default TRUE)
+- Added the parameter DELETE_WHEN_EDGELESS (boolean) to the section JOBS. This parameter allows deleting a job when it has no edges (default TRUE).
 
 .. warning::
     The configuration language has changed. Please, check the new configuration file format.
@@ -32,22 +32,22 @@ Mayor mentions:
 .. warning::
     Edgeless jobs are now deleted by default. Please, check the new parameter DELETE_WHEN_EDGELESS.
 
-.. warning:: upgrade may not translate all the scripts, we recommend to revise your scripts before run AS.
+.. warning:: Upgrade may not translate all the scripts. We recommend reviewing your scripts before running AS.
 
 Configuration changes
 =====================
 
-Now autosubmit is composed by two kind of YAML configurations, the default ones, which are the same as always, and the custom ones.
+Now autosubmit is composed of two kinds of YAML configurations: the default ones, which are the same as always, and the custom ones.
 
-The custom ones, allows to define custom configurations that will override the default ones, in order to do this, you only have to put the key in the custom configuration file.
-These custom ones, can be anywhere and have any name, by default they're inside `<EXPID>/conf` but you can change this path in the expdef_<EXPID>.yml file. `DEFAULT.CUSTOM_CONFIG`
+The custom ones allow defining custom configurations that will override the default ones. In order to do this, you only have to put the key in the custom configuration file.
+These custom ones can be anywhere and have any name. By default, they're inside ``<EXPID>/conf``, but you can change this path in the expdef_<EXPID>.yml file using ``DEFAULT.CUSTOM_CONFIG``.
 
 Additionally, you must be aware of the following changes:
 
- - All sections **keys** are normalized to **UPPERCASE**, while values remain as the user put. Beware of the scripts that relies on %CURRENT_HPCARCH% and variables that refer to a platform because they will be always in UPPERCASE. Normalize the script.
- - To define a job, you must put them under the key `jobs` in any custom configuration file.
- - To define a platform, you must put them under the key `platforms` in any custom configuration file.
- - To define a loop, you must put the key "FOR" as the first key of the section.
+ - All section **keys** are normalized to **UPPERCASE**, while values remain as the user put them. Beware of scripts that rely on %CURRENT_HPCARCH% and variables that refer to a platform because they will always be in UPPERCASE. Normalize the script.
+ - To define a job, you must put it under the key ``jobs`` in any custom configuration file.
+ - To define a platform, you must put it under the key ``platforms`` in any custom configuration file.
+ - To define a loop, you must put the key ``FOR`` as the first key of the section.
  - You can put any %placeholder% in the proj_<EXPID>.yml and custom files, and also you can put %ROOTDIR% in the expdef_<EXPID>.yml.
  - All configuration is now based in an hierarchical structure, so to export a var, you must use the following syntax: `%KEY.SUBKEY.SUBSUBKEY%`. The same goes for override them.
  - YAML has into account the type.
@@ -396,15 +396,15 @@ One can use now the following configuration:
           RUNNING: chunk
           WALLCLOCK: '00:05'
 
-.. warning:: Only the parameters that changes must be included inside the `FOR` key.
+.. warning:: Only the parameters that change must be included inside the ``FOR`` key.
 
 Dependencies rework
 ===================
 
 The DEPENDENCIES key is used to define the dependencies of a job. It can be used in the following ways:
 
-- Basic: The dependencies are a list of jobs, separated by " ", that runs before the current task is submitted.
-- New: The dependencies is a list of YAML sections, separated by "\n", that runs before the current job is submitted.
+- Basic: The dependencies are a list of jobs, separated by spaces, that run before the current task is submitted.
+- New: The dependencies are a list of YAML sections, separated by newlines, that run before the current job is submitted.
 
     - For each dependency section, you can designate the following keywords to control the current job-affected tasks:
 
@@ -420,9 +420,9 @@ The DEPENDENCIES key is used to define the dependencies of a job. It can be used
 
     - Important keywords for [DATES|MEMBERS|CHUNKS]_TO:
 
-        - "natural": Will keep the default linkage. Will link if it would be normally. Example, SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1.
-        - "all": Will link all selected tasks of the dependency with current selected tasks. Example, SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1, DA_FC00_CHUNK_2, DA_FC00_CHUNK_3...
-        - "none": Will unlink selected tasks of the dependency with current selected tasks.
+        - "natural": Will keep the default linkage. Will link as it would normally. Example: SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1.
+        - "all": Will link all selected tasks of the dependency with the current selected tasks. Example: SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1, DA_FC00_CHUNK_2, DA_FC00_CHUNK_3...
+        - "none": Will unlink selected tasks of the dependency from the current selected tasks.
 
 For the new format, consider that the priority is hierarchy and goes like this DATES_FROM -(includes)-> MEMBERS_FROM -(includes)-> CHUNKS_FROM.
 

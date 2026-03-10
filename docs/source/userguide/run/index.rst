@@ -23,7 +23,7 @@ Options:
 
 Example:
 
-.. important:: If the autosubmit version is set on ``autosubmit_<EXPID>.yml`` it must match the actual autosubmit version
+.. important:: If the autosubmit version is set in ``autosubmit_<EXPID>.yml``, it must match the actual autosubmit version.
 .. hint:: It is recommended to launch it in background and with ``nohup`` (continue running although the user who launched the process logs out).
 
 .. code-block:: bash
@@ -32,8 +32,8 @@ Example:
     ssh-add ~/.ssh/id_rsa
     nohup autosubmit run <EXPID> &
 
-.. important:: Before launching Autosubmit check password-less ssh is feasible (*HPCName* is the hostname):
-.. important:: Add encryption key to ssh agent for each session (if your ssh key is encrypted)
+.. important:: Before launching Autosubmit, check that password-less ssh is feasible (*HPCName* is the hostname).
+.. important:: Add encryption key to ssh agent for each session (if your ssh key is encrypted).
 
 .. important:: The host machine has to be able to access HPC's/Clusters via password-less ssh. Make sure that the ssh key is in PEM format `ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM`.
 
@@ -122,7 +122,7 @@ To run only a subset of selected members you can execute the command:
 
 Then, your experiment will start running jobs belonging to those members only. If the experiment was previously running and autosubmit was stopped when some jobs belonging to other members (not the ones from your input) where running, those jobs will be tracked and finished in the new exclusive run.
 
-Furthermore, if you wish to run a sequence of only members execution; then, instead of running `autosubmit run -rom "member_1"` ... `autosubmit run -rom "member_n"`, you can make a bash file with that sequence and run the bash file. Example:
+Furthermore, if you wish to run a sequence of only members execution, then instead of running `autosubmit run -rom "member_1"` ... `autosubmit run -rom "member_n"`, you can make a bash file with that sequence and run the bash file. Example:
 
 .. code-block:: bash
 
@@ -148,8 +148,8 @@ To start an experiment at a given time, use the command:
 *<EXPID>* is the experiment identifier
 
 *INPUT* is the time when your experiment will start. You can provide two formats:
-  * `H:M:S`: For example `15:30:00` will start your experiment at 15:30 in the afternoon of the present day.
-  * `yyyy-mm-dd H:M:S`: For example `2021-02-15 15:30:00` will start your experiment at 15:30 in the afternoon on February 15th.
+  * ``H:M:S``: For example, ``15:30:00`` will start your experiment at 15:30 in the afternoon of the present day.
+  * ``yyyy-mm-dd H:M:S``: For example, ``2021-02-15 15:30:00`` will start your experiment at 15:30 in the afternoon on February 15th.
 
 Then, your terminal will show a countdown for your experiment start.
 
@@ -175,7 +175,7 @@ To start an experiment after another experiment is finished, use the command:
 
 .. warning:: Both experiments must be using Autosubmit version `3.13.0` or later.
 
-Then, your terminal will show the current status of the experiment you are waiting for. The status format is `COMPLETED/QUEUING/RUNNING/SUSPENDED/FAILED`.
+Then, your terminal will show the current status of the experiment you are waiting for. The status format is ``COMPLETED/QUEUING/RUNNING/SUSPENDED/FAILED``.
 
 This functionality can be used together with other options supplied by the `run` command.
 

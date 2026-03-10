@@ -1,7 +1,7 @@
 Log operations
 =====================
 
-Autosubmit have some utilities to handle the log files that are created during the workflow execution. These utilities can help to save disk space and improve performance when dealing with large log files.
+Autosubmit has some utilities to handle the log files that are created during the workflow execution. These utilities can help to save disk space and improve performance when dealing with large log files.
 
 
 Compressing logs from a remote job execution

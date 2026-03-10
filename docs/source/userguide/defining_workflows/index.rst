@@ -1,9 +1,9 @@
 Defining the workflow
 =====================
 
-One of the most important step that you have to do when planning to use autosubmit for an experiment is the definition
-of the workflow the experiment will use. In this section you will learn about the workflow definition syntax so you will
-be able to exploit autosubmit's full potential
+One of the most important steps that you have to do when planning to use autosubmit for an experiment is the definition
+of the workflow the experiment will use. In this section, you will learn about the workflow definition syntax so you will
+be able to exploit autosubmit's full potential.
 
 .. warning::
    This section is NOT intended to show how to define your jobs. Please go to :doc:`/qstartguide/index` section for a comprehensive
@@ -13,8 +13,8 @@ be able to exploit autosubmit's full potential
 Simple workflow
 ---------------
 
-The simplest workflow that can be defined it is a sequence of two jobs, with the second one triggering at the end of
-the first. To define it, we define the two jobs and then add a DEPENDENCIES attribute on the second job referring to the
+The simplest workflow that can be defined is a sequence of two jobs, with the second one triggering at the end of
+the first. To define it, we define the two jobs and then add a DEPENDENCIES attribute to the second job referring to the
 first one.
 
 It is important to remember when defining workflows that DEPENDENCIES on autosubmit always refer to jobs that should

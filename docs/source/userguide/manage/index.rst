@@ -17,7 +17,7 @@ Options:
 
 .. runcmd:: autosubmit clean -h
 
-* The -p and -s flag are used to clean our experiment ``plot`` folder to save disk space. Only the two latest plots will be kept. Older plots will be removed.
+* The -p and -s flags are used to clean our experiment ``plot`` folder to save disk space. Only the two latest plots will be kept. Older plots will be removed.
 
 Example:
 ::
@@ -37,8 +37,8 @@ A bare copy (which occupies less space on disk) will be automatically made.
 
 .. hint:: That bare clone can be always reconverted in a working clone if we want to run again the experiment by using ``git clone bare_clone original_clone``.
 
-.. note:: In addition, every time you run this command with -pr option, it will check the commit unique identifier for local working tree existing on the ``proj`` directory.
-    In case that commit identifier exists, clean will register it to the ``expdef_<EXPID>.yml`` file.
+.. note:: In addition, every time you run this command with the -pr option, it will check the commit unique identifier for the local working tree existing in the ``proj`` directory.
+    If that commit identifier exists, clean will register it in the ``expdef_<EXPID>.yml`` file.
 
 .. _archive:
 
@@ -57,7 +57,7 @@ Options:
 
 .. runcmd:: autosubmit archive -h
 
-The archived experiment will be stored as a ``tar.gz` file, under
+The archived experiment will be stored as a ``tar.gz`` file, under
 a directory named after the year of the last ``_COMPLETED`` file
 date or, if no ``_COMPLETED`` job is present, it will use the year of
 the date the ``autosubmit archive`` was run (e.g. for the selected
@@ -297,9 +297,9 @@ if you see that the file name has changed to:
 
     update_list_<EXPID>_<DATE>_<TIME>.txt
 
-.. note:: A running instance of Autosubmit will check the existence of adobe file after checking already submitted jobs.
+.. note:: A running instance of Autosubmit will check the existence of the above file after checking already submitted jobs.
     It may take some time, depending on the setting ``SAFETYSLEEPTIME``.
 
 
 
-.. warning:: Keep in mind that autosubmit reads the file automatically so it is suggested to create the file in another location like ``/tmp`` or ``/var/tmp`` and then copy/move it to the ``pkl`` folder. Alternatively you can create the file with a different name an rename it when you have finished.
+.. warning:: Keep in mind that autosubmit reads the file automatically, so it is suggested to create the file in another location like ``/tmp`` or ``/var/tmp`` and then copy/move it to the ``pkl`` folder. Alternatively, you can create the file with a different name and rename it when you have finished.

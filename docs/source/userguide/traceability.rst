@@ -70,7 +70,7 @@ configuration file.
 
 .. note::
 
-   The are commands that do not produce any log, e.g. ``autosubmit delete`` as
+   There are commands that do not produce any log, e.g. ``autosubmit delete``.
 
 The logs of the workflow tasks are retrieved from remote platforms by Autosubmit
 and written to ``<EXPID>/tmp/LOG_<EXPID>/``. They contain the output and errors,
