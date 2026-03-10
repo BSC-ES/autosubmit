@@ -113,9 +113,9 @@ Wrapper parameters description
 Type
 ^^^^
 
-The type parameter allow the user to determine the wrapper algorithm. 
+The type parameter allows the user to determine the wrapper algorithm. 
 
-It affects tasks in wrapper order executions, and in hybrid cases, it adds some internal logic. 
+It affects task execution order in wrappers, and in hybrid cases, it adds some internal logic. 
 
 .. code-block:: YAML
 
@@ -126,7 +126,7 @@ It affects tasks in wrapper order executions, and in hybrid cases, it adds some 
 Jobs_in_wrapper
 ^^^^^^^^^^^^^^^
 
-The jobs_in_wrapper parameter allow the user to determine the tasks inside a wrapper by giving the job_section name. It can group multiple tasks by providing more than one job_section name. 
+The jobs_in_wrapper parameter allows the user to determine the tasks inside a wrapper by specifying the job_section name. It can group multiple tasks by providing more than one job_section name. 
 
 .. code-block:: YAML
 
@@ -139,9 +139,9 @@ The jobs_in_wrapper parameter allow the user to determine the tasks inside a wra
 Method
 ^^^^^^
 
-The method parameter allow the user to determine if the wrapper will use machine files or threads. 
+The method parameter allows the user to determine if the wrapper will use machine files or threads. 
 
-This allows to form a wrapper with that relies on machinefiles to work.
+This allows forming a wrapper that relies on machinefiles to work.
 
 .. code-block:: YAML
 
@@ -160,7 +160,7 @@ or
       TYPE: "horizontal"
       JOBS_IN_WRAPPER: "SIM"
 
-This allows to form a wrapper with shared-memory paradigm instead of rely in machinefiles to work in parallel.
+This allows forming a wrapper with shared-memory paradigm instead of relying on machinefiles to work in parallel.
 
 
 .. code-block:: YAML
@@ -174,7 +174,7 @@ This allows to form a wrapper with shared-memory paradigm instead of rely in mac
 Extend_wallclock
 ^^^^^^^^^^^^^^^^
 
-The extend_wallclock parameter allow the users to provide extra headroom for the wrapper. The accepted value is an integer. Autosubmit will translate this value automatically to the max_wallclock of the sum of wrapper inner-tasks wallclock at the horizontal level. 
+The extend_wallclock parameter allows users to provide extra headroom for the wrapper. The accepted value is an integer. Autosubmit will translate this value automatically to the max_wallclock of the sum of wrapper inner-task wallclocks at the horizontal level. 
 
 .. code-block:: YAML
 
@@ -216,7 +216,7 @@ The queue parameter allows the users to define a different queue for the wrapper
 Export
 ^^^^^^
 
-The queue parameter allows the users to define a path to a script that will load environment scripts before running the wrapper tasks. This value overrides the job queue.
+The export parameter allows users to define a path to a script that will load environment scripts before running the wrapper tasks. This value overrides the job export setting.
 
 .. code-block:: YAML
 
@@ -289,7 +289,7 @@ Autosubmit will wrap as many tasks as possible while respecting the limits set i
 * Strict: will always wait for MIN_WRAPPED tasks to be ready to create a wrapper.
 
 
-.. warning: Mixed and strict policies can cause deadlocks.
+.. warning:: Mixed and strict policies can cause deadlocks.
 
 .. code-block:: YAML
 

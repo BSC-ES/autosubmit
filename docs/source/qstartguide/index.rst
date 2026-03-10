@@ -102,7 +102,7 @@ Then, execute ``autosubmit create <EXPID> -np`` and Autosubmit will generate the
 Run and monitoring
 ==================
 
- To run an experiment, use ```autosubmit run <EXPID>```. Autosubmit runs experiments performing the following operations:
+ To run an experiment, use ``autosubmit run <EXPID>``. Autosubmit runs experiments performing the following operations:
 
  - First, it **checks the experiment configuration**. If it is wrong, it won't proceed further.
  - Second, it **runs the experiment while retrieving all logs** from completed or failed tasks as they run.
@@ -199,7 +199,7 @@ Now open platforms_<EXPID>.yml. Note: This will be an example for marenostrum4
 
 .. runcmd:: cat /home/docs/autosubmit/a000/conf/platforms_a000.yml
 
-``autosubmit create <EXPID>** (without -np)`` will generate the new workflow and ``autosubmit run <EXPID>`` will run the experiment with the latest changes.
+``autosubmit create <EXPID>`` (without -np) will generate the new workflow and ``autosubmit run <EXPID>`` will run the experiment with the latest changes.
 
 .. warning::
     If you are using an encrypted key, you will need to add it to the ssh-agent before running the experiment. To do so, run ``ssh-add <path_to_key>``.

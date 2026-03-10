@@ -63,7 +63,7 @@ We create an initialization method with the required parameters.
         SlurmPlatform.__init__(self, expid, name, config, auth_password = auth_password)
         self.example_platform_parameter = ... # add any platform specific parameters
 
-As it can be seen, the parent class has an initialization method to invoke all the parent'`s methods and attributes
+As it can be seen, the parent class has an initialization method to invoke all the parent's methods and attributes
 into the child (``Slurm_ExamplePlatform``).
 In order to override methods from the parent class, we can simply redefine them as shown below, this way we can add
 new parameters and/or behaviours, making it possible to add flexibility and restructure a platform for the new needs.
@@ -223,7 +223,7 @@ Now we start configuring the experiment adding the additional ``PARAMETERS`` to 
         CALENDAR: standard
 
 
-Add the following PARAMETER will point towards the folder containing all the scripts and instructions to be
+Add the following PARAMETER which will point towards the folder containing all the scripts and instructions to be
 used to execute the experiment in the platform
 
 .. code-block:: yaml
@@ -234,8 +234,8 @@ used to execute the experiment in the platform
 
 Autosubmit will copy your sources to the ``$autosubmit_installation/$expid/proj/%PROJECT.PROJECT_DESTINATION%``.
 
-The following settings used to create a connection with a platform to execute the jobs,
-you must to input the information suitable for your project. (e.g.: user, host, platform)
+The following settings are used to create a connection with a platform to execute the jobs.
+You must input the information suitable for your project (e.g.: user, host, platform).
 
 
 .. _TargetPlatform:
@@ -368,7 +368,7 @@ these files will contain proj-associated code that will be executed on the job-s
     APP.sh
     CLEAN.sh
 
-To keep and concise and clear example of how Autosubmit works, a simple instruction can be executed as a test.
+To keep a concise and clear example of how Autosubmit works, a simple instruction can be executed as a test.
 So add the following the instruction below to one or more ``Bash`` files created in the previous steps.
 
 .. code-block:: yaml
@@ -380,7 +380,7 @@ How to run the experiment
 
 ``autosubmit create -np -f -v <EXPID>``
 
-Once the experiment is generated we can execute it and check if by running the command below the experiment
+Once the experiment is generated, we can execute it and check the experiment by running the command below
 
     #. Submit the job to the specified platform
     #. monitor their status

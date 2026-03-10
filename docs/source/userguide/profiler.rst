@@ -8,9 +8,9 @@
 autosubmit.profiler
 ===================
 
-.. important:: If you only want to use the profiler built into the Autosubmit commands, simpler 
-      user-oriented guides are available for :ref:`run<run_profiling>`, 
-      :ref:`create<create_profiling>` and :ref:`monitor<monitor_profiling>`.
+.. important:: If you only want to use the profiler built into the Autosubmit commands, simpler
+      user-oriented guides are available for :ref:`run<run_profiling>`,
+      :ref:`create<create_profiling>`, and :ref:`monitor<monitor_profiling>`.
 
 ######################################
 The Autosubmit's profiler
@@ -27,8 +27,8 @@ profiling and reasonable overhead features. However, it also limits profiling to
 please, do not use it on concurrent code. For memory profiling, it uses ``psutil``.
 
 .. caution::
-      This profiler was originally designed to be used in the ``autosubmit run`` command, so using 
-      it in other functions may produce unexpected results or errors. Now, its usage have been 
+      This profiler was originally designed to be used in the ``autosubmit run`` command, so using
+      it in other functions may produce unexpected results or errors. Now, its usage has been
       extended to ``autosubmit create`` and ``monitor``.
       
       The profiler instantiation requires an ``<EXPID>``, and not all the functions in Autosubmit use it.

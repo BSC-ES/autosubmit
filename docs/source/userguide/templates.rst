@@ -23,7 +23,7 @@ In the example above, the script template ``print_expid.sh`` file must exist in 
 When you run ``autosubmit create`` or ``autosubmit refresh``, Autosubmit will copy the Project files,
 including template scripts, to the experiment folder `proj`.
 
-The first time the ``create`` command it performs the equivalent of ``autosubmit refresh``, updating
+The first time the ``create`` command is run, it performs the equivalent of ``autosubmit refresh``, updating
 the Autosubmit project and it will plot and try to display a new graph. The template scripts are then
 preprocessed and the final script is generated when an Autosubmit experiment is
 :ref:`inspected <inspect_cmd>` or :doc:`created </userguide/run/index>`.

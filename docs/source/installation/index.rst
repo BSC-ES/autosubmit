@@ -9,8 +9,8 @@ The Autosubmit code is hosted in GitHub. The Autosubmit Python package is availa
 
 - Pre-requisites: bash, python >= 3.9, sqlite3, git-scm > 1.8.2, subversion, pip >= 24.0, dialog, curl, python-tk(tkinter in centOS), graphviz >= 2.41, rsync
 
-.. important:: (SYSTEM) Python version has to be at least 3.9 and at most 3.12. 
-.. important:: (SYSTEM) Graphviz version must be >= 2.38 except 2.40(not working). You can check the version using dot -v.
+.. important:: (SYSTEM) Python version has to be at least 3.9 and at most 3.12.
+.. important:: (SYSTEM) Graphviz version must be >= 2.38 except 2.40 (not working). You can check the version using dot -v.
 .. important:: (SYSTEM) Pip version must be >= 24.0. You can check the version using pip -V.
 
 - Python dependencies: configobj>=5.0.6, argparse>=1.4.0 , python-dateutil>=2.8.2, matplotlib==3.4.3, numpy==1.21.6, py3dotplus>=1.1.0, pyparsing>=3.0.7, paramiko>=2.9.2, mock>=4.0.3, six>=1.10, portalocker>=2.3.2, networkx==2.6.3, requests>=2.27.1, bscearth.utils>=0.5.2, cryptography>=36.0.1, setuptools>=60.8.2, xlib>=0.21, pip>=22.0.3, ruamel.yaml, pythondialog, pytest, nose, coverage, PyNaCl==1.4.0, six>=1.10.0, requests, xlib, Pygments, packaging==19, typing>=3.7
@@ -189,7 +189,7 @@ Manually generate an ``autosubmitrc`` file in one of these locations, which is t
 
 * Set the environment variable ``AUTOSUBMIT_CONFIGURATION`` to the path of the ``autosubmitrc`` file. This will override all other configuration files.
 
-.. important::  `.autosubmitrc` user level precedes system configuration unless the environment variable is set. `AUTOSUBMIT_CONFIGURATION` > `$HOME/.autosubmitrc > /etc/autosubmitrc`
+.. important::  ``.autosubmitrc`` user level precedes system configuration unless the environment variable is set. ``AUTOSUBMIT_CONFIGURATION`` > ``$HOME/.autosubmitrc`` > ``/etc/autosubmitrc``
 
 Quick Installation - Non-shared database (user level)
 ------------------------------------------------------
@@ -202,7 +202,7 @@ To use the default settings, create a directory called ``autosubmit`` (``mkdir $
 
     autosubmit configure
 
-``autosubmit generate`` will always generate a file called ``.autosubmitrc`` in your ``$HOME``.
+``autosubmit configure`` will always generate a file called ``.autosubmitrc`` in your ``$HOME``.
 
 You can add ``--advanced`` to the configure command for advanced options.
 
@@ -212,7 +212,7 @@ You can add ``--advanced`` to the configure command for advanced options.
 
 It will allow you to choose different directories:
 
-* Experiments path and database name ( ``$HOME/autosubmit/`` by default ) and database name ( ``$HOME/autosubmit/autosubmit.db``  by default )
+* Experiments path and database name (``$HOME/autosubmit/`` by default) and database name (``$HOME/autosubmit/autosubmit.db`` by default)
 * Path for the global logs (those not belonging to any experiment). Default is ``$HOME/autosubmit/logs``.
 * Autosubmit metadata. Default is ``$HOME/autosubmit/metadata/``
 
