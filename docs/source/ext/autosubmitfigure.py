@@ -6,7 +6,7 @@
 # the Common Workflow Language project, and, where practical,
 # linking to https://www.commonwl.org/ ),...
 # Ref: https://github.com/common-workflow-language/user_guide/blob/8abf537144d7b63c3561c1ff2b660543effd0eb0/LICENSE.md
-
+import os
 from pathlib import Path
 from shutil import copy, move
 from typing import cast, Optional
@@ -178,6 +178,7 @@ def _copy_rst_yaml_files_to_as_experiment(
             continue
         path_to = Path(target_path, f'autosubmit/autosubmit/{expid}/conf/{key}_{expid}.yml')
         logger.debug(f'Copying {path_from} to {path_to}')
+        os.makedirs(os.path.dirname(path_to), exist_ok=True)
         copy(path_from, path_to)
 
 

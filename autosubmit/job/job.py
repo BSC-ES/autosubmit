@@ -152,7 +152,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit', '_debug'
+        '_log_recovered', 'packed_during_building', 'workflow_commit', '_validate_template'
     )
 
     def __setstate__(self, state):
@@ -302,7 +302,7 @@ class Job(object):
                                                             Status.PREPARED,
                                                             Status.READY] else \
                 self.status
-        self.debug = False
+        self.validate_template = False
 
     def clean_attributes(self):
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
@@ -692,14 +692,14 @@ class Job(object):
         self._notify_on = value
 
     @property
-    @autosubmit_parameter(name='debug')
-    def debug(self):
-        """Whether to print debug information about the job."""
-        return self._debug
+    @autosubmit_parameter(name='validate_template')
+    def validate_template(self):
+        """Whether to print validate information about the job."""
+        return self._validate_template
 
-    @debug.setter
-    def debug(self, value):
-        self._debug = value
+    @validate_template.setter
+    def validate_template(self, value):
+        self._validate_template = value
 
     def read_header_tailer_script(self, script_path: str, as_conf: AutosubmitConfig, is_header: bool):
         """
@@ -2153,7 +2153,7 @@ class Job(object):
             if self.checkpoint:  # To activate placeholder substitution per <empty> in the template
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
-            self.debug = parameters.get("CURRENT_DEBUG", False)
+            self.validate_template = parameters.get("CURRENT_VALIDATE", False)
 
         parameters['JOBNAME'] = self.name
         parameters['FAIL_COUNT'] = str(self.fail_count)
@@ -2448,7 +2448,7 @@ class Job(object):
 
         # Added here so the user can check the generated script
 
-        if self.debug:
+        if self.validate_template:
             self._check_is_well_formed(template_content, script_path)
         return script_name
 
@@ -2474,8 +2474,18 @@ class Job(object):
         :return: True if the content is valid R code, False otherwise.
         :rtype: bool
         """
-        Log.warning("Syntax check for R scripts is not implemented. Skipping syntax validation for R scripts.")
-        return True
+
+        import subprocess
+        result = subprocess.run(
+            ['Rscript', '-e', 'parse(file = "stdin")'],
+            input=content,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode:
+            raise AutosubmitCritical(f"Syntax error in generated R script for job {self.name}: {result.stderr.strip()}", 7014)
+
+        return result.returncode == 0
 
     def _is_valid_bash(self, content: str) -> bool:
         """Check if the given content is valid Bash code.

@@ -44,18 +44,23 @@ The important part of this error is the message ``'%' must be followed by '%'``.
 This library is included in the python common libraries, so you shouldn't have any other version of it installed in your environment. Execute ``pip list``, if you see
 ``configparser`` in the list, then run ``pip uninstall configparser``. Then, try to create your experiment again.
 
-How to check if my script is syntactically correct for autosubmit
-==================================================================
+Error when using jobs.<job>.VALIDATE: True
+==========================================
 
-*Explanation*: If you are trying to use a script that is not compatible with autosubmit, it will fail to run.
-*Solution*: You can check if your script is compatible with autosubmit by running the following command: ``autosubmit inspect -f -q <EXPID>`` for jobs that run under ``DEBUG``.
+
+When using the ``VALIDATE: True`` option in your job configuration, you might encounter errors related to syntax issues in the generated Python script for that job.
+This validation checks if your script is compatible with autosubmit and will print any errors it finds.
+To get rid of this error, you need to fix the syntax issues in your job script.
+The error message will indicate the specific line and type of syntax error that needs to be addressed.
+
+Example of how to enable validation for a job in your configuration:
 
 .. code-block:: yaml
 
     JOBS:
         JOB:
             FILE: <path_to_your_script>
-            DEBUG: True  # This will check if your script is compatible with autosubmit and will print any errors.
+            VALIDATE: True
 
 Example output of the command:
 

@@ -91,21 +91,21 @@ def as_header(platform_header: str, executable: str) -> str:
 def as_body(body: str) -> str:
     return dedent(
         f"""
-        ###################
-        # Autosubmit job
-        ###################
+            ###################
+            # Autosubmit job
+            ###################
 
-        tryCatch(
-            expr = {{
-                {body}
-            }}
-        ), finally {{
-            # Write the finish time in the job _STAT_
-            fileConn<-file(paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = ''),"a")
-            writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
-            close(fileConn)
-        }}
-
+            tryCatch(
+                expr = {{
+                    {body}
+                }},
+                finally = {{
+                    # Write the finish time in the job _STAT_
+                    fileConn<-file(paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = ''),"a")
+                    writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
+                    close(fileConn)
+                }}
+            )
         # Now, we let the execution of the tailer happen, where the _COMPLETED
         # file will be created.
         """)

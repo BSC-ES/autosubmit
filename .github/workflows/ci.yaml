@@ -37,7 +37,7 @@ jobs:
           cache: 'pip' # caching pip dependencies
 
       - name: Install system dependencies
-        run: sudo apt-get install -y curl graphviz rsync
+        run: sudo apt-get install -y curl graphviz rsync r-base
 
       - name: Install dependencies
         run: |

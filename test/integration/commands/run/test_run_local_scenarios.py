@@ -212,7 +212,7 @@ def test_run_interrupted(
             job:
                 SCRIPT: |
                     print("Hello!")
-                debug: True
+                validate: True
                 PLATFORM: LOCAL
                 RUNNING: once
                 wallclock: 00:01
@@ -226,7 +226,7 @@ def test_run_interrupted(
         JOBS:
             job:
                 FILE: test.py
-                debug: True
+                validate: True
                 PLATFORM: LOCAL
                 RUNNING: once
                 wallclock: 00:01
@@ -238,7 +238,7 @@ def test_run_interrupted(
             job:
                 SCRIPT: |
                     print("Hello!")syntaxerror
-                debug: True
+                validate: True
                 PLATFORM: LOCAL
                 RUNNING: once
                 wallclock: 00:01
@@ -252,7 +252,7 @@ def test_run_interrupted(
         JOBS:
             job:
                 FILE: test.py
-                debug: True
+                validate: True
                 PLATFORM: LOCAL
                 RUNNING: once
                 wallclock: 00:01
@@ -264,7 +264,7 @@ def test_run_interrupted(
             job:
                 SCRIPT: |
                     echo "Hello from Bash!"
-                debug: True
+                validate: True
                 PLATFORM: LOCAL
                 RUNNING: once
                 wallclock: 00:01
@@ -278,7 +278,7 @@ def test_run_interrupted(
         JOBS:
             job:
                 FILE: test.sh
-                debug: True
+                validate: True
                 PLATFORM: LOCAL
                 RUNNING: once
                 wallclock: 00:01
@@ -290,7 +290,7 @@ def test_run_interrupted(
             job:
                 SCRIPT: |
                     echo "Hello!" $(()invalid
-                debug: True
+                validate: True
                 PLATFORM: LOCAL
                 RUNNING: once
                 wallclock: 00:01
@@ -304,12 +304,65 @@ def test_run_interrupted(
         JOBS:
             job:
                 FILE: test.sh
-                debug: True
+                validate: True
                 PLATFORM: LOCAL
                 RUNNING: once
                 wallclock: 00:01
                 type: Bash
         """), False),
+    # R-script: inline script success
+    (dedent("""\
+    JOBS:
+        job:
+            SCRIPT: |
+                print("Hello from R!")
+            validate: True
+            PLATFORM: LOCAL
+            RUNNING: once
+            wallclock: 00:01
+            type: R
+    """), True),
+    # R-script: file-based success
+    (dedent("""\
+    PROJECT:
+        PROJECT_TYPE: local
+        project_destination: "test"
+    JOBS:
+        job:
+            FILE: test.R
+            validate: True
+            PLATFORM: LOCAL
+            RUNNING: once
+            wallclock: 00:01
+            type: R
+    """), True),
+    # R-script: inline script syntax error
+    (dedent("""\
+    JOBS:
+        job:
+            SCRIPT: |
+                print("Hello from R!")syntaxerror
+            validate: True
+            PLATFORM: LOCAL
+            RUNNING: once
+            wallclock: 00:01
+            type: R
+    """), False),
+    # R-script: file-based syntax error
+    (dedent("""\
+    PROJECT:
+        PROJECT_TYPE: local
+        project_destination: "test"
+    JOBS:
+        job:
+            FILE: test.R
+            validate: True
+            PLATFORM: LOCAL
+            RUNNING: once
+            wallclock: 00:01
+            type: R
+    """), False),
+
 ], ids=[
     "Python-Script",
     "Python-File",
@@ -319,6 +372,10 @@ def test_run_interrupted(
     "Bash-File",
     "Bash-Script-syntax-error",
     "Bash-File-syntax-error",
+    "R-Script",
+    "R-File",
+    "R-Script-syntax-error",
+    "R-File-syntax-error",
 ])
 def test_run_debug(
         autosubmit_exp,
@@ -346,9 +403,12 @@ def test_run_debug(
     invalid_python = 'print("Hello from test.py")syntaxerror'
     valid_bash = '#!/usr/bin/env bash\necho "Hello from test.sh"'
     invalid_bash = '#!/usr/bin/env bash\necho "Hello!" $(()invalid'
+    valid_r = 'print("Hello World!")'
+    invalid_r = 'print("Hello from test.R")syntaxerror'
 
     (project_files / "test.py").write_text(valid_python if must_success else invalid_python)
     (project_files / "test.sh").write_text(valid_bash if must_success else invalid_bash)
+    (project_files / "test.R").write_text(valid_r if must_success else invalid_r)
 
     for script_file in project_files.iterdir():
         script_file.chmod(0o755)
