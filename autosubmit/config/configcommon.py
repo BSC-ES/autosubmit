@@ -95,11 +95,24 @@ class AutosubmitConfig(object):
     @property
     def platforms_data(self) -> dict[str, Any]:
         try:
-            return self.experiment_data["PLATFORMS"]
-        except KeyError:
-            raise AutosubmitCritical(
-                "PLATFORMS section not found in configuration file", 7014
-            )
+            hpcarch = str(
+                self.experiment_data.get("DEFAULT", {}).get("HPCARCH", "")
+            ).upper()
+            platforms = self.experiment_data.get("PLATFORMS")
+            if platforms is None:
+                if hpcarch == "LOCAL":
+                    # DEFAULT.HPCARCH is LOCAL and no defined platform, return empty dict
+                    return {}
+                raise AutosubmitCritical(
+                    "PLATFORMS section not found in configuration file", 7014
+                )
+            if not isinstance(platforms, dict):
+                raise AutosubmitCritical(
+                    "PLATFORMS section is malformed in configuration file", 7014
+                )
+            return platforms
+        except AutosubmitCritical:
+            raise
         except Exception as exc:
             raise AutosubmitCritical(
                 f"Error while reading PLATFORMS section: {exc}", 7014
