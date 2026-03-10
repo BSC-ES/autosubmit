@@ -249,11 +249,24 @@ def test_inspect(
             SPLITSIZE: '1'
             SPLITSIZEUNIT: 'hour'
     """)),
-
+    (dedent(f"""\
+JOBS:
+    test_auto:
+        SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+        PLATFORM: LOCAL
+        RUNNING: chunk
+        wallclock: 00:01
+        SPLITS: "auto"
+        SPLITPOLICY: 'flexible'
+        SPLITSIZE: '2'
+        SPLITSIZEUNIT: 'hour'
+""")),
 ], ids=[
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_15_DAY",
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_DAY",
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_HOUR",
+    "CALENDAR_SPLITS_AUTO_SPLITSIZE_2_HOUR",  # Equivalent to the removed test_calendar test
+
 ])
 def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, Any], additional_data: str):
     """Test that auto splits are correctly calculated and injected in the script."""
