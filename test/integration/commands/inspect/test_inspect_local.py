@@ -261,11 +261,24 @@ JOBS:
         SPLITSIZE: '2'
         SPLITSIZEUNIT: 'hour'
 """)),
+    (dedent(f"""\
+JOBS:
+    test_auto:
+        SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+        PLATFORM: LOCAL
+        RUNNING: chunk
+        wallclock: 00:01
+        SPLITS: "auto"
+        SPLITPOLICY: 'flexible'
+        chunksize: '3'
+        SPLITSIZE: '2'
+""")),
 ], ids=[
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_15_DAY",
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_DAY",
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_HOUR",
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_2_HOUR",  # Equivalent to the removed test_calendar test
+    "CALENDAR_SPLITS_AUTO_SPLITSIZE_splitsize_15_chunksize_3"  # Equivalent to docs/source/userguide/defining_workflows/code/jobs_splits_auto.yml and expdef_splits_auto.yml
 
 ])
 def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, Any], additional_data: str):
