@@ -18,247 +18,285 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import textwrap
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
+
+from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
+
+
+def check_directive(directive: str, job_parameters: Union[dict, list, str], het: int = -1) -> bool:
+    """
+    Returns if directive the directive exists and has value
+
+    :param directive: Which directive needs to be found
+    :type directive: str
+    :param job_parameters: dict, list, or str that needs to be validated if directive exists in order to be accessed
+    :type job_parameters: Union[dict, list, str]
+    :param het: Value of the interation in which the value will be validated for specific directive
+    :type het: int
+    :return: queue directive
+    :rtype: bool
+    """
+    if het > -1 and directive in job_parameters:
+        if (isinstance(job_parameters[directive], dict) and het in job_parameters[directive]
+                and job_parameters[directive][het] != '' and job_parameters[directive][het] != '0'
+                and job_parameters[directive][het] != '1'):
+            return True
+    else:
+        if (job_parameters is not None and directive in job_parameters and job_parameters[directive] != ''
+                and job_parameters[directive] != '0' and job_parameters[directive] != '1'):
+            return True
+    return False
 
 
 class SlurmHeader(object):
     """Class to handle the SLURM headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_queue_directive(self, job: 'Job', parameters, het=-1):
-        """Returns queue directive for the specified job
+    def get_queue_directive(self, job: 'Job', parameters: dict = None, het=-1):
+        """
+        Returns queue directive for the specified job
 
-        :param job: job to create queue directive for
+        :param job: job to create directive `QUEUE` for SLURM HEADER
         :type job: Job
-        :param parameters:
-        :param het:
-        :return: queue directive
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: int
+        :return: `CURRENT_QUEUE` directive
         :rtype: str
         """
         # There is no queue, so directive is empty
-        if het > -1 and len(job.het['CURRENT_QUEUE']) > 0:
-            if job.het['CURRENT_QUEUE'][het] != '':
-                return f"SBATCH --qos={job.het['CURRENT_QUEUE'][het]}"
-        else:
-            if parameters['CURRENT_QUEUE'] != '':
-                return f"SBATCH --qos={parameters['CURRENT_QUEUE']}"
+        if check_directive('CURRENT_QUEUE', job.het, het):
+            return f"SBATCH --qos={job.het['CURRENT_QUEUE'][het]}"
+        elif check_directive('CURRENT_QUEUE', job.het):
+            return f"SBATCH --qos={job.het['CURRENT_QUEUE']}"
+        if check_directive('CURRENT_QUEUE', parameters):
+            return f"SBATCH --qos={parameters['CURRENT_QUEUE']}"
+        Log.warning(f"No QUEUE was found for the JOB: {job.name}")
         return ""
 
     def get_processors_directive(self, job: 'Job', het: int = -1) -> str:
-        """Returns processors directive for the specified job
+        """
+        Returns processors directive for the specified job
 
-        :param job: job to create processors directive for
+        Since for LUMI platform it is mandatory the nodes to be set, it forces to use either Nodes or Processor
+        this way ensuring that it wont ever be empty unless both variables are not set.
+
+        :param job: job to create directive `PROCESSORS` for SLURM HEADER
         :type job: Job
-        :param het:
-        :return: processors directive
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `NODES` or `PROCESSORS` directive
         :rtype: str
         """
-        if het > -1 and len(job.het['NODES']) > 0:
-            if job.het['NODES'][het] == '':
-                job_nodes = 0
-            else:
-                job_nodes = job.het['NODES'][het]
-            if len(job.het['PROCESSORS']) == 0 or job.het['PROCESSORS'][het] == '' or job.het['PROCESSORS'][
-                het] == '1' and int(job_nodes) > 0:
-                return ""
-            else:
-                return "SBATCH -n {0}".format(job.het['PROCESSORS'][het])
-        if job.nodes == "":
-            job_nodes = 0
-        else:
+        job_nodes = 0
+        if het > -1 and 'NODES' in job.het and check_directive('NODES', job.het, het):
+            job_nodes = job.het['NODES'][het]
+        if job_nodes <= 1 and 'PROCESSORS' in job.het and check_directive('PROCESSORS', job.het, het):
+            return f"SBATCH -n {job.het['PROCESSORS'][het]}"
+        if job.nodes != "":
             job_nodes = job.nodes
-        if job.processors == '' or job.processors == '1' and int(job_nodes) > 0:
-            return ""
-        else:
+        if (job.processors != '' or job.processors != '0' or job.processors != '1') and int(job_nodes) < 1:
             return f"SBATCH -n {job.processors}"
+        return ""
 
     def get_partition_directive(self, job: 'Job', het: int = -1) -> str:
-        """Returns partition directive for the specified job
+        """
+        Returns partition directive for the specified job
 
-        :param job: job to create partition directive for
+        :param job: job to create directive `PARTITION` for SLURM HEADER
         :type job: Job
-        :param het:
-        :return: partition directive
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `PARTITION` directive
         :rtype: str
         """
-        if het > -1 and len(job.het['PARTITION']) > 0:
-            if job.het['PARTITION'][het] != '':
-                return f"SBATCH --partition={job.het['PARTITION'][het]}"
-        else:
-            if job.partition != '':
-                return f"SBATCH --partition={job.partition}"
+        if check_directive('PARTITION', job.het, het):
+            return f"SBATCH --partition={job.het['PARTITION'][het]}"
+        if check_directive('PARTITION', job.het, -1):
+            return f"SBATCH --partition={job.het['PARTITION']}"
+        elif job.partition != '':
+            return f"SBATCH --partition={job.partition}"
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_account_directive(self, job: 'Job', parameters, het=-1) -> str:
-        """Returns account directive for the specified job
+    def get_account_directive(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+        """
+        Returns account directive for the specified job
 
-        :param job: job to create account directive for
+        :param job: job to create directive `CURRENT_PROJ` for SLURM HEADER
         :type job: Job
-        :param parameters:
-        :param het:
-        :type het: dict
-        :return: account directive
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `CURRENT_PROJ` directive
         :rtype: str
         """
-        if het > -1 and len(job.het['CURRENT_PROJ']) > 0:
-            if job.het['CURRENT_PROJ'][het] != '':
-                return f"SBATCH -A {job.het['CURRENT_PROJ'][het]}"
-        else:
-            if parameters['CURRENT_PROJ'] != '':
+        if check_directive('CURRENT_PROJ', job.het, het):
+            return f"SBATCH -A {job.het['CURRENT_PROJ'][het]}"
+        if check_directive('CURRENT_PROJ', parameters):
                 return f"SBATCH -A {parameters['CURRENT_PROJ']}"
         return ""
 
-    def get_exclusive_directive(self, job: 'Job', parameters, het=-1) -> str:
-        """Returns account directive for the specified job
+    def get_exclusive_directive(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+        """
+        Returns account directive for the specified job
 
-        :param job: job to create account directive for
+        :param job: job to create directive `EXCLUSIVE` for SLURM HEADER
         :type job: Job
-        :param parameters:
-        :param het:
-        :return: account directive
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `EXCLUSIVE` directive
         :rtype: str
         """
-        if het > -1 and len(job.het['EXCLUSIVE']) > 0:
-            if str(parameters['EXCLUSIVE']).lower() == 'true':
-                return "SBATCH --exclusive"
-        else:
-            if str(parameters['EXCLUSIVE']).lower() == 'true':
-                return "SBATCH --exclusive"
+        if het > -1 and 'EXCLUSIVE' in job.het and str(parameters['EXCLUSIVE']).lower() == 'true':
+            return "SBATCH --exclusive"
+        elif parameters is not None and 'EXCLUSIVE' in parameters and bool(parameters['EXCLUSIVE']):
+            return "SBATCH --exclusive"
         return ""
 
-    def get_nodes_directive(self, job: 'Job', parameters, het=-1) -> str:
-        """Returns nodes directive for the specified job
+    def get_nodes_directive(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+        """
+        Returns nodes directive for the specified job
 
-        :param job: job to create nodes directive for
+        :param job: job to create directive `NODES` for SLURM HEADER
         :type job: Job
-        :param parameters:
-        :param het:
-        :return: nodes directive
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `NODES` directive
         :rtype: str
         """
-        if het > -1 and len(job.het['NODES']) > 0:
-            if job.het['NODES'][het] != '' and int(job.het['NODES'][het]) > 1:
-                return f"SBATCH --nodes={job.het['NODES'][het]}"
-        else:
-            if parameters['NODES'] != '' and int(parameters['NODES']) > 1:
-                return f"SBATCH --nodes={parameters['NODES']}"
-        return ""
-
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_directive(self, job: 'Job', parameters, het=-1):
-        """Returns memory directive for the specified job
-
-        :param job: job to create memory directive for
-        :type job: Job
-        :param parameters:
-        :param het:
-        :return: memory directive
-        :rtype: str
-        """
-        if het > -1 and len(job.het['MEMORY']) > 0:
-            if job.het['MEMORY'][het] != '':
-                return f"SBATCH --mem={job.het['MEMORY'][het]}"
-        else:
-            if parameters['MEMORY'] != '':
-                return f"SBATCH --mem={parameters['MEMORY']}"
+        if check_directive('NODES', job.het, het):
+            return f"SBATCH --nodes={job.het['NODES'][het]}"
+        elif check_directive('NODES', parameters):
+            return f"SBATCH --nodes={parameters['NODES']}"
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_per_task_directive(self, job: 'Job', parameters, het=-1):
-        """Returns memory per task directive for the specified job
+    def get_memory_directive(self, job: 'Job', parameters: dict = None, het=-1):
+        """
+        Returns memory directive for the specified job
 
-        :param job: job to create memory per task directive for
+        :param job: job to create directive `MEMORY` for SLURM HEADER
         :type job: Job
-        :param parameters:
-        :param het:
-        :return: memory per task directive
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `MEMORY` directive
         :rtype: str
         """
-        if het > -1 and len(job.het['MEMORY_PER_TASK']) > 0:
-            if job.het['MEMORY_PER_TASK'][het] != '':
-                return "SBATCH --mem-per-cpu={0}".format(job.het['MEMORY_PER_TASK'][het])
-        else:
-            if parameters['MEMORY_PER_TASK'] != '':
-                return f"SBATCH --mem-per-cpu={parameters['MEMORY_PER_TASK']}"
+        if check_directive('MEMORY', job.het, het):
+            return f"SBATCH --mem={job.het['MEMORY'][het]}"
+        elif check_directive('MEMORY', parameters):
+            return f"SBATCH --mem={parameters['MEMORY']}"
         return ""
 
-    def get_threads_per_task(self, job: 'Job', parameters, het=-1):
-        """Returns threads per task directive for the specified job
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    def get_memory_per_task_directive(self, job: 'Job', parameters: dict = None, het=-1):
+        """
+        Returns memory per task directive for the specified job
 
-        :param job: job to create threads per task directive for
+        :param job: job to create directive `MEMORY_PER_TASK` for SLURM HEADER
         :type job: Job
-        :param parameters:
-        :param het:
-        :return: threads per task directive
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `MEMORY_PER_TASK` directive
+        :rtype: str
+        """
+        if check_directive('MEMORY_PER_TASK', job.het, het):
+            return f"SBATCH --mem-per-cpu={job.het['MEMORY_PER_TASK'][het]}"
+        if check_directive('MEMORY_PER_TASK', parameters):
+            return f"SBATCH --mem-per-cpu={parameters['MEMORY_PER_TASK']}"
+        return ""
+
+    def get_threads_per_task(self, job: 'Job', parameters: dict = None, het=-1):
+        """
+        Returns threads per task directive for the specified job
+
+        :param job: job to create directive `NUMTHREADS` for SLURM HEADER
+        :type job: Job
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `NUMTHREADS` directive
         :rtype: str
         """
         # There is no threads per task, so directive is empty
-        if het > -1 and len(job.het['NUMTHREADS']) > 1:
-            if job.het['NUMTHREADS'][het] != '' and int(job.het['NUMTHREADS'][het]) > 1:
-                return f"SBATCH --cpus-per-task={job.het['NUMTHREADS'][het]}"
-        else:
-            if parameters['NUMTHREADS'] != '' and int(parameters['NUMTHREADS']) > 1:
+        if check_directive('NUMTHREADS', job.het, het):
+            return f"SBATCH --cpus-per-task={job.het['NUMTHREADS'][het]}"
+        elif check_directive('NUMTHREADS', parameters):
                 return f"SBATCH --cpus-per-task={parameters['NUMTHREADS']}"
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
 
-    def get_reservation_directive(self, job: 'Job', parameters, het=-1):
-        """Returns reservation directive for the specified job
-
-        :param job:
-        :param parameters:
-        :param het:
-        :return:
+    def get_reservation_directive(self, job: 'Job', parameters: dict = None, het=-1):
         """
+        Returns reservation directive for the specified job
 
-        if het > -1 and len(job.het['RESERVATION']) > 0:
-            if job.het['RESERVATION'][het] != '':
-                return f"SBATCH --reservation={job.het['RESERVATION'][het]}"
-        else:
-            if parameters['RESERVATION'] != '':
-                return f"SBATCH --reservation={parameters['RESERVATION']}"
+        :param job: job to create directive `RESERVATION` for SLURM HEADER
+        :type job: Job
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `RESERVATION` directive
+        :rtype: str
+        """
+        if check_directive('RESERVATION', job.het, het):
+            return f"SBATCH --reservation={job.het['RESERVATION'][het]}"
+        elif check_directive('RESERVATION', parameters):
+            return f"SBATCH --reservation={parameters['RESERVATION']}"
         return ""
 
-    def get_custom_directives(self, job: 'Job', parameters, het=-1) -> str:
-        """Returns custom directives for the specified job
+    def get_custom_directives(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+        """
+        Returns custom directives for the specified job
 
-        :param job: job to create custom directive for
+        :param job: job to create directive `CUSTOM_DIRECTIVES` for SLURM HEADER
         :type job: Job
-        :param parameters:
-        :param het:
-        :return: custom directives
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `CUSTOM_DIRECTIVES` directive
         :rtype: str
         """
         # There is no custom directives, so directive is empty
-        if het > -1 and len(job.het['CUSTOM_DIRECTIVES']) > 0:
-            if job.het['CUSTOM_DIRECTIVES'][het] != '':
-                return '\n'.join(str(s) for s in job.het['CUSTOM_DIRECTIVES'][het])
-        else:
-            if parameters['CUSTOM_DIRECTIVES'] != '':
-                return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
+        if check_directive('CUSTOM_DIRECTIVES', job.het, het):
+            return '\n'.join(str(s) for s in job.het['CUSTOM_DIRECTIVES'][het])
+        elif check_directive('CUSTOM_DIRECTIVES', parameters):
+            return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
         return ""
 
-    def get_tasks_per_node(self, job: 'Job', parameters, het=-1) -> str:
-        """Returns memory per task directive for the specified job
+    def get_tasks_per_node(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+        """
+        Returns memory per task directive for the specified job
 
-        :param job: job to create tasks per node directive for
+        :param job: job to create directive `TASKS` for SLURM HEADER
         :type job: Job
-        :param parameters:
-        :param het:
-        :return: tasks per node directive
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
+        :param het: Value of the interation in which the value will be validated for specific directive
+        :type het: int
+        :return: `TASKS` per node directive
         :rtype: str
         """
-        if het > -1 and len(job.het['TASKS']) > 0:
-            if int(job.het['TASKS'][het]):
+        if check_directive('TASKS', job.het, het):
                 return f"SBATCH --ntasks-per-node={job.het['TASKS'][het]}"
-        else:
-            if int(parameters['TASKS']) > 1:
-                return f"SBATCH --ntasks-per-node={parameters['TASKS']}"
+        elif check_directive('TASKS', parameters):
+            return f"SBATCH --ntasks-per-node={parameters['TASKS']}"
         return ""
 
     def wrapper_header(self, **kwargs):
@@ -355,30 +393,31 @@ class SlurmHeader(object):
         header = self.hetjob_common_header(hetsize, wr_job)
         for components in range(hetsize):
             header = header.replace(
-                f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(wr_job, None, hetsize))
+                f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(wr_job, het=components))
             header = header.replace(
-                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(wr_job, hetsize))
+                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(wr_job, components))
             header = header.replace(
-                f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(wr_job, None, hetsize))
+                f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(wr_job, het=components))
             header = header.replace(
-                f'%MEMORY_DIRECTIVE_{components}%', self.get_memory_directive(wr_job, None, hetsize))
+                f'%MEMORY_DIRECTIVE_{components}%', self.get_memory_directive(wr_job, het=components))
             header = header.replace(
-                f'%MEMORY_PER_TASK_DIRECTIVE_{components}%', self.get_memory_per_task_directive(wr_job, None, hetsize))
+                f'%MEMORY_PER_TASK_DIRECTIVE_{components}%', self.get_memory_per_task_directive(wr_job, het=components))
             header = header.replace(
-                f'%THREADS_PER_TASK_DIRECTIVE_{components}%', self.get_threads_per_task(wr_job, None, hetsize))
+                f'%THREADS_PER_TASK_DIRECTIVE_{components}%', self.get_threads_per_task(wr_job, het=components))
             header = header.replace(
-                f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(wr_job, None, hetsize))
+                f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(wr_job, het=components))
             header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(wr_job, hetsize))
+                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(wr_job, components))
             header = header.replace(
-                f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(wr_job, None, hetsize))
+                f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(wr_job, het=components))
             header = header.replace(
-                f'%TASKS_PER_NODE_DIRECTIVE_{components}%', self.get_tasks_per_node(wr_job, None, hetsize))
+                f'%TASKS_PER_NODE_DIRECTIVE_{components}%', self.get_tasks_per_node(wr_job, het=components))
             header = header.replace(
-                f'%CUSTOM_DIRECTIVES_{components}%', self.get_custom_directives(wr_job, None, hetsize))
+                f'%CUSTOM_DIRECTIVES_{components}%', self.get_custom_directives(wr_job, het=components))
         header = header[:-len("#SBATCH hetjob\n")]  # last element
 
         return header
+
 
     def calculate_het_header(self, job: 'Job', parameters: dict):
         header = self.hetjob_common_header(hetsize=job.het["HETSIZE"])
