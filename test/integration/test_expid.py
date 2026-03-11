@@ -251,6 +251,46 @@ def test_as_conf_default_values(git_command, git_session, autosubmit_exp: Callab
         assert yaml_data['GIT']['PROJECT_BRANCH'] == git_command[1]
 
 
+def test_expid_git_repo_sets_project_type_in_full_configuration(autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
+    """Ensure non-minimal configuration with ``git_repo`` sets project defaults in expdef."""
+    exp = autosubmit_exp(experiment_data={
+        'JOBS': {
+            'LOCAL_SEND_INITIAL': {
+                'CHUNKS_FROM': {
+                    1: {
+                        'CHUNKS_TO': 1
+                    }
+                }
+            }
+        },
+    })
+
+    as_conf_default_values(
+        autosubmit.autosubmit_version,
+        exp.expid,
+        'local',
+        False,
+        'https://earth.bsc.es/gitlab/ces/auto-advanced_config_example',
+        'main',
+        'as_conf',
+    )
+
+    yaml = YAML(typ='rt')
+    conf_path = tmp_path / f"{exp.expid}/conf"
+
+    project_data = None
+    for conf_file in conf_path.iterdir():
+        if conf_file.name.lower().endswith(('.yml', '.yaml')):
+            yaml_data = yaml.load(open(conf_file))
+            if isinstance(yaml_data, dict) and 'PROJECT' in yaml_data:
+                project_data = yaml_data['PROJECT']
+                break
+
+    assert project_data is not None
+    assert project_data['PROJECT_TYPE'] == 'git'
+    assert project_data['PROJECT_DESTINATION'] == 'git_project'
+
+
 @pytest.mark.parametrize(
     'type_flag',
     [
