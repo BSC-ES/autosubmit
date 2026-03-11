@@ -286,7 +286,7 @@ def test_is_valid_mail_address(email, expected):
 
 
 def test_platforms_missing_hpcarch_local(autosubmit_config: "AutosubmitConfigFactory"):
-    """Test that if PLATFORMS is missing but DEFAULT.HPCARCH is LOCAL, we return an empty dictionary."""
+    """Test that if the PLATFORMS key is missing but DEFAULT.HPCARCH is LOCAL, we return an empty dictionary."""
     as_conf: AutosubmitConfig = autosubmit_config(
         expid="a000", experiment_data={"DEFAULT": {"HPCARCH": "LOCAL"}}
     )
@@ -298,7 +298,7 @@ def test_platforms_missing_hpcarch_local(autosubmit_config: "AutosubmitConfigFac
 def test_platforms_missing_hpcarch_non_local(
     autosubmit_config: "AutosubmitConfigFactory",
 ):
-    """Test that if PLATFORMS is missing and DEFAULT.HPCARCH is not LOCAL, we raise an AutosubmitCritical."""
+    """Test that if the PLATFORMS key is missing and DEFAULT.HPCARCH is not LOCAL, we raise an AutosubmitCritical."""
     as_conf: AutosubmitConfig = autosubmit_config(
         expid="a000", experiment_data={"DEFAULT": {"HPCARCH": "MARENOSTRUM5"}}
     )
@@ -447,3 +447,100 @@ def test_validate_wallclock_errors(autosubmit_config: 'AutosubmitConfigFactory')
 
     res = as_conf.validate_wallclock()
     assert res == "Job AQUA_ANALYSIS has a wallclock value of 7200.0s, which is greater than the platform's 3600.0s wallclock time\n"
+
+
+def test_load_config_file(autosubmit_config, tmp_path):
+    """Test most basic functionality of ``load_config_file``."""
+    as_conf = autosubmit_config(expid='a000', experiment_data={})
+    config_file = tmp_path / 'a000.yml'
+    with open(config_file, 'w') as f:
+        f.write(dedent('''\
+        JOB:
+          A:
+            SCRIPT: "echo OK"
+            PLATFORM: local
+        '''))
+    current_config = {}
+    new_config = as_conf.load_config_file(current_config, tmp_path / 'a000.yml', False)
+    assert 'JOB' in new_config
+
+    # This implies DEFAULT.CUSTOM_CONFIG is also not present.
+    assert 'DEFAULT' not in new_config
+
+
+def test_load_config_file_custom_config(autosubmit_config, tmp_path):
+    """Test loading custom configuration files with ``load_config_file``."""
+    as_conf = autosubmit_config(expid='a000', experiment_data={})
+    config_file = tmp_path / 'a000.yml'
+    with open(config_file, 'w') as f:
+        f.write(dedent('''\
+        DEFAULT:
+          CUSTOM_CONFIG:
+            - a.yml
+            - b.yml
+        JOB:
+          A:
+            SCRIPT: "echo OK"
+            PLATFORM: local
+        '''))
+    current_config = {}
+    new_config = as_conf.load_config_file(current_config, tmp_path / 'a000.yml', False)
+
+    custom_config = new_config['DEFAULT']['CUSTOM_CONFIG']
+    assert 'a.yml' in custom_config
+    assert 'b.yml' in custom_config
+
+
+@pytest.mark.parametrize(
+    'new_config_data,load_misc,expected_misc_files_length',
+    [
+        (
+            'AS_MISC: False',
+            True,
+            0
+        ),
+        (
+            'AS_MISC: False',
+            False,
+            0
+        ),
+        (
+            'AS_MISC: True',
+            True,
+            0
+        ),
+        (
+            'AS_MISC: True',
+            False,
+            1
+        )
+    ],
+    ids=[
+        'Contains AS_MISC load_misc True',
+        'Contains AS_MISC load_misc False',
+        'Does not contain AS_MISC load_misc True',
+        'Does not contain AS_MISC load_misc False'
+    ]
+)
+def test_load_config_file_misc(new_config_data: str, load_misc: bool, expected_misc_files_length: int,
+                               autosubmit_config, tmp_path):
+    """Test loading miscellaneous configuration files with ``load_config_file``.
+
+    If the current data contains ``AS_MISC``, then the function never loads new miscellaneous files.
+
+    If it does not contain ``AS_MISC``, the ``load_misc`` argument of the function controls where new files are
+    loaded or not.
+
+    Loaded here simply means added to the list ``as_conf.misc_files``. The ``reload`` function is the only place
+    where these files are finally parsed and its configuration merged into Autosubmit's main configuration.
+
+    TODO: this could probably be simplified.
+    """
+    as_conf = autosubmit_config(expid='a000', experiment_data={})
+    config_file = tmp_path / 'a000.yml'
+    with open(config_file, 'w') as f:
+        f.write(new_config_data)
+    current_config = as_conf.experiment_data
+    as_conf.load_config_file(current_config, tmp_path / 'a000.yml', load_misc=load_misc)
+
+    assert len(as_conf.misc_files) == expected_misc_files_length

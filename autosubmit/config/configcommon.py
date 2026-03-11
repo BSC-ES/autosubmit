@@ -655,23 +655,25 @@ class AutosubmitConfig(object):
                     self.convert_list_to_string(data[key])
         return data
 
-    def load_config_file(self, current_folder_data, yaml_file, load_misc=False):
-        """Load a config file and parse it
-        :param current_folder_data: current folder data
-        :param yaml_file: yaml file to load
-        :param load_misc: Whether to load misc files or not
-        :return: unified config file
+    def load_config_file(self, current_folder_data: dict, yaml_file: Path, load_misc=False) -> dict:
+        """Load and parse YAML configuration files.
+
+        :param current_folder_data: Current configuration to be updated.
+        :param yaml_file: A YAML file to include to the current configuration.
+        :param load_misc: Whether to load the ``AS_MISC`` key and children values or no.
+        :return: The result configuration data.
         """
-
-        # check if path is file o folder
-        # load yaml file with ruamel.yaml
-
+        Log.debug(f"Loading YAML: {yaml_file}")
         new_file = AutosubmitConfig.get_parser(self.parser_factory, yaml_file)
-        new_file.data = self.normalize_variables(new_file.data.copy(),
-                                                 must_exists=False)  # TODO Figure out why this .copy is needed
-        if new_file.data.get("DEFAULT", {}).get("CUSTOM_CONFIG", None) is not None:
-            new_file.data["DEFAULT"]["CUSTOM_CONFIG"] = self.convert_list_to_string(
-                new_file.data["DEFAULT"]["CUSTOM_CONFIG"])
+        # TODO Figure out why this .copy is needed
+        new_file.data = self.normalize_variables(new_file.data.copy(), must_exists=False)
+        custom_config = new_file.data.get("DEFAULT", {}).get("CUSTOM_CONFIG", None)
+        if custom_config is not None:
+            new_file.data["DEFAULT"]["CUSTOM_CONFIG"] = self.convert_list_to_string(custom_config)
+        # TODO: This was a bit confusing. I thought initially that this meant if ``load_misc``, then we would
+        #       load the miscellaneous file/key. But in reality, I believe this means if ``load_misc``, and
+        #       we still don't have ``AS_MISC``, then we will add the given YAML file to the list of
+        #       ``misc_files``. It might be simpler to have a separate function for this, or append directly.
         if new_file.data.get("AS_MISC", False) and not load_misc:
             self.misc_files.append(yaml_file)
             new_file.data = {}
@@ -1629,7 +1631,7 @@ class AutosubmitConfig(object):
             current_data_aux = self.substitute_dynamic_variables(current_data_aux)
             filename = Path(current_data_aux["AS_TEMP"]["FILENAME_TO_LOAD"])
             if not filename.exists() and "%" not in str(filename):
-                Log.warning(f"Yaml file {filename} not found")
+                Log.warning(f"YAML file not found: {filename}")
             if filename.exists() and str(filename) not in self.current_loaded_files:
                 # Check if this file is already loaded. If not, load it
                 self.current_loaded_files[str(filename)] = filename.stat().st_mtime
@@ -1812,6 +1814,10 @@ class AutosubmitConfig(object):
             self.load_workflow_commit()
             self.dynamic_variables = {}
             self.set_default_parameters()
+
+        Log.result('YAML configuration loaded:')
+        for f in self.current_loaded_files:
+            Log.result(f'  {f}')
 
     def set_default_parameters(self) -> None:
         """Sets the default parameters for the experiment."""
