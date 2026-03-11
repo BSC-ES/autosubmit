@@ -81,15 +81,19 @@ def test_copying_experiment_with_hpc_in_command(autosubmit_exp: Callable, autosu
     )
     assert autosubmit.create(exp_id, noplot=True, hide=True) == 0
 
-    yaml_data = yaml.load(open(tmp_path / f"{exp_id}/conf/metadata/experiment_data.yml"))
-    assert yaml_data['DEFAULT']['EXPID'] == exp_id
-    assert yaml_data['DEFAULT']['HPCARCH'] == "TEST1"
-    assert not yaml_data['MAIL']['NOTIFICATIONS']
-    assert yaml_data['MAIL']['TO'] == ""
-    assert yaml_data['JOBS']['LOCAL_SEND_INITIAL']['CHUNKS_FROM']['1']['CHUNKS_TO'] == '1'
-    assert yaml_data['LOCAL']['PROJECT_PATH'] == ""
-    assert yaml_data['GIT']['PROJECT_ORIGIN'] == "origin_test"
-    assert yaml_data['GIT']['PROJECT_BRANCH'] == "branch_test"
+    with open(tmp_path / f"{exp_id}/conf/metadata/experiment_data.yml") as f:
+        yaml_data = yaml.load(f)
+        assert yaml_data["DEFAULT"]["EXPID"] == exp_id
+        assert yaml_data["DEFAULT"]["HPCARCH"] == "TEST1"
+        assert not yaml_data["MAIL"]["NOTIFICATIONS"]
+        assert yaml_data["MAIL"]["TO"] == ""
+        assert (
+            yaml_data["JOBS"]["LOCAL_SEND_INITIAL"]["CHUNKS_FROM"]["1"]["CHUNKS_TO"]
+            == "1"
+        )
+        assert yaml_data["LOCAL"]["PROJECT_PATH"] == ""
+        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == "origin_test"
+        assert yaml_data["GIT"]["PROJECT_BRANCH"] == "branch_test"
 
 
 def test_copying_experiment_without_hpc_in_command(autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
@@ -119,8 +123,9 @@ def test_copying_experiment_without_hpc_in_command(autosubmit_exp: Callable, aut
     )
 
     assert autosubmit.create(exp_id, noplot=True, hide=True) == 0
-    yaml_data = yaml.load(open(tmp_path / f"{exp_id}/conf/metadata/experiment_data.yml"))
-    assert yaml_data['DEFAULT']['HPCARCH'] == "LOCAL"
+    with open(tmp_path / f"{exp_id}/conf/metadata/experiment_data.yml") as f:
+        yaml_data = yaml.load(f)
+        assert yaml_data["DEFAULT"]["HPCARCH"] == "LOCAL"
 
 
 def test_copy_expid_with_main_yaml(tmp_path: Path, autosubmit_exp):
@@ -144,9 +149,10 @@ def test_copy_expid_with_main_yaml(tmp_path: Path, autosubmit_exp):
         '''))
 
     assert exp.autosubmit.create(exp.expid, noplot=True, hide=True) == 0
-    yaml_data = YAML(typ='rt').load(open(tmp_path / f"{exp.expid}/conf/metadata/experiment_data.yml"))
-    assert len(yaml_data['JOBS']) == 2
-    assert {'A', 'B'} <= set(yaml_data['JOBS'].keys())
+    with open(tmp_path / f"{exp.expid}/conf/metadata/experiment_data.yml") as f:
+        yaml_data = YAML(typ="rt").load(f)
+        assert len(yaml_data["JOBS"]) == 2
+        assert {"A", "B"} <= set(yaml_data["JOBS"].keys())
 
     new_expid = exp.autosubmit.expid(
         'test',
@@ -187,8 +193,9 @@ def test_copying_experiment_with_hpc_in_file(autosubmit_exp: Callable, autosubmi
     )
 
     assert autosubmit.create(exp_id, noplot=True, hide=True) == 0
-    yaml_data = yaml.load(open(tmp_path / f"{exp_id}/conf/metadata/experiment_data.yml"))
-    assert yaml_data['DEFAULT']['HPCARCH'] == "MN5"
+    with open(tmp_path / f"{exp_id}/conf/metadata/experiment_data.yml") as f:
+        yaml_data = yaml.load(f)
+        assert yaml_data["DEFAULT"]["HPCARCH"] == "MN5"
 
 @pytest.mark.parametrize(
     'git_command,git_session',
@@ -224,11 +231,15 @@ def test_as_conf_default_values(git_command, git_session, autosubmit_exp: Callab
 
     yaml = YAML(typ='rt')
     assert autosubmit.create(exp.expid, noplot=True, hide=True) == 0
-    yaml_data = yaml.load(open(tmp_path / f"{exp.expid}/conf/metadata/experiment_data.yml"))
-    assert yaml_data['DEFAULT']['HPCARCH'] == "MN5"
-    assert yaml_data['DEFAULT']['EXPID'] == exp.expid
-    assert yaml_data['DEFAULT']['CUSTOM_CONFIG'] == f"{tmp_path}/{exp.expid}/proj/test_3"
-    assert yaml_data['LOCAL']['PROJECT_PATH'] == ""
+    with open(tmp_path / f"{exp.expid}/conf/metadata/experiment_data.yml") as f:
+        yaml_data = yaml.load(f)
+        assert yaml_data["DEFAULT"]["HPCARCH"] == "MN5"
+        assert yaml_data["DEFAULT"]["EXPID"] == exp.expid
+        assert (
+            yaml_data["DEFAULT"]["CUSTOM_CONFIG"]
+            == f"{tmp_path}/{exp.expid}/proj/test_3"
+        )
+        assert yaml_data["LOCAL"]["PROJECT_PATH"] == ""
 
     if git_command[0] != '':
         assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_command[0]
@@ -251,44 +262,41 @@ def test_as_conf_default_values(git_command, git_session, autosubmit_exp: Callab
         assert yaml_data['GIT']['PROJECT_BRANCH'] == git_command[1]
 
 
-def test_expid_git_repo_sets_project_type_in_full_configuration(autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
+def test_expid_git_repo_sets_project_type_in_full_configuration(
+    autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path
+):
     """Ensure non-minimal configuration with ``git_repo`` sets project defaults in expdef."""
-    exp = autosubmit_exp(experiment_data={
-        'JOBS': {
-            'LOCAL_SEND_INITIAL': {
-                'CHUNKS_FROM': {
-                    1: {
-                        'CHUNKS_TO': 1
-                    }
-                }
-            }
-        },
-    })
+    exp = autosubmit_exp(
+        experiment_data={
+            "JOBS": {"LOCAL_SEND_INITIAL": {"CHUNKS_FROM": {1: {"CHUNKS_TO": 1}}}},
+        }
+    )
 
     as_conf_default_values(
         autosubmit.autosubmit_version,
         exp.expid,
-        'local',
+        "local",
         False,
-        'https://earth.bsc.es/gitlab/ces/auto-advanced_config_example',
-        'main',
-        'as_conf',
+        "https://earth.bsc.es/gitlab/ces/auto-advanced_config_example",
+        "main",
+        "as_conf",
     )
 
-    yaml = YAML(typ='rt')
+    yaml = YAML(typ="rt")
     conf_path = tmp_path / f"{exp.expid}/conf"
 
     project_data = None
     for conf_file in conf_path.iterdir():
-        if conf_file.name.lower().endswith(('.yml', '.yaml')):
-            yaml_data = yaml.load(open(conf_file))
-            if isinstance(yaml_data, dict) and 'PROJECT' in yaml_data:
-                project_data = yaml_data['PROJECT']
-                break
+        if conf_file.name.lower().endswith((".yml", ".yaml")):
+            with open(conf_file, "r") as file:
+                yaml_data = yaml.load(file)
+                if isinstance(yaml_data, dict) and "PROJECT" in yaml_data:
+                    project_data = yaml_data["PROJECT"]
+                    break
 
     assert project_data is not None
-    assert project_data['PROJECT_TYPE'] == 'git'
-    assert project_data['PROJECT_DESTINATION'] == 'git_project'
+    assert project_data["PROJECT_TYPE"] == "git"
+    assert project_data["PROJECT_DESTINATION"] == "git_project"
 
 
 @pytest.mark.parametrize(
