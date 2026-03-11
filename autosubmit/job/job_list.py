@@ -41,6 +41,7 @@ from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency
 from autosubmit.log.log import AutosubmitCritical, Log
+from autosubmit.monitor.diagram import JobData
 from autosubmit.platforms.platform import Platform
 
 
@@ -3844,6 +3845,7 @@ class JobList(object):
     @staticmethod
     def retrieve_times(status_code, name, tmp_path, make_exception=False, job_times=None,
                        seconds=False, job_data_collection: Optional['JobData'] = None) -> Union[None, JobRow]:
+
         """Retrieve job timestamps from database.
 
         :param status_code: Code of the Status of the job

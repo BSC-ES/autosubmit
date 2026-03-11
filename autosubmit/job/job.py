@@ -28,7 +28,7 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, Optional, Tuple, TYPE_CHECKING, Any, Dict
+from typing import List, Optional, TYPE_CHECKING, Any, Dict
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 
