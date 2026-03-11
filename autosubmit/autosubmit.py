@@ -1319,6 +1319,8 @@ class Autosubmit:
         if hpc is None and not minimal_configuration:
             raise AutosubmitCritical(
                 "Check that the parameters are defined (-H) ", 7011)
+        if git_repo and not minimal_configuration:
+            minimal_configuration = True
         # Register the experiment in the database
         # Copy another experiment from the database
         if copy_id != '' and copy_id is not None:
