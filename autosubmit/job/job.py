@@ -28,7 +28,7 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 
@@ -1296,13 +1296,12 @@ class Job(object):
                     log_recovered = False
         return log_recovered
 
-    def retrieve_internal_retrials_logfiles(self) -> Tuple[int, bool]:
-        """
-        Retrieves internal retrials log files for the given platform.
+    def retrieve_internal_retrials_logfiles(self) -> tuple[int, bool]:
+        """Retrieves internal retrials log files for the given platform.
         This function is used when the job is inside a vertical wrapper.
 
-        Returns:
-            int: The last retrial index where logs were successfully retrieved.
+        :return: The last retrial index where logs were successfully retrieved.
+        :rtype: tuple[int, bool]
         """
         log_recovered = False
         last_retrial = 0
@@ -2674,14 +2673,12 @@ class Job(object):
         self.write_end_time(self.status == Status.COMPLETED, count=count)
 
     def write_end_time(self, completed, count=-1):
-        """
-        Writes end timestamp to TOTAL_STATS file and jobs_data.db
+        """Writes end timestamp to TOTAL_STATS file and jobs_data.db
         :param completed: True if the job has been completed, False otherwise
         :type completed: bool
         :param count: number of retrials
         :type count: int
         """
-
         end_time = self.check_end_time(count)
         if end_time > 0:
             self.finish_time_timestamp = int(end_time)
