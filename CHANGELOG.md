@@ -33,6 +33,8 @@
 - Commands `setstatus, create and recovery` do not display the plot by default #1347
 - Creation and modification dates are now timezone-aware in the `job_data` table #2943
 - Added `DEFAULT.DESCRIPTION` from the database into the list of job parameters #2857
+- Every YAML file loaded is now printed in the debug log (use -lc DEBUG in the
+  command line if you want this) #2879
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

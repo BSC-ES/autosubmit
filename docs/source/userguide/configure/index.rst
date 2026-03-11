@@ -7,15 +7,17 @@ This page covers some of the basics for defining experiment parameters, as well 
 Configuration files
 -------------------
 
-Experiment configuration files are stored under each experiment's configuration directory. You should adjust all parameters to your needs in this files before creating the experiment. 
-The files follow the naming schema *type_expid.yml* where *type* is either **expdef**, **jobs**, **platforms** or **autosubmit**.
+Experiment configuration files are stored under each experiment's configuration directory.
+You should adjust all parameters to your needs in this files before creating the experiment.
+The files follow the naming schema ``type_expid.yml`` where ``type`` is either
+``**expdef**``, ``**jobs**``, ``**platforms**`` or ``**autosubmit**``.
 
-*expdef_<EXPID>.yml* contains:
+``expdef_<EXPID>.yml`` contains:
     - Start dates, members and chunks (number and length).
     - Experiment project source: origin (version control system or path)
     - Project configuration file path.
 
-*jobs_<EXPID>.yml* contains the workflow to be run:
+``jobs_<EXPID>.yml`` contains the workflow to be run:
     - Scripts to execute.
     - Dependencies between tasks.
     - Task requirements (processors, wallclock time...).
@@ -28,13 +30,13 @@ For more information on adding jobs see :ref:`add-new-job` and :ref:`add-het-job
 
 For more information on adding a new platform to the experiment configuration, see :ref:`add-new-plat-exp`.
 
-.. note:: *platforms_<EXPID>.yml* is usually provided by technicians, users will only have to change login and accounting options for HPCs.
+.. note:: ``platforms_<EXPID>.yml`` is usually provided by workflow developers or site administrators.
+          Users only have to change their login and accounting options for the selected HPCs.
 
 *autosubmit_<EXPID>.yml* contains:
     - Maximum number of jobs to be running at the same time at the HPC.
     - Time (seconds) between connections to the HPC queue scheduler to poll already submitted jobs status.
     - Number of retries if a job fails.
-
 
 Once all file parameters have been tuned, an experiment can be created. Refer to the method page :meth:`autosubmit.autosubmit.Autosubmit.create` for syntax details.
 ``autosubmit create`` will make use of the ``expdef_<EXPID>.yml`` file to generate the experiment and related workflow.
@@ -43,6 +45,11 @@ More info on pickle can be found at http://docs.python.org/library/pickle.html.
 
 In order to understand more the grouping options, which are used for visualization purposes, please check :ref:`grouping`.
 
+The output of ``autosubmit create`` includes details about the YAML files used to build the final Autosubmit
+configuration model. This information is useful for developing workflows and troubleshooting configuration issues.
+
+When debug logging is enabled (for example, ``autosubmit -lc DEBUG create <EXPID>``), additional log entries
+are shown each time a YAML file is loaded from disk.
 
 .. _add-new-job:
 
