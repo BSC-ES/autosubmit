@@ -2341,7 +2341,7 @@ def test_retrieve_logfiles(local, mocker, output):
     job.platform = local
 
     Path(job._tmp_path + "/" + job.name).mkdir(parents=True)
-    for i in range (2):
+    for i in range(2):
         Path(job.platform.get_files_path() + f'/test.out.{i}').touch()
         Path(job.platform.get_files_path() + f'/test.err.{i}').touch()
         Path(job.platform.get_files_path() + f'/t001_STAT_{i}').touch()
@@ -2352,7 +2352,7 @@ def test_retrieve_logfiles(local, mocker, output):
     job.script_name = 'test'
     job.local_logs = 'test_local'
     job.submit_time_timestamp = '0'
-
+    job.start_time_timestamp = '19700101000000'
     job.platform.check_file_exists = mocker.MagicMock(return_value=True)
     job.retrieve_logfiles()
-    assert job.log_recovered
+    assert job.updated_log > 0
