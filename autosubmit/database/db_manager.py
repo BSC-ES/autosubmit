@@ -20,7 +20,7 @@ import os
 from pathlib import Path
 from typing import Any, Optional, cast, List, Dict, Union
 
-from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc, asc
+from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable, CreateSchema, DropTable

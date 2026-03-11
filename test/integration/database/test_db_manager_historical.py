@@ -162,7 +162,7 @@ def test_get_current_run_id_raises_when_no_rows(autosubmit_exp) -> None:
 
 def test_get_current_run_id_returns_latest_run(autosubmit_exp) -> None:
     """get_current_run_id must return the most recently modified run."""
-    exp = autosubmit_exp()
+    exp = autosubmit_exp(create=False)
     manager = _make_manager(exp)
     manager.create_table(ExperimentRunTable.name)
 
