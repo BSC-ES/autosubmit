@@ -33,6 +33,8 @@
 - Fixed `num_max_spits` unit conversion to months when `split_unit` is "month" #2944
 - Fixed migration of pre-v4.1.17 historical databases missing columns (split, fail_count, out, err) #3062
 - Fixed infinite loop when STAT file stays on RUNNING, now falls back to scheduler status after IO_SAFE_WAIT #3059
+- Fixed `HETSIZE` whenever it had values bigger than 0 without a `CURRENT_QUEUE` or skipping the order of info #2660
+- Fixed `CPU per task` for new version of autosubmit #2897
 
 **Enhancements:**
 
