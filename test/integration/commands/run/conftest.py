@@ -120,7 +120,7 @@ def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> Thread:
     return thread
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid) -> dict[str, (bool, str)]:
+def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, run_type: str = "simple") -> dict[str, (bool, str)]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.
@@ -133,7 +133,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid) ->
     }
 
     # Check job_data info
-    with sqlite3.connect(job_data_db) as conn:
+    with (sqlite3.connect(job_data_db) as conn):
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute("SELECT * FROM job_data ORDER BY job_name, counter")
@@ -176,6 +176,14 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid) ->
                 #       contains the workflow commit column. For the content we can verify it
                 #       later with a more complete functional test using Git.
                 check_workflow_commit = "workflow_commit" in row_dict
+                check_split = "split" in row_dict and "splits" in row_dict and (
+                        "split" in row_dict
+                        and "splits" in row_dict
+                        and (
+                                (run_type.lower() == "split" and int(row_dict["split"]) > 0 and int(row_dict["splits"]) > 0)
+                                or (run_type.lower() != "split" and not row_dict["split"] and not row_dict["splits"])
+                        )
+                )
 
                 if previous_retry_row:
                     check_submit_previous_submit_retry = row_dict["submit"] >= previous_retry_row["submit"]
@@ -221,6 +229,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid) ->
                     "finish>=previous_finish": check_finish_previous_finish_retry,
                     "finish>=previous_start": check_finish_previous_start_retry,
                     "finish>=previous_submit": check_finish_previous_submit_retry,
+                    "split": check_split,
                 }
 
                 db_check_job[i]["empty_fields"] = "".join(

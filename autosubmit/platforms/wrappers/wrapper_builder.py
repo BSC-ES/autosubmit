@@ -63,6 +63,8 @@ class WrapperBuilder(object):
         self.machinefiles_name = ''
         self.machinefiles_indent = 0
         self.exit_thread = ''
+        self.fail_count = kwargs.get('fail_count', 0)
+
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
         self.working_dir = kwargs.get('working_dir', '')
@@ -169,15 +171,16 @@ class PythonWrapperBuilder(WrapperBuilder):
     def build_job_thread(self):
         return textwrap.dedent(f"""
         class JobThread(Thread):
-            def __init__ (self, template, id_run):
+            def __init__(self, template, id_run):
                 Thread.__init__(self)
-                self.template = template
+                self.template = str(template)
                 self.id_run = id_run
-
+                self.fail_count = {self.fail_count}
+                
             def run(self):
                 jobname = self.template.replace('.cmd', '')
-                out = f"{self.working_dir}/{{str(self.template)}}.out.0"
-                err = f"{self.working_dir}/{{str(self.template)}}.err.0"
+                out = f"{self.working_dir}/{{self.template}}.out.{{self.fail_count}}"
+                err = f"{self.working_dir}/{{self.template}}.err.{{self.fail_count}}"
                 template_path = f"{self.working_dir}/{{self.template}}"
                 print(out+"\\n")
                 print(err+"\\n")
@@ -405,14 +408,16 @@ for i in range(len(pid_list)):
         failed_filename = {jobs_list}[i].replace('.cmd', '_FAILED')
         failed_path = os.path.join(os.getcwd(),failed_filename)
         failed_wrapper = os.path.join(os.getcwd(),wrapper_id)
-        Failed = False
+        exit_code = 0
         if os.path.exists(completed_path):
             print((datetime.now(), "The job ", pid.template," has been COMPLETED"))
         else:
             open(failed_wrapper, 'w').close()
             open(failed_path, 'w').close()
             print((datetime.now(), "The job ", pid.template," has FAILED"))
+            exit_code = 1
                     {os.linesep.ljust(13)}"""), 4)
+        parallel_threads_launcher += self._indent(textwrap.dedent("""exit(exit_code)\n"""), 0)
 
         return parallel_threads_launcher
 
@@ -558,7 +563,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
     def build_job_thread(self):  # fastlook
         return textwrap.dedent(f"""
         class JobThread(Thread):
-            def __init__ (self, template, id_run, retrials, fail_count):
+            def __init__(self, template, id_run, retrials, fail_count):
                 Thread.__init__(self)
                 self.template = template
                 self.id_run = id_run
@@ -600,7 +605,7 @@ class PythonVerticalHorizontalWrapperBuilder(PythonWrapperBuilder):
     def build_joblist_thread(self):
         return textwrap.dedent(f"""
         class JobListThread(Thread):
-            def __init__ (self, jobs_list, id_run):
+            def __init__(self, jobs_list, id_run):
                 Thread.__init__(self)
                 self.jobs_list = jobs_list
                 self.id_run = id_run
@@ -615,8 +620,7 @@ class PythonVerticalHorizontalWrapperBuilder(PythonWrapperBuilder):
         joblist_thread = self.build_joblist_thread()
         nodes_list = self.build_nodes_list()
         # threads_launcher = self.build_parallel_threads_launcher("scripts", "JobListThread", footer=False)
-        threads_launcher = self.build_parallel_threads_launcher_vertical_horizontal("scripts", "JobListThread",
-                                                                                    footer=False)
+        threads_launcher = self.build_parallel_threads_launcher_vertical_horizontal("scripts", "JobListThread", footer=False)
 
         return joblist_thread + nodes_list + threads_launcher
 
@@ -661,7 +665,7 @@ for i in range(len(pid_list)):
     def build_joblist_thread(self):
         return textwrap.dedent(f"""
         class JobListThread(Thread):
-            def __init__ (self, jobs_list, id_run, all_cores):
+            def __init__(self, jobs_list, id_run, all_cores):
                 Thread.__init__(self)
                 self.jobs_list = jobs_list
                 self.id_run = id_run

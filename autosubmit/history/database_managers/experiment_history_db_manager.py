@@ -29,8 +29,7 @@ from autosubmit.database import session
 from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.tables import (
     ExperimentRunTable,
-    JobDataTable,
-    get_table_with_schema,
+    JobDataTable, TableRegistry,
 )
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
@@ -39,7 +38,7 @@ from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
 )
 
-CURRENT_DB_VERSION = 19  # Update this if you change the database schema
+CURRENT_DB_VERSION = 20  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
 DB_VERSION_SCHEMA_CHANGES = 12
 DEFAULT_DB_VERSION = 10
@@ -140,6 +139,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
             children TEXT,
             platform_output TEXT,
             workflow_commit TEXT,
+            split TEXT,
+            splits TEXT,
             UNIQUE(counter,job_name)
             );
             ''')
@@ -176,6 +177,11 @@ class ExperimentHistoryDbManager(DatabaseManager):
         # Version 18
         self.version_schema_changes.extend([
             "ALTER TABLE job_data ADD COLUMN workflow_commit TEXT"
+        ])
+        # Version 20 ( It was already 19 in the constant variable...so skip to 20)
+        self.version_schema_changes.extend([
+            "ALTER TABLE job_data ADD COLUMN split TEXT",
+            "ALTER TABLE job_data ADD COLUMN splits TEXT"
         ])
 
     def create_historical_database(self):
@@ -311,8 +317,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
                 submit, start, finish, status, rowtype, ncpus, 
                 wallclock, qos, energy, date, section, member, chunk, last, 
                 platform, job_id, extra_data, nnodes, run_id, MaxRSS, AveRSS, 
-                out, err, rowstatus, children, platform_output, workflow_commit) 
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
+                out, err, rowstatus, children, platform_output, workflow_commit, split, splits) 
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
         arguments = (job_data.counter, job_data.job_name, HUtils.get_current_datetime(), HUtils.get_current_datetime(),
                      job_data.submit, job_data.start, job_data.finish, job_data.status, job_data.rowtype,
                      job_data.ncpus,
@@ -321,7 +327,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      job_data.platform, job_data.job_id, job_data.extra_data, job_data.nnodes, job_data.run_id,
                      job_data.MaxRSS, job_data.AveRSS,
                      job_data.out, job_data.err, job_data.rowstatus, job_data.children, job_data.platform_output,
-                     job_data.workflow_commit)
+                     job_data.workflow_commit, job_data.split, job_data.splits)
         return self.insert_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
 
     def _insert_experiment_run(self, experiment_run):
@@ -331,10 +337,10 @@ class ExperimentHistoryDbManager(DatabaseManager):
                 failed, queuing, running, 
                 submitted, suspended, metadata) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
         arguments = (
-        HUtils.get_current_datetime(), HUtils.get_current_datetime(), experiment_run.start, experiment_run.finish,
-        experiment_run.chunk_unit, experiment_run.chunk_size, experiment_run.completed, experiment_run.total,
-        experiment_run.failed, experiment_run.queuing, experiment_run.running,
-        experiment_run.submitted, experiment_run.suspended, experiment_run.metadata)
+            HUtils.get_current_datetime(), HUtils.get_current_datetime(), experiment_run.start, experiment_run.finish,
+            experiment_run.chunk_unit, experiment_run.chunk_size, experiment_run.completed, experiment_run.total,
+            experiment_run.failed, experiment_run.queuing, experiment_run.running,
+            experiment_run.submitted, experiment_run.suspended, experiment_run.metadata)
         return self.insert_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
 
     def update_many_job_data_change_status(self, changes):
@@ -357,14 +363,14 @@ class ExperimentHistoryDbManager(DatabaseManager):
         statement = ''' UPDATE job_data SET last=?, submit=?, start=?, finish=?, modified=?, 
                     job_id=?, status=?, energy=?, extra_data=?, 
                     nnodes=?, ncpus=?, rowstatus=?, out=?, err=?, 
-                    children=?, platform_output=?, id=?, workflow_commit=? WHERE id=?'''
+                    children=?, platform_output=?, id=?, workflow_commit=?, split=?, splits=? WHERE id=?'''
         # noinspection PyProtectedMember
         arguments = (
             job_data_dc.last, job_data_dc.submit, job_data_dc.start, job_data_dc.finish, HUtils.get_current_datetime(),
             job_data_dc.job_id, job_data_dc.status, job_data_dc.energy, job_data_dc.extra_data,
             job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus, job_data_dc.out, job_data_dc.err,
-            job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc.workflow_commit, job_data_dc._id
-            )
+            job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc.workflow_commit, job_data_dc.split, job_data_dc.splits, job_data_dc._id
+        )
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
     def _update_experiment_run(self, experiment_run_dc):
@@ -519,7 +525,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             db_path = Path(base) / file_name
             connection_url = get_connection_url(db_path)
             self.schema = None
-
+        self.table_registry = TableRegistry(schema=self.schema)
         self.engine = session.create_engine(connection_url=connection_url)
 
     def initialize(self):
@@ -545,11 +551,11 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def create_historical_database(self):
         with self.engine.connect() as conn:
-            if BasicConfig.DATABASE_BACKEND != "sqlite":
-                conn.execute(CreateSchema(self.schema, if_not_exists=True))
-            conn.execute(CreateTable(get_table_with_schema(self.schema, ExperimentRunTable), if_not_exists=True))
-            conn.execute(CreateTable(get_table_with_schema(self.schema, JobDataTable), if_not_exists=True))
-            conn.commit()
+            with conn.begin():
+                if BasicConfig.DATABASE_BACKEND != "sqlite":
+                    conn.execute(CreateSchema(self.schema, if_not_exists=True))
+                conn.execute(CreateTable(self.table_registry.get(ExperimentRunTable.name), if_not_exists=True))
+                conn.execute(CreateTable(self.table_registry.get(JobDataTable.name), if_not_exists=True))
             # TODO: implement db migrations?
             # self._set_historical_pragma_version(CURRENT_DB_VERSION)
 
@@ -562,7 +568,7 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def register_experiment_run_dc(self, experiment_run_dc):
         query = (
-            insert(get_table_with_schema(self.schema, ExperimentRunTable)).
+            insert(self.table_registry.get(ExperimentRunTable.name)).
             values(
                 created=HUtils.get_current_datetime(),
                 modified=HUtils.get_current_datetime(),
@@ -581,12 +587,12 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
+            with conn.begin():
+                conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
     def update_experiment_run_dc_by_id(self, experiment_run_dc):
-        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
             update(experiment_run_table).
             where(experiment_run_table.c.run_id == experiment_run_dc.run_id).  # type: ignore
@@ -605,12 +611,13 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
+            with conn.begin():
+                conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
     def _get_experiment_run_with_max_id(self):
-        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        """ Get Models.ExperimentRunRow for the maximum id run. """
+        experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
             select(experiment_run_table).
             where(experiment_run_table.c.run_id > 0).
@@ -622,8 +629,17 @@ class SqlAlchemyExperimentHistoryDbManager:
                 raise Exception("No Experiment Runs registered.")
         return Models.ExperimentRunRow(*row)
 
+    def _get_max_experiment_run_id(self) -> int:
+        """Get the maximum experiment run ID from the experiment_run table."""
+        experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
+        query = select(func.max(experiment_run_table.c.run_id))
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+        return result[0] if result and result[0] is not None else 0
+
     def is_there_a_last_experiment_run(self):
-        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        """Return ``True`` if there is at least one experiment run in the database. ``False`` otherwise."""
+        experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
             select(experiment_run_table).
             where(experiment_run_table.c.run_id > 0).
@@ -634,7 +650,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         return result is not None
 
     def get_job_data_all(self):
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         with self.engine.connect() as conn:
             job_data_rows = conn.execute(select(job_data_table)).all()
         return [Models.JobDataRow(*row) for row in job_data_rows]
@@ -671,14 +687,15 @@ class SqlAlchemyExperimentHistoryDbManager:
             self._update_job_data_by_id(job_data_dc)
         return len(job_data_dcs)
 
-    def get_job_data_dc_unique_latest_by_job_name(self, job_name):
+    def get_job_data_dc_unique_latest_by_job_name(self, job_name: Optional[str]):
+        """ Returns JobData data class for the latest job_data_row with last=1 by job_name. """
         job_data_row_last = self._get_job_data_last_by_name(job_name)
         if len(job_data_row_last) > 0:
             return JobData.from_model(job_data_row_last[0])
         return None
 
     def _get_job_data_last_by_name(self, job_name):
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table).
             where(
@@ -709,7 +726,7 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def _get_job_data_last_by_wrapper_code(self, wrapper_code):
         """ Get List of Models.JobDataRow for last=1 and rowtype=wrapper_code """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table).
             where(
@@ -731,7 +748,7 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def _get_all_last_job_data_rows(self):
         """ Get List of Models.JobDataRow for last=1. """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table).
             where(job_data_table.c.last == 1)  # type: ignore
@@ -741,7 +758,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         return [Models.JobDataRow(*row) for row in job_data_rows]
 
     def _insert_job_data(self, job_data):
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         insert_query = (
             insert(job_data_table).
             values(
@@ -778,8 +795,8 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            result = conn.execute(insert_query)
-            conn.commit()
+            with conn.begin():
+                result = conn.execute(insert_query)
         return result.lastrowid
 
     def update_many_job_data_change_status(self, changes):
@@ -788,23 +805,23 @@ class SqlAlchemyExperimentHistoryDbManager:
         Update many job_data rows in bulk. Requires a changes list of argument tuples.
         Only updates finish, modified, status, and rowstatus by id.
         """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         with self.engine.connect() as conn:
-            for change in changes:
-                query = (
-                    update(job_data_table).
-                    where(job_data_table.c.id == change[3]).  # type: ignore
-                    values(
-                        modified=change[0],
-                        status=change[1],
-                        rowstatus=change[2]
+            with conn.begin():
+                for change in changes:
+                    query = (
+                        update(job_data_table).
+                        where(job_data_table.c.id == change[3]).  # type: ignore
+                        values(
+                            modified=change[0],
+                            status=change[1],
+                            rowstatus=change[2]
+                        )
                     )
-                )
-                conn.execute(query)
-            conn.commit()
+                    conn.execute(query)
 
     def _update_job_data_by_id(self, job_data_dc):
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         # noinspection PyProtectedMember
         query = (
             update(job_data_table).
@@ -829,12 +846,12 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
+            with conn.begin():
+                conn.execute(query)
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
         """Get the job data by job ID and name."""
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table)
             .where(job_data_table.c.job_id == job_id)  # type: ignore
@@ -847,7 +864,7 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def get_job_data_max_counter(self, job_name: str = None):
         """ The max counter is the maximum count value for the count column in job_data. """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = select(func.max(job_data_table.c.counter).label("maxcounter"))
         if job_name:
             query = query.where(job_data_table.c.job_name == job_name)  # type: ignore
@@ -857,7 +874,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         return max_counter if max_counter else DEFAULT_MAX_COUNTER
 
     def get_jobs_data_last_row(self, job_names) -> dict[str, Any]:
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         jobs_data = self.select_jobs_data(job_data_table, job_names)
         jobs_data = [dict(job) for job in jobs_data]
         jobs_data_by_name = {}
