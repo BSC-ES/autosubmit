@@ -178,7 +178,7 @@ def _copy_rst_yaml_files_to_as_experiment(
             continue
         path_to = Path(target_path, f'autosubmit/autosubmit/{expid}/conf/{key}_{expid}.yml')
         logger.debug(f'Copying {path_from} to {path_to}')
-        os.makedirs(os.path.dirname(path_to), exist_ok=True)
+        path_to.mkdir(parents=True, exist_ok=True)
         copy(path_from, path_to)
 
 
