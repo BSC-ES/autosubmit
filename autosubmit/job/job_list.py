@@ -2659,7 +2659,7 @@ class JobList(object):
                     retrials = int(job.retrials)
 
                 # Fixes the issue with the integration test. Failed vertical job was being resubmitted. In 4.2.0 this has a better fix since the check_wrapper was redesigned in general.
-                if job.wrapper_type == "vertical":
+                if job.wrapper_type and job.wrapper_type == "vertical":
                     job.fail_count = job.retrials
 
                 if job.fail_count < retrials:
