@@ -197,39 +197,52 @@ def test_copying_experiment_with_hpc_in_file(autosubmit_exp: Callable, autosubmi
         yaml_data = yaml.load(f)
         assert yaml_data["DEFAULT"]["HPCARCH"] == "MN5"
 
+
 @pytest.mark.parametrize(
-    'git_command,git_session',
+    "git_command,git_session",
     [
-        (['', ''], ['', '']),
-        (['test_1', 'test_2'], ['', '']),
-        (['', 'test_2'], ['', '']),
-        (['test_1', ''], ['', '']),
-        (['', ''], ['test_3', 'test_4']),
-        (['test_1', 'test_2'], ['test_3', 'test_4']),
-        (['', 'test_2'], ['test_3', 'test_4']),
-        (['test_1', ''], ['test_3', 'test_4']),
+        (["", ""], ["", ""]),
+        (["test_1", "test_2"], ["", ""]),
+        (["", "test_2"], ["", ""]),
+        (["test_1", ""], ["", ""]),
+        (["", ""], ["test_3", "test_4"]),
+        (["test_1", "test_2"], ["test_3", "test_4"]),
+        (["", "test_2"], ["test_3", "test_4"]),
+        (["test_1", ""], ["test_3", "test_4"]),
     ],
 )
-def test_as_conf_default_values(git_command, git_session, autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
+def test_as_conf_default_values(
+    git_command,
+    git_session,
+    autosubmit_exp: Callable,
+    autosubmit: Autosubmit,
+    tmp_path,
+    mocker,
+):
     """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
-    exp = autosubmit_exp(experiment_data={
-        'JOBS': {
-            'LOCAL_SEND_INITIAL': {
-                'CHUNKS_FROM': {
-                    1: {
-                        'CHUNKS_TO': 1
-                    }
-                }
-            }
-        },
-        'GIT': {
-            'PROJECT_ORIGIN': f'{git_session[0]}',
-            'PROJECT_BRANCH': f'{git_session[1]}'
-        },
-    })
-    as_conf_default_values(autosubmit.autosubmit_version, exp.expid, 'MN5', True, git_command[0], git_command[1], 'test_3')
-
-    yaml = YAML(typ='rt')
+    exp = autosubmit_exp(
+        experiment_data={
+            "JOBS": {"LOCAL_SEND_INITIAL": {"CHUNKS_FROM": {1: {"CHUNKS_TO": 1}}}},
+            "GIT": {
+                "PROJECT_ORIGIN": f"{git_session[0]}",
+                "PROJECT_BRANCH": f"{git_session[1]}",
+            },
+        }
+    )
+    as_conf_default_values(
+        autosubmit.autosubmit_version,
+        exp.expid,
+        "MN5",
+        True,
+        git_command[0],
+        git_command[1],
+        "test_3",
+    )
+    # mock cloning the repository
+    mocker.patch(
+        "autosubmit.autosubmit.AutosubmitGit.clone_repository", return_value=True
+    )
+    yaml = YAML(typ="rt")
     assert autosubmit.create(exp.expid, noplot=True, hide=True) == 0
     with open(tmp_path / f"{exp.expid}/conf/metadata/experiment_data.yml") as f:
         yaml_data = yaml.load(f)
@@ -241,25 +254,25 @@ def test_as_conf_default_values(git_command, git_session, autosubmit_exp: Callab
         )
         assert yaml_data["LOCAL"]["PROJECT_PATH"] == ""
 
-    if git_command[0] != '':
-        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_command[0]
+    if git_command[0] != "":
+        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_command[0]
     else:
-        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_session[0]
+        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_session[0]
 
-    if git_command[1] != '':
-        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_command[1]
+    if git_command[1] != "":
+        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_command[1]
     else:
-        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_session[1]
+        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_session[1]
 
-    if git_session[0] != '' and git_command[0] == '':
-        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_session[0]
+    if git_session[0] != "" and git_command[0] == "":
+        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_session[0]
     else:
-        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_command[0]
+        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_command[0]
 
-    if git_session[1] != '' and git_command[1] == '':
-        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_session[1]
+    if git_session[1] != "" and git_command[1] == "":
+        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_session[1]
     else:
-        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_command[1]
+        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_command[1]
 
 
 def test_expid_git_repo_sets_project_type_in_full_configuration(
@@ -297,6 +310,64 @@ def test_expid_git_repo_sets_project_type_in_full_configuration(
     assert project_data is not None
     assert project_data["PROJECT_TYPE"] == "git"
     assert project_data["PROJECT_DESTINATION"] == "git_project"
+
+
+def test_expid_git_repo_sets_project_type_project_destination_present(
+    autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path
+):
+    """Ensure non-minimal configuration with ``git_repo`` sets project defaults in expdef without overwriting existing project destination."""
+    exp = autosubmit_exp(experiment_data={
+        'PROJECT': {
+            'PROJECT_DESTINATION': 'existing_destination'
+        },
+        'JOBS': {
+            'LOCAL_SEND_INITIAL': {
+                'CHUNKS_FROM': {
+                    1: {
+                        'CHUNKS_TO': 1
+                    }
+                }
+            }
+        },
+    })
+
+    # Write in config file before calling as_conf_default_values
+    yaml = YAML(typ="rt")
+    conf_path = tmp_path / f"{exp.expid}/conf"
+
+    for conf_file in conf_path.iterdir():
+        if conf_file.name.lower().endswith((".yml", ".yaml")):
+            with open(conf_file, "r+") as file:
+                yaml_data = yaml.load(file)
+                if isinstance(yaml_data, dict) and "PROJECT" in yaml_data:
+                    yaml_data["PROJECT"]["PROJECT_DESTINATION"] = "existing_destination"
+                    file.seek(0)
+                    yaml.dump(yaml_data, file)
+                    file.truncate()
+                    break
+
+    as_conf_default_values(
+        autosubmit.autosubmit_version,
+        exp.expid,
+        "local",
+        False,
+        "https://earth.bsc.es/gitlab/ces/auto-advanced_config_example",
+        "main",
+        "as_conf",
+    )
+
+    project_data = None
+    for conf_file in conf_path.iterdir():
+        if conf_file.name.lower().endswith((".yml", ".yaml")):
+            with open(conf_file, "r") as file:
+                yaml_data = yaml.load(file)
+                if isinstance(yaml_data, dict) and "PROJECT" in yaml_data:
+                    project_data = yaml_data["PROJECT"]
+                    break
+
+    assert project_data is not None
+    assert project_data["PROJECT_TYPE"] == "git"
+    assert project_data["PROJECT_DESTINATION"] == "existing_destination"
 
 
 @pytest.mark.parametrize(
