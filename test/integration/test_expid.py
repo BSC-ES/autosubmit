@@ -197,89 +197,69 @@ def test_copying_experiment_with_hpc_in_file(autosubmit_exp: Callable, autosubmi
         yaml_data = yaml.load(f)
         assert yaml_data["DEFAULT"]["HPCARCH"] == "MN5"
 
-
 @pytest.mark.parametrize(
-    "git_command,git_session",
+    'git_command,git_session',
     [
-        (["", ""], ["", ""]),
-        (["test_1", "test_2"], ["", ""]),
-        (["", "test_2"], ["", ""]),
-        (["test_1", ""], ["", ""]),
-        (["", ""], ["test_3", "test_4"]),
-        (["test_1", "test_2"], ["test_3", "test_4"]),
-        (["", "test_2"], ["test_3", "test_4"]),
-        (["test_1", ""], ["test_3", "test_4"]),
+        (['', ''], ['', '']),
+        (['test_1', 'test_2'], ['', '']),
+        (['', 'test_2'], ['', '']),
+        (['test_1', ''], ['', '']),
+        (['', ''], ['test_3', 'test_4']),
+        (['test_1', 'test_2'], ['test_3', 'test_4']),
+        (['', 'test_2'], ['test_3', 'test_4']),
+        (['test_1', ''], ['test_3', 'test_4']),
     ],
 )
-def test_as_conf_default_values(
-    git_command,
-    git_session,
-    autosubmit_exp: Callable,
-    autosubmit: Autosubmit,
-    tmp_path,
-    mocker,  # added mocker to avoid cloning repos with fake git paths
-):
-    """Test that as_conf_default_values sets default values and create() persists them."""
-    exp = autosubmit_exp(
-        experiment_data={
-            "JOBS": {"LOCAL_SEND_INITIAL": {"CHUNKS_FROM": {1: {"CHUNKS_TO": 1}}}},
-            "GIT": {
-                "PROJECT_ORIGIN": f"{git_session[0]}",
-                "PROJECT_BRANCH": f"{git_session[1]}",
-            },
-        }
-    )
+def test_as_conf_default_values(git_command, git_session, autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path):
+    """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
+    exp = autosubmit_exp(experiment_data={
+        'JOBS': {
+            'LOCAL_SEND_INITIAL': {
+                'CHUNKS_FROM': {
+                    1: {
+                        'CHUNKS_TO': 1
+                    }
+                }
+            }
+        },
+        'GIT': {
+            'PROJECT_ORIGIN': f'{git_session[0]}',
+            'PROJECT_BRANCH': f'{git_session[1]}'
+        },
+    })
+    as_conf_default_values(autosubmit.autosubmit_version, exp.expid, 'MN5', True, git_command[0], git_command[1], 'test_3')
 
-    # git_command[0] != "" means --repo was passed, which forces minimal_configuration=True
-    # in expid(), so as_conf_default_values is always called with True when a git repo is given.
-    minimal = git_command[0] != ""
-    as_conf_default_values(
-        autosubmit.autosubmit_version,
-        exp.expid,
-        "MN5",
-        minimal,
-        git_command[0],
-        git_command[1],
-        "test_3",
-    )
-
-    yaml = YAML(typ="rt")
-    # create method clones the git repo when PROJECT_TYPE = git
-    # mock it because we use synthetic git values
-    mocker.patch(
-        "autosubmit.autosubmit.AutosubmitGit.clone_repository", return_value=True
-    )
+    yaml = YAML(typ='rt')
     assert autosubmit.create(exp.expid, noplot=True, hide=True) == 0
     with open(tmp_path / f"{exp.expid}/conf/metadata/experiment_data.yml") as f:
         yaml_data = yaml.load(f)
         assert yaml_data["DEFAULT"]["HPCARCH"] == "MN5"
         assert yaml_data["DEFAULT"]["EXPID"] == exp.expid
-        if minimal:
-            assert (
-                yaml_data["DEFAULT"]["CUSTOM_CONFIG"]
-                == f"{tmp_path}/{exp.expid}/proj/test_3"
-            )
+        assert (
+            yaml_data["DEFAULT"]["CUSTOM_CONFIG"]
+            == f"{tmp_path}/{exp.expid}/proj/test_3"
+        )
         assert yaml_data["LOCAL"]["PROJECT_PATH"] == ""
 
-    if git_command[0] != "":
-        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_command[0]
+    if git_command[0] != '':
+        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_command[0]
     else:
-        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_session[0]
+        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_session[0]
 
-    if git_command[1] != "":
-        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_command[1]
+    if git_command[1] != '':
+        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_command[1]
     else:
-        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_session[1]
+        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_session[1]
 
-    if git_session[0] != "" and git_command[0] == "":
-        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_session[0]
+    if git_session[0] != '' and git_command[0] == '':
+        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_session[0]
     else:
-        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_command[0]
+        assert yaml_data['GIT']['PROJECT_ORIGIN'] == git_command[0]
 
-    if git_session[1] != "" and git_command[1] == "":
-        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_session[1]
+    if git_session[1] != '' and git_command[1] == '':
+        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_session[1]
     else:
-        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_command[1]
+        assert yaml_data['GIT']['PROJECT_BRANCH'] == git_command[1]
 
 
 def test_expid_git_repo_sets_project_type_in_full_configuration(

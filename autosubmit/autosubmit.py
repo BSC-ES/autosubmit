@@ -765,9 +765,7 @@ class Autosubmit:
             return Autosubmit.run_experiment(args.expid, args.start_time, args.start_after, args.run_only_members,
                                              args.profile)
         elif args.command == 'expid':
-            # Using a git repo implies minimal configuration
-            minimal_configuration = args.minimal_configuration or bool(args.git_repo)
-            return Autosubmit.expid(args.description, args.HPC, args.copy, args.dummy, minimal_configuration,
+            return Autosubmit.expid(args.description, args.HPC, args.copy, args.dummy, args.minimal_configuration,
                                     args.git_repo, args.git_branch, args.git_as_conf, args.operational, args.testcase,
                                     args.evaluation, args.use_local_minimal) != ''
         elif args.command == 'delete':
@@ -835,9 +833,7 @@ class Autosubmit:
                 warnings.warn('member is deprecated and will be removed in a future major release!')
             if args.stardate:
                 warnings.warn('stardate is deprecated and will be removed in a future major release!')
-            # Using git_repo implies minimal configuration
-            minimal_configuration = args.minimal_configuration or bool(args.git_repo)
-            return Autosubmit.testcase(args.description, args.HPC, args.copy, minimal_configuration, args.git_repo,
+            return Autosubmit.testcase(args.description, args.HPC, args.copy, args.minimal_configuration, args.git_repo,
                                        args.git_branch, args.git_as_conf, args.use_local_minimal)
         elif args.command == 'refresh':
             return Autosubmit.refresh(args.expid, args.model_conf, args.jobs_conf)
