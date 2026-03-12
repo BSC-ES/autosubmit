@@ -2448,7 +2448,11 @@ class JobList(object):
                 queue = "no-scheduler"
             else:
                 queue = job.queue
-            Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job.id, Status(
+            # safeguard for older experiments
+            job_id = job.id if job.id else "no-id"
+            if not job.id:
+                Log.warning(f"Job {job.name} has {job_id}. This shouldn't happen.")
+            Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
             ).VALUE_TO_KEY[job.status], job.platform.name, queue)
 
     def update_from_file(self, store_change=True):
@@ -2653,6 +2657,11 @@ class JobList(object):
                     retrials = int(as_conf.get_retrials())
                 else:
                     retrials = int(job.retrials)
+
+                # Fixes the issue with the integration test. Failed vertical job was being resubmitted. In 4.2.0 this has a better fix since the check_wrapper was redesigned in general.
+                if job.wrapper_type == "vertical" and job.status != Status.WAITING:  # job is being retrieved internally by the wrapper
+                    job.fail_count = job.retrials
+
                 if job.fail_count < retrials:
                     job.inc_fail_count()
                     tmp = [
