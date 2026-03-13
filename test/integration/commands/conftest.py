@@ -59,7 +59,23 @@ def general_data(tmp_path: Path) -> dict[str, Any]:
                 'PROCESSORS': '1',
                 'MAX_PROCESSORS': '128',
                 'PROCESSORS_PER_NODE': '128',
-            }
+            },
+            # TODO: Containarize ecaccess to be able to run these tests in CI/CD.
+            'TEST_EC': {
+                'TYPE': 'ecaccess',  # enables the usage of ecaccess commands, requires a valid .eccert in ~/.eccert
+                'VERSION': 'slurm',  # HPC scheduler accesed via ecaccess commands
+                'ADD_PROJECT_TO_HOST': 'False',
+                'HOST': 'hpc-login',  # Can only run locally with a valid .eccert, see https://gitlab.earth.bsc.es/es/auto-ecearth3/-/wikis/Running-on-ECMWF-HPC2020
+                'MAX_WALLCLOCK': '48:00',
+                'PROJECT': 'spesiccf',
+                'QUEUE': 'nf',
+                'EC_QUEUE': 'hpc',
+                'SCRATCH_DIR': '/ec/res4/scratch/c3d',
+                'USER': 'c3d',  # Requires a valid user, contact ecmwf for one.
+                'PROCESSORS_PER_NODE': '4',
+                'MAX_PROCESSORS': '4',
+                'CUSTOM_DIRECTIVES': ['#SBATCH --hint=nomultithread'],
+            },
         }
     }
 

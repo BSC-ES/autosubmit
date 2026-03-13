@@ -18,8 +18,10 @@
 import locale
 import os
 import subprocess
+from contextlib import suppress
+from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from autosubmit.log.log import Log, AutosubmitError
 from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
@@ -172,6 +174,7 @@ class EcPlatform(ParamikoPlatform):
             if output.lower().find("yes") != -1:
                 self.connected = True
             else:
+                Log.warning(f"Connection to {self.host} could not be established. Please remember to weekly renew your ecaccess-certificate if you are using one.")
                 self.connected = False
         except Exception:
             self.connected = False
@@ -211,15 +214,25 @@ class EcPlatform(ParamikoPlatform):
         self.connect(as_conf)
 
     def check_remote_permissions(self) -> bool:
+        """Checks if the necessary permissions are in place on the remote host.
+         There is no mkdir -p equivalent in ecaccess-file-mkdir.
+         So we need to check permissions for each level of the path separately."""
+        with suppress(Exception):
+            subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
+        with suppress(Exception):
+            subprocess.check_output(f"{self.host}:{self.scratch}", shell=True)
+        with suppress(Exception):
+            subprocess.check_output(f"{self.host}:{self.scratch}/{self.project}", shell=True)
+        with suppress(Exception):
+            subprocess.check_output(f"{self.host}:{self.scratch}/{self.project}/{self.user}", shell=True)
+        with suppress(Exception):
+            subprocess.check_output(f"{self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}", shell=True)
         try:
-            try:
-                subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=False)
-            except Exception:
-                pass
             subprocess.check_output(self.check_remote_permissions_cmd, shell=True)
             subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
             return True
-        except Exception:
+        except Exception as e:
+            Log.warning(f"Remote permissions check failed: {e}")
             return False
 
     def send_command(self, command, ignore_log=False, x11=False) -> bool:
@@ -347,3 +360,34 @@ class EcPlatform(ParamikoPlatform):
         ###############################################################################
         """.format(filename, queue, project, wallclock, num_procs, expid, dependency, rootdir,
                    '\n'.ljust(13).join(str(s) for s in directives))
+
+    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
+
+        Uses ``ecaccess-file-dir`` to inspect the remote directory and filters
+        results locally. If ``job_names`` is provided, only those names are checked.
+
+        :param job_names: Optional job names to restrict the lookup.
+        :return: Job names whose ``_COMPLETED`` marker exists remotely.
+        """
+        completed_job_names = []
+
+        if self.expid in str(self.remote_log_dir):
+            expected_files = (
+                {f"{name}_COMPLETED" for name in job_names}
+                if job_names
+                else None
+            )
+
+            cmd = f"ecaccess-file-dir {self.host}:{self.remote_log_dir}"
+            self.send_command(cmd)
+            output = self.get_ssh_output()
+
+            for line in output.splitlines():
+                file_name = Path(line.strip().split()[-1].rstrip("/")).name if line.strip() else ""
+                if not file_name.endswith("_COMPLETED") or (expected_files and file_name not in expected_files):
+                    continue
+
+                completed_job_names.append(file_name.removesuffix("_COMPLETED"))
+
+        return completed_job_names
