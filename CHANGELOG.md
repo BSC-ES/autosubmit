@@ -3,6 +3,7 @@
 **Bug fixes:**
 
 - Fixed issue with experiments running on LOCAL platform without a defined LOCAL entry in platforms.yml config file #1131
+- Set PROJECT_TYPE, PROJECT_DESTINATION and CUSTOM_CONFIG for experiments without minimal configuration #2864
 
 **Enhancements:**
 
