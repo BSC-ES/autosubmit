@@ -2033,18 +2033,15 @@ class Job(object):
             if set_attributes and start_date:
                 self.date_split = datetime.datetime.strptime(start_date, "%Y%m%d")
             split_start = chunk_start_date(self.date_split, int(self.split), split_length, split_unit, cal)
-            if parameters["SPLIT_LAST"] != 'TRUE':
-                split_end = chunk_end_date(split_start, split_length, split_unit, cal)
-                if split_unit == 'hour':
-                    split_end_1 = split_end
-                else:
-                    split_end_1 = previous_day(split_end, cal)
+            if parameters["SPLIT_LAST"].lower() == "true":
+                split_end = datetime.datetime.strptime(parameters['CHUNK_END_DATE'], "%Y%m%d")
             else:
-                split_end = datetime.datetime.strptime(parameters.get('CHUNK_END_DATE', None), "%Y%m%d")
-                if split_unit == 'hour':
-                    split_end_1 = split_end
-                else:
-                    split_end_1 = previous_day(split_end, cal)
+                split_end = chunk_end_date(split_start, split_length, split_unit, cal)
+
+            if split_unit == 'hour':
+                split_end_1 = split_end - datetime.timedelta(hours=1)
+            else:
+                split_end_1 = previous_day(split_end, cal)
 
             parameters['SPLIT'] = self.split
             parameters['SPLITSCALENDAR'] = cal

@@ -38,7 +38,7 @@ echo "HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR=%HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR%"
 
 _TEMPLATE_CONTENT_CALENDAR_SPLITS = dedent("""
 echo "SPLIT_START_DATE=%SPLIT_START_DATE%"
-echo "SPLIT_END_DATE=%SPLIT_SECOND_TO_LAST_DATE%"
+echo "SPLIT_END_DATE=%SPLIT_END_DATE%"
 echo "CHUNK_START_DATE=%CHUNK_START_DATE%"
 echo "CHUNK_END_DATE=%CHUNK_END_DATE%"
 echo "SPLIT_FIRST=%SPLIT_FIRST%"
@@ -273,13 +273,25 @@ JOBS:
         chunksize: '3'
         SPLITSIZE: '2'
 """)),
+    (dedent(f"""\
+    JOBS:
+        test_auto:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+            SPLITS: "auto"
+            SPLITPOLICY: 'flexible'
+            SPLITSIZE: '25'
+            SPLITSIZEUNIT: 'hour'
+    """)),
 ], ids=[
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_15_DAY",
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_DAY",
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_HOUR",
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_2_HOUR",  # Equivalent to the removed test_calendar test
-    "CALENDAR_SPLITS_AUTO_SPLITSIZE_splitsize_15_chunksize_3"  # Equivalent to docs/source/userguide/defining_workflows/code/jobs_splits_auto.yml and expdef_splits_auto.yml
-
+    "CALENDAR_SPLITS_AUTO_SPLITSIZE_splitsize_15_chunksize_3",  # Equivalent to docs/source/userguide/defining_workflows/code/jobs_splits_auto.yml and expdef_splits_auto.yml
+    "CALENDAR_SPLITS_AUTO_check_hours_SPLITSIZE_25_HOUR",
 ])
 def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, Any], additional_data: str):
     """Test that auto splits are correctly calculated and injected in the script."""
@@ -350,7 +362,7 @@ def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, A
         chunk_start_date = info["CHUNK_START_DATE"]
         chunk_end_date = info["CHUNK_END_DATE"]
         if not (chunk_start_date <= chunk_end_date and split_start_date <= split_end_date and chunk_start_date <= split_start_date <= split_end_date <= chunk_end_date):
-            lookup_date_errors[key] = {split_start_date, split_end_date, chunk_start_date, chunk_end_date}
+            lookup_date_errors[key] = splits_info[key]
 
         # Check two
         chunk = info["CURRENT_CHUNK"]
@@ -362,8 +374,14 @@ def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, A
         im_last_chunk: bool = info["CHUNK_LAST"]
         im_last_split: bool = info["SPLIT_LAST"]
 
-        if im_first_chunk and chunk != 1:
-            lookup_first_last_errors[key] = {chunk, split, im_first_chunk, im_first_split, im_last_chunk, im_last_split, max_chunks, max_splits}
+        if im_first_chunk and chunk != 1 or im_first_split and split != 1 or im_last_split and split != max_splits or im_last_chunk and chunk != max_chunks:
+            lookup_first_last_errors[key] = splits_info[key]
+
+        if im_first_chunk and im_first_split and split_start_date != chunk_start_date:
+            lookup_first_last_errors[key] = splits_info[key]
+
+        if im_last_chunk and im_last_split and split_end_date != chunk_end_date:
+            lookup_first_last_errors[key] = splits_info[key]
 
     assert not lookup_first_last_errors, f"First/Last chunk/split errors found in splits: {lookup_first_last_errors}"
     assert not lookup_date_errors, f"Date errors found in splits: {lookup_date_errors}"
