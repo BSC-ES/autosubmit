@@ -28,18 +28,18 @@ _AS_R_HEADER = dedent("""\
         ###################
         oldw <- getOption("warn")
         options( warn = -1 )
-        leave = F
+        leave = FALSE
         langs <- c("C.utf8","C.UTF-8","C","en_GB","es_ES")
         i = 1
         e=""
-        while (nchar(e) == 0 || leave)
+        while (nchar(e) == 0 && !leave)
         {
             e=Sys.setlocale("LC_ALL",langs[i])
             e
             i=i+1
             if (i > NROW(langs)) 
             {
-                leave=T
+                leave=TRUE
             }
         } 
         options( warn = oldw )
