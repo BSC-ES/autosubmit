@@ -14,6 +14,9 @@ permissions:
   contents: read
   packages: read
 
+env:
+  TESTCONTAINERS_RYUK_DISABLED: true
+
 jobs:
   test-unit:
     env:
@@ -259,10 +262,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Integration tests
+      - name: Slurm integration tests
+        # Here, instead of `nproc` we use 4 to reduce the number of concurrent
+        # Slurm jobs as these are expensive tests.
         run: |
           pytest \
-            -n $(nproc) \
+            -n 4 \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
