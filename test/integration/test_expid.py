@@ -275,83 +275,51 @@ def test_as_conf_default_values(
         assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_command[1]
 
 
-def test_expid_git_repo_sets_project_type_in_full_configuration(
-    autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path
+@pytest.mark.parametrize(
+    "git_repo,project_destination",
+    [
+        ("https://earth.bsc.es/gitlab/ces/auto-advanced_config_example", ""),
+        ("https://earth.bsc.es/gitlab/ces/auto-advanced_config_example", "   "),
+        (
+            "https://earth.bsc.es/gitlab/ces/auto-advanced_config_example",
+            "existing_destination",
+        ),
+    ],
+)
+def test_expid_git_repo_sets_project_type_and_destination(
+    git_repo: str,
+    project_destination: str,
+    autosubmit_exp: Callable,
+    autosubmit: Autosubmit,
+    tmp_path,
 ):
-    """Ensure non-minimal configuration with ``git_repo`` sets project defaults in expdef."""
+    """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
     exp = autosubmit_exp(
         experiment_data={
+            "PROJECT": {"PROJECT_DESTINATION": project_destination},
             "JOBS": {"LOCAL_SEND_INITIAL": {"CHUNKS_FROM": {1: {"CHUNKS_TO": 1}}}},
         }
     )
 
-    as_conf_default_values(
-        autosubmit.autosubmit_version,
-        exp.expid,
-        "local",
-        False,
-        "https://earth.bsc.es/gitlab/ces/auto-advanced_config_example",
-        "main",
-        "as_conf",
-    )
-
     yaml = YAML(typ="rt")
     conf_path = tmp_path / f"{exp.expid}/conf"
 
-    project_data = None
+    # rewrite project_destination in yaml files
     for conf_file in conf_path.iterdir():
         if conf_file.name.lower().endswith((".yml", ".yaml")):
             with open(conf_file, "r") as file:
                 yaml_data = yaml.load(file)
                 if isinstance(yaml_data, dict) and "PROJECT" in yaml_data:
-                    project_data = yaml_data["PROJECT"]
-                    break
-
-    assert project_data is not None
-    assert project_data["PROJECT_TYPE"] == "git"
-    assert project_data["PROJECT_DESTINATION"] == "git_project"
-
-
-def test_expid_git_repo_sets_project_type_project_destination_present(
-    autosubmit_exp: Callable, autosubmit: Autosubmit, tmp_path
-):
-    """Ensure non-minimal configuration with ``git_repo`` sets project defaults in expdef without overwriting existing project destination."""
-    exp = autosubmit_exp(experiment_data={
-        'PROJECT': {
-            'PROJECT_DESTINATION': 'existing_destination'
-        },
-        'JOBS': {
-            'LOCAL_SEND_INITIAL': {
-                'CHUNKS_FROM': {
-                    1: {
-                        'CHUNKS_TO': 1
-                    }
-                }
-            }
-        },
-    })
-
-    # Write in config file before calling as_conf_default_values
-    yaml = YAML(typ="rt")
-    conf_path = tmp_path / f"{exp.expid}/conf"
-
-    for conf_file in conf_path.iterdir():
-        if conf_file.name.lower().endswith((".yml", ".yaml")):
-            with open(conf_file, "r+") as file:
-                yaml_data = yaml.load(file)
-                if isinstance(yaml_data, dict) and "PROJECT" in yaml_data:
-                    yaml_data["PROJECT"]["PROJECT_DESTINATION"] = "existing_destination"
-                    file.seek(0)
-                    yaml.dump(yaml_data, file)
-                    file.truncate()
-                    break
+                    yaml_data["PROJECT"]["PROJECT_DESTINATION"] = project_destination
+                    with open(conf_file, "w") as file_to_write:
+                        yaml.dump(yaml_data, file_to_write)
 
     as_conf_default_values(
         autosubmit.autosubmit_version,
         exp.expid,
         "local",
         False,
-        "https://earth.bsc.es/gitlab/ces/auto-advanced_config_example",
+        git_repo,
         "main",
         "as_conf",
     )
@@ -367,7 +335,10 @@ def test_expid_git_repo_sets_project_type_project_destination_present(
 
     assert project_data is not None
     assert project_data["PROJECT_TYPE"] == "git"
-    assert project_data["PROJECT_DESTINATION"] == "existing_destination"
+    if project_destination.strip() == "":
+        assert project_data["PROJECT_DESTINATION"] == "git_project"
+    else:
+        assert project_data["PROJECT_DESTINATION"] == project_destination
 
 
 @pytest.mark.parametrize(
