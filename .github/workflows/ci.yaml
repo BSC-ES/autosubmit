@@ -22,7 +22,9 @@ jobs:
     env:
       COVERAGE_PROCESS_START: .coveragerc
     # needs: lint
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 10
 
     strategy:
@@ -33,22 +35,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-          # See: https://github.com/actions/setup-python#caching-packages-dependencies
-          cache: 'pip' # caching pip dependencies
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl graphviz rsync r-base
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       # NOTE: We used `--trace --full-trace` with pytest but had strange
       #       bugs in unit tests with py3.11:
@@ -81,6 +71,9 @@ jobs:
       COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
+      options: --user 0 -v /var/run/docker.sock:/var/run/docker.sock
 
     strategy:
       matrix:
@@ -102,22 +95,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-          # See: https://github.com/actions/setup-python#caching-packages-dependencies
-          cache: 'pip' # caching pip dependencies
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl git subversion graphviz rsync xvfb r-base
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       - name: Set up Git
         run: |
@@ -212,6 +193,8 @@ jobs:
 
   test-regression:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 10
 
     strategy:
@@ -222,20 +205,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl graphviz rsync
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       # Run regression tests
       - name: Regression tests
@@ -260,7 +233,10 @@ jobs:
           retention-days: 7
 
   test-slurm:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
+      options: --user 0 -v /var/run/docker.sock:/var/run/docker.sock
 
     strategy:
       matrix:
@@ -270,15 +246,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       - name: Set up Git
         run: |
@@ -363,6 +334,8 @@ jobs:
   #       we can build it and ii) collect the coverage of the examples executed.
   test-docs:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 10
 
     strategy:
@@ -373,20 +346,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl graphviz rsync
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       # Run regression tests
       - name: Build docs
@@ -408,6 +371,8 @@ jobs:
 
   test-misc:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 5
 
     strategy:
@@ -418,16 +383,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
           # To validate CFF citation files.
-          python -m pip install cffconvert
+          python${{ matrix.python-version }} -m pip install cffconvert
 
       - name: Validate citation file
         run: |
