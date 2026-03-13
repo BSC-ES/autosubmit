@@ -38,6 +38,7 @@ ORG=bsc-es
 # openssh: sha256:fdd9783e0fa4c52592c8405765c5de04dcf657db1b4d6ab073c14c4b998ca1fa
 
 IMAGES=(
+  autosubmit/autosubmit-ci:latest
   githttpd/githttpd:latest
   autosubmit/linuxserverio-ssh-2fa-x11:latest
   autosubmit/slurm-openssh-container:25-05-0-1
