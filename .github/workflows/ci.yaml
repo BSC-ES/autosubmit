@@ -22,7 +22,7 @@ jobs:
     env:
       COVERAGE_PROCESS_START: .coveragerc
     # needs: lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
 
     strategy:
@@ -77,7 +77,7 @@ jobs:
   test-integration:
     env:
       COVERAGE_PROCESS_START: .coveragerc
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
 
     strategy:
@@ -129,6 +129,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pre-pull Docker images from docker.py constants
+        run: |
+          set -e
+          echo "Extracting Docker images from test/integration/test_utils/docker.py..."
+          IMAGES=$(grep -oP "^[_A-Za-z0-9]+_IMAGE\s*=\s*['\"]\K[^'\"]+" test/integration/test_utils/docker.py)
+          echo "Found images:"
+          echo "$IMAGES"
+
+          for IMAGE in $IMAGES; do
+            echo "Pulling $IMAGE ..."
+            docker pull "$IMAGE" || echo "Warning: failed to pull $IMAGE, continuing..."
+          done
 
       # In GitHub Actions we run all the integration tests, including those that require
       # dependencies such as Docker (see `-m ''`, which means all markers). Read the
@@ -224,7 +237,7 @@ jobs:
           retention-days: 7
 
   test-slurm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     strategy:
       matrix:
@@ -262,12 +275,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Pre-pull Docker images from docker.py constants
+        run: |
+          set -e
+          echo "Extracting Docker images from test/integration/test_utils/docker.py..."
+          IMAGES=$(grep -oP "^[_A-Za-z0-9]+_IMAGE\s*=\s*['\"]\K[^'\"]+" test/integration/test_utils/docker.py)
+          echo "Found images:"
+          echo "$IMAGES"
+
+          for IMAGE in $IMAGES; do
+            echo "Pulling $IMAGE ..."
+            docker pull "$IMAGE" || echo "Warning: failed to pull $IMAGE, continuing..."
+          done
+
       - name: Slurm integration tests
         # Here, instead of `nproc` we use 4 to reduce the number of concurrent
         # Slurm jobs as these are expensive tests.
         run: |
           pytest \
-            -n 4 \
+            -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
