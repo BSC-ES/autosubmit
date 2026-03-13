@@ -490,9 +490,9 @@ class SlurmPlatform(ParamikoPlatform):
                         lang = 'UTF-8'
                 with open(self._submit_script_path, "ab") as submit_script_file:
                     if not hold:
-                        submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))
+                        submit_script_file.write((export + self._submit_cmd + job_script + " \n").encode(lang))
                     else:
-                        submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
+                        submit_script_file.write((export + self._submit_hold_cmd + job_script + " \n").encode(lang))
         else:
             return export + self.get_submit_cmd_x11(job.x11_options.strip(""), job_script.strip(""))
 

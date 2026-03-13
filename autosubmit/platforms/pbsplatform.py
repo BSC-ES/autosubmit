@@ -226,35 +226,24 @@ class PBSPlatform(ParamikoPlatform):
                     sleep(10)
                 jobs_id_index = 0
                 for package in valid_packages_to_submit:
-                    current_package_id = str(jobs_id[jobs_id_index])
-                    if hold:
-                        retries = 5
-                        package.jobs[0].id = current_package_id
-                        try:
-                            while retries > 0:
-                                cmd = package.jobs[0].platform.get_queue_status_cmd(current_package_id)
-                                package.jobs[0].platform.send_command(cmd)
-                                sleep(5)
-                                retries = retries - 1
-                                package.jobs[0].platform.send_command(
-                                    package.jobs[0].platform.cancel_cmd + f" {current_package_id}")
-                                jobs_id_index += 1
-                                continue
-                        except Exception:
-                            failed_packages.append(current_package_id)
-                            continue
-                    package.process_jobs_to_submit(current_package_id, hold)
+                    if jobs_id_index >= len(jobs_id):
+                        jobs_id_index = 0
+                        sleep(10)
+                    job_name = package.name if hasattr(package, "name") else package.jobs[0].name
+                    job_id_running = self.get_jobs_id_by_job_name(job_name)
+                    if job_id_running is not None and job_id_running is not '':
+                        current_package_id = str(jobs_id[jobs_id_index])
+                        package.process_jobs_to_submit(current_package_id, hold)
+                        duplicated_jobs_already_checked = True
                     # Check if there are duplicated job_name
                     if not duplicated_jobs_already_checked:
-                        job_name = package.name if hasattr(package, "name") else package.jobs[0].name
-                        jobs_id = self.get_jobs_id_by_job_name(job_name)
-                        if len(jobs_id) > 1:  # Cancel each job that is not the associated
+                        if len(job_id_running) > 1:  # Cancel each job that is not the associated
                             ids_to_check = [package.jobs[0].id]
                             if package.jobs[0].het:
                                 for i in range(1, package.jobs[0].het.get("HETSIZE", 1)):  # noqa
                                     ids_to_check.append(str(int(ids_to_check[0]) + i))
                             # TODO to optimize cancel all jobs at once
-                            for id_ in [jobs_id for jobs_id in jobs_id if jobs_id not in ids_to_check]:
+                            for id_ in [job_id_running for job_id_running in job_id_running if job_id_running not in ids_to_check]:
                                 self.send_command(self.cancel_job(id_))
                                 Log.debug(f'Job {id_} with the assigned name: {job_name} has been cancelled')
                             Log.debug(f'Job {package.jobs[0].id} with the assigned name: {job_name} has been submitted')
@@ -386,7 +375,7 @@ class PBSPlatform(ParamikoPlatform):
             self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "qdel"
-        self._submit_cmd = f'qsub {self.remote_log_dir}/'
+        self._submit_cmd = f' qsub {self.remote_log_dir}/'
         self._submit_command_name = "qsub"
         self._submit_hold_cmd = 'qhold '  # Needs the JOB_ID to hold a JOB
         self.put_cmd = "scp"
@@ -491,9 +480,9 @@ class PBSPlatform(ParamikoPlatform):
                     lang = 'UTF-8'
 
             if not hold:
-                cmd = (export + self._submit_cmd + job_script).encode(lang)
+                cmd = (export + self._submit_cmd + job_script + "\n").encode(lang)
             else:
-                cmd = (export + self._submit_hold_cmd + job_script).encode(lang)
+                cmd = (export + self._submit_hold_cmd + job_script + "\n").encode(lang)
 
             with open(self._submit_script_path, "ab") as submit_script_file:
                 submit_script_file.write(cmd)
@@ -653,6 +642,28 @@ class PBSPlatform(ParamikoPlatform):
                     job.new_status = Status.QUEUING  # If it was HELD and was released, it should be QUEUING next.
                 else:
                     job.new_status = Status.HELD
+
+
+    def wrapper_header(self, **kwargs: 'Any') -> str:
+        """It generates the header of the wrapper configuring it to execute the Experiment.
+
+        :param kwargs: Key arguments associated to the Job/Experiment to configure the wrapper.
+        :type kwargs: Any
+        :return: a sequence of slurm commands.
+        :rtype: str
+        """
+        return self._header.wrapper_header(**kwargs)
+
+
+    @staticmethod
+    def allocated_nodes() -> None:
+        """It sets the allocated nodes of the wrapper
+
+        :return: A command that changes the num of Node per job
+        :rtype: str
+        """
+        Log.warning("Permission denied: Not enough permission to execute the command that sets the allocated nodes of the wrapper")
+
 
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5,
                           max_retries: int = 3) -> bool:
