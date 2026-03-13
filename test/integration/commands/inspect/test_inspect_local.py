@@ -374,13 +374,8 @@ def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, A
         im_last_chunk: bool = info["CHUNK_LAST"]
         im_last_split: bool = info["SPLIT_LAST"]
 
-        if im_first_chunk and chunk != 1 or im_first_split and split != 1 or im_last_split and split != max_splits or im_last_chunk and chunk != max_chunks:
-            lookup_first_last_errors[key] = splits_info[key]
-
-        if im_first_chunk and im_first_split and split_start_date != chunk_start_date:
-            lookup_first_last_errors[key] = splits_info[key]
-
-        if im_last_chunk and im_last_split and split_end_date != chunk_end_date:
+        if (im_first_chunk and chunk != 1 or im_first_split and split != 1 or im_last_split and split != max_splits or im_last_chunk and chunk != max_chunks) or (
+                im_first_chunk and im_first_split and split_start_date != chunk_start_date) or (im_last_chunk and im_last_split and split_end_date != chunk_end_date):
             lookup_first_last_errors[key] = splits_info[key]
 
     assert not lookup_first_last_errors, f"First/Last chunk/split errors found in splits: {lookup_first_last_errors}"
