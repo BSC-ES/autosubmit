@@ -2786,12 +2786,17 @@ class AutosubmitConfig(object):
         return self.get_section(['STORAGE', 'TYPE'], 'pkl')
 
     @staticmethod
-    def is_valid_mail_address(mail_address):
-        if re.match('^[_a-z0-9-]+(\\.[_a-z0-9-]+)*@[a-z0-9-]+(\\.[a-z0-9-]+)*(\\.[a-z]{2,4})$', mail_address,
-                    flags=re.IGNORECASE):
-            return True
-        else:
-            return False
+    def is_valid_mail_address(mail_address: str) -> bool:
+        """Validate an email address.
+
+        Uses a permissive regex that accepts both standard internet
+        addresses (``user@example.com``) and local/intranet addresses
+        (``user@localhost``, ``user@hostname``) as described in the
+        relevant RFCs (RFC 5321, RFC 5322).
+
+        See https://github.com/BSC-ES/autosubmit/issues/1471
+        """
+        return re.match(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$', mail_address) is not None
 
     def is_valid_communications_library(self) -> bool:
         library = self.get_communications_library()

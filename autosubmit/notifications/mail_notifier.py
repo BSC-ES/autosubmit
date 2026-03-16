@@ -147,7 +147,7 @@ def _check_mail_address(mail_to: list[str]) -> None:
             'Recipients of mail notifications must be a list of emails!')
     elif not mail_to:
         raise ValueError('Empty recipient list')
-    elif any([not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', mail) for mail in mail_to]):
+    elif any([not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$', mail) for mail in mail_to]):
         raise ValueError('Invalid email in recipient list')
 
 
