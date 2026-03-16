@@ -1827,6 +1827,7 @@ class AutosubmitConfig(object):
             if not only_experiment_data:
                 # Loads all configuration associated with the project data "pre"
                 custom_conf_pre = self.load_custom_config_section({}, filenames_to_load["PRE"])
+                custom_conf_pre = self._pin_inmutable_variables(custom_conf_pre)
                 # Loads all configuration associated with the user data "post"
                 self.experiment_data = self.load_custom_config_section(
                     self.unify_conf(custom_conf_pre, non_minimal_conf), filenames_to_load["POST"])

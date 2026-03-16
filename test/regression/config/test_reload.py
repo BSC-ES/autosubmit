@@ -297,3 +297,41 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
     if PROFILE:
         stats = pstats.Stats(profiler).sort_stats('cumtime')
         stats.print_stats()
+
+
+def test_override_inmutable_variables_in_custom_config(temp_folder: Path, mocker) -> None:
+    """
+    Test that inmutable variables cannot be overridden in custom configuration files.
+    """
+    default_yaml_file = {
+        "DEFAULT": {
+            "EXPID": "a000",
+            "HPCARCH": "local",
+            "CUSTOM_CONFIG": {
+                "PRE": [
+                    "%job_variableX.path%",
+
+                ]
+            }
+        },
+        "job": {
+            "FOR": {
+                "NAME": "%var%"
+            },
+            "path": "TOFILL"
+        },
+        "var": [
+            "%hola%",
+            "%test%",
+        ],
+        "test": "variableX"
+    }
+    project_yaml_files = {"/variableX/test.yml": {"expid": "a_test"}}
+    mocker.patch('pathlib.Path.exists', return_value=True)
+    default_yaml_file = prepare_custom_config_tests(default_yaml_file, project_yaml_files, temp_folder)
+    prepare_yaml_files(default_yaml_file, temp_folder)
+    as_conf = AutosubmitConfig("test")
+    as_conf.conf_folder_yaml = Path(temp_folder)
+    as_conf.load_workflow_commit = MagicMock()
+    as_conf.reload(True)
+    assert as_conf.experiment_data["EXPID"] == "a000"

@@ -544,3 +544,16 @@ def test_load_config_file_misc(new_config_data: str, load_misc: bool, expected_m
     as_conf.load_config_file(current_config, tmp_path / 'a000.yml', load_misc=load_misc)
 
     assert len(as_conf.misc_files) == expected_misc_files_length
+
+
+def test_pin_inmutable_variables(autosubmit_config: "AutosubmitConfigFactory"):
+    """Test that the _pin_inmutable_variables method correctly pins inmutable variables."""
+    as_conf: AutosubmitConfig = autosubmit_config(
+        expid="a000", experiment_data={"DEFAULT": {"HPCARCH": "LOCAL", "EXPID": "a000"}}
+    )
+    inmutable_variables = {"EXPID": "a000", "HPCARCH": "LOCAL"}
+    as_conf.inmutable_variables = inmutable_variables.copy()
+    data = {"EXPID": "a001", "HPCARCH": "MARENOSTRUM5"}
+    pinned_data = as_conf._pin_inmutable_variables(data)
+    assert pinned_data["EXPID"] == "a000"
+    assert pinned_data["HPCARCH"] == "LOCAL"
