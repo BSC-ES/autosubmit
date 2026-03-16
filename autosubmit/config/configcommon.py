@@ -667,6 +667,7 @@ class AutosubmitConfig(object):
         #       load the miscellaneous file/key. But in reality, I believe this means if ``load_misc``, and
         #       we still don't have ``AS_MISC``, then we will add the given YAML file to the list of
         #       ``misc_files``. It might be simpler to have a separate function for this, or append directly.
+        new_file.data = self._pin_inmutable_variables(new_file.data)
         if new_file.data.get("AS_MISC", False) and not load_misc:
             self.misc_files.append(yaml_file)
             new_file.data = {}
@@ -1624,6 +1625,29 @@ class AutosubmitConfig(object):
         keys_to_delete = ["HPCROOTDIR", "HPCLOGDIR", "HPCARCH"]
         for key in keys_to_delete:
             yaml_data.pop(key, None)
+    
+    def _pin_inmutable_variables(self, parameters: dict) -> dict:
+        """Keep default variables regardless of the experiment configuration files
+        :param parameters: dict with current parameters
+        :return: dict with updated parameters
+        """
+        # Variables that should be fixed regardless of the configuration file
+        PINNED_VARIABLES = ["EXPID", "HPCARCH"]
+        
+        starter_default = self.starter_conf.get("DEFAULT", {})
+        
+        if not isinstance(parameters, dict) or not isinstance(starter_default, dict):
+            return parameters
+        
+        default_section = parameters.setdefault("DEFAULT", {})
+        for key in PINNED_VARIABLES:
+            if key not in starter_default:
+                continue
+            # For each key, get the original value and the one in the configuration file
+            starter_value = starter_default[key]
+            default_section[key] = starter_value
+        
+        return parameters
 
     def load_custom_config(self, current_data, filenames_to_load):
         """Loads custom config files
@@ -1801,9 +1825,6 @@ class AutosubmitConfig(object):
             if not only_experiment_data:
                 # Loads all configuration associated with the project data "pre"
                 custom_conf_pre = self.load_custom_config_section({}, filenames_to_load["PRE"])
-                custom_conf_pre["DEFAULT"] = {}
-                custom_conf_pre["DEFAULT"]["EXPID"] =  starter_conf.get("DEFAULT", {}).get("EXPID", None)
-                custom_conf_pre["DEFAULT"]["HPCARCH"] =  starter_conf.get("DEFAULT", {}).get("HPCARCH", None)
                 # Loads all configuration associated with the user data "post"
                 self.experiment_data = self.load_custom_config_section(
                     self.unify_conf(custom_conf_pre, non_minimal_conf), filenames_to_load["POST"])
