@@ -1646,7 +1646,8 @@ class AutosubmitConfig(object):
             # For each key, get the original value and the one in the configuration file
             starter_value = starter_default[key]
             default_section[key] = starter_value
-        
+            # update dynamic variables
+            self.dynamic_variables[f"DEFAULT.{key}"] = starter_value
         return parameters
 
     def load_custom_config(self, current_data, filenames_to_load):
@@ -1664,7 +1665,8 @@ class AutosubmitConfig(object):
             filename = filename.strip(", ")  # Remove commas and spaces if any
             if filename.startswith("~"):
                 filename = os.path.expanduser(filename)
-            current_data_aux = self.unify_conf(self.starter_conf, current_data)
+            # UPDATE
+            current_data_aux = self._pin_inmutable_variables(self.unify_conf(copy.deepcopy(self.starter_conf), current_data))
             current_data_aux["AS_TEMP"] = {}
             current_data_aux["AS_TEMP"]["FILENAME_TO_LOAD"] = filename
             self.dynamic_variables["AS_TEMP.FILENAME_TO_LOAD"] = filename
@@ -1678,13 +1680,16 @@ class AutosubmitConfig(object):
                 # Load a folder or a file
                 if not filename.is_file():
                     # Load a folder by calling recursively to this function as a list of files
-                    current_data_pre, current_data_post = self.load_config_folder(copy.deepcopy(current_data), filename)
+                    # UPDATE
+                    current_data_pre, current_data_post = self.load_config_folder(copy.deepcopy(self._pin_inmutable_variables(current_data)), filename)
                     current_data = self.unify_conf(current_data_pre, current_data)
                     current_data = self.unify_conf(current_data, current_data_post)
                 else:
+                    # UPDATE
                     # Load a file and unify the current_data with the loaded data
+                    load_context = self._pin_inmutable_variables(self.unify_conf(copy.deepcopy(self.starter_conf), current_data))
                     current_data = self.unify_conf(current_data,
-                                                   self.load_config_file(current_data, filename))
+                                                   self.load_config_file(load_context, filename))
                     # Load next level if any
                     custom_conf_directive = current_data.get('DEFAULT', {}).get('CUSTOM_CONFIG', None)
                     filenames_to_load_level = self.parse_custom_conf_directive(custom_conf_directive)
@@ -1727,7 +1732,8 @@ class AutosubmitConfig(object):
         current_data_pre, current_data_post = self.load_custom_config(current_data, filenames_to_load)
         # Unifies all ``pre`` and ``post`` data.
         # Think of it as a tree with two branches that needs to be unified at each level
-        return self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post)
+        # UPDATE
+        return self._pin_inmutable_variables(self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post))
 
     def load_list_parameter(self, parameter):
         """Loads a list parameter
@@ -1825,9 +1831,13 @@ class AutosubmitConfig(object):
             if not only_experiment_data:
                 # Loads all configuration associated with the project data "pre"
                 custom_conf_pre = self.load_custom_config_section({}, filenames_to_load["PRE"])
+                # UPDATE
+                custom_conf_pre = self._pin_inmutable_variables(custom_conf_pre)
                 # Loads all configuration associated with the user data "post"
                 self.experiment_data = self.load_custom_config_section(
                     self.unify_conf(custom_conf_pre, non_minimal_conf), filenames_to_load["POST"])
+                # UPDATE
+                self.experiment_data = self._pin_inmutable_variables(self.experiment_data)
             else:
                 self.experiment_data = starter_conf
             ###
