@@ -2012,7 +2012,8 @@ class Job(object):
         :type parameters: dict
         :param set_attributes: Flag indicating whether to set attributes directly.
         :type set_attributes: bool
-        :return: None
+        :return: The updated parameters dictionary containing calendar split information.
+        :rtype: dict
         """
         # Calendar struct type numbered ( year, month, day, hour )
         if str(self.splits).isdigit() and int(self.splits) > 0 and self.running != "once":  # once jobs has no date
