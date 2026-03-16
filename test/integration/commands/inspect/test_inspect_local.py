@@ -285,6 +285,42 @@ JOBS:
             SPLITSIZE: '25'
             SPLITSIZEUNIT: 'hour'
     """)),
+    (dedent(f"""\
+    EXPERIMENT:
+        NUMCHUNKS: 3
+        CHUNKSIZE: 25
+        CHUNKUNIT: hour
+    JOBS:
+        test:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+""")),
+    (dedent(f"""\
+    EXPERIMENT:
+        NUMCHUNKS: 3
+        CHUNKSIZE: 1
+        CHUNKUNIT: day
+    JOBS:
+        test:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+""")),
+    (dedent(f"""\
+    EXPERIMENT:
+        NUMCHUNKS: 3
+        CHUNKSIZE: 1
+        CHUNKUNIT: month
+    JOBS:
+        test:
+            SCRIPT: | {_SCRIPT_CONTENT_CALENDAR_SPLITS}
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+""")),
 ], ids=[
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_15_DAY",
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_1_DAY",
@@ -292,8 +328,12 @@ JOBS:
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_2_HOUR",  # Equivalent to the removed test_calendar test
     "CALENDAR_SPLITS_AUTO_SPLITSIZE_splitsize_15_chunksize_3",  # Equivalent to docs/source/userguide/defining_workflows/code/jobs_splits_auto.yml and expdef_splits_auto.yml
     "CALENDAR_SPLITS_AUTO_check_hours_SPLITSIZE_25_HOUR",
+    "CALENDAR_CHUNKS_check_hours_CHUNKSIZE_25_HOUR",
+    "CALENDAR_CHUNKS_DAYS",
+    "CALENDAR_CHUNKS_MONTHS",
+
 ])
-def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, Any], additional_data: str):
+def test_inspect_calendar(tmp_path, autosubmit_exp, general_data: dict[str, Any], additional_data: str):
     """Test that auto splits are correctly calculated and injected in the script."""
 
     # init
@@ -315,7 +355,7 @@ def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, A
     as_exp.autosubmit.inspect(expid=as_exp.expid, lst=None, check_wrapper=False, force=True, filter_chunks=None, filter_section=None, filter_status=None, quick=False)
 
     # Parse result
-    splits_info = {}
+    jobs_info = {}
     for file in sorted(tmp_path.glob(f"{as_exp.expid}*.cmd")):
         content = file.read_text()
         parts = file.stem.split("_")
@@ -335,9 +375,9 @@ def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, A
         max_splits = content.split("MAX_SPLITS=")[1].splitlines()[0].strip("'\"")
         chunk = content.split("CURRENT_CHUNK=")[1].splitlines()[0].strip("'\"")
         max_chunks = content.split("MAX_CHUNKS=")[1].splitlines()[0].strip("'\"")
-        splits_info[key] = {
-            "SPLIT_START_DATE": int(split_start_date),
-            "SPLIT_END_DATE": int(split_end_date),
+        jobs_info[key] = {
+            "SPLIT_START_DATE": int(split_start_date) if split_start_date.isdigit() else None,
+            "SPLIT_END_DATE": int(split_end_date) if split_end_date.isdigit() else None,
             "CHUNK_START_DATE": int(chunk_start_date),
             "CHUNK_END_DATE": int(chunk_end_date),
             "SPLIT_FIRST": True if split_first.lower() == 'true' else False,
@@ -350,20 +390,17 @@ def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, A
             "MAX_CHUNKS": int(max_chunks),
         }
 
-    assert splits_info, "No cmd files found"
+    assert jobs_info, "No cmd files found"
 
     lookup_date_errors = {}
     lookup_first_last_errors = {}
     # Assert that splits are correct
-    for key, info in splits_info.items():
+    for key, info in jobs_info.items():
         # Check one
-        split_start_date = info["SPLIT_START_DATE"]
-        split_end_date = info["SPLIT_END_DATE"]
         chunk_start_date = info["CHUNK_START_DATE"]
         chunk_end_date = info["CHUNK_END_DATE"]
-        if not (chunk_start_date <= chunk_end_date and split_start_date <= split_end_date and chunk_start_date <= split_start_date <= split_end_date <= chunk_end_date):
-            lookup_date_errors[key] = splits_info[key]
-
+        split_start_date = info["SPLIT_START_DATE"]
+        split_end_date = info["SPLIT_END_DATE"]
         # Check two
         chunk = info["CURRENT_CHUNK"]
         split = info["CURRENT_SPLIT"]
@@ -374,9 +411,17 @@ def test_inspect_auto_splits(tmp_path, autosubmit_exp, general_data: dict[str, A
         im_last_chunk: bool = info["CHUNK_LAST"]
         im_last_split: bool = info["SPLIT_LAST"]
 
-        if (im_first_chunk and chunk != 1 or im_first_split and split != 1 or im_last_split and split != max_splits or im_last_chunk and chunk != max_chunks) or (
-                im_first_chunk and im_first_split and split_start_date != chunk_start_date) or (im_last_chunk and im_last_split and split_end_date != chunk_end_date):
-            lookup_first_last_errors[key] = splits_info[key]
+        if split_start_date and split_end_date:
+            if not (chunk_start_date <= chunk_end_date and split_start_date <= split_end_date and chunk_start_date <= split_start_date <= split_end_date <= chunk_end_date):
+                lookup_date_errors[key] = jobs_info[key]
+            if (im_first_chunk and chunk != 1 or im_first_split and split != 1 or im_last_split and split != max_splits or im_last_chunk and chunk != max_chunks) or (
+                    im_first_chunk and im_first_split and split_start_date != chunk_start_date) or (im_last_chunk and im_last_split and split_end_date != chunk_end_date):
+                lookup_first_last_errors[key] = jobs_info[key]
+        else:
+            if not chunk_start_date <= chunk_end_date and not split_start_date and not split_end_date:
+                lookup_date_errors[key] = jobs_info[key]
+            if (im_first_chunk and chunk != 1 or im_last_chunk and chunk != max_chunks) or (im_first_chunk and im_last_chunk and chunk_start_date != chunk_end_date):
+                lookup_first_last_errors[key] = jobs_info[key]
 
     assert not lookup_first_last_errors, f"First/Last chunk/split errors found in splits: {lookup_first_last_errors}"
     assert not lookup_date_errors, f"Date errors found in splits: {lookup_date_errors}"

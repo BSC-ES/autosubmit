@@ -2015,7 +2015,7 @@ class Job(object):
         :return: None
         """
         # Calendar struct type numbered ( year, month, day, hour )
-        if self.splits and self.running != "once":  # once jobs has no date
+        if str(self.splits).isdigit() and int(self.splits) > 0 and self.running != "once":  # once jobs has no date
             if int(self.split) == 1:
                 parameters['SPLIT_FIRST'] = 'TRUE'
             else:
@@ -2093,8 +2093,9 @@ class Job(object):
                 self.date, chunk, chunk_length, chunk_unit, cal)
             chunk_end = chunk_end_date(
                 chunk_start, chunk_length, chunk_unit, cal)
+
             if chunk_unit == 'hour':
-                chunk_end_1 = chunk_end
+                chunk_end_1 = chunk_end - datetime.timedelta(hours=1)
             else:
                 chunk_end_1 = previous_day(chunk_end, cal)
 
