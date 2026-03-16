@@ -622,3 +622,16 @@ def test_is_section_in_any_wrapper(
     as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data=experiment_data)
     as_conf.experiment_data = experiment_data
     assert as_conf.is_section_in_any_wrapper(section) is expected
+
+
+def test_pin_inmutable_variables(autosubmit_config: "AutosubmitConfigFactory"):
+    """Test that the _pin_inmutable_variables method correctly pins inmutable variables."""
+    as_conf: AutosubmitConfig = autosubmit_config(
+        expid="a000", experiment_data={"DEFAULT": {"HPCARCH": "LOCAL", "EXPID": "a000"}}
+    )
+    inmutable_variables = {"EXPID": "a000", "HPCARCH": "LOCAL"}
+    as_conf.inmutable_variables = inmutable_variables.copy()
+    data = {"EXPID": "a001", "HPCARCH": "MARENOSTRUM5"}
+    pinned_data = as_conf._pin_inmutable_variables(data)
+    assert pinned_data["EXPID"] == "a000"
+    assert pinned_data["HPCARCH"] == "LOCAL"
