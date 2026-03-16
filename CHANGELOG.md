@@ -6,6 +6,7 @@
 - Reduce the frequency with which energy data was not being stored for the last job of the batch #2657 #2418
 - Fixed issue with experiments running on LOCAL platform without a defined LOCAL entry in platforms.yml config file #1131
 - Fixed an issue with the ECMWF platform not working with the new online recovery
+- Changed logic in Slurm submission to look for submitted messaged (hotfix) #2886" 
 
 **Enhancements:**
 
