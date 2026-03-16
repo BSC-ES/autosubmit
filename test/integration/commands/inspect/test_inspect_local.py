@@ -418,7 +418,7 @@ def test_inspect_calendar(tmp_path, autosubmit_exp, general_data: dict[str, Any]
                     im_first_chunk and im_first_split and split_start_date != chunk_start_date) or (im_last_chunk and im_last_split and split_end_date != chunk_end_date):
                 lookup_first_last_errors[key] = jobs_info[key]
         else:
-            if not chunk_start_date <= chunk_end_date and not split_start_date and not split_end_date:
+            if not chunk_start_date <= chunk_end_date or split_start_date or split_end_date:
                 lookup_date_errors[key] = jobs_info[key]
             if (im_first_chunk and chunk != 1 or im_last_chunk and chunk != max_chunks) or (im_first_chunk and im_last_chunk and chunk_start_date != chunk_end_date):
                 lookup_first_last_errors[key] = jobs_info[key]
