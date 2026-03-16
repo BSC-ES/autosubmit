@@ -1172,6 +1172,9 @@ class ParamikoPlatform(Platform):
             for s in stdout_chunks:
                 if s.decode(lang) != '':
                     self._ssh_output += s.decode(lang)
+            submitted_job_re = re.compile(r"Submitted batch job (\d+)")
+            if submitted_job_re.search(self._ssh_output):
+                return True
             for errorLineCase in stderr_readlines:
                 self._ssh_output_err += errorLineCase.decode(lang)
 
@@ -1466,7 +1469,7 @@ class ParamikoPlatform(Platform):
             return True
         except Exception as e:
             return False
-    
+
     def check_remote_log_dir(self):
         """
         Creates log dir on remote host
