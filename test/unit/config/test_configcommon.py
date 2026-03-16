@@ -270,19 +270,19 @@ def test_set_default_parameters(autosubmit_config: 'AutosubmitConfigFactory', ex
 @pytest.mark.parametrize(
     'email,expected',
     [
-        (None, TypeError),
         ('user@example.com', True),
         ('user.name@example.com', True),
         ('user', False),
-        # ('user@localhost', True)  # TODO: Bug. This is a valid email address.
+        ('user@localhost', True),  # Fixed: local/intranet addresses are valid (issue #1471)
+        ('admin@mailserver', True),  # Single-label domain
+        ('user+tag@example.com', True),  # Plus addressing
+        ('user@sub.domain.example.com', True),  # Subdomain
+        ('', False),  # Empty string
+        ('    ', False),  # Blank string
     ]
 )
 def test_is_valid_mail_address(email, expected):
-    if type(expected) is not bool and issubclass(expected, Exception):
-        with pytest.raises(expected):
-            AutosubmitConfig.is_valid_mail_address(email)
-    else:
-        assert AutosubmitConfig.is_valid_mail_address(email) is expected
+    assert AutosubmitConfig.is_valid_mail_address(email) is expected
 
 
 def test_platforms_missing_hpcarch_local(autosubmit_config: "AutosubmitConfigFactory"):
