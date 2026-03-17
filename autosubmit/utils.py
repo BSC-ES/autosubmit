@@ -73,7 +73,7 @@ def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", 
                         if not str(destination).strip():
                             yaml_data['PROJECT']['PROJECT_DESTINATION'] = 'git_project'
 
-                if 'DEFAULT' in yaml_data:
+                if 'DEFAULT' in yaml_data and git_repo and git_as_conf:
                     yaml_data['DEFAULT']['CUSTOM_CONFIG'] = f"%PROJDIR%/{git_as_conf}"
 
             yaml.dump(yaml_data, as_conf_file)

@@ -248,10 +248,13 @@ def test_as_conf_default_values(
         yaml_data = yaml.load(f)
         assert yaml_data["DEFAULT"]["HPCARCH"] == "MN5"
         assert yaml_data["DEFAULT"]["EXPID"] == exp.expid
-        assert (
-            yaml_data["DEFAULT"]["CUSTOM_CONFIG"]
-            == f"{tmp_path}/{exp.expid}/proj/test_3"
-        )
+        if git_command[0]:
+            assert (
+                yaml_data["DEFAULT"]["CUSTOM_CONFIG"]
+                == f"{tmp_path}/{exp.expid}/proj/test_3"
+            )
+        else:
+            assert "CUSTOM_CONFIG" not in yaml_data["DEFAULT"]
         assert yaml_data["LOCAL"]["PROJECT_PATH"] == ""
 
     if git_command[0] != "":
