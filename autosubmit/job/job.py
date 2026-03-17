@@ -2012,13 +2012,21 @@ class Job(object):
         :type parameters: dict
         :param set_attributes: Flag indicating whether to set attributes directly.
         :type set_attributes: bool
-        :return: None
+        :return: The updated parameters dictionary containing calendar split information.
+        :rtype: dict
         """
         # Calendar struct type numbered ( year, month, day, hour )
+        if str(self.splits).isdigit() and int(self.splits) > 0 and self.running != "once":  # once jobs has no date
+            if int(self.split) == 1:
+                parameters['SPLIT_FIRST'] = 'TRUE'
+            else:
+                parameters['SPLIT_FIRST'] = 'FALSE'
 
-        job_data = as_conf.jobs_data.get(self.section, {})
-        if job_data.get("SPLITS", None) and self.running != "once":  # once jobs has no date
-            # total_split = int(self.splits)
+            if int(self.splits) == int(self.split):
+                parameters['SPLIT_LAST'] = 'TRUE'
+            else:
+                parameters['SPLIT_LAST'] = 'FALSE'
+
             split_unit = get_split_size_unit(as_conf.experiment_data, self.section)
             cal = str(parameters.get('EXPERIMENT.CALENDAR', "standard")).lower()
             split_length = get_split_size(as_conf.experiment_data, self.section)
@@ -2026,9 +2034,13 @@ class Job(object):
             if set_attributes and start_date:
                 self.date_split = datetime.datetime.strptime(start_date, "%Y%m%d")
             split_start = chunk_start_date(self.date_split, int(self.split), split_length, split_unit, cal)
-            split_end = chunk_end_date(split_start, split_length, split_unit, cal)
+            if parameters["SPLIT_LAST"].lower() == "true":
+                split_end = datetime.datetime.strptime(parameters['CHUNK_END_DATE'], "%Y%m%d")
+            else:
+                split_end = chunk_end_date(split_start, split_length, split_unit, cal)
+
             if split_unit == 'hour':
-                split_end_1 = split_end
+                split_end_1 = split_end - datetime.timedelta(hours=1)
             else:
                 split_end_1 = previous_day(split_end, cal)
 
@@ -2057,15 +2069,6 @@ class Job(object):
             parameters['SPLIT_END_MONTH'] = str(split_end.month).zfill(2)
             parameters['SPLIT_END_DAY'] = str(split_end.day).zfill(2)
             parameters['SPLIT_END_HOUR'] = str(split_end.hour).zfill(2)
-            if int(self.split) == 1:
-                parameters['SPLIT_FIRST'] = 'TRUE'
-            else:
-                parameters['SPLIT_FIRST'] = 'FALSE'
-
-            # if int(total_split) == int(self.split):
-            #     parameters['SPLIT_LAST'] = 'TRUE'
-            # else:
-            #     parameters['SPLIT_LAST'] = 'FALSE'
 
         return parameters
 
@@ -2091,8 +2094,9 @@ class Job(object):
                 self.date, chunk, chunk_length, chunk_unit, cal)
             chunk_end = chunk_end_date(
                 chunk_start, chunk_length, chunk_unit, cal)
+
             if chunk_unit == 'hour':
-                chunk_end_1 = chunk_end
+                chunk_end_1 = chunk_end - datetime.timedelta(hours=1)
             else:
                 chunk_end_1 = previous_day(chunk_end, cal)
 
@@ -2173,7 +2177,6 @@ class Job(object):
         parameters = self.calendar_chunk(parameters)
         parameters = self.calendar_split(as_conf, parameters, set_attributes)
         parameters['NUMMEMBERS'] = len(as_conf.get_member_list())
-
         parameters['JOB_DEPENDENCIES'] = self.dependencies
         parameters['EXPORT'] = self.export
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()

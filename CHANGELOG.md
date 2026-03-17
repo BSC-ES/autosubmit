@@ -7,6 +7,7 @@
 - Fixed issue with experiments running on LOCAL platform without a defined LOCAL entry in platforms.yml config file #1131
 - Fixed an issue with the ECMWF platform not working with the new online recovery
 - Changed logic in Slurm submission to look for submitted messaged (hotfix) #2886" 
+- Calendar splits: last split boundaries #2866, last split not exported #2099 and splitsize not working at experiment level #2016.
 
 **Enhancements:**
 
