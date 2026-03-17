@@ -205,16 +205,16 @@ class BasicConfig:
             # Call read_file_config with the value of the environment variable
             BasicConfig.__read_file_config(config_file_path)
         else:
-            if os.path.exists(os.path.join("", filename)):
-                BasicConfig.__read_file_config(os.path.join("", filename))
-            elif os.path.exists(os.path.join("", "." + filename)):
+            if os.path.exists(os.path.join("", "." + filename)):
                 BasicConfig.__read_file_config(os.path.join("", "." + filename))
             elif os.path.exists(os.path.join(os.path.expanduser("~"), "." + filename)):
                 BasicConfig.__read_file_config(
                     os.path.join(os.path.expanduser("~"), "." + filename)
                 )
-            else:
+            elif os.path.exists(os.path.join("/etc", filename)):
                 BasicConfig.__read_file_config(os.path.join("/etc", filename))
+            else:
+                BasicConfig.__read_file_config(os.path.join("/etc", "." + filename))
 
             # Check if the environment variable is defined
 
