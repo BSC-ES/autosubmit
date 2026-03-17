@@ -1626,7 +1626,7 @@ class AutosubmitConfig(object):
         for key in keys_to_delete:
             yaml_data.pop(key, None)
     
-    def _pin_inmutable_variables(self, parameters: dict) -> dict:
+    def _pin_immutable_variables(self, parameters: dict) -> dict:
         """Keep default variables regardless of the experiment configuration files
         :param parameters: dict with current parameters
         :return: dict with updated parameters
@@ -1646,8 +1646,6 @@ class AutosubmitConfig(object):
             # For each key, get the original value and the one in the configuration file
             starter_value = starter_default[key]
             default_section[key] = starter_value
-            # update dynamic variables
-            self.dynamic_variables[f"DEFAULT.{key}"] = starter_value
         return parameters
 
     def load_custom_config(self, current_data, filenames_to_load):
@@ -1827,10 +1825,11 @@ class AutosubmitConfig(object):
             if not only_experiment_data:
                 # Loads all configuration associated with the project data "pre"
                 custom_conf_pre = self.load_custom_config_section({}, filenames_to_load["PRE"])
-                custom_conf_pre = self._pin_inmutable_variables(custom_conf_pre)
+                custom_conf_pre = self._pin_immutable_variables(custom_conf_pre)
                 # Loads all configuration associated with the user data "post"
                 self.experiment_data = self.load_custom_config_section(
                     self.unify_conf(custom_conf_pre, non_minimal_conf), filenames_to_load["POST"])
+                self.experiment_data = self._pin_immutable_variables(self.experiment_data)
             else:
                 self.experiment_data = starter_conf
             ###

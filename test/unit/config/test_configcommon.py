@@ -546,14 +546,33 @@ def test_load_config_file_misc(new_config_data: str, load_misc: bool, expected_m
     assert len(as_conf.misc_files) == expected_misc_files_length
 
 
-def test_pin_inmutable_variables(autosubmit_config: "AutosubmitConfigFactory"):
-    """Test that the _pin_inmutable_variables method correctly pins inmutable variables."""
-    as_conf: AutosubmitConfig = autosubmit_config(
-        expid="a000", experiment_data={"DEFAULT": {"HPCARCH": "LOCAL", "EXPID": "a000"}}
-    )
-    inmutable_variables = {"EXPID": "a000", "HPCARCH": "LOCAL"}
-    as_conf.inmutable_variables = inmutable_variables.copy()
-    data = {"EXPID": "a001", "HPCARCH": "MARENOSTRUM5"}
-    pinned_data = as_conf._pin_inmutable_variables(data)
-    assert pinned_data["EXPID"] == "a000"
-    assert pinned_data["HPCARCH"] == "LOCAL"
+def test_immutable_variables_overwrites_default_values(
+    autosubmit_config: "AutosubmitConfigFactory",
+) -> None:
+    """Test that the _pin_immutable_variables method correctly pins immutable variables."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.starter_conf = {"DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"}}
+    parameters = {
+        "DEFAULT": {"EXPID": "a001", "HPCARCH": "MARENOSTRUM5", "OTHER": "value"}
+    }
+    pinned = as_conf._pin_immutable_variables(parameters)
+
+    # Check immutable variables keep original values, other variables not affected
+    assert pinned["DEFAULT"]["EXPID"] == "a000"
+    assert pinned["DEFAULT"]["HPCARCH"] == "LOCAL"
+    assert pinned["DEFAULT"]["OTHER"] == "value"
+
+
+def test_immutable_variables_adds_missing_sections(
+    autosubmit_config: "AutosubmitConfigFactory",
+) -> None:
+    """Test that the _pin_immutable_variables method adds missing sections and keys."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.starter_conf = {"DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"}}
+
+    parameters = {}
+    pinned = as_conf._pin_immutable_variables(parameters)
+
+    # Check that missing DEFAULT section is added with original values
+    assert pinned["DEFAULT"]["EXPID"] == "a000"
+    assert pinned["DEFAULT"]["HPCARCH"] == "LOCAL"
