@@ -292,7 +292,7 @@ def get_rc_path(machine: bool, local: bool) -> Path:
     If the environment variable ``AUTOSUBMIT_CONFIGURATION`` is specified in the
     system, this function will return a ``Path`` pointing to that value.
 
-    If ``machine`` is ``True``, it will use the file from ``/etc/.autosubmitrc``
+    If ``machine`` is ``True``, it will use the file from ``/etc/autosubmitrc``
     (pay attention to the dot prefix).
 
     Else, if ``local`` is ``True``, it will use the file from  ``./.autosubmitrc``
@@ -306,7 +306,7 @@ def get_rc_path(machine: bool, local: bool) -> Path:
 
     rc_path: Union[str, Path]
     if machine:
-        rc_path = '/etc'
+        return Path('/etc/autosubmitrc') # Higher priority than /etc/.autosubmitrc
     elif local:
         rc_path = '.'
     else:
