@@ -1636,9 +1636,6 @@ class AutosubmitConfig(object):
         
         starter_default = self.starter_conf.get("DEFAULT", {})
         
-        if not isinstance(parameters, dict) or not isinstance(starter_default, dict):
-            return parameters
-        
         default_section = parameters.setdefault("DEFAULT", {})
         for key in PINNED_VARIABLES:
             if key not in starter_default:
