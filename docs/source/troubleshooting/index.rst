@@ -44,6 +44,33 @@ The important part of this error is the message ``'%' must be followed by '%'``.
 This library is included in the python common libraries, so you shouldn't have any other version of it installed in your environment. Execute ``pip list``, if you see
 ``configparser`` in the list, then run ``pip uninstall configparser``. Then, try to create your experiment again.
 
+Error when using jobs.<job>.VALIDATE: True
+==========================================
+
+
+When using the ``VALIDATE: True`` option in your job configuration, you might encounter errors related to syntax issues in the generated Python script for that job.
+This validation checks if your script is compatible with autosubmit and will print any errors it finds.
+To get rid of this error, you need to fix the syntax issues in your job script.
+The error message will indicate the specific line and type of syntax error that needs to be addressed.
+
+Example of how to enable validation for a job in your configuration:
+
+.. code-block:: yaml
+
+    JOBS:
+        JOB:
+            FILE: <path_to_your_script>
+            VALIDATE: True
+
+Example output of the command:
+
+.. code-block:: none
+
+    [CRITICAL] Syntax error in generated Python script for job t006_LOCAL_SETUP: unexpected indent (<string>, line 45) [eCode=7014]
+
+
+
+
 Other possible errors
 =====================
 

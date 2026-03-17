@@ -87,7 +87,7 @@ def exit_from_error(e: BaseException) -> int:
         err_code = e.code
 
     if not is_portalocker_error and not is_autosubmit_error:
-        msg = "Unexpected error: {0}.\n Please report it to Autosubmit Developers through Git"
+        msg = "Unexpected error: {0}.\n Please report it to Autosubmit Developers through Git: https://github.com/BSC-ES/autosubmit/issues"
         args = [str(e)]
         Log.critical(msg.format(*args))
         err_code = 7000

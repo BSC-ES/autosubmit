@@ -23,6 +23,7 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.log.log import AutosubmitCritical
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
     _assert_db_fields, _assert_files_recovered
 from test.integration.test_utils.misc import wait_locker
@@ -202,3 +203,227 @@ def test_run_interrupted(
     _assert_files_recovered(files_check_list)
 
     _assert_exit_code(final_status, exit_code)
+
+
+@pytest.mark.parametrize("jobs_data, must_success", [
+    # Python: inline script success
+    (dedent("""\
+        JOBS:
+            job:
+                SCRIPT: |
+                    print("Hello!")
+                validate: True
+                PLATFORM: LOCAL
+                RUNNING: once
+                wallclock: 00:01
+                type: Python
+        """), True),
+    # Python: file-based success
+    (dedent("""\
+        PROJECT:
+            PROJECT_TYPE: local
+            project_destination: "test"
+        JOBS:
+            job:
+                FILE: test.py
+                validate: True
+                PLATFORM: LOCAL
+                RUNNING: once
+                wallclock: 00:01
+                type: Python
+        """), True),
+    # Python: inline script syntax error
+    (dedent("""\
+        JOBS:
+            job:
+                SCRIPT: |
+                    print("Hello!")syntaxerror
+                validate: True
+                PLATFORM: LOCAL
+                RUNNING: once
+                wallclock: 00:01
+                type: Python
+        """), False),
+    # Python: file-based syntax error
+    (dedent("""\
+        PROJECT:
+            PROJECT_TYPE: local
+            project_destination: "test"
+        JOBS:
+            job:
+                FILE: test.py
+                validate: True
+                PLATFORM: LOCAL
+                RUNNING: once
+                wallclock: 00:01
+                type: Python
+        """), False),
+    # Bash: inline script success
+    (dedent("""\
+        JOBS:
+            job:
+                SCRIPT: |
+                    echo "Hello from Bash!"
+                validate: True
+                PLATFORM: LOCAL
+                RUNNING: once
+                wallclock: 00:01
+                type: Bash
+        """), True),
+    # Bash: file-based success
+    (dedent("""\
+        PROJECT:
+            PROJECT_TYPE: local
+            project_destination: "test"
+        JOBS:
+            job:
+                FILE: test.sh
+                validate: True
+                PLATFORM: LOCAL
+                RUNNING: once
+                wallclock: 00:01
+                type: Bash
+        """), True),
+    # Bash: inline script syntax error
+    (dedent("""\
+        JOBS:
+            job:
+                SCRIPT: |
+                    echo "Hello!" $(()invalid
+                validate: True
+                PLATFORM: LOCAL
+                RUNNING: once
+                wallclock: 00:01
+                type: Bash
+        """), False),
+    # Bash: file-based syntax error
+    (dedent("""\
+        PROJECT:
+            PROJECT_TYPE: local
+            project_destination: "test"
+        JOBS:
+            job:
+                FILE: test.sh
+                validate: True
+                PLATFORM: LOCAL
+                RUNNING: once
+                wallclock: 00:01
+                type: Bash
+        """), False),
+    # R-script: inline script success
+    (dedent("""\
+    JOBS:
+        job:
+            SCRIPT: |
+                print("Hello from R!")
+            validate: True
+            PLATFORM: LOCAL
+            RUNNING: once
+            wallclock: 00:01
+            type: R
+    """), True),
+    # R-script: file-based success
+    (dedent("""\
+    PROJECT:
+        PROJECT_TYPE: local
+        project_destination: "test"
+    JOBS:
+        job:
+            FILE: test.R
+            validate: True
+            PLATFORM: LOCAL
+            RUNNING: once
+            wallclock: 00:01
+            type: R
+    """), True),
+    # R-script: inline script syntax error
+    (dedent("""\
+    JOBS:
+        job:
+            SCRIPT: |
+                print("Hello from R!")syntaxerror
+            validate: True
+            PLATFORM: LOCAL
+            RUNNING: once
+            wallclock: 00:01
+            type: R
+    """), False),
+    # R-script: file-based syntax error
+    (dedent("""\
+    PROJECT:
+        PROJECT_TYPE: local
+        project_destination: "test"
+    JOBS:
+        job:
+            FILE: test.R
+            validate: True
+            PLATFORM: LOCAL
+            RUNNING: once
+            wallclock: 00:01
+            type: R
+    """), False),
+
+], ids=[
+    "Python-Script",
+    "Python-File",
+    "Python-Script-syntax-error",
+    "Python-File-syntax-error",
+    "Bash-Script",
+    "Bash-File",
+    "Bash-Script-syntax-error",
+    "Bash-File-syntax-error",
+    "R-Script",
+    "R-File",
+    "R-Script-syntax-error",
+    "R-File-syntax-error",
+])
+def test_run_debug(
+        autosubmit_exp,
+        jobs_data: str,
+        must_success: bool,
+        general_data: dict,
+        tmp_path: Path,
+):
+    """Test debug mode execution for Python and Bash job types.
+
+    Covers inline scripts and file-based jobs, verifying both successful
+    execution and proper failure on syntax errors.
+
+    :param autosubmit_exp: Fixture providing an Autosubmit experiment instance.
+    :param jobs_data: YAML string defining the job configuration.
+    :param must_success: Whether the experiment run is expected to succeed.
+    :param general_data: Fixture providing general experiment configuration data.
+    :param tmp_path: Pytest-provided temporary directory for project files.
+    """
+    project_files = tmp_path / "project_files"
+    general_data["LOCAL"] = {"PROJECT_PATH": str(project_files)}
+    project_files.mkdir(parents=True, exist_ok=True)
+
+    valid_python = 'print("Hello from test.py")'
+    invalid_python = 'print("Hello from test.py")syntaxerror'
+    valid_bash = '#!/usr/bin/env bash\necho "Hello from test.sh"'
+    invalid_bash = '#!/usr/bin/env bash\necho "Hello!" $(()invalid'
+    valid_r = 'print("Hello World!")'
+    invalid_r = 'print("Hello from test.R")syntaxerror'
+
+    (project_files / "test.py").write_text(valid_python if must_success else invalid_python)
+    (project_files / "test.sh").write_text(valid_bash if must_success else invalid_bash)
+    (project_files / "test.R").write_text(valid_r if must_success else invalid_r)
+
+    for script_file in project_files.iterdir():
+        script_file.chmod(0o755)
+
+    yaml = YAML(typ='rt')
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    as_conf = as_exp.as_conf
+    as_conf.set_last_as_command('run')
+
+    if must_success:
+        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        assert exit_code == 0
+    else:
+        with pytest.raises(AutosubmitCritical) as exc_info:
+            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        assert "Syntax error" in exc_info.value.message
+        assert "Generated script" in exc_info.value.message
+        assert exc_info.value.code == 7014

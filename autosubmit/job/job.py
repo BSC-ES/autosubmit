@@ -152,7 +152,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit'
+        '_log_recovered', 'packed_during_building', 'workflow_commit', '_validate_template'
     )
 
     def __setstate__(self, state):
@@ -248,7 +248,7 @@ class Job(object):
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False # type: bool
+        self.hold = False  # type: bool
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
@@ -302,6 +302,7 @@ class Job(object):
                                                             Status.PREPARED,
                                                             Status.READY] else \
                 self.status
+        self.validate_template = False
 
     def clean_attributes(self):
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
@@ -689,6 +690,16 @@ class Job(object):
     @notify_on.setter
     def notify_on(self, value):
         self._notify_on = value
+
+    @property
+    @autosubmit_parameter(name='validate_template')
+    def validate_template(self):
+        """Whether to print validate information about the job."""
+        return self._validate_template
+
+    @validate_template.setter
+    def validate_template(self, value):
+        self._validate_template = value
 
     def read_header_tailer_script(self, script_path: str, as_conf: AutosubmitConfig, is_header: bool):
         """
@@ -2001,13 +2012,21 @@ class Job(object):
         :type parameters: dict
         :param set_attributes: Flag indicating whether to set attributes directly.
         :type set_attributes: bool
-        :return: None
+        :return: The updated parameters dictionary containing calendar split information.
+        :rtype: dict
         """
         # Calendar struct type numbered ( year, month, day, hour )
+        if str(self.splits).isdigit() and int(self.splits) > 0 and self.running != "once":  # once jobs has no date
+            if int(self.split) == 1:
+                parameters['SPLIT_FIRST'] = 'TRUE'
+            else:
+                parameters['SPLIT_FIRST'] = 'FALSE'
 
-        job_data = as_conf.jobs_data.get(self.section, {})
-        if job_data.get("SPLITS", None) and self.running != "once":  # once jobs has no date
-            # total_split = int(self.splits)
+            if int(self.splits) == int(self.split):
+                parameters['SPLIT_LAST'] = 'TRUE'
+            else:
+                parameters['SPLIT_LAST'] = 'FALSE'
+
             split_unit = get_split_size_unit(as_conf.experiment_data, self.section)
             cal = str(parameters.get('EXPERIMENT.CALENDAR', "standard")).lower()
             split_length = get_split_size(as_conf.experiment_data, self.section)
@@ -2015,9 +2034,13 @@ class Job(object):
             if set_attributes and start_date:
                 self.date_split = datetime.datetime.strptime(start_date, "%Y%m%d")
             split_start = chunk_start_date(self.date_split, int(self.split), split_length, split_unit, cal)
-            split_end = chunk_end_date(split_start, split_length, split_unit, cal)
+            if parameters["SPLIT_LAST"].lower() == "true":
+                split_end = datetime.datetime.strptime(parameters['CHUNK_END_DATE'], "%Y%m%d")
+            else:
+                split_end = chunk_end_date(split_start, split_length, split_unit, cal)
+
             if split_unit == 'hour':
-                split_end_1 = split_end
+                split_end_1 = split_end - datetime.timedelta(hours=1)
             else:
                 split_end_1 = previous_day(split_end, cal)
 
@@ -2046,15 +2069,6 @@ class Job(object):
             parameters['SPLIT_END_MONTH'] = str(split_end.month).zfill(2)
             parameters['SPLIT_END_DAY'] = str(split_end.day).zfill(2)
             parameters['SPLIT_END_HOUR'] = str(split_end.hour).zfill(2)
-            if int(self.split) == 1:
-                parameters['SPLIT_FIRST'] = 'TRUE'
-            else:
-                parameters['SPLIT_FIRST'] = 'FALSE'
-
-            # if int(total_split) == int(self.split):
-            #     parameters['SPLIT_LAST'] = 'TRUE'
-            # else:
-            #     parameters['SPLIT_LAST'] = 'FALSE'
 
         return parameters
 
@@ -2080,8 +2094,9 @@ class Job(object):
                 self.date, chunk, chunk_length, chunk_unit, cal)
             chunk_end = chunk_end_date(
                 chunk_start, chunk_length, chunk_unit, cal)
+
             if chunk_unit == 'hour':
-                chunk_end_1 = chunk_end
+                chunk_end_1 = chunk_end - datetime.timedelta(hours=1)
             else:
                 chunk_end_1 = previous_day(chunk_end, cal)
 
@@ -2142,6 +2157,7 @@ class Job(object):
             if self.checkpoint:  # To activate placeholder substitution per <empty> in the template
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
+            self.validate_template = parameters.get("CURRENT_VALIDATE", False)
 
         parameters['JOBNAME'] = self.name
         parameters['FAIL_COUNT'] = str(self.fail_count)
@@ -2161,7 +2177,6 @@ class Job(object):
         parameters = self.calendar_chunk(parameters)
         parameters = self.calendar_split(as_conf, parameters, set_attributes)
         parameters['NUMMEMBERS'] = len(as_conf.get_member_list())
-
         parameters['JOB_DEPENDENCIES'] = self.dependencies
         parameters['EXPORT'] = self.export
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()
@@ -2425,13 +2440,96 @@ class Job(object):
         template_content = self._substitute_placeholders(
             template_content, parameters, as_conf, self.undefined_variables
         )
+
+
         script_name = f'{self.name}.cmd'
         self.script_name = script_name
         script_path = Path(self._tmp_path) / script_name
         with open(script_path, 'wb') as f:
             f.write(template_content.encode(lang))
         Path(script_path).chmod(0o755)
+
+        # Added here so the user can check the generated script
+
+        if self.validate_template:
+            self._check_is_well_formed(template_content, script_path)
         return script_name
+
+    def _is_valid_python(self, content: str) -> bool:
+        """Check if the given content is valid Python code.
+
+        :param content: The script content to check.
+        :type content: str
+        :return: True if the content is valid Python code, False otherwise.
+        :rtype: bool
+        """
+        try:
+            compile(content, '<string>', 'exec')
+            return True
+        except (ValueError, SyntaxError) as e:
+            raise AutosubmitCritical(f"Syntax error in generated Python script for job {self.name}: {str(e)}", 7014)
+
+    def _is_valid_r(self, content: str) -> bool:
+        """Check if the given content is valid R code.
+
+        :param content: The script content to check.
+        :type content: str
+        :return: True if the content is valid R code, False otherwise.
+        :rtype: bool
+        """
+
+        import subprocess
+        result = subprocess.run(
+            ['Rscript', '-e', 'parse(file = "stdin")'],
+            input=content,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode:
+            raise AutosubmitCritical(f"Syntax error in generated R script for job {self.name}: {result.stderr.strip()}", 7014)
+
+        return result.returncode == 0
+
+    def _is_valid_bash(self, content: str) -> bool:
+        """Check if the given content is valid Bash code.
+
+        :param content: The script content to check.
+        :type content: str
+        :return: True if the content is valid Bash code, False otherwise.
+        :rtype: bool
+        """
+        import subprocess
+        result = subprocess.run(
+            ['bash', '-n', '/dev/stdin'],
+            input=content,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode:
+            raise AutosubmitCritical(f"Syntax error in generated Bash script for job {self.name}: {result.stderr.strip()}", 7014)
+
+        return result.returncode == 0
+
+    def _check_is_well_formed(self, content: str, script_path: Path = None) -> None:
+        """Check if the script content is syntactically correct depending on the language specified.
+
+        :param content: The script content to check.
+        :type content: str
+        :param script_path: The path to the generated script file.
+        :type script_path: Path
+        :raises ValueError: If there are unsubstituted placeholders in the content.
+        """
+        try:
+            if self.type == Language.PYTHON2 or self.type == Language.PYTHON3 or self.type == Language.PYTHON:
+                self._is_valid_python(content)
+            elif self.type == Language.R:
+                self._is_valid_r(content)
+            elif self.type == Language.BASH:
+                self._is_valid_bash(content)
+        except AutosubmitCritical as e:
+            if script_path:
+                e.message += f". Generated scripts are located in file://{script_path.parent} the current file is {script_path.name}"
+            raise e
 
     def _substitute_placeholders(
             self,

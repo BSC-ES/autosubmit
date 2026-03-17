@@ -82,13 +82,14 @@ tests = [
     "pytest>=8.2,<9.1",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.15.5",
+    "ruff==0.15.6",
     "pytest-xdist",
     "testcontainers",
     "pytest-timeout",
     "roc-validator",
     "types-requests",
-    "typing_extensions==4.*"
+    "typing_extensions==4.*",
+    "pytest-timestamper"
 ]
 docs = [
     "livereload",

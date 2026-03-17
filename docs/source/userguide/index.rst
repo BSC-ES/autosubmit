@@ -20,6 +20,7 @@ User Guide
    /userguide/templates
    /userguide/user_metrics/index
    /userguide/log_operations
+   /userguide/debug/index
 
 Command list
 ============
