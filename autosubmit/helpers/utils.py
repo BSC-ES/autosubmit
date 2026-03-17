@@ -301,18 +301,18 @@ def get_rc_path(machine: bool, local: bool) -> Path:
     Otherwise, it will load the file from ``~/.autosubmitrc``, for the user
     currently running Autosubmit.
     """
-    if 'AUTOSUBMIT_CONFIGURATION' in os.environ:
-        return Path(os.environ['AUTOSUBMIT_CONFIGURATION'])
+    if "AUTOSUBMIT_CONFIGURATION" in os.environ:
+        return Path(os.environ["AUTOSUBMIT_CONFIGURATION"])
 
     rc_path: Union[str, Path]
     if machine:
-        return Path('/etc/autosubmitrc') # Higher priority than /etc/.autosubmitrc
+        return Path("/etc/autosubmitrc")  # Higher priority than /etc/.autosubmitrc
     elif local:
-        rc_path = '.'
+        rc_path = "."
     else:
         rc_path = Path.home()
 
-    return Path(rc_path) / '.autosubmitrc'
+    return Path(rc_path) / ".autosubmitrc"
 
 
 def user_yes_no_query(question: str) -> bool:
