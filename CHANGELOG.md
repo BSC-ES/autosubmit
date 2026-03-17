@@ -17,6 +17,7 @@
   crate 0.5, and workflow ro crate 1.0. A new integration test has been
   added to check that we produce valid crates with the `rocrate-validator` #2816
 - Changed Yaml load mode from 'safe' to 'rt' #2851
+- Add issues URL to error message #2888
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
