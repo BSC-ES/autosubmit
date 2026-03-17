@@ -576,3 +576,4 @@ def test_immutable_variables_adds_missing_sections(
     # Check that missing DEFAULT section is added with original values
     assert pinned["DEFAULT"]["EXPID"] == "a000"
     assert pinned["DEFAULT"]["HPCARCH"] == "LOCAL"
+    

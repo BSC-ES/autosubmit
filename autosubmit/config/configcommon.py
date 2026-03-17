@@ -1641,8 +1641,7 @@ class AutosubmitConfig(object):
             if key not in starter_default:
                 continue
             # For each key, get the original value and the one in the configuration file
-            starter_value = starter_default[key]
-            default_section[key] = starter_value
+            default_section[key] = starter_default[key]
         return parameters
 
     def load_custom_config(self, current_data, filenames_to_load):
@@ -1659,7 +1658,7 @@ class AutosubmitConfig(object):
         for filename in filenames_to_load:
             filename = filename.strip(", ")  # Remove commas and spaces if any
             if filename.startswith("~"):
-                filename = os.path.expanduser(filename)
+                filename = Path(filename).expanduser(filename)
             current_data_aux = self.unify_conf(copy.deepcopy(self.starter_conf), current_data)
             current_data_aux["AS_TEMP"] = {}
             current_data_aux["AS_TEMP"]["FILENAME_TO_LOAD"] = filename
