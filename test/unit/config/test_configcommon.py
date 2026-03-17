@@ -624,14 +624,111 @@ def test_is_section_in_any_wrapper(
     assert as_conf.is_section_in_any_wrapper(section) is expected
 
 
-def test_pin_inmutable_variables(autosubmit_config: "AutosubmitConfigFactory"):
-    """Test that the _pin_inmutable_variables method correctly pins inmutable variables."""
-    as_conf: AutosubmitConfig = autosubmit_config(
-        expid="a000", experiment_data={"DEFAULT": {"HPCARCH": "LOCAL", "EXPID": "a000"}}
-    )
-    inmutable_variables = {"EXPID": "a000", "HPCARCH": "LOCAL"}
-    as_conf.inmutable_variables = inmutable_variables.copy()
-    data = {"EXPID": "a001", "HPCARCH": "MARENOSTRUM5"}
-    pinned_data = as_conf._pin_inmutable_variables(data)
-    assert pinned_data["EXPID"] == "a000"
-    assert pinned_data["HPCARCH"] == "LOCAL"
+@pytest.mark.parametrize(
+    'experiment_data, section, expected',
+    [
+        (
+            {
+                'WRAPPERS': {
+                    'WRAPPER_A': {
+                        'TYPE': 'horizontal',
+                        'JOBS_IN_WRAPPER': ['SIM', 'POST'],
+                    }
+                }
+            },
+            'SIM',
+            True,
+        ),
+        (
+            {
+                'WRAPPERS': {
+                    'WRAPPER_A': {
+                        'TYPE': 'horizontal',
+                        'JOBS_IN_WRAPPER': ['SIM', 'POST'],
+                    }
+                }
+            },
+            'INI',
+            False,
+        ),
+        (
+            {
+                'WRAPPERS': {
+                    'WRAPPER_A': {
+                        'TYPE': 'horizontal',
+                        'JOBS_IN_WRAPPER': ['SIM'],
+                    },
+                    'WRAPPER_B': {
+                        'TYPE': 'vertical',
+                        'JOBS_IN_WRAPPER': ['POST'],
+                    },
+                }
+            },
+            'POST',
+            True,
+        ),
+        (
+            {},
+            'SIM',
+            False,
+        ),
+        (
+            {
+                'WRAPPERS': {
+                    'WRAPPER_A': 'not_a_dict',
+                }
+            },
+            'SIM',
+            False,
+        ),
+    ],
+    ids=[
+        'section_in_single_wrapper',
+        'section_not_in_wrapper',
+        'section_in_second_wrapper',
+        'no_wrappers_section',
+        'wrapper_value_not_dict',
+    ],
+)
+def test_is_section_in_any_wrapper(
+    autosubmit_config: 'AutosubmitConfigFactory',
+    experiment_data: dict,
+    section: str,
+    expected: bool,
+) -> None:
+    """Test that is_section_in_any_wrapper returns the correct result."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data=experiment_data)
+    as_conf.experiment_data = experiment_data
+    assert as_conf.is_section_in_any_wrapper(section) is expected
+
+
+def test_immutable_variables_overwrites_default_values(
+    autosubmit_config: "AutosubmitConfigFactory",
+) -> None:
+    """Test that the _pin_immutable_variables method correctly pins immutable variables."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.starter_conf = {"DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"}}
+    parameters = {
+        "DEFAULT": {"EXPID": "a001", "HPCARCH": "MARENOSTRUM5", "OTHER": "value"}
+    }
+    pinned = as_conf._pin_immutable_variables(parameters)
+
+    # Check immutable variables keep original values, other variables not affected
+    assert pinned["DEFAULT"]["EXPID"] == "a000"
+    assert pinned["DEFAULT"]["HPCARCH"] == "LOCAL"
+    assert pinned["DEFAULT"]["OTHER"] == "value"
+
+
+def test_immutable_variables_adds_missing_sections(
+    autosubmit_config: "AutosubmitConfigFactory",
+) -> None:
+    """Test that the _pin_immutable_variables method adds missing sections and keys."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.starter_conf = {"DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"}}
+
+    parameters = {}
+    pinned = as_conf._pin_immutable_variables(parameters)
+
+    # Check that missing DEFAULT section is added with original values
+    assert pinned["DEFAULT"]["EXPID"] == "a000"
+    assert pinned["DEFAULT"]["HPCARCH"] == "LOCAL"
