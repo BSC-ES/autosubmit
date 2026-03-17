@@ -299,39 +299,49 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
         stats.print_stats()
 
 
-def test_override_inmutable_variables_in_custom_config(temp_folder: Path, mocker) -> None:
+@pytest.mark.parametrize("custom_section", ["PRE", "POST"])
+def test_override_inmutable_variables_in_custom_config(
+    temp_folder: Path, mocker, custom_section: str
+) -> None:
     """
-    Test that inmutable variables cannot be overridden in custom configuration files.
+    Test that inmutable variables (DEFAULT.EXPID, DEFAULT.HPCARCH) cannot be overridden
+    by custom configuration files.
     """
+    custom_config = {"PRE": [], "POST": []}
+    custom_config[custom_section].append("%job_variableX.path%")
+
     default_yaml_file = {
         "DEFAULT": {
             "EXPID": "a000",
             "HPCARCH": "local",
-            "CUSTOM_CONFIG": {
-                "PRE": [
-                    "%job_variableX.path%",
-
-                ]
-            }
+            "CUSTOM_CONFIG": custom_config,
         },
-        "job": {
-            "FOR": {
-                "NAME": "%var%"
-            },
-            "path": "TOFILL"
-        },
+        "job": {"FOR": {"NAME": "%var%"}, "path": "TOFILL"},
         "var": [
-            "%hola%",
             "%test%",
         ],
-        "test": "variableX"
+        "test": "variableX",
     }
-    project_yaml_files = {"/variableX/test.yml": {"expid": "a_test"}}
-    mocker.patch('pathlib.Path.exists', return_value=True)
-    default_yaml_file = prepare_custom_config_tests(default_yaml_file, project_yaml_files, temp_folder)
+    project_yaml_files = {
+        "/variableX/test.yml": {
+            "DEFAULT": {"EXPID": "a_test", "HPCARCH": "different_hpc"},
+            "custom_marker": "loaded",
+        }
+    }
+    mocker.patch("pathlib.Path.exists", return_value=True)
+    default_yaml_file = prepare_custom_config_tests(
+        default_yaml_file, project_yaml_files, temp_folder
+    )
     prepare_yaml_files(default_yaml_file, temp_folder)
+
     as_conf = AutosubmitConfig("test")
     as_conf.conf_folder_yaml = Path(temp_folder)
     as_conf.load_workflow_commit = MagicMock()
     as_conf.reload(True)
-    assert as_conf.experiment_data["EXPID"] == "a000"
+
+    # Custom file merged
+    assert as_conf.experiment_data["CUSTOM_MARKER"] == "loaded"
+
+    # Inmutable variables not overridden
+    assert as_conf.experiment_data["DEFAULT"]["EXPID"] == "a000"
+    assert as_conf.experiment_data["DEFAULT"]["HPCARCH"] == "LOCAL"
