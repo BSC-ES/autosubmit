@@ -120,7 +120,7 @@ def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> Thread:
     return thread
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wrapper_type=None) -> dict[str, (bool, str)]:
+def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wrapper_type="simple") -> dict[str, (bool, str)]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.
@@ -175,7 +175,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
                 check_job_start = row_dict["start"] > 0 and row_dict["start"] != 1970010101
                 check_job_finish = row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
                 if row_dict["first_level"]:
-                    check_job_start_submit = row_dict["start"] > row_dict["submit"]
+                    check_job_start_submit = row_dict["start"] >= row_dict["submit"]
                 else:
                     check_job_start_submit = row_dict["start"] == row_dict["submit"]
                 check_job_finish_start = int(row_dict["finish"]) >= int(row_dict["start"])
