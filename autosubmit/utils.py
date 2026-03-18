@@ -64,9 +64,16 @@ def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", 
                         yaml_data['GIT']['PROJECT_ORIGIN'] = f'{git_repo}'
                     if git_branch != "":
                         yaml_data['GIT']['PROJECT_BRANCH'] = f'{git_branch}'
+                
+                if 'PROJECT' in yaml_data:
+                    if git_repo != "":
+                        yaml_data['PROJECT']['PROJECT_TYPE'] = 'git'
+                        destination = yaml_data['PROJECT'].get('PROJECT_DESTINATION', '')
+                        # Overwrite only if empty
+                        if not str(destination).strip():
+                            yaml_data['PROJECT']['PROJECT_DESTINATION'] = 'git_project'
 
-                if minimal_configuration:
-                    if 'DEFAULT' in yaml_data:
-                        yaml_data['DEFAULT']['CUSTOM_CONFIG'] = f"%PROJDIR%/{git_as_conf}"
+                if 'DEFAULT' in yaml_data and git_repo and git_as_conf:
+                    yaml_data['DEFAULT']['CUSTOM_CONFIG'] = f"%PROJDIR%/{git_as_conf}"
 
             yaml.dump(yaml_data, as_conf_file)
