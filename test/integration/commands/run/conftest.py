@@ -146,7 +146,8 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
         if wrapper_type:
             for row_dict in rows_as_dicts:
                 # TODO: add splits in 4.2, and modify the check to be only for chunk 1 and split 1
-                if not wrapper_type or (wrapper_type and row_dict.get("chunk", -1) == 1):
+                # Change the check for assert internally retried jobs for the first submission
+                if wrapper_type != "vertical" or (wrapper_type == "vertical" and row_dict.get("chunk", -1) == 1 and row_dict.get("counter", -1) == 0):
                     row_dict["first_level"] = True
                 else:
                     row_dict["first_level"] = False
