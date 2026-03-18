@@ -211,10 +211,12 @@ class BasicConfig:
                 BasicConfig.__read_file_config(
                     os.path.join(os.path.expanduser("~"), "." + filename)
                 )
-            elif os.path.exists(os.path.join("/etc", filename)):
-                BasicConfig.__read_file_config(os.path.join("/etc", filename))
             else:
-                BasicConfig.__read_file_config(os.path.join("/etc", "." + filename))
+                # First check the legacy filename, then the new one
+                if os.path.exists(os.path.join("/etc", "." + filename)):
+                    BasicConfig.__read_file_config(os.path.join("/etc", "." + filename))
+                if os.path.exists(os.path.join("/etc", filename)):
+                    BasicConfig.__read_file_config(os.path.join("/etc", filename))
 
             # Check if the environment variable is defined
 

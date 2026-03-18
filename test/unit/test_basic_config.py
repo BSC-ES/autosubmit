@@ -46,3 +46,4 @@ def test_read_makes_the_right_method_calls():
         BasicConfig.read()
         # assert
         BasicConfig._update_config.assert_called_once_with()  # type: ignore
+
