@@ -120,7 +120,7 @@ def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> Thread:
     return thread
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid) -> dict[str, (bool, str)]:
+def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wrapper_type=None) -> dict[str, (bool, str)]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.
@@ -142,6 +142,15 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid) ->
             f"Expected {expected_entries} entries, found {len(rows)}"
         # Convert rows to a list of dictionaries
         rows_as_dicts: list[dict[str, Any]] = [dict(row) for row in rows]
+        # add first level of a wrapper if wrapper_type != None
+        if wrapper_type:
+            for row_dict in rows_as_dicts:
+                # TODO: add splits in 4.2, and modify the check to be only for chunk 1 and split 1
+                if not wrapper_type or (wrapper_type and row_dict.get("chunk", -1) == 1):
+                    row_dict["first_level"] = True
+                else:
+                    row_dict["first_level"] = False
+
         # Tune the print, so it is more readable, so it is easier to debug in case of failure
         counter_by_name = {}
         group_by_job_name = {
@@ -165,7 +174,10 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid) ->
                 check_job_submit = row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
                 check_job_start = row_dict["start"] > 0 and row_dict["start"] != 1970010101
                 check_job_finish = row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
-                check_job_start_submit = int(row_dict["start"]) >= int(row_dict["submit"])
+                if row_dict["first_level"]:
+                    check_job_start_submit = row_dict["start"] > row_dict["submit"]
+                else:
+                    check_job_start_submit = row_dict["start"] == row_dict["submit"]
                 check_job_finish_start = int(row_dict["finish"]) >= int(row_dict["start"])
                 check_job_finish_submit = int(row_dict["finish"]) >= int(row_dict["submit"])
                 check_job_status = row_dict["status"] == final_status
@@ -206,7 +218,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid) ->
                 db_check_job[i] = {
                     "submit": check_job_submit,
                     "start": check_job_start,
-                    "start>submit": check_job_start_submit,
+                    "start>=submit": check_job_start_submit,
                     "finish": check_job_finish,
                     "finish>start": check_job_finish_start,
                     "finish>submit": check_job_finish_submit,

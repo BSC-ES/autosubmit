@@ -215,7 +215,6 @@ class Platform:
         self.log_retrieval_process_active: bool = False
         self.log_recovery_process: Optional['BaseProcess'] = None
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
-        self.processed_wrapper_logs: set[str] = set()
         self.compress_remote_logs = False
         self.remote_logs_compress_type = "gzip"
         self.compression_level = 9
@@ -851,7 +850,6 @@ class Platform:
         self.work_event = self.ctx.Event()
         self.cleanup_event = self.ctx.Event()
         self.log_recovery_process = self.ctx.Process()
-        self.processed_wrapper_logs = set()
 
     def load_process_info(self, platform):
 

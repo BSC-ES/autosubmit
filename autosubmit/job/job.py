@@ -152,7 +152,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit', '_validate_template'
+        '_log_recovered', 'packed_during_building', 'workflow_commit', '_validate_template', 'first_wrapped_level'
     )
 
     def __setstate__(self, state):
@@ -191,6 +191,7 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
+        self.first_wrapped_level = False
         self._wrapper_queue = None
         self._platform = None
         self._queue = None
@@ -315,6 +316,7 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
+        self.first_wrapped_level = False
         self._wrapper_queue = None
         self._queue = None
         self._partition = None
@@ -1369,9 +1371,6 @@ class Job(object):
                 self.remote_logs = backup_log
                 break
 
-        if log_recovered:
-            self.platform.processed_wrapper_logs.add(self.wrapper_name)
-
         return last_retrial, log_recovered
 
     def update_stat_file(self):
@@ -1414,8 +1413,6 @@ class Job(object):
             last_retrial = 0
         if not log_recovered:
             self.local_logs = backup_logname
-            if raise_error and self.wrapper_name not in self.platform.processed_wrapper_logs:
-                raise AutosubmitCritical("Failed to retrieve logs for job {self.name}", 6000)
         else:
             self.write_stats(last_retrial)
             if self.wrapper_type == "vertical":
@@ -2750,7 +2747,7 @@ class Job(object):
         else:
             Log.warning(f"Start time for job {self.name} not found in the .cmd file, using last known time.")
             self.start_time_timestamp = self.start_time_timestamp if self.start_time_timestamp else time.time()
-        if count > 0 or self.wrapper_name in self.platform.processed_wrapper_logs:
+        if count > 0 or not self.first_wrapped_level:
             self.submit_time_timestamp = date2str(datetime.datetime.fromtimestamp(self.start_time_timestamp), 'S')
 
     def fix_local_logs_timestamps(self, current_timestamp: str, new_timestamp: str) -> None:
