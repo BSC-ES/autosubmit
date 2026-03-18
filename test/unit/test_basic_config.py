@@ -16,8 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from mock import Mock
-from mock import patch
+from mock import Mock, patch, call
 
 from autosubmit.config.basicconfig import BasicConfig
 
@@ -47,3 +46,43 @@ def test_read_makes_the_right_method_calls():
         # assert
         BasicConfig._update_config.assert_called_once_with()  # type: ignore
 
+
+def test_read_loads_etc_files_with_priority():
+    # mock the os.environ dictionary to empty values to prevent entering the first conditional
+    with patch.dict(os.environ, {}, clear=True):
+        # mock os.path.exists
+        with patch("autosubmit.config.basicconfig.os.path.exists") as mock_exists:
+            # mock __read_file_config
+            # As it's a private static method, access it with name mangling: _BasicConfig__read_file_config
+            with patch(
+                "autosubmit.config.basicconfig.BasicConfig._BasicConfig__read_file_config"
+            ) as mock_read:
+                # mock _update_config
+                with patch(
+                    "autosubmit.config.basicconfig.BasicConfig._update_config", Mock()
+                ):
+                    filename = "autosubmitrc"
+                    local_rc = os.path.join("", "." + filename)
+                    home_rc = os.path.join(os.path.expanduser("~"), "." + filename)
+                    legacy_etc_rc = os.path.join("/etc", "." + filename)
+                    etc_rc = os.path.join("/etc", filename)
+                    # mock os.path.exists to return True for the two /etc files and False for the others
+                    mock_exists.side_effect = lambda x: x in [etc_rc, legacy_etc_rc]
+
+                    BasicConfig.read()
+
+                    # assert and check that the files are checked in the right order
+                    mock_exists.assert_has_calls(
+                        [
+                            call(local_rc),
+                            call(home_rc),
+                            call(legacy_etc_rc),
+                            call(etc_rc),
+                        ]
+                    )
+                    assert mock_read.call_args_list == [
+                        call(legacy_etc_rc),
+                        call(etc_rc),
+                    ]
+
+                    assert mock_read.call_count == 2
