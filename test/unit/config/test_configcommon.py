@@ -583,11 +583,11 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
 
     git_project_dir = tmp_path / "proj" / "git_project"
     conf_dir = git_project_dir / "conf"
+    common_dir = git_project_dir / "as_conf" / "common"
+    real_dir = git_project_dir / "as_conf" / "real_from_ideal"
     conf_dir.mkdir(parents=True, exist_ok=True)
-
-    # create common and real_from_ideal dirs with dummy files to be loaded as custom config
-    (git_project_dir / "as_conf" / "common").mkdir(parents=True, exist_ok=True)
-    (git_project_dir / "as_conf" / "real_from_ideal").mkdir(parents=True, exist_ok=True)
+    common_dir.mkdir(parents=True, exist_ok=True)
+    real_dir.mkdir(parents=True, exist_ok=True)
 
     as_conf.starter_conf = {
         "DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"},
@@ -601,19 +601,18 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
         "PROJDIR": str(git_project_dir),
     }
 
-    real_from_ideal_file = conf_dir / "real_from_ideal.yml"
-    real_from_ideal_file.write_text(
-        dedent("""\
-        DEFAULT:
-          CUSTOM_CONFIG:
-            PRE:
-              - "%PROJDIR%/as_conf/common"
-              - "%PROJDIR%/as_conf/real_from_ideal"
-    """)
+    root_file = conf_dir / "root_config.yml"
+    root_file.write_text(
+        dedent(
+            """\
+            DEFAULT:
+              CUSTOM_CONFIG:
+                PRE: "%PROJDIR%/as_conf/common,%PROJDIR%/as_conf/real_from_ideal"
+            """
+        )
     )
 
-    common_file = conf_dir / "common_config.yml"
-    common_file.write_text(
+    (common_dir / "common_config.yml").write_text(
         dedent("""\
         DEFAULT:
           EXPID: "a001"
@@ -622,26 +621,26 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
     """)
     )
 
-    real_from_ideal_file = conf_dir / "real_from_ideal.yml"
-    real_from_ideal_file.write_text(
+    (real_dir / "real_from_ideal_config.yml").write_text(
         dedent("""\
         DEFAULT:
           EXPID: "a002"
           HPCARCH: "MARENOSTRUM5"
-          REAL_CONFIG_VALUE: "real_from_ideal_value"
-        REAL_FROM_IDEAL_VALUE: "real_from_ideal_value"
+          REAL_CONFIG_VALUE: "real_from_ideal_value_1"
+        REAL_FROM_IDEAL_VALUE: "real_from_ideal_value_2"
     """)
     )
 
-    pre_config_dynamic_path = ["%PROJDIR%/conf"]
+    data_pre, data_post = as_conf.load_custom_config(current_data, [str(root_file)])
 
-    data_pre, _ = as_conf.load_custom_config(current_data, pre_config_dynamic_path)
+    # check nested configurations are merged
+    assert data_pre["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
+    assert data_pre["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
+    assert data_pre["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
 
-    # check pinned variables are not overwritten
+    # check that custom_config does not appear in data_post
+    assert "CUSTOM_CONFIG" not in data_post.get("DEFAULT", {})
+
+    # check that pinned variables are not overwritten
     assert data_pre["DEFAULT"]["EXPID"] == "a000"
     assert data_pre["DEFAULT"]["HPCARCH"] == "LOCAL"
-    # check default config from common and real_from_ideal are loaded
-    assert data_pre["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
-    assert data_pre["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value"
-    # check real_from_ideal values are loaded
-    assert data_pre["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value"
