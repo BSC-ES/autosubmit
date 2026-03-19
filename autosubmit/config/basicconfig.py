@@ -217,7 +217,9 @@ class BasicConfig:
                     BasicConfig.__read_file_config(os.path.join("/etc", filename))
                 # only for backward compatibility
                 elif os.path.exists(os.path.join("/etc", "." + filename)):
-                    Log.warning('The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc')
+                    Log.warning(
+                        "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
+                    )
                     BasicConfig.__read_file_config(os.path.join("/etc", "." + filename))         
 
             # Check if the environment variable is defined
