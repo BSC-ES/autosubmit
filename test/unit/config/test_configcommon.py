@@ -585,9 +585,13 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
     conf_dir = git_project_dir / "conf"
     common_dir = git_project_dir / "as_conf" / "common"
     real_dir = git_project_dir / "as_conf" / "real_from_ideal"
+    post_dir = git_project_dir / "as_conf" / "post"
     conf_dir.mkdir(parents=True, exist_ok=True)
+    # PRE
     common_dir.mkdir(parents=True, exist_ok=True)
     real_dir.mkdir(parents=True, exist_ok=True)
+    # POST
+    post_dir.mkdir(parents=True, exist_ok=True)
 
     as_conf.starter_conf = {
         "DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"},
@@ -608,6 +612,7 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
             DEFAULT:
               CUSTOM_CONFIG:
                 PRE: "%PROJDIR%/as_conf/common,%PROJDIR%/as_conf/real_from_ideal"
+                POST: "%PROJDIR%/as_conf/post"
             """
         )
     )
@@ -631,16 +636,33 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
     """)
     )
 
+    (post_dir / "post_config.yml").write_text(
+        dedent("""\
+        DEFAULT:
+          EXPID: "a003"
+          HPCARCH: "MARENOSTRUM6"
+          POST_CONFIG_VALUE: "post_value"
+    """)
+    )
+
     data_pre, data_post = as_conf.load_custom_config(current_data, [str(root_file)])
 
     # check nested configurations are merged
     assert data_pre["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
     assert data_pre["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
+    assert data_pre["DEFAULT"]["POST_CONFIG_VALUE"] == "post_value"
     assert data_pre["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
+    assert data_post["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
+    assert data_post["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
+    assert data_post["DEFAULT"]["POST_CONFIG_VALUE"] == "post_value"
+    assert data_post["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
 
     # check that custom_config does not appear in data_post
+    assert "CUSTOM_CONFIG" not in data_pre.get("DEFAULT", {})
     assert "CUSTOM_CONFIG" not in data_post.get("DEFAULT", {})
 
     # check that pinned variables are not overwritten
     assert data_pre["DEFAULT"]["EXPID"] == "a000"
     assert data_pre["DEFAULT"]["HPCARCH"] == "LOCAL"
+    assert data_post["DEFAULT"]["EXPID"] == "a000"
+    assert data_post["DEFAULT"]["HPCARCH"] == "LOCAL"
