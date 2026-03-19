@@ -49,19 +49,16 @@ def test_read_makes_the_right_method_calls():
         # assert
         BasicConfig._update_config.assert_called_once_with()  # type: ignore
 
+
 @pytest.mark.parametrize(
-    'etc_rc, legacy_etc_rc',
+    "etc_rc, legacy_etc_rc",
     [
         [os.path.join("/etc", "autosubmitrc"), os.path.join("/etc", ".autosubmitrc")],
         [os.path.join("/etc", "autosubmitrc"), None],
-        [None, os.path.join("/etc", ".autosubmitrc")]
-    ]
+        [None, os.path.join("/etc", ".autosubmitrc")],
+    ],
 )
-
-def test_read_loads_etc_files_with_priority(
-    etc_rc,
-    legacy_etc_rc
-):
+def test_read_loads_etc_files_with_priority(etc_rc, legacy_etc_rc):
     """
     Test that the read method loads configuration files with the correct priority.
     """
@@ -79,82 +76,89 @@ def test_read_loads_etc_files_with_priority(
                     "autosubmit.config.basicconfig.BasicConfig._update_config", Mock()
                 ):
                     filename = "autosubmitrc"
-                    local_rc = os.path.join("", "." + filename)
-                    home_rc = os.path.join(os.path.expanduser("~"), "." + filename)
-                    legacy_etc_rc = legacy_etc_rc
-                    etc_rc = etc_rc
                     # mock os.path.exists to return True for the two /etc files and False for the others
                     mock_exists.side_effect = lambda x: x in [etc_rc, legacy_etc_rc]
 
                     BasicConfig.read()
 
                     if etc_rc and legacy_etc_rc:
-                        # assert and check that the files are checked in the right order
                         mock_exists.assert_has_calls(
                             [
-                                call(local_rc),
-                                call(home_rc),
+                                call(os.path.join("", "." + filename)),
+                                call(
+                                    os.path.join(
+                                        os.path.expanduser("~"), "." + filename
+                                    )
+                                ),
                                 call(etc_rc),
                             ],
                             any_order=False,
                         )
-                        assert mock_read.call_args_list == [
-                            call(etc_rc)
-                        ]
+                        # assert and check that the files are checked in the right order
+                        assert mock_read.call_args_list == [call(etc_rc)]
                         assert mock_read.call_count == 1
-                    
+
                     elif legacy_etc_rc and not etc_rc:
-                        # if only legacy_etc_rc exists only legacy_etc_rc should be read
-                        mock_exists.assert_called_with(legacy_etc_rc)
-                        assert mock_read.call_args_list == [
-                            call(legacy_etc_rc)
-                        ]
-                        assert mock_read.call_count == 1
-                    
-                    elif etc_rc and not legacy_etc_rc:
-                        # if only etc_rc exists -> only etc_rc should be read
-                        mock_exists.assert_called_with(etc_rc)
-                        assert mock_read.call_args_list == [
-                            call(etc_rc)
-                        ]
-                        assert mock_read.call_count == 1
-                    
-                    else:
-                        # if none of the files exist no file should be read
                         mock_exists.assert_has_calls(
                             [
-                                call(etc_rc),
+                                call(os.path.join("", "." + filename)),
+                                call(
+                                    os.path.join(
+                                        os.path.expanduser("~"), "." + filename
+                                    )
+                                ),
+                                call(os.path.join("/etc", "autosubmitrc")),
                                 call(legacy_etc_rc),
                             ],
                             any_order=False,
                         )
+                        # if only legacy_etc_rc exists only legacy_etc_rc should be read
+                        assert mock_read.call_args_list == [call(legacy_etc_rc)]
+                        assert mock_read.call_count == 1
+
+                    elif etc_rc and not legacy_etc_rc:
+                        assert mock_exists.call_args_list == [
+                            call(os.path.join("", "." + filename)),
+                            call(os.path.join(os.path.expanduser("~"), "." + filename)),
+                            call(etc_rc),
+                        ]
+                        # if only etc_rc exists only etc_rc should be read
+                        assert mock_read.call_args_list == [call(etc_rc)]
+                        assert mock_read.call_count == 1
+
+                    else:
+                        # if none of the files exist no file should be read
                         assert mock_read.call_count == 0
 
 
 def test_read_overwrites_config_with_etc_files(tmp_path):
     """
-    Precedence: if two autosubmitrc files exist, 
+    Precedence: if two autosubmitrc files exist,
     the /etc/ version should take precedence over the /etc/.autosubmitrc version
     """
     filename = "autosubmitrc"
-    legacy_etc_rc =  tmp_path / ("." + filename)
+    legacy_etc_rc = tmp_path / ("." + filename)
     etc_rc = tmp_path / filename
 
     legacy_db_dir = tmp_path / "legacy.db"
     etc_db_dir = tmp_path / "etc.db"
 
-    legacy_etc_rc.write_text(dedent(f"""
+    legacy_etc_rc.write_text(
+        dedent(f"""
         [database]
         path = {legacy_db_dir}
         filename = legacy.db
-    """))
-        
-    with open(etc_rc, 'w') as f:
-        f.write(dedent(f"""
+    """)
+    )
+
+    with open(etc_rc, "w") as f:
+        f.write(
+            dedent(f"""
         [database]
         path = {etc_db_dir}
         filename = etc.db
-    """))
+    """)
+        )
 
     # original values
     original_db_dir = BasicConfig.DB_DIR
@@ -164,7 +168,7 @@ def test_read_overwrites_config_with_etc_files(tmp_path):
     try:
         # reset config to force reading the files again
         BasicConfig.CONFIG_FILE_FOUND = False
-        
+
         # act: read files in order: legacy first, modern second
         BasicConfig._BasicConfig__read_file_config(str(legacy_etc_rc))
         BasicConfig._BasicConfig__read_file_config(str(etc_rc))
