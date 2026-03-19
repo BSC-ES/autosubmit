@@ -3453,13 +3453,21 @@ class Autosubmit:
 
         filename = '.autosubmitrc'
         if level == 'All':
-            path = '/etc'
-            filename = 'autosubmitrc'
+            base_path = Path('/etc')
+            write_path = base_path / 'autosubmitrc'
+            # Retro-compatibility: load legacy first, then current with higher priority
+            read_options = [
+                base_path / ".autosubmitrc",
+                base_path / "autosubmitrc"
+            ]
         elif level == 'User':
-            path = home_path
+            base_path = Path(home_path)
+            write_path = base_path / filename
+            read_options = [write_path]
         else:
-            path = '.'
-        path = os.path.join(path, filename)
+            base_path = Path('.')
+            write_path = base_path / filename
+            read_options = [write_path]
 
         # Setting default values
         database_path = home_path
@@ -3470,10 +3478,10 @@ class Autosubmit:
 
         d.infobox("Reading configuration file...", width=50, height=5)
         try:
-            if os.path.isfile(path):
-                parser = ConfigParser()
-                parser.optionxform = str
-                parser.load(path)
+            parser = ConfigParser()
+            parser.optionxform = str
+            parser.read([str(p) for p in read_options])
+            if parser.sections():
                 if parser.has_option('database', 'path'):
                     database_path = parser.get('database', 'path')
                 if parser.has_option('database', 'filename'):
@@ -3587,7 +3595,6 @@ class Autosubmit:
                 break
                 # TODO: Check that is a valid config?
 
-        config_file = open(path, 'w')
         d.infobox("Writing configuration file...", width=50, height=5)
         try:
             parser = ConfigParser()
@@ -3606,8 +3613,8 @@ class Autosubmit:
             parser.add_section('mail')
             parser.set('mail', 'smtp_server', smtp_hostname)
             parser.set('mail', 'mail_from', mail_from)
-            parser.write(config_file)
-            config_file.close()
+            with open(write_path, 'w') as config_file:
+                parser.write(config_file)
             d.msgbox("Configuration file written successfully",
                      width=50, height=5)
             os.system('clear')

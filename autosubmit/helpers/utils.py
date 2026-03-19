@@ -292,8 +292,7 @@ def get_rc_path(machine: bool, local: bool) -> Path:
     If the environment variable ``AUTOSUBMIT_CONFIGURATION`` is specified in the
     system, this function will return a ``Path`` pointing to that value.
 
-    If ``machine`` is ``True``, it will use the file from ``/etc/autosubmitrc``
-    (pay attention to the dot prefix).
+    If ``machine`` is ``True``, it will use the file from ``/etc/autosubmitrc``.
 
     Else, if ``local`` is ``True``, it will use the file from  ``./.autosubmitrc``
     (i.e. it will use the current working directory for the process).

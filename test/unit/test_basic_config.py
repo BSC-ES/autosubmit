@@ -17,6 +17,7 @@
 
 import os
 from mock import Mock, patch, call
+from textwrap import dedent
 
 from autosubmit.config.basicconfig import BasicConfig
 
@@ -48,6 +49,9 @@ def test_read_makes_the_right_method_calls():
 
 
 def test_read_loads_etc_files_with_priority():
+    """
+    Test that the read method loads configuration files with the correct priority.
+    """
     # mock the os.environ dictionary to empty values to prevent entering the first conditional
     with patch.dict(os.environ, {}, clear=True):
         # mock os.path.exists
@@ -78,7 +82,8 @@ def test_read_loads_etc_files_with_priority():
                             call(home_rc),
                             call(legacy_etc_rc),
                             call(etc_rc),
-                        ]
+                        ],
+                        any_order=False,
                     )
                     assert mock_read.call_args_list == [
                         call(legacy_etc_rc),
@@ -86,3 +91,56 @@ def test_read_loads_etc_files_with_priority():
                     ]
 
                     assert mock_read.call_count == 2
+
+
+def test_read_overwrites_config_with_etc_files(tmp_path):
+    """
+    Precedence: if two autosubmitrc files exist, 
+    the /etc/ version should take precedence over the /etc/.autosubmitrc version
+    """
+    filename = "autosubmitrc"
+    legacy_etc_rc =  tmp_path / ("." + filename)
+    etc_rc = tmp_path / filename
+
+    legacy_db_dir = tmp_path / "legacy.db"
+    etc_db_dir = tmp_path / "etc.db"
+
+    legacy_etc_rc.write_text(dedent(f"""
+        [database]
+        path = {legacy_db_dir}
+        filename = legacy.db
+    """))
+        
+    with open(etc_rc, 'w') as f:
+        f.write(dedent(f"""
+        [database]
+        path = {etc_db_dir}
+        filename = etc.db
+    """))
+
+    # original values
+    original_db_dir = BasicConfig.DB_DIR
+    original_db_file = BasicConfig.DB_FILE
+    original_db_path = BasicConfig.DB_PATH
+    original_config_file_found = BasicConfig.CONFIG_FILE_FOUND
+    try:
+        # reset config to force reading the files again
+        BasicConfig.CONFIG_FILE_FOUND = False
+        
+        # act: read files in order: legacy first, modern second
+        BasicConfig._BasicConfig__read_file_config(str(legacy_etc_rc))
+        BasicConfig._BasicConfig__read_file_config(str(etc_rc))
+        BasicConfig._update_config()
+
+        # assert
+        assert BasicConfig.CONFIG_FILE_FOUND is True
+        assert BasicConfig.DB_DIR == str(etc_db_dir)
+        assert BasicConfig.DB_FILE == "etc.db"
+        assert BasicConfig.DB_PATH == os.path.join(str(etc_db_dir), "etc.db")
+
+    finally:
+        # restore original values
+        BasicConfig.DB_DIR = original_db_dir
+        BasicConfig.DB_FILE = original_db_file
+        BasicConfig.DB_PATH = original_db_path
+        BasicConfig.CONFIG_FILE_FOUND = original_config_file_found
