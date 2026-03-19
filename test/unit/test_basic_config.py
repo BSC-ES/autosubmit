@@ -75,60 +75,78 @@ def test_read_loads_etc_files_with_priority(etc_rc, legacy_etc_rc):
                 with patch(
                     "autosubmit.config.basicconfig.BasicConfig._update_config", Mock()
                 ):
-                    filename = "autosubmitrc"
-                    # mock os.path.exists to return True for the two /etc files and False for the others
-                    mock_exists.side_effect = lambda x: x in [etc_rc, legacy_etc_rc]
+                    with patch("autosubmit.config.basicconfig.Log.warning") as mock_log_warning:
+                        filename = "autosubmitrc"
+                        # mock os.path.exists to return True for the two /etc files and False for the others
+                        mock_exists.side_effect = lambda x: x in [etc_rc, legacy_etc_rc]
 
-                    BasicConfig.read()
+                        BasicConfig.read()
 
-                    if etc_rc and legacy_etc_rc:
-                        mock_exists.assert_has_calls(
-                            [
-                                call(os.path.join("", "." + filename)),
-                                call(
-                                    os.path.join(
-                                        os.path.expanduser("~"), "." + filename
-                                    )
-                                ),
-                                call(etc_rc),
-                            ],
-                            any_order=False,
-                        )
-                        # assert and check that the files are checked in the right order
-                        assert mock_read.call_args_list == [call(etc_rc)]
-                        assert mock_read.call_count == 1
+                        if etc_rc and legacy_etc_rc:
+                            mock_exists.assert_has_calls(
+                                [
+                                    call(os.path.join("", "." + filename)),
+                                    call(
+                                        os.path.join(
+                                            os.path.expanduser("~"), "." + filename
+                                        )
+                                    ),
+                                    call(legacy_etc_rc),
+                                    call(etc_rc),
+                                ],
+                                any_order=False,
+                            )
+                            # assert and check that the files are checked in the right order
+                            assert mock_read.call_args_list == [call(legacy_etc_rc), call(etc_rc)]
+                            assert mock_read.call_count == 2
+                            mock_log_warning.assert_called_once_with(
+                                "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
+                            )
 
-                    elif legacy_etc_rc and not etc_rc:
-                        mock_exists.assert_has_calls(
-                            [
-                                call(os.path.join("", "." + filename)),
-                                call(
-                                    os.path.join(
-                                        os.path.expanduser("~"), "." + filename
-                                    )
-                                ),
-                                call(os.path.join("/etc", "autosubmitrc")),
-                                call(legacy_etc_rc),
-                            ],
-                            any_order=False,
-                        )
-                        # if only legacy_etc_rc exists only legacy_etc_rc should be read
-                        assert mock_read.call_args_list == [call(legacy_etc_rc)]
-                        assert mock_read.call_count == 1
+                        elif legacy_etc_rc and not etc_rc:
+                            mock_exists.assert_has_calls(
+                                [
+                                    call(os.path.join("", "." + filename)),
+                                    call(
+                                        os.path.join(
+                                            os.path.expanduser("~"), "." + filename
+                                        )
+                                    ),
+                                    call(legacy_etc_rc),
+                                    call(os.path.join("/etc", "autosubmitrc")),
+                                ],
+                                any_order=False,
+                            )
+                            # if only legacy_etc_rc exists only legacy_etc_rc should be read
+                            assert mock_read.call_args_list == [call(legacy_etc_rc)]
+                            assert mock_read.call_count == 1
+                            mock_log_warning.assert_called_once_with(
+                                "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
+                            )
 
-                    elif etc_rc and not legacy_etc_rc:
-                        assert mock_exists.call_args_list == [
-                            call(os.path.join("", "." + filename)),
-                            call(os.path.join(os.path.expanduser("~"), "." + filename)),
-                            call(etc_rc),
-                        ]
-                        # if only etc_rc exists only etc_rc should be read
-                        assert mock_read.call_args_list == [call(etc_rc)]
-                        assert mock_read.call_count == 1
+                        elif etc_rc and not legacy_etc_rc:
+                            mock_exists.assert_has_calls(
+                                [
+                                    call(os.path.join("", "." + filename)),
+                                    call(
+                                        os.path.join(
+                                            os.path.expanduser("~"), "." + filename
+                                        )
+                                    ),
+                                    call(os.path.join("/etc", "." + filename)),
+                                    call(etc_rc),
+                                ],
+                                any_order=False,
+                            )
+                            # if only etc_rc exists only etc_rc should be read
+                            assert mock_read.call_args_list == [call(etc_rc)]
+                            assert mock_read.call_count == 1
+                            mock_log_warning.assert_not_called()
 
-                    else:
-                        # if none of the files exist no file should be read
-                        assert mock_read.call_count == 0
+                        else:
+                            # if none of the files exist no file should be read
+                            assert mock_read.call_count == 0
+                            mock_log_warning.assert_not_called()
 
 
 def test_read_overwrites_config_with_etc_files(tmp_path):
