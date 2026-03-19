@@ -647,22 +647,19 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
 
     data_pre, data_post = as_conf.load_custom_config(current_data, [str(root_file)])
 
-    # check nested configurations are merged
+    # check nested configurations are merged in PRE
     assert data_pre["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
     assert data_pre["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
-    assert data_pre["DEFAULT"]["POST_CONFIG_VALUE"] == "post_value"
     assert data_pre["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
-    assert data_post["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
-    assert data_post["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
-    assert data_post["DEFAULT"]["POST_CONFIG_VALUE"] == "post_value"
-    assert data_post["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
 
-    # check that custom_config does not appear in data_post
+    # check that custom_config does not appear in data_pre
     assert "CUSTOM_CONFIG" not in data_pre.get("DEFAULT", {})
-    assert "CUSTOM_CONFIG" not in data_post.get("DEFAULT", {})
 
-    # check that pinned variables are not overwritten
+    # check that pinned variables are not overwritten in data_pre
     assert data_pre["DEFAULT"]["EXPID"] == "a000"
     assert data_pre["DEFAULT"]["HPCARCH"] == "LOCAL"
-    assert data_post["DEFAULT"]["EXPID"] == "a000"
-    assert data_post["DEFAULT"]["HPCARCH"] == "LOCAL"
+
+    # check that POST config is merged in data_post
+    assert "POST_CONFIG_VALUE" not in data_pre.get("DEFAULT", {})
+    assert data_post["DEFAULT"]["POST_CONFIG_VALUE"] == "post_value"
+    assert data_post["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
