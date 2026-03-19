@@ -1700,11 +1700,15 @@ class AutosubmitConfig(object):
                     current_data = self.unify_conf(current_data_pre, current_data)
 
                     if len(filenames_to_load_level["POST"]) > 0:
-                        current_data_post = self.unify_conf(current_data_post, self.unify_conf(current_data,
-                                                                                               self.load_custom_config_section(
-                                                                                                   current_data,
-                                                                                                   filenames_to_load_level[
-                                                                                                       "POST"])))
+                        current_data_post = self.unify_conf(
+                            current_data_post,
+                            self.unify_conf(
+                                copy.deepcopy(current_data),
+                                self.load_custom_config_section(
+                                    current_data, filenames_to_load_level["POST"]
+                                ),
+                            ),
+                        )
                     else:
                         current_data_post = current_data
 
