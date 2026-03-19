@@ -3451,20 +3451,18 @@ class Autosubmit:
             raise AutosubmitCritical(
                 "Graphical visualization failed, not enough screen size", 7060)
 
-        filename = '.autosubmitrc'
-        if level == 'All':
-            base_path = Path('/etc')
+        filename = ".autosubmitrc"
+        if level == "All":
+            base_path = Path("/etc")
+            write_path = base_path / "autosubmitrc"
             # Retro-compatibility: load legacy first, then current with higher priority
-            read_options = [
-                base_path / ".autosubmitrc",
-                base_path / "autosubmitrc"
-            ]
-        elif level == 'User':
+            read_options = [base_path / ".autosubmitrc", base_path / "autosubmitrc"]
+        elif level == "User":
             base_path = Path(home_path)
             write_path = base_path / filename
             read_options = [write_path]
         else:
-            base_path = Path('.')
+            base_path = Path(".")
             write_path = base_path / filename
             read_options = [write_path]
 
