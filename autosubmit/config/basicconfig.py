@@ -20,6 +20,7 @@ import os
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Union
+from autosubmit.log.log import Log
 
 
 class BasicConfig:
@@ -212,11 +213,12 @@ class BasicConfig:
                     os.path.join(os.path.expanduser("~"), "." + filename)
                 )
             else:
-                # First check the legacy filename, then the new one
-                if os.path.exists(os.path.join("/etc", "." + filename)):
-                    BasicConfig.__read_file_config(os.path.join("/etc", "." + filename))
                 if os.path.exists(os.path.join("/etc", filename)):
                     BasicConfig.__read_file_config(os.path.join("/etc", filename))
+                # only for backward compatibility
+                elif os.path.exists(os.path.join("/etc", "." + filename)):
+                    Log.warning('The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc')
+                    BasicConfig.__read_file_config(os.path.join("/etc", "." + filename))         
 
             # Check if the environment variable is defined
 

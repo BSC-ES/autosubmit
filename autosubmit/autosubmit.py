@@ -3454,7 +3454,6 @@ class Autosubmit:
         filename = '.autosubmitrc'
         if level == 'All':
             base_path = Path('/etc')
-            write_path = base_path / 'autosubmitrc'
             # Retro-compatibility: load legacy first, then current with higher priority
             read_options = [
                 base_path / ".autosubmitrc",
@@ -3480,7 +3479,13 @@ class Autosubmit:
         try:
             parser = ConfigParser()
             parser.optionxform = str
-            parser.read([str(p) for p in read_options])
+            for option in read_options:
+                if option.exists():
+                    if option == base_path / ".autosubmitrc":
+                        Log.warning(
+                            "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
+                        )
+                    parser.read(str(option))
             if parser.sections():
                 if parser.has_option('database', 'path'):
                     database_path = parser.get('database', 'path')
