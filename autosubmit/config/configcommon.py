@@ -1696,7 +1696,7 @@ class AutosubmitConfig(object):
                                                                                            filenames_to_load_level[
                                                                                                "PRE"]))
                     else:
-                        current_data_pre = current_data
+                        current_data_pre = copy.deepcopy(current_data)
                     current_data = self.unify_conf(current_data_pre, current_data)
 
                     if len(filenames_to_load_level["POST"]) > 0:
@@ -1705,12 +1705,12 @@ class AutosubmitConfig(object):
                             self.unify_conf(
                                 copy.deepcopy(current_data),
                                 self.load_custom_config_section(
-                                    current_data, filenames_to_load_level["POST"]
+                                    copy.deepcopy(current_data), filenames_to_load_level["POST"]
                                 ),
                             ),
                         )
                     else:
-                        current_data_post = current_data
+                        current_data_post = copy.deepcopy(current_data)
 
         if current_data_aux:
             del current_data_aux

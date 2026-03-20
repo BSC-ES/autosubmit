@@ -17,6 +17,7 @@
 
 """Basic tests for ``AutosubmitConfig``."""
 
+import copy
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING
@@ -604,6 +605,7 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
         "CONFIG": {},
         "PROJDIR": str(git_project_dir),
     }
+    current_data_before = copy.deepcopy(current_data)
 
     root_file = conf_dir / "root_config.yml"
     root_file.write_text(
@@ -654,6 +656,8 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
 
     # check that custom_config does not appear in data_pre
     assert "CUSTOM_CONFIG" not in data_pre.get("DEFAULT", {})
+    assert "CUSTOM_CONFIG" not in data_post.get("DEFAULT", {})
+    assert "CUSTOM_CONFIG" not in data_post.get("DEFAULT", {})
 
     # check that pinned variables are not overwritten in data_pre
     assert data_pre["DEFAULT"]["EXPID"] == "a000"
@@ -663,3 +667,15 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
     assert "POST_CONFIG_VALUE" not in data_pre.get("DEFAULT", {})
     assert data_post["DEFAULT"]["POST_CONFIG_VALUE"] == "post_value"
     assert data_post["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
+    assert data_post["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
+    assert data_post["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
+
+    # check there is no aliasing between data_pre and data_post
+    assert data_pre is not data_post
+    data_post["DEFAULT"]["POST_ONLY_TMP"] = "tmp"
+    assert "POST_ONLY_TMP" not in data_pre["DEFAULT"]
+
+    # check input current_data is not mutated by load_custom_config
+    assert current_data == current_data_before
+
+    assert data_pre is not data_post
