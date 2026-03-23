@@ -53,3 +53,27 @@ class YAMLParser(YAML):
     def __init__(self):
         self.data = []
         super(YAMLParser, self).__init__(typ="rt")
+
+    def load(self, stream):
+        """Load YAML from *stream*, attaching provenance metadata.
+
+        The returned mapping is a ``DictWithProvenance`` instance where every
+        leaf value carries its source ``yaml_file``, ``line`` and ``col``.
+        These survive through subsequent ``dict`` operations because
+        ``WithProvenance`` objects are transparent subclasses of their native
+        Python types.
+
+        After loading, pickle and YAML-dump compatibility is ensured by
+        calling ``register_pickle_reducers()`` and
+        ``register_yaml_representers()``.  These must be called after *every*
+        load because the internal wrapper registry is populated lazily — new
+        types are registered on first encounter.
+
+        :param stream: An open file-like object (with ``.name`` attribute),
+            or a ``str``/``pathlib.Path`` pointing to the YAML file.
+        :return: Parsed mapping (``DictWithProvenance`` or plain ``dict``).
+        """
+        result = load_yaml(stream)
+        register_pickle_reducers()
+        register_yaml_representers()
+        return result if result is not None else {}
