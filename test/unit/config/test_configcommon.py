@@ -17,7 +17,6 @@
 
 """Basic tests for ``AutosubmitConfig``."""
 
-import copy
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING
@@ -580,6 +579,7 @@ def test_immutable_variables_adds_missing_sections(
 
 
 def test_load_custom_config(autosubmit_config, tmp_path) -> None:
+    """Test that the load_custom_config method correctly loads and merges custom configuration files."""
     as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
 
     git_project_dir = tmp_path / "proj" / "git_project"
