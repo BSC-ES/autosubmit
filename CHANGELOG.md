@@ -6,10 +6,11 @@
 - Reduce the frequency with which energy data was not being stored for the last job of the batch #2657 #2418
 - Fixed issue with experiments running on LOCAL platform without a defined LOCAL entry in platforms.yml config file #1131
 - Fixed an issue with the ECMWF platform not working with the new online recovery
-- Changed logic in Slurm submission to look for submitted messaged (hotfix) #2886" 
+- Changed logic in Slurm submission to look for submitted messaged (hotfix) #2886
 - Calendar splits: last split boundaries #2866, last split not exported #2099 and splitsize not working at experiment level #2016.
 - Accept local/intranet email addresses in validation #1471
 - Set PROJECT_TYPE, PROJECT_DESTINATION and CUSTOM_CONFIG for experiments without minimal configuration #2864
+- Added priority and retro-compatibility for etc/autosubmitrc over etc/.autosubmitrc #2312
 
 **Enhancements:**
 
