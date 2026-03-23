@@ -607,7 +607,6 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
         "CONFIG": {},
         "PROJDIR": str(git_project_dir),
     }
-    current_data_before = copy.deepcopy(current_data)
 
     root_file = conf_dir / "root_config.yml"
     root_file.write_text(
