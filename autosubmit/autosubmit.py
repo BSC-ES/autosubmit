@@ -480,10 +480,11 @@ class Autosubmit:
             subparser.add_argument(
                 '-f', '--force', action='store_true', default=False, help='force regenerate job_list')
             # Configure
-            subparser = subparsers.add_parser('configure', description="configure database and path for autosubmit. It "
-                                                                       "can be done at machine, user or local level."
-                                                                       "If no arguments specified configure will "
-                                                                       "display dialog boxes (if installed)")
+            subparser = subparsers.add_parser(
+                "configure",
+                description="configure database and path for autosubmit. It "
+                "can be done at machine, user or local level.",
+            )
             subparser.add_argument(
                 '--advanced', action="store_true", help="Open advanced configuration of autosubmit")
             subparser.add_argument(
