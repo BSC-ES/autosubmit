@@ -528,57 +528,130 @@ class Autosubmit:
 
             # Set status
             subparser = subparsers.add_parser(
-                'setstatus', description="sets job status for an experiment")
-            subparser.add_argument('expid', help='experiment identifier')
+                "setstatus", description="sets job status for an experiment"
+            )
+            subparser.add_argument("expid", help="experiment identifier")
             subparser.add_argument(
-                '-np', '--noplot', action='store_true', default=False, help='omit plot')
+                "-np", "--noplot", action="store_true", default=False, help="omit plot"
+            )
             subparser.add_argument(
-                '-s', '--save', action="store_true", default=False, help='Save changes to disk')
-            subparser.add_argument('-t', '--status_final',
-                                   choices=('READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN',
-                                            'QUEUING', 'RUNNING', 'HELD'),
-                                   required=True,
-                                   help='Supply the target status')
-            subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
-            group = subparser.add_mutually_exclusive_group(required=True)
-            group.add_argument('-fl', '--list', type=str,
-                               help='Supply the list of job names to be changed. Default = "Any". '
-                                    'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
-            group.add_argument('-fc', '--filter_chunks', type=str,
-                               help='Supply the list of chunks to change the status. Default = "Any". '
-                                    'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
-            group.add_argument('-fs', '--filter_status', type=str,
-                               help='Select the status (one or more) to filter the list of jobs.'
-                                    "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']")
-            group.add_argument('-ft', '--filter_type', type=str,
-                               help='Select the job type to filter the list of jobs')
-            group.add_argument('-ftc', '--filter_type_chunk', type=str,
-                               help='Supply the list of chunks to change the status. Default = "Any". When the member name "all" is set, all the chunks \
+                "-s",
+                "--save",
+                action="store_true",
+                default=False,
+                help="Save changes to disk",
+            )
+            subparser.add_argument(
+                "-t",
+                "--status_final",
+                choices=(
+                    "READY",
+                    "COMPLETED",
+                    "WAITING",
+                    "SUSPENDED",
+                    "FAILED",
+                    "UNKNOWN",
+                    "QUEUING",
+                    "RUNNING",
+                    "HELD",
+                ),
+                required=True,
+                help="Supply the target status",
+            )
+            subparser.add_argument(
+                "-v",
+                "--update_version",
+                action="store_true",
+                default=False,
+                help="Update experiment version",
+            )
+            subparser.add_argument(
+                "-fl",
+                "--list",
+                type=str,
+                help='Supply the list of job names to be changed. Default = "Any". '
+                'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
+            )
+            subparser.add_argument(
+                "-fc",
+                "--filter_chunks",
+                type=str,
+                help='Supply the list of chunks to change the status. Default = "Any". '
+                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+            )
+            subparser.add_argument(
+                "-fs",
+                "--filter_status",
+                type=str,
+                help="Select the status (one or more) to filter the list of jobs."
+                "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
+            )
+            subparser.add_argument(
+                "-ft",
+                "--filter_type",
+                type=str,
+                help="Select the job type to filter the list of jobs",
+            )
+            subparser.add_argument(
+                "-ftc",
+                "--filter_type_chunk",
+                type=str,
+                help='[Deprecated] EQuivalent behaviour can be obtained combining achieved by combining -ft and -fc. \
+                               Supply the list of chunks to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                    chunks 1 for all the members will be updated. Follow the format: '
-                                    '"[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"')
-            group.add_argument('-ftcs', '--filter_type_chunk_split', type=str,
-                               help='Supply the list of chunks & splits to change the status. Default = "Any". When the member name "all" is set, all the chunks \
+                '"[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+            )
+            subparser.add_argument(
+                "-ftcs",
+                "--filter_type_chunk_split",
+                type=str,
+                help='Deprecated] EQuivalent behaviour can be obtained combining achieved by combining -ft and -fc. \
+                                Supply the list of chunks & splits to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                            selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                                chunks 1 for all the members will be updated. Follow the format: '
-                                    '"[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"')
+                '"[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+            )
 
-            subparser.add_argument('--hide', action='store_true', default=False,
-                                   help='hides plot window')
-            subparser.add_argument('-group_by', choices=('date', 'member', 'chunk', 'split', 'automatic'), default=None,
-                                   help='Groups the jobs automatically or by date, member, chunk or split')
-            subparser.add_argument('-expand', type=str,
-                                   help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
-                                        'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument(
-                '-expand_status', type=str, help='Select the statuses to be expanded')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
-            subparser.add_argument('-cw', '--check_wrapper', action='store_true',
-                                   default=False, help='Generate possible wrapper in the current workflow')
-            subparser.add_argument('-d', '--detail', action='store_true',
-                                   default=False, help='Generate detailed view of changes')
+                "--hide", action="store_true", default=False, help="hides plot window"
+            )
+            subparser.add_argument(
+                "-group_by",
+                choices=("date", "member", "chunk", "split", "automatic"),
+                default=None,
+                help="Groups the jobs automatically or by date, member, chunk or split",
+            )
+            subparser.add_argument(
+                "-expand",
+                type=str,
+                help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
+                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+            )
+            subparser.add_argument(
+                "-expand_status", type=str, help="Select the statuses to be expanded"
+            )
+            subparser.add_argument(
+                "-nt",
+                "--notransitive",
+                action="store_true",
+                default=False,
+                help="Disable transitive reduction",
+            )
+            subparser.add_argument(
+                "-cw",
+                "--check_wrapper",
+                action="store_true",
+                default=False,
+                help="Generate possible wrapper in the current workflow",
+            )
+            subparser.add_argument(
+                "-d",
+                "--detail",
+                action="store_true",
+                default=False,
+                help="Generate detailed view of changes",
+            )
 
             # Test Case
             subparser = subparsers.add_parser(
