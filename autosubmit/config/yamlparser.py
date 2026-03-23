@@ -37,6 +37,7 @@ from yaml_provenance import (
 # a complete chain of origin information.
 # ---------------------------------------------------------------------------
 configure(ProvenanceConfig(track_history=True))
+register_pickle_reducers()
 
 
 class YAMLParserFactory:
