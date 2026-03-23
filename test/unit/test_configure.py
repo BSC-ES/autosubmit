@@ -20,20 +20,17 @@ from textwrap import dedent
 import pytest
 
 
-@pytest.mark.parametrize('suffix', [
-    '',
-    '/',
-    '//'
-])
+@pytest.mark.parametrize("suffix", ["", "/", "//"])
 def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
     # To update ``Path.home`` appending the provided suffix.
-    mocker.patch('autosubmit.autosubmit.get_rc_path').return_value = \
-        Path(str(tmp_path) + suffix, '.autosubmitrc')
+    mocker.patch("autosubmit.autosubmit.get_rc_path").return_value = Path(
+        str(tmp_path) + suffix, ".autosubmitrc"
+    )
 
     # assign values that will be passed on cmd
     database_filename = "autosubmit.db"
-    db_path = tmp_path / 'database'
-    lr_path = tmp_path / 'experiments'
+    db_path = tmp_path / "database"
+    lr_path = tmp_path / "experiments"
 
     autosubmit.configure(
         advanced=False,
@@ -45,7 +42,8 @@ def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
         smtp_hostname=None,
         mail_from=None,
         machine=False,
-        local=False)
+        local=False,
+    )
 
     expected = dedent(f"""\
         [database]
@@ -73,27 +71,24 @@ def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
         
         """)
 
-    with open(tmp_path / '.autosubmitrc', 'r') as file:
+    with open(tmp_path / ".autosubmitrc", "r") as file:
         assert file.read() == expected
 
 
-@pytest.mark.parametrize('suffix', [
-    '',
-    '/',
-    '//'
-])
+@pytest.mark.parametrize("suffix", ["", "/", "//"])
 def test_configure_advanced(mocker, tmp_path, suffix: str, autosubmit) -> None:
     """Test the advanced configuration options."""
     # To update ``Path.home`` appending the provided suffix.
-    mocker.patch('autosubmit.autosubmit.get_rc_path').return_value = \
-        Path(str(tmp_path) + suffix, '.autosubmitrc')
+    mocker.patch("autosubmit.autosubmit.get_rc_path").return_value = Path(
+        str(tmp_path) + suffix, ".autosubmitrc"
+    )
 
     # assign values that will be passed on cmd
     database_filename = "autosubmit.db"
-    db_path = tmp_path / 'database'
-    lr_path = tmp_path / 'experiments'
-    platforms_conf = tmp_path / 'platforms.yml'
-    jobs_conf = tmp_path / 'jobs.yml'
+    db_path = tmp_path / "database"
+    lr_path = tmp_path / "experiments"
+    platforms_conf = tmp_path / "platforms.yml"
+    jobs_conf = tmp_path / "jobs.yml"
     smtp_hostname = "smtp.example.com"
     mail_from = "autosubmit@example.com"
 
@@ -111,7 +106,8 @@ def test_configure_advanced(mocker, tmp_path, suffix: str, autosubmit) -> None:
         smtp_hostname=smtp_hostname,
         mail_from=mail_from,
         machine=False,
-        local=False)
+        local=False,
+    )
 
     expected = dedent(f"""\
         [database]
@@ -147,6 +143,5 @@ def test_configure_advanced(mocker, tmp_path, suffix: str, autosubmit) -> None:
         
         """)
 
-    with open(tmp_path / '.autosubmitrc', 'r') as file:
+    with open(tmp_path / ".autosubmitrc", "r") as file:
         assert file.read() == expected
-
