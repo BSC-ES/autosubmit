@@ -85,8 +85,6 @@ from autosubmit.utils import as_conf_default_values
 if TYPE_CHECKING:
     from rocrate.rocrate import ROCrate
 
-dialog = None
-
 """Main module for autosubmit. Only contains an interface class to all functionality implemented on autosubmit."""
 
 sys.path.insert(0, os.path.abspath('.'))
@@ -801,23 +799,20 @@ class Autosubmit:
             return Autosubmit.create(args.expid, args.noplot, args.hide, args.output, args.group_by, args.expand,
                                      args.expand_status, args.check_wrapper, args.detail, args.profile, args.force)
         elif args.command == 'configure':
-            if not args.advanced or (args.advanced and dialog is None):
-                return Autosubmit.configure(
-                    args.advanced,
-                    args.databasepath,
-                    args.databasefilename,
-                    args.localrootpath,
-                    args.platformsconfpath,
-                    args.jobsconfpath,
-                    args.smtphostname,
-                    args.mailfrom,
-                    args.all,
-                    args.local,
-                    args.database_backend,
-                    args.database_conn_url,
-                )
-            else:
-                return Autosubmit.configure_dialog()
+            return Autosubmit.configure(
+                args.advanced,
+                args.databasepath,
+                args.databasefilename,
+                args.localrootpath,
+                args.platformsconfpath,
+                args.jobsconfpath,
+                args.smtphostname,
+                args.mailfrom,
+                args.all,
+                args.local,
+                args.database_backend,
+                args.database_conn_url,
+            )
         elif args.command == 'install':
             return Autosubmit.install()
         elif args.command == 'setstatus':
@@ -3410,229 +3405,6 @@ class Autosubmit:
         except BaseException as e:
             raise AutosubmitCritical(str(e), 7014)
         return True
-
-    @staticmethod
-    def configure_dialog():
-        """Configure several paths for autosubmit interactively: database, local root and others.
-        Can be configured at system, user or local levels. Local level configuration precedes user level and user level
-        precedes system configuration. """
-        home_path = Path("~").expanduser().resolve()
-
-        try:
-            d = dialog.Dialog(
-                dialog="dialog", autowidgetsize=True, screen_color='GREEN')
-        except dialog.DialogError:
-            raise AutosubmitCritical(
-                "Graphical visualization failed, not enough screen size", 7060)
-        except Exception:
-            raise AutosubmitCritical(
-                "Dialog libs aren't found in your Operational system", 7060)
-
-        d.set_background_title("Autosubmit configure utility")
-        if os.geteuid() == 0:
-            text = ''
-            choice = [
-                ("All", "All users on this machine (may require root privileges)")]
-        else:
-            text = "If you want to configure Autosubmit for all users, you will need to provide root privileges"
-            choice = []
-
-        choice.append(("User", "Current user"))
-        choice.append(
-            ("Local", "Only when launching Autosubmit from this path"))
-
-        try:
-            code, level = d.menu(text, choices=choice, width=60,
-                                 title="Choose when to apply the configuration")
-            if code != dialog.Dialog.OK:
-                os.system('clear')
-                return False
-        except dialog.DialogError:
-            raise AutosubmitCritical(
-                "Graphical visualization failed, not enough screen size", 7060)
-
-        filename = ".autosubmitrc"
-        if level == "All":
-            base_path = Path("/etc")
-            write_path = base_path / "autosubmitrc"
-            # log warning always if legacy exists
-            if (base_path / ".autosubmitrc").exists():
-                Log.warning(
-                    "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc")
-            # Retro-compatibility: load legacy first, then current with higher priority
-            read_options = [base_path / ".autosubmitrc", base_path / "autosubmitrc"]
-        elif level == "User":
-            base_path = Path(home_path)
-            write_path = base_path / filename
-            read_options = [write_path]
-        else:
-            base_path = Path(".")
-            write_path = base_path / filename
-            read_options = [write_path]
-
-        # Setting default values
-        database_path = home_path
-        local_root_path = home_path
-        database_filename = 'autosubmit.db'
-        jobs_conf_path = ''
-        platforms_conf_path = ''
-
-        d.infobox("Reading configuration file...", width=50, height=5)
-        try:
-            parser = ConfigParser()
-            parser.optionxform = str
-            parser.read([str(p) for p in read_options])
-            if parser.sections():
-                if parser.has_option('database', 'path'):
-                    database_path = parser.get('database', 'path')
-                if parser.has_option('database', 'filename'):
-                    database_filename = parser.get('database', 'filename')
-                if parser.has_option('local', 'path'):
-                    local_root_path = parser.get('local', 'path')
-                if parser.has_option('conf', 'platforms'):
-                    platforms_conf_path = parser.get('conf', 'platforms')
-                if parser.has_option('conf', 'jobs'):
-                    jobs_conf_path = parser.get('conf', 'jobs')
-
-        except (IOError, OSError) as e:
-            raise AutosubmitCritical(
-                "Can not read config file", 7014, e.message)
-
-        while True:
-            try:
-                code, database_path = d.dselect(database_path, width=80, height=20,
-                                                title='\\Zb\\Z1Select path to database\\Zn', colors='enable')
-            except dialog.DialogError:
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, not enough screen size", 7060)
-            if Autosubmit._requested_exit(code, d):
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, requested exit", 7060)
-            elif code == dialog.Dialog.OK:
-                database_path = database_path.replace('~', home_path)
-                if not os.path.exists(database_path):
-                    d.msgbox(
-                        "Database path does not exist.\nPlease, insert the right path", width=50, height=6)
-                else:
-                    break
-
-        while True:
-            try:
-                code, local_root_path = d.dselect(local_root_path, width=80, height=20,
-                                                  title='\\Zb\\Z1Select path to experiments repository\\Zn',
-                                                  colors='enable')
-            except dialog.DialogError:
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, not enough screen size", 7060)
-
-            if Autosubmit._requested_exit(code, d):
-                raise AutosubmitCritical(
-                    "Graphical visualization failed,requested exit", 7060)
-            elif code == dialog.Dialog.OK:
-                database_path = database_path.replace('~', home_path)
-                if not os.path.exists(database_path):
-                    d.msgbox(
-                        "Local root path does not exist.\nPlease, insert the right path", width=50, height=6)
-                else:
-                    break
-        while True:
-            try:
-                (code, tag) = d.form(text="",
-                                     elements=[("Database filename", 1, 1, database_filename, 1, 40, 20, 20),
-                                               (
-                                                   "Default platform.yml path", 2, 1, platforms_conf_path, 2, 40, 40,
-                                                   200),
-                                               ("Default jobs.yml path", 3, 1, jobs_conf_path, 3, 40, 40, 200)],
-                                     height=20,
-                                     width=80,
-                                     form_height=10,
-                                     title='\\Zb\\Z1Just a few more options:\\Zn', colors='enable')
-            except dialog.DialogError:
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, not enough screen size", 7060)
-
-            if Autosubmit._requested_exit(code, d):
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, _requested_exit", 7060)
-            elif code == dialog.Dialog.OK:
-                database_filename = tag[0]
-                platforms_conf_path = tag[1]
-                jobs_conf_path = tag[2]
-
-                platforms_conf_path = platforms_conf_path.replace(
-                    '~', home_path).strip()
-                jobs_conf_path = jobs_conf_path.replace('~', home_path).strip()
-
-                if platforms_conf_path and not os.path.exists(platforms_conf_path):
-                    d.msgbox(
-                        "Platforms conf path does not exist.\nPlease, insert the right path", width=50, height=6)
-                elif jobs_conf_path and not os.path.exists(jobs_conf_path):
-                    d.msgbox(
-                        "Jobs conf path does not exist.\nPlease, insert the right path", width=50, height=6)
-                else:
-                    break
-
-        smtp_hostname = "mail.bsc.es"
-        mail_from = "automail@bsc.es"
-        while True:
-            try:
-                (code, tag) = d.form(text="",
-                                     elements=[("SMTP server hostname", 1, 1, smtp_hostname, 1, 40, 20, 20),
-                                               ("Notifications sender address", 2, 1, mail_from, 2, 40, 40, 200)],
-                                     height=20,
-                                     width=80,
-                                     form_height=10,
-                                     title='\\Zb\\Z1Mail notifications configuration:\\Zn', colors='enable')
-            except dialog.DialogError:
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, not enough screen size", 7060)
-
-            if Autosubmit._requested_exit(code, d):
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, requested exit", 7060)
-            elif code == dialog.Dialog.OK:
-                smtp_hostname = tag[0]
-                mail_from = tag[1]
-                break
-                # TODO: Check that is a valid config?
-
-        d.infobox("Writing configuration file...", width=50, height=5)
-        try:
-            parser = ConfigParser()
-            parser.add_section('database')
-            parser.set('database', 'path', database_path)
-            if database_filename:
-                parser.set('database', 'filename', database_filename)
-            parser.add_section('local')
-            parser.set('local', 'path', local_root_path)
-            if jobs_conf_path or platforms_conf_path:
-                parser.add_section('conf')
-                if jobs_conf_path:
-                    parser.set('conf', 'jobs', jobs_conf_path)
-                if platforms_conf_path:
-                    parser.set('conf', 'platforms', platforms_conf_path)
-            parser.add_section('mail')
-            parser.set('mail', 'smtp_server', smtp_hostname)
-            parser.set('mail', 'mail_from', mail_from)
-            with open(write_path, 'w') as config_file:
-                parser.write(config_file)
-            d.msgbox("Configuration file written successfully",
-                     width=50, height=5)
-            os.system('clear')
-        except (IOError, OSError) as e:
-            raise AutosubmitCritical(
-                "Can not write config file", 7012, e.message)
-        return True
-
-    @staticmethod
-    def _requested_exit(code, d):
-        if code != dialog.Dialog.OK:
-            code = d.yesno(
-                'Exit configure utility without saving?', width=50, height=5)
-            if code == dialog.Dialog.OK:
-                os.system('clear')
-                return True
-        return False
 
     @staticmethod
     def install():
