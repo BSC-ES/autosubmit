@@ -1658,7 +1658,7 @@ class AutosubmitConfig(object):
         for filename in filenames_to_load:
             filename = filename.strip(", ")  # Remove commas and spaces if any
             if filename.startswith("~"):
-                filename = Path(filename).expanduser()
+                filename = str(Path(filename).expanduser())
             current_data_aux = self.unify_conf(copy.deepcopy(self.starter_conf), current_data)
             current_data_aux["AS_TEMP"] = {}
             current_data_aux["AS_TEMP"]["FILENAME_TO_LOAD"] = filename
