@@ -4943,12 +4943,30 @@ class Autosubmit:
         """
         if filter_status:
             filter_status = filter_status.upper()
-        # TODO: unify filters. There is already an issue for that
-        # TODO: Normalize some filters that are the same ( To avoid changing the usage ... FIX in another PR)
-        filter_chunk_section_split = None
-        # TODO: TMP fix until the previous TODO is resolved. Select the one that is filled
-        for f in [filter_chunks, filter_type_chunk, filter_type_chunk_split]:
-            filter_chunk_section_split = f if f else filter_chunk_section_split
+        # legacy filters
+        if filter_type_chunk:
+            Log.warning(
+                "--filter_type_chunk is deprecated and will be removed in future versions. Use a combination of -ft and -fc."
+            )
+        if filter_type_chunk_split:
+            Log.warning(
+                "--filter_type_chunk_split is deprecated and will be removed in future versions. Use a combination of -ft and -fc."
+            )
+        # multiple overlapping filters selected
+        provided_chunk_filters = [
+            ("-fc/--filter_chunks", filter_chunks),
+            ("-ftc/--filter_type_chunk", filter_type_chunk),
+            ("-ftcs/--filter_type_chunk_split", filter_type_chunk_split)
+        ]
+        selected_chunk_filters = [name for name, value in provided_chunk_filters if value]
+        if len(selected_chunk_filters) > 1:
+            Log.warning(
+                "Multiple chunk filters provided (%s). Using -fc first, then -ftc, and finally -ftcs."
+                " Use only one of them to avoid ambiguity."
+                ", ".join(selected_chunk_filters)
+            )
+        # keep retro-compatibility with legacy filters while prioritizing -fc, then -ftc, and finally -ftcs
+        filter_chunk_section_split = filter_chunks or filter_type_chunk_split or filter_type_chunk
 
         check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
@@ -5009,59 +5027,45 @@ class Autosubmit:
                                                         filter_section)
                 #### Starts the filtering process ####
                 Log.info("Filtering jobs...")
-                final_list = []
+                all_jobs = job_list.get_job_list()
+                selected_job_names = {job.name for job in all_jobs}
+
+                def intersect_with(job_names: set[str]) -> None:
+                    nonlocal selected_job_names
+                    selected_job_names &= job_names
+                
                 final_status = Autosubmit._get_status(final)
-                # I have the impression that whoever did this function thought about the possibility of having multiple filters at the same time
-                # But, as it was, it is not possible to have multiple filters at the same time due to the way the code is written
                 if filter_section:
                     ft = filter_section.split()
-                    if str(ft).upper() == 'ANY':
-                        for job in job_list.get_job_list():
-                            final_list.append(job)
-                    else:
-                        for section in ft:
-                            for job in job_list.get_job_list():
-                                if job.section == section:
-                                    final_list.append(job)
-                # TODO: unify filters in the args. There is already an issue for that
-                if filter_chunks or filter_type_chunk or filter_chunk_section_split:
+                    if str(ft).upper() != 'ANY':
+                        intersect_with({job.name for job in all_jobs if job.section in ft})
+
+                if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
-                    # The extend is because the code was thought to have multiple filters at the same time (but it is not possible for some combinations)
-                    final_list.extend(Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split))
-                    final_list = list(set(final_list))
+                    intersect_with({job.name for job in Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)})
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
                 if filter_status:
                     status_list = filter_status.split()
                     Log.debug(f"Filtering jobs with status {filter_status}")
-                    if str(status_list).upper() == 'ANY':
-                        for job in job_list.get_job_list():
-                            final_list.append(job)
-                    else:
-                        for status in status_list:
-                            fs = Autosubmit._get_status(status)
-                            for job in [j for j in job_list.get_job_list() if j.status == fs]:
-                                final_list.append(job)
+                    if str(status_list).upper() != 'ANY':
+                        allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
+                        intersect_with({job.name for job in all_jobs if job.status in allowed_statuses})
 
                 if filter_list:
                     jobs = filter_list.split()
                     expidJoblist = defaultdict(int)
-                    for x in filter_list.split():
+                    for x in jobs:
                         expidJoblist[str(x[0:4])] += 1
                     if str(expid) in expidJoblist:
-                        wrongExpid = jobs.__len__() - expidJoblist[expid]
+                        wrongExpid = len(jobs) - expidJoblist[expid]
                     if wrongExpid > 0:
                         Log.warning(f"There are {wrongExpid} job.name with an invalid Expid")
-                    if str(jobs).upper() == 'ANY':
-                        for job in job_list.get_job_list():
-                            final_list.append(job)
-                    else:
-                        for job in job_list.get_job_list():
-                            if job.name in jobs:
-                                final_list.append(job)
-
+                    if str(jobs).upper() != 'ANY':
+                        intersect_with({job.name for job in all_jobs if job.name in jobs})
+                # preserve job list ordering
+                final_list = [job for job in all_jobs if job.name in selected_job_names]
                 # Time to change status
-                final_list = list(set(final_list))
                 performed_changes = {}
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")
                 for job in final_list:
