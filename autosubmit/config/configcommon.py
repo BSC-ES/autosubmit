@@ -1674,7 +1674,7 @@ class AutosubmitConfig(object):
                 if not filename.is_file():
                     # Load a folder by calling recursively to this function as a list of files
                     current_data_pre, current_data_post = self.load_config_folder(copy.deepcopy(current_data), filename)
-                    current_data = self.unify_conf(current_data_pre, current_data)
+                    current_data = self.unify_conf(current_data, current_data_pre)
                     current_data = self.unify_conf(current_data, current_data_post)
                 else:
                     # Load a file and unify the current_data with the loaded data
@@ -1697,7 +1697,7 @@ class AutosubmitConfig(object):
                                                                                                "PRE"]))
                     else:
                         current_data_pre = copy.deepcopy(current_data)
-                    current_data = self.unify_conf(current_data_pre, current_data)
+                    current_data = self.unify_conf(current_data, current_data_pre)
 
                     if len(filenames_to_load_level["POST"]) > 0:
                         current_data_post = self.unify_conf(
@@ -1727,7 +1727,7 @@ class AutosubmitConfig(object):
         current_data_pre, current_data_post = self.load_custom_config(current_data, filenames_to_load)
         # Unifies all ``pre`` and ``post`` data.
         # Think of it as a tree with two branches that needs to be unified at each level
-        return self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post)
+        return self.unify_conf(self.unify_conf(current_data, current_data_pre), current_data_post)
 
     def load_list_parameter(self, parameter):
         """Loads a list parameter
@@ -1828,7 +1828,7 @@ class AutosubmitConfig(object):
                 custom_conf_pre = self._pin_immutable_variables(custom_conf_pre)
                 # Loads all configuration associated with the user data "post"
                 self.experiment_data = self.load_custom_config_section(
-                    self.unify_conf(custom_conf_pre, non_minimal_conf), filenames_to_load["POST"])
+                    self.unify_conf(non_minimal_conf, custom_conf_pre), filenames_to_load["POST"])
                 self.experiment_data = self._pin_immutable_variables(self.experiment_data)
             else:
                 self.experiment_data = starter_conf
