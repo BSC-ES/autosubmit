@@ -77,7 +77,17 @@ def test_read_loads_etc_files_with_priority(
 ):
     """Test read precedence among local, home and /etc rc files."""
     with patch.dict(os.environ, {}, clear=True):
-        with patch("pathlib.Path.exists", autospec=True) as mock_exists:
+        with patch.object(
+            Path,
+            "exists",
+            autospec=True,
+            side_effect=lambda path_obj: (
+                (user_config and path_obj == Path(Path.cwd(), ".autosubmitrc"))
+                or (home_user_config and path_obj == Path(Path.home(), ".autosubmitrc"))
+                or (etc_rc and path_obj == Path("/etc", "autosubmitrc"))
+                or (legacy_etc_rc and path_obj == Path("/etc", ".autosubmitrc"))
+            ),
+        ):
             with patch(
                 "autosubmit.config.basicconfig.BasicConfig._BasicConfig__read_file_config"
             ) as mock_read:
@@ -93,13 +103,6 @@ def test_read_loads_etc_files_with_priority(
                         home_user_config_path = Path(Path.home(), dot_filename)
                         etc_rc_path = Path("/etc", filename)
                         legacy_etc_rc_path = Path("/etc", dot_filename)
-
-                        mock_exists.side_effect = lambda path_obj: (
-                            (user_config and path_obj == user_config_path)
-                            or (home_user_config and path_obj == home_user_config_path)
-                            or (etc_rc and path_obj == etc_rc_path)
-                            or (legacy_etc_rc and path_obj == legacy_etc_rc_path)
-                        )
 
                         BasicConfig.read()
 
