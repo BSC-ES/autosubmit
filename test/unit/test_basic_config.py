@@ -121,7 +121,7 @@ def test_read_loads_etc_files_with_priority(user_config, home_user_config, etc_r
 def test_read_overwrites_config_with_etc_files(tmp_path):
     """
     Precedence: if two autosubmitrc files exist,
-    the /etc/ version should take precedence over the /etc/.autosubmitrc version
+    the /etc/autosubmitrc version should take precedence over the /etc/.autosubmitrc version
     """
     filename = "autosubmitrc"
     legacy_etc_rc = tmp_path / ("." + filename)
