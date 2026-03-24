@@ -98,7 +98,7 @@ class BasicConfig:
     @staticmethod
     def __read_file_config(file_path):
         """
-        Reads configuration file. If configuration file dos not exist in given path,
+        Reads configuration file. If configuration file does not exist in given path,
         no error is raised. Configuration options also are not required to exist
 
         :param file_path: configuration file to read
@@ -199,30 +199,34 @@ class BasicConfig:
         directory and last for current path.
         """
         filename = "autosubmitrc"
-        if "AUTOSUBMIT_CONFIGURATION" in os.environ and os.path.exists(
-            os.environ["AUTOSUBMIT_CONFIGURATION"]
+        # Check if the environment variable is defined
+        if (
+            "AUTOSUBMIT_CONFIGURATION" in os.environ
+            and Path(os.environ["AUTOSUBMIT_CONFIGURATION"]).exists()
         ):
             config_file_path = os.environ["AUTOSUBMIT_CONFIGURATION"]
             # Call read_file_config with the value of the environment variable
             BasicConfig.__read_file_config(config_file_path)
         else:
-            if os.path.exists(os.path.join("", "." + filename)):
-                BasicConfig.__read_file_config(os.path.join("", "." + filename))
-            elif os.path.exists(os.path.join(os.path.expanduser("~"), "." + filename)):
-                BasicConfig.__read_file_config(
-                    os.path.join(os.path.expanduser("~"), "." + filename)
-                )
+            user_config_path = str(Path("", "." + filename))
+            home_user_config_path = str(Path("~", "." + filename).expanduser())
+            etc_rc_path = str(Path("/etc", filename))
+            legacy_etc_rc_path = str(Path("/etc", "." + filename))
+
+            if os.path.exists(user_config_path):
+                BasicConfig.__read_file_config(user_config_path)
+            elif os.path.exists(home_user_config_path):
+                print(f"Reading configuration from {home_user_config_path}")
+                BasicConfig.__read_file_config(home_user_config_path)
             else:
-                if os.path.exists(os.path.join("/etc", "." + filename)):
+                if os.path.exists(legacy_etc_rc_path):
                     Log.warning(
                         "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
                     )
-                    BasicConfig.__read_file_config(os.path.join("/etc", "." + filename))     
+                    BasicConfig.__read_file_config(legacy_etc_rc_path)
                 # Overwrite legacy config
-                if os.path.exists(os.path.join("/etc", filename)):
-                    BasicConfig.__read_file_config(os.path.join("/etc", filename))
-
-            # Check if the environment variable is defined
+                if os.path.exists(etc_rc_path):
+                    BasicConfig.__read_file_config(etc_rc_path)
 
         BasicConfig._update_config()
         return

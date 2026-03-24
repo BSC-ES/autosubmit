@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from pathlib import Path
 from mock import Mock, patch, call
 from textwrap import dedent
 
@@ -68,10 +69,12 @@ def test_read_makes_the_right_method_calls():
         [False, False, True, True],
         [False, False, True, False],
         [False, False, False, True],
-        [False, False, False, False]
+        [False, False, False, False],
     ],
 )
-def test_read_loads_etc_files_with_priority(user_config, home_user_config, etc_rc, legacy_etc_rc):
+def test_read_loads_etc_files_with_priority(
+    user_config, home_user_config, etc_rc, legacy_etc_rc
+):
     """Test read precedence among local, home and /etc rc files."""
     with patch.dict(os.environ, {}, clear=True):
         with patch("autosubmit.config.basicconfig.os.path.exists") as mock_exists:
@@ -81,18 +84,22 @@ def test_read_loads_etc_files_with_priority(user_config, home_user_config, etc_r
                 with patch(
                     "autosubmit.config.basicconfig.BasicConfig._update_config", Mock()
                 ):
-                    with patch("autosubmit.config.basicconfig.Log.warning") as mock_log_warning:
+                    with patch(
+                        "autosubmit.config.basicconfig.Log.warning"
+                    ) as mock_log_warning:
                         filename = "autosubmitrc"
-                        user_config_path = os.path.join("", "." + filename)
-                        home_user_config_path = os.path.join(os.path.expanduser("~"), "." + filename)
-                        etc_rc_path = os.path.join("/etc", filename)
-                        legacy_etc_rc_path = os.path.join("/etc", "." + filename)
+                        user_config_path = str(Path("", "." + filename))
+                        home_user_config_path = str(
+                            Path("~", "." + filename).expanduser()
+                        )
+                        etc_rc_path = str(Path("/etc", filename))
+                        legacy_etc_rc_path = str(Path("/etc", "." + filename))
 
                         mock_exists.side_effect = lambda path: (
-                            (user_config and path == os.path.join("", "." + filename)) or
-                            (home_user_config and path == os.path.join(os.path.expanduser("~"), "." + filename)) or
-                            (etc_rc and path == os.path.join("/etc", filename)) or
-                            (legacy_etc_rc and path == os.path.join("/etc", "." + filename))
+                            (user_config and path == user_config_path)
+                            or (home_user_config and path == home_user_config_path)
+                            or (etc_rc and path == etc_rc_path)
+                            or (legacy_etc_rc and path == legacy_etc_rc_path)
                         )
 
                         BasicConfig.read()
@@ -110,7 +117,11 @@ def test_read_loads_etc_files_with_priority(user_config, home_user_config, etc_r
 
                         assert mock_read.call_args_list == expected_read_calls
 
-                        if (not user_config) and (not home_user_config) and legacy_etc_rc:
+                        if (
+                            (not user_config)
+                            and (not home_user_config)
+                            and legacy_etc_rc
+                        ):
                             mock_log_warning.assert_called_once_with(
                                 "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
                             )
