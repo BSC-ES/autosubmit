@@ -113,6 +113,72 @@ def test_set_status(as_exp, slurm_server, reset_target):
         assert len(completed_jobs) == len(job_list_.get_job_list())
 
 
+def test_set_status_combined_filters(as_exp):
+    """Test setstatus when multiple filters are used, selected jobs must match the intersection of the filters."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    # reset all the jobs to waiting
+    reset(as_exp, "WAITING")
+
+    # define filters to match only one job
+    target_job = f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB"
+    no_matching_job = f"{as_exp.expid}_20200101_fc0_1_1_PSJOB"
+    filter_list = f"{target_job} {no_matching_job}"
+
+    job_list = do_setstatus(
+        as_exp,
+        fl=filter_list,
+        fc="[20200101 [ fc0 [1] ] ]",  # force the intersection to be the target job
+        ft="LOCALJOB",
+        target="COMPLETED",
+    )
+
+    completed_jobs = [
+        job.name for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+
+    assert target_job in completed_jobs
+    assert no_matching_job not in completed_jobs
+    assert len(completed_jobs) == 1
+
+
+def test_set_status_multiple_chunk_filters_set_warning(as_exp, mocker):
+    """Test that a warning is raised when multiple chunk filters are used, as they do the same."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
+
+    job_list_ = do_setstatus(
+        as_exp,
+        fc="[20200101 [ fc0 [1] ] ]",
+        fct="[20200101 [ fc0 [1] ] ],LOCALJOB",
+        ftcs="[20200101 [ fc0 [1] ] ],LOCALJOB [2]",
+        target="COMPLETED",
+    )
+
+    # -fc precedence over the other chunk filters
+    completed_jobs = [
+        job.name
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED and job.chunk == 1
+    ]
+    assert len(completed_jobs) == 9
+
+    warning_messages = [
+        str(call.args[0]) for call in mocked_warning.call_args_list if call.args
+    ]
+    assert any(
+        "Multiple chunk filters provided" in message for message in warning_messages
+    )
+
+
 @pytest.mark.parametrize(
     "ftcs_filter, expected_jobs",
     [
