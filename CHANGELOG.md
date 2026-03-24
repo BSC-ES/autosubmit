@@ -22,6 +22,7 @@
   added to check that we produce valid crates with the `rocrate-validator` #2816
 - Changed Yaml load mode from 'safe' to 'rt' #2851
 - Add issues URL to error message #2888
+- Allow multiple filters in `setstatus` command #1250
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
