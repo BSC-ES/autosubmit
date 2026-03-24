@@ -199,6 +199,7 @@ class BasicConfig:
         directory and last for current path.
         """
         filename = "autosubmitrc"
+        dot_filename = f".{filename}"
         # Check if the environment variable is defined
         if (
             "AUTOSUBMIT_CONFIGURATION" in os.environ
@@ -208,24 +209,23 @@ class BasicConfig:
             # Call read_file_config with the value of the environment variable
             BasicConfig.__read_file_config(config_file_path)
         else:
-            user_config_path = str(Path("", "." + filename))
-            home_user_config_path = str(Path("~", "." + filename).expanduser())
-            etc_rc_path = str(Path("/etc", filename))
-            legacy_etc_rc_path = str(Path("/etc", "." + filename))
+            user_config_path = Path(Path.cwd(), dot_filename)
+            home_user_config_path = Path(Path.home(), dot_filename)
+            etc_rc_path = Path("/etc", filename)
+            legacy_etc_rc_path = Path("/etc", dot_filename)
 
-            if os.path.exists(user_config_path):
+            if user_config_path.exists():
                 BasicConfig.__read_file_config(user_config_path)
-            elif os.path.exists(home_user_config_path):
-                print(f"Reading configuration from {home_user_config_path}")
+            elif home_user_config_path.exists():
                 BasicConfig.__read_file_config(home_user_config_path)
             else:
-                if os.path.exists(legacy_etc_rc_path):
+                if legacy_etc_rc_path.exists():
                     Log.warning(
                         "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
                     )
                     BasicConfig.__read_file_config(legacy_etc_rc_path)
                 # Overwrite legacy config
-                if os.path.exists(etc_rc_path):
+                if etc_rc_path.exists():
                     BasicConfig.__read_file_config(etc_rc_path)
 
         BasicConfig._update_config()

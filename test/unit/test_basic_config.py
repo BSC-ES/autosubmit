@@ -77,7 +77,7 @@ def test_read_loads_etc_files_with_priority(
 ):
     """Test read precedence among local, home and /etc rc files."""
     with patch.dict(os.environ, {}, clear=True):
-        with patch("autosubmit.config.basicconfig.os.path.exists") as mock_exists:
+        with patch("pathlib.Path.exists", autospec=True) as mock_exists:
             with patch(
                 "autosubmit.config.basicconfig.BasicConfig._BasicConfig__read_file_config"
             ) as mock_read:
@@ -88,18 +88,17 @@ def test_read_loads_etc_files_with_priority(
                         "autosubmit.config.basicconfig.Log.warning"
                     ) as mock_log_warning:
                         filename = "autosubmitrc"
-                        user_config_path = str(Path("", "." + filename))
-                        home_user_config_path = str(
-                            Path("~", "." + filename).expanduser()
-                        )
-                        etc_rc_path = str(Path("/etc", filename))
-                        legacy_etc_rc_path = str(Path("/etc", "." + filename))
+                        dot_filename = f".{filename}"
+                        user_config_path = Path(Path.cwd(), dot_filename)
+                        home_user_config_path = Path(Path.home(), dot_filename)
+                        etc_rc_path = Path("/etc", filename)
+                        legacy_etc_rc_path = Path("/etc", dot_filename)
 
-                        mock_exists.side_effect = lambda path: (
-                            (user_config and path == user_config_path)
-                            or (home_user_config and path == home_user_config_path)
-                            or (etc_rc and path == etc_rc_path)
-                            or (legacy_etc_rc and path == legacy_etc_rc_path)
+                        mock_exists.side_effect = lambda path_obj: (
+                            (user_config and path_obj == user_config_path)
+                            or (home_user_config and path_obj == home_user_config_path)
+                            or (etc_rc and path_obj == etc_rc_path)
+                            or (legacy_etc_rc and path_obj == legacy_etc_rc_path)
                         )
 
                         BasicConfig.read()
@@ -135,7 +134,8 @@ def test_read_overwrites_config_with_etc_files(tmp_path):
     the /etc/autosubmitrc version should take precedence over the /etc/.autosubmitrc version
     """
     filename = "autosubmitrc"
-    legacy_etc_rc = tmp_path / ("." + filename)
+    dot_filename = f".{filename}"
+    legacy_etc_rc = tmp_path / dot_filename
     etc_rc = tmp_path / filename
 
     legacy_db_dir = tmp_path / "legacy.db"
