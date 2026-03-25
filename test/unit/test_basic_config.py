@@ -16,8 +16,11 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from mock import Mock
-from mock import patch
+from pathlib import Path
+from mock import Mock, patch, call
+from textwrap import dedent
+
+import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
 
@@ -46,3 +49,141 @@ def test_read_makes_the_right_method_calls():
         BasicConfig.read()
         # assert
         BasicConfig._update_config.assert_called_once_with()  # type: ignore
+
+
+@pytest.mark.parametrize(
+    "user_config, home_user_config, etc_rc, legacy_etc_rc",
+    [
+        [True, True, True, True],
+        [True, True, True, False],
+        [True, True, False, True],
+        [True, True, False, False],
+        [True, False, True, True],
+        [True, False, True, False],
+        [True, False, False, True],
+        [True, False, False, False],
+        [False, True, True, True],
+        [False, True, True, False],
+        [False, True, False, True],
+        [False, True, False, False],
+        [False, False, True, True],
+        [False, False, True, False],
+        [False, False, False, True],
+        [False, False, False, False],
+    ],
+)
+def test_read_loads_etc_files_with_priority(
+    user_config, home_user_config, etc_rc, legacy_etc_rc
+):
+    """Test read precedence among local, home and /etc rc files."""
+    with patch.dict(os.environ, {}, clear=True):
+        with patch.object(
+            Path,
+            "exists",
+            autospec=True,
+            side_effect=lambda path_obj: (
+                (user_config and path_obj == Path(Path.cwd(), ".autosubmitrc"))
+                or (home_user_config and path_obj == Path(Path.home(), ".autosubmitrc"))
+                or (etc_rc and path_obj == Path("/etc", "autosubmitrc"))
+                or (legacy_etc_rc and path_obj == Path("/etc", ".autosubmitrc"))
+            ),
+        ):
+            with patch(
+                "autosubmit.config.basicconfig.BasicConfig._BasicConfig__read_file_config"
+            ) as mock_read:
+                with patch(
+                    "autosubmit.config.basicconfig.BasicConfig._update_config", Mock()
+                ):
+                    with patch(
+                        "autosubmit.config.basicconfig.Log.warning"
+                    ) as mock_log_warning:
+                        filename = "autosubmitrc"
+                        dot_filename = f".{filename}"
+                        user_config_path = Path(Path.cwd(), dot_filename)
+                        home_user_config_path = Path(Path.home(), dot_filename)
+                        etc_rc_path = Path("/etc", filename)
+                        legacy_etc_rc_path = Path("/etc", dot_filename)
+
+                        BasicConfig.read()
+
+                        expected_read_calls = []
+                        if user_config:
+                            expected_read_calls = [call(user_config_path)]
+                        elif home_user_config:
+                            expected_read_calls = [call(home_user_config_path)]
+                        else:
+                            if legacy_etc_rc:
+                                expected_read_calls.append(call(legacy_etc_rc_path))
+                            if etc_rc:
+                                expected_read_calls.append(call(etc_rc_path))
+
+                        assert mock_read.call_args_list == expected_read_calls
+
+                        if (
+                            (not user_config)
+                            and (not home_user_config)
+                            and legacy_etc_rc
+                        ):
+                            mock_log_warning.assert_called_once_with(
+                                "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
+                            )
+                        else:
+                            mock_log_warning.assert_not_called()
+
+
+def test_read_overwrites_config_with_etc_files(tmp_path):
+    """
+    Precedence: if two autosubmitrc files exist,
+    the /etc/autosubmitrc version should take precedence over the /etc/.autosubmitrc version
+    """
+    filename = "autosubmitrc"
+    dot_filename = f".{filename}"
+    legacy_etc_rc = tmp_path / dot_filename
+    etc_rc = tmp_path / filename
+
+    legacy_db_dir = tmp_path / "legacy.db"
+    etc_db_dir = tmp_path / "etc.db"
+
+    legacy_etc_rc.write_text(
+        dedent(f"""
+        [database]
+        path = {legacy_db_dir}
+        filename = legacy.db
+    """)
+    )
+
+    with open(etc_rc, "w") as f:
+        f.write(
+            dedent(f"""
+        [database]
+        path = {etc_db_dir}
+        filename = etc.db
+    """)
+        )
+
+    # original values
+    original_db_dir = BasicConfig.DB_DIR
+    original_db_file = BasicConfig.DB_FILE
+    original_db_path = BasicConfig.DB_PATH
+    original_config_file_found = BasicConfig.CONFIG_FILE_FOUND
+    try:
+        # reset config to force reading the files again
+        BasicConfig.CONFIG_FILE_FOUND = False
+
+        # act: read files in order: legacy first, modern second
+        BasicConfig._BasicConfig__read_file_config(str(legacy_etc_rc))
+        BasicConfig._BasicConfig__read_file_config(str(etc_rc))
+        BasicConfig._update_config()
+
+        # assert
+        assert BasicConfig.CONFIG_FILE_FOUND is True
+        assert BasicConfig.DB_DIR == str(etc_db_dir)
+        assert BasicConfig.DB_FILE == "etc.db"
+        assert BasicConfig.DB_PATH == os.path.join(str(etc_db_dir), "etc.db")
+
+    finally:
+        # restore original values
+        BasicConfig.DB_DIR = original_db_dir
+        BasicConfig.DB_FILE = original_db_file
+        BasicConfig.DB_PATH = original_db_path
+        BasicConfig.CONFIG_FILE_FOUND = original_config_file_found
