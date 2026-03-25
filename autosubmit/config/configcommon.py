@@ -1678,9 +1678,8 @@ class AutosubmitConfig(object):
                     current_data = self.unify_conf(current_data, current_data_post)
                 else:
                     # Load a file and unify the current_data with the loaded data
-                    load_context = self.unify_conf(copy.deepcopy(self.starter_conf), current_data)
                     current_data = self.unify_conf(current_data,
-                                                   self.load_config_file(load_context, filename))
+                                                   self.load_config_file(current_data, filename))
                     # Load next level if any
                     custom_conf_directive = current_data.get('DEFAULT', {}).get('CUSTOM_CONFIG', None)
                     filenames_to_load_level = self.parse_custom_conf_directive(custom_conf_directive)
