@@ -23,7 +23,6 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from textwrap import dedent
 from typing import TYPE_CHECKING
 
@@ -43,8 +42,6 @@ def _compress_file(
 
     The function returns a ``Path`` of the archive file.
 
-    :param temporary_directory: The temporary directory.
-    :type temporary_directory: TemporaryDirectory
     :param file_path: The path of the file to be compressed.
     :type file_path: list[Path]
     :return: The Path object of the compressed file.
@@ -157,26 +154,27 @@ class MailNotifier:
 
     def _collect_logfiles(self, message: 'MIMEMultipart', exp_id: str):
         """Generate a compressed file with all the logs from the LOG_<EXPID> folder"""
+        logs_exist = False
         run_log_files_err = [f for f in self.config.expid_log_dir(exp_id).glob('*.err') if Path(f).is_file()]
         run_log_files_out = [f for f in self.config.expid_log_dir(exp_id).glob('*.out') if Path(f).is_file()]
         run_log_files_log = [f for f in self.config.expid_log_dir(exp_id).glob('*.log') if Path(f).is_file()]
-        latest_run_log_err = Path()
-        latest_run_log_out = Path()
-        latest_run_log_log = Path()
-        if run_log_files_err:
-            latest_run_log_err: Path = max(run_log_files_err)
-        if run_log_files_out:
-            latest_run_log_out: Path = max(run_log_files_out)
-        if run_log_files_log:
-            latest_run_log_log: Path = max(run_log_files_log)
-            with TemporaryDirectory() as temp_dir:
-                try:
-                    compressed_run_log = _compress_file(temp_dir, [latest_run_log_err, latest_run_log_out, latest_run_log_log])
-                    if self.config.ATTACHMENT:
-                        _attach_file(compressed_run_log, message)
-                except AutosubmitError as e:
-                    Log.printlog(code=e.code, message=e.message)
-        else:
+
+        try:
+            if self.config.ATTACHMENT:
+                if len(run_log_files_err) > 0:
+                    logs_exist = True
+                    _attach_file(max(run_log_files_err), message)
+                if len(run_log_files_out) > 0:
+                    logs_exist = True
+                    _attach_file(max(run_log_files_out), message)
+                if len(run_log_files_log) > 0:
+                    logs_exist = True
+                    _attach_file(max(run_log_files_log), message)
+            else:
+                return
+        except AutosubmitError as e:
+            Log.printlog(code=e.code, message=e.message)
+        if not logs_exist:
             raise AutosubmitError(message=f'No Log files for the experiment {exp_id} where found to send via email')
 
 
