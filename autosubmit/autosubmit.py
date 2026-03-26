@@ -596,7 +596,7 @@ class Autosubmit:
                 "-ftc",
                 "--filter_type_chunk",
                 type=str,
-                help='[Deprecated] EQuivalent behaviour can be obtained combining achieved by combining -ft and -fc. \
+                help='[Deprecated] Equivalent behaviour can be achieved by combining -ft and -fc. \
                                Supply the list of chunks to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                    chunks 1 for all the members will be updated. Follow the format: '
@@ -606,7 +606,7 @@ class Autosubmit:
                 "-ftcs",
                 "--filter_type_chunk_split",
                 type=str,
-                help='Deprecated] EQuivalent behaviour can be obtained combining achieved by combining -ft and -fc. \
+                help='[Deprecated] Equivalent behaviour can be achieved by combining -ft and -fc. \
                                 Supply the list of chunks & splits to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                            selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                                chunks 1 for all the members will be updated. Follow the format: '
@@ -4586,7 +4586,10 @@ class Autosubmit:
                 if reference not in status_list:
                     status_list.append(reference)
             for status in status_filter:
+                if status == "ANY":
+                    continue
                 if status not in status_list:
+                    print(status)
                     status_validation_error = True
                     status_validation_message += "\n\t There are no jobs with status " + \
                                                  status + " in this experiment."
@@ -4961,12 +4964,12 @@ class Autosubmit:
         selected_chunk_filters = [name for name, value in provided_chunk_filters if value]
         if len(selected_chunk_filters) > 1:
             Log.warning(
-                "Multiple chunk filters provided (%s). Using -fc first, then -ftc, and finally -ftcs."
-                "Use only one of them to avoid ambiguity."
+                "Multiple chunk filters provided (%s). Using -fc first, then -ftc, and finally -ftcs." 
+                " Use only one of them to avoid ambiguity."
                 % ", ".join(selected_chunk_filters)
             )
         # keep retro-compatibility with legacy filters while prioritizing -fc, then -ftc, and finally -ftcs
-        filter_chunk_section_split = filter_chunks or filter_type_chunk_split or filter_type_chunk
+        filter_chunk_section_split = filter_chunks or filter_type_chunk or filter_type_chunk_split
 
         check_ownership(expid, raise_error=True)
         exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
@@ -5030,27 +5033,35 @@ class Autosubmit:
                 all_jobs = job_list.get_job_list()
                 selected_job_names = {job.name for job in all_jobs}
 
-                def intersect_with(job_names: set[str]) -> None:
-                    nonlocal selected_job_names
-                    selected_job_names &= job_names
+                def intersect_with(current_names: set[str], job_names: set[str]) -> set[str]:
+                    return current_names & job_names
                 
                 final_status = Autosubmit._get_status(final)
                 if filter_section:
                     ft = filter_section.split()
-                    if str(ft).upper() != 'ANY':
-                        intersect_with({job.name for job in all_jobs if job.section in ft})
+                    if not (len(ft) == 1 and ft[0].upper() == 'ANY'):
+                        selected_job_names = intersect_with(
+                            selected_job_names,
+                            {job.name for job in all_jobs if job.section in ft},
+                        )
 
                 if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
-                    intersect_with({job.name for job in Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)})
+                    selected_job_names = intersect_with(
+                        selected_job_names,
+                        {job.name for job in Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)},
+                    )
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
                 if filter_status:
                     status_list = filter_status.split()
                     Log.debug(f"Filtering jobs with status {filter_status}")
-                    if str(status_list).upper() != 'ANY':
+                    if not (len(status_list) == 1 and status_list[0].upper() == 'ANY'):
                         allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
-                        intersect_with({job.name for job in all_jobs if job.status in allowed_statuses})
+                        selected_job_names = intersect_with(
+                            selected_job_names,
+                            {job.name for job in all_jobs if job.status in allowed_statuses},
+                        )
 
                 if filter_list:
                     jobs = filter_list.split()
@@ -5061,8 +5072,11 @@ class Autosubmit:
                         wrongExpid = len(jobs) - expidJoblist[expid]
                     if wrongExpid > 0:
                         Log.warning(f"There are {wrongExpid} job.name with an invalid Expid")
-                    if str(jobs).upper() != 'ANY':
-                        intersect_with({job.name for job in all_jobs if job.name in jobs})
+                    if not (len(jobs) == 1 and jobs[0].upper() == 'ANY'):
+                        selected_job_names = intersect_with(
+                            selected_job_names,
+                            {job.name for job in all_jobs if job.name in jobs},
+                        )
                 # preserve job list ordering
                 final_list = [job for job in all_jobs if job.name in selected_job_names]
                 # Time to change status

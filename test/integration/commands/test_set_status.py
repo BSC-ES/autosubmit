@@ -179,6 +179,82 @@ def test_set_status_multiple_chunk_filters_set_warning(as_exp, mocker):
     )
 
 
+def test_set_status_multiple_legacy_chunk_filters_precedence(as_exp, mocker):
+    """When only legacy chunk filters overlap, ``-ftc`` should take precedence over ``-ftcs``."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
+
+    job_list_ = do_setstatus(
+        as_exp,
+        fct="[20200101 [ fc0 [1] ] ],LOCALJOB",
+        ftcs="[20200101 [ fc0 [1] ] ],LOCALJOB [2]",
+        target="COMPLETED",
+    )
+
+    # ``-ftc`` should be used before ``-ftcs`` when ``-fc`` is not provided.
+    completed_jobs = [
+        job.name
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED and job.section == "LOCALJOB" and job.chunk == 1
+    ]
+    assert len(completed_jobs) == 3
+
+    warning_messages = [
+        str(call.args[0]) for call in mocked_warning.call_args_list if call.args
+    ]
+    assert any(
+        "Multiple chunk filters provided" in message for message in warning_messages
+    )
+
+
+def test_set_status_invalid_job_in_list_raises_validation_error(as_exp):
+    """Invalid job IDs in ``-fl`` must fail validation without bypassing validators."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    valid_job = f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB"
+    invalid_expid_job = "9999_20200101_fc0_1_1_LOCALJOB"
+    filter_list = f"{valid_job} {invalid_expid_job}"
+
+    with pytest.raises(AutosubmitCritical):
+        do_setstatus(
+            as_exp,
+            fl=filter_list,
+            fs="WAITING",
+            target="COMPLETED",
+        )
+
+
+def test_set_status_combined_any_tokens_are_noop(as_exp):
+    """Any tokens in -ft, -fs and -fl should not restrict selection when used together."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list_ = do_setstatus(
+        as_exp,
+        fl="Any",
+        fs="Any",
+        ft="Any",
+        target="COMPLETED",
+    )
+
+    completed_jobs = [job for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+    assert len(completed_jobs) == len(job_list_.get_job_list())
+
+
 @pytest.mark.parametrize(
     "ftcs_filter, expected_jobs",
     [
