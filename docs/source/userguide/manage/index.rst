@@ -167,100 +167,161 @@ This procedure allows you to modify the status of your jobs.
 You must execute:
 ::
 
-    autosubmit setstatus <EXPID> -fs STATUS_ORIGINAL -t STATUS_FINAL -s
+    autosubmit setstatus <EXPID> -f{ l | s | t | c } <VALUE_TO_FILTER> -t <STATUS_FINAL> -s
 
-*<EXPID>* is the experiment identifier.
-*STATUS_ORIGINAL* is the original status to filter by the list of jobs.
-*STATUS_FINAL* the desired target status.
+If multiple filters are provided (``-f{ l | s | t | c }``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
+
+Mandatory arguments:
+
+* ``<EXPID>``: experiment identifier
+* ``-f{ l | s | t | c } <VALUE_TO_FILTER>``: at least one filter is required to select jobs (see below for filter options)
+* ``-t STATUS_FINAL``: target status (``READY``, ``COMPLETED``, ``WAITING``, ``SUSPENDED``, ``FAILED``, ``UNKNOWN``)
+
+Optional filter arguments (combine multiple for granular selection):
+
+* ``-fl``: space-separated list of job names
+::
+
+    autosubmit setstatus <EXPID> -fl "<EXPID>_20101101_fc3_21_sim <EXPID>_20111101_fc4_26_sim" -t READY -s
+
+* ``-fc``: chunk/section/split filter (JSON-like format, takes precedence over legacy filters)
+::
+
+    autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc1 [1] ] ]" -t READY -s
+
+* ``-fs``: space-separated job statuses. The available statuses are: ``READY``, ``COMPLETED``, ``WAITING``, ``SUSPENDED``, ``FAILED``, and ``UNKNOWN``.
+::
+
+    autosubmit setstatus <EXPID> -fs FAILED -t READY -s
+
+* ``-ft``: space-separated job types
+::
+
+    autosubmit setstatus <EXPID> -ft TRANSFER -t SUSPENDED -s
+
+* ``-ftc``: **[DEPRECATED]** legacy chunk/type filter (use a combination of ``-fc`` and ``-ft`` instead).
+Command:
+::
+
+    autosubmit setstatus <EXPID> -ftc "[ 19601101 [ fc0 [1 2 3 4] ] ],SIM" -t READY -s
+
+Can be replaced with:
+::
+
+    autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc0 [1 2 3 4] ] ]" -ft SIM -t READY -s
+
+* ``-ftcs``: **[DEPRECATED]** legacy chunk/type/split filter (use a combination of ``-fc`` and ``-ft`` instead).
+Command:
+::
+
+    autosubmit setstatus <EXPID> -ftcs "[ 19601101 [ fc0 [1 2 3 4] ] ],SIM,1" -t READY -s
+
+Can be replaced with:
+::
+
+    autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc0 [1 2 3 4] ] ]" -ft SIM -t READY -s
 
 Options:
 
 .. runcmd:: autosubmit setstatus -h
 
-Examples:
+Filter precedence (when multiple chunk filters are specified):
+
+When ``-fc``, ``-ftc``, and ``-ftcs`` are combined, precedence is: ``-fc`` → ``-ftc`` → ``-ftcs``. A warning will be logged if multiple chunk filters are detected.
+
+Filter Examples
+~~~~~~~~~~~~~~~
+
+Single filter, by job list:
 ::
 
     autosubmit setstatus <EXPID> -fl "<EXPID>_20101101_fc3_21_sim <EXPID>_20111101_fc4_26_sim" -t READY -s
+
+Single filter, by chunk/section/split:
+::
+
     autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc1 [1] ] ]" -t READY -s
+
+Single filter, by current status:
+::
+
     autosubmit setstatus <EXPID> -fs FAILED -t READY -s
+
+Single filter, by job type:
+::
+
     autosubmit setstatus <EXPID> -ft TRANSFER -t SUSPENDED -s
-    autosubmit setstatus <EXPID> -ftc "[ 19601101 [ fc1 [1] ] ], SIM" -t SUSPENDED -s
+
+Multiple filters combined (AND logic, selects jobs matching ALL filters):
+::
+
+    autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc1 [1] ] ]" -ft "SIM" -t SUSPENDED -s
+
+This selects jobs that are in both the chunk filter AND have type "SIM".
+
+Chunk/Section/Split Filter Details
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Format:
+::
+
+    [ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]
 
 Date (month) range example:
 ::
 
-    autosubmit setstatus <EXPID> -ftc "[ 1960(1101-1201) [ fc1 [1] ] ], SIM" -t SUSPENDED -s
+    autosubmit setstatus <EXPID> -fc "[ 1960(1101-1201) [ fc1 [1] ] ]" -ft "SIM" -t SUSPENDED -s
 
-This example will result changing the following jobs:
+Result:
 ::
 
     <EXPID>_19601101_fc1_1_SIM
     <EXPID>_19601201_fc1_1_SIM
 
+
 Date (day) range example:
 ::
-
-    autosubmit setstatus <EXPID> -ftc "[ 1960(1101-1105) [ fc1 [1] ] ], SIM" -t SUSPENDED -s
-
+    autosubmit setstatus <EXPID> -fc "[ 1960(1101-1105) [ fc1 [1] ] ]" -ft "SIM" -t SUSPENDED -s
 Result:
 ::
-
     <EXPID>_19601101_fc1_1_SIM
     <EXPID>_19601102_fc1_1_SIM
     <EXPID>_19601103_fc1_1_SIM
     <EXPID>_19601104_fc1_1_SIM
     <EXPID>_19601105_fc1_1_SIM
 
-This script has two mandatory arguments.
+Using the "Any" Keyword
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-The -t where you must specify the target status of the jobs you want to change to:
+The keyword ``Any`` (case-insensitive) means "no restriction" in that filter:
+
+* ``-fl Any``: all jobs (no job list restriction)
+* ``-fs Any``: all job statuses (no status restriction)
+* ``-ft Any``: all job types (no type restriction)
+
+Example:
 ::
 
-    {READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}
+    autosubmit setstatus <EXPID> -fs Any -fc "[ 19601101 [ fc1 [1] ] ]" -t READY -s
 
+This changes all jobs in the chunk filter to ``READY``, regardless of their current status.
 
-The second argument has four alternatives, the -fl, -fc, -fs and -ft; with those we can apply a filter for the jobs we want to change:
+Deprecated Filters
+~~~~~~~~~~~~~~~~~~~
 
-* The -fl variable receives a list of job names separated by blank spaces: e.g.:
-    ::
+.. warning:: The ``-ftc`` and ``-ftcs`` filters are deprecated and will be removed in future versions. Use ``-fc`` instead.
 
-     "<EXPID>_20101101_fc3_21_sim <EXPID>_20111101_fc4_26_sim"
+``-ftc`` (deprecated) is similar to ``-fc`` but also accepts job types without separate ``-ft``:
+::
 
-If we supply the key word "Any", all jobs will be changed to the target status.
+    autosubmit setstatus <EXPID> -ftc "[ 19601101 [ fc0 [1 2 3 4] ] ],SIM" -t READY -s
 
-* The variable -fc should be a list of individual chunks or ranges of chunks in the following format:
-    ::
+Use ``-fc`` with ``-ft`` instead:
+::
 
-        [ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]
+    autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc0 [1 2 3 4] ] ]" -ft SIM -t READY -s
 
-* The variable -fs can be the following status for job:
-    ::
-
-        {Any,READY,COMPLETED,WAITING,SUSPENDED,FAILED,UNKNOWN}
-
-* The variable -ft can be one of the defined types of job.
-
-The variable -ftc acts similar to -fc but also accepts the job types. It does not accept chunk ranges e.g. "1-10", but accepts the wildcard "Any" for members and job types. Let's look at some examples.
-
-* Using -ftc to change the chunks "1 2 3 4" of member "fc0" and chunk "1" of member "fc1" for the starting date "19601101", where these changes apply only for the "SIM" jobs:
-    ::
-
-        [ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] ],SIM
-
-* Using -ftc to change the chunks "1 2 3 4" of all members for the starting date "19601101", where these changes apply only for the "SIM" jobs:
-    ::
-
-        [ 19601101 [ Any [1 2 3 4] ] ],SIM
-
-* Using -ftc to change the chunks "1 2 3 4" of "fc0" members for the starting date "19601101", where these changes apply to all jobs:
-    ::
-
-        [ 19601101 [ fc0 [1 2 3 4] ] ],Any
-
-Try the combinations you come up with. Autosubmit will supply with proper feedback when a wrong combination is supplied.
-
-.. hint:: When we are satisfied with the results we can use the parameter -s, which will save the change to the pkl file. In order to understand more the grouping options, which are used for visualization purposes, please check :ref:`grouping`.
-
+.. hint:: When satisfied with your filter selections, use the parameter ``-s`` to save changes to the pkl file. In order to understand more the grouping options, which are used for visualization purposes, please check :ref:`grouping`.
 .. _setstatusno:
 
 How to change the job status without stopping autosubmit
