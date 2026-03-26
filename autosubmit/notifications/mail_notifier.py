@@ -19,6 +19,7 @@ import email.utils
 import re
 import smtplib
 import zipfile
+from copy import deepcopy
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -87,6 +88,7 @@ def _attach_file(file_path: Path, message: MIMEMultipart) -> None:
             code=6011,
             message='An error has occurred while attaching log files to a warning email about remote_platforms',
             trace=str(e))
+
 
 def _generate_message_text(
         exp_id: str,
@@ -208,6 +210,15 @@ class MailNotifier:
         self.config = basic_config
 
     def _collect_logfiles(self, message, exp_id):
+        """Collect the logfiles of an experiment to attach to the mail message.
+
+        :param message: Message to have the files attached to.
+        :type message: MIMEMultipart
+        :param exp_id: expid of the experiment that has a report.
+        :type exp_id: str
+
+        :raises AutosubmitError: The file cannot be attached.
+        """
         run_log_files = [f for f in self.config.expid_aslog_dir(
             exp_id).glob('*_run.log') if Path(f).is_file()]
         if run_log_files:
@@ -262,24 +273,13 @@ class MailNotifier:
         _check_mail_address(mail_to)
         message_text = _generate_message_text(
             exp_id, job_name, prev_status, status)
-        message = MIMEMultipart()
+        message = MIMEText(message_text)
         message['From'] = email.utils.formataddr(
             ('Autosubmit', self.config.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {status}'
         message['Date'] = email.utils.formatdate(localtime=True)
         if status == "FAILED":
-            message.attach(MIMEText(message_text))
-            self._collect_logfiles(message, exp_id)
-
-        for mail in mail_to:  # expects a list
-            message['To'] = email.utils.formataddr((mail, mail))
-            try:
-                self._send_mail(self.config.MAIL_FROM, mail, message)
-            except BaseException as e:
-                Log.printlog(
-                    f'Trace:{str(e)}\nAn error has occurred while sending a mail '
-                    f'for the job {job_name}', 6011)
-
+            self._collect_logfiles(deepcopy(message), exp_id)
         self._send_message(mail_to, self.config.MAIL_FROM, message)
 
     def notify_cpmip_threshold_violations(
