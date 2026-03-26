@@ -180,26 +180,31 @@ Mandatory arguments:
 Optional filter arguments (combine multiple for granular selection):
 
 * ``-fl``: space-separated list of job names
+
 ::
 
     autosubmit setstatus <EXPID> -fl "<EXPID>_20101101_fc3_21_sim <EXPID>_20111101_fc4_26_sim" -t READY -s
 
 * ``-fc``: chunk/section/split filter (JSON-like format, takes precedence over legacy filters)
+
 ::
 
     autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc1 [1] ] ]" -t READY -s
 
 * ``-fs``: space-separated job statuses. The available statuses are: ``READY``, ``COMPLETED``, ``WAITING``, ``SUSPENDED``, ``FAILED``, and ``UNKNOWN``.
+
 ::
 
     autosubmit setstatus <EXPID> -fs FAILED -t READY -s
 
 * ``-ft``: space-separated job types
+
 ::
 
     autosubmit setstatus <EXPID> -ft TRANSFER -t SUSPENDED -s
 
 * ``-ftc``: **[DEPRECATED]** legacy chunk/type filter (use a combination of ``-fc`` and ``-ft`` instead).
+
 Command:
 ::
 
@@ -211,6 +216,7 @@ Can be replaced with:
     autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc0 [1 2 3 4] ] ]" -ft SIM -t READY -s
 
 * ``-ftcs``: **[DEPRECATED]** legacy chunk/type/split filter (use a combination of ``-fc`` and ``-ft`` instead).
+
 Command:
 ::
 
