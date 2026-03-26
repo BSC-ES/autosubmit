@@ -66,32 +66,28 @@ def mail_notifier(mock_basic_config):
 
 
 @pytest.mark.parametrize(
-    "number_of_files, sendmail_error, compress_error, attach_error",
+    "number_of_files, sendmail_error, attach_error",
     [
         # No errors, no log files compressed.
-        (0, None, None, None),
+        (0, None, None),
 
         # No errors, one log file compressed.
-        (1, None, None, None),
+        (1, None, None),
 
         # No errors, three log files, one file compressed.
-        (3, None, None, None),
+        (3, None, None),
 
         # STMP error.
-        (1, Exception("SMTP server error"), None, None),
-
-        # ZIP error.
-        (1, None, ValueError('Zip error'), None),
+        (1, Exception("SMTP server error"), None),
 
         # Attach error.
-        (1, None, None, ValueError('Attach error'))
+        (1, None, ValueError('Attach error'))
     ],
     ids=[
         "No files. No errors",
         "One file. Attach a single file. No errors",
         "Three files. Attach a single file. No errors",
         "SMTP server error",
-        "Zip error",
         "Attach error"
     ]
 )
@@ -104,7 +100,6 @@ def test_compress_file(
         tmp_path,
         number_of_files: int,
         sendmail_error: Optional[Exception],
-        compress_error: Optional[Exception],
         attach_error: Optional[Exception]
 ):
     expid = 'a000'
@@ -114,11 +109,6 @@ def test_compress_file(
 
     if sendmail_error:
         mock_smtp.side_effect = sendmail_error
-
-    if compress_error:
-        mock_compress = mocker.patch(
-            'autosubmit.notifications.mail_notifier.zipfile.ZipFile')
-        mock_compress.side_effect = compress_error
 
     if attach_error:
         mock_message = mocker.patch(
@@ -161,11 +151,6 @@ def test_compress_file(
         mock_printlog.assert_called_once()
         log_calls = [call[0][0] for call in mock_printlog.call_args_list]
         assert 'Traceback' not in log_calls
-    elif compress_error:
-        mock_printlog.assert_called_once()
-        exception_raised = mock_printlog.call_args_list[0][1]
-        assert 'error has occurred while compressing' in exception_raised['message']
-        assert 6011 == exception_raised['code']
     elif attach_error:
         mock_printlog.assert_called_once()
         exception_raised = mock_printlog.call_args_list[0][1]
@@ -181,9 +166,9 @@ def test_compress_file(
             message_arg = mock_smtp.method_calls[0].args[2]
 
             if number_of_files > 0:
-                assert '.zip' in message_arg
+                assert '.log' in message_arg
             else:
-                assert '.zip' not in message_arg
+                assert '.log' not in message_arg
         else:
             assert 'No Log files for the experiment' in ae_info.value.error_message
 
