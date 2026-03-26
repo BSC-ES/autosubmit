@@ -5032,25 +5032,16 @@ class Autosubmit:
                 Log.info("Filtering jobs...")
                 all_jobs = job_list.get_job_list()
                 selected_job_names = {job.name for job in all_jobs}
-
-                def intersect_with(current_names: set[str], job_names: set[str]) -> set[str]:
-                    return current_names & job_names
                 
                 final_status = Autosubmit._get_status(final)
                 if filter_section:
                     ft = filter_section.split()
                     if not (len(ft) == 1 and ft[0].upper() == 'ANY'):
-                        selected_job_names = intersect_with(
-                            selected_job_names,
-                            {job.name for job in all_jobs if job.section in ft},
-                        )
+                        selected_job_names &= {job.name for job in all_jobs if job.section in ft}
 
                 if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
-                    selected_job_names = intersect_with(
-                        selected_job_names,
-                        {job.name for job in Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)},
-                    )
+                    selected_job_names &={job.name for job in Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)}
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
                 if filter_status:
@@ -5058,10 +5049,7 @@ class Autosubmit:
                     Log.debug(f"Filtering jobs with status {filter_status}")
                     if not (len(status_list) == 1 and status_list[0].upper() == 'ANY'):
                         allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
-                        selected_job_names = intersect_with(
-                            selected_job_names,
-                            {job.name for job in all_jobs if job.status in allowed_statuses},
-                        )
+                        selected_job_names &= {job.name for job in all_jobs if job.status in allowed_statuses}
 
                 if filter_list:
                     jobs = filter_list.split()
@@ -5073,10 +5061,7 @@ class Autosubmit:
                     if wrongExpid > 0:
                         Log.warning(f"There are {wrongExpid} job.name with an invalid Expid")
                     if not (len(jobs) == 1 and jobs[0].upper() == 'ANY'):
-                        selected_job_names = intersect_with(
-                            selected_job_names,
-                            {job.name for job in all_jobs if job.name in jobs},
-                        )
+                        selected_job_names &= {job.name for job in all_jobs if job.name in jobs}
                 # preserve job list ordering
                 final_list = [job for job in all_jobs if job.name in selected_job_names]
                 # Time to change status
