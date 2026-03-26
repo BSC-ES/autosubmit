@@ -117,10 +117,11 @@ where *<EXPID>* is the experiment identifier.
 It checks the experiment configuration and copies code from the original repository to project directory.
 
 .. warning:: THIS WILL OVERWRITE LOCAL CHANGES!
-    Project directory ( <EXPID>/proj will be overwritten and you may loose local changes.
+    Project directory ``<EXPID>/proj`` will be overwritten and you may loose local changes.
 
 
 Options:
+
 .. runcmd:: autosubmit refresh -h
 
 Example:

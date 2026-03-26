@@ -169,6 +169,7 @@ def test_set_status_multiple_chunk_filters_set_warning(as_exp, mocker):
         for job in job_list_.get_job_list()
         if job.status == Status.COMPLETED and job.chunk == 1
     ]
+
     assert len(completed_jobs) == 9
 
     warning_messages = [
