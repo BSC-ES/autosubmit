@@ -17,11 +17,12 @@
 
 import logging
 from contextlib import nullcontext as does_not_raise
-from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+
 from autosubmit.config.basicconfig import BasicConfig
 
 # noinspection PyProtectedMember
@@ -35,9 +36,8 @@ from autosubmit.log.log import (
     StatusFilter,
 )
 from autosubmit.log.utils import compress_xz
-from test.unit.test_utils import find_uncompressed_files, is_xz_file
-from autosubmit.log.utils import compress_xz, find_uncompressed_files, is_xz_file
 from autosubmit.notifications.mail_notifier import MailNotifier
+from test.unit.test_utils import find_uncompressed_files, is_xz_file
 
 if TYPE_CHECKING:
     from pytest_mock import MockFixture
@@ -67,10 +67,9 @@ def test_autosubmit_error_constructor():
     assert as_error.error_message == "test abc"
 
 
-
 def test_autosubmit_error_error_message():
-    ae = AutosubmitError(trace='ERROR!')
-    assert 'ERROR! Unhandled Error' == ae.error_message
+    ae = AutosubmitError(trace="ERROR!")
+    assert "ERROR! Unhandled Error" == ae.error_message
 
 
 def test_autosubmit_critical_default_values():
@@ -93,11 +92,11 @@ def test_autosubmit_critical_constructor():
     assert str(as_error) == "abc\nError code: 6500\nDetails:\ntest"
 
 
-@pytest.mark.parametrize('to_file', [False, True])
+@pytest.mark.parametrize("to_file", [False, True])
 def test_log_formatter(to_file):
     formatter = LogFormatter(to_file=to_file)
 
-    msg = 'abc'
+    msg = "abc"
 
     # The logger code uses ``Log`` levels that match the values in ``LogFormatter``,
     # so we capture those values here dynamically.
@@ -111,17 +110,17 @@ def test_log_formatter(to_file):
     for level in levels:
         # Create a dummy ``LogRecord`` object, and set the message and level we want to test.
         log_record = logging.LogRecord(
-            name='',
+            name="",
             exc_info=None,
             lineno=0,
-            pathname='',
+            pathname="",
             args=None,
             msg=msg,
-            level=logging.INFO
+            level=logging.INFO,
         )
         log_record.levelno = getattr(Log, level)
 
-        level_str = '' if level == 'RESULT' else f'[{level}] '
+        level_str = "" if level == "RESULT" else f"[{level}] "
 
         # This is bad design in the tests, probably the code could be simplified to make
         # writing tests a bit simpler.
@@ -131,7 +130,9 @@ def test_log_formatter(to_file):
             assert logged.startswith(level_str)
             assert logged.endswith(msg)
         else:
-            expected = f'{getattr(LogFormatter, level)}{level_str}{msg}{LogFormatter.DEFAULT}'
+            expected = (
+                f"{getattr(LogFormatter, level)}{level_str}{msg}{LogFormatter.DEFAULT}"
+            )
 
             logged = formatter.format(log_record)
 
@@ -143,13 +144,13 @@ def test_filters():
         recs = []
         for level in [Log.STATUS, Log.STATUS_FAILED, Log.INFO]:
             log_record = logging.LogRecord(
-                name='',
+                name="",
                 exc_info=None,
                 lineno=0,
-                pathname='',
+                pathname="",
                 args=None,
-                msg='bla',
-                level=logging.INFO
+                msg="bla",
+                level=logging.INFO,
             )
             log_record.levelno = level
             recs.append(log_record)
@@ -171,7 +172,7 @@ def test_log_init_variables():
 
 
 def test_log_shutdown_logger(mocker):
-    mocked_logging = mocker.patch('autosubmit.log.log.logging')
+    mocked_logging = mocker.patch("autosubmit.log.log.logging")
 
     log = Log()
     log.shutdown_logger()
@@ -185,39 +186,39 @@ def test_set_console_level():
     log.set_console_level(42)
     assert log.console_handler.level == 42
 
-    log.set_console_level('INFO')
+    log.set_console_level("INFO")
     assert log.console_handler.level == Log.INFO
 
     with pytest.raises(AttributeError):
-        log.set_console_level('CANNOT_FIND_IT')
+        log.set_console_level("CANNOT_FIND_IT")
 
 
 @pytest.mark.parametrize(
-    'level,msg,args,expected',
+    "level,msg,args,expected",
     [
         # No args.
-        ('debug', 'john says %s', None, 'john says '),
-        ('info', 'john says %s', None, 'john says '),
-        ('result', 'john says %s', None, 'john says '),
-        ('warning', 'john says %s', None, 'john says '),
-        ('error', 'john says %s', None, 'john says '),
-        ('critical', 'john says %s', None, 'john says '),
-        ('status', 'john says %s', None, 'john says '),
-        ('status_failed', 'john says %s', None, 'john says '),
+        ("debug", "john says %s", None, "john says "),
+        ("info", "john says %s", None, "john says "),
+        ("result", "john says %s", None, "john says "),
+        ("warning", "john says %s", None, "john says "),
+        ("error", "john says %s", None, "john says "),
+        ("critical", "john says %s", None, "john says "),
+        ("status", "john says %s", None, "john says "),
+        ("status_failed", "john says %s", None, "john says "),
         # Now repeat, with args.
-        ('debug', 'john says %s', 'Hi!', 'john says Hi!'),
-        ('info', 'john says %s', 'Hi!', 'john says  Hi!'),
-        ('result', 'john says %s', 'Hi!', 'john says  Hi!'),
-        ('warning', 'john says %s', 'Hi!', 'john says  Hi!'),
-        ('error', 'john says %s', 'Hi!', 'john says  Hi!'),
-        ('critical', 'john says %s', 'Hi!', 'john says  Hi!'),
-        ('status', 'john says %s', 'Hi!', 'john says  Hi!'),
-        ('status_failed', 'john says %s', 'Hi!', 'john says  Hi!'),
-    ]
+        ("debug", "john says %s", "Hi!", "john says Hi!"),
+        ("info", "john says %s", "Hi!", "john says  Hi!"),
+        ("result", "john says %s", "Hi!", "john says  Hi!"),
+        ("warning", "john says %s", "Hi!", "john says  Hi!"),
+        ("error", "john says %s", "Hi!", "john says  Hi!"),
+        ("critical", "john says %s", "Hi!", "john says  Hi!"),
+        ("status", "john says %s", "Hi!", "john says  Hi!"),
+        ("status_failed", "john says %s", "Hi!", "john says  Hi!"),
+    ],
 )
 def test_log_at_certain_level(level, msg, args, expected, mocker):
     """Ensures calling ``Log.{level}`` function passing message and args results in a call to ``Log.log.log``."""
-    mocked_log_log = mocker.patch('autosubmit.log.log.Log.log')
+    mocked_log_log = mocker.patch("autosubmit.log.log.Log.log")
 
     fn = getattr(Log, level)
     if args:
@@ -230,23 +231,23 @@ def test_log_at_certain_level(level, msg, args, expected, mocker):
 
 
 @pytest.mark.parametrize(
-    'code,fn',
+    "code,fn",
     [
-        (3000, 'warning'),
-        (4000, 'info'),
-        (5000, 'result'),
-        (6000, 'error'),
-        (7000, 'critical'),
+        (3000, "warning"),
+        (4000, "info"),
+        (5000, "result"),
+        (6000, "error"),
+        (7000, "critical"),
         # TODO: Huh, that's interesting, below 7000 and not in the other groups, it's a critical;
         #       but above the other groups is an info?
-        (1, 'critical'),
-        (-1, 'critical'),
-        (0, 'critical'),
-        (8000, 'info')
-    ]
+        (1, "critical"),
+        (-1, "critical"),
+        (0, "critical"),
+        (8000, "info"),
+    ],
 )
 def test_printlog(code, fn, mocker):
-    mocked_log = mocker.patch('autosubmit.log.log.Log')
+    mocked_log = mocker.patch("autosubmit.log.log.Log")
 
     Log.printlog(code=code)
 
@@ -257,23 +258,23 @@ def test_printlog(code, fn, mocker):
 def test_reset_status_file_dummy():
     """It's harmless to call ``Log.reset_status_file()`` with a random ``type``."""
     with does_not_raise():
-        Log.reset_status_file(file_path='', type='SHEEP')
+        Log.reset_status_file(file_path="", type="SHEEP")
 
 
 def test_reset_status_file_exceptions_are_ignored(mocker):
     """For some reason the old code ignores any exceptions..."""
-    mocked_log = mocker.patch('autosubmit.log.log.Log')
+    mocked_log = mocker.patch("autosubmit.log.log.Log")
     mocked_log.log.side_effect = ValueError
 
     with does_not_raise():
-        Log.reset_status_file(file_path='', type='status')
+        Log.reset_status_file(file_path="", type="status")
 
 
 def test_reset_status_file_filters(mocker, tmp_path):
-    mocked_log = mocker.patch('autosubmit.log.log.Log.log')
+    mocked_log = mocker.patch("autosubmit.log.log.Log.log")
 
-    for status_filter in ['status', 'status_failed']:
-        tmp_file = tmp_path / f'{status_filter}.tmp'
+    for status_filter in ["status", "status_failed"]:
+        tmp_file = tmp_path / f"{status_filter}.tmp"
         tmp_file.touch()
         Log.reset_status_file(file_path=str(tmp_file), type=status_filter)
 
@@ -282,13 +283,13 @@ def test_reset_status_file_filters(mocker, tmp_path):
 
 def test_reset_status_file_status_filter_more_than_three_handlers(mocker, tmp_path):
     """Another case where the old code limited the number of handlers to 3..."""
-    mocked_log = mocker.patch('autosubmit.log.log.Log.log')
+    mocked_log = mocker.patch("autosubmit.log.log.Log.log")
     mocked_log.handlers = [1, 2, 3, 4, 5, 6]
 
     assert len(mocked_log.handlers) == 6
 
-    _type = 'status'
-    tmp_file = tmp_path / f'{_type}.tmp'
+    _type = "status"
+    tmp_file = tmp_path / f"{_type}.tmp"
     tmp_file.touch()
     Log.reset_status_file(file_path=str(tmp_file), type=_type)
 
@@ -299,26 +300,26 @@ def test_reset_status_file_status_filter_more_than_three_handlers(mocker, tmp_pa
 
 
 @pytest.mark.parametrize(
-    '_type,handler_added',
+    "_type,handler_added",
     [
-        ('out', True),
-        ('err', True),
-        ('status', True),
-        ('status_failed', True),
-        ('disney', False)
-    ]
+        ("out", True),
+        ("err", True),
+        ("status", True),
+        ("status_failed", True),
+        ("disney", False),
+    ],
 )
 def test_set_file(_type, handler_added, tmp_path, mocker):
-    date = '20100309_'
-    mocked_log = mocker.patch('autosubmit.log.log.Log.log')
-    mocker.patch('autosubmit.log.log.Log.date', date)
+    date = "20100309_"
+    mocked_log = mocker.patch("autosubmit.log.log.Log.log")
+    mocker.patch("autosubmit.log.log.Log.date", date)
 
-    tmp_file = tmp_path / 'test.tmp'
+    tmp_file = tmp_path / "test.tmp"
 
     # TODO: This is strange too, you want to set the file, but first you must have an
     #       existing log file, with the same name, but with the date. (What about the
     #       first ever call? Chicken or egg case?)".
-    tmp_file_with_date = tmp_path / f'{date}test.tmp'
+    tmp_file_with_date = tmp_path / f"{date}test.tmp"
     tmp_file_with_date.touch()
 
     Log.set_file(file_path=str(tmp_file), type=_type)
@@ -327,31 +328,31 @@ def test_set_file(_type, handler_added, tmp_path, mocker):
 
 
 def test_set_file_more_than_10_files(test_tmp_path: Path, mocker):
-    tmp_file = test_tmp_path / 'test.tmp'
+    tmp_file = test_tmp_path / "test.tmp"
 
     # TODO: This is strange too, you want to set the file, but first you must have an
     #       existing log file, with the same name, but with the date. (What about the
     #       first ever call? Chicken or egg case?)".
     for i in range(20):
-        tmp_file_with_date = test_tmp_path / f'{i}_test.tmp'
+        tmp_file_with_date = test_tmp_path / f"{i}_test.tmp"
         tmp_file_with_date.touch()
 
     assert len(list(test_tmp_path.iterdir())) == 20
-    assert Path(test_tmp_path / '0_test.tmp').exists()
-    assert not Path(test_tmp_path / '100_test.tmp').exists()
+    assert Path(test_tmp_path / "0_test.tmp").exists()
+    assert not Path(test_tmp_path / "100_test.tmp").exists()
 
-    mocked_log = mocker.patch('autosubmit.log.log.Log.log')
-    mocker.patch('autosubmit.log.log.Log.date', '100_')
+    mocked_log = mocker.patch("autosubmit.log.log.Log.log")
+    mocker.patch("autosubmit.log.log.Log.date", "100_")
 
-    Log.set_file(file_path=str(tmp_file), type='out')
+    Log.set_file(file_path=str(tmp_file), type="out")
     assert mocked_log.addHandler.called
 
     # Here we confirm the number of log files remains the same (because it's more than 10),
     # and that the new log file has been created, and the first in the sorted by name list
     # has been deleted.
     assert len(list(test_tmp_path.iterdir())) == 20
-    assert not Path(test_tmp_path / '0_test.tmp').exists()
-    assert Path(test_tmp_path / '100_test.tmp').exists()
+    assert not Path(test_tmp_path / "0_test.tmp").exists()
+    assert Path(test_tmp_path / "100_test.tmp").exists()
 
 
 def test_log_not_format():
@@ -440,33 +441,35 @@ def test_global_log_name():
     ids=[
         "With Files: No errors",
         "No Files: error",
-    ]
+    ],
 )
 def test__collect_logfiles(make_files: bool, mocker):
-    mock_config = mocker.Mock()
-    mock_config.MAIL_FROM = "test@example.com"
-    mock_config.SMTP_SERVER = "smtp.example.com"
-    mock_config.expid_log_dir.side_effect = lambda exp_id: BasicConfig.expid_log_dir(exp_id)
+    mock_log_info = mocker.patch("autosubmit.log.log.Log.info")
 
-    mail_notifier = MailNotifier(mock_config)
+    BasicConfig.MAIL_FROM = "test@example.com"
+    BasicConfig.SMTP_SERVER = "smtp.example.com"
 
-    job_name = 'Job1'
-    expid = 'a123'
+    mail_notifier = MailNotifier(BasicConfig)
 
-    path_to_attach = mock_config.expid_log_dir(expid)
-    path_to_attach.mkdir(parents=True, exist_ok=True)
+    job_name = "Job1"
+    expid = "a123"
+
+    path_to_attach_log = BasicConfig.expid_log_dir(expid)
+    path_to_attach_compress = BasicConfig.expid_aslog_dir(expid)
+    path_to_attach_log.mkdir(parents=True, exist_ok=True)
+    path_to_attach_compress.mkdir(parents=True, exist_ok=True)
     if make_files:
-        path_to_attach.joinpath('test_run.err').touch(mode=0o666, exist_ok=True)
-        path_to_attach.joinpath('test_run.out').touch(mode=0o666, exist_ok=True)
+        path_to_attach_compress.joinpath("test_run.log").touch(mode=0o666, exist_ok=True)
+        path_to_attach_log.joinpath("test_run.err").touch(mode=0o666, exist_ok=True)
+        path_to_attach_log.joinpath("test_run.out").touch(mode=0o666, exist_ok=True)
 
-    message = MIMEText("Generated message")
-    message['From'] = mail_notifier.config.MAIL_FROM
-    message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to Test'
+    message = MIMEMultipart("Generated message")
+    message["From"] = mail_notifier.config.MAIL_FROM
+    message["Subject"] = f"[Autosubmit] The job {job_name} status has changed to Test"
 
     if make_files:
         mail_notifier._collect_logfiles(message, exp_id=expid)
     else:
-        with pytest.raises(AutosubmitError) as ae:
-            mail_notifier._collect_logfiles(message, exp_id=expid)
+        mail_notifier._collect_logfiles(message, exp_id=expid)
 
-        assert 'No Log files for the experiment' in str(ae.value.message)
+        assert "No Log files for the experiment" in mock_log_info.call_args.args[0]
