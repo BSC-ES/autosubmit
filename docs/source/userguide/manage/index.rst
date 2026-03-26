@@ -287,9 +287,11 @@ Result:
 
 Date (day) range example:
 ::
+
     autosubmit setstatus <EXPID> -fc "[ 1960(1101-1105) [ fc1 [1] ] ]" -ft "SIM" -t SUSPENDED -s
 Result:
 ::
+
     <EXPID>_19601101_fc1_1_SIM
     <EXPID>_19601102_fc1_1_SIM
     <EXPID>_19601103_fc1_1_SIM
