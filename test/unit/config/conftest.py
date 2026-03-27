@@ -25,6 +25,12 @@ from autosubmit.config.configcommon import AutosubmitConfig
 if TYPE_CHECKING:
     pass
 
+
+# ---------------------------------------------------------------------------
+# yaml-provenance helpers
+# ---------------------------------------------------------------------------
+from yaml_provenance import wrap_computed
+
 """A small configuration example."""
 AS_CONF_SMALL = {
     "CONFIG": {
