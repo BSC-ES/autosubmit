@@ -4971,10 +4971,10 @@ class Autosubmit:
         filter_chunk_section_split = filter_chunks or filter_type_chunk or filter_type_chunk_split
 
         check_ownership(expid, raise_error=True)
-        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-        tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
+        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+        tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
         try:
-            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
+            with Lock(Path(tmp_path, 'autosubmit.lock'), timeout=1):
                 Log.info(
                     "Preparing .lock file to avoid multiple instances with same expid.")
 
@@ -5117,8 +5117,7 @@ class Autosubmit:
                     if as_conf.get_wrapper_type() != 'none' and check_wrapper:
                         packages_persistence = JobPackagePersistence(expid)
                         if BasicConfig.DATABASE_BACKEND == 'sqlite':
-                            os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
-                                                  expid, "pkl", "job_packages_" + expid + ".db"), 0o775)
+                            Path(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl", "job_packages_" + expid + ".db").chmod(0o775)
                         packages_persistence.reset_table(True)
                         job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
 
@@ -5144,8 +5143,7 @@ class Autosubmit:
                     monitor_exp = Monitor()
                     monitor_exp.generate_output(expid,
                                                 job_list.get_job_list(),
-                                                os.path.join(
-                                                    exp_path, "/tmp/LOG_", expid),
+                                                Path(exp_path, "tmp", "LOG_" + expid),
                                                 output_format=output_type,
                                                 packages=packages,
                                                 show=not hide,
