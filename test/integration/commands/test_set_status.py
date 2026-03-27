@@ -140,13 +140,53 @@ def test_set_status_combined_filters(as_exp):
         job.name for job in job_list.get_job_list() if job.status == Status.COMPLETED
     ]
 
+    # assert
     assert target_job in completed_jobs
     assert no_matching_job not in completed_jobs
     assert len(completed_jobs) == 1
 
 
-def test_set_status_multiple_chunk_filters_set_warning(as_exp, mocker):
-    """Test that a warning is raised when multiple chunk filters are used, as they do the same."""
+@pytest.mark.parametrize(
+    "setstatus_kwargs, expected_jobs, expected_selector, expect_multiple_filters_warning",
+    [
+        pytest.param(
+            {
+                "fc": "[20200101 [ fc0 [1] ] ]",
+                "fct": "[20200101 [ fc0 [1] ] ],LOCALJOB",
+                "ftcs": "[20200101 [ fc0 [1] ] ],LOCALJOB [2]",
+            },
+            9,
+            "chunk",
+            True,
+        ),
+        pytest.param(
+            {
+                "fct": "[20200101 [ fc0 [1] ] ],LOCALJOB",
+                "ftcs": "[20200101 [ fc0 [1] ] ],LOCALJOB [2]",
+            },
+            3,
+            "legacy_chunk",
+            True,
+        ),
+        pytest.param(
+            {
+                "ftcs": "[20200101 [ Any [1] ] ],LOCALJOB [1]",
+            },
+            2,
+            "ftcs_specific",
+            False,
+        ),
+    ],
+)
+def test_set_status_multiple_chunk_filters_priority(
+    as_exp,
+    mocker,
+    setstatus_kwargs,
+    expected_jobs,
+    expected_selector,
+    expect_multiple_filters_warning,
+):
+    """Test that when multiple chunk filters are used, the one with the highest priority is applied."""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
         as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
     )
@@ -157,110 +197,55 @@ def test_set_status_multiple_chunk_filters_set_warning(as_exp, mocker):
 
     job_list_ = do_setstatus(
         as_exp,
-        fc="[20200101 [ fc0 [1] ] ]",
-        fct="[20200101 [ fc0 [1] ] ],LOCALJOB",
-        ftcs="[20200101 [ fc0 [1] ] ],LOCALJOB [2]",
         target="COMPLETED",
+        **setstatus_kwargs,
     )
+    # highest priority is filter by chunk
+    if expected_selector == "chunk":
+        completed_jobs = [
+            job.name
+            for job in job_list_.get_job_list()
+            if job.status == Status.COMPLETED and job.chunk == 1
+        ]
+    # highest priority is filter by chunk split
+    elif expected_selector == "legacy_chunk":
+        completed_jobs = [
+            job.name
+            for job in job_list_.get_job_list()
+            if job.status == Status.COMPLETED and job.section == "LOCALJOB" and job.chunk == 1
+        ]
+    # highest priority is filter by chunk split section
+    elif expected_selector == "ftcs_specific":
+        completed_jobs = [
+            job.name
+            for job in job_list_.get_job_list()
+            if job.status == Status.COMPLETED and job.section == "LOCALJOB" and job.chunk == 1 and job.split == 1
+        ]
 
-    # -fc precedence over the other chunk filters
-    completed_jobs = [
-        job.name
-        for job in job_list_.get_job_list()
-        if job.status == Status.COMPLETED and job.chunk == 1
-    ]
-
-    assert len(completed_jobs) == 9
+    # assertions
+    assert len(completed_jobs) == expected_jobs
 
     warning_messages = [
         str(call.args[0]) for call in mocked_warning.call_args_list if call.args
     ]
-    assert any(
-        "Multiple chunk filters provided" in message for message in warning_messages
-    )
 
-
-def test_set_status_multiple_legacy_chunk_filters_precedence(as_exp, mocker):
-    """When only legacy chunk filters overlap, ``-ftc`` should take precedence over ``-ftcs``."""
-    db_manager = SqlAlchemyExperimentHistoryDbManager(
-        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
-    )
-    db_manager.initialize()
-
-    reset(as_exp, "WAITING")
-    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
-
-    job_list_ = do_setstatus(
-        as_exp,
-        fct="[20200101 [ fc0 [1] ] ],LOCALJOB",
-        ftcs="[20200101 [ fc0 [1] ] ],LOCALJOB [2]",
-        target="COMPLETED",
-    )
-
-    # ``-ftc`` should be used before ``-ftcs`` when ``-fc`` is not provided.
-    completed_jobs = [
-        job.name
-        for job in job_list_.get_job_list()
-        if job.status == Status.COMPLETED and job.section == "LOCALJOB" and job.chunk == 1
-    ]
-    assert len(completed_jobs) == 3
-
-    warning_messages = [
-        str(call.args[0]) for call in mocked_warning.call_args_list if call.args
-    ]
-    assert any(
-        "Multiple chunk filters provided" in message for message in warning_messages
-    )
-
-
-def test_set_status_legacy_filter_type_chunk_logs_deprecation_warning(as_exp, mocker):
-    """Legacy ``-ftc`` usage should log its deprecation warning."""
-    db_manager = SqlAlchemyExperimentHistoryDbManager(
-        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
-    )
-    db_manager.initialize()
-
-    reset(as_exp, "WAITING")
-    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
-
-    do_setstatus(
-        as_exp,
-        fct="[20200101 [ fc0 [1] ] ],LOCALJOB",
-        target="COMPLETED",
-    )
-
-    warning_messages = [
-        str(call.args[0]) for call in mocked_warning.call_args_list if call.args
-    ]
-    assert any(
-        "--filter_type_chunk is deprecated" in message
-        for message in warning_messages
-    )
-
-
-def test_set_status_legacy_filter_type_chunk_split_logs_deprecation_warning(as_exp, mocker):
-    """Legacy ``-ftcs`` usage should log its deprecation warning."""
-    db_manager = SqlAlchemyExperimentHistoryDbManager(
-        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
-    )
-    db_manager.initialize()
-
-    reset(as_exp, "WAITING")
-    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
-
-    do_setstatus(
-        as_exp,
-        ftcs="[20200101 [ fc0 [1] ] ],LOCALJOB [2]",
-        target="COMPLETED",
-    )
-
-    warning_messages = [
-        str(call.args[0]) for call in mocked_warning.call_args_list if call.args
-    ]
-    assert any(
-        "--filter_type_chunk_split is deprecated" in message
-        for message in warning_messages
-    )
+    # If at least 2 chunk filters are provided, check warning for overlapping chunk filters.
+    if expect_multiple_filters_warning:
+        assert any(
+            "Multiple chunk filters provided" in message for message in warning_messages
+        )
+    
+    # If any deprecated filters are used, check deprecation warnings are raised.
+    if "fct" in setstatus_kwargs:
+        assert any(
+            "--filter_type_chunk is deprecated" in message
+            for message in warning_messages
+        )
+    if "ftcs" in setstatus_kwargs:
+        assert any(
+            "--filter_type_chunk_split is deprecated" in message
+            for message in warning_messages
+        )
 
 
 def test_set_status_section_any_with_chunk_filter_does_not_restrict(as_exp):
@@ -308,7 +293,7 @@ def test_set_status_invalid_job_in_list_raises_validation_error(as_exp):
         )
 
 
-def test_set_status_combined_any_tokens_are_noop(as_exp):
+def test_set_status_combined_any_tokens_do_nothing(as_exp):
     """Any tokens in -ft, -fs and -fl should not restrict selection when used together."""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
         as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
