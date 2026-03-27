@@ -4589,7 +4589,6 @@ class Autosubmit:
                 if status == "ANY":
                     continue
                 if status not in status_list:
-                    print(status)
                     status_validation_error = True
                     status_validation_message += "\n\t There are no jobs with status " + \
                                                  status + " in this experiment."
