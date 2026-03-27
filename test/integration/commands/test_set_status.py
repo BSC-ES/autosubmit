@@ -17,7 +17,9 @@
 
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.database_managers.experiment_history_db_manager import SqlAlchemyExperimentHistoryDbManager
+from autosubmit.history.database_managers.experiment_history_db_manager import (
+    SqlAlchemyExperimentHistoryDbManager,
+)
 from autosubmit.job.job_common import Status
 import pytest
 
@@ -32,14 +34,17 @@ def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
 
 def reset(as_exp_, target="WAITING"):
     job_list_ = as_exp_.autosubmit.load_job_list(
-        as_exp_.expid, as_exp_.as_conf, new=False)
+        as_exp_.expid, as_exp_.as_conf, new=False
+    )
 
     job_names = " ".join([job.name for job in job_list_.get_job_list()])
     do_setstatus(as_exp_, fl=job_names, target=target)
     return job_list_
 
 
-def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=None, target="WAITING"):
+def do_setstatus(
+    as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=None, target="WAITING"
+):
     target = target.upper()
     as_exp_.autosubmit.set_status(
         as_exp_.expid,
@@ -57,19 +62,22 @@ def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=Non
         expand=[],
         expand_status=[],
         check_wrapper=False,
-        detail=False
+        detail=False,
     )
-    return as_exp_.autosubmit.load_job_list(
-        as_exp_.expid, as_exp_.as_conf, new=False)
+    return as_exp_.autosubmit.load_job_list(as_exp_.expid, as_exp_.as_conf, new=False)
 
 
 @pytest.mark.docker
 @pytest.mark.ssh
 @pytest.mark.slurm
-@pytest.mark.parametrize("reset_target", ["RUNNING", "WAITING"], ids=["Online", "Offline"])
+@pytest.mark.parametrize(
+    "reset_target", ["RUNNING", "WAITING"], ids=["Online", "Offline"]
+)
 def test_set_status(as_exp, slurm_server, reset_target):
     """Tests the setstatus command with various filters in an offline scenario."""
-    db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
     db_manager.initialize()
     fl_filter_names = f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB {as_exp.expid}_20200101_fc0_1_1_PSJOB {as_exp.expid}_20200101_fc0_1_1_SLURMJOB"
     fc_filter = "[20200101 [ fc0 [1] ] ]"
@@ -80,27 +88,49 @@ def test_set_status(as_exp, slurm_server, reset_target):
     target = "COMPLETED"
 
     job_list_ = do_setstatus(as_exp, fl=fl_filter_names, target=target)
-    completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.name in fl_filter_names]
+    completed_jobs = [
+        job.name
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED and job.name in fl_filter_names
+    ]
     assert len(completed_jobs) == 3
     reset(as_exp, reset_target)
 
     job_list_ = do_setstatus(as_exp, fc=fc_filter, target=target)
-    completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.chunk == 1]
+    completed_jobs = [
+        job.name
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED and job.chunk == 1
+    ]
     assert len(completed_jobs) == 9
     reset(as_exp, reset_target)
 
     job_list_ = do_setstatus(as_exp, fct=fct_filter, target=target)
-    completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.section == "LOCALJOB"]
+    completed_jobs = [
+        job.name
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED and job.section == "LOCALJOB"
+    ]
     assert len(completed_jobs) == 3
     reset(as_exp, reset_target)
 
     job_list_ = do_setstatus(as_exp, ftcs=ftcs_filter, target=target)
-    completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.split == 2 and job.section == "LOCALJOB"]
+    completed_jobs = [
+        job.name
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED
+        and job.split == 2
+        and job.section == "LOCALJOB"
+    ]
     assert len(completed_jobs) == 1
     reset(as_exp, reset_target)
 
     job_list_ = do_setstatus(as_exp, ft=ft_filter, target=target)
-    completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED and job.section == "LOCALJOB"]
+    completed_jobs = [
+        job.name
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED and job.section == "LOCALJOB"
+    ]
     assert len(completed_jobs) == 24
     reset(as_exp, reset_target)
 
@@ -109,7 +139,11 @@ def test_set_status(as_exp, slurm_server, reset_target):
             do_setstatus(as_exp, fs=fs, target=target)
     else:
         job_list_ = do_setstatus(as_exp, fs=fs, target=target)
-        completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+        completed_jobs = [
+            job.name
+            for job in job_list_.get_job_list()
+            if job.status == Status.COMPLETED
+        ]
         assert len(completed_jobs) == len(job_list_.get_job_list())
 
 
@@ -212,14 +246,19 @@ def test_set_status_multiple_chunk_filters_priority(
         completed_jobs = [
             job.name
             for job in job_list_.get_job_list()
-            if job.status == Status.COMPLETED and job.section == "LOCALJOB" and job.chunk == 1
+            if job.status == Status.COMPLETED
+            and job.section == "LOCALJOB"
+            and job.chunk == 1
         ]
     # highest priority is filter by chunk split section
     elif expected_selector == "ftcs_specific":
         completed_jobs = [
             job.name
             for job in job_list_.get_job_list()
-            if job.status == Status.COMPLETED and job.section == "LOCALJOB" and job.chunk == 1 and job.split == 1
+            if job.status == Status.COMPLETED
+            and job.section == "LOCALJOB"
+            and job.chunk == 1
+            and job.split == 1
         ]
 
     # assertions
@@ -234,7 +273,7 @@ def test_set_status_multiple_chunk_filters_priority(
         assert any(
             "Multiple chunk filters provided" in message for message in warning_messages
         )
-    
+
     # If any deprecated filters are used, check deprecation warnings are raised.
     if "fct" in setstatus_kwargs:
         assert any(
@@ -265,8 +304,7 @@ def test_set_status_section_any_with_chunk_filter_does_not_restrict(as_exp):
     )
 
     completed_jobs = [
-        job for job in job_list_.get_job_list()
-        if job.status == Status.COMPLETED
+        job for job in job_list_.get_job_list() if job.status == Status.COMPLETED
     ]
     assert len(completed_jobs) == 9
 
@@ -310,7 +348,9 @@ def test_set_status_combined_any_tokens_do_nothing(as_exp):
         target="COMPLETED",
     )
 
-    completed_jobs = [job for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+    completed_jobs = [
+        job for job in job_list_.get_job_list() if job.status == Status.COMPLETED
+    ]
     assert len(completed_jobs) == len(job_list_.get_job_list())
 
 
@@ -364,7 +404,6 @@ def test_set_status_combined_any_tokens_do_nothing(as_exp):
         ("[ Any [ fc0 [Any] ] ]", 36),
         ("[ Any [ fc0 [Any] fc1 [Any] ] ]", 72),
         ("[ Any [ fc0 [Any] fc1 [Any] ] 20200102 [ fc0 [Any] fc1 [Any] ] ]", 72),
-
         # Good ones // Testing sections and splits
         ("[20200101 [ fc0 [1] ] ],LOCALJOB", 3),
         ("[20200101 [ fc0 [1] ] ],Any", 9),
@@ -376,7 +415,6 @@ def test_set_status_combined_any_tokens_do_nothing(as_exp):
         ("[20200101 [ fc0 [1] ] ],Any [1:2]", 6),
         ("[20200101 [ fc0 [1] ] ],Any [Any]", 9),
         ("[20200101 [ fc0 [1] ] ],Any []", 9),
-
     ],
 )
 def test_set_status_ftcs(as_exp: object, ftcs_filter: str, expected_jobs: int):
@@ -396,7 +434,9 @@ def test_set_status_ftcs(as_exp: object, ftcs_filter: str, expected_jobs: int):
     :type expected_jobs: int
     """
 
-    db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
     db_manager.initialize()
     target = "COMPLETED"
 
@@ -407,7 +447,11 @@ def test_set_status_ftcs(as_exp: object, ftcs_filter: str, expected_jobs: int):
         print(validation_err.value)
     else:
         job_list_ = do_setstatus(as_exp, fc=ftcs_filter, target=target)
-        completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+        completed_jobs = [
+            job.name
+            for job in job_list_.get_job_list()
+            if job.status == Status.COMPLETED
+        ]
         assert len(completed_jobs) == expected_jobs
 
     reset(as_exp, "WAITING")
@@ -418,7 +462,11 @@ def test_set_status_ftcs(as_exp: object, ftcs_filter: str, expected_jobs: int):
         print(validation_err.value)
     else:
         job_list_ = do_setstatus(as_exp, fct=ftcs_filter, target=target)
-        completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+        completed_jobs = [
+            job.name
+            for job in job_list_.get_job_list()
+            if job.status == Status.COMPLETED
+        ]
         assert len(completed_jobs) == expected_jobs
 
     reset(as_exp, "WAITING")
@@ -429,5 +477,9 @@ def test_set_status_ftcs(as_exp: object, ftcs_filter: str, expected_jobs: int):
         print(validation_err.value)
     else:
         job_list_ = do_setstatus(as_exp, ftcs=ftcs_filter, target=target)
-        completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
+        completed_jobs = [
+            job.name
+            for job in job_list_.get_job_list()
+            if job.status == Status.COMPLETED
+        ]
         assert len(completed_jobs) == expected_jobs
