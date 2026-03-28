@@ -655,11 +655,11 @@ class AutosubmitConfig(object):
         """
         for job in data_fixed.get("JOBS", {}):
             wallclock = data_fixed["JOBS"][job].get("WALLCLOCK", "")
-            if wallclock and re.match(r'^\d{2}:\d{2}:\d{2}$', wallclock):
+            if wallclock and re.match(r'^\d{1,2}:\d{2}:\d{2}$', wallclock):
                 # Truncate SS to "HH:MM"
                 Log.warning(
                     f"Wallclock {wallclock} is in HH:MM:SS format. Autosubmit does not support the seconds. Truncating to HH:MM")
-                data_fixed["JOBS"][job]["WALLCLOCK"] = wallclock[:5]
+                data_fixed["JOBS"][job]["WALLCLOCK"] = ":".join(wallclock.split(":")[:2])
 
     @staticmethod
     def _normalize_dependencies(dependencies: Union[str, dict]) -> dict:

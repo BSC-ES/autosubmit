@@ -11,6 +11,7 @@
 - Accept local/intranet email addresses in validation #1471
 - Set PROJECT_TYPE, PROJECT_DESTINATION and CUSTOM_CONFIG for experiments without minimal configuration #2864
 - Added priority and retro-compatibility for etc/autosubmitrc over etc/.autosubmitrc #2312
+- Updated Slurm wallclock truncation, allowing users to use e.g., 01:00:00 correctly #2059
 
 **Enhancements:**
 
