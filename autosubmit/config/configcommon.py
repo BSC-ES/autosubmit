@@ -222,6 +222,140 @@ class AutosubmitConfig(object):
         return self.jobs_data.get(section, {}).get('WCHUNKINC', "")
 
 
+    def get_tasks(self, section: str) -> str:
+        """Gets tasks needed for the given job type.
+
+        :param section: job type
+        :type section: str
+        :return: tasks (processes) per host
+        :rtype: str
+        """
+        return str(self.get_section([section, 'TASKS'], ""))
+
+
+    def get_current_user(self, section: str) -> str:
+        """Returns the user to be changed from platform config file.
+        This function is used by the autosubmit API.
+
+        :return: migrate user to
+        :rtype: str
+        """
+        return self.get_section([section, 'USER'], "")
+
+    def get_current_host(self, section: str) -> str:
+        """Returns the user to be changed from platform config file.
+        This function might be used for autosubmit API after complete migration of `AutosubmitConfigParser`.
+
+        :return: migrate user to
+        :rtype: str
+        """
+        return self.get_section([section, 'HOST'], "")
+
+
+    def get_current_project(self, section: str) -> str:
+        """Returns the project to be changed from platform config file.
+        This function is used by the autosubmit API.
+
+        :return: migrate user to
+        :rtype: str
+        """
+        return self.get_section([section, 'PROJECT'], "")
+
+
+    def set_new_user(self, section: str, new_user: str) -> None:
+        """Sets new user for given platform.
+        This function is used by the autosubmit API.
+
+        :param new_user:
+        :param section: platform name
+        :type: str
+        """
+
+        with open(self._platforms_parser_file) as p_file:
+            content_line = p_file.readline()
+            content_to_mod = ""
+            content = ""
+            mod = False
+            while content_line:
+                if re.search(section, content_line):
+                    mod = True
+                if mod:
+                    content_to_mod += content_line
+                else:
+                    content += content_line
+                content_line = p_file.readline()
+        if mod:
+            old_user = self.get_current_user(section)
+            content_to_mod = content_to_mod.replace(re.search(
+                'USER:.*', content_to_mod).group(0)[1:], "USER: " + new_user)
+            content_to_mod = content_to_mod.replace(re.search(
+                'USER_TO:.*', content_to_mod).group(0)[1:], "USER_TO: " + old_user)
+        open(self._platforms_parser_file, 'w').write(content)
+        open(self._platforms_parser_file, 'a').write(content_to_mod)
+
+
+    def set_new_host(self, section: str, new_host: str) -> None:
+        """Sets new host for given platform
+        This function might be used for autosubmit API after complete migration of `AutosubmitConfigParser`.
+
+        :param new_host:
+        :param section: platform name
+        :type: str
+        """
+        with open(self._platforms_parser_file) as p_file:
+            content_line = p_file.readline()
+            content_to_mod = ""
+            content = ""
+            mod = False
+            while content_line:
+                if re.search(section, content_line):
+                    mod = True
+                if mod:
+                    content_to_mod += content_line
+                else:
+                    content += content_line
+                content_line = p_file.readline()
+        if mod:
+            old_host = self.get_current_host(section)
+            content_to_mod = content_to_mod.replace(re.search(
+                'HOST:.*', content_to_mod).group(0)[1:], "HOST: " + new_host)
+            content_to_mod = content_to_mod.replace(re.search(
+                'HOST_TO:.*', content_to_mod).group(0)[1:], "HOST_TO: " + old_host)
+        open(self._platforms_parser_file, 'w').write(content)
+        open(self._platforms_parser_file, 'a').write(content_to_mod)
+
+
+    def set_new_project(self, section: str, new_project: str) -> None:
+        """Sets new project for given platform
+        This function is used by the autosubmit API.
+
+        :param new_project:
+        :param section: platform name
+        :type: str
+        """
+        with open(self._platforms_parser_file) as p_file:
+            content_line = p_file.readline()
+            content_to_mod = ""
+            content = ""
+            mod = False
+            while content_line:
+                if re.search(section, content_line):
+                    mod = True
+                if mod:
+                    content_to_mod += content_line
+                else:
+                    content += content_line
+                content_line = p_file.readline()
+        if mod:
+            old_project = self.get_current_project(section)
+            content_to_mod = content_to_mod.replace(re.search(
+                "PROJECT:.*", content_to_mod).group(0)[1:], "PROJECT: " + new_project)
+            content_to_mod = content_to_mod.replace(re.search(
+                "PROJECT_TO:.*", content_to_mod).group(0)[1:], "PROJECT_TO: " + old_project)
+        open(self._platforms_parser_file, 'w').write(content)
+        open(self._platforms_parser_file, 'a').write(content_to_mod)
+
+
     def show_messages(self) -> bool:
 
         if len(list(self.warn_config.keys())) == 0 and len(list(self.wrong_config.keys())) == 0:
