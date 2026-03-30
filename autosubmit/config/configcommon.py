@@ -222,17 +222,6 @@ class AutosubmitConfig(object):
         return self.jobs_data.get(section, {}).get('WCHUNKINC', "")
 
 
-    def get_tasks(self, section: str) -> str:
-        """Gets tasks needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: tasks (processes) per host
-        :rtype: str
-        """
-        return str(self.get_section([section, 'TASKS'], ""))
-
-
     def get_current_user(self, section: str) -> str:
         """Returns the user to be changed from platform config file.
         This function is used by the autosubmit API.
