@@ -63,7 +63,7 @@ _TEST_EXCEPTION.trace = 'a trace'
         (ValueError, 0, 2, True),
         (BaseLockException, 0, 1, False),
         (AutosubmitCritical, 0, 2, True),
-        (_TEST_EXCEPTION, 1, 2, True),
+        (_TEST_EXCEPTION, 0, 3, True),
         (AutosubmitError, 0, 2, True)
     ],
     ids=[
