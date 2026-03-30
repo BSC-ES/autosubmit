@@ -377,3 +377,16 @@ def test_get_cpmip_thresholds_with_no_data(autosubmit_config):
     })
     thresholds = as_conf.get_cpmip_thresholds('SIM')
     assert thresholds == {}
+
+@pytest.mark.parametrize('invalid_thresholds', ['not_a_dict', 123, ['SYPD']])
+def test_get_cpmip_thresholds_with_invalid_data_type(autosubmit_config, invalid_thresholds):
+    as_conf = autosubmit_config(expid='a000', experiment_data={
+        'JOBS': {
+            'SIM': {
+                'CPMIP_THRESHOLDS': invalid_thresholds
+            }
+        }
+    })
+    thresholds = as_conf.get_cpmip_thresholds('SIM')
+    assert thresholds == {}
+    
