@@ -5143,7 +5143,7 @@ class Autosubmit:
                     monitor_exp = Monitor()
                     monitor_exp.generate_output(expid,
                                                 job_list.get_job_list(),
-                                                Path(exp_path, "tmp", "LOG_" + expid),
+                                                str(Path(exp_path, "tmp", "LOG_" + expid)),
                                                 output_format=output_type,
                                                 packages=packages,
                                                 show=not hide,
