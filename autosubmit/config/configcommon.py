@@ -1028,10 +1028,12 @@ class AutosubmitConfig(object):
         :rtype: tuple[dict[str, Any], dict[str, Any]]
         """
         for i, key in enumerate(filter(None, keys)):
-            matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
-            if in_the_end and "^" in key:
-                pattern_special_variables = '%\^[a-zA-Z0-9_.-]*%'
+            matches = list()
+            if in_the_end and ("^" in key or "," in key):
+                pattern_special_variables = "%[\^]?[a-zA-Z0-9_.-]*(\^\^|,,)?%"
                 matches.extend(list(re.finditer(pattern_special_variables, key, flags=re.IGNORECASE))[::-1])
+            else:
+                matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
             for match in matches:
                 value = self._get_substituted_value(key, match, parameters, start_long, dict_keys_type)
                 if value:
@@ -1076,10 +1078,17 @@ class AutosubmitConfig(object):
             key_parts[start_long:-1]]
         param = parameters
         for k in key_parts:
+            upper_validate = True if "^^" in k else False
+            lower_validate = True if ",," in k else False
             k = k.strip("^")
+            k = k.strip(",")
             param = param.get(k.upper(), {})
             if isinstance(param, int):
                 param = str(param)
+            if upper_validate:
+                param = param.upper()
+            if lower_validate:
+                param = param.lower()
         return str(rest_of_key_start) + str(param) + str(rest_of_key_end) if param else None
 
     def _update_parameters(
