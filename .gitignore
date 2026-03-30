@@ -26,5 +26,8 @@ test/htmlcov
 dockerfiles/id_rsa*
 dockerfiles/authorized_keys
 
+# Version
+autosubmit/_version.py
+
 venv/
 .ipynb_checkpoints

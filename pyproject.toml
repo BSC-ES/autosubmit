@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 [build-system]
-requires = ["setuptools >= 77.0.3"]
+requires = ["setuptools >= 77.0.3", "setuptools_scm >= 8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -71,8 +71,12 @@ Documentation = "https://autosubmit.readthedocs.io/"
 "Download Link" = "https://earth.bsc.es/wiki/doku.php?id=tools:autosubmit"
 
 [tool.setuptools.dynamic]
-version =  {file = "VERSION"}
 readme = {file = "README_PIP.md"}
+
+[tool.setuptools_scm]
+write_to = "autosubmit/_version.py"
+tag_regex = "^(?:autosubmit|v)?(?P<version>[0-9]+\\.[0-9]+.*)"
+version_scheme = "no.guess-dev"
 
 [project.optional-dependencies]
 postgres = ["psycopg2"]
@@ -120,7 +124,6 @@ package-data = { "autosubmit" = [
     "autosubmit/config/conf/files/*",
     "README",
     "CHANGELOG",
-    "VERSION",
     "LICENSE",
     "docs/autosubmit.pdf"
 ] }

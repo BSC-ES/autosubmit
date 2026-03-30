@@ -19,3 +19,12 @@
 
 These files are the core of the Autosubmit, where all the workflow will be handled, processed and generated
 """
+
+try:
+    from autosubmit._version import version as __version__
+except ImportError:
+    from importlib.metadata import version, PackageNotFoundError
+    try:
+        __version__ = version("autosubmit")
+    except PackageNotFoundError:
+        __version__ = "unknown"
