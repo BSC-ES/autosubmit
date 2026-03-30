@@ -48,10 +48,8 @@ def delete_lock_file(base_path: str = Log.file_path, lock_file: str = 'autosubmi
 def exit_from_error(e: BaseException) -> int:
     """Called by ``Autosubmit`` when an exception is raised during a command execution.
 
-    Prints the exception in ``DEBUG`` level.
-
     Prints the exception in ``CRITICAL`` if is it an ``AutosubmitCritical`` or an
-    ``AutosubmitError`` exception.
+    ``AutosubmitError`` exception, including any trace attached to the exception.
 
     Exceptions raised by ``porta-locker` library print a message informing the user
     about the locked experiment. Other exceptions raised cause the lock to be deleted.
@@ -82,7 +80,7 @@ def exit_from_error(e: BaseException) -> int:
     if is_autosubmit_error:
         e: Union[AutosubmitError, AutosubmitCritical] = e
         if e.trace:
-            Log.debug("Trace: {0}", str(e.trace))
+            Log.critical("Trace: {0}", str(e.trace))
         Log.critical("{1} [eCode={0}]", e.code, e.message)
         err_code = e.code
 
