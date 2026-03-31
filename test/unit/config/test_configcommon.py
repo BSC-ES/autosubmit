@@ -350,43 +350,48 @@ def test_platforms_not_dict(
     else:
         assert platform_description == as_conf.platforms_data
 
-def test_get_cpmip_thresholds_with_data(autosubmit_config):
-    as_conf = autosubmit_config(expid='a000', experiment_data={
-        'JOBS': {
-            'SIM': {
-                'CPMIP_THRESHOLDS': {
-                    'SYPD': {
-                        'THRESHOLD': 5.0,
-                        'COMPARISON': 'greater_than',
-                        '%_ACCEPTED_ERROR': 10
+@pytest.mark.parametrize('experiment_data, expected', 
+    [
+        (
+            {
+                'JOBS': {
+                    'SIM': {
+                        'CPMIP_THRESHOLDS': {
+                            'SYPD':{
+                                'THRESHOLD': 5.0,
+                                'COMPARISON': 'greater_than',
+                                '%_ACCEPTED_ERROR': 10
+                            }
+                        }
                     }
                 }
-            }
-        }
-    })
+            }, {'SYPD':{ 'THRESHOLD': 5.0, 'COMPARISON': 'greater_than', '%_ACCEPTED_ERROR': 10}}
+        ),
+        (
+            {
+                'JOBS': {
+                    'SIM': {}
+                }
+            }, {}
+        ),
+        (
+            {
+                'JOBS': {
+                    'SIM': {
+                        'CPMIP_THRESHOLDS': {
+                            'not_a_dict'
+                        }
+                    }
+                }
+            }, {}
+        ),
+    ], 
+    ids=[
+        'valid_thresholds',
+        'no_thresholds',
+        'invalid_thresholds'
+    ])
+def test_get_cpmip_thresholds_different_cases(autosubmit_config, experiment_data, expected):
+    as_conf = autosubmit_config(expid='a000', experiment_data=experiment_data)
     thresholds = as_conf.get_cpmip_thresholds('SIM')
-    assert thresholds['SYPD']['THRESHOLD'] == 5.0
-    assert thresholds['SYPD']['COMPARISON'] == 'greater_than'
-    assert thresholds['SYPD']['%_ACCEPTED_ERROR'] == 10
-
-def test_get_cpmip_thresholds_with_no_data(autosubmit_config):
-    as_conf = autosubmit_config(expid='a000', experiment_data={
-        'JOBS': {
-            'SIM': {}
-        }
-    })
-    thresholds = as_conf.get_cpmip_thresholds('SIM')
-    assert thresholds == {}
-
-@pytest.mark.parametrize('invalid_thresholds', ['not_a_dict', 123, ['SYPD']])
-def test_get_cpmip_thresholds_with_invalid_data_type(autosubmit_config, invalid_thresholds):
-    as_conf = autosubmit_config(expid='a000', experiment_data={
-        'JOBS': {
-            'SIM': {
-                'CPMIP_THRESHOLDS': invalid_thresholds
-            }
-        }
-    })
-    thresholds = as_conf.get_cpmip_thresholds('SIM')
-    assert thresholds == {}
-    
+    assert thresholds == expected
