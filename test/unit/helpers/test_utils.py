@@ -65,8 +65,8 @@ def test_strtobool(val, expected):
         (Path('/tmp/hello/scooby/doo/ooo.txt'), True, True, {
             'AUTOSUBMIT_CONFIGURATION': '/tmp/hello/scooby/doo/ooo.txt'
         }),
-        (Path('/etc/.autosubmitrc'), True, True, {}),
-        (Path('/etc/.autosubmitrc'), True, False, {}),
+        (Path('/etc/autosubmitrc'), True, True, {}),
+        (Path('/etc/autosubmitrc'), True, False, {}),
         (Path('./.autosubmitrc'), False, True, {}),
         (Path(Path.home(), '.autosubmitrc'), False, False, {})
     ],

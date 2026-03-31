@@ -85,8 +85,6 @@ from autosubmit.utils import as_conf_default_values
 if TYPE_CHECKING:
     from rocrate.rocrate import ROCrate
 
-dialog = None
-
 """Main module for autosubmit. Only contains an interface class to all functionality implemented on autosubmit."""
 
 sys.path.insert(0, os.path.abspath('.'))
@@ -482,10 +480,11 @@ class Autosubmit:
             subparser.add_argument(
                 '-f', '--force', action='store_true', default=False, help='force regenerate job_list')
             # Configure
-            subparser = subparsers.add_parser('configure', description="configure database and path for autosubmit. It "
-                                                                       "can be done at machine, user or local level."
-                                                                       "If no arguments specified configure will "
-                                                                       "display dialog boxes (if installed)")
+            subparser = subparsers.add_parser(
+                "configure",
+                description="configure database and path for autosubmit. It "
+                "can be done at machine, user or local level.",
+            )
             subparser.add_argument(
                 '--advanced', action="store_true", help="Open advanced configuration of autosubmit")
             subparser.add_argument(
@@ -529,57 +528,130 @@ class Autosubmit:
 
             # Set status
             subparser = subparsers.add_parser(
-                'setstatus', description="sets job status for an experiment")
-            subparser.add_argument('expid', help='experiment identifier')
+                "setstatus", description="sets job status for an experiment"
+            )
+            subparser.add_argument("expid", help="experiment identifier")
             subparser.add_argument(
-                '-np', '--noplot', action='store_true', default=False, help='omit plot')
+                "-np", "--noplot", action="store_true", default=False, help="omit plot"
+            )
             subparser.add_argument(
-                '-s', '--save', action="store_true", default=False, help='Save changes to disk')
-            subparser.add_argument('-t', '--status_final',
-                                   choices=('READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN',
-                                            'QUEUING', 'RUNNING', 'HELD'),
-                                   required=True,
-                                   help='Supply the target status')
-            subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
-            group = subparser.add_mutually_exclusive_group(required=True)
-            group.add_argument('-fl', '--list', type=str,
-                               help='Supply the list of job names to be changed. Default = "Any". '
-                                    'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
-            group.add_argument('-fc', '--filter_chunks', type=str,
-                               help='Supply the list of chunks to change the status. Default = "Any". '
-                                    'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
-            group.add_argument('-fs', '--filter_status', type=str,
-                               help='Select the status (one or more) to filter the list of jobs.'
-                                    "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']")
-            group.add_argument('-ft', '--filter_type', type=str,
-                               help='Select the job type to filter the list of jobs')
-            group.add_argument('-ftc', '--filter_type_chunk', type=str,
-                               help='Supply the list of chunks to change the status. Default = "Any". When the member name "all" is set, all the chunks \
+                "-s",
+                "--save",
+                action="store_true",
+                default=False,
+                help="Save changes to disk",
+            )
+            subparser.add_argument(
+                "-t",
+                "--status_final",
+                choices=(
+                    "READY",
+                    "COMPLETED",
+                    "WAITING",
+                    "SUSPENDED",
+                    "FAILED",
+                    "UNKNOWN",
+                    "QUEUING",
+                    "RUNNING",
+                    "HELD",
+                ),
+                required=True,
+                help="Supply the target status",
+            )
+            subparser.add_argument(
+                "-v",
+                "--update_version",
+                action="store_true",
+                default=False,
+                help="Update experiment version",
+            )
+            subparser.add_argument(
+                "-fl",
+                "--list",
+                type=str,
+                help='Supply the list of job names to be changed. Default = "Any". '
+                'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
+            )
+            subparser.add_argument(
+                "-fc",
+                "--filter_chunks",
+                type=str,
+                help='Supply the list of chunks to change the status. Default = "Any". '
+                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+            )
+            subparser.add_argument(
+                "-fs",
+                "--filter_status",
+                type=str,
+                help="Select the status (one or more) to filter the list of jobs."
+                "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
+            )
+            subparser.add_argument(
+                "-ft",
+                "--filter_type",
+                type=str,
+                help="Select the job type to filter the list of jobs",
+            )
+            subparser.add_argument(
+                "-ftc",
+                "--filter_type_chunk",
+                type=str,
+                help='[Deprecated] Equivalent behaviour can be achieved by combining -ft and -fc. \
+                               Supply the list of chunks to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                    chunks 1 for all the members will be updated. Follow the format: '
-                                    '"[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"')
-            group.add_argument('-ftcs', '--filter_type_chunk_split', type=str,
-                               help='Supply the list of chunks & splits to change the status. Default = "Any". When the member name "all" is set, all the chunks \
+                '"[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+            )
+            subparser.add_argument(
+                "-ftcs",
+                "--filter_type_chunk_split",
+                type=str,
+                help='[Deprecated] Equivalent behaviour can be achieved by combining -ft and -fc. \
+                                Supply the list of chunks & splits to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                            selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                                chunks 1 for all the members will be updated. Follow the format: '
-                                    '"[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"')
+                '"[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+            )
 
-            subparser.add_argument('--hide', action='store_true', default=False,
-                                   help='hides plot window')
-            subparser.add_argument('-group_by', choices=('date', 'member', 'chunk', 'split', 'automatic'), default=None,
-                                   help='Groups the jobs automatically or by date, member, chunk or split')
-            subparser.add_argument('-expand', type=str,
-                                   help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
-                                        'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument(
-                '-expand_status', type=str, help='Select the statuses to be expanded')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
-            subparser.add_argument('-cw', '--check_wrapper', action='store_true',
-                                   default=False, help='Generate possible wrapper in the current workflow')
-            subparser.add_argument('-d', '--detail', action='store_true',
-                                   default=False, help='Generate detailed view of changes')
+                "--hide", action="store_true", default=False, help="hides plot window"
+            )
+            subparser.add_argument(
+                "-group_by",
+                choices=("date", "member", "chunk", "split", "automatic"),
+                default=None,
+                help="Groups the jobs automatically or by date, member, chunk or split",
+            )
+            subparser.add_argument(
+                "-expand",
+                type=str,
+                help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
+                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+            )
+            subparser.add_argument(
+                "-expand_status", type=str, help="Select the statuses to be expanded"
+            )
+            subparser.add_argument(
+                "-nt",
+                "--notransitive",
+                action="store_true",
+                default=False,
+                help="Disable transitive reduction",
+            )
+            subparser.add_argument(
+                "-cw",
+                "--check_wrapper",
+                action="store_true",
+                default=False,
+                help="Generate possible wrapper in the current workflow",
+            )
+            subparser.add_argument(
+                "-d",
+                "--detail",
+                action="store_true",
+                default=False,
+                help="Generate detailed view of changes",
+            )
 
             # Test Case
             subparser = subparsers.add_parser(
@@ -801,23 +873,20 @@ class Autosubmit:
             return Autosubmit.create(args.expid, args.noplot, args.hide, args.output, args.group_by, args.expand,
                                      args.expand_status, args.check_wrapper, args.detail, args.profile, args.force)
         elif args.command == 'configure':
-            if not args.advanced or (args.advanced and dialog is None):
-                return Autosubmit.configure(
-                    args.advanced,
-                    args.databasepath,
-                    args.databasefilename,
-                    args.localrootpath,
-                    args.platformsconfpath,
-                    args.jobsconfpath,
-                    args.smtphostname,
-                    args.mailfrom,
-                    args.all,
-                    args.local,
-                    args.database_backend,
-                    args.database_conn_url,
-                )
-            else:
-                return Autosubmit.configure_dialog()
+            return Autosubmit.configure(
+                args.advanced,
+                args.databasepath,
+                args.databasefilename,
+                args.localrootpath,
+                args.platformsconfpath,
+                args.jobsconfpath,
+                args.smtphostname,
+                args.mailfrom,
+                args.all,
+                args.local,
+                args.database_backend,
+                args.database_conn_url,
+            )
         elif args.command == 'install':
             return Autosubmit.install()
         elif args.command == 'setstatus':
@@ -3412,221 +3481,6 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def configure_dialog():
-        """Configure several paths for autosubmit interactively: database, local root and others.
-        Can be configured at system, user or local levels. Local level configuration precedes user level and user level
-        precedes system configuration. """
-        home_path = Path("~").expanduser().resolve()
-
-        try:
-            d = dialog.Dialog(
-                dialog="dialog", autowidgetsize=True, screen_color='GREEN')
-        except dialog.DialogError:
-            raise AutosubmitCritical(
-                "Graphical visualization failed, not enough screen size", 7060)
-        except Exception:
-            raise AutosubmitCritical(
-                "Dialog libs aren't found in your Operational system", 7060)
-
-        d.set_background_title("Autosubmit configure utility")
-        if os.geteuid() == 0:
-            text = ''
-            choice = [
-                ("All", "All users on this machine (may require root privileges)")]
-        else:
-            text = "If you want to configure Autosubmit for all users, you will need to provide root privileges"
-            choice = []
-
-        choice.append(("User", "Current user"))
-        choice.append(
-            ("Local", "Only when launching Autosubmit from this path"))
-
-        try:
-            code, level = d.menu(text, choices=choice, width=60,
-                                 title="Choose when to apply the configuration")
-            if code != dialog.Dialog.OK:
-                os.system('clear')
-                return False
-        except dialog.DialogError:
-            raise AutosubmitCritical(
-                "Graphical visualization failed, not enough screen size", 7060)
-
-        filename = '.autosubmitrc'
-        if level == 'All':
-            path = '/etc'
-            filename = 'autosubmitrc'
-        elif level == 'User':
-            path = home_path
-        else:
-            path = '.'
-        path = os.path.join(path, filename)
-
-        # Setting default values
-        database_path = home_path
-        local_root_path = home_path
-        database_filename = 'autosubmit.db'
-        jobs_conf_path = ''
-        platforms_conf_path = ''
-
-        d.infobox("Reading configuration file...", width=50, height=5)
-        try:
-            if os.path.isfile(path):
-                parser = ConfigParser()
-                parser.optionxform = str
-                parser.load(path)
-                if parser.has_option('database', 'path'):
-                    database_path = parser.get('database', 'path')
-                if parser.has_option('database', 'filename'):
-                    database_filename = parser.get('database', 'filename')
-                if parser.has_option('local', 'path'):
-                    local_root_path = parser.get('local', 'path')
-                if parser.has_option('conf', 'platforms'):
-                    platforms_conf_path = parser.get('conf', 'platforms')
-                if parser.has_option('conf', 'jobs'):
-                    jobs_conf_path = parser.get('conf', 'jobs')
-
-        except (IOError, OSError) as e:
-            raise AutosubmitCritical(
-                "Can not read config file", 7014, e.message)
-
-        while True:
-            try:
-                code, database_path = d.dselect(database_path, width=80, height=20,
-                                                title='\\Zb\\Z1Select path to database\\Zn', colors='enable')
-            except dialog.DialogError:
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, not enough screen size", 7060)
-            if Autosubmit._requested_exit(code, d):
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, requested exit", 7060)
-            elif code == dialog.Dialog.OK:
-                database_path = database_path.replace('~', home_path)
-                if not os.path.exists(database_path):
-                    d.msgbox(
-                        "Database path does not exist.\nPlease, insert the right path", width=50, height=6)
-                else:
-                    break
-
-        while True:
-            try:
-                code, local_root_path = d.dselect(local_root_path, width=80, height=20,
-                                                  title='\\Zb\\Z1Select path to experiments repository\\Zn',
-                                                  colors='enable')
-            except dialog.DialogError:
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, not enough screen size", 7060)
-
-            if Autosubmit._requested_exit(code, d):
-                raise AutosubmitCritical(
-                    "Graphical visualization failed,requested exit", 7060)
-            elif code == dialog.Dialog.OK:
-                database_path = database_path.replace('~', home_path)
-                if not os.path.exists(database_path):
-                    d.msgbox(
-                        "Local root path does not exist.\nPlease, insert the right path", width=50, height=6)
-                else:
-                    break
-        while True:
-            try:
-                (code, tag) = d.form(text="",
-                                     elements=[("Database filename", 1, 1, database_filename, 1, 40, 20, 20),
-                                               (
-                                                   "Default platform.yml path", 2, 1, platforms_conf_path, 2, 40, 40,
-                                                   200),
-                                               ("Default jobs.yml path", 3, 1, jobs_conf_path, 3, 40, 40, 200)],
-                                     height=20,
-                                     width=80,
-                                     form_height=10,
-                                     title='\\Zb\\Z1Just a few more options:\\Zn', colors='enable')
-            except dialog.DialogError:
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, not enough screen size", 7060)
-
-            if Autosubmit._requested_exit(code, d):
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, _requested_exit", 7060)
-            elif code == dialog.Dialog.OK:
-                database_filename = tag[0]
-                platforms_conf_path = tag[1]
-                jobs_conf_path = tag[2]
-
-                platforms_conf_path = platforms_conf_path.replace(
-                    '~', home_path).strip()
-                jobs_conf_path = jobs_conf_path.replace('~', home_path).strip()
-
-                if platforms_conf_path and not os.path.exists(platforms_conf_path):
-                    d.msgbox(
-                        "Platforms conf path does not exist.\nPlease, insert the right path", width=50, height=6)
-                elif jobs_conf_path and not os.path.exists(jobs_conf_path):
-                    d.msgbox(
-                        "Jobs conf path does not exist.\nPlease, insert the right path", width=50, height=6)
-                else:
-                    break
-
-        smtp_hostname = "mail.bsc.es"
-        mail_from = "automail@bsc.es"
-        while True:
-            try:
-                (code, tag) = d.form(text="",
-                                     elements=[("SMTP server hostname", 1, 1, smtp_hostname, 1, 40, 20, 20),
-                                               ("Notifications sender address", 2, 1, mail_from, 2, 40, 40, 200)],
-                                     height=20,
-                                     width=80,
-                                     form_height=10,
-                                     title='\\Zb\\Z1Mail notifications configuration:\\Zn', colors='enable')
-            except dialog.DialogError:
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, not enough screen size", 7060)
-
-            if Autosubmit._requested_exit(code, d):
-                raise AutosubmitCritical(
-                    "Graphical visualization failed, requested exit", 7060)
-            elif code == dialog.Dialog.OK:
-                smtp_hostname = tag[0]
-                mail_from = tag[1]
-                break
-                # TODO: Check that is a valid config?
-
-        config_file = open(path, 'w')
-        d.infobox("Writing configuration file...", width=50, height=5)
-        try:
-            parser = ConfigParser()
-            parser.add_section('database')
-            parser.set('database', 'path', database_path)
-            if database_filename:
-                parser.set('database', 'filename', database_filename)
-            parser.add_section('local')
-            parser.set('local', 'path', local_root_path)
-            if jobs_conf_path or platforms_conf_path:
-                parser.add_section('conf')
-                if jobs_conf_path:
-                    parser.set('conf', 'jobs', jobs_conf_path)
-                if platforms_conf_path:
-                    parser.set('conf', 'platforms', platforms_conf_path)
-            parser.add_section('mail')
-            parser.set('mail', 'smtp_server', smtp_hostname)
-            parser.set('mail', 'mail_from', mail_from)
-            parser.write(config_file)
-            config_file.close()
-            d.msgbox("Configuration file written successfully",
-                     width=50, height=5)
-            os.system('clear')
-        except (IOError, OSError) as e:
-            raise AutosubmitCritical(
-                "Can not write config file", 7012, e.message)
-        return True
-
-    @staticmethod
-    def _requested_exit(code, d):
-        if code != dialog.Dialog.OK:
-            code = d.yesno(
-                'Exit configure utility without saving?', width=50, height=5)
-            if code == dialog.Dialog.OK:
-                os.system('clear')
-                return True
-        return False
-
-    @staticmethod
     def install():
         """Creates a new database instance for autosubmit at the configured path."""
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
@@ -4732,6 +4586,8 @@ class Autosubmit:
                 if reference not in status_list:
                     status_list.append(reference)
             for status in status_filter:
+                if status == "ANY":
+                    continue
                 if status not in status_list:
                     status_validation_error = True
                     status_validation_message += "\n\t There are no jobs with status " + \
@@ -5089,18 +4945,36 @@ class Autosubmit:
         """
         if filter_status:
             filter_status = filter_status.upper()
-        # TODO: unify filters. There is already an issue for that
-        # TODO: Normalize some filters that are the same ( To avoid changing the usage ... FIX in another PR)
-        filter_chunk_section_split = None
-        # TODO: TMP fix until the previous TODO is resolved. Select the one that is filled
-        for f in [filter_chunks, filter_type_chunk, filter_type_chunk_split]:
-            filter_chunk_section_split = f if f else filter_chunk_section_split
+        # legacy filters
+        if filter_type_chunk:
+            Log.warning(
+                "--filter_type_chunk is deprecated and will be removed in future versions. Use a combination of -ft and -fc."
+            )
+        if filter_type_chunk_split:
+            Log.warning(
+                "--filter_type_chunk_split is deprecated and will be removed in future versions. Use a combination of -ft and -fc."
+            )
+        # multiple overlapping filters selected
+        provided_chunk_filters = [
+            ("-fc/--filter_chunks", filter_chunks),
+            ("-ftc/--filter_type_chunk", filter_type_chunk),
+            ("-ftcs/--filter_type_chunk_split", filter_type_chunk_split)
+        ]
+        selected_chunk_filters = [name for name, value in provided_chunk_filters if value]
+        if len(selected_chunk_filters) > 1:
+            Log.warning(
+                "Multiple chunk filters provided (%s). Using -fc first, then -ftc, and finally -ftcs." 
+                " Use only one of them to avoid ambiguity."
+                % ", ".join(selected_chunk_filters)
+            )
+        # keep retro-compatibility with legacy filters while prioritizing -fc, then -ftc, and finally -ftcs
+        filter_chunk_section_split = filter_chunks or filter_type_chunk or filter_type_chunk_split
 
         check_ownership(expid, raise_error=True)
-        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-        tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
+        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+        tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
         try:
-            with Lock(os.path.join(tmp_path, 'autosubmit.lock'), timeout=1):
+            with Lock(Path(tmp_path, 'autosubmit.lock'), timeout=1):
                 Log.info(
                     "Preparing .lock file to avoid multiple instances with same expid.")
 
@@ -5155,59 +5029,41 @@ class Autosubmit:
                                                         filter_section)
                 #### Starts the filtering process ####
                 Log.info("Filtering jobs...")
-                final_list = []
+                all_jobs = job_list.get_job_list()
+                selected_job_names = {job.name for job in all_jobs}
+                
                 final_status = Autosubmit._get_status(final)
-                # I have the impression that whoever did this function thought about the possibility of having multiple filters at the same time
-                # But, as it was, it is not possible to have multiple filters at the same time due to the way the code is written
                 if filter_section:
                     ft = filter_section.split()
-                    if str(ft).upper() == 'ANY':
-                        for job in job_list.get_job_list():
-                            final_list.append(job)
-                    else:
-                        for section in ft:
-                            for job in job_list.get_job_list():
-                                if job.section == section:
-                                    final_list.append(job)
-                # TODO: unify filters in the args. There is already an issue for that
-                if filter_chunks or filter_type_chunk or filter_chunk_section_split:
+                    if not (len(ft) == 1 and ft[0].upper() == 'ANY'):
+                        selected_job_names &= {job.name for job in all_jobs if job.section in ft}
+
+                if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
-                    # The extend is because the code was thought to have multiple filters at the same time (but it is not possible for some combinations)
-                    final_list.extend(Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split))
-                    final_list = list(set(final_list))
+                    selected_job_names &={job.name for job in Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)}
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
                 if filter_status:
                     status_list = filter_status.split()
                     Log.debug(f"Filtering jobs with status {filter_status}")
-                    if str(status_list).upper() == 'ANY':
-                        for job in job_list.get_job_list():
-                            final_list.append(job)
-                    else:
-                        for status in status_list:
-                            fs = Autosubmit._get_status(status)
-                            for job in [j for j in job_list.get_job_list() if j.status == fs]:
-                                final_list.append(job)
+                    if not (len(status_list) == 1 and status_list[0].upper() == 'ANY'):
+                        allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
+                        selected_job_names &= {job.name for job in all_jobs if job.status in allowed_statuses}
 
                 if filter_list:
                     jobs = filter_list.split()
                     expidJoblist = defaultdict(int)
-                    for x in filter_list.split():
+                    for x in jobs:
                         expidJoblist[str(x[0:4])] += 1
                     if str(expid) in expidJoblist:
-                        wrongExpid = jobs.__len__() - expidJoblist[expid]
+                        wrongExpid = len(jobs) - expidJoblist[expid]
                     if wrongExpid > 0:
                         Log.warning(f"There are {wrongExpid} job.name with an invalid Expid")
-                    if str(jobs).upper() == 'ANY':
-                        for job in job_list.get_job_list():
-                            final_list.append(job)
-                    else:
-                        for job in job_list.get_job_list():
-                            if job.name in jobs:
-                                final_list.append(job)
-
+                    if not (len(jobs) == 1 and jobs[0].upper() == 'ANY'):
+                        selected_job_names &= {job.name for job in all_jobs if job.name in jobs}
+                # preserve job list ordering
+                final_list = [job for job in all_jobs if job.name in selected_job_names]
                 # Time to change status
-                final_list = list(set(final_list))
                 performed_changes = {}
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")
                 for job in final_list:
@@ -5261,8 +5117,7 @@ class Autosubmit:
                     if as_conf.get_wrapper_type() != 'none' and check_wrapper:
                         packages_persistence = JobPackagePersistence(expid)
                         if BasicConfig.DATABASE_BACKEND == 'sqlite':
-                            os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
-                                                  expid, "pkl", "job_packages_" + expid + ".db"), 0o775)
+                            Path(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl", "job_packages_" + expid + ".db").chmod(0o775)
                         packages_persistence.reset_table(True)
                         job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
 
@@ -5288,8 +5143,7 @@ class Autosubmit:
                     monitor_exp = Monitor()
                     monitor_exp.generate_output(expid,
                                                 job_list.get_job_list(),
-                                                os.path.join(
-                                                    exp_path, "/tmp/LOG_", expid),
+                                                str(Path(exp_path, "tmp", "LOG_" + expid)),
                                                 output_format=output_type,
                                                 packages=packages,
                                                 show=not hide,

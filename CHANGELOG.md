@@ -6,10 +6,13 @@
 - Reduce the frequency with which energy data was not being stored for the last job of the batch #2657 #2418
 - Fixed issue with experiments running on LOCAL platform without a defined LOCAL entry in platforms.yml config file #1131
 - Fixed an issue with the ECMWF platform not working with the new online recovery
-- Changed logic in Slurm submission to look for submitted messaged (hotfix) #2886" 
+- Changed logic in Slurm submission to look for submitted messaged (hotfix) #2886
 - Calendar splits: last split boundaries #2866, last split not exported #2099 and splitsize not working at experiment level #2016.
 - Accept local/intranet email addresses in validation #1471
 - Set PROJECT_TYPE, PROJECT_DESTINATION and CUSTOM_CONFIG for experiments without minimal configuration #2864
+- Added priority and retro-compatibility for etc/autosubmitrc over etc/.autosubmitrc #2312
+- Updated Slurm wallclock truncation, allowing users to use e.g., 01:00:00 correctly #2059
+- Fixed exception trace in AutosubmitCritical and AutosubmitError not being displayed to the user #2109
 
 **Enhancements:**
 
@@ -20,6 +23,7 @@
   added to check that we produce valid crates with the `rocrate-validator` #2816
 - Changed Yaml load mode from 'safe' to 'rt' #2851
 - Add issues URL to error message #2888
+- Allow multiple filters in `setstatus` command #1250
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

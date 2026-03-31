@@ -20,20 +20,17 @@ from textwrap import dedent
 import pytest
 
 
-@pytest.mark.parametrize('suffix', [
-    '',
-    '/',
-    '//'
-])
+@pytest.mark.parametrize("suffix", ["", "/", "//"])
 def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
     # To update ``Path.home`` appending the provided suffix.
-    mocker.patch('autosubmit.autosubmit.get_rc_path').return_value = \
-        Path(str(tmp_path) + suffix, '.autosubmitrc')
+    mocker.patch("autosubmit.autosubmit.get_rc_path").return_value = Path(
+        str(tmp_path) + suffix, ".autosubmitrc"
+    )
 
     # assign values that will be passed on cmd
     database_filename = "autosubmit.db"
-    db_path = tmp_path / 'database'
-    lr_path = tmp_path / 'experiments'
+    db_path = tmp_path / "database"
+    lr_path = tmp_path / "experiments"
 
     autosubmit.configure(
         advanced=False,
@@ -45,7 +42,8 @@ def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
         smtp_hostname=None,
         mail_from=None,
         machine=False,
-        local=False)
+        local=False,
+    )
 
     expected = dedent(f"""\
         [database]
@@ -73,5 +71,77 @@ def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
         
         """)
 
-    with open(tmp_path / '.autosubmitrc', 'r') as file:
+    with open(tmp_path / ".autosubmitrc", "r") as file:
+        assert file.read() == expected
+
+
+@pytest.mark.parametrize("suffix", ["", "/", "//"])
+def test_configure_advanced(mocker, tmp_path, suffix: str, autosubmit) -> None:
+    """Test the advanced configuration options."""
+    # To update ``Path.home`` appending the provided suffix.
+    mocker.patch("autosubmit.autosubmit.get_rc_path").return_value = Path(
+        str(tmp_path) + suffix, ".autosubmitrc"
+    )
+
+    # assign values that will be passed on cmd
+    database_filename = "autosubmit.db"
+    db_path = tmp_path / "database"
+    lr_path = tmp_path / "experiments"
+    platforms_conf = tmp_path / "platforms.yml"
+    jobs_conf = tmp_path / "jobs.yml"
+    smtp_hostname = "smtp.example.com"
+    mail_from = "autosubmit@example.com"
+
+    # Create the platform and jobs config files
+    platforms_conf.write_text("# Platforms configuration\n")
+    jobs_conf.write_text("# Jobs configuration\n")
+
+    autosubmit.configure(
+        advanced=True,
+        database_path=str(db_path),
+        database_filename=database_filename,
+        local_root_path=str(lr_path),
+        platforms_conf_path=str(platforms_conf),
+        jobs_conf_path=str(jobs_conf),
+        smtp_hostname=smtp_hostname,
+        mail_from=mail_from,
+        machine=False,
+        local=False,
+    )
+
+    expected = dedent(f"""\
+        [database]
+        backend = sqlite
+        path = {str(tmp_path)}/database
+        filename = autosubmit.db
+        
+        [local]
+        path = {str(tmp_path)}/experiments
+        
+        [conf]
+        jobs = {str(jobs_conf)}
+        platforms = {str(platforms_conf)}
+        
+        [mail]
+        smtp_server = smtp.example.com
+        mail_from = autosubmit@example.com
+        
+        [globallogs]
+        path = {str(tmp_path)}/experiments/logs
+        
+        [structures]
+        path = {str(tmp_path)}/experiments/metadata/structures
+        
+        [historicdb]
+        path = {str(tmp_path)}/experiments/metadata/data
+        
+        [historiclog]
+        path = {str(tmp_path)}/experiments/metadata/logs
+        
+        [autosubmitapi]
+        url = http://192.168.11.91:8081 # Replace me?
+        
+        """)
+
+    with open(tmp_path / ".autosubmitrc", "r") as file:
         assert file.read() == expected

@@ -64,3 +64,33 @@ def test_exceptions_raised(exception: BaseException, raised: BaseException, stat
         assert status
         status_returned, _ = Autosubmit.parse_args()
         assert status_returned == status
+
+
+def test_setstatus_accepts_combined_filters(mocker):
+    """Test that the combined ``setstatus`` filters should parse correctly."""
+    mocker.patch(
+        "sys.argv",
+        [
+            "autosubmit",
+            "setstatus",
+            "a000",
+            "-fl",
+            "a000_20200101_fc0_1_1_LOCALJOB",
+            "-fc",
+            "[20200101 [ fc0 [1] ] ]",
+            "-ft",
+            "LOCALJOB",
+            "-fs",
+            "WAITING",
+            "-t",
+            "READY",
+        ],
+    )
+    status, args = Autosubmit.parse_args()
+
+    assert status == 0
+    assert args.command == "setstatus"
+    assert args.list == "a000_20200101_fc0_1_1_LOCALJOB"
+    assert args.filter_chunks == "[20200101 [ fc0 [1] ] ]"
+    assert args.filter_type == "LOCALJOB"
+    assert args.filter_status == "WAITING"

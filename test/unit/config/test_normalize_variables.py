@@ -414,6 +414,50 @@ from autosubmit.log.log import AutosubmitCritical
             True,
             id="wallclock"
         ),
+        pytest.param(
+            {
+                "JOBS": {
+                    "job1": {
+                        "FILE": "FILE1",
+                        "WALLCLOCK": "1:00:00"
+                    }
+                }
+            },
+            {
+                'JOBS': {
+                    'JOB1': {
+                        'FILE': 'FILE1',
+                        'ADDITIONAL_FILES': [],
+                        'DEPENDENCIES': {},
+                        'WALLCLOCK': "1:00",
+                    },
+                }
+            },
+            True,
+            id="wallclock_single_digit_hour"
+        ),
+        pytest.param(
+            {
+                "JOBS": {
+                    "job1": {
+                        "FILE": "FILE1",
+                        "WALLCLOCK": "9:30:45"
+                    }
+                }
+            },
+            {
+                'JOBS': {
+                    'JOB1': {
+                        'FILE': 'FILE1',
+                        'ADDITIONAL_FILES': [],
+                        'DEPENDENCIES': {},
+                        'WALLCLOCK': "9:30",
+                    },
+                }
+            },
+            True,
+            id="wallclock_single_digit_hour_non_zero_seconds"
+        ),
     ]
 )
 def test_normalize_variables(autosubmit_config, data, expected_data, must_exists):
