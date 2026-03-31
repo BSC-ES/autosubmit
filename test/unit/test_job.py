@@ -1108,11 +1108,12 @@ def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greate
     assert job.local_logs[1] == str(expected_local_logs[1])
 
 
-@pytest.mark.parametrize('experiment_data, attributes_to_check', [(
+@pytest.mark.parametrize('experiment_data, attributes_to_check', [
+    (
         {
             'JOBS': {
                 'RANDOM-SECTION': {
-                    'FILE': "test.sh",
+                    'FILE': 'test.sh',
                     'PLATFORM': 'DUMMY_PLATFORM',
                     'NOTIFY_ON': 'COMPLETED',
                 },
@@ -1127,12 +1128,100 @@ def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greate
             'LOCAL_ROOT_DIR': 'dummy_rootdir',
         },
         {'notify_on': ['COMPLETED']}
-)])
+    ),
+    (
+        {
+            'JOBS': {
+                'RANDOM-SECTION': {
+                    'FILE': 'test.sh',
+                    'PLATFORM': 'DUMMY_PLATFORM',
+                    'CPMIP_THRESHOLDS': {
+                        'SYPD': {
+                            'THRESHOLD': 5.0,
+                            'COMPARISON': 'greater_than',
+                            '%_ACCEPTED_ERROR': 10,
+                        }
+                    },
+                },
+            },
+        },
+        {
+            'cpmip_thresholds': {
+                'SYPD': {
+                    'THRESHOLD': 5.0,
+                    'COMPARISON': 'greater_than',
+                    '%_ACCEPTED_ERROR': 10,
+                }
+            }
+        }
+    ),
+    (
+        {
+            'JOBS': {
+                'RANDOM-SECTION': {
+                    'FILE': 'test.sh',
+                    'PLATFORM': 'DUMMY_PLATFORM',
+                },
+            },
+        },
+        {'cpmip_thresholds': {}}
+    ),
+    (
+        {
+            'EXPERIMENT': {
+                'CHUNKSIZE': 3,
+                'CHUNKSIZEUNIT': 'MONTH',
+            },
+            'JOBS': {
+                'RANDOM-SECTION': {
+                    'FILE': 'test.sh',
+                    'PLATFORM': 'DUMMY_PLATFORM',
+                },
+            },
+        },
+        {'chunk_size': 3, 'chunk_size_unit': 'month'}
+    ),
+    (
+        {
+            'EXPERIMENT': {
+                'CHUNKSIZE': 1,
+                'CHUNKSIZEUNIT': 'day',
+            },
+            'JOBS': {
+                'RANDOM-SECTION': {
+                    'FILE': 'test.sh',
+                    'PLATFORM': 'DUMMY_PLATFORM',
+                    'CHUNKSIZE': 12,
+                    'CHUNKSIZEUNIT': 'HOUR',
+                },
+            },
+        },
+        {'chunk_size': 12, 'chunk_size_unit': 'hour'}
+    ),
+    (
+        {
+            'JOBS': {
+                'RANDOM-SECTION': {
+                    'FILE': 'test.sh',
+                    'PLATFORM': 'DUMMY_PLATFORM',
+                },
+            },
+        },
+        {'chunk_size': 1, 'chunk_size_unit': ''}
+    ),
+], ids=[
+    'notify_on_attribute',
+    'cpmip_thresholds_from_config',
+    'empty_cpmip_thresholds_when_missing',
+    'chunk_metadata_from_experiment_defaults',
+    'chunk_metadata_with_job_overrides',
+    'chunk_metadata_when_missing',
+])
 def test_update_parameters_attributes(autosubmit_config, experiment_data, attributes_to_check):
     job, _, _ = create_job_and_update_parameters(autosubmit_config, experiment_data)
-    for attr in attributes_to_check:
+    for attr, expected in attributes_to_check.items():
         assert hasattr(job, attr)
-        assert getattr(job, attr) == attributes_to_check[attr]
+        assert getattr(job, attr) == expected
 
 
 @pytest.mark.parametrize('custom_directives, test_type, result_by_lines', [
