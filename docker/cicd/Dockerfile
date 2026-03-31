@@ -12,13 +12,15 @@ RUN apt-get update \
     git \
     curl \
     graphviz \
+    libnss-wrapper \
     libpq-dev \
     python3.9 python3.9-venv python3.9-dev \
     python3.10 python3.10-venv python3.10-dev \
     python3.11 python3.11-venv python3.11-dev \
-    python3.11 python3.11-venv python3.12-dev \
+    python3.12 python3.12-venv python3.12-dev \
     r-base \
     rsync \
+    tini \
     xvfb \
     wget \
     && rm -rf /var/lib/apt/lists/*
@@ -41,6 +43,11 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py \
 
 RUN update-alternatives --set python3 /usr/bin/python3.9
 
-WORKDIR /workspace
+RUN chmod 666 /etc/passwd /etc/group
+RUN mkdir -p /tmp/userhome && chmod 1777 /tmp /tmp/userhome
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
+WORKDIR /workspace
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD [ "bash" ]

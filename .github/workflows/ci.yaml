@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/bsc-es/autosubmit-ci:latest
+      options: --init --user $(id -u):$(id -g)
     timeout-minutes: 10
 
     strategy:
@@ -72,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/bsc-es/autosubmit-ci:latest
-      options: --user 0 -v /var/run/docker.sock:/var/run/docker.sock
+      options: --init --user 0 -v /var/run/docker.sock:/var/run/docker.sock
     timeout-minutes: 10
 
     strategy:
