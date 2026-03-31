@@ -309,6 +309,72 @@ def test_set_status_section_any_with_chunk_filter_does_not_restrict(as_exp):
     assert len(completed_jobs) == 9
 
 
+@pytest.mark.parametrize(
+    "ft_filter, expected_jobs",
+    [
+        ("LOCALJOB [2]", 8),
+        ("LOCALJOB [2-3]", 16),
+        ("LOCALJOB [2:3]", 16),
+        ("LOCALJOB [ANY]", 24),
+    ],
+)
+def test_set_status_filter_type_with_splits(as_exp, ft_filter, expected_jobs):
+    """``-ft`` should support split selectors per section."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list_ = do_setstatus(
+        as_exp,
+        ft=ft_filter,
+        target="COMPLETED",
+    )
+
+    completed_jobs = [
+        job
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED and job.section == "LOCALJOB"
+    ]
+    assert len(completed_jobs) == expected_jobs
+
+
+def test_set_status_filter_type_invalid_section_raises_validation_error(as_exp):
+    """Unknown sections in ``-ft`` must fail validation before changing any status."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    with pytest.raises(AutosubmitCritical):
+        do_setstatus(
+            as_exp,
+            ft="DOES_NOT_EXIST [1]",
+            target="COMPLETED",
+        )
+
+
+def test_set_status_filter_chunks_invalid_section_raises_validation_error(as_exp):
+    """Unknown sections in ``-fc`` section/split suffix must fail validation."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    with pytest.raises(AutosubmitCritical):
+        do_setstatus(
+            as_exp,
+            fc="[20200101 [ fc0 [1] ] ],DOES_NOT_EXIST [1]",
+            target="COMPLETED",
+        )
+
+
 def test_set_status_invalid_job_in_list_raises_validation_error(as_exp):
     """Invalid job IDs in ``-fl`` must fail validation without bypassing validators."""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
