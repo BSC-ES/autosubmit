@@ -2904,3 +2904,16 @@ class AutosubmitConfig(object):
             if isinstance(wrapper, dict) and section in wrapper.get("JOBS_IN_WRAPPER", []):
                 return wrapper
         return {}
+    
+    def get_cpmip_thresholds(self, job_section: str) -> dict:
+        """Returns the CPMIP thresholds for a given job section.
+
+        :param job_section: job section
+        :type job_section: str
+        :return: CPMIP thresholds
+        :rtype: dict
+        """
+        thresholds = self.jobs_data.get(job_section, {}).get("CPMIP_THRESHOLDS", {})
+        if isinstance(thresholds, dict):
+            return thresholds
+        return {}
