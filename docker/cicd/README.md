@@ -19,6 +19,7 @@ docker login ghcr.io
 ```
 
 ```bash
+docker build -t ghcr.io/autosubmit-ci:latest .
 docker push autosubmit/autosubmit-ci:latest
-docker ghcr.io/push bsc-es/autosubmit-ci:latest
+docker push ghcr.io/autosubmit-ci:latest
 ```
