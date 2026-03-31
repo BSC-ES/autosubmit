@@ -87,7 +87,7 @@ EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
             'chunk_first': 'True if the current chunk is the first, false otherwise.',
             'chunk_last': 'True if the current chunk is the last, false otherwise.',
             'run_days': 'Chunk length in days.',
-            'notify_on': 'Determine the job statuses you want to be notified.',
+            'notify_on': 'Determine the job statuses you want to be notified.'
         },
         'config': {
             'config.autosubmit_version': 'Current version of Autosubmit.',
