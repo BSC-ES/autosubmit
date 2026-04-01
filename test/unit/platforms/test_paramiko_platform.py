@@ -23,6 +23,7 @@ from typing import Generator, Optional, TYPE_CHECKING
 
 import pytest
 
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical
@@ -743,3 +744,287 @@ def test_ps_get_job_names_cmd_contains_expected_components(
 
     assert "job_a" in cmd
     assert "job_b" in cmd
+
+
+@pytest.mark.parametrize("mode", ["all", "specific"])
+def test_get_completed_job_names(tmp_path, mode):
+    """Test that completed job names are correctly retrieved from the remote platform."""
+    # Actually we want to test a paramiko function, but using local platform for simplicity with the "send_command" part.
+    platform = LocalPlatform(expid='t001', name='local', config={})
+    platform.remote_log_dir = tmp_path / 't001/remote_logs'
+    platform.remote_log_dir.mkdir(parents=True, exist_ok=True)
+    platform.connected = True
+    completed_jobs = ['job1_COMPLETED', 'job2_COMPLETED', 'job3_COMPLETED']
+    for job_file in completed_jobs:
+        (platform.remote_log_dir / job_file).touch()
+
+    if mode == "all":
+        job_names = platform.get_completed_job_names()
+        expected_job_names = ['job1', 'job2', 'job3']
+    else:
+        job_names = platform.get_completed_job_names(job_names=['job1', 'job3'])
+        expected_job_names = ['job1', 'job3']
+    assert set(job_names) == set(expected_job_names)
+
+
+def _make_job(name: str, job_id: str, status: int, platform: ParamikoPlatform) -> Job:
+    """Return a minimal Job attached to ``platform``."""
+    job = Job(name=name, job_id=job_id, status=status, priority=0)
+    job.platform = platform
+    return job
+
+
+@pytest.fixture
+def multi_platform_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Return LOCAL, PS, and SLURM platforms, each with send_command patched to a tracker."""
+    base_config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"}
+    slurm_config = {**base_config, "LOCAL_ASLOG_DIR": "ASLOGS"}
+
+    local = LocalPlatform(expid="a000", name="local", config=base_config)
+    ps = PsPlatform(expid="a000", name="ps", config=base_config)
+    slurm = SlurmPlatform(expid="a000", name="slurm", config=slurm_config)
+
+    sent: dict[str, list[str]] = {"local": [], "ps": [], "slurm": []}
+    for platform, key in [(local, "local"), (ps, "ps"), (slurm, "slurm")]:
+        monkeypatch.setattr(
+            platform, "send_command", lambda cmd, _k=key, **kw: sent[_k].append(cmd)
+        )
+
+    return {"platforms": {"local": local, "ps": ps, "slurm": slurm}, "sent": sent}
+
+
+@pytest.mark.parametrize(
+    "active_status",
+    [Status.QUEUING, Status.RUNNING, Status.SUBMITTED],
+    ids=["QUEUING", "RUNNING", "SUBMITTED"],
+)
+def test_change_status_sends_batch_cancel_per_platform_with_mixed_job_list(
+        active_status: int,
+        multi_platform_setup: dict,
+) -> None:
+    """Test that batched cancel commands are dispatched independently per platform."""
+    platforms = multi_platform_setup["platforms"]
+    sent = multi_platform_setup["sent"]
+
+    jobs_by_platform = {
+        "local": [_make_job(f"job_local_{i}", f"l{i}", active_status, platforms["local"]) for i in range(3)],
+        "ps": [_make_job(f"job_ps_{i}", f"p{i}", active_status, platforms["ps"]) for i in range(3)],
+        "slurm": [_make_job(f"job_slurm_{i}", f"s{i}", active_status, platforms["slurm"]) for i in range(3)],
+    }
+    all_jobs = [job for jobs in jobs_by_platform.values() for job in jobs]
+
+    changes = Autosubmit.change_status(
+        final="FAILED",
+        final_status=Status.FAILED,
+        final_list=all_jobs,
+        save=True,
+        definitive_platforms=list(platforms.keys()),
+        platforms=platforms,
+    )
+
+    assert len(changes) == 9
+    for job in all_jobs:
+        assert job.status == Status.FAILED
+        assert job.name in changes
+
+    for platform_name in ("local", "ps", "slurm"):
+        assert len(sent[platform_name]) == 1, (
+            f"Expected one batched call for '{platform_name}', "
+            f"got {len(sent[platform_name])}"
+        )
+
+    assert platforms["local"].cancel_cmd in sent["local"][0]  # "kill -SIGINT"
+    assert platforms["ps"].cancel_cmd in sent["ps"][0]  # "kill -SIGINT"
+    assert platforms["slurm"].cancel_cmd in sent["slurm"][0]  # "scancel"
+
+
+@pytest.mark.parametrize(
+    "initial_status,final,final_status",
+    [
+        (Status.WAITING, "FAILED", Status.FAILED),
+        (Status.READY, "COMPLETED", Status.COMPLETED),
+        (Status.FAILED, "WAITING", Status.WAITING),
+    ],
+    ids=["WAITING->FAILED", "READY->COMPLETED", "FAILED->WAITING"],
+)
+def test_change_status_applies_status_to_all_jobs(
+        initial_status: int,
+        final: str,
+        final_status: int,
+        multi_platform_setup: dict,
+) -> None:
+    """Test that change_status sets the target status on all jobs and records them in performed_changes."""
+    platforms = multi_platform_setup["platforms"]
+    jobs = [
+        _make_job(f"job_{name}", str(i), initial_status, platform)
+        for i, (name, platform) in enumerate(platforms.items())
+    ]
+
+    changes = Autosubmit.change_status(
+        final=final,
+        final_status=final_status,
+        final_list=jobs,
+        save=False,
+        definitive_platforms=[],
+        platforms={},
+    )
+
+    for job in jobs:
+        assert job.status == final_status
+        assert job.name in changes
+        assert Status.VALUE_TO_KEY[initial_status] in changes[job.name]
+        assert final in changes[job.name]
+
+
+def test_change_status_skips_jobs_already_at_final_status(
+        multi_platform_setup: dict,
+) -> None:
+    """Test that jobs already at the target status produce no entry in performed_changes."""
+    platforms = multi_platform_setup["platforms"]
+    jobs = [
+        _make_job(f"job_{name}", str(i), Status.FAILED, platform)
+        for i, (name, platform) in enumerate(platforms.items())
+    ]
+
+    changes = Autosubmit.change_status(
+        final="FAILED",
+        final_status=Status.FAILED,
+        final_list=jobs,
+        save=False,
+        definitive_platforms=[],
+        platforms={},
+    )
+
+    assert changes == {}
+    for job in jobs:
+        assert job.status == Status.FAILED
+
+
+@pytest.mark.parametrize(
+    "active_status",
+    [Status.QUEUING, Status.RUNNING, Status.SUBMITTED],
+    ids=["QUEUING", "RUNNING", "SUBMITTED"],
+)
+def test_change_status_skips_active_job_with_unreachable_platform(
+        active_status: int,
+        multi_platform_setup: dict,
+) -> None:
+    """Test that active jobs whose platforms are all unreachable keep their original status."""
+    platforms = multi_platform_setup["platforms"]
+    jobs = [
+        _make_job(f"job_{name}", str(i), active_status, platform)
+        for i, (name, platform) in enumerate(platforms.items())
+    ]
+
+    changes = Autosubmit.change_status(
+        final="FAILED",
+        final_status=Status.FAILED,
+        final_list=jobs,
+        save=True,
+        definitive_platforms=[],  # no platform reachable
+        platforms=platforms,
+    )
+
+    assert changes == {}
+    for job in jobs:
+        assert job.status == active_status
+
+
+@pytest.mark.parametrize(
+    "active_status",
+    [Status.QUEUING, Status.RUNNING, Status.SUBMITTED],
+    ids=["QUEUING", "RUNNING", "SUBMITTED"],
+)
+def test_change_status_sends_one_batch_cancel_per_platform(
+        active_status: int,
+        multi_platform_setup: dict,
+) -> None:
+    """Test that N active jobs on a platform produce exactly one batched cancel call, not N."""
+    platforms = multi_platform_setup["platforms"]
+    sent = multi_platform_setup["sent"]
+
+    jobs_per_platform = 3
+    all_jobs = [
+        _make_job(f"job_{name}_{i}", f"{name[0]}{i}", active_status, platform)
+        for name, platform in platforms.items()
+        for i in range(jobs_per_platform)
+    ]
+
+    changes = Autosubmit.change_status(
+        final="FAILED",
+        final_status=Status.FAILED,
+        final_list=all_jobs,
+        save=True,
+        definitive_platforms=list(platforms.keys()),
+        platforms=platforms,
+    )
+
+    assert len(changes) == jobs_per_platform * len(platforms)
+    for platform_name in ("local", "ps", "slurm"):
+        assert len(sent[platform_name]) == 1, (
+            f"Expected one batched call for '{platform_name}', "
+            f"got {len(sent[platform_name])}"
+        )
+        for i in range(jobs_per_platform):
+            assert f"{platform_name[0]}{i}" in sent[platform_name][0]
+
+
+def test_change_status_no_cancel_when_save_is_false(
+        multi_platform_setup: dict,
+) -> None:
+    """Test that no cancel is dispatched to any platform when save is False."""
+    platforms = multi_platform_setup["platforms"]
+    sent = multi_platform_setup["sent"]
+
+    jobs = [
+        _make_job(f"job_{name}", str(i), Status.RUNNING, platform)
+        for i, (name, platform) in enumerate(platforms.items())
+    ]
+
+    changes = Autosubmit.change_status(
+        final="FAILED",
+        final_status=Status.FAILED,
+        final_list=jobs,
+        save=False,
+        definitive_platforms=list(platforms.keys()),
+        platforms=platforms,
+    )
+
+    for job in jobs:
+        assert job.status == Status.FAILED
+        assert job.name in changes
+    for platform_name in ("local", "ps", "slurm"):
+        assert sent[platform_name] == []
+
+
+def test_change_status_handles_send_command_failure_gracefully(
+        multi_platform_setup: dict,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that send_command failures across all platforms do not prevent status changes."""
+    platforms = multi_platform_setup["platforms"]
+
+    def _raise(*args, **kwargs):
+        raise Exception("SSH connection lost")
+
+    for platform in platforms.values():
+        monkeypatch.setattr(platform, "send_command", _raise)
+
+    jobs = [
+        _make_job(f"job_{name}", str(i), Status.RUNNING, platform)
+        for i, (name, platform) in enumerate(platforms.items())
+    ]
+
+    changes = Autosubmit.change_status(
+        final="FAILED",
+        final_status=Status.FAILED,
+        final_list=jobs,
+        save=True,
+        definitive_platforms=list(platforms.keys()),
+        platforms=platforms,
+    )
+
+    assert len(changes) == len(platforms)
+    for job in jobs:
+        assert job.status == Status.FAILED
+        assert job.name in changes
