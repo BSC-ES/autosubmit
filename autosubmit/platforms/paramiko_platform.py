@@ -35,7 +35,6 @@ import paramiko
 import Xlib.support.connect as xlib_connect
 from bscearth.utils.date import date2str
 from paramiko import ProxyCommand
-from paramiko.agent import Agent
 from paramiko.ssh_exception import SSHException
 
 from autosubmit.job.job_common import Status
@@ -174,13 +173,13 @@ class ParamikoPlatform(Platform):
 
         self.remove_log_files_on_transfer = False
         if self.config:
-            platform_config = self.config.get("PLATFORMS", {}).get(
+            platform_config: dict = self.config.get("PLATFORMS", {}).get(
                 self.name.upper(), {}
             )
             self.remove_log_files_on_transfer = platform_config.get(
                 "REMOVE_LOG_FILES_ON_TRANSFER", False
             )
-        self._uses_local_api = False
+        self._uses_local_api: bool = False
         # Pre-submission snapshot used by get_submitted_jobs_by_name to exclude
         # stale processes from previous runs on process-based platforms.
         self._pre_submission_pids: dict[str, set[int]] = {}
@@ -1276,8 +1275,6 @@ class ParamikoPlatform(Platform):
         :type command: str
         :param bufsize: interpreted the same way as by the built-in ``file()`` function in Python.
         :type bufsize: int
-        :param timeout: set command's channel timeout. See ``Channel.settimeout``.
-        :type timeout: int
         :return: the stdin, stdout, and stderr of the executing command
         """
         for retry in range(retries):
