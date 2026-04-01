@@ -4512,32 +4512,62 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def change_status(final, final_status, job, save):
-        """Set job status to final.
+    def change_status(
+            final: str,
+            final_status: int,
+            final_list: list["Job"],
+            save: bool,
+            definitive_platforms: list[str],
+            platforms: dict[str, ParamikoPlatform],
+    ) -> dict[str, str]:
+        """Apply a status change to all jobs in final_list and cancel active jobs on their platforms.
 
-        :param save:
-        :param final:
-        :param final_status:
-        :param job:
+        Iterates over ``final_list``, skipping jobs already at ``final_status``.
+        For jobs moving out of an active status, the platform connection is verified
+        and a batch cancel command is queued. All queued cancels are dispatched
+        once after the loop.
+
+        :param final: Human-readable name of the target status.
+        :param final_status: Numeric status value to assign.
+        :param final_list: Jobs selected for the status change.
+        :param save: Whether changes should be persisted.
+        :param definitive_platforms: Names of platforms with a confirmed connection.
+        :param platforms: Mapping of platform name to Platform instance.
+        :return: Mapping of job name to ``"old_status -> new_status"`` strings.
         """
-        if save:
-            if job.status in [Status.SUBMITTED, Status.QUEUING, Status.HELD] and final_status not in [Status.QUEUING,
-                                                                                                      Status.HELD,
-                                                                                                      Status.SUSPENDED]:
-                job.hold = False
-                if job.platform_name and job.platform_name.upper() != "LOCAL":
-                    job.platform.send_command(job.platform.cancel_cmd + " " + str(job.id), ignore_log=True)
-            elif job.status in [Status.QUEUING, Status.RUNNING, Status.SUBMITTED] and final_status == Status.SUSPENDED:
-                if job.platform_name and job.platform_name.upper() != "LOCAL":
-                    job.platform.send_command("scontrol hold " + f"{job.id}", ignore_log=True)
-            elif final_status in [Status.QUEUING, Status.RUNNING] and (job.status == Status.SUSPENDED):
-                if job.platform_name and job.platform_name.upper() != "LOCAL":
-                    job.platform.send_command("scontrol release " + f"{job.id}", ignore_log=True)
-        if job.status == Status.FAILED and job.status != final_status:
-            job._fail_count = 0
-        job.status = final_status
-        Log.info("CHANGED: job: " + job.name + " status to: " + final)
-        Log.status("CHANGED: job: " + job.name + " status to: " + final)
+        performed_changes: dict[str, str] = {}
+        batch_cancel_commands: dict[str, list[str]] = defaultdict(list)
+        _active_statuses = {Status.QUEUING, Status.RUNNING, Status.SUBMITTED}
+
+        for job in final_list:
+            if job.status == final_status:
+                continue
+
+            if save and job.status in _active_statuses and final_status not in _active_statuses:
+                if job.platform.name not in definitive_platforms:
+                    Log.error(
+                        f"Cannot change status of job [{job.name}] because the connection to its "
+                        f"platform [{job.platform.name}] could not be established. "
+                        f"Please check the platform connection and try again.",
+                        7013,
+                    )
+                    Log.error(f"Job [{job.name}] status will remain as {Status.VALUE_TO_KEY[job.status]}.")
+                    continue
+                batch_cancel_commands[job.platform.name].append(f"{job.platform.cancel_cmd} {job.id}; ")
+
+            performed_changes[job.name] = f"{Status.VALUE_TO_KEY[job.status]} -> {final}"
+            job.status = final_status
+            Log.info(f"CHANGED: job: {job.name} status to: {final}")
+            Log.status(f"CHANGED: job: {job.name} status to: {final}")
+
+        if save and batch_cancel_commands:
+            for platform_name, cancel_cmds in batch_cancel_commands.items():
+                try:
+                    platforms[platform_name].send_command("".join(cancel_cmds), ignore_log=True)
+                except Exception as e:
+                    Log.error(f"Failed to send batch cancel command to platform {platform_name}: {e}")
+
+        return performed_changes
 
     @staticmethod
     def _validate_section(as_conf: AutosubmitConfig, filter_section: str) -> None:
@@ -5246,23 +5276,11 @@ class Autosubmit:
                 # preserve job list ordering
                 final_list = [job for job in all_jobs if job.name in selected_job_names]
                 # Time to change status
-                performed_changes = {}
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")
-                for job in final_list:
-                    if final_status in [Status.WAITING, Status.PREPARED, Status.DELAYED, Status.READY]:
-                        job.fail_count = 0
-                    if job.status in [Status.QUEUING, Status.RUNNING,
-                                      Status.SUBMITTED] and job.platform.name not in definitive_platforms:
-                        Log.printlog(f"JOB: [{job.platform.name}] is ignored as the [{job.name}] platform is currently"
-                                     f" offline", 6000)
-                        continue
-                    if job.status != final_status:
-                        # Only real changes
-                        performed_changes[job.name] = str(
-                            Status.VALUE_TO_KEY[job.status]) + " -> " + str(final)
-                        Autosubmit.change_status(
-                            final, final_status, job, save)
-                # If changes have been performed
+                performed_changes = Autosubmit.change_status(
+                    final, final_status, final_list, save, definitive_platforms, platforms
+                )
+
                 if performed_changes:
                     if detail:
                         current_length = len(job_list.get_job_list())
