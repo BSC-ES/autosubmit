@@ -282,9 +282,11 @@ class Job(object):
         self.is_wrapper = False
         self._wallclock_in_seconds = None
         self._notify_on = None
-        self._cpmip_thresholds = {}
-        self._chunk_size = None
-        self._chunk_size_unit = None
+        # The three variables under this message are related to the #PR2918 that is a development
+        # focused on adding the key information for computing the simulated years for the CPMIPS metrics.
+        self._cpmip_thresholds = {} 
+        self._chunk_size = None 
+        self._chunk_size_unit = None 
         self._processors_per_node = None
         self.ec_queue = None
         self.platform_name = None
@@ -2020,11 +2022,9 @@ class Job(object):
         self.ext_tailer_path = as_conf.jobs_data.get(self.section, {}).get('EXTENDED_TAILER_PATH', None)
         if self.platform_name:
             self.platform_name = self.platform_name.upper()
-        self.cpmip_thresholds = as_conf.jobs_data.get(self.section, {}).get("CPMIP_THRESHOLDS", {})
-        self.chunk_size = as_conf.jobs_data.get(self.section, {}).get("CHUNKSIZE", as_conf.get_chunk_size())
-        self.chunk_size_unit = str(as_conf.jobs_data.get(self.section, {}).get(
-            "CHUNKSIZEUNIT", as_conf.get_chunk_size_unit()
-        )).lower()
+        self._cpmip_thresholds = as_conf.jobs_data.get(self.section, {}).get("CPMIP_THRESHOLDS", {})
+        self._chunk_size = as_conf.get_chunk_size()
+        self._chunk_size_unit = as_conf.get_chunk_size_unit().lower()
 
     def update_check_variables(self, as_conf: AutosubmitConfig) -> None:
         job_data = as_conf.jobs_data.get(self.section, {})
