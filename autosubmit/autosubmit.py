@@ -4521,6 +4521,7 @@ class Autosubmit:
         else:
             valid_sections = {str(section).upper() for section in as_conf.jobs_data}
             for raw_section in Autosubmit._split_section_filter_entries(filter_section):
+                print(f"Validating section entry: '{raw_section}'")
                 section = raw_section.strip()
                 if not section:
                     continue
@@ -4579,7 +4580,8 @@ class Autosubmit:
     def _split_section_filter_entries(filter_section: str) -> list[str]:
         """Split ``-ft`` filter into section entries preserving split blocks.
         Entries are space-separated section names, optionally followed by
-        a bracketed split block. Spaces inside brackets are not separators:
+        a bracketed split block. 
+        Examples of valid entries:
         LOCALJOB PSJOB
         LOCALJOB [1 2] PSJOB [3-5]
         LOCALJOB [1 2] PSJOB
@@ -4590,7 +4592,7 @@ class Autosubmit:
             return []
 
         entries = []
-        current: list[str] = []
+        current = []
         level = 0
         i = 0
         while i < len(text):
@@ -4884,32 +4886,16 @@ class Autosubmit:
         if all_empty:
             raise AutosubmitCritical("At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.", 7014)
 
-
     @staticmethod
     def _split_match(j: Job, split_list: list[str]) -> bool:
-        """Check if job split matches a split filter.
-        
-        A job matches if:
-        - No split filter was provided (split_list is empty)
-        - Split filter contains 'ANY'
-        - Job has splits AND its split is in the filter list
-        - Job has no splits (split < 0) and no split filter was provided
-        """
-        # If no split filter, match all jobs
-        if not split_list:
-            return True
-        # If split filter contains ANY, match all jobs
-        if "ANY" in split_list:
-            return True
-        # If job has no splits (split < 0), it shouldn't match a specific split filter
-        if j.split < 0:
-            return False
-        # If job has only one split (not actually split), match only if split_list is empty or ANY
-        # This is already handled above, so if we're here, no match for non-split jobs
-        if not j.splits or int(j.splits) < 2:
-            return False
-        # Job has multiple splits, check if it matches the filter
-        return str(j.split) in split_list
+        """Check if job split matches"""
+        return (
+            "ANY" in split_list
+            or not j.splits
+            or int(j.splits) < 2
+            or not split_list
+            or str(j.split) in split_list
+        )
 
     @staticmethod
     def _filter_sections_splits(filter_section_splits: str, jobs: list[Job]) -> list[Job]:
