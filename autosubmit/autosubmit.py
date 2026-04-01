@@ -4500,7 +4500,7 @@ class Autosubmit:
         Log.status("CHANGED: job: " + job.name + " status to: " + final)
 
     @staticmethod
-    def _validate_section(as_conf, filter_section):
+    def _validate_section(as_conf: AutosubmitConfig, filter_section: str) -> None:
         """Validates the section filter input.
         Expected format for each section entry: SECTION or SECTION [1 2 5-8]
 
@@ -4575,58 +4575,38 @@ class Autosubmit:
                     7011,
                     section_validation_message,
                 )
-    
+
     @staticmethod
     def _split_section_filter_entries(filter_section: str) -> list[str]:
         """Split ``-ft`` filter into section entries preserving split blocks.
-        Entries are space-separated section names, optionally followed by
-        a bracketed split block. 
+        Entries are section names, optionally followed by a bracketed split block.
+        The separation between sections is a comma.
         Examples of valid entries:
         LOCALJOB PSJOB
-        LOCALJOB [1 2] PSJOB [3-5]
-        LOCALJOB [1 2] PSJOB
+        LOCALJOB [1 2], PSJOB [3-5]
+        LOCALJOB [12] PSJOB
         LOCALJOB [1]
+
+        :param filter_section: string with the sections separated by blank space
+        :return: list of section entries
         """
         text = filter_section.strip()
         if not text:
             return []
 
         entries = []
-        current = []
-        level = 0
-        i = 0
-        while i < len(text):
-            ch = text[i]
-            if ch == "[":
-                level += 1
-                current.append(ch)
-            elif ch == "]":
-                level = max(0, level - 1)
-                current.append(ch)
-            elif ch == " " and level == 0:
-                # peek ahead, skip spaces, check if next char is '['
-                j = i + 1
-                while j < len(text) and text[j] == " ":
-                    j += 1
-                if j < len(text) and text[j] == "[":
-                    # space between section name and its bracket block, keep together
-                    current.append(ch)
-                else:
-                    # space between two entries, flush current
-                    entry = "".join(current).strip()
-                    if entry:
-                        entries.append(entry)
-                    current = []
-            else:
-                current.append(ch)
-            i += 1
-
-        tail = "".join(current).strip()
-        if tail:
-            entries.append(tail)
-
+        for entry in text.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            if re.search(r"\s+\[", entry):
+                raise AutosubmitCritical(
+                    "Malformed section filter: space between section name and split block.",
+                    7011,
+                    "\n\tEach entry should be in the format: SECTION or SECTION [1 2 5-8].",
+                )
+            entries.append(entry)
         return entries
-
 
     @staticmethod
     def _validate_list(as_conf, job_list, filter_list):
