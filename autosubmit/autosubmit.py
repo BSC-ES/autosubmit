@@ -591,7 +591,7 @@ class Autosubmit:
                 "--filter_type",
                 type=str,
                 help='Select the job type and split to filter the list of jobs. Default split = "Any". '
-                'LIST = "LOCALJOB [5-10]"',
+                'LIST = "LOCALJOB [5-10] SIM"',
             )
             subparser.add_argument(
                 "-ftc",
@@ -4502,9 +4502,10 @@ class Autosubmit:
     @staticmethod
     def _validate_section(as_conf, filter_section):
         """Validates the section filter input.
+        Expected format for each section entry: SECTION or SECTION [1 2 5-8]
 
         :param as_conf: Autosubmit configuration object
-        :param filter_section: section filter input provided by the user
+        :param filter_section: string with the sections separated by blank space
         """
         malformed_error = False  # incorrectly formatted
         malformed_sections = []
