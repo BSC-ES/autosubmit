@@ -1444,7 +1444,7 @@ class ParamikoPlatform(Platform):
             timeout = package.timeout if package.timeout else 0
             x11_options = package.x11_options.strip("")
             cmd_list.append(
-                f"{self.get_call(abs_path, timeout, export, package.executable if not self.has_scheduler and not self._uses_local_api else None, x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if not self.has_scheduler and not x11_options else False)}")
+                f"{self.get_call(abs_path, timeout, export, package.executable if not self.has_scheduler and not self._uses_local_api else '', x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if not self.has_scheduler and not x11_options else False)}")
 
         return " ;".join(cmd_list)
 
