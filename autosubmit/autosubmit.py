@@ -4522,7 +4522,6 @@ class Autosubmit:
             valid_sections = {str(section).upper() for section in as_conf.jobs_data}
             for raw_section in Autosubmit._split_section_filter_entries(filter_section):
                 section = raw_section.strip()
-                print(f"Validating section entry: '{section}'")
                 if not section:
                     continue
                 # regex expression match
@@ -4536,14 +4535,11 @@ class Autosubmit:
                 )
                 # evaluate section format
                 if not match:
-                    print(f"Section entry '{section}' is malformed.")
                     malformed_sections.append(section)
                     continue
 
                 section_name = match.group(1).upper()
                 splits = match.group(2)
-                print(f"Extracted section name: '{section_name}'")
-                print(f"Extracted splits: '{splits}'")
                 # evaluate section name
                 if section_name not in valid_sections and section_name != "ANY":
                     section_not_found_error = True
