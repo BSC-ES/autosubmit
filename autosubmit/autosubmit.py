@@ -4521,7 +4521,6 @@ class Autosubmit:
         else:
             valid_sections = {str(section).upper() for section in as_conf.jobs_data}
             for raw_section in Autosubmit._split_section_filter_entries(filter_section):
-                print(f"Validating section entry: '{raw_section}'")
                 section = raw_section.strip()
                 if not section:
                     continue
@@ -4578,13 +4577,13 @@ class Autosubmit:
 
     @staticmethod
     def _split_section_filter_entries(filter_section: str) -> list[str]:
-        """Split ``-ft`` filter into section entries preserving split blocks.
-        Entries are section names, optionally followed by a bracketed split block.
+        """Split ``-ft`` filter into sections preserving split blocks.
+        Sections are section names, optionally followed by a split bracket.
         The separation between sections is a comma.
         Examples of valid entries:
-        LOCALJOB PSJOB
+        LOCALJOB, PSJOB
         LOCALJOB [1 2], PSJOB [3-5]
-        LOCALJOB [12] PSJOB
+        LOCALJOB [1:2], PSJOB
         LOCALJOB [1]
 
         :param filter_section: string with the sections separated by blank space
