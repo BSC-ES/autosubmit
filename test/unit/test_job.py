@@ -2227,3 +2227,14 @@ def test_retrieve_logfiles(local, mocker, output):
     job.platform.check_file_exists = mocker.MagicMock(return_value=True)
     job.retrieve_logfiles()
     assert job.log_recovered
+
+
+def test_case_insensitive_running_parameter(autosubmit_config):
+    """Test that the ``running`` parameter is case-insensitive."""
+    as_conf = autosubmit_config(
+        _EXPID, {"JOBS": {"A": {"FILE": "a", "PLATFORM": "local", "RUNNING": "ONCE"}}}
+    )
+    job = Job(_EXPID, "1", status=Status.WAITING, priority=0, loaded_data=None)
+    job.section = "A"
+    job.update_dict_parameters(as_conf)
+    assert job.running == "once"

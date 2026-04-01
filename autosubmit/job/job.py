@@ -1968,7 +1968,7 @@ class Job(object):
             self.splits = as_conf.jobs_data.get(self.section, {}).get("SPLITS", None)
         self.delete_when_edgeless = as_conf.jobs_data.get(self.section, {}).get("DELETE_WHEN_EDGELESS", True)
         self.dependencies = str(as_conf.jobs_data.get(self.section, {}).get("DEPENDENCIES", ""))
-        self.running = as_conf.jobs_data.get(self.section, {}).get("RUNNING", "once")
+        self.running = str(as_conf.jobs_data.get(self.section, {}).get("RUNNING", "once")).lower()
         self.platform_name = as_conf.jobs_data.get(self.section, {}).get("PLATFORM",
                                                                          as_conf.experiment_data.get("DEFAULT", {}).get(
                                                                              "HPCARCH", None))
