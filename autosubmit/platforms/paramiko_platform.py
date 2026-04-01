@@ -194,13 +194,13 @@ class ParamikoPlatform(Platform):
 
         self.remove_log_files_on_transfer = False
         if self.config:
-            platform_config = self.config.get("PLATFORMS", {}).get(
+            platform_config: dict = self.config.get("PLATFORMS", {}).get(
                 self.name.upper(), {}
             )
             self.remove_log_files_on_transfer = platform_config.get(
                 "REMOVE_LOG_FILES_ON_TRANSFER", False
             )
-        self._uses_local_api = False
+        self._uses_local_api: bool = False
         # Number of consecutive transport failures for this platform. It is only
         # reset when a command completes successfully, so repeated drops that
         # survive reconnection can be detected and stop the run.
