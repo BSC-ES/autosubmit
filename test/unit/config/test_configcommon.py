@@ -349,3 +349,49 @@ def test_platforms_not_dict(
         )
     else:
         assert platform_description == as_conf.platforms_data
+
+@pytest.mark.parametrize('experiment_data, expected', 
+    [
+        (
+            {
+                'JOBS': {
+                    'SIM': {
+                        'CPMIP_THRESHOLDS': {
+                            'SYPD':{
+                                'THRESHOLD': 5.0,
+                                'COMPARISON': 'greater_than',
+                                '%_ACCEPTED_ERROR': 10
+                            }
+                        }
+                    }
+                }
+            }, {'SYPD':{ 'THRESHOLD': 5.0, 'COMPARISON': 'greater_than', '%_ACCEPTED_ERROR': 10}}
+        ),
+        (
+            {
+                'JOBS': {
+                    'SIM': {}
+                }
+            }, {}
+        ),
+        (
+            {
+                'JOBS': {
+                    'SIM': {
+                        'CPMIP_THRESHOLDS': {
+                            'not_a_dict'
+                        }
+                    }
+                }
+            }, {}
+        ),
+    ], 
+    ids=[
+        'valid_thresholds',
+        'no_thresholds',
+        'invalid_thresholds'
+    ])
+def test_get_cpmip_thresholds_different_cases(autosubmit_config, experiment_data, expected):
+    as_conf = autosubmit_config(expid='a000', experiment_data=experiment_data)
+    thresholds = as_conf.get_cpmip_thresholds('SIM')
+    assert thresholds == expected
