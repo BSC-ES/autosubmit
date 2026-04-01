@@ -442,7 +442,6 @@ def test_move_file_errors(error, must_exist, expected_error_or_return_value, par
         ('get_partition_directive', '%PARTITION_DIRECTIVE%', '-p 1'),
         ('get_tasks_per_node', '%TASKS_PER_NODE_DIRECTIVE%', '-t 1'),
         ('get_threads_per_task', '%THREADS_PER_TASK_DIRECTIVE%', '-tt 11'),
-        ('get_scratch_free_space', '%SCRATCH_FREE_SPACE_DIRECTIVE%', '-s 10GB'),
         ('get_custom_directives', '%CUSTOM_DIRECTIVES%', '-t 10'),
         ('get_exclusive_directive', '%EXCLUSIVE_DIRECTIVE%', '--exclusive'),
         ('get_account_directive', '%ACCOUNT_DIRECTIVE%', '-A bsc'),

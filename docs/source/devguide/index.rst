@@ -27,7 +27,7 @@ Command list
 * ``install``  Install database for Autosubmit on the configured folder
 * ``archive``  Clean, compress and remove from the experiments' folder a finalized experiment
 * ``unarchive``  Restores an archived experiment
-* ``migrate_exp``  Migrates an experiment from one user to another
+* ``migrate_exp`` Deprecated and removed in v4.1.16; planned for restructuring and redeployment in the near future.
 * ``report``  extract experiment parameters
 * ``updateversion``  Updates the Autosubmit version of your experiment with the current version of the module you are using
 * ``dbfix``  Fixes the database malformed error in the historical database of your experiment
