@@ -319,7 +319,7 @@ def test_set_status_section_any_with_chunk_filter_does_not_restrict(as_exp):
     ],
 )
 def test_set_status_filter_type_with_splits(as_exp, ft_filter, expected_jobs):
-    """``-ft`` should support split selectors per section."""
+    """Test ``-ft`` with splits per section."""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
         as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
     )

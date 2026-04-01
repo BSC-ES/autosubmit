@@ -4527,11 +4527,12 @@ class Autosubmit:
                     continue
                 # regex expression match
                 # evaluate two parts in the section
-                # SECTION: string with uppercase letters, digits, _ . - or the keyword 'ANY'
-                # SPLIT: optional only one pair of brackets
+                # SECTION NAME: string with uppercase letters, digits, _ . - or the keyword 'ANY'
+                # SPLIT: optional, only one pair of brackets allowed
                 match = re.match(
-                    r"^([A-Z0-9_.-]+|ANY)(?:\s*\[\s*([0-9]+(?:[-:][0-9]+)?(?:\s+[0-9]+(?:[-:][0-9]+)?)*)\s*\])?$",
-                    section,re.IGNORECASE
+                    r"^([A-Z0-9_.-]+|ANY)(?:\s*\[\s*((?:ANY)|(?:[0-9]+(?:[-:][0-9]+)?(?:\s+[0-9]+(?:[-:][0-9]+)?)*))\s*\])?$",
+                    section,
+                    re.IGNORECASE,
                 )
                 # evaluate section format
                 if not match:
