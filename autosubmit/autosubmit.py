@@ -4598,12 +4598,6 @@ class Autosubmit:
             entry = entry.strip()
             if not entry:
                 continue
-            if re.search(r"\s+\[", entry):
-                raise AutosubmitCritical(
-                    "Malformed section filter: space between section name and split block.",
-                    7011,
-                    "\n\tEach entry should be in the format: SECTION or SECTION [1 2 5-8].",
-                )
             entries.append(entry)
         return entries
 
