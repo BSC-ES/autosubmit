@@ -15,12 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import locale
 import os
+import re
 import textwrap
-from contextlib import suppress
+from pathlib import Path
 from time import sleep
-from typing import Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
@@ -31,6 +31,19 @@ from autosubmit.platforms.wrappers.wrapper_factory import PJMWrapperFactory
 if TYPE_CHECKING:
     # Avoid circular imports
     from autosubmit.job.job import Job
+
+# Compiled patterns that identify valid stdout from any PJM command.
+_PJM_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
+    # pjsub success: "[INFO] PJM 0000 pjsub Job <id> submitted."
+    # pjdel success: "[INFO] PJM 0000 pjdel Job <id> deleted."
+    re.compile(r"\[INFO] PJM 0000", re.IGNORECASE),
+    # pjstat tabular output: any row that starts with a numeric job ID
+    re.compile(r"^\s*\d+\b", re.MULTILINE),
+    # pjstat known job-state abbreviations (all states, including failed ones,
+    re.compile(r"\b(ext|rno|rne|run|acc|que|rna|rnp|hld|err|ccl|rjt)\b", re.IGNORECASE),
+    # pjstat header-only output: column headers present when no jobs match.
+    re.compile(r"\bJOBID\b|\bJID\b", re.IGNORECASE),
+)
 
 
 class PJMPlatform(ParamikoPlatform):
@@ -70,14 +83,10 @@ class PJMPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
         self._submit_script_base_name = os.path.join(
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
+        self.type = "pjm"
 
     def create_a_new_copy(self):
         return PJMPlatform(self.expid, self.name, self.config)
-
-    def generate_new_name_submit_script_file(self):
-        if os.path.exists(self._submit_script_path):
-            os.remove(self._submit_script_path)
-        self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
 
     def submit_error(self, output):
         """Check if the output of the submit command contains an error message.
@@ -86,145 +95,6 @@ class PJMPlatform(ParamikoPlatform):
         :return: boolean
         """
         return not all(part.lower() in output.lower() for part in ["pjsub", "[INFO] PJM 0000"])
-
-    def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
-        """Retrieve multiple jobs identifiers.
-
-        :param valid_packages_to_submit:
-        :param failed_packages:
-        :param error_message:
-        :param hold:
-        :return:
-        """
-        try:
-            valid_packages_to_submit = [package for package in valid_packages_to_submit]
-            if len(valid_packages_to_submit) > 0:
-                try:
-                    jobs_id = self.submit_script(hold=hold)
-                except AutosubmitError as e:
-                    jobnames = [job.name for job in valid_packages_to_submit[0].jobs]
-                    for jobname in jobnames:
-                        jobid = self.get_jobid_by_jobname(jobname)
-                        # cancel bad submitted job if jobid is encountered
-                        for id_ in jobid:
-                            self.cancel_job(id_)
-                    jobs_id = None
-                    self.connected = False
-                    if e.trace is not None:
-                        has_trace_bad_parameters = self.submit_error(e.trace)
-                    else:
-                        e.trace = ""
-                        has_trace_bad_parameters = False
-                    if e.message is not None:
-                        has_message_bad_parameters = self.submit_error(e.message)
-                    else:
-                        e.message = ""
-                        has_message_bad_parameters = False
-                    if has_trace_bad_parameters or has_message_bad_parameters or e.message.lower().find(
-                            "invalid partition") != -1 or e.message.lower().find(
-                        "invalid qos") != -1 or e.message.lower().find(
-                        "scheduler is not installed") != -1 or e.message.lower().find(
-                        "failed") != -1 or e.message.lower().find("not available") != -1:
-                        error_msg = ""
-                        for package_tmp in valid_packages_to_submit:
-                            for job_tmp in package_tmp.jobs:
-                                if job_tmp.section not in error_msg:
-                                    error_msg += job_tmp.section + "&"
-                        if has_trace_bad_parameters:
-                            error_message += f"Check job and queue specified in your JOBS definition in YAML. Sections that could be affected: {error_msg[:-1]}"
-                        else:
-                            error_message += f"\ncheck that {self.name} platform has set the correct scheduler. Sections that could be affected: {error_msg[:-1]}"
-
-                        if e.trace is None:
-                            e.trace = ""
-                        raise AutosubmitCritical(error_message, 7014, e.message + "\n" + str(e.trace))
-                except IOError as e:
-                    raise AutosubmitError(
-                        "IO issues ", 6016, str(e))
-                except BaseException as e:
-                    if str(e).find("scheduler") != -1:
-                        raise AutosubmitCritical(
-                            f"Are you sure that [{self.type.upper()}] scheduler is the correct type for platform [{self.name.upper()}]?.\n Please, double check that {self.type.upper()} is loaded for {self.name.upper()} before autosubmit launch any job.",
-                            7070)
-                    raise AutosubmitError(
-                        "Submission failed, this can be due a failure on the platform", 6015, str(e))
-                if jobs_id is None or len(jobs_id) <= 0:
-                    raise AutosubmitError(
-                        "Submission failed, this can be due a failure on the platform", 6015, f"Jobs_id {jobs_id}")
-                i = 0
-                if hold:
-                    sleep(10)
-
-                for package in valid_packages_to_submit:
-                    package.process_jobs_to_submit(jobs_id[i], hold)
-                    i += 1
-            save = True
-        except AutosubmitError:
-            raise
-        except AutosubmitCritical:
-            raise
-        except Exception as e:
-            raise AutosubmitError(f"{self.name} submission failed", 6015, str(e))
-        return save, valid_packages_to_submit
-
-    def generate_submit_script(self):
-        # remove file
-        with suppress(FileNotFoundError):
-            os.remove(self._submit_script_path)
-        self.generate_new_name_submit_script_file()
-
-    def get_submit_script(self):
-        os.chmod(self._submit_script_path, 0o750)
-        return os.path.join(self.config.get("LOCAL_ASLOG_DIR"), os.path.basename(self._submit_script_path))
-
-    def submit_job(self, job, script_name, hold=False, export="none"):
-        """Submit a job from a given job object.
-
-        :param export:
-        :param job: job object
-        :type job: autosubmit.job.job.Job
-        :param script_name: job script's name
-        :rtype scriptname: str
-        :param hold: send job hold
-        :type hold: boolean
-        :return: job id for the submitted job
-        :rtype: int
-        """
-        self.get_submit_cmd(script_name, job, hold=hold, export=export)
-        return None
-
-    def submit_script(self, hold=False) -> Union[list[str], str]:
-        """Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once.
-
-        :param hold: if True, the job will be held
-        :type hold: bool
-        :return: job id for  submitted jobs
-        :rtype: list(str)
-        """
-        try:
-            self.send_file(self.get_submit_script(), False)
-            cmd = os.path.join(self.get_files_path(),
-                               os.path.basename(self._submit_script_path))
-            # remove file after submisison
-            cmd = f"{cmd} ; rm {cmd}"
-            try:
-                self.send_command(cmd)
-            except AutosubmitError:
-                raise
-            except AutosubmitCritical:
-                raise
-            except Exception:
-                raise
-            jobs_id = self.get_submitted_job_id(self.get_ssh_output())
-            return jobs_id
-        except IOError as e:
-            raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
-        except AutosubmitError:
-            raise
-        except AutosubmitCritical:
-            raise
-        except Exception as e:
-            raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e))
 
     def check_remote_log_dir(self):
         """Creates log dir on remote host"""
@@ -244,21 +114,18 @@ class PJMPlatform(ParamikoPlatform):
                     "SFTP session not active ", 6007, str(e))
 
     def update_cmds(self):
-        """Updates commands for platforms. """
+        """Update commands for platforms."""
         self.root_dir = os.path.join(
             self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
-        self.cancel_cmd = "pjdel "
+        self.cancel_cmd = "pjdel"
         self._checkhost_cmd = "echo 1"
-        self._submit_cmd = f'cd {self.remote_log_dir} ; pjsub  '
+        self._submit_cmd = f'cd {self.remote_log_dir} ; pjsub'
         self._submit_command_name = "pjsub"
-        self._submit_hold_cmd = f'cd {self.remote_log_dir} ; pjsub  '
+        self._submit_hold_cmd = f'cd {self.remote_log_dir} ; pjsub'
         self.put_cmd = "scp"
         self.get_cmd = "scp"
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
-
-    def get_checkhost_cmd(self):
-        return self._checkhost_cmd
 
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
@@ -296,14 +163,9 @@ class PJMPlatform(ParamikoPlatform):
             if job.queuing_reason_cancel(reason):
                 Log.printlog(f"Job {job.name} will be cancelled and set to FAILED as it was queuing due to {reason}",
                              6000)
-                self.send_command(self.cancel_cmd + f" {job.id}")
+                self.send_command(f"{self.cancel_cmd} {job.id}")
                 job.new_status = Status.FAILED
                 job.update_status(as_conf)
-            elif reason.find('ASHOLD') != -1:
-                job.new_status = Status.HELD
-                if not job.hold:
-                    self.send_command(f"{self.cancel_cmd} {job.id}")
-                    job.new_status = Status.QUEUING  # If it was HELD and was released, it should be QUEUING next.
 
     def parse_all_jobs_output(self, output, job_id):
         status = ""
@@ -342,35 +204,27 @@ class PJMPlatform(ParamikoPlatform):
                 return False
         return True
 
-    def get_submitted_job_id(self, outputlines):
-        try:
-            jobs_id = []
-            for output in outputlines.splitlines():
-                if not self.submit_error(output):
-                    jobs_id.append(int(output.split()[5]))
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[int]:
+        """Parse the output of the submit command and return PJM job IDs.
 
-            return jobs_id
-        except IndexError:
-            raise AutosubmitCritical(
-                "Submission failed. There are issues on your config file", 7014)
+        :param output: Output of the submit command.
+        :type output: str
+        :param x11: Unused for PJM, kept for API compatibility.
+        :type x11: bool
+        :return: Parsed PJM job IDs.
+        :rtype: list[int]
+        """
+        jobs_id: list[int] = []
 
-    def get_submit_cmd(self, job_script, job, hold=False, export=""):
-        if (export is None or str(export).lower() == "none") or len(export) == 0:
-            export = ""
-        else:
-            export += " ; "
+        for line in output.splitlines():
+            if self.submit_error(line):
+                continue
 
-        with suppress(Exception):
-            lang = locale.getlocale()[1]
-            if lang is None:
-                lang = locale.getdefaultlocale()[1]
-                if lang is None:
-                    lang = 'UTF-8'
-            with open(self._submit_script_path, "ab") as submit_script_file:
-                if not hold:
-                    submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))
-                else:
-                    submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
+            parts = line.split()
+            if len(parts) >= 6 and parts[5].isdigit():
+                jobs_id.append(int(parts[5]))
+
+        return jobs_id
 
     def get_check_all_jobs_cmd(self, jobs_id):
         # jobs_id = "jobid1+jobid2+jobid3"
@@ -390,9 +244,6 @@ class PJMPlatform(ParamikoPlatform):
         if job_name[-1] == ",":
             job_name = job_name[:-1]
         return f'pjstat -v --choose jid,st,ermsg --filter \"jnam={job_name}\"'
-
-    def cancel_job(self, job_id):
-        return f'{self.cancel_cmd} {job_id}'
 
     def parse_queue_reason(self, output, job_id):
         # split() is used to remove the trailing whitespace but also \t and multiple spaces
@@ -480,3 +331,138 @@ class PJMPlatform(ParamikoPlatform):
                     file_exist = False  # won't exist
                     retries = 999  # no more retries
         return file_exist
+
+    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
+        """Get submitted PJM job IDs by script name.
+
+        This is a fallback used when the submit command output does not contain
+        enough information to recover all submitted job IDs directly.
+
+        :param script_names: Submitted script filenames.
+        :type script_names: list[str]
+        :return: Matching PJM job IDs in the same order as ``script_names``.
+        :rtype: list[int]
+        """
+        submitted_job_ids: list[int] = []
+
+        for script_name in script_names:
+            job_name = Path(script_name).stem
+            command = f'pjstat -v --choose jid,jnam --filter "jnam={job_name}"'
+            self.send_command(command)
+
+            matched_ids: list[int] = []
+            for line in self.get_ssh_output().splitlines():
+                parts = line.split()
+                if parts and parts[0].isdigit():
+                    matched_ids.append(int(parts[0]))
+
+            if not matched_ids:
+                return []
+
+            submitted_job_ids.append(max(matched_ids))
+
+        return submitted_job_ids
+
+    def _get_job_names_cmd(self, job_names: list[str]) -> str:
+        """Return a command that groups PJM job IDs by job name.
+
+        The command returns one line per job name using the format
+        ``JobName:id,id2,id3``.
+
+        :param job_names: Job names to query.
+        :type job_names: list[str]
+        :return: Shell command that groups matching job IDs by job name.
+        :rtype: str
+        """
+        if not job_names:
+            return ""
+
+        commands = " ; ".join(
+            f'pjstat -v --choose jid,jnam --filter "jnam={job_name}"'
+            for job_name in job_names
+        )
+
+        return (
+            f"{commands} | "
+            "awk '$1 ~ /^[0-9]+$/ {"
+            "job_name = $NF; "
+            "sub(/\\.cmd$/, \"\", job_name); "
+            "jobs[job_name] = jobs[job_name] ? jobs[job_name] \",\" $1 : $1"
+            "} END {"
+            "for (name in jobs) print name \":\" jobs[name]"
+            "}'"
+        )
+
+    def cancel_jobs(self, job_ids: list[str]) -> None:
+        """Cancel PJM jobs by their IDs.
+
+        :param job_ids: List of PJM job IDs to cancel.
+        :type job_ids: list[str]
+        :rtype: None
+        """
+        if not job_ids:
+            return
+        ids = " ".join(str(job_id) for job_id in job_ids)
+        self.send_command(f"{self.cancel_cmd} {ids}")
+
+    def _check_for_unrecoverable_errors(self) -> None:
+        """Check PJM command output for recoverable and unrecoverable errors."""
+        out = self._ssh_output or ""
+        err = self._ssh_output_err or ""
+
+        # Fast-exit: any match in stdout confirms valid PJM command output.
+        if any(pat.search(out) for pat in _PJM_EXPECTED_OUTPUT):
+            return
+
+        err_lower = err.lower()
+        if not err_lower.strip():
+            return
+
+        transient_patterns: list[tuple[str, str]] = [
+            ("not active", "SSH session not active"),
+            ("socket timed out", "Socket timed out communicating with PJM"),
+            ("socket error", "Socket error communicating with PJM"),
+            ("connection timed out", "Connection to PJM server timed out"),
+            ("connection refused", "Connection to PJM server refused"),
+            ("connection reset by peer", "Connection reset by PJM server"),
+            ("broken pipe", "Broken pipe while communicating with PJM"),
+            ("network is unreachable", "Network unreachable; cannot reach PJM server"),
+            ("cannot connect to server", "Cannot connect to PJM server"),
+            ("server not responding", "PJM server not responding"),
+            ("communication failure", "PJM communication failure"),
+            ("communication error", "PJM communication error"),
+            ("temporary failure in name resolution", "DNS resolution failed temporarily"),
+        ]
+
+        for pattern, message in transient_patterns:
+            if pattern in err_lower:
+                raise AutosubmitError(
+                    f"Transient PJM error: {message}",
+                    6016,
+                    err,
+                )
+
+        critical_patterns: list[tuple[str, str]] = [
+            ("[err.] pjm", "PJM reported an error; check directives or resource group"),
+            ("invalid resource group", "Invalid PJM resource group specified"),
+            ("resource group does not exist", "PJM resource group does not exist"),
+            ("resource group stop", "PJM resource group is stopped"),
+            ("no permission", "No permission to submit to this PJM resource group"),
+            ("exceeds limit", "Job exceeds a configured PJM resource limit"),
+            ("not submitted", "Job was not submitted to PJM; check pjsub directives"),
+            ("submission failed", "PJM submission failed; check directives or resource group"),
+            ("invalid job name", "Invalid PJM job name"),
+            ("invalid elapse", "Invalid wallclock time specification"),
+            ("unrecognized option", "Unrecognised pjsub option"),
+            ("unknown option", "Unknown pjsub option in the job script"),
+            ("syntax error", "Syntax error in the job script or directives"),
+            ("command not found", "PJM command not found on the remote host"),
+        ]
+
+        for pattern, message in critical_patterns:
+            if pattern in err_lower:
+                raise AutosubmitCritical(
+                    f"Permanent PJM error: {message}",
+                    7014,
+                    err,
+                )

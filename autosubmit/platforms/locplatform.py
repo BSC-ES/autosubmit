@@ -54,9 +54,6 @@ class LocalPlatform(ParamikoPlatform):
 
         self.update_cmds()
 
-    def submit_script(self, hold=False):
-        pass
-
     def parse_all_jobs_output(self, output, job_id):
         pass
 
@@ -80,8 +77,6 @@ class LocalPlatform(ParamikoPlatform):
         self.del_cmd = "rm -f"
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
 
-    def get_checkhost_cmd(self):
-        return self._checkhost_cmd
 
     def get_remote_log_dir(self):
         return self.remote_log_dir
@@ -92,21 +87,13 @@ class LocalPlatform(ParamikoPlatform):
     def parse_job_output(self, output):
         return output[0]
 
-    def get_submitted_job_id(self, output, x11=False):
-        return output
-
-    def get_submit_cmd(self, job_script, job, hold=False, export=""):
-        if job:  # Not intuitive at all, but if it is not a job, it is a wrapper
-            seconds = job.wallclock_in_seconds
-        else:
-            # TODO for another branch this, it is to add a timeout to the wrapped jobs even if the wallclock is 0, default to 2 days
-            seconds = 60 * 60 * 24 * 2
-        if export == "none" or export == "None" or export is None or export == "":
-            export = ""
-        else:
-            export += " ; "
-        command = self.get_call(job_script, job, export=export, timeout=seconds)
-        return f"cd {self.remote_log_dir} ; {command}"
+    def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
+        """Parses the output of the submit command to get the job ID.
+        :param raw_output: output of the submit command.
+        :param x11: whether the job is an x11 job, which has a different output format.
+        :return: job ID of the submitted job.
+        """
+        return [output.strip() for output in raw_output.splitlines() if output.strip()]
 
     def get_check_job_cmd(self, job_id):
         return self.get_pscall(job_id)
@@ -179,6 +166,7 @@ class LocalPlatform(ParamikoPlatform):
             return False
         self._ssh_output = output.decode(lang)
         Log.debug(f"Command '{command}': {self._ssh_output}")
+        self._check_for_unrecoverable_errors()
 
         return True
 
@@ -385,3 +373,28 @@ class LocalPlatform(ParamikoPlatform):
         except Exception as exc:
             Log.error(f"Error compressing file {file_path}: {exc}")
         return None
+
+    def cancel_jobs(self, job_ids: list[str]) -> None:
+        """Cancel local processes by their PIDs.
+        :param job_ids: List of local process IDs to cancel.
+        :type job_ids: list[str]
+        """
+        if not job_ids:
+            return
+        pids = " ".join(str(job_id) for job_id in job_ids)
+        self.send_command(f"{self.cancel_cmd} {pids}")
+
+    def _get_job_names_cmd(self, job_names: list) -> str:
+        """Gets command to check for duplicated job names on remote platforms (UNIX).
+
+        Checks if there is a job name already present on the remote platform and
+        returns the oldest ID (process or job_id) entry for each duplicated job name,
+        separated by commas.
+        """
+        # check processes with the same name, and return the oldest one (if any)
+        # avoid truncating
+        return f"ps -eo pid,cmd | grep -E '({'|'.join(job_names)})' | awk '{{print $1}}' | sort -n | uniq -d"
+
+    def _check_for_unrecoverable_errors(self) -> None:
+        """Return immediately; local commands raise exceptions on failure."""
+        return

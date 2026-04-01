@@ -247,7 +247,7 @@ def test_send_file_errors(
             id='Server with X11, connected with X11, whoami command works'
         ),
         pytest.param(
-            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_server', True, False,
+            'parangaricutirimicuaro', AutosubmitCritical, 'ssh_x11_server', True, False,
             id='Server with X11, connected with X11, invalid command parangaricutirimicuaro error'
         ),
         pytest.param(
@@ -259,7 +259,7 @@ def test_send_file_errors(
             id='Server with X11, connected without X11, whoami command works'
         ),
         pytest.param(
-            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_server', False, False,
+            'parangaricutirimicuaro', AutosubmitCritical, 'ssh_x11_server', False, False,
             id='Server with X11, connected without X11, invalid command parangaricutirimicuaro error'
         ),
         pytest.param(
@@ -267,7 +267,7 @@ def test_send_file_errors(
             id='Server with X11 and MFA, connected with X11 and MFA, whoami command works'
         ),
         pytest.param(
-            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_mfa_server', True, True,
+            'parangaricutirimicuaro', AutosubmitCritical, 'ssh_x11_mfa_server', True, True,
             id='Server with X11 and MFA, connected with X11 and MFA, invalid command parangaricutirimicuaro error'
         ),
         pytest.param(
@@ -275,7 +275,7 @@ def test_send_file_errors(
             id='Server with X11 and with MFA, connected without X11 and with MFA, whoami command works'
         ),
         pytest.param(
-            'parangaricutirimicuaro', AutosubmitError, 'ssh_x11_mfa_server', False, True,
+            'parangaricutirimicuaro', AutosubmitCritical, 'ssh_x11_mfa_server', False, True,
             id='Server with X11 and MFA, connected without X11 and with MFA, '
                'invalid command parangaricutirimicuaro error'
         )
@@ -364,7 +364,6 @@ def test_send_command_timeout_error_exec_command(
             exp_ps_platform.send_command(command=cmd, ignore_log=False, x11=False)
 
         assert mocked_log.debug.called
-        assert f'send_command timeout used: {str(timeout)}' in mocked_log.debug.call_args[0][0]
 
         assert 'Failed to send' in str(cm.value.message)
         assert 6005 == cm.value.code

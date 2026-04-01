@@ -1804,18 +1804,8 @@ class Job(object):
             self.exclusive = self.het['HYPERTHREADING'][0]
         else:
             self.hyperthreading = self.hyperthreading
-        if type(self.executable) is list:
-            # Get the executable, each element can be only be bool
-            self.het['EXECUTABLE'] = list()
-            if len(self.executable) == 1:
-                for x in range(self.het['HETSIZE']):
-                    self.het['EXECUTABLE'].append(self.executable)
-            else:
-                for x in self.executable:
-                    self.het['EXECUTABLE'].append(x)
-            self.executable = str(self.het['EXECUTABLE'][0])
-        else:
-            self.executable = self.executable
+        # Doesn't make sense to have executable as heterogeneous parameter
+        self._calculate_executable()
         if type(self.queue) is list:
             # Get the queue, each element can be only be bool
             self.het['CURRENT_QUEUE'] = list()
@@ -2950,6 +2940,14 @@ class Job(object):
                         '%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
 
+    def _calculate_executable(self):
+        """Calculate the executable for the job based on the platform type and job type.
+         This setting only makes sense when the remote platform is not being used within a scheduler.
+        """
+        if self.platform.type.upper() in ["PS", "LOCAL"]:
+            self.executable = self.executable if self.executable else Language.get_executable(self.type)
+        else:
+            self.executable = None
 
 class WrapperJob(Job):
     """Defines a wrapper from a package.

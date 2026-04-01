@@ -81,7 +81,6 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values
 
-
 if TYPE_CHECKING:
     from rocrate.rocrate import ROCrate
 
@@ -256,7 +255,7 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'delete', description="delete specified experiment")
             subparser.add_argument('expid', help='experiment identifiers separated by commas',
-                               nargs='?')
+                                   nargs='?')
             subparser.add_argument(
                 '-f', '--force', action='store_true', help='deletes experiment without confirmation')
             subparser.add_argument('-v', '--update_version', action='store_true',
@@ -521,7 +520,7 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 "configure",
                 description="configure database and path for autosubmit. It "
-                "can be done at machine, user or local level.",
+                            "can be done at machine, user or local level.",
             )
             subparser.add_argument(
                 '--advanced', action="store_true", help="Open advanced configuration of autosubmit")
@@ -618,28 +617,28 @@ class Autosubmit:
                 "--list",
                 type=str,
                 help='Supply the list of job names to be changed. Default = "Any". '
-                'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
+                     'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
             )
             subparser.add_argument(
                 "-fc",
                 "--filter_chunks",
                 type=str,
                 help='Supply the list of chunks to change the status. Default = "Any". '
-                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
             )
             subparser.add_argument(
                 "-fs",
                 "--filter_status",
                 type=str,
                 help="Select the status (one or more) to filter the list of jobs."
-                "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
+                     "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
             )
             subparser.add_argument(
                 "-ft",
                 "--filter_type",
                 type=str,
                 help='Select the job type and split to filter the list of jobs. Default split = "Any". '
-                'LIST = "LOCALJOB [5-10] SIM"',
+                     'LIST = "LOCALJOB [5-10] SIM"',
             )
             subparser.add_argument(
                 "-ftc",
@@ -649,7 +648,7 @@ class Autosubmit:
                                Supply the list of chunks to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                    chunks 1 for all the members will be updated. Follow the format: '
-                '"[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+                     '"[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
             )
             subparser.add_argument(
                 "-ftcs",
@@ -659,7 +658,7 @@ class Autosubmit:
                                 Supply the list of chunks & splits to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                            selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                                chunks 1 for all the members will be updated. Follow the format: '
-                '"[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+                     '"[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
             )
 
             subparser.add_argument(
@@ -675,7 +674,7 @@ class Autosubmit:
                 "-expand",
                 type=str,
                 help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
-                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
             )
             subparser.add_argument(
                 "-expand_status", type=str, help="Select the statuses to be expanded"
@@ -1215,9 +1214,9 @@ class Autosubmit:
     @staticmethod
     def generate_as_config(
             exp_id: str,
-            dummy: bool=False,
-            minimal_configuration: bool=False,
-            local: bool=False,
+            dummy: bool = False,
+            minimal_configuration: bool = False,
+            local: bool = False,
             parameters: Optional[dict[str, Union[dict, list, str]]] = None
     ) -> None:
         """Retrieve the configuration from autosubmit.config package.
@@ -1704,8 +1703,7 @@ class Autosubmit:
             if job.status != Status.WAITING:
                 job.status = Status.READY
         while job_list.get_active():
-            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, True,
-                                         only_wrappers, hold=False)
+            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, True, only_wrappers)
             job_list.update_list(as_conf, False)
         for job in job_list.get_job_list():
             job.status = Status.WAITING
@@ -2073,7 +2071,7 @@ class Autosubmit:
             # establish the connection to all platforms
             # Restore is misleading, it is actually a "connect" function when the recover flag is not set.
             Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf)
-            return job_list, submitter , exp_history, host , as_conf, list(platforms_to_test), packages_persistence, False
+            return job_list, submitter, exp_history, host, as_conf, list(platforms_to_test), packages_persistence, False
         else:
             return job_list, submitter, None, None, as_conf, list(platforms_to_test), packages_persistence, True
 
@@ -2249,8 +2247,7 @@ class Autosubmit:
                         job_list.save()
                         # Submit jobs that are ready to run
                         if len(job_list.get_ready()) > 0:
-                            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence,
-                                                         hold=False)
+                            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence)
                             job_list.update_list(as_conf, submitter=submitter)
                             job_list.save()
                             as_conf.save()
@@ -2348,8 +2345,8 @@ class Autosubmit:
                             except BaseException:
                                 reconnected = False
                         if recovery_retrials == max_recovery_retrials and max_recovery_retrials > 0:
-                            raise AutosubmitCritical(f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials*120} reached",
-                                7051, e.message)
+                            raise AutosubmitCritical(f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials * 120} reached",
+                                                     7051, e.message)
                     except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
                         raise AutosubmitCritical(e.message, e.code, e.trace)
                     except BaseException:
@@ -2457,10 +2454,10 @@ class Autosubmit:
                     if mail_notify:
                         email = as_conf.get_mails_to()
                         if "@" in email[0]:
-                            Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, platform)
+                            Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, platform_to_test)
                 except Exception as e2:
                     Log.debug(f'Unexpected exception sending email notification: {str(e2)}')
-                platform_issues += f"\n[{platform.name}] Connection Unsuccessful to host {platform.host} "
+                platform_issues += f"\n[{platform_to_test.name}] Connection Unsuccessful to host {platform_to_test.host} "
                 issues += platform_issues
                 continue
             if platform_to_test.check_remote_permissions():
@@ -2496,12 +2493,11 @@ class Autosubmit:
                                          7010, issues + "\n" + ssh_config_issues)
 
     @staticmethod
-    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: list[Platform],
+    def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: list[ParamikoPlatform],
                           packages_persistence: JobPackagePersistence, inspect=False,
-                          only_wrappers=False, hold=False) -> bool:
+                          only_wrappers=False) -> None:
         """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
-        :param hold:
         :param as_conf: autosubmit config object
         :type as_conf: AutosubmitConfig object
         :param job_list: job list to check
@@ -2516,8 +2512,6 @@ class Autosubmit:
         :type only_wrappers: Boolean
         :return: True if at least one job was submitted, False otherwise
         """
-        save_1 = False
-        save_2 = False
         wrapper_errors = {}
         any_job_submitted = False
         # Check section jobs
@@ -2527,33 +2521,43 @@ class Autosubmit:
                 if check_jobs_file_exists(as_conf, section):
                     raise AutosubmitCritical(f"Job {section} does not have a correct template// template not found",
                                              7014)
-        try:
-            for platform in platforms_to_test:
-                packager = JobPackager(as_conf, platform, job_list)
-                packages_to_submit = packager.build_packages()
-                save_1, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = (
-                    platform.submit_ready_jobs(as_conf, job_list, packages_persistence, packages_to_submit,
-                                               inspect=inspect, only_wrappers=only_wrappers)
-                )
-                wrapper_errors.update(packager.wrappers_with_error)
-                save_2 = False
-                # Jobs that are being retrieved in batch. Right now, only available for slurm platforms.
-                if platform.type.lower() in ["slurm", "pjm"] and not inspect and not only_wrappers:
-                    # Process the script generated in submit_ready_jobs
-                    save_2, valid_packages_to_submit = platform.process_batch_ready_jobs(valid_packages_to_submit,
-                                                                                         failed_packages,
-                                                                                         error_message="")
-                if not inspect and len(valid_packages_to_submit) > 0:
-                    job_list.save()
-                # Save wrappers(jobs that has the same id) to be visualized and checked in other parts of the code
-                job_list.save_wrappers(valid_packages_to_submit, failed_packages, as_conf, packages_persistence,
-                                       hold=hold, inspect=inspect)
-                if error_message != "":
-                    raise AutosubmitCritical(f"Submission Failed due wrong configuration:{error_message}", 7014)
-            Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
-            return save_1 or save_2
-        except Exception:
-            raise
+
+        for p in platforms_to_test:
+            packager = JobPackager(as_conf, p, job_list)
+            packages_to_submit = packager.build_packages()
+
+            scripts_to_submit_by_section, x11_scripts_to_submit_by_section = p.prepare_submission(as_conf, job_list, packages_persistence, packages_to_submit, inspect=inspect,
+                                                                                                  only_wrappers=only_wrappers)
+
+            # Divided by section in case of finding any unrecoverable error due a bad configuration
+            for section, scripts_to_submit_by_name in scripts_to_submit_by_section.items():
+                try:
+                    p.process_ready_jobs(scripts_to_submit_by_name)
+                    any_job_submitted = True
+                except Exception:
+                    if not inspect:
+                        job_list.save()
+                    raise
+            if not inspect:
+                job_list.save()
+            for section, x11_scripts in x11_scripts_to_submit_by_section.items():
+                # X11 only works sequentially, so we need to process them one by one, and not in parallel by section like the normal scripts.
+                for script_name, package in x11_scripts.items():
+                    try:
+                        p.process_ready_jobs({script_name: package})
+                        any_job_submitted = True
+                    except Exception:
+                        if not inspect:
+                            job_list.save()
+                        raise
+            if not inspect:
+                job_list.save()
+
+            wrapper_errors.update(packager.wrappers_with_error)
+            job_list.save_wrappers(scripts_to_submit_by_section, as_conf, packages_persistence,
+                                   hold=False, inspect=inspect)
+
+        Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
 
     @staticmethod
     def check_deadlock(wrapper_errors: dict, any_job_submitted: bool, job_list: JobList) -> None:
@@ -4474,7 +4478,7 @@ class Autosubmit:
                     Log.info("Local project destination already exists, will not sync project files.")
 
         return True
-    
+
     @staticmethod
     def change_status(final, final_status, job, save):
         """Set job status to final.
@@ -4719,7 +4723,7 @@ class Autosubmit:
             section_name = section.strip().split("[")[0].strip().upper()
             if valid_sections is not None and section_name not in valid_sections and section_name != "ANY":
                 validation_message += f"\n\tSpecified section not found: {section_name}."
-            
+
             if '[' not in section and ']' not in section:
                 if len(section.split()) > 1:
                     validation_message += f"\n\tMalformed section/split entry: {section}. "
@@ -4865,7 +4869,7 @@ class Autosubmit:
 
     @staticmethod
     def _filter_sections_splits(
-        filter_section_splits: list[str], jobs: list[Job]
+            filter_section_splits: list[str], jobs: list[Job]
     ) -> list[Job]:
         """Filter jobs by sections and splits.
 
@@ -4884,7 +4888,7 @@ class Autosubmit:
                 if job.splits and int(job.splits) >= 2 and job.split is not None
             }
         )
-        
+
         for section in filter_section_splits:
             section_name = section.strip().split("[")[0].strip()
             section_name_upper = section_name.upper()
@@ -4899,9 +4903,9 @@ class Autosubmit:
                 job_splits = set(all_splits)
 
             if (
-                has_split_selector
-                and job_splits_str.strip()
-                and job_splits_str.strip().upper() != "ANY"
+                    has_split_selector
+                    and job_splits_str.strip()
+                    and job_splits_str.strip().upper() != "ANY"
             ):
                 if section_name_upper == "ANY":
                     available_section_splits = set(all_splits)
@@ -4910,9 +4914,9 @@ class Autosubmit:
                         str(job.split).upper()
                         for job in jobs
                         if job.section.upper() == section_name_upper
-                        and job.splits
-                        and int(job.splits) >= 2
-                        and job.split is not None
+                           and job.splits
+                           and int(job.splits) >= 2
+                           and job.split is not None
                     }
 
                 missing_splits = set(job_splits) - available_section_splits
@@ -4929,9 +4933,9 @@ class Autosubmit:
                     j
                     for j in jobs
                     if j.section.upper() == section_name_upper
-                    and Autosubmit._split_match(j, job_splits)
+                       and Autosubmit._split_match(j, job_splits)
                 ]
-            
+
             section_matching_jobs.extend(filtered_jobs)
             # Deduplicate
             section_matching_jobs = list(dict.fromkeys(section_matching_jobs))
@@ -4944,7 +4948,7 @@ class Autosubmit:
 
     @staticmethod
     def _filter_chunks(
-        filter_chunk_str: str, job_list: "JobList", matching_jobs: list[Job]
+            filter_chunk_str: str, job_list: "JobList", matching_jobs: list[Job]
     ) -> list[Job]:
         """Filter jobs by exact date, member and chunk matches.
 
@@ -5015,14 +5019,14 @@ class Autosubmit:
                     for job_tuple in pruned_jobs:
                         job, job_date, job_member, job_chunk = job_tuple
                         if (
-                            job_date in date_values
-                            and job_member in member_values
-                            and job_chunk in chunk_values
+                                job_date in date_values
+                                and job_member in member_values
+                                and job_chunk in chunk_values
                         ):
                             final_list.append(job)
 
         return list(set(final_list))
-    
+
     @staticmethod
     def _filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list[Job]:
         """Select jobs from *job_list* according to *filter_chunks* specification.
@@ -5114,7 +5118,7 @@ class Autosubmit:
         selected_chunk_filters = [name for name, value in provided_chunk_filters if value]
         if len(selected_chunk_filters) > 1:
             Log.warning(
-                "Multiple chunk filters provided (%s). Using -fc first, then -ftc, and finally -ftcs." 
+                "Multiple chunk filters provided (%s). Using -fc first, then -ftc, and finally -ftcs."
                 " Use only one of them to avoid ambiguity."
                 % ", ".join(selected_chunk_filters)
             )
@@ -5182,7 +5186,7 @@ class Autosubmit:
                 Log.info("Filtering jobs...")
                 all_jobs = job_list.get_job_list()
                 selected_job_names = {job.name for job in all_jobs}
-                
+
                 final_status = Autosubmit._get_status(final)
                 if filter_section:
                     ft_entries = [section for section in separate_section_entries(filter_section)]
@@ -5192,8 +5196,7 @@ class Autosubmit:
 
                 if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
-                    chunk_filtered_jobs = Autosubmit._filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)
-                    selected_job_names &={job.name for job in chunk_filtered_jobs}
+                    selected_job_names &= {job.name for job in Autosubmit._filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)}
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
                 if filter_status:

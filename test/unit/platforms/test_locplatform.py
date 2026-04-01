@@ -34,7 +34,6 @@ def test_local_platform_copy():
 
     assert local_platform.name == copied.name
     assert local_platform.expid == copied.expid
-    assert local_platform.get_checkhost_cmd() == copied.get_checkhost_cmd()
 
 
 @pytest.mark.parametrize(
@@ -82,3 +81,16 @@ def test_get_stat_file(count: int, stats_file_exists: bool, job_fail_count: int,
 
     assert remote_file_exists == local.get_stat_file(job=job, count=count)
     assert mocked_os_remove.called == stats_file_exists
+
+
+def test_get_job_names_cmd_contains_expected_jobs() -> None:
+    """The command must use ps to list processes and filter by job name.
+
+    LocalPlatform shares the same implementation as PsPlatform for detecting
+    duplicated process names on a UNIX remote host.
+    """
+    local = LocalPlatform(_EXPID, 'local', {})
+    cmd = local._get_job_names_cmd(["job_a", "job_b"])
+
+    assert "job_a" in cmd
+    assert "job_b" in cmd

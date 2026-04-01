@@ -849,3 +849,45 @@ def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture
     templates_generated = [t for t in templates_dir.glob(f"{exp.expid}*.cmd")]
 
     assert len(templates_generated) == 1
+
+
+@pytest.mark.ssh
+@pytest.mark.slurm
+@pytest.mark.docker
+@pytest.mark.parametrize("jobs_data,final_status", [
+    # Failure
+    (dedent("""\
+    CONFIG:
+        SAFETYSLEEPTIME: 0
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 1  
+    """), "Success"),
+], ids=["Create -> Run Completed -> Create -> Run Completed"])
+def test_rerun_expid(
+        autosubmit_exp,
+        general_data,
+        jobs_data,
+        final_status,
+        slurm_server
+):
+    yaml = YAML(typ='rt')
+    jobs_data_yaml = yaml.load(jobs_data)
+    as_exp = autosubmit_exp(experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
+    as_conf = as_exp.as_conf
+    as_conf.set_last_as_command('run')
+
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+    _assert_exit_code(final_status, exit_code)
+    _assert_exit_code("SUCCESS", exit_code)
+
+    as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=False)
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+    _assert_exit_code("SUCCESS", exit_code)

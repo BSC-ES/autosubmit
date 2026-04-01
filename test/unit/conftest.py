@@ -31,6 +31,11 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
+from autosubmit.platforms.ecplatform import EcPlatform
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.pjmplatform import PJMPlatform
+from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 
 # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
@@ -268,3 +273,84 @@ def experiment_config_fixture(session_mocker):
         'autosubmit.config.configcommon.get_experiment_description',
         return_value=[['test experiment']]
     )
+
+
+@pytest.fixture
+def slurm_platform(autosubmit_config, tmp_path):
+    """Minimal SlurmPlatform with the directory structure it expects."""
+    exp_data = {
+        "LOCAL_ROOT_DIR": str(tmp_path),
+        "LOCAL_TMP_DIR": "tmp",
+        "LOCAL_ASLOG_DIR": "ASLOGS",
+        "PLATFORMS": {
+            "local": {
+                "type": "slurm",
+                "host": "localhost",
+                "user": "user",
+                "project": "project",
+                "scratch_dir": str(tmp_path),
+            }
+        },
+    }
+    as_conf = autosubmit_config("a000", experiment_data=exp_data)
+    aslogs = tmp_path / "a000" / "tmp" / "ASLOGS"
+    aslogs.mkdir(parents=True, exist_ok=True)
+    (aslogs / "submit_local.sh").touch()
+    return SlurmPlatform(expid="a000", name="local", config=as_conf.experiment_data)
+
+
+@pytest.fixture
+def pjm_platform(autosubmit_config, tmp_path):
+    """Minimal PJMPlatform."""
+    exp_data = {
+        "LOCAL_ROOT_DIR": str(tmp_path),
+        "LOCAL_TMP_DIR": "tmp",
+        "LOCAL_ASLOG_DIR": "ASLOGS",
+        "PLATFORMS": {
+            "local": {
+                "type": "pjm",
+                "host": "localhost",
+                "user": "user",
+                "project": "project",
+                "scratch_dir": str(tmp_path),
+            }
+        },
+    }
+    as_conf = autosubmit_config("a000", experiment_data=exp_data)
+    aslogs = tmp_path / "a000" / "tmp" / "ASLOGS"
+    aslogs.mkdir(parents=True, exist_ok=True)
+    (aslogs / "submit_local.sh").touch()
+    return PJMPlatform(expid="a000", name="local", config=as_conf.experiment_data)
+
+
+@pytest.fixture
+def ec_platform(tmp_path):
+    """Minimal EcPlatform (slurm scheduler variant)."""
+    config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"}
+    return EcPlatform(expid="a000", name="local", config=config, scheduler="slurm")
+
+
+@pytest.fixture
+def ps_platform(tmp_path):
+    """Minimal PsPlatform."""
+    config = {
+        "LOCAL_ROOT_DIR": str(tmp_path),
+        "LOCAL_TMP_DIR": "tmp",
+        "PLATFORMS": {
+            "local": {
+                "type": "ps",
+                "host": "127.0.0.1",
+                "user": "user",
+                "project": "project",
+                "scratch_dir": str(tmp_path),
+            }
+        },
+    }
+    return PsPlatform(expid="a000", name="local", config=config)
+
+
+@pytest.fixture
+def local_platform(tmp_path):
+    """Minimal LocalPlatform."""
+    config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"}
+    return LocalPlatform(expid="a000", name="local", config=config)

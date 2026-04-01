@@ -20,9 +20,10 @@
 This file contains code that interfaces between Autosubmit and a Slurm Platform.
 """
 
-import locale
 import os
+import re
 from contextlib import suppress
+from pathlib import Path
 from time import sleep
 from typing import Any, Optional, Union, TYPE_CHECKING
 
@@ -36,6 +37,30 @@ from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
 if TYPE_CHECKING:
     # Avoid circular imports
     from autosubmit.job.job import Job
+
+
+# Compiled patterns that identify valid stdout from any Slurm command.
+_SLURM_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
+    # sbatch (one or more "Submitted batch job N" lines in batched submission).
+    re.compile(r"submitted batch job \d+", re.IGNORECASE),
+    # squeue / sacct tabular output: any row that starts with a numeric job ID
+    re.compile(r"^\s*\d+\b", re.MULTILINE),
+    # sacct state-only output (-o "State"): matches any known job-state word
+    re.compile(
+        r"\b(completed|running|pending|configuring|resizing|failed|cancelled|"
+        r"timeout|node_fail|preempted|suspended|out_of_memory)\b",
+        re.IGNORECASE,
+    ),
+    # scontrol show output: key=value pairs present in single or multi-job output.
+    re.compile(r"JobId=\d+", re.IGNORECASE),
+    # squeue / sacct header-only output: command ran successfully but returned
+    # The "JOBID" column header is always present in squeue (without -h) and
+    # in sacct (without -n).
+    re.compile(r"\bJOBID\b", re.IGNORECASE),
+    # sacct column-separator line ("------------ ---------- ...") that appears
+    # when sacct is called without -n and finds no matching job records.
+    re.compile(r"^-{3,}", re.MULTILINE),
+)
 
 
 class SlurmPlatform(ParamikoPlatform):
@@ -63,7 +88,7 @@ class SlurmPlatform(ParamikoPlatform):
         self._submit_command_name = None
         self._submit_cmd = None
         self.x11_options = None
-        self._submit_cmd_x11 = f'{self.remote_log_dir}'
+        self._submit_cmd_x11 = None
         self.cancel_cmd = None
         self.type = 'slurm'
         self._header = SlurmHeader()
@@ -95,258 +120,6 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return SlurmPlatform(self.expid, self.name, self.config)
 
-    def get_submit_cmd_x11(self, args: str, script_name: str) -> str:
-        """Returns the submit command for the platform.
-
-        :param args: Arguments to be used in the construction of the submit command.
-        :type args: str
-        :param script_name: Name of the file to be referenced.
-        :type script_name: str
-
-        :return: Command slurm to allocate jobs
-        :rtype: str
-        """
-
-        cmd = f'salloc {args} {self._submit_cmd_x11}/{script_name}'
-        Log.debug(f"Salloc command: {cmd}")
-        return cmd
-
-    def generate_new_name_submit_script_file(self) -> None:
-        """Delete the current file and generates a new one with a new name.
-
-        :rtype: None
-        """
-        if os.path.exists(self._submit_script_path):
-            os.remove(self._submit_script_path)
-        self._submit_script_path = self._submit_script_base_name + os.urandom(16).hex() + ".sh"
-
-    def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages: list[str],
-                                 error_message: str = "", hold: bool = False) -> tuple[bool, list]:
-        """Retrieve multiple jobs identifiers.
-
-        :param valid_packages_to_submit: List of valid Job Packages to be processes
-        :type valid_packages_to_submit: List[JobPackageBase]
-        :param failed_packages: List of packages that have failed to be submitted
-        :type failed_packages: list[str]
-        :param error_message: concatenated error message
-        :type error_message: str
-        :param hold: if True, the job will be held for 5 retries
-        :type hold: bool
-
-        :return: retrieve the ID of the Jobs
-        :rtype: tuple[bool, list[JobPackageBase]]
-        """
-        try:
-            valid_packages_to_submit = [package for package in valid_packages_to_submit if package.x11 is not True]
-            if len(valid_packages_to_submit) > 0:
-                duplicated_jobs_already_checked = False
-                platform = valid_packages_to_submit[0].jobs[0].platform
-                try:
-                    jobs_id = self.submit_script(hold=hold)
-                except AutosubmitError as e:
-                    job_names = []
-                    duplicated_jobs_already_checked = True
-                    with suppress(Exception):
-                        for package_ in valid_packages_to_submit:
-                            if hasattr(package_, "name"):
-                                job_names.append(package_.name)  # wrapper_name
-                            else:
-                                job_names.append(package_.jobs[0].name)  # job_name
-                        Log.error(f'TRACE:{e.trace}\n{e.message} JOBS:{job_names}')
-                        for job_name in job_names:
-                            jobid = self.get_jobid_by_jobname(job_name)
-                            # cancel bad submitted job if jobid is encountered
-                            for id_ in jobid:
-                                self.send_command(self.cancel_job(id_))
-                    jobs_id = None
-                    self.connected = False
-                    if e.trace is not None:
-                        has_trace_bad_parameters = str(e.trace).lower().find("bad parameters") != -1
-                    else:
-                        has_trace_bad_parameters = False
-                    if (has_trace_bad_parameters or e.message.lower().find("invalid partition") != -1 or
-                            e.message.lower().find(" invalid qos") != -1 or
-                            e.message.lower().find("scheduler is not installed") != -1 or
-                            e.message.lower().find("failed") != -1 or e.message.lower().find("not available") != -1):
-                        error_msg = ""
-                        for package_tmp in valid_packages_to_submit:
-                            for job_tmp in package_tmp.jobs:
-                                if job_tmp.section not in error_msg:
-                                    error_msg += job_tmp.section + "&"
-                        if has_trace_bad_parameters:
-                            error_message += (
-                                f"Check job and queue specified in your JOBS definition in YAML. Sections "
-                                f"that could be affected: {error_msg[:-1]}"
-                            )
-                        else:
-                            error_message += (
-                                f"\ncheck that {self.name} platform has set the correct scheduler. "
-                                f"Sections that could be affected: {error_msg[:-1]}"
-                            )
-
-                        raise AutosubmitCritical(error_message, 7014, e.error_message) from e
-                except IOError as e:
-                    raise AutosubmitError("IO issues ", 6016, str(e)) from e
-                except BaseException as e:
-                    if str(e).find("scheduler") != -1:
-                        raise AutosubmitCritical(
-                            f"Are you sure that [{self.type.upper()}] scheduler is the "
-                            f"correct type for platform [{self.name.upper()}]?.\n Please, double check that "
-                            f"{self.type.upper()} is loaded for {self.name.upper()} before "
-                            f"autosubmit launch any job.", 7070
-                        ) from e
-                    raise AutosubmitError(
-                        "Submission failed, this can be due a failure on the platform", 6015, str(e)) from e
-                if jobs_id is None or len(jobs_id) <= 0:
-                    raise AutosubmitError(
-                        "Submission failed, this can be due a failure on the platform",
-                        6015, f"Jobs_id {jobs_id}")
-                if hold:
-                    sleep(10)
-                jobid_index = 0
-                for package in valid_packages_to_submit:
-                    current_package_id = str(jobs_id[jobid_index])
-                    if hold:
-                        retries = 5
-                        package.jobs[0].id = current_package_id
-                        try:
-                            can_continue = True
-                            while can_continue and retries > 0:
-                                cmd = package.jobs[0].platform.get_queue_status_cmd(current_package_id)
-                                package.jobs[0].platform.send_command(cmd)
-                                queue_status = package.jobs[0].platform._ssh_output
-                                reason = package.jobs[0].platform.parse_queue_reason(queue_status, current_package_id)
-                                if reason == '(JobHeldAdmin)':
-                                    can_continue = False
-                                elif reason == '(JobHeldUser)':
-                                    can_continue = True
-                                else:
-                                    can_continue = False
-                                    sleep(5)
-                                retries = retries - 1
-                            if not can_continue:
-                                package.jobs[0].platform.send_command(
-                                    package.jobs[0].platform.cancel_cmd + f" {current_package_id}")
-                                jobid_index += 1
-                                continue
-                            if not self.hold_job(package.jobs[0]):
-                                jobid_index += 1
-                                continue
-                        except Exception as e:
-                            Log.debug(f'Adding {current_package_id} to failed packages: {str(e)}')
-                            failed_packages.append(current_package_id)
-                            continue
-                    package.process_jobs_to_submit(current_package_id, hold)
-                    # Check if there are duplicated job_name
-                    if not duplicated_jobs_already_checked:
-                        job_name = package.name if hasattr(package, "name") else package.jobs[0].name
-                        jobid = self.get_jobid_by_jobname(job_name)
-                        if len(jobid) > 1:  # Cancel each job that is not the associated
-                            ids_to_check: list = [package.jobs[0].id]
-                            if package.jobs[0].het:
-                                for i in range(1, package.jobs[0].het.get("HETSIZE", 1)):
-                                    ids_to_check.append(str(int(ids_to_check[0]) + i))
-                            # TODO to optimize cancel all jobs at once
-                            for id_ in [jobid for jobid in jobid if jobid not in ids_to_check]:
-                                self.send_command(self.cancel_job(id_))
-                                Log.debug(f'Job {id_} with the assigned name: {job_name} has been cancelled')
-                            Log.debug(f'Job {package.jobs[0].id} with the assigned name: {job_name} has been submitted')
-                    jobid_index += 1
-                if len(failed_packages) > 0:
-                    for job_id in failed_packages:
-                        platform.send_command(platform.cancel_cmd + f" {job_id}")
-                    raise AutosubmitError(f"{self.name} submission failed, some hold jobs failed to be held", 6015)
-            save = True
-        except AutosubmitError:
-            raise
-        except AutosubmitCritical:
-            raise
-        except AttributeError:
-            raise
-        except Exception as e:
-            raise AutosubmitError(f"{self.name} submission failed", 6015, str(e)) from e
-        return save, valid_packages_to_submit
-
-    def generate_submit_script(self) -> None:
-        """Delete the current file and generates a new one with a new name.
-
-        :rtype: None
-        """
-        # remove file
-        with suppress(FileNotFoundError):
-            os.remove(self._submit_script_path)
-        self.generate_new_name_submit_script_file()
-
-    def get_submit_script(self) -> str:
-        """Change file permissions to 0o750 and return the path of the file.
-
-        :return: Path to the file
-        """
-        os.chmod(self._submit_script_path, 0o750)
-        return self._submit_script_path
-
-    def submit_job(self, job, script_name: str, hold: bool = False, export: str = "none") -> Union[int, None]:
-        """Submit a job from a given job object.
-
-        :param job: Job object
-        :type job: autosubmit.job.job.Job
-        :param script_name: Name of the script of the job.
-        :type script_name: str
-        :param hold: Send job hold.
-        :type hold: bool
-        :param export: Set within the jobs.yaml, used to export environment script to use before the job is launched.
-        :type export: str
-        :return: job id for the submitted job.
-        """
-        if job is None or not job:
-            x11 = False
-        else:
-            x11 = job.x11
-        if not x11:
-            self.get_submit_cmd(script_name, job, hold=hold, export=export)
-            return None
-        cmd = self.get_submit_cmd(script_name, job, hold=hold, export=export)
-        if cmd is None:
-            return None
-        if self.send_command(cmd, x11=x11):
-            job_id = self.get_submitted_job_id(self.get_ssh_output(), x11=x11)
-            if job:
-                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: "
-                           f"{job.workflow_commit}")
-            return int(job_id)
-        return None
-
-    def submit_script(self, hold: bool = False) -> Union[list[int], int]:
-        """Sends a Submit file Script with sbatch instructions.
-
-        Execute it in the platform and retrieves the Jobs_ID of all jobs at once.
-
-        :param hold: Submit a job in held status. Held jobs will only earn priority status if the
-            remote machine allows it.
-        :type hold: bool
-        :return: job id for submitted jobs.
-        :rtype: Union[List[int], int]
-        """
-        try:
-            self.send_file(self.get_submit_script(), False)
-            cmd = os.path.join(self.get_files_path(),
-                               os.path.basename(self._submit_script_path))
-            # remove file after submission
-            cmd = f"{cmd} ; rm {cmd}"
-            try:
-                self.send_command(cmd)
-            except Exception:
-                raise
-            jobs_id = self.get_submitted_job_id(self.get_ssh_output())
-
-            return jobs_id
-        except IOError as e:
-            raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e)) from e
-        except (AutosubmitError, AutosubmitCritical):
-            raise
-        except Exception as e:
-            raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e)) from e
-
     def check_remote_log_dir(self) -> None:
         """Creates log dir on remote host."""
 
@@ -371,54 +144,16 @@ class SlurmPlatform(ParamikoPlatform):
             self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "scancel"
-        self._submit_cmd = f'sbatch --no-requeue -D {self.remote_log_dir} {self.remote_log_dir}/'
+        self._submit_cmd = f'sbatch --no-requeue -D {self.remote_log_dir} '
         self._submit_command_name = "sbatch"
-        self._submit_hold_cmd = f'sbatch -H -D {self.remote_log_dir} {self.remote_log_dir}/'
+        self._submit_hold_cmd = f'sbatch -H -D {self.remote_log_dir} '
         # jobid =$(sbatch WOA_run_mn4.sh 2 > & 1 | grep -o "[0-9]*"); scontrol hold $jobid;
         self.put_cmd = "scp"
         self.get_cmd = "scp"
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
-        self._submit_cmd_x11 = f'{self.remote_log_dir}'
 
-    def hold_job(self, job) -> bool:
-        """Create a Slurm command to cancel the execution of the Job.
-
-        :param job: Job to be held.
-        :type job: autosubmit.job.job.Job
-        :return: A boolean indicating whether the job is being held.
-        :rtype: bool
-        """
-        try:
-            cmd = f"scontrol release {job.id} ; sleep 2 ; scontrol hold {job.id} "
-            self.send_command(cmd)
-            job_status = self.check_job(job, submit_hold_check=True)
-            if job_status == Status.RUNNING:
-                self.send_command(f"scancel {job.id}")
-                return False
-            if job_status == Status.FAILED:
-                return False
-            cmd = self.get_queue_status_cmd(job.id)
-            self.send_command(cmd)
-
-            queue_status = self._ssh_output
-            reason = self.parse_queue_reason(queue_status, job.id)
-            self.send_command(self.get_estimated_queue_time_cmd(job.id))
-            estimated_time = self.parse_estimated_time(self._ssh_output)
-            if reason == '(JobHeldAdmin)':  # Job is held by the system
-                self.send_command(f"scancel {job.id}")
-                return False
-            Log.info(
-                f"The {job.name} will be eligible to run the day {estimated_time.get('date', 'Unknown')} at "
-                f"{estimated_time.get('time', 'Unknown')}\nQueuing reason is: {reason}")
-            return True
-        except BaseException as e:
-            try:
-                self.send_command(f"scancel {job.id}")
-                raise AutosubmitError(f"Can't hold jobid:{job.id}, canceling job", 6000, str(e)) from e
-            except BaseException as err:
-                raise AutosubmitError(f"Can't cancel the jobid: {job.id}", 6000, str(err)) from err
-            except AutosubmitError as as_err:
-                raise as_err
+    def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
+        return f"cd {self.remote_log_dir} ; {pre} salloc {x11_options} {script_name} {post}" if x11_options else f"{pre} {self._submit_cmd} {script_name} {post}"
 
     def get_mkdir_cmd(self) -> str:
         """Get the variable mkdir_cmd that stores the mkdir command.
@@ -458,43 +193,48 @@ class SlurmPlatform(ParamikoPlatform):
             return status
         return status[0]
 
-    def get_submitted_job_id(self, output: str, x11: bool = False) -> Union[list[int], int]:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
+        """Parses the output of the submit command to get the job ID.
+        :param output: output of the submit command.
+        :param x11: whether the job is an x11 job, which has a different output format.
+        :return: job ID of the submitted job.
+        """
+        jobs_id = []
         try:
-            if output.find("failed") != -1:
+            if "failed" in output.lower():
                 raise AutosubmitCritical("Submission failed. Command Failed", 7014)
             if x11:
                 return int(output.splitlines()[0])
-            jobs_id = []
             for line in output.splitlines():
                 jobs_id.append(int(line.split(' ')[3]))
             return jobs_id
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
 
-    def get_submit_cmd(self, job_script: str, job, hold: bool = False, export: str = "") -> str:
-        if (export is None or export.lower() == "none") or len(export) == 0:
-            export = ""
-        else:
-            export += " ; "
-        if job is None or not job:
-            x11 = False
-        else:
-            x11 = job.x11
+    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
+        """Return submitted Slurm job IDs by script name.
 
-        if not x11:
-            with suppress(Exception):
-                lang = locale.getlocale()[1]
-                if lang is None:
-                    lang = locale.getdefaultlocale()[1]
-                    if lang is None:
-                        lang = 'UTF-8'
-                with open(self._submit_script_path, "ab") as submit_script_file:
-                    if not hold:
-                        submit_script_file.write((export + self._submit_cmd + job_script + "\n").encode(lang))
-                    else:
-                        submit_script_file.write((export + self._submit_hold_cmd + job_script + "\n").encode(lang))
-        else:
-            return export + self.get_submit_cmd_x11(job.x11_options.strip(""), job_script.strip(""))
+        This fallback is used when the batched submit command does not return
+        one recoverable job identifier per submitted script.
+
+        :param script_names: Submitted script filenames.
+        :type script_names: list[str]
+        :return: Matching Slurm job IDs in submission order.
+        :rtype: list[int]
+        """
+        submitted_job_ids: list[int] = []
+
+        for script_name in script_names:
+            job_name = Path(script_name).stem
+
+            matched_ids = [int(job_id) for job_id in self.get_jobid_by_jobname(job_name)]
+
+            if not matched_ids:
+                return []
+
+            submitted_job_ids.append(max(matched_ids))
+
+        return submitted_job_ids
 
     def get_check_job_cmd(self, job_id: str) -> str:
         """Generates sacct command to the job selected.
@@ -542,17 +282,6 @@ class SlurmPlatform(ParamikoPlatform):
         :rtype: str
         """
         return f'squeue -o %A,%.50j -n {job_name}'
-
-    @staticmethod
-    def cancel_job(job_id: str) -> str:
-        """Command to cancel a job.
-
-        :param job_id: ID of a job.
-        :param job_id: str
-        :return: Cancel job command.
-        :rtype: str
-        """
-        return f'scancel {job_id}'
 
     def get_job_energy_cmd(self, job_id: str) -> str:
         """Generates a command to get data from a job
@@ -671,3 +400,112 @@ class SlurmPlatform(ParamikoPlatform):
         if not file_exist:
             Log.warning(f"File {src} couldn't be found")
         return file_exist
+
+    def _get_job_names_cmd(self, job_names: list[str]) -> str:
+        """Return a command that groups Slurm job IDs by job name.
+
+        The command returns one line per job name using the format
+        ``JobName:id,id2,id3``.
+
+        :param job_names: Job names to query.
+        :type job_names: list[str]
+        :return: Shell command that groups matching job IDs by job name.
+        :rtype: str
+        """
+        return (
+            f"squeue -h -o '%j:%A' -n {','.join(job_names)} "
+            "| awk -F':' '{jobs[$1] = jobs[$1] ? jobs[$1] \",\" $2 : $2} "
+            "END {for (name in jobs) print name \":\" jobs[name]}'"
+        )
+
+    def cancel_jobs(self, job_ids: list[str]) -> None:
+        """Cancel jobs by their IDs.
+
+        :param job_ids: List of job IDs to cancel.
+        :type job_ids: list[str]
+        """
+        if job_ids:
+            cancel_by_comma = ",".join(str(job_id) for job_id in job_ids)
+            self.send_command(f"{self.cancel_cmd} {cancel_by_comma}")
+
+    def _check_for_unrecoverable_errors(self) -> None:
+        """Check Slurm command output for recoverable and unrecoverable errors."""
+        out = self._ssh_output or ""
+        err = self._ssh_output_err or ""
+
+        # Fast-exit: any match in stdout (single or multi-line) confirms the
+        if any(pat.search(out) for pat in _SLURM_EXPECTED_OUTPUT):
+            return
+
+        # stdout does not contain the expected Slurm output; inspect stderr.
+        err_lower = err.lower()
+        if not err_lower.strip():
+            return
+
+        transient_patterns: list[tuple[str, str]] = [
+            ("not active", "SSH session not active"),
+            ("git clone", "Git clone failed during submission; likely a transient network issue"),
+            ("socket timed out", "Socket timed out communicating with Slurm"),
+            ("socket error", "Socket error communicating with Slurm"),
+            ("connection timed out", "Connection to Slurm daemon timed out"),
+            ("connection refused", "Connection to Slurm daemon refused"),
+            ("connection reset by peer", "Connection reset by Slurm daemon"),
+            ("broken pipe", "Broken pipe while communicating with Slurm"),
+            ("network is unreachable", "Network unreachable; cannot reach Slurm daemon"),
+            ("unable to connect to slurm daemon", "Unable to connect to Slurm daemon"),
+            ("slurm_persist_conn_open_without_init", "Slurm persistent connection not initialised"),
+            ("slurmdbd", "Slurm database daemon (slurmdbd) is unavailable"),
+            ("slurmctld", "Slurm controller daemon (slurmctld) is unavailable"),
+            ("communication failure", "Slurm communication failure"),
+            ("communication error", "Slurm communication error"),
+            ("temporary failure in name resolution", "DNS resolution failed temporarily"),
+        ]
+
+        for pattern, message in transient_patterns:
+            if pattern in err_lower:
+                raise AutosubmitError(
+                    f"Transient Slurm error: {message}",
+                    6016,
+                    err,
+                )
+
+        critical_patterns: list[tuple[str, str]] = [
+            ("invalid partition", "Invalid Slurm partition specified"),
+            ("invalid qos", "Invalid QOS specified"),
+            ("invalid account", "Invalid Slurm account or account/partition combination"),
+            ("invalid constraint", "Invalid node constraint specified"),
+            ("invalid time specification", "Invalid wallclock time specification"),
+            ("invalid --time", "Invalid --time directive"),
+            ("invalid --mem", "Invalid --mem directive"),
+            ("invalid --nodes", "Invalid --nodes directive"),
+            ("invalid --ntasks", "Invalid --ntasks directive"),
+            ("invalid --cpus-per-task", "Invalid --cpus-per-task directive"),
+            ("invalid --partition", "Invalid --partition directive"),
+            ("invalid --qos", "Invalid --qos directive"),
+            ("invalid --account", "Invalid --account directive"),
+            ("unrecognized option", "Unrecognised sbatch/salloc option"),
+            ("batch job submission failed", "Batch job submission failed; check sbatch directives"),
+            ("not submitted", "Job was not submitted to Slurm; check sbatch directives"),
+            ("violates accounting/qos policy", "Job violates accounting or QOS policy"),
+            ("violates accounting policy", "Job violates accounting policy"),
+            ("requested node configuration is not available", "Requested node configuration is unavailable"),
+            ("not allowed to submit", "User is not permitted to submit jobs to this platform"),
+            ("user/account not found", "Slurm user or account not found"),
+            ("job exceeds", "Job exceeds a configured Slurm limit"),
+            ("account has insufficient", "Account has insufficient quota"),
+            ("syntax error", "Syntax error in the job script or directives"),
+            ("command not found", "Slurm command not found on the remote host"),
+            ("salloc: error", "salloc error; likely wrong directives or options"),
+            ("salloc: unrecognized option", "Unrecognised salloc option"),
+            ("unknown option", "Unknown Slurm option in the job script"),
+            ("error: cpu count per node", "Invalid CPU count per node specification"),
+            ("sbatch: error:", "sbatch reported an unrecognised error; check directives"),
+        ]
+
+        for pattern, message in critical_patterns:
+            if pattern in err_lower:
+                raise AutosubmitCritical(
+                    f"Permanent Slurm error: {message}",
+                    7014,
+                    err,
+                )

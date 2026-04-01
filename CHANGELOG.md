@@ -29,8 +29,10 @@
 - Add issues URL to error message #2888
 - Allow multiple filters in `setstatus` command #1250
 - Allow filtering by section and split in the `ft` command #2910
+- Improved profiler adding tracing and stopping capabilities  #2933
+- Commands `setstatus, create and recovery` do not display tre plot by default #1347
+- Improved submission readability, performance and logic flow #2939
 - Improved profiler adding tracing and stopping capabilities #2933
-- Commands `setstatus, create and recovery` do not display the plot by default #1347
 - Creation and modification dates are now timezone-aware in the `job_data` table #2943
 - Added `DEFAULT.DESCRIPTION` from the database into the list of job parameters #2857
 

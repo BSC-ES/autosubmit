@@ -201,28 +201,23 @@ def test_jobs_in_wrapper_str(autosubmit_config):
 
 
 @pytest.mark.parametrize(
-    "error, target_function",
+    "error,target_function",
     [
         (None, None),
-        (AutosubmitError, "_create_scripts"),
-        (AutosubmitCritical, "_create_scripts"),
-        (AutosubmitError, "_send_files"),
-        (AutosubmitCritical, "_send_files"),
-        (AutosubmitError, "_do_submission"),
-        (AutosubmitCritical, "_do_submission"),
+        (AutosubmitError, "check_job_files_exists"),
+        (AutosubmitCritical, "check_job_files_exists"),
+        (AutosubmitError, "build_scripts"),
+        (AutosubmitCritical, "build_scripts"),
     ],
     ids=[
         "no_error",
-        "autosubmit_error_on_create_scripts",
-        "autosubmit_critical_on_create_scripts",
-        "autosubmit_error_on_send_files",
-        "autosubmit_critical_on_send_files",
-        "autosubmit_error_on_do_submission",
-        "autosubmit_critical_on_do_submission",
+        "autosubmit_error_on_check_job_files_exists",
+        "autosubmit_critical_on_check_job_files_exists",
+        "autosubmit_error_on_build_scripts",
+        "autosubmit_critical_on_build_scripts",
     ],
 )
-def test_job_package_submission(mocker, local, tmp_path, error, target_function) -> None:
-    """Verify submit succeeds normally and propagates AutosubmitError or AutosubmitCritical."""
+def test_job_package_generate_scripts(mocker, local, tmp_path, error, target_function) -> None:
     jobs = [
         Job("job1", "1", Status.READY, 0),
         Job("job2", "2", Status.READY, 0),
@@ -235,42 +230,57 @@ def test_job_package_submission(mocker, local, tmp_path, error, target_function)
         job.custom_directives = []
         job.file.write_text("echo 'Hello World'")
 
-    mocker.patch("multiprocessing.cpu_count", return_value=len(jobs) + 1)
-    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value={})
-    mocker.patch("autosubmit.job.job.Job._get_paramiko_template", return_value="empty")
-
     job_package = JobPackageSimple(jobs)
-    mock_create_scripts = mocker.patch.object(job_package, "_create_scripts")
-    mock_send_files = mocker.patch.object(job_package, "_send_files")
-    mock_do_submission = mocker.patch.object(job_package, "_do_submission")
+    mock_clean_previous_run = mocker.patch.object(job_package, "_clean_previous_run")
+    mock_check_job_files_exists = mocker.patch.object(job_package, "check_job_files_exists")
+    mock_build_scripts = mocker.patch.object(job_package, "build_scripts")
 
     method_mocks = {
-        "_create_scripts": mock_create_scripts,
-        "_send_files": mock_send_files,
-        "_do_submission": mock_do_submission,
+        "check_job_files_exists": mock_check_job_files_exists,
+        "build_scripts": mock_build_scripts,
     }
-
     configuration = mocker.MagicMock()
-    configuration.get_project_dir.return_value = "fake-proj-dir"
 
-    if error:
-        method_mocks[target_function].side_effect = error
+    if error is not None and target_function is not None:
+        method_mocks[target_function].side_effect = error("boom", 7000) if error is AutosubmitError else error("boom", 7000)
 
         with pytest.raises(error):
-            job_package.submit(configuration, "fake-params")
+            job_package.generate_scripts(configuration)
 
-        methods_after_failure = {
-            "_create_scripts": [],
-            "_send_files": ["_create_scripts"],
-            "_do_submission": ["_create_scripts", "_send_files"],
-        }
-        for skipped in methods_after_failure[target_function]:
-            method_mocks[skipped].assert_called_once()
-        for skipped in set(method_mocks) - set(methods_after_failure[target_function]) - {target_function}:
-            method_mocks[skipped].assert_not_called()
+        mock_clean_previous_run.assert_called_once()
+        if target_function == "build_scripts":
+            mock_check_job_files_exists.assert_called_once_with(configuration, False)
+        if target_function == "check_job_files_exists":
+            mock_build_scripts.assert_not_called()
     else:
-        job_package.submit(configuration, "fake-params")
+        job_package.generate_scripts(configuration)
 
-        mock_create_scripts.assert_called_once()
-        mock_send_files.assert_called_once()
-        mock_do_submission.assert_called_once()
+        mock_clean_previous_run.assert_called_once()
+        mock_check_job_files_exists.assert_called_once_with(configuration, False)
+        mock_build_scripts.assert_called_once_with(configuration)
+
+
+def test_job_package_send_files_uses_current_public_api(mocker, local, tmp_path) -> None:
+    """Send package scripts through the current ``send_files`` method."""
+    jobs = [
+        Job("job1", "1", Status.READY, 0),
+        Job("job2", "2", Status.READY, 0),
+    ]
+    for job in jobs:
+        job.platform = local
+        job._tmp_path = tmp_path
+        job.additional_files = []
+
+    job_package = JobPackageSimple(jobs)
+    job_package._job_scripts = {
+        "job1": "job1.cmd",
+        "job2": "job2.cmd",
+    }
+    mocked_send_file = mocker.patch.object(local, "send_file")
+
+    job_package.send_files()
+
+    assert mocked_send_file.call_args_list == [
+        mocker.call("job1.cmd"),
+        mocker.call("job2.cmd"),
+    ]

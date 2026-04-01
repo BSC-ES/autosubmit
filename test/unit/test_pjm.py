@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from collections import OrderedDict
 from pathlib import Path
 
 import pytest
@@ -169,45 +170,166 @@ def test_parse_queue_reason(remote_platform):
     assert output == "COMPLETED"
 
 
-def test_process_batch_ready_jobs_valid_packages_to_submit(mocker, pjm_platform, as_conf, create_packages):
-    valid_packages_to_submit = create_packages
-    failed_packages = []
-    pjm_platform.get_jobid_by_jobname = mocker.MagicMock()
-    pjm_platform.send_command = mocker.MagicMock()
-    pjm_platform.submit_script = mocker.MagicMock()
+def test_process_ready_jobs_valid_packages_to_submit(mocker, pjm_platform, create_packages):
     jobs_id = [1, 2, 3]
-    pjm_platform.submit_script.return_value = jobs_id
-    pjm_platform.process_batch_ready_jobs(valid_packages_to_submit, failed_packages)
-    for i, package in enumerate(valid_packages_to_submit):
+    scripts_to_submit = OrderedDict(
+        [
+            ("dummy-1.cmd", create_packages[0]),
+            ("wrapped-1.cmd", create_packages[1]),
+            ("wrapped-2.cmd", create_packages[2]),
+        ]
+    )
+
+    mocker.patch.object(pjm_platform, "submit_multiple_jobs", return_value=jobs_id)
+    mocker.patch.object(pjm_platform, "_check_and_cancel_duplicated_job_names", return_value=None)
+
+    pjm_platform.process_ready_jobs(scripts_to_submit)
+
+    for i, package in enumerate(create_packages):
         for job in package.jobs:
-            assert job.hold is False
             assert job.id == str(jobs_id[i])
             assert job.status == Status.SUBMITTED
-            if not isinstance(package, JobPackageSimple):
-                assert job.wrapper_name == "wrapped"
-            else:
-                assert job.wrapper_name is None
-    assert failed_packages == []
 
 
-@pytest.mark.parametrize("create_jobs", [[3, 5]], indirect=True)
-@pytest.mark.parametrize('parse_queue_reason, result', [
-    ('ASHOLD', 3),
-    ('WAITING ASHOLD', 6),
-    ('(Invalid)', -1)
-], ids=['ASHOLD', 'WAITING ASHOLD', 'AssociationJobLimit'])
-def test_get_queue_status(mocker, create_jobs: list[Job], pjm_platform: 'PJMPlatform', as_conf: 'AutosubmitConfig',
-                          parse_queue_reason, result):
-    in_queue_jobs = create_jobs
-    jobs_id = []
-    mocker.patch('autosubmit.platforms.platform.Platform.add_job_to_log_recover', return_value = True)
-    for job in in_queue_jobs:
-        job.platform = pjm_platform
-        jobs_id.append(job.id)
-        if 'WAITING' in parse_queue_reason:
-            job.hold = True
-    mocker.patch('autosubmit.platforms.pjmplatform.PJMPlatform.send_command', return_value = True)
-    mocker.patch('autosubmit.platforms.pjmplatform.PJMPlatform.parse_queue_reason', return_value = parse_queue_reason)
-    pjm_platform.get_queue_status(in_queue_jobs, jobs_id, as_conf)
-    assert result == in_queue_jobs[0].new_status
+def test_get_submitted_jobs_by_name_returns_max_id(
+        pjm_platform: PJMPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return the highest job ID found for each queried script.
 
+    :param pjm_platform: PJM platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+
+    def _send_command(cmd, **_):
+        pjm_platform._ssh_output = "  1001  job_a\n  1002  job_a\n"
+
+    monkeypatch.setattr(pjm_platform, "send_command", _send_command)
+
+    result = pjm_platform.get_submitted_jobs_by_name(["job_a.cmd"])
+
+    assert result == [1002]
+
+
+def test_get_submitted_jobs_by_name_returns_empty_when_no_digits(
+        pjm_platform: PJMPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return an empty list when the output contains no numeric job IDs.
+
+    :param pjm_platform: PJM platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+
+    def _send_command(cmd, **_):
+        pjm_platform._ssh_output = "JOB_ID  NAME\n"
+
+    monkeypatch.setattr(pjm_platform, "send_command", _send_command)
+
+    result = pjm_platform.get_submitted_jobs_by_name(["job_a.cmd"])
+
+    assert result == []
+
+
+def test_get_submitted_jobs_by_name_returns_empty_when_one_script_missing(
+        pjm_platform: PJMPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return an empty list when one of the queried scripts has no match.
+
+    :param pjm_platform: PJM platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    outputs = iter(["  1001  job_a\n", ""])
+
+    def _send_command(cmd, **_):
+        pjm_platform._ssh_output = next(outputs)
+
+    monkeypatch.setattr(pjm_platform, "send_command", _send_command)
+
+    result = pjm_platform.get_submitted_jobs_by_name(["job_a.cmd", "job_b.cmd"])
+
+    assert result == []
+
+
+def test_get_job_names_cmd_empty_list_returns_empty(
+        pjm_platform: PJMPlatform,
+) -> None:
+    """Return empty when no job names are given.
+
+    :param pjm_platform: PJM platform under test.
+    """
+    assert pjm_platform._get_job_names_cmd([]) == ""
+
+
+def test_get_job_names_cmd_nonempty(
+        pjm_platform: PJMPlatform,
+) -> None:
+    """grouping for a non-empty job-name list.
+
+    :param pjm_platform: PJM platform under test.
+    """
+    cmd = pjm_platform._get_job_names_cmd(["job_a", "job_b"])
+
+    assert "job_a" in cmd
+    assert "job_b" in cmd
+
+
+def test_cancel_jobs_empty_list_sends_no_command(
+        pjm_platform: PJMPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Send no command when the list of job IDs to cancel is empty.
+
+    :param pjm_platform: PJM platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    sent: list[str] = []
+    monkeypatch.setattr(pjm_platform, "send_command", lambda cmd, **_: sent.append(cmd))
+
+    pjm_platform.cancel_jobs([])
+
+    assert sent == []
+
+
+def test_cancel_jobs_single_id_sends_pjdel_command(
+        pjm_platform: PJMPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Send a single pjdel command for one job ID.
+
+    :param pjm_platform: PJM platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    sent: list[str] = []
+    monkeypatch.setattr(pjm_platform, "send_command", lambda cmd, **_: sent.append(cmd))
+
+    pjm_platform.cancel_jobs(["1001"])
+
+    assert sent == ["pjdel 1001"]
+
+
+@pytest.mark.parametrize("job_ids,expected_command", [
+    (["1001", "1002", "1003"], "pjdel 1001 1002 1003"),
+    (["1001", "1002"], "pjdel 1001 1002"),
+])
+def test_cancel_jobs_multiple(
+        pjm_platform: PJMPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+        job_ids: list[str],
+        expected_command: str,
+) -> None:
+    """Send one space-joined pjdel command for multiple job IDs.
+
+    :param pjm_platform: PJM platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param job_ids: Job IDs to cancel.
+    :param expected_command: Expected command string.
+    """
+    sent: list[str] = []
+    monkeypatch.setattr(pjm_platform, "send_command", lambda cmd, **_: sent.append(cmd))
+
+    pjm_platform.cancel_jobs(job_ids)
+
+    assert len(sent) == 1
+    assert sent[0] == expected_command

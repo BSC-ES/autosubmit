@@ -2849,20 +2849,17 @@ class JobList(object):
         except Exception as exp:
             Log.warning(str(exp))
 
-    def save_wrappers(self, packages_to_save, failed_packages, as_conf, packages_persistence,
+    def save_wrappers(self, submitted_scripts, as_conf, packages_persistence,
                       hold=False, inspect=False):
-        for package in packages_to_save:
-            if package.jobs[0].id not in failed_packages:
-                if hasattr(package, "name"):
+        for section, scripts_to_submit_by_name in submitted_scripts.items():
+            for package in scripts_to_submit_by_name.values():
+                if isinstance(package, JobPackageThread):
                     self.packages_dict[package.name] = package.jobs
                     from ..job.job import WrapperJob
                     wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
                                              package.jobs, package._wallclock, package.platform, as_conf, hold)
                     self.job_package_map[package.jobs[0].id] = wrapper_job
-                    if isinstance(package, JobPackageThread):
-                        # Saving only when it is a real multi job package
-                        # Need to store the wallclock for the is_overwallclock function
-                        packages_persistence.save(package, inspect)
+                    packages_persistence.save(package, inspect)
 
     def check_scripts(self, as_conf) -> bool:
         """When we have created the scripts, all parameters should have been substituted.

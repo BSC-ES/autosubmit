@@ -33,7 +33,7 @@ from io import BufferedReader
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING, Any
 
 import Xlib.support.connect as xlib_connect
 import paramiko
@@ -42,7 +42,6 @@ from paramiko.agent import Agent
 from paramiko.ssh_exception import (SSHException)
 
 from autosubmit.job.job_common import Status
-from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
 from autosubmit.platforms.platform import Platform
 
@@ -52,6 +51,7 @@ if TYPE_CHECKING:
     from autosubmit.job.job import Job
     from autosubmit.platforms.headers import PlatformHeader
     from paramiko.channel import Channel
+    from autosubmit.job.job_packages import JobPackageBase
 
 
 def threaded(fn):
@@ -173,6 +173,7 @@ class ParamikoPlatform(Platform):
             self.remove_log_files_on_transfer = platform_config.get(
                 "REMOVE_LOG_FILES_ON_TRANSFER", False
             )
+        self._uses_local_api: bool = False
 
     @property
     def header(self) -> 'PlatformHeader':
@@ -597,9 +598,9 @@ class ParamikoPlatform(Platform):
             # Remove file from remote if configured and checksum matches
             is_log_file = bool(re.match(r".*\.(out|err)(\.(xz|gz))?$", filename))
             if (
-                is_log_file
-                and self.remove_log_files_on_transfer
-                and self._checksum_validation(file_path, remote_path)
+                    is_log_file
+                    and self.remove_log_files_on_transfer
+                    and self._checksum_validation(file_path, remote_path)
             ):
                 try:
                     self._ftpChannel.remove(remote_path)
@@ -688,38 +689,6 @@ class ParamikoPlatform(Platform):
                 Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
                 return False
 
-    def submit_job(self, job, script_name, hold=False, export="none"):
-        """Submit a job from a given job object.
-
-        :param export:
-        :param job: job object
-        :type job: autosubmit.job.job.Job
-        :param script_name: job script's name
-        :rtype script_name: str
-        :param hold: send job hold
-        :type hold: boolean
-        :return: job id for the submitted job
-        :rtype: int
-        """
-        if job is None or not job:
-            x11 = False
-        else:
-            x11 = job.x11
-
-        cmd = self.get_submit_cmd(script_name, job, hold=hold, export=export)
-        Log.debug(f"Submitting job with the command: {cmd}")
-        if cmd is None:
-            return None
-        if self.send_command(cmd, x11=x11):
-            x11 = False if job is None else job.x11
-            job_id = self.get_submitted_job_id(self.get_ssh_output(), x11)
-            if job:
-                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: "
-                           f"{job.workflow_commit}")
-            return int(job_id)
-        else:
-            return None
-
     def get_job_energy_cmd(self, job_id):
         raise NotImplementedError  # pragma: no cover
 
@@ -735,13 +704,54 @@ class ParamikoPlatform(Platform):
         self.send_command(check_energy_cmd)
         return self.get_ssh_output()
 
-    def submit_script(self, hold=False):
-        """Sends a Submit file Script, exec in platform and retrieve the Jobs_ID.
+    def submit_multiple_jobs(self, script_names: dict[str, 'JobPackageBase']) -> list[int]:
+        """Submit multiple scripts to the platform.
 
-        :param hold: send job hold
-        :type hold: boolean
-        :return: job id for the submitted job
-        :rtype: int
+        :param script_names: Script filenames to submit on the remote
+            platform.
+        :type script_names: list[str]
+        :return: Submitted Slurm job identifiers in submission order.
+        :rtype: list[int]
+        :raises AutosubmitError: If the submission command fails or no submit
+            output can be parsed.
+        :raises AutosubmitCritical: If Slurm reports a critical submission
+            failure.
+        """
+
+        if not script_names:
+            return []
+
+        cmd = self.get_multi_submit_cmd(script_names)
+        self.send_command(cmd)
+        jobs_ids = None
+
+        # If it is is a critical, no jobs will be submitted at all, stop autosubmit
+        with suppress(AutosubmitError):
+            jobs_ids = self.get_submitted_job_id(self.get_ssh_output())
+
+        # Fallback to retrieving job IDs by script names if they cannot be parsed from the submission output or if the number of parsed IDs does not match the number of submitted scripts
+        # This should be a rare case, and it is expected that most platforms will return the job IDs directly in the submission output, but this is a safeguard to ensure we can still track the submitted jobs even if the output format is not as expected.
+        if not jobs_ids or len(jobs_ids) != len(script_names):
+            candidate_to_cancel = set(jobs_ids) if jobs_ids else set()
+            jobs_ids = self.get_submitted_jobs_by_name(script_names)
+            if not jobs_ids or len(jobs_ids) != len(script_names):
+                # Avoid having not tracked jobs if everything goes wrong
+                self.cancel_jobs(list(candidate_to_cancel | set(jobs_ids or [])))
+                raise AutosubmitError("Failed to retrieve job IDs for submitted jobs. Submission output: "
+                                      f"{self.get_ssh_output()}", 6005)
+
+        return jobs_ids
+
+    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
+        """Get the IDs of the submitted jobs by their script names.
+
+        This is a fallback method to retrieve job IDs when the submission command does not return them directly.
+        It relies on the assumption that the job script names are unique identifiers for the submitted jobs.
+
+        :param script_names: List of script filenames that were submitted.
+        :type script_names: list[str]
+        :return: List of job IDs corresponding to the submitted scripts, in the same order as the input list.
+        :rtype: list[int]
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -890,7 +900,7 @@ class ParamikoPlatform(Platform):
                 job_status = Status.UNKNOWN
         else:
             Log.error(
-                f" check_job(), job is not on the queue system. Output was: {self.get_check_job_cmd(job_id)}" )
+                f" check_job(), job is not on the queue system. Output was: {self.get_check_job_cmd(job_id)}")
             job_status = Status.UNKNOWN
             Log.error(
                 f'check_job() The job id ({job_id}) status is {job_status}.')
@@ -1247,12 +1257,7 @@ class ParamikoPlatform(Platform):
         :return: True if executed, False if failed
         """
         lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
-        if "rsync" in command or "find" in command or "convertLink" in command:
-            timeout = None  # infinite timeout on migrate command  # TODO: still needed?
-        elif "rm" in command:
-            timeout = 60
-        else:
-            timeout = 60 * 2
+        timeout = None
         if not ignore_log:
             Log.debug(f"send_command timeout used: {timeout} seconds (None = infinity)")
 
@@ -1330,81 +1335,17 @@ class ParamikoPlatform(Platform):
                 stdout.close()
                 stderr.close()
 
-            self._ssh_output = ""
-            self._ssh_output_err = ""
+            self._ssh_output = ''.join([s.decode(lang) for s in stdout_chunks if s.decode(lang) != ''])
+            self._ssh_output_err = ''.join([s.decode(lang) for s in stderr_readlines if s.decode(lang) != ''])
+            self._check_for_unrecoverable_errors()
 
-            for s in [s for s in stdout_chunks if s.decode(lang) != '']:
-                self._ssh_output += s.decode(lang)
-            submitted_job_re = re.compile(r"Submitted batch job (\d+)")
-            if submitted_job_re.search(self._ssh_output):
-                return True
-
-            for error_line_case in stderr_readlines:
-                self._ssh_output_err += error_line_case.decode(lang)
-
-                error_line = error_line_case.lower().decode(lang)
-                # To be simplified in the future in a function and using in.
-                # The errors should be inside the class of the platform not here.
-                if "not active" in error_line:
-                    raise AutosubmitError('SSH Session not active, will restart the platforms', 6005)
-                if error_line.find("command not found") != -1:
-                    raise AutosubmitError(
-                        f"A platform command was not found. This may be a temporary issue. "
-                        f"Please verify that the correct scheduler is specified for this platform: "
-                        f"'{self.name}.{self.type}'.",
-                        7052,
-                        self._ssh_output_err
-                    )
-                elif error_line.find("syntax error") != -1:
-                    raise AutosubmitCritical("Syntax error", 7052, self._ssh_output_err)
-                elif (
-                        error_line.find("refused") != -1
-                        or error_line.find("slurm_persist_conn_open_without_init") != -1
-                        or error_line.find("slurmdbd") != -1
-                        or error_line.find("submission failed") != -1
-                        or error_line.find("git clone") != -1
-                        or error_line.find("sbatch: error: ") != -1
-                        or error_line.find("not submitted") != -1
-                        or error_line.find("invalid") != -1
-                        or "[ERR.] PJM".lower() in error_line
-                ):
-                    # TODO: if conditions above and below could be simplified?
-                    if (
-                            "salloc: error" in error_line
-                            or "salloc: unrecognized option" in error_line
-                            or "[ERR.] PJM".lower() in error_line
-                            or (
-                            self._submit_command_name == "sbatch"
-                            and (
-                                    error_line.find("policy") != -1
-                                    or error_line.find("invalid") != -1)
-                    )
-                            or (
-                            self._submit_command_name == "sbatch"
-                            and error_line.find("argument") != -1
-                    )
-                            or (
-                            self._submit_command_name == "bsub"
-                            and error_line.find("job not submitted") != -1
-                    )
-                            or self._submit_command_name == "ecaccess-job-submit"
-                            or self._submit_command_name == "qsub "
-                    ):
-                        raise AutosubmitError(error_line, 7014, "Bad Parameters.")
-                    raise AutosubmitError(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6005)
-
-            if not ignore_log and len(stderr_readlines) > 0:
+            if not ignore_log and self._ssh_output_err:
                 Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
             return True
-        except (AutosubmitCritical, AutosubmitError):
-            raise
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
         except IOError as e:
-            raise AutosubmitError(str(e), 6016)
-        except Exception as e:
-            warning_message = '\n'.join(stderr_readlines)
-            raise AutosubmitError(f'Command {command} in {self.host} warning: {warning_message}', 6005, str(e))
+            raise AutosubmitError(f"I/O issues: {str(e)}", 6016)
 
     def parse_job_output(self, output):
         """Parses check job command output, so it can be interpreted by autosubmit
@@ -1427,26 +1368,27 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def generate_submit_script(self):
-        pass  # pragma: no cover
-
-    def get_submit_script(self):
-        pass  # pragma: no cover
-
-    def get_submit_cmd(self, job_script: str, job, hold: bool = False, export: str = "") -> str:
-        """Get command to add job to scheduler
-
-        :param job:
-        :param job_script: path to job script
-        :param job_script: str
-        :param hold: submit a job in a held status
-        :param hold: boolean
-        :param export: modules that should've downloaded
-        :param export: string
-        :return: command to submit job to platforms
+    def get_multi_submit_cmd(self, job_scripts: dict) -> str:
+        """Gets command to submit all the current active jobs on HPC
+        :param job_scripts: dict of job names and their info (export, x11_options)
+        :return: command to submit all the current active jobs on HPC
         :rtype: str
         """
-        raise NotImplementedError  # pragma: no cover
+        if not self._uses_local_api:
+            cmd_list = [f"cd {self.remote_log_dir}"]
+        else:
+            # This is actually covered by "local" marked tests
+            cmd_list = []
+
+        for job_name, package in job_scripts.items():
+            abs_path = str(Path(self.remote_log_dir) / job_name.strip(""))
+            export = package.export.strip("") + " ; " if package.export else ""
+            timeout = package.timeout if package.timeout else 0
+            x11_options = package.x11_options.strip("")
+            cmd_list.append(
+                f"{self.get_call(abs_path, timeout, export, package.executable, x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if self.type.lower() in ['local', 'ps'] and not x11_options else False)}")
+
+        return " ;".join(cmd_list)
 
     def get_mkdir_cmd(self):
         """Gets command to create directories on HPC
@@ -1472,38 +1414,40 @@ class ParamikoPlatform(Platform):
     def get_ssh_output_err(self):
         return self._ssh_output_err
 
-    def get_call(self, job_script: str, job: Optional['Job'], export="none", timeout=-1) -> str:
-        """Gets execution command for given job.
+    def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
+        """Gets the command to submit a job, for the current platform, with the given parameters.
+         This needs to be adapted to each scheduler, the default assumes that is being launched directly.
+        :param script_name: name of the script to submit
+        :type script_name: str
+        :param pre: command part to be placed before the script name, e.g. timeout, export, executable
+        :type pre: str
+        :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
+        :type post: str
+        :param x11_options: x11 options to run the script, if any
+        :type x11_options: str
+        :return: command to submit a job
+        """
+        return f"{pre} {x11_options} {script_name} {post}" if x11_options else f"nohup {pre} {script_name} {post} & echo $!"
 
-        :param job_script: script to run
-        :param job: job
-        :param export:
-        :param timeout:
+    def get_call(self, script_name, timeout: float, export: str, executable: str, x11_options: str, fail_count: int, sub_queue: str, redirect_out_err: bool = False) -> str:
+        """Gets execution command for given job. it builds the command to execute the script on the remote platform.
+        :param script_name: script to run
+        :param timeout: timeout for the execution
+        :param export: export command to set environment variables
+        :param executable: executable to run the script
+        :param x11_options: x11 options to run the script
+        :param fail_count: number of times the job has failed, used to name the output and error files
+        :param sub_queue: alternative queue to run the job, used for some platforms like ECaccess
+        :param redirect_out_err: whether to redirect stdout and stderr to files
         :return: command to execute script
         """
-        # If job is None, it is a wrapper. (TODO: 0 clarity there, to be improved in a rework)
-        if job:
-            if job.executable != '':
-                executable = ''  # Alternative: use job.executable with substituted placeholders
-            else:
-                executable = Language.get_executable(job.type)
-            remote_logs = (job.script_name + ".out." + str(job.fail_count),
-                           job.script_name + ".err." + str(job.fail_count))
-        else:
-            executable = Language.get_executable(Language.EMPTY)  # wrappers are always python3
-            remote_logs = (f"{job_script}.out", f"{job_script}.err")
-
-        if timeout < 1:
-            command = export + ' nohup ' + executable + (f' {os.path.join(self.remote_log_dir, job_script)} > '
-                                                         f'{os.path.join(self.remote_log_dir, remote_logs[0])} 2> '
-                                                         f'{os.path.join(self.remote_log_dir, remote_logs[1])} & '
-                                                         f'echo $!')
-        else:
-            command = (export + f"timeout {timeout}" + ' nohup ' + executable +
-                       f' {os.path.join(self.remote_log_dir, job_script)} > '
-                       f'{os.path.join(self.remote_log_dir, remote_logs[0])} 2> '
-                       f'{os.path.join(self.remote_log_dir, remote_logs[1])} & echo $!')
-        return command
+        # Some platforms (right now only ECaccess) has a dual queue system, one to run the job and another to submit the job.
+        self._set_submit_cmd(sub_queue)
+        pre = f"timeout {str(timeout)} " if float(timeout) > 0 else ""
+        pre += f"{export} " if export else ""
+        pre += f"{executable} " if executable else ""
+        post = f"> {script_name.replace('.cmd', f'.cmd.out.{fail_count}')} 2> {script_name.replace('.cmd', f'.cmd.err.{fail_count}')}" if redirect_out_err else ""
+        return self._construct_final_call(script_name, pre.strip(), post.strip(), x11_options).strip(" ;,")
 
     @staticmethod
     def get_pscall(job_id):
@@ -1516,14 +1460,11 @@ class ParamikoPlatform(Platform):
         """
         return f'nohup kill -0 {job_id} > /dev/null 2>&1; echo $?'
 
-    def get_submitted_job_id(self, output: str, x11: bool = False) -> Union[list[int], int]:
-        """Parses submit command output to extract job id.
-
-        :param x11:
-        :param output: output to parse
-        :type output: str
-        :return: job id
-        :rtype: str
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
+        """Parses the output of the submit command to get the job ID.
+        :param output: output of the submit command.
+        :param x11: whether the job is an x11 job, which has a different output format.
+        :return: job ID of the submitted job.
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -1741,6 +1682,93 @@ class ParamikoPlatform(Platform):
     def update_cmds(self):
         """Updates commands for this platform. """
         pass  # pragma: no cover
+
+    def _check_and_cancel_duplicated_job_names(self, scripts_to_submit: dict) -> None:
+        """Check for duplicated job names in the submitted packages.
+        :param scripts_to_submit: Package script names and their info.
+        :type: dict
+        """
+        all_jobs_submitted = [name.split(".cmd")[0] for name in scripts_to_submit.keys()]
+        cmd = self._get_job_names_cmd(all_jobs_submitted)
+        self.send_command(cmd)
+        # Gather all jobs that were recently submitted
+        parsed_job_names = self._parse_job_names(self.get_ssh_output())
+        if parsed_job_names:
+            duplicated_job_ids = []
+            for job_name, job_ids in parsed_job_names.items():
+                if len(job_ids) > 1:
+                    Log.warning(f"Duplicated job name found: {job_name} with job ids {job_ids}. Cancelling the oldest.")
+                    duplicated_job_ids.append(job_ids[0])
+            if duplicated_job_ids:
+                self.cancel_jobs(duplicated_job_ids)
+
+    @staticmethod
+    def _parse_job_names(output) -> dict[str, list[str]]:
+        """Parse grouped job-name output into a dictionary.
+
+        The expected output is one or more lines in the form:
+        ``JobName:id,id2,id3``
+
+        :param output: Command output to parse.
+        :type output: str
+        :return: Mapping of job name to sorted job IDs.
+        :rtype: dict[str, list[str]]
+        """
+        parsed_job_names: dict[str, list[str]] = {}
+
+        for line in output.splitlines():
+            if not line.strip():
+                continue
+
+            job_name, ids = line.split(":", 1)
+            if not ids:
+                parsed_job_names[job_name.strip()] = []
+            elif "," in ids:
+                parsed_job_names[job_name.strip()] = sorted(ids.split(","), key=int)
+            else:
+                parsed_job_names[job_name.strip()] = [ids]
+
+        return parsed_job_names
+
+    def _get_job_names_cmd(self, job_names: list) -> str:
+        """Return a command that groups job IDs by job name.
+
+        The command returns one line per job name using the format
+        ``JobName:id,id2,id3``.
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def cancel_jobs(self, job_ids: list[str]) -> None:
+        """Cancel jobs with given job ids.
+
+        :param job_ids: List of job ids to cancel
+        :type job_ids: list
+
+        :rtype: None
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def process_ready_jobs(self, scripts_to_submit: dict[str, 'JobPackageBase']) -> tuple[bool, list[Any]]:
+        """Retrieve multiple jobs identifiers.
+
+        :param scripts_to_submit: List of valid Job Packages to be processes
+        :type scripts_to_submit: List[Any]
+
+        :return: retrieve the ID of the Jobs
+        :rtype: tuple[bool, list[Any]]
+        """
+        jobs_id: list[str] = self.submit_multiple_jobs(scripts_to_submit)
+        for jobid_index, package in enumerate(scripts_to_submit.values()):
+            current_package_id = str(jobs_id[jobid_index]).strip()
+            package.process_jobs_to_submit(current_package_id)
+        self._check_and_cancel_duplicated_job_names(scripts_to_submit)
+
+    def _set_submit_cmd(self, ec_queue):
+        pass
+
+    def _check_for_unrecoverable_errors(self):
+        """Check for unrecoverable errors in the command output"""
+        raise NotImplementedError
 
 
 class ParamikoPlatformException(Exception):
