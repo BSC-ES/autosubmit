@@ -4524,23 +4524,24 @@ class Autosubmit:
                 if not section:
                     continue
                 # regex expression match
-                # evaluate two groups in the section
+                # evaluate two parts in the section
                 # SECTION: string with uppercase letters, digits, _ . - or the keyword 'ANY'
                 # SPLIT: optional list of sections between brackets, separated by blank space
                 match = re.match(
                     r"^([A-Z0-9_.-]+|ANY)(?:\s*\[(.*?)\])?$", section, re.IGNORECASE
                 )
+                # evaluate section format
                 if not match:
                     malformed_sections.append(section)
                     continue
 
                 section_name = match.group(1).upper()
                 splits = match.group(2)
-
+                # evaluate section name
                 if section_name not in valid_sections and section_name != "ANY":
                     section_not_found_error = True
                     section_not_found_list.append(section_name)
-
+                # evaluate section splits
                 if splits is not None:
                     section_validation_message = (
                         Autosubmit._validate_section_split_formula(
