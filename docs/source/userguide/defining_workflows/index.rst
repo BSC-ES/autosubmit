@@ -530,22 +530,22 @@ There is also an special character '*' that can be used to specify that the spli
     JOBS:
       INI:
         FILE: INI.sh
-        RUNNING: ONCE
+        RUNNING: once
 
       SIM:
         FILE: SIM.sh
         DEPENDENCIES: INI SIM-1
-        RUNNING: ONCE
+        RUNNING: once
 
       ASIM:
         FILE: ASIM.sh
         DEPENDENCIES: SIM
-        RUNNING: ONCE
+        RUNNING: once
         SPLITS: 3
 
       POST:
         FILE: POST.sh
-        RUNNING: ONCE
+        RUNNING: once
         DEPENDENCIES:
           ASIM:
             SPLITS_FROM:
