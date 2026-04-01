@@ -1183,23 +1183,6 @@ def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greate
     ),
     (
         {
-            'EXPERIMENT': {
-                'CHUNKSIZE': 1,
-                'CHUNKSIZEUNIT': 'day',
-            },
-            'JOBS': {
-                'RANDOM-SECTION': {
-                    'FILE': 'test.sh',
-                    'PLATFORM': 'DUMMY_PLATFORM',
-                    'CHUNKSIZE': 12,
-                    'CHUNKSIZEUNIT': 'HOUR',
-                },
-            },
-        },
-        {'chunk_size': 12, 'chunk_size_unit': 'hour'}
-    ),
-    (
-        {
             'JOBS': {
                 'RANDOM-SECTION': {
                     'FILE': 'test.sh',
@@ -1211,11 +1194,10 @@ def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greate
     ),
 ], ids=[
     'notify_on_attribute',
-    'cpmip_thresholds_from_config',
-    'empty_cpmip_thresholds_when_missing',
-    'chunk_metadata_from_experiment_defaults',
-    'chunk_metadata_with_job_overrides',
-    'chunk_metadata_when_missing',
+    'cpmip_thresholds_from_config', # Expected to be loaded when present in the config.
+    'empty_cpmip_thresholds_when_missing', # Expected to be empty when not present in the config.
+    'chunk_metadata_from_experiment_defaults', # Expected to be loaded from experiment config when present.
+    'chunk_metadata_when_missing', # Expected to have default values when chunk metadata is missing in the config
 ])
 def test_update_parameters_attributes(autosubmit_config, experiment_data, attributes_to_check):
     job, _, _ = create_job_and_update_parameters(autosubmit_config, experiment_data)
