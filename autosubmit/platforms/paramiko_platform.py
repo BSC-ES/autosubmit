@@ -1572,9 +1572,6 @@ class ParamikoPlatform(Platform):
             else:
                 header = header.replace(
                     '%X11%', "")
-            if hasattr(self.header, 'get_scratch_free_space'):
-                header = header.replace(
-                    '%SCRATCH_FREE_SPACE_DIRECTIVE%', self.header.get_scratch_free_space(job, parameters))
             if hasattr(self.header, 'get_custom_directives'):
                 header = header.replace(
                     '%CUSTOM_DIRECTIVES%', self.header.get_custom_directives(job, parameters))

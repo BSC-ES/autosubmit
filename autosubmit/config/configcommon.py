@@ -173,14 +173,6 @@ class AutosubmitConfig(object):
         )
         return str(dir_templates)
 
-    def get_x11(self, section: str) -> str:
-        """Active X11 for this section
-        :param section: job type
-        :type section: str
-        :return: false/true
-        :rtype: str
-        """
-        return str(self.get_section([section, 'X11'], "false")).lower()
 
     def get_section(self, section: list[str], d_value: Union[str, Any] = "", must_exists=False) -> str:
         """Gets any section.
@@ -229,79 +221,10 @@ class AutosubmitConfig(object):
         """
         return self.jobs_data.get(section, {}).get('WCHUNKINC', "")
 
-    def get_synchronize(self, section: str) -> str:
-        """Gets wallclock for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: wallclock time
-        :rtype: str
-        """
-        return self.get_section([section, 'SYNCHRONIZE'], "")
-
-    def get_processors(self, section: str) -> str:
-        """Gets processors needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: wallclock time
-        :rtype: str
-        """
-        return str(self.get_section([section, 'PROCESSORS'], 1))
-
-    def get_threads(self, section: str) -> str:
-        """Gets threads needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: threads needed
-        :rtype: str
-        """
-
-        return str(self.get_section([section, 'THREADS'], 1))
-
-    def get_tasks(self, section: str) -> str:
-        """Gets tasks needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: tasks (processes) per host
-        :rtype: str
-        """
-        return str(self.get_section([section, 'TASKS'], ""))
-
-    def get_scratch_free_space(self, section: str) -> int:
-        """Gets scratch free space needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: percentage of scratch free space needed
-        :rtype: int
-        """
-        return int(self.get_section([section, 'SCRATCH_FREE_SPACE'], ""))
-
-    def get_memory(self, section: str) -> str:
-        """Gets memory needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: memory needed
-        :rtype: str
-        """
-        return str(self.get_section([section, 'MEMORY'], ""))
-
-    def get_memory_per_task(self, section: str) -> str:
-        """Gets memory per task needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: memory per task needed
-        :rtype: str
-        """
-        return str(self.get_section([section, 'MEMORY_PER_TASK'], ""))
 
     def get_current_user(self, section: str) -> str:
         """Returns the user to be changed from platform config file.
+        This function is used by the autosubmit API.
 
         :return: migrate user to
         :rtype: str
@@ -310,22 +233,27 @@ class AutosubmitConfig(object):
 
     def get_current_host(self, section: str) -> str:
         """Returns the user to be changed from platform config file.
+        This function might be used for autosubmit API after complete migration of `AutosubmitConfigParser`.
 
         :return: migrate user to
         :rtype: str
         """
         return self.get_section([section, 'HOST'], "")
 
+
     def get_current_project(self, section: str) -> str:
         """Returns the project to be changed from platform config file.
+        This function is used by the autosubmit API.
 
         :return: migrate user to
         :rtype: str
         """
         return self.get_section([section, 'PROJECT'], "")
 
+
     def set_new_user(self, section: str, new_user: str) -> None:
         """Sets new user for given platform.
+        This function is used by the autosubmit API.
 
         :param new_user:
         :param section: platform name
@@ -354,8 +282,11 @@ class AutosubmitConfig(object):
         open(self._platforms_parser_file, 'w').write(content)
         open(self._platforms_parser_file, 'a').write(content_to_mod)
 
+
     def set_new_host(self, section: str, new_host: str) -> None:
         """Sets new host for given platform
+        This function might be used for autosubmit API after complete migration of `AutosubmitConfigParser`.
+
         :param new_host:
         :param section: platform name
         :type: str
@@ -382,8 +313,11 @@ class AutosubmitConfig(object):
         open(self._platforms_parser_file, 'w').write(content)
         open(self._platforms_parser_file, 'a').write(content_to_mod)
 
+
     def set_new_project(self, section: str, new_project: str) -> None:
         """Sets new project for given platform
+        This function is used by the autosubmit API.
+
         :param new_project:
         :param section: platform name
         :type: str
@@ -410,16 +344,6 @@ class AutosubmitConfig(object):
         open(self._platforms_parser_file, 'w').write(content)
         open(self._platforms_parser_file, 'a').write(content_to_mod)
 
-    def get_custom_directives(self, section: str) -> str:
-        """Gets custom directives needed for the given job type.
-
-        :param section: job type
-        :type section: str
-        :return: custom directives needed
-        :rtype: str
-        """
-        directives = self.get_section([section, 'CUSTOM_DIRECTIVES'], "")
-        return directives
 
     def show_messages(self) -> bool:
 

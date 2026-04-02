@@ -347,7 +347,7 @@ Example - BSC - /etc/autosubmitrc skeleton
 
    [hosts]
         authorized =  [run bscearth000,bscesautosubmit01,bscesautosubmit02] [stats, clean, describe, check, report,dbfix,pklfix, upgrade,updateversion all]
-        forbidden =  [expìd, create, recovery, delete, inspect, monitor, recovery, migrate, configure,setstatus,testcase, test, refresh, archive, unarchive bscearth000,bscesautosubmit01,bscesautosubmit02]
+        forbidden =  [expìd, create, recovery, delete, inspect, monitor, recovery, configure,setstatus,testcase, test, refresh, archive, unarchive bscearth000,bscesautosubmit01,bscesautosubmit02]
 
 Experiments database installation
 =================================

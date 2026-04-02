@@ -1,22 +1,22 @@
 JOBS:
   INI:
     SCRIPT: 'sleep 0'
-    RUNNING: ONCE
+    RUNNING: once
 
   SIM:
     SCRIPT: 'sleep 0'
     DEPENDENCIES: INI SIM-1
-    RUNNING: ONCE
+    RUNNING: once
 
   ASIM:
     SCRIPT: 'sleep 0'
     DEPENDENCIES: SIM
-    RUNNING: ONCE
+    RUNNING: once
     SPLITS: 3
 
   POST:
     SCRIPT: 'sleep 0'
-    RUNNING: ONCE
+    RUNNING: once
     DEPENDENCIES:
       ASIM:
         SPLITS_FROM:
