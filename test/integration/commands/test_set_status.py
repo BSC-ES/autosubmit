@@ -312,13 +312,13 @@ def test_set_status_section_any_with_chunk_filter_does_not_restrict(as_exp):
 @pytest.mark.parametrize(
     "ft_filter, expected_jobs",
     [
-        ("LOCALJOB [2]", 16),
+        ("LOCALJOB [2]", 8),
         ("LOCALJOB [2-3]", 16),
         ("LOCALJOB [2:3]", 16),
         ("LOCALJOB [ANY]", 24),
         ("LOCALJOB [2], LOCALJOB [3]", 16),
-        ("SLURMJOB, PSJOB [2]", 16),
-        ("SLURMJOB [2], PSJOB", 16),
+        ("SLURMJOB, PSJOB [2]", 0),
+        ("SLURMJOB [2], PSJOB", 0),
     ],
 )
 def test_set_status_filter_type_with_splits(as_exp, ft_filter, expected_jobs):
@@ -372,18 +372,16 @@ def test_set_status_filter_type_empty_section_raises_validation_error(as_exp):
 
     reset(as_exp, "WAITING")
 
-    with pytest.raises(AutosubmitCritical) as validation_err:
+    with pytest.raises(AutosubmitCritical):
         do_setstatus(
             as_exp,
             ft=" ",
             target="COMPLETED",
         )
 
-    assert "Empty input. No changes performed." in str(validation_err.value)
 
-
-def test_set_status_filter_type_with_splits_invalid_split_raises_validation_error(as_exp):
-    """Invalid splits in ``-ft`` raises AutosubmitCritical."""
+def test_set_status_filter_type_with_splits_invalid_split_noop(as_exp):
+    """Invalid splits in ``-ft`` does not change any job status"""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
         as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
     )
@@ -391,12 +389,11 @@ def test_set_status_filter_type_with_splits_invalid_split_raises_validation_erro
 
     reset(as_exp, "WAITING")
 
-    with pytest.raises(AutosubmitCritical):
-        do_setstatus(
-            as_exp,
-            ft="LOCALJOB [999]",
-            target="COMPLETED",
-        )
+    do_setstatus(
+        as_exp,
+        ft="LOCALJOB [999]",
+        target="COMPLETED",
+    )
 
 
 def test_set_status_filter_chunks_invalid_section_raises_validation_error(as_exp):

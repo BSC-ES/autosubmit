@@ -549,10 +549,7 @@ class Autosubmit:
                     "COMPLETED",
                     "WAITING",
                     "SUSPENDED",
-                    "FAILED",
                     "UNKNOWN",
-                    "QUEUING",
-                    "RUNNING",
                     "HELD",
                 ),
                 required=True,
@@ -4507,75 +4504,22 @@ class Autosubmit:
         :param as_conf: Autosubmit configuration object
         :param filter_section: string with the sections separated by comma
         """
-        malformed_error = False  # incorrectly formatted
-        malformed_sections = []
-        section_not_found_error = (
-            False  # correctly formatted but does not match any existing section
-        )
-        section_not_found_list = []
         section_validation_message = "\n## Section Validation Message ##"
 
         if len(str(filter_section).strip()) == 0:
-            malformed_error = True
             section_validation_message += "\n\tEmpty input. No changes performed."
         else:
             valid_sections = {str(section).upper() for section in as_conf.jobs_data}
-            for raw_section in Autosubmit._split_section_filter_entries(filter_section):
-                section = raw_section.strip()
-                if not section:
-                    continue
-                # regex expression match
-                # evaluate two parts in the section
-                # SECTION NAME: string with uppercase letters, digits, _ . - or the keyword 'ANY'
-                # SPLIT: optional, only one pair of brackets allowed
-                match = re.match(
-                    r"^([A-Z0-9_.-]+|ANY)(?:\s*\[\s*((?:ANY)|(?:[0-9]+(?:[-:][0-9]+)?(?:\s+[0-9]+(?:[-:][0-9]+)?)*))\s*\])?$",
-                    section,
-                    re.IGNORECASE,
-                )
-                # evaluate section format
-                if not match:
-                    malformed_sections.append(section)
-                    continue
+            section_validation_message = Autosubmit._validate_section_split_formula(
+                filter_section, section_validation_message, valid_sections
+            )
 
-                section_name = match.group(1).upper()
-                splits = match.group(2)
-                # evaluate section name
-                if section_name not in valid_sections and section_name != "ANY":
-                    section_not_found_error = True
-                    section_not_found_list.append(section_name)
-                # evaluate section splits
-                if splits is not None:
-                    section_validation_message = (
-                        Autosubmit._validate_section_split_formula(
-                            f"{section_name} [{splits}]", section_validation_message
-                        )
-                    )
-
-            if malformed_sections:
-                malformed_error = True
-                section_validation_message += (
-                    "\n\tMalformed section/split entries in -ft: "
-                    + ", ".join(malformed_sections)
-                    + "."
-                )
-                section_validation_message += "\n\tEach entry should be in the format: SECTION or SECTION [1 2 5-8]."
-
-            if malformed_error or section_not_found_error:
-                if section_not_found_error:
-                    unique_not_found = sorted(set(section_not_found_list))
-                    section_validation_message += (
-                        "\n\tSpecified section(s) not found in this experiment: "
-                        + ", ".join(unique_not_found)
-                        + "."
-                        + "\n\tProcess stopped. Review the format of the provided input."
-                        + "\n\tRemember that this option expects section names separated by comma as input, and optionally splits between brackets."
-                    )
-                raise AutosubmitCritical(
-                    "Error in the supplied input for -ft.",
-                    7011,
-                    section_validation_message,
-                )
+        if section_validation_message != "\n## Section Validation Message ##":
+            raise AutosubmitCritical(
+                "Error in the supplied input for -ft.",
+                7011,
+                section_validation_message,
+            )
 
     @staticmethod
     def _split_section_filter_entries(filter_section: str) -> list[str]:
@@ -4879,6 +4823,7 @@ class Autosubmit:
 
     @staticmethod
     def _filter_sections_splits(filter_section_splits: str, jobs: list[Job]) -> list[Job]:
+        # TODO: I suspect that filter_section_splits is a list of sections with their splits, not a string
         """Filter jobs by sections and splits.
         :param filter_section_splits: filter sections and splits
         :param jobs: list of jobs
@@ -5123,10 +5068,8 @@ class Autosubmit:
                 
                 final_status = Autosubmit._get_status(final)
                 if filter_section:
-                    ft_entries = [section.upper() for section in Autosubmit._split_section_filter_entries(filter_section)]
-                    if not (len(ft_entries) == 1 and ft_entries[0].upper() == 'ANY'):
-                        section_filtered_jobs = Autosubmit._filter_sections_splits(ft_entries, all_jobs)
-                        selected_job_names &= {job.name for job in all_jobs if job in section_filtered_jobs}
+                    section_filtered_jobs = Autosubmit._filter_sections_splits(filter_section, all_jobs)
+                    selected_job_names &= {job.name for job in all_jobs if job in section_filtered_jobs}
 
                 if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
