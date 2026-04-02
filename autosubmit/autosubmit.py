@@ -5074,7 +5074,8 @@ class Autosubmit:
 
                 if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
-                    selected_job_names &={job.name for job in Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)}
+                    chunk_filtered_jobs = Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)
+                    selected_job_names &={job.name for job in chunk_filtered_jobs}
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
                 if filter_status:
