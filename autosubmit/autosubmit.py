@@ -4505,7 +4505,7 @@ class Autosubmit:
         Expected format for each section entry: SECTION or SECTION [1 2 5-8]
 
         :param as_conf: Autosubmit configuration object
-        :param filter_section: string with the sections separated by blank space
+        :param filter_section: string with the sections separated by comma
         """
         malformed_error = False  # incorrectly formatted
         malformed_sections = []
@@ -4569,7 +4569,7 @@ class Autosubmit:
                         + ", ".join(unique_not_found)
                         + "."
                         + "\n\tProcess stopped. Review the format of the provided input."
-                        + "\n\tRemember that this option expects section names separated by a blank space as input, and optionally split lists between brackets."
+                        + "\n\tRemember that this option expects section names separated by comma as input, and optionally splits between brackets."
                     )
                 raise AutosubmitCritical(
                     "Error in the supplied input for -ft.",
@@ -4588,7 +4588,7 @@ class Autosubmit:
         LOCALJOB [1:2], PSJOB
         LOCALJOB [1]
 
-        :param filter_section: string with the sections separated by blank space
+        :param filter_section: string with the sections separated by comma
         :return: list of section entries
         """
         text = filter_section.strip()
@@ -4637,7 +4637,7 @@ class Autosubmit:
                                           str(as_conf.expid) + ". \n\tProcess stopped. Review the format of the provided input. Comparison is case sensitive." + \
                                           "\n\tRemember that this option expects job names separated by a blank space as input."
             raise AutosubmitCritical(
-                "Error in the supplied input for -ft.", 7011, job_validation_message)
+                "Error in the supplied input for -fl.", 7011, job_validation_message)
 
     @staticmethod
     def _validate_status(job_list, filter_status):
@@ -4863,14 +4863,19 @@ class Autosubmit:
 
     @staticmethod
     def _split_match(j: Job, split_list: list[str]) -> bool:
-        """Check if job split matches"""
-        return (
-            "ANY" in split_list
-            or not j.splits
-            or int(j.splits) < 2
-            or not split_list
-            or str(j.split) in split_list
-        )
+        """Check if a job matches a split filter.
+
+        If no split filter is provided (or ``ANY``), all jobs match.
+        When specific splits are provided, only real split jobs (``splits >= 2``)
+        can match.
+        """
+        if not split_list or "ANY" in split_list:
+            return True
+
+        if not j.splits or int(j.splits) < 2:
+            return False
+
+        return str(j.split) in split_list
 
     @staticmethod
     def _filter_sections_splits(filter_section_splits: str, jobs: list[Job]) -> list[Job]:
