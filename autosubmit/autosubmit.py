@@ -4567,7 +4567,7 @@ class Autosubmit:
                 if len(filter_list.split()) > 0:
                     for sentJob in filter_list.split():
                         # Provided job does not exist, or it is not the keyword 'Any'
-                        if sentJob not in jobs and (sentJob != "Any"):
+                        if sentJob not in jobs and (sentJob.upper() != "ANY"):
                             job_error = True
                             job_not_foundList.append(sentJob)
             else:
@@ -4822,8 +4822,7 @@ class Autosubmit:
         return str(j.split) in split_list
 
     @staticmethod
-    def _filter_sections_splits(filter_section_splits: str, jobs: list[Job]) -> list[Job]:
-        # TODO: I suspect that filter_section_splits is a list of sections with their splits, not a string
+    def _filter_sections_splits(filter_section_splits: list[str], jobs: list[Job]) -> list[Job]:
         """Filter jobs by sections and splits.
         :param filter_section_splits: filter sections and splits
         :param jobs: list of jobs
@@ -5068,8 +5067,10 @@ class Autosubmit:
                 
                 final_status = Autosubmit._get_status(final)
                 if filter_section:
-                    section_filtered_jobs = Autosubmit._filter_sections_splits(filter_section, all_jobs)
-                    selected_job_names &= {job.name for job in all_jobs if job in section_filtered_jobs}
+                    ft_entries = [section.upper() for section in Autosubmit._split_section_filter_entries(filter_section)]
+                    if not (len(ft_entries) == 1 and ft_entries[0] == 'ANY'):
+                        section_filtered_jobs = Autosubmit._filter_sections_splits(ft_entries, all_jobs)
+                        selected_job_names &= {job.name for job in all_jobs if job in section_filtered_jobs}
 
                 if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
