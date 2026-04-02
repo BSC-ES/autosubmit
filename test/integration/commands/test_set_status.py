@@ -24,6 +24,7 @@ from autosubmit.job.job_common import Status
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical
+from bscearth.utils.date import date2str
 
 
 @pytest.fixture(scope="function")
@@ -145,6 +146,34 @@ def test_set_status(as_exp, slurm_server, reset_target):
             if job.status == Status.COMPLETED
         ]
         assert len(completed_jobs) == len(job_list_.get_job_list())
+
+
+def test_set_status_filter_chunks_matches_exact_job_fields(as_exp):
+    """``-fc`` must only match the exact date/member/chunk combination."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list_ = do_setstatus(
+        as_exp,
+        fc="[20200101 [ fc0 [1] ] ]",
+        target="COMPLETED",
+    )
+
+    completed_jobs = [
+        job
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED
+    ]
+
+    assert len(completed_jobs) == 9
+    # datetime object
+    assert all(date2str(job.date) == "20200101" for job in completed_jobs)
+    assert all(job.member == "fc0" for job in completed_jobs)
+    assert all(job.chunk == 1 for job in completed_jobs)
 
 
 def test_set_status_combined_filters(as_exp):

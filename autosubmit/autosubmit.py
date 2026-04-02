@@ -4498,20 +4498,24 @@ class Autosubmit:
 
     @staticmethod
     def _validate_section(as_conf: AutosubmitConfig, filter_section: str) -> None:
-        """Validates the section filter input.
-        Expected format for each section entry: SECTION or SECTION [1 2 5-8]
+        """Validate the ``-ft`` section filter.
+
+        Each entry must be an exact section name, optionally followed by a split
+        selector in brackets. The filter is comma-separated and supports ``ANY``
+        as a wildcard value.
 
         :param as_conf: Autosubmit configuration object
         :param filter_section: string with the sections separated by comma
         """
         section_validation_message = "\n## Section Validation Message ##"
+        section_entries = Autosubmit._split_section_filter_entries(filter_section)
 
-        if len(str(filter_section).strip()) == 0:
+        if not section_entries:
             section_validation_message += "\n\tEmpty input. No changes performed."
         else:
             valid_sections = {str(section).upper() for section in as_conf.jobs_data}
             section_validation_message = Autosubmit._validate_section_split_formula(
-                filter_section, section_validation_message, valid_sections
+                ", ".join(section_entries), section_validation_message, valid_sections
             )
 
         if section_validation_message != "\n## Section Validation Message ##":
@@ -4860,7 +4864,7 @@ class Autosubmit:
             else:
                 section_matching_jobs.extend([j for j in jobs if j.section == section_name and Autosubmit._split_match(j, job_splits)])
 
-            section_matching_jobs = list(set(section_matching_jobs))
+            section_matching_jobs = list(dict.fromkeys(section_matching_jobs))
 
             # All jobs matched, no need to continue
             if len(section_matching_jobs) == len(jobs):
@@ -4870,7 +4874,10 @@ class Autosubmit:
 
     @staticmethod
     def _filter_chunks(filter_chunk_str: str, job_list: "JobList", matching_jobs: list[Job]) -> list[Job]:
-        """Filter jobs by chunks.
+        """Filter jobs by exact date, member and chunk matches.
+
+        ``ANY`` acts as a wildcard for the corresponding field. Jobs that do not
+        have a value for a required field are excluded.
 
         :param filter_chunk_str: filter chunks
         :param job_list: JobList object
@@ -4878,53 +4885,58 @@ class Autosubmit:
 
         :return: list of jobs matching the filter
         """
-        final_list = []
         data = json.loads(Autosubmit._create_json(filter_chunk_str))
-        # Mapping so it is easier to understand
         dates = 'sds'
         members = 'ms'
         chunks = 'cs'
         date = 'sd'
         member = 'm'
 
-        selected_dates: set = set()
-        selected_members: set = set()
+        def normalize_date(value) -> str:
+            return date2str(value).upper() if value is not None else ""
 
-        # Prune first to reduce the amount of jobs that the chunk filter (last one) has to interate with
-        # Here we want a reduced list of jobs that matches any date or member selected and remove the rest.
-        for date_json in data[dates]:
-            if "ANY" == str(date_json[date]).upper():
-                selected_dates = set(date2str(d).upper() for d in job_list._date_list)
-            else:
-                selected_dates.add(date_json[date].upper())
-            for member_json in date_json[members]:
-                if "ANY" == str(member_json[member]).upper():
-                    selected_members = set(m.upper() for m in job_list._member_list)
+        def expand_values(raw_value, known_values: list[str]) -> set[str] | None:
+            value = str(raw_value).strip().upper()
+            if not value or value == "ANY":
+                return None
+            expanded_values: set[str] = set()
+            for token in value.split():
+                if token.find("-") != -1:
+                    start, end = token.split("-", 1)
+                    expanded_values.update(str(i) for i in range(int(start), int(end) + 1))
+                elif token.find(":") != -1:
+                    start, end = token.split(":", 1)
+                    expanded_values.update(str(i) for i in range(int(start), int(end) + 1))
                 else:
-                    selected_members.add(member_json[member].upper())
+                    expanded_values.add(token)
+            if not expanded_values and known_values:
+                return {str(value).upper() for value in known_values}
+            return expanded_values
 
-        matching_jobs = [job for job in matching_jobs if
-                         (not job.date or date2str(job.date).upper() in selected_dates) and
-                         (not job.member or job.member.upper() in selected_members)]
-
-        # Now, build final list according to the structure in data
+        selected_jobs: list[Job] = []
         for date_json in data[dates]:
-            if "ANY" == str(date_json[date]).upper():
-                selected_dates = set(date2str(d).upper() for d in job_list._date_list)
-            else:
-                selected_dates = {date_json[date].upper()}
+            selected_dates = expand_values(date_json[date], [normalize_date(d) for d in job_list._date_list])
             for member_json in date_json[members]:
-                if "ANY" == str(member_json[member]).upper():
-                    selected_members = set([m.upper() for m in job_list._member_list])
-                else:
-                    selected_members = {member_json[member].upper()}
+                selected_members = expand_values(member_json[member], [str(m).upper() for m in job_list._member_list])
+                for chunk_json in member_json[chunks]:
+                    selected_chunks = expand_values(chunk_json, [str(c).upper() for c in job_list._chunk_list])
+                    for job in matching_jobs:
+                        if job.date is None or job.member is None or job.chunk is None:
+                            continue
 
-                selected_chunks = member_json[chunks] if "ANY" != str(member_json[chunks][-1]).upper() else [str(chunks) for chunks in job_list._chunk_list]
-                final_list.extend([job for job in matching_jobs if
-                                   (not job.date or date2str(job.date).upper() in selected_dates) and
-                                   (not job.member or job.member.upper() in selected_members) and
-                                   (not job.chunk or job.synchronize or str(job.chunk) in selected_chunks)])
-        return final_list
+                        job_date = normalize_date(job.date)
+                        job_member = str(job.member).upper()
+                        job_chunk = str(job.chunk).upper()
+
+                        if selected_dates is not None and job_date not in selected_dates:
+                            continue
+                        if selected_members is not None and job_member not in selected_members:
+                            continue
+                        if selected_chunks is not None and job_chunk not in selected_chunks:
+                            continue
+                        selected_jobs.append(job)
+
+        return list(dict.fromkeys(selected_jobs))
 
     @staticmethod
     def filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list[Job]:
@@ -4949,7 +4961,7 @@ class Autosubmit:
 
         final_list = Autosubmit._filter_chunks(fc, job_list, matching_jobs)
 
-        return list(set(final_list))
+        return list(dict.fromkeys(final_list))
 
     @staticmethod
     def set_status(expid: str, noplot: bool, save: bool, final: str, filter_list: str, filter_chunks: str,
