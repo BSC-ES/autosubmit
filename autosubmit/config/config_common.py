@@ -301,7 +301,7 @@ class AutosubmitConfig(object):
         :return: threads needed
         :rtype: str
         """
-        return str(self._jobs_parser.get_option(section, 'THREADS', 1))
+        return str(self._jobs_parser.get_option(section, 'THREADS', ''))
 
     def get_tasks(self, section):
         """
