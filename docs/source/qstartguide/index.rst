@@ -93,7 +93,7 @@ The output of the command will show the <EXPID> of the experiment and generate t
       - User scripts and  project code. (empty)
 
 
-Then, execute ``autosubmit create <EXPID> -np`` and Autosubmit will generate the workflow graph.
+Then, execute ``autosubmit create <EXPID>`` and Autosubmit will generate the workflow graph.
 
 .. runcmd:: autosubmit create a000 -o png --hide
     :silent-output: 1
@@ -199,7 +199,7 @@ Now open platforms_<EXPID>.yml. Note: This will be an example for marenostrum4
 
 .. runcmd:: cat /home/docs/autosubmit/a000/conf/platforms_a000.yml
 
-``autosubmit create <EXPID>`` (without -np) will generate the new workflow and ``autosubmit run <EXPID>`` will run the experiment with the latest changes.
+``autosubmit create <EXPID>`` will generate the new workflow and ``autosubmit run <EXPID>`` will run the experiment with the latest changes.
 
 .. warning::
     If you are using an encrypted key, you will need to add it to the ssh-agent before running the experiment. To do so, run ``ssh-add <path_to_key>``.

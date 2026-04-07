@@ -169,6 +169,8 @@ You must execute:
 
     autosubmit setstatus <EXPID> -f{ l | s | t | c } <VALUE_TO_FILTER> -t <STATUS_FINAL> -s
 
+By default, plots are **not** generated when changing status (``-np`` is the default). To generate plots showing the updated job statuses, use the ``-plt`` or ``--plot`` option.
+
 If multiple filters are provided (``-f{ l | s | t | c }``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
 
 Mandatory arguments:
