@@ -373,8 +373,17 @@ def test_set_status_filter_type_with_splits(as_exp, ft_filter, expected_jobs):
     assert len(completed_jobs) == expected_jobs
 
 
-def test_set_status_filter_type_invalid_section_raises_validation_error(as_exp):
-    """Unknown sections in ``-ft`` raises AutosubmitCritical."""
+@pytest.mark.parametrize(
+    "ft_filter",
+    [
+        ("DOES NOT EXIST [1]"),
+        (" "),
+        ("LOCALJOB [[2:3]"),
+        ("LOCALJOB [ANY]]"),
+    ],
+)
+def test_set_status_filter_type_invalid_section_raises_validation_error(as_exp, ft_filter):
+    """Invalid sections in ``-ft`` raises AutosubmitCritical."""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
         as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
     )
@@ -385,26 +394,7 @@ def test_set_status_filter_type_invalid_section_raises_validation_error(as_exp):
     with pytest.raises(AutosubmitCritical):
         do_setstatus(
             as_exp,
-            ft="DOES_NOT_EXIST [1]",
-            target="COMPLETED",
-        )
-
-
-def test_set_status_filter_type_empty_section_raises_validation_error(as_exp):
-    """Unknown sections in ``-ft`` raises AutosubmitCritical."""
-    db_manager = SqlAlchemyExperimentHistoryDbManager(
-        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
-    )
-    db_manager.initialize()
-
-    # assert error message contains "Empty input. No changes performed."
-
-    reset(as_exp, "WAITING")
-
-    with pytest.raises(AutosubmitCritical):
-        do_setstatus(
-            as_exp,
-            ft=" ",
+            ft=ft_filter,
             target="COMPLETED",
         )
 
@@ -426,7 +416,7 @@ def test_set_status_filter_type_with_splits_invalid_split_noop(as_exp):
 
 
 def test_set_status_filter_chunks_invalid_section_raises_validation_error(as_exp):
-    """Unknown sections in ``-fc`` section/split raises AutosubmitCritical."""
+    """Unknown sections in ``-fc`` raises AutosubmitCritical."""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
         as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
     )
