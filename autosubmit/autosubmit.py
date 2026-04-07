@@ -4441,7 +4441,12 @@ class Autosubmit:
         as a wildcard.
 
         :param as_conf: Autosubmit configuration object
+        :type as_conf: AutosubmitConfig
         :param filter_section: string with the sections separated by comma
+        :type filter_section: str
+        :return None if the filter is valid
+        :rtype: None
+        :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
         """
         section_validation_message = "\n## Section Validation Message ##"
         section_entries = separate_section_entries(filter_section)
@@ -4469,8 +4474,14 @@ class Autosubmit:
         Each entry must be an exact job name. The filter is space-separated and supports ``ANY`` as a wildcard.
 
         :param as_conf: Autosubmit configuration object
+        :type as_conf: AutosubmitConfig
         :param job_list: JobList object containing the jobs to validate against
+        :type job_list: JobList
         :param filter_list: string with the jobs separated by space
+        :type filter_list: str
+        :return None if the filter is valid
+        :rtype: None
+        :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
         """
         job_validation_error = False
         job_error = False
@@ -4513,8 +4524,13 @@ class Autosubmit:
 
         Each entry must be an exact status name. The filter is space-separated and supports ``ANY`` as a wildcard.
 
-        :param job_list: JobList object containing the jobs to validate against.
+        :param job_list: JobList object containing the jobs to validate against
+        :type job_list: JobList
         :param filter_status: string with the statuses separated by space
+        :type filter_status: str
+        :return None if the filter is valid
+        :rtype: None
+        :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
         """
         status_validation_error = False
         status_validation_message = "\n## Status Validation Message ##"
@@ -4550,8 +4566,11 @@ class Autosubmit:
         [ 19900101 [ fc0 [ Any ] fc1 [1 2] ] 19950101 [ fc0 [1-10] ] ]
 
         :param chunk_formula: Chunk formula string.
+        :type chunk_formula: str
         :param validation_message: Message to append validation errors to.
+        :type validation_message: str
         :return: Updated validation message with any errors found.
+        :rtype: str
         """
 
         if not chunk_formula:
@@ -4613,9 +4632,13 @@ class Autosubmit:
         Expects to receive the second part of the -ftcs filter. ex: SIM [ Any ], SIM2 [1 2], SIM3.
 
         :param section_split_formula: section_split_formula string.
+        :type section_split_formula: str
         :param validation_message: Message to append validation errors to.
+        :type validation_message: str
         :param valid_sections: Set of valid section names.
+        :type valid_sections: Optional[set[str]]
         :return: Updated validation message with any errors found.
+        :rtype: str
         """
 
         if not section_split_formula:
@@ -4660,16 +4683,17 @@ class Autosubmit:
         Validate that the filter string contains a chunk formula and, optionally,
         a comma-separated list of section names. Section names are checked
         case-insensitively against the keys in ``as_conf.jobs_data``.
-
         Splits are also optional and must be included in the Section part of the formula.
-
         [ chunk_splits_formula, section1 [splits], section2 [splits], ... ]
-
         Example:
-
         [ 19900101 [ fc0 [ Any ] fc1 [1 2] ] 19950101 [ fc0 [1-10] ], SIM [ Any ], SIM2 [1 2] ]
 
         :param filter_string: Filter string with form '<chunk_split_formula>[,<SECTION>[<splits>],...]'.
+        :type filter_string: str
+        :param valid_sections: Set of valid section names for validation. If None, section names are not validated.
+        :type valid_sections: Optional[set[str]]
+        :return: None if the filter string is valid.
+        :rtype: None
         :raises AutosubmitCritical: If the input is malformed or references unknown sections.
         """
 
@@ -4709,11 +4733,19 @@ class Autosubmit:
         AutosubmitCritical (code 7014) if all filters are empty or whitespace-only.
 
         :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
         :param job_list: JobList object containing jobs to validate against.
+        :type job_list: JobList
         :param filter_list: Job name list filter (``-fl``).
+        :type filter_list: Optional[str]
         :param filter_chunk_section_split: Chunk/section/split filter (``-fc``, ``-ftc``, ``-ftcs``).
+        :type filter_chunk_section_split: Optional[str]
         :param filter_status: Status filter (``-fs``).
+        :type filter_status: Optional[str]
         :param filter_section: Section filter (``-ft``).
+        :type filter_section: Optional[str]
+        :return: None if all provided filters are valid.
+        :rtype: None
         :raises AutosubmitCritical: If no non-empty filter is provided or if any validator fails.
         """
         all_empty = True
@@ -4744,9 +4776,13 @@ class Autosubmit:
         If no split filter is provided (or ``ANY``), all jobs match.
         When specific splits are provided, only real split jobs (``splits >= 2``)
         can match.
+
         :param j: Job object to check.
+        :type j: Job
         :param split_list: list of splits to match against.
+        :type split_list: list[str]
         :return: True if the job matches the split filter, False otherwise.
+        :rtype: bool
         """
         if not split_list or "ANY" in split_list:
             return True
@@ -4761,9 +4797,13 @@ class Autosubmit:
         filter_section_splits: list[str], jobs: list[Job]
     ) -> list[Job]:
         """Filter jobs by sections and splits.
+
         :param filter_section_splits: filter sections and splits
+        :type filter_section_splits: list[str]
         :param jobs: list of jobs
+        :type jobs: list[Job]
         :return: list of jobs matching the filter
+        :rtype: list[Job]
         """
         section_matching_jobs: list[Job] = []
         all_splits = list(
@@ -4841,10 +4881,13 @@ class Autosubmit:
         have a value for a required field are excluded.
 
         :param filter_chunk_str: filter chunks
+        :type filter_chunk_str: str
         :param job_list: JobList object
+        :type job_list: JobList
         :param matching_jobs: list of jobs to filter
-
+        :type matching_jobs: list[Job]
         :return: list of jobs matching the filter
+        :rtype: list[Job]
         """
         final_list = []
         data = json.loads(Autosubmit._create_json(filter_chunk_str))
@@ -4917,8 +4960,11 @@ class Autosubmit:
             - "[ DATE|Any [ MEMBER|Any [ CHUNKS|Any ] ... ] ... ], SECTION1|Any [SPLITS|Any], ..."
 
         :param job_list: JobList object
+        :type job_list: JobList
         :param filter_chunks: filter chunks
+        :type filter_chunks: str
         :return: list of jobs matching the filter
+        :rtype: list[Job]
         """
 
         filter_chunks = filter_chunks.upper()
@@ -4942,22 +4988,40 @@ class Autosubmit:
         """Set status of jobs.
 
         :param expid: experiment id
+        :type expid: str
         :param noplot: do not plot
+        :type noplot: bool
         :param save: save
+        :type save: bool
         :param final: final status
+        :type final: str
         :param filter_list: list of jobs
+        :type filter_list: str
         :param filter_chunks: filter chunks
+        :type filter_chunks: str
         :param filter_status: filter status
+        :type filter_status: str
         :param filter_section: filter section
+        :type filter_section: str
         :param filter_type_chunk: filter type chunk
+        :type filter_type_chunk: str
         :param filter_type_chunk_split: filter chunk split
+        :type filter_type_chunk_split: str
         :param hide: hide
+        :type hide: bool
         :param group_by: group by
+        :type group_by: Optional[str]
         :param expand: Whether to expand during job grouping or not.
+        :type expand: Optional[list]
         :param expand_status: The status to use when expanding.
+        :type expand_status: Optional[str]
         :param check_wrapper: check wrapper
+        :type check_wrapper: bool
         :param detail: detail
+        :type detail: bool
         :return: ``True`` if executed successfully.
+        :rtype: bool
+        :raises AutosubmitCritical: if any of the filters is malformed or if no filter is provided, with a message describing the errors found.
         """
         if filter_status:
             filter_status = filter_status.upper()
