@@ -398,8 +398,15 @@ def test_set_status_filter_type_invalid_section_raises_validation_error(as_exp, 
             target="COMPLETED",
         )
 
-
-def test_set_status_filter_type_with_splits_invalid_split_noop(as_exp, mocker):
+@pytest.mark.parametrize(
+    "ft_filter, expected_jobs",
+    [
+        ("LOCALJOB [999]", 0),
+        ("LOCALJOB [2-999]", 16),
+        ("LOCALJOB [2:999]", 16),
+    ],
+)
+def test_set_status_filter_type_with_splits_invalid_split_logs_warning(as_exp, mocker, ft_filter, expected_jobs):
     """Unknown split in ``-ft`` logs a warning and does not stop execution."""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
         as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
@@ -412,54 +419,20 @@ def test_set_status_filter_type_with_splits_invalid_split_noop(as_exp, mocker):
 
     job_list_ = do_setstatus(
         as_exp,
-        ft="LOCALJOB [999]",
+        ft=ft_filter,
         target="COMPLETED",
     )
 
     completed_jobs = [
         job for job in job_list_.get_job_list() if job.status == Status.COMPLETED
     ]
-    assert len(completed_jobs) == 0
+    assert len(completed_jobs) == expected_jobs
 
     warning_messages = [
         str(call.args[0]) for call in mocked_warning.call_args_list if call.args
     ]
     assert any(
         "Some jobs do not exist in section 'LOCALJOB' with the requested splits." in message
-        for message in warning_messages
-    )
-
-
-def test_set_status_filter_type_with_splits_partial_range_logs_missing_range(as_exp, mocker):
-    """Partially missing split ranges in ``-ft`` log a warning but still update valid splits."""
-    db_manager = SqlAlchemyExperimentHistoryDbManager(
-        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
-    )
-    db_manager.initialize()
-
-    reset(as_exp, "WAITING")
-
-    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
-
-    job_list_ = do_setstatus(
-        as_exp,
-        ft="LOCALJOB [1-999]",
-        target="COMPLETED",
-    )
-
-    completed_jobs = [
-        job
-        for job in job_list_.get_job_list()
-        if job.status == Status.COMPLETED and job.section == "LOCALJOB"
-    ]
-    assert len(completed_jobs) == 24
-
-    warning_messages = [
-        str(call.args[0]) for call in mocked_warning.call_args_list if call.args
-    ]
-    assert any(
-        "Some jobs do not exist in section 'LOCALJOB' with the requested splits."
-        in message
         for message in warning_messages
     )
 
