@@ -4844,14 +4844,12 @@ class Autosubmit:
         return str(j.split) in split_list
 
     @staticmethod
-    def _expand_values(
-        raw_value: str, known_values: list[str]
-    ) -> set[str]:
+    def _expand_values(raw_value: str, known_values: list[str]) -> set[str]:
         """Expand ranges, colon, dash, space-separated values.
 
         'ANY' expands to known_values if given.
         :param raw_value: string with the values to expand
-        :param known_values: list of known values to expand 'ANY' to
+        :param known_values: list of known valuses to expand 'ANY' to
         :return: set of expanded values
         """
         if raw_value is None:
