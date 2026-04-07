@@ -4845,7 +4845,7 @@ class Autosubmit:
 
     @staticmethod
     def _expand_values(
-        raw_value: str | None, known_values: list[str] | None = None
+        raw_value: str, known_values: list[str]
     ) -> set[str]:
         """Expand ranges, colon, dash, space-separated values.
 
