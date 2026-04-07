@@ -112,6 +112,7 @@ While the experiment is running, it can be visualized via ``autosubmit monitor <
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: dummy.png

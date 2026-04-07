@@ -526,6 +526,7 @@ New format
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: new_dependencies.png
@@ -590,6 +591,7 @@ In the following example, we want to launch the next member SIM after the last S
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: new_dependencies_1.png
@@ -692,6 +694,7 @@ Example 2: Crossdate wrappers using the the new dependencies
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: monarch-da.png
