@@ -4467,10 +4467,6 @@ class Autosubmit:
                     Log.info("Local project destination already exists, will not sync project files.")
 
         return True
-
-    ###############################
-    ## SETSTATUS METHODS
-    ###############################
     
     @staticmethod
     def change_status(final, final_status, job, save):
