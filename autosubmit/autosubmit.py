@@ -79,7 +79,7 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
-from autosubmit.utils import as_conf_default_values
+from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values
 
 
 if TYPE_CHECKING:
@@ -1276,70 +1276,6 @@ class Autosubmit:
             # replace only the parameter
             content = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', content)
         return content
-
-    @staticmethod
-    def as_conf_default_values(exp_id:str, hpc:str = "local", minimal_configuration:bool = False, git_repo:str = "",
-                               git_branch:str = "main", git_as_conf:str = "") -> None:
-        """Replace default values in as_conf files.
-
-        :param exp_id: experiment id
-        :param hpc: platform
-        :param minimal_configuration: minimal configuration
-        :param git_repo: path to project git repository
-        :param git_branch: main branch
-        :param git_as_conf: path to as_conf file in git repository
-        :return: None
-        """
-        # the var hpc was hardcoded in the header of the function
-
-        # open and replace values
-        for as_conf_file in Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp_id}/conf").iterdir():
-            if as_conf_file.name.endswith(".yml") or as_conf_file.name.endswith(".yaml"):
-                with open(as_conf_file, 'r+') as f:
-                    # Copied files could not have default names.
-                    content = f.read()
-                    search = re.search('AUTOSUBMIT_VERSION: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), f"AUTOSUBMIT_VERSION: \""
-                                                                   f"{Autosubmit.autosubmit_version}\"")
-                    search = re.search('NOTIFICATIONS: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), "NOTIFICATIONS: False")
-                    search = re.search('TO: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), "TO: \"\"")
-                    content = Autosubmit.replace_parameter_inside_section(content, "EXPID", exp_id, "DEFAULT")
-                    search = re.search('HPCARCH: .*', content, re.MULTILINE)
-                    if search is not None:
-                        x = search.group(0).split(":")
-                        # clean blank space, quotes and double quote
-                        aux = x[1].strip(' "\'')
-                        # hpc in config is empty && -H has a value-> write down hpc value
-                        if hpc != "":
-                            content = content.replace(search.group(0), f"HPCARCH: \"{hpc}\"")
-                        elif len(aux) > 0:
-                            content = content.replace(search.group(0), f"HPCARCH: \"{aux}\"")
-                        else:
-                            content = content.replace(search.group(0), "HPCARCH: \"local\"")
-                        # the other case is aux!=0 that we dont care about val(hpc) because its a copyExpId
-                    if minimal_configuration:
-                        search = re.search('CUSTOM_CONFIG: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0),
-                                                      "CUSTOM_CONFIG: \"%PROJDIR%/" + git_as_conf + "\"")
-                        search = re.search('PROJECT_ORIGIN: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_ORIGIN: \"{git_repo}\"")
-                        search = re.search('PROJECT_PATH: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_PATH: \"{git_repo}\"")
-                        search = re.search('PROJECT_BRANCH: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_BRANCH: \"{git_branch}\"")
-
-                    f.seek(0)
-                    f.write(content)
-                    f.truncate()
 
     @staticmethod
     def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False,
@@ -4508,7 +4444,7 @@ class Autosubmit:
         :param filter_section: string with the sections separated by comma
         """
         section_validation_message = "\n## Section Validation Message ##"
-        section_entries = Autosubmit._separate_section_entries(filter_section)
+        section_entries = separate_section_entries(filter_section)
 
         if not section_entries:
             section_validation_message += "\n\tEmpty input. No changes performed."
@@ -4687,6 +4623,7 @@ class Autosubmit:
 
         for section in [section.strip() for section in section_split_formula.split(",") if section.strip()]:
             section_name = section.strip().split("[")[0].strip().upper()
+            split_part = section.strip().split("[")[1].strip() if "[" in section and "]" in section else None
             if valid_sections is not None and section_name not in valid_sections and section_name != "ANY":
                 validation_message += f"\n\tSpecified section not found: {section_name}."
             
@@ -4800,25 +4737,6 @@ class Autosubmit:
 
         if all_empty:
             raise AutosubmitCritical("At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.", 7014)
-    
-    @staticmethod
-    def _separate_section_entries(filter_entries: str) -> list[str]:
-        """Separate section entries with optional splits separated by comma into a list.
-
-        :param filter_entries: string with the entries separated by comma
-        :return: list of entries
-        """
-        text = filter_entries.strip()
-        if not text:
-            return []
-
-        entries = []
-        for entry in text.split(","):
-            entry = entry.strip()
-            if not entry:
-                continue
-            entries.append(entry.upper())
-        return entries
 
     @staticmethod
     def _split_match(j: Job, split_list: list[str]) -> bool:
@@ -4840,32 +4758,6 @@ class Autosubmit:
         return str(j.split) in split_list
 
     @staticmethod
-    def _expand_values(raw_value: str, known_values: list[str]) -> set[str]:
-        """Expand ranges, colon, dash, space-separated values.
-
-        'ANY' expands to known_values if given.
-        :param raw_value: string with the values to expand
-        :param known_values: list of known valuses to expand 'ANY' to
-        :return: set of expanded values
-        """
-        if raw_value is None:
-            return set(known_values) if known_values else set()
-
-        value = str(raw_value).strip().upper()
-        if not value or value == "ANY":
-            return set(known_values) if known_values else set()
-
-        expanded_values: set[str] = set()
-        for token in value.split():
-            if "-" in token or ":" in token:
-                sep = "-" if "-" in token else ":"
-                start, end = token.split(sep, 1)
-                expanded_values.update(str(i) for i in range(int(start), int(end) + 1))
-            else:
-                expanded_values.add(token)
-        return expanded_values
-
-    @staticmethod
     def _filter_sections_splits(
         filter_section_splits: list[str], jobs: list[Job]
     ) -> list[Job]:
@@ -4885,21 +4777,48 @@ class Autosubmit:
         
         for section in filter_section_splits:
             section_name = section.strip().split("[")[0].strip()
+            section_name_upper = section_name.upper()
+            has_split_selector = "[" in section and "]" in section
+            job_splits_str = ""
 
-            if "[" in section and "]" in section:
+            if has_split_selector:
                 job_splits_str = section.strip().split("[")[1].strip(" ]")
                 # splits: can be: [ 1:15 ] [ 1-15 ] [ 1 2 3 4 5 6 ] [ Any ]
-                job_splits = Autosubmit._expand_values(job_splits_str, all_splits)
+                job_splits = expand_values(job_splits_str, all_splits)
             else:
                 job_splits = set(all_splits)
+
+            if (
+                has_split_selector
+                and job_splits_str.strip()
+                and job_splits_str.strip().upper() != "ANY"
+            ):
+                if section_name_upper == "ANY":
+                    available_section_splits = set(all_splits)
+                else:
+                    available_section_splits = {
+                        str(job.split).upper()
+                        for job in jobs
+                        if job.section.upper() == section_name_upper
+                        and job.splits
+                        and int(job.splits) >= 2
+                        and job.split is not None
+                    }
+
+                missing_splits = set(job_splits) - available_section_splits
+                if missing_splits:
+                    Log.warning(
+                        f"Some jobs do not exist in section '{section_name_upper}' with the requested splits."
+                    )
+
             # Filter jobs by section and split
-            if section_name.upper() == "ANY":
+            if section_name_upper == "ANY":
                 filtered_jobs = [j for j in jobs if Autosubmit._split_match(j, job_splits)]
             else:
                 filtered_jobs = [
                     j
                     for j in jobs
-                    if j.section.upper() == section_name.upper()
+                    if j.section.upper() == section_name_upper
                     and Autosubmit._split_match(j, job_splits)
                 ]
             
@@ -4961,9 +4880,9 @@ class Autosubmit:
         # Prune first to reduce the amount of jobs that the chunk filter (last one) has to interate with
         # Here we want a reduced list of jobs that matches any date or member selected and remove the rest.
         for date_json in data[dates]:
-            selected_dates.update(Autosubmit._expand_values(date_json[date], all_dates))
+            selected_dates.update(expand_values(date_json[date], all_dates))
             for member_json in date_json[members]:
-                selected_members.update(Autosubmit._expand_values(member_json[member], all_members))
+                selected_members.update(expand_values(member_json[member], all_members))
 
         pruned_jobs = [
             job_tuple
@@ -4973,13 +4892,13 @@ class Autosubmit:
 
         # Now, build final list according to the structure in data
         for date_json in data[dates]:
-            date_values = Autosubmit._expand_values(date_json[date], all_dates)
+            date_values = expand_values(date_json[date], all_dates)
             for member_json in date_json[members]:
-                member_values = Autosubmit._expand_values(
+                member_values = expand_values(
                     member_json[member], all_members
                 )
                 for chunk_value in member_json[chunks]:
-                    chunk_values = Autosubmit._expand_values(chunk_value, all_chunks)
+                    chunk_values = expand_values(chunk_value, all_chunks)
                     for job_tuple in pruned_jobs:
                         job, job_date, job_member, job_chunk = job_tuple
                         if (
@@ -5132,7 +5051,7 @@ class Autosubmit:
                 
                 final_status = Autosubmit._get_status(final)
                 if filter_section:
-                    ft_entries = [section for section in Autosubmit._separate_section_entries(filter_section)]
+                    ft_entries = [section for section in separate_section_entries(filter_section)]
                     if not (len(ft_entries) == 1 and ft_entries[0] == 'ANY'):
                         section_filtered_jobs = Autosubmit._filter_sections_splits(ft_entries, all_jobs)
                         selected_job_names &= {job.name for job in all_jobs if job in section_filtered_jobs}
