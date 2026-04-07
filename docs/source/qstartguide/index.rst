@@ -95,7 +95,7 @@ The output of the command will show the <EXPID> of the experiment and generate t
 
 Then, execute ``autosubmit create <EXPID>`` and Autosubmit will generate the workflow graph.
 
-.. runcmd:: autosubmit create a000 -o png --hide
+.. runcmd:: autosubmit create a000 -plt -o png --hide
     :silent-output: 1
     :prompt:
 
