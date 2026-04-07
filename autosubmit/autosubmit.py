@@ -4623,7 +4623,6 @@ class Autosubmit:
 
         for section in [section.strip() for section in section_split_formula.split(",") if section.strip()]:
             section_name = section.strip().split("[")[0].strip().upper()
-            split_part = section.strip().split("[")[1].strip() if "[" in section and "]" in section else None
             if valid_sections is not None and section_name not in valid_sections and section_name != "ANY":
                 validation_message += f"\n\tSpecified section not found: {section_name}."
             
