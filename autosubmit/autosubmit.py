@@ -350,6 +350,7 @@ class Autosubmit:
                 "-np",
                 "--noplot",
                 action="store_true",
+                default=True,
                 dest="noplot",
                 help="omit plot (default)",
             )
@@ -480,6 +481,7 @@ class Autosubmit:
                 "-np",
                 "--noplot",
                 action="store_true",
+                default=True,
                 dest="noplot",
                 help="omit plot (default)",
             )
