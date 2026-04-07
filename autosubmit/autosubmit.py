@@ -346,7 +346,20 @@ class Autosubmit:
             # Recovery
             subparser = subparsers.add_parser('recovery', description="recover specified experiment")
             subparser.add_argument('expid', type=str, help='experiment identifier')
-            subparser.add_argument('-np', '--noplot', action='store_true', default=False, help='omit plot')
+            subparser.add_argument(
+                "-np",
+                "--noplot",
+                action="store_true",
+                dest="noplot",
+                help="omit plot (default)",
+            )
+            subparser.add_argument(
+                "-plt",
+                "--plot",
+                action="store_false",
+                dest="noplot",
+                help="generate plot",
+            )
             subparser.add_argument(
                 '--all', action="store_true", default=False, help='Get completed files to synchronize pkl')
             subparser.add_argument(
@@ -464,7 +477,19 @@ class Autosubmit:
                 'create', description="create specified experiment joblist")
             subparser.add_argument('expid', help='experiment identifier')
             subparser.add_argument(
-                '-np', '--noplot', action='store_true', default=False, help='omit plot')
+                "-np",
+                "--noplot",
+                action="store_true",
+                dest="noplot",
+                help="omit plot (default)",
+            )
+            subparser.add_argument(
+                "-plt",
+                "--plot",
+                action="store_false",
+                dest="noplot",
+                help="generate plot",
+            )
             subparser.add_argument('--hide', action='store_true', default=False,
                                    help='hides plot window')
             subparser.add_argument('-d', '--detail', action='store_true',
@@ -541,7 +566,19 @@ class Autosubmit:
             )
             subparser.add_argument("expid", help="experiment identifier")
             subparser.add_argument(
-                "-np", "--noplot", action="store_true", default=False, help="omit plot"
+                "-np",
+                "--noplot",
+                action="store_true",
+                default=True,
+                dest="noplot",
+                help="omit plot (default)",
+            )
+            subparser.add_argument(
+                "-plt",
+                "--plot",
+                action="store_false",
+                dest="noplot",
+                help="generate plot",
             )
             subparser.add_argument(
                 "-s",
