@@ -126,8 +126,8 @@ class WrapperBuilder(object):
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self, letters_count, digits_count):
-        sample_str = ''.join((random.choice(string.ascii_letters) for i in range(letters_count)))
-        sample_str += ''.join((random.choice(string.digits) for i in range(digits_count)))
+        sample_str = ''.join((random.choice(string.ascii_letters) for _ in range(letters_count)))
+        sample_str += ''.join((random.choice(string.digits) for _ in range(digits_count)))
 
         # Convert string to list and shuffle it to mix letters and digits
         sample_list = list(sample_str)
