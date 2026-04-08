@@ -175,6 +175,23 @@ By default, plots are **not** generated when changing status. To generate plots 
 
     autosubmit setstatus <EXPID> -f{ l | s | t | c } <VALUE_TO_FILTER> -t <STATUS_FINAL> -s -plt
 
+Where:
+
++------+----------------------------------------------+----------------------------------------------+
+| Flag | Meaning                                      | Example                                      |
++======+==============================================+==============================================+
+| -fl  | filter by section (and optionally split)     | ``-fl "19601101_fc3_21_sim ..."``            |
++------+----------------------------------------------+----------------------------------------------+
+| -fs  | filter by job status                         | ``-fs FAILED``                               |
++------+----------------------------------------------+----------------------------------------------+
+| -ft  | filter by job type                           | ``-ft TRANSFER``                             |
++------+----------------------------------------------+----------------------------------------------+
+| -fc  | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
++------+----------------------------------------------+----------------------------------------------+
+| -t   | target status                                | ``-t READY``                                 |
++------+----------------------------------------------+----------------------------------------------+
+| -s   | save changes                                 | ``-s``                                       |
++------+----------------------------------------------+----------------------------------------------+
 
 If multiple filters are provided (``-f{ l | s | t | c }``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
 
