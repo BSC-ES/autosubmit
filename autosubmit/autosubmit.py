@@ -363,7 +363,40 @@ class Autosubmit:
             )
             subparser.set_defaults(noplot=True)
             subparser.add_argument(
-                '--all', action="store_true", default=False, help='Get completed files to synchronize pkl')
+                "--all",
+                action="store_true",
+                default=False,
+                help="Get completed files to synchronize pkl",
+            )
+            subparser.add_argument(
+                "-fl",
+                "--list",
+                type=str,
+                help='Supply the list of job names to be recovered. Default = "Any". '
+                'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
+            )
+            subparser.add_argument(
+                "-fc",
+                "--filter_chunks",
+                type=str,
+                help='Supply the list of chunks to be recovered. Default = "Any". '
+                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+            )
+            subparser.add_argument(
+                "-fs",
+                "--filter_status",
+                type=str,
+                choices=('Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
+                help='Select the status (one or more) of jobs to be recovered. Default = "Any". '
+                "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
+            )
+            subparser.add_argument(
+                "-ft",
+                "--filter_type",
+                type=str,
+                help='Select the job type and split to be recovered. Default split = "Any". '
+                'LIST = "LOCALJOB [5-10] SIM"',
+            )
             subparser.add_argument(
                 '-s', '--save', action="store_true", default=False, help='Save changes to disk')
             subparser.add_argument(
@@ -906,8 +939,23 @@ class Autosubmit:
         elif args.command == 'recovery':
             if args.no_recover_logs:
                 warnings.warn('no_recover_logs is deprecated and will be removed in a future major release!')
-            return Autosubmit.recovery(args.expid, args.noplot, args.save, args.all, args.hide, args.group_by,
-                                       args.expand, args.expand_status, args.detail, args.force, args.offline)
+            return Autosubmit.recovery(
+                args.expid,
+                args.noplot,
+                args.save,
+                args.all,
+                args.hide,
+                args.group_by,
+                args.expand,
+                args.expand_status,
+                args.detail,
+                args.force,
+                args.offline,
+                args.list,
+                args.filter_chunks,
+                args.filter_status,
+                args.filter_type,
+            )
         elif args.command == 'check':
             return Autosubmit.check(args.expid)
         elif args.command == 'inspect':
@@ -2955,23 +3003,48 @@ class Autosubmit:
             detail: bool = False,
             force: bool = False,
             offline: bool = False,
+            filter_list: Optional[str] = None,
+            filter_chunks: Optional[str] = None,
+            filter_status: Optional[str] = None,
+            filter_section: Optional[str] = None,
+
     ) -> bool:
         """Recover job statuses for an experiment and update the job list.
 
         Return True when the recovery completed successfully.
 
         :param expid: Experiment identifier.
+        :type expid: str
         :param noplot: If True, do not generate a plot.
+        :type noplot: bool
         :param save: If True, persist changes to the job list.
+        :type save: bool
         :param all_jobs: If True, recover all jobs; otherwise only active jobs.
+        :type all_jobs: bool
         :param hide: If True, hide GUI/windows when generating plots.
+        :type hide: bool
         :param group_by: Optional grouping key for display.
+        :type group_by: Optional[str]
         :param expand: Optional list of job names/sections to expand in the view.
+        :type expand: Optional[list[str]]
         :param expand_status: Optional list of statuses to expand in the view.
+        :type expand_status: Optional[list[str]]
         :param detail: If True, produce a more detailed (and more expensive) textual representation.
+        :type detail: bool
         :param force: If True, cancel active jobs before recovery.
+        :type force: bool
         :param offline: If True, avoid connecting to remote platforms and use offline recovery.
+        :type offline: bool
+        :param filter_list: Optional list of job names to filter for recovery.
+        :type filter_list: Optional[str]
+        :param filter_chunks: Optional list of chunk identifiers to filter for recovery.
+        :type filter_chunks: Optional[str]
+        :param filter_status: Optional list of job statuses to filter for recovery.
+        :type filter_status: Optional[str]
+        :param filter_section: Optional list of job sections to filter for recovery.
+        :type filter_section: Optional[str]
         :return: True if recovery ran successfully, False otherwise.
+        :rtype: bool
         :raises AutosubmitCritical: On configuration/IO failures.
         """
         if not save:
@@ -3047,6 +3120,61 @@ class Autosubmit:
             jobs_to_recover = job_list.get_job_list()
         else:
             jobs_to_recover = job_list.get_active()
+        
+        if filter_section or filter_chunks or filter_status or filter_list:
+            # Validate filters. Raises AutosubmitCritical if any filter is invalid, with a message specifying the issue.
+            Autosubmit._validate_set_status_filters(
+                as_conf,
+                job_list,
+                filter_list,
+                filter_chunks,
+                filter_status,
+                filter_section,
+            )
+
+            # Starts the filtering process
+            Log.info("Filtering jobs...")
+            all_jobs = job_list.get_job_list()
+            selected_job_names = {job.name for job in jobs_to_recover}
+
+            if filter_section:
+                ft_entries = [
+                    section for section in separate_section_entries(filter_section)
+                ]
+                if not (len(ft_entries) == 1 and ft_entries[0] == "Any"):
+                    section_filtered_jobs = Autosubmit._filter_section_splits(
+                        ft_entries, all_jobs
+                    )
+                    selected_job_names &= {
+                        job.name for job in all_jobs if job in section_filtered_jobs
+                    }
+
+            if filter_chunks:
+                chunk_filtered_jobs = Autosubmit._filter_jobs_by_chunks_splits(
+                    job_list, filter_chunks
+                )
+                selected_job_names &= {job.name for job in chunk_filtered_jobs}
+
+            if filter_status:
+                status_list = filter_status.split()
+                if not (len(status_list) == 1 and status_list[0].upper() == "ANY"):
+                    allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
+                    selected_job_names &= {
+                        job.name for job in all_jobs if job.status in allowed_statuses
+                    }
+
+            if filter_list:
+                jobs = filter_list.split()
+                if not (len(jobs) == 1 and jobs[0] == "Any"):
+                    selected_job_names &= {
+                        job.name for job in all_jobs if job.name in jobs
+                    }
+
+        jobs_to_recover = [
+            job for job in jobs_to_recover if job.name in selected_job_names
+        ]
+
+        Log.info(f"The selected number of jobs to recover is {len(jobs_to_recover)}")
 
         try:
             for job in jobs_to_recover:
