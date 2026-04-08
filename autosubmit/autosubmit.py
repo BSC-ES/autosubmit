@@ -79,7 +79,7 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
-from autosubmit.utils import as_conf_default_values
+from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values
 
 
 if TYPE_CHECKING:
@@ -549,10 +549,7 @@ class Autosubmit:
                     "COMPLETED",
                     "WAITING",
                     "SUSPENDED",
-                    "FAILED",
                     "UNKNOWN",
-                    "QUEUING",
-                    "RUNNING",
                     "HELD",
                 ),
                 required=True,
@@ -590,7 +587,8 @@ class Autosubmit:
                 "-ft",
                 "--filter_type",
                 type=str,
-                help="Select the job type to filter the list of jobs",
+                help='Select the job type and split to filter the list of jobs. Default split = "Any". '
+                'LIST = "LOCALJOB [5-10] SIM"',
             )
             subparser.add_argument(
                 "-ftc",
@@ -1278,70 +1276,6 @@ class Autosubmit:
             # replace only the parameter
             content = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', content)
         return content
-
-    @staticmethod
-    def as_conf_default_values(exp_id:str, hpc:str = "local", minimal_configuration:bool = False, git_repo:str = "",
-                               git_branch:str = "main", git_as_conf:str = "") -> None:
-        """Replace default values in as_conf files.
-
-        :param exp_id: experiment id
-        :param hpc: platform
-        :param minimal_configuration: minimal configuration
-        :param git_repo: path to project git repository
-        :param git_branch: main branch
-        :param git_as_conf: path to as_conf file in git repository
-        :return: None
-        """
-        # the var hpc was hardcoded in the header of the function
-
-        # open and replace values
-        for as_conf_file in Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp_id}/conf").iterdir():
-            if as_conf_file.name.endswith(".yml") or as_conf_file.name.endswith(".yaml"):
-                with open(as_conf_file, 'r+') as f:
-                    # Copied files could not have default names.
-                    content = f.read()
-                    search = re.search('AUTOSUBMIT_VERSION: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), f"AUTOSUBMIT_VERSION: \""
-                                                                   f"{Autosubmit.autosubmit_version}\"")
-                    search = re.search('NOTIFICATIONS: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), "NOTIFICATIONS: False")
-                    search = re.search('TO: .*', content, re.MULTILINE)
-                    if search is not None:
-                        content = content.replace(search.group(0), "TO: \"\"")
-                    content = Autosubmit.replace_parameter_inside_section(content, "EXPID", exp_id, "DEFAULT")
-                    search = re.search('HPCARCH: .*', content, re.MULTILINE)
-                    if search is not None:
-                        x = search.group(0).split(":")
-                        # clean blank space, quotes and double quote
-                        aux = x[1].strip(' "\'')
-                        # hpc in config is empty && -H has a value-> write down hpc value
-                        if hpc != "":
-                            content = content.replace(search.group(0), f"HPCARCH: \"{hpc}\"")
-                        elif len(aux) > 0:
-                            content = content.replace(search.group(0), f"HPCARCH: \"{aux}\"")
-                        else:
-                            content = content.replace(search.group(0), "HPCARCH: \"local\"")
-                        # the other case is aux!=0 that we dont care about val(hpc) because its a copyExpId
-                    if minimal_configuration:
-                        search = re.search('CUSTOM_CONFIG: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0),
-                                                      "CUSTOM_CONFIG: \"%PROJDIR%/" + git_as_conf + "\"")
-                        search = re.search('PROJECT_ORIGIN: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_ORIGIN: \"{git_repo}\"")
-                        search = re.search('PROJECT_PATH: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_PATH: \"{git_repo}\"")
-                        search = re.search('PROJECT_BRANCH: .*', content, re.MULTILINE)
-                        if search is not None:
-                            content = content.replace(search.group(0), f"PROJECT_BRANCH: \"{git_branch}\"")
-
-                    f.seek(0)
-                    f.write(content)
-                    f.truncate()
 
     @staticmethod
     def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False,
@@ -4469,7 +4403,7 @@ class Autosubmit:
                     Log.info("Local project destination already exists, will not sync project files.")
 
         return True
-
+    
     @staticmethod
     def change_status(final, final_status, job, save):
         """Set job status to final.
@@ -4499,39 +4433,56 @@ class Autosubmit:
         Log.status("CHANGED: job: " + job.name + " status to: " + final)
 
     @staticmethod
-    def _validate_section(as_conf, filter_section):
-        section_validation_error = False
-        section_error = False
-        section_not_foundList = list()
-        section_validation_message = "\n## Section Validation Message ##"
-        countStart = filter_section.count('[')
-        countEnd = filter_section.count(']')
-        if countStart > 1 or countEnd > 1:
-            section_validation_error = True
-            section_validation_message += "\n\tList of sections has a format error. Perhaps you were trying to use -fc instead."
-        if section_validation_error is False:
-            if len(str(filter_section).strip()) > 0:
-                if len(filter_section.split()) > 0:
-                    jobSections = as_conf.jobs_data
-                    for section in filter_section.split():
-                        # print(section)
-                        # Provided section is not an existing section, or it is not the keyword 'Any'
-                        if section not in jobSections and (section != "Any"):
-                            section_error = True
-                            section_not_foundList.append(section)
-            else:
-                section_validation_error = True
-                section_validation_message += "\n\tEmpty input. No changes performed."
-        if section_validation_error is True or section_error is True:
-            if section_error is True:
-                section_validation_message += "\n\tSpecified section(s) : [" + str(section_not_foundList) + " not found" \
-                                                                                                            ".\n\tProcess stopped. Review the format of the provided input. Comparison is case sensitive." + \
-                                              "\n\tRemember that this option expects section names separated by a blank space as input."
+    def _validate_section(as_conf: AutosubmitConfig, filter_section: str) -> None:
+        """Validate the ``-ft`` section filter.
 
-            raise AutosubmitCritical("Error in the supplied input for -ft.", 7011, section_validation_message)
+        Each entry must be an exact section name, optionally followed by a split
+        selector in brackets. The filter is comma-separated and supports ``ANY``
+        as a wildcard.
+
+        :param as_conf: Autosubmit configuration object
+        :type as_conf: AutosubmitConfig
+        :param filter_section: string with the sections separated by comma
+        :type filter_section: str
+        :return None if the filter is valid
+        :rtype: None
+        :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
+        """
+        section_validation_message = "\n## Section Validation Message ##"
+        section_entries = separate_section_entries(filter_section)
+
+        if not section_entries:
+            section_validation_message += "\n\tEmpty input. No changes performed."
+        else:
+            valid_sections = {str(section).upper() for section in as_conf.jobs_data}
+            section_validation_message = Autosubmit._validate_section_split_formula(
+                ", ".join(section_entries), section_validation_message, valid_sections
+            )
+
+        if section_validation_message != "\n## Section Validation Message ##":
+            raise AutosubmitCritical(
+                "Error in the supplied input for -ft.",
+                7011,
+                section_validation_message,
+            )
 
     @staticmethod
     def _validate_list(as_conf, job_list, filter_list):
+        """
+        Validate the ``-fl`` job filter.
+
+        Each entry must be an exact job name. The filter is space-separated and supports ``ANY`` as a wildcard.
+
+        :param as_conf: Autosubmit configuration object
+        :type as_conf: AutosubmitConfig
+        :param job_list: JobList object containing the jobs to validate against
+        :type job_list: JobList
+        :param filter_list: string with the jobs separated by space
+        :type filter_list: str
+        :return None if the filter is valid
+        :rtype: None
+        :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
+        """
         job_validation_error = False
         job_error = False
         job_not_foundList = list()
@@ -4550,7 +4501,7 @@ class Autosubmit:
                 if len(filter_list.split()) > 0:
                     for sentJob in filter_list.split():
                         # Provided job does not exist, or it is not the keyword 'Any'
-                        if sentJob not in jobs and (sentJob != "Any"):
+                        if sentJob not in jobs and (sentJob.upper() != "ANY"):
                             job_error = True
                             job_not_foundList.append(sentJob)
             else:
@@ -4564,10 +4515,23 @@ class Autosubmit:
                                           str(as_conf.expid) + ". \n\tProcess stopped. Review the format of the provided input. Comparison is case sensitive." + \
                                           "\n\tRemember that this option expects job names separated by a blank space as input."
             raise AutosubmitCritical(
-                "Error in the supplied input for -ft.", 7011, job_validation_message)
+                "Error in the supplied input for -fl.", 7011, job_validation_message)
 
     @staticmethod
     def _validate_status(job_list, filter_status):
+        """
+        Validate the ``-fs`` status filter.
+
+        Each entry must be an exact status name. The filter is space-separated and supports ``ANY`` as a wildcard.
+
+        :param job_list: JobList object containing the jobs to validate against
+        :type job_list: JobList
+        :param filter_status: string with the statuses separated by space
+        :type filter_status: str
+        :return None if the filter is valid
+        :rtype: None
+        :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
+        """
         status_validation_error = False
         status_validation_message = "\n## Status Validation Message ##"
         # Trying to identify chunk formula
@@ -4601,9 +4565,12 @@ class Autosubmit:
 
         [ 19900101 [ fc0 [ Any ] fc1 [1 2] ] 19950101 [ fc0 [1-10] ] ]
 
-
         :param chunk_formula: Chunk formula string.
+        :type chunk_formula: str
         :param validation_message: Message to append validation errors to.
+        :type validation_message: str
+        :return: Updated validation message with any errors found.
+        :rtype: str
         """
 
         if not chunk_formula:
@@ -4659,19 +4626,29 @@ class Autosubmit:
         return validation_message
 
     @staticmethod
-    def _validate_section_split_formula(section_split_formula: str, validation_message: str) -> str:
+    def _validate_section_split_formula(section_split_formula: str, validation_message: str, valid_sections: Optional[set[str]] = None) -> str:
         """Validate section/split formula syntax.
 
         Expects to receive the second part of the -ftcs filter. ex: SIM [ Any ], SIM2 [1 2], SIM3.
 
         :param section_split_formula: section_split_formula string.
+        :type section_split_formula: str
         :param validation_message: Message to append validation errors to.
+        :type validation_message: str
+        :param valid_sections: Set of valid section names.
+        :type valid_sections: Optional[set[str]]
+        :return: Updated validation message with any errors found.
+        :rtype: str
         """
 
         if not section_split_formula:
             return validation_message
 
         for section in [section.strip() for section in section_split_formula.split(",") if section.strip()]:
+            section_name = section.strip().split("[")[0].strip().upper()
+            if valid_sections is not None and section_name not in valid_sections and section_name != "ANY":
+                validation_message += f"\n\tSpecified section not found: {section_name}."
+            
             if '[' not in section and ']' not in section:
                 if len(section.split()) > 1:
                     validation_message += f"\n\tMalformed section/split entry: {section}. "
@@ -4700,22 +4677,23 @@ class Autosubmit:
         return validation_message
 
     @staticmethod
-    def _validate_chunk_section_split(filter_string: str) -> None:
+    def _validate_chunk_section_split(filter_string: str, valid_sections: Optional[set[str]] = None) -> None:
         """Validate a chunk/section/split filter string for commands using -fc/-ftc/-ftcs.
 
         Validate that the filter string contains a chunk formula and, optionally,
         a comma-separated list of section names. Section names are checked
         case-insensitively against the keys in ``as_conf.jobs_data``.
-
         Splits are also optional and must be included in the Section part of the formula.
-
         [ chunk_splits_formula, section1 [splits], section2 [splits], ... ]
-
         Example:
-
         [ 19900101 [ fc0 [ Any ] fc1 [1 2] ] 19950101 [ fc0 [1-10] ], SIM [ Any ], SIM2 [1 2] ]
 
         :param filter_string: Filter string with form '<chunk_split_formula>[,<SECTION>[<splits>],...]'.
+        :type filter_string: str
+        :param valid_sections: Set of valid section names for validation. If None, section names are not validated.
+        :type valid_sections: Optional[set[str]]
+        :return: None if the filter string is valid.
+        :rtype: None
         :raises AutosubmitCritical: If the input is malformed or references unknown sections.
         """
 
@@ -4738,7 +4716,7 @@ class Autosubmit:
         section_split_formula = ",".join(filter_string_parts[1:]) if len(filter_string_parts) > 1 else ''
 
         validation_message = Autosubmit._validate_chunk_formula(chunk_formula, validation_message)
-        validation_message = Autosubmit._validate_section_split_formula(section_split_formula, validation_message)
+        validation_message = Autosubmit._validate_section_split_formula(section_split_formula, validation_message, valid_sections=valid_sections)
 
         if validation_message != "## -fc // -ftc // -ftcs Validation Message ##":
             raise AutosubmitCritical("Error in the supplied input for -fc // -ftc // -ftcs.", 7011, validation_message)
@@ -4755,11 +4733,19 @@ class Autosubmit:
         AutosubmitCritical (code 7014) if all filters are empty or whitespace-only.
 
         :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
         :param job_list: JobList object containing jobs to validate against.
+        :type job_list: JobList
         :param filter_list: Job name list filter (``-fl``).
+        :type filter_list: Optional[str]
         :param filter_chunk_section_split: Chunk/section/split filter (``-fc``, ``-ftc``, ``-ftcs``).
+        :type filter_chunk_section_split: Optional[str]
         :param filter_status: Status filter (``-fs``).
+        :type filter_status: Optional[str]
         :param filter_section: Section filter (``-ft``).
+        :type filter_section: Optional[str]
+        :return: None if all provided filters are valid.
+        :rtype: None
         :raises AutosubmitCritical: If no non-empty filter is provided or if any validator fails.
         """
         all_empty = True
@@ -4776,58 +4762,108 @@ class Autosubmit:
             all_empty = False
 
         if filter_chunk_section_split:
-            Autosubmit._validate_chunk_section_split(filter_chunk_section_split)
+            valid_sections = {str(section).upper() for section in as_conf.jobs_data}
+            Autosubmit._validate_chunk_section_split(filter_chunk_section_split, valid_sections=valid_sections)
             all_empty = False
 
         if all_empty:
             raise AutosubmitCritical("At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.", 7014)
 
-
     @staticmethod
     def _split_match(j: Job, split_list: list[str]) -> bool:
-        """Check if job split matches"""
-        return "ANY" in split_list or not j.splits or int(j.splits) < 2 or not split_list or str(j.split) in split_list
+        """Check if a job matches a split filter.
+
+        If no split filter is provided (or ``ANY``), all jobs match.
+        When specific splits are provided, only real split jobs (``splits >= 2``)
+        can match.
+
+        :param j: Job object to check.
+        :type j: Job
+        :param split_list: list of splits to match against.
+        :type split_list: list[str]
+        :return: True if the job matches the split filter, False otherwise.
+        :rtype: bool
+        """
+        if not split_list or "ANY" in split_list:
+            return True
+
+        if not j.splits or int(j.splits) < 2:
+            return False
+
+        return str(j.split) in split_list
 
     @staticmethod
-    def _filter_sections_splits(filter_section_splits: str, jobs: list[Job]) -> list[Job]:
+    def _filter_sections_splits(
+        filter_section_splits: list[str], jobs: list[Job]
+    ) -> list[Job]:
         """Filter jobs by sections and splits.
+
         :param filter_section_splits: filter sections and splits
+        :type filter_section_splits: list[str]
         :param jobs: list of jobs
+        :type jobs: list[Job]
         :return: list of jobs matching the filter
+        :rtype: list[Job]
         """
         section_matching_jobs: list[Job] = []
+        all_splits = list(
+            {
+                str(job.split).upper()
+                for job in jobs
+                if job.splits and int(job.splits) >= 2 and job.split is not None
+            }
+        )
+        
         for section in filter_section_splits:
             section_name = section.strip().split("[")[0].strip()
-            job_splits = []
-            if "[" in section and "]" in section:
+            section_name_upper = section_name.upper()
+            has_split_selector = "[" in section and "]" in section
+            job_splits_str = ""
+
+            if has_split_selector:
                 job_splits_str = section.strip().split("[")[1].strip(" ]")
                 # splits: can be: [ 1:15 ] [ 1-15 ] [ 1 2 3 4 5 6 ] [ Any ]
-                if "ANY" in job_splits_str.upper() or not job_splits_str.strip():
-                    job_splits = ["ANY"]
-                else:
-                    for job_split in job_splits_str.split():
-                        job_split = job_split.strip()
-                        start = None
-                        end = None
-                        if job_split.find("-") != -1:
-                            start = job_split.split("-")[0]
-                            end = job_split.split("-")[1]
-                        elif job_split.find(":") != -1:
-                            start = job_split.split(":")[0]
-                            end = job_split.split(":")[1]
-                        if start and end:
-                            job_splits += [str(i) for i in range(int(start), int(end) + 1)]
-                        else:
-                            job_splits.append(str(job_split))
-            if not job_splits:
-                job_splits = ["ANY"]
-
-            if section_name == "ANY":
-                section_matching_jobs.extend([j for j in jobs if Autosubmit._split_match(j, job_splits)])
+                job_splits = expand_values(job_splits_str, all_splits)
             else:
-                section_matching_jobs.extend([j for j in jobs if j.section == section_name and Autosubmit._split_match(j, job_splits)])
+                job_splits = set(all_splits)
 
-            section_matching_jobs = list(set(section_matching_jobs))
+            if (
+                has_split_selector
+                and job_splits_str.strip()
+                and job_splits_str.strip().upper() != "ANY"
+            ):
+                if section_name_upper == "ANY":
+                    available_section_splits = set(all_splits)
+                else:
+                    available_section_splits = {
+                        str(job.split).upper()
+                        for job in jobs
+                        if job.section.upper() == section_name_upper
+                        and job.splits
+                        and int(job.splits) >= 2
+                        and job.split is not None
+                    }
+
+                missing_splits = set(job_splits) - available_section_splits
+                if missing_splits:
+                    Log.warning(
+                        f"Some jobs do not exist in section '{section_name_upper}' with the requested splits."
+                    )
+
+            # Filter jobs by section and split
+            if section_name_upper == "ANY":
+                filtered_jobs = [j for j in jobs if Autosubmit._split_match(j, job_splits)]
+            else:
+                filtered_jobs = [
+                    j
+                    for j in jobs
+                    if j.section.upper() == section_name_upper
+                    and Autosubmit._split_match(j, job_splits)
+                ]
+            
+            section_matching_jobs.extend(filtered_jobs)
+            # Deduplicate
+            section_matching_jobs = list(dict.fromkeys(section_matching_jobs))
 
             # All jobs matched, no need to continue
             if len(section_matching_jobs) == len(jobs):
@@ -4836,73 +4872,99 @@ class Autosubmit:
         return section_matching_jobs
 
     @staticmethod
-    def _filter_chunks(filter_chunk_str: str, job_list: "JobList", matching_jobs: list[Job]) -> list[Job]:
-        """Filter jobs by chunks.
+    def _filter_chunks(
+        filter_chunk_str: str, job_list: "JobList", matching_jobs: list[Job]
+    ) -> list[Job]:
+        """Filter jobs by exact date, member and chunk matches.
+
+        ``ANY`` acts as a wildcard for the corresponding field. Jobs that do not
+        have a value for a required field are excluded.
 
         :param filter_chunk_str: filter chunks
+        :type filter_chunk_str: str
         :param job_list: JobList object
+        :type job_list: JobList
         :param matching_jobs: list of jobs to filter
-
+        :type matching_jobs: list[Job]
         :return: list of jobs matching the filter
+        :rtype: list[Job]
         """
         final_list = []
         data = json.loads(Autosubmit._create_json(filter_chunk_str))
-        # Mapping so it is easier to understand
-        dates = 'sds'
-        members = 'ms'
-        chunks = 'cs'
-        date = 'sd'
-        member = 'm'
 
-        selected_dates: set = set()
-        selected_members: set = set()
+        dates = "sds"
+        members = "ms"
+        chunks = "cs"
+        date = "sd"
+        member = "m"
+
+        # Precompute normalized dates, members and chunks
+        normalized_jobs = []
+        for job in matching_jobs:
+            if job.date is None or job.member is None or job.chunk is None:
+                continue
+            normalized_jobs.append(
+                (
+                    job,
+                    date2str(job.date).upper(),
+                    str(job.member).upper(),
+                    str(job.chunk).upper(),
+                )
+            )
+
+        all_dates = [date2str(d).upper() for d in job_list._date_list]
+        all_members = [str(m).upper() for m in job_list._member_list]
+        all_chunks = [str(c).upper() for c in job_list._chunk_list]
+
+        selected_dates: set[str] = set()
+        selected_members: set[str] = set()
 
         # Prune first to reduce the amount of jobs that the chunk filter (last one) has to interate with
         # Here we want a reduced list of jobs that matches any date or member selected and remove the rest.
         for date_json in data[dates]:
-            if "ANY" == str(date_json[date]).upper():
-                selected_dates = set(date2str(d).upper() for d in job_list._date_list)
-            else:
-                selected_dates.add(date_json[date].upper())
+            selected_dates.update(expand_values(date_json[date], all_dates))
             for member_json in date_json[members]:
-                if "ANY" == str(member_json[member]).upper():
-                    selected_members = set(m.upper() for m in job_list._member_list)
-                else:
-                    selected_members.add(member_json[member].upper())
+                selected_members.update(expand_values(member_json[member], all_members))
 
-        matching_jobs = [job for job in matching_jobs if
-                         (not job.date or date2str(job.date).upper() in selected_dates) and
-                         (not job.member or job.member.upper() in selected_members)]
+        pruned_jobs = [
+            job_tuple
+            for job_tuple in normalized_jobs
+            if job_tuple[1] in selected_dates and job_tuple[2] in selected_members
+        ]
 
         # Now, build final list according to the structure in data
         for date_json in data[dates]:
-            if "ANY" == str(date_json[date]).upper():
-                selected_dates = set(date2str(d).upper() for d in job_list._date_list)
-            else:
-                selected_dates = {date_json[date].upper()}
+            date_values = expand_values(date_json[date], all_dates)
             for member_json in date_json[members]:
-                if "ANY" == str(member_json[member]).upper():
-                    selected_members = set([m.upper() for m in job_list._member_list])
-                else:
-                    selected_members = {member_json[member].upper()}
+                member_values = expand_values(
+                    member_json[member], all_members
+                )
+                for chunk_value in member_json[chunks]:
+                    chunk_values = expand_values(chunk_value, all_chunks)
+                    for job_tuple in pruned_jobs:
+                        job, job_date, job_member, job_chunk = job_tuple
+                        if (
+                            job_date in date_values
+                            and job_member in member_values
+                            and job_chunk in chunk_values
+                        ):
+                            final_list.append(job)
 
-                selected_chunks = member_json[chunks] if "ANY" != str(member_json[chunks][-1]).upper() else [str(chunks) for chunks in job_list._chunk_list]
-                final_list.extend([job for job in matching_jobs if
-                                   (not job.date or date2str(job.date).upper() in selected_dates) and
-                                   (not job.member or job.member.upper() in selected_members) and
-                                   (not job.chunk or job.synchronize or str(job.chunk) in selected_chunks)])
-        return final_list
-
+        return list(set(final_list))
+    
     @staticmethod
-    def filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list[Job]:
+    def _filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list[Job]:
         """Select jobs from *job_list* according to *filter_chunks* specification.
 
         Expected format:
             - "[ DATE|Any [ MEMBER|Any [ CHUNKS|Any ] ... ] ... ], SECTION1|Any [SPLITS|Any], ..."
 
         :param job_list: JobList object
+        :type job_list: JobList
         :param filter_chunks: filter chunks
+        :type filter_chunks: str
         :return: list of jobs matching the filter
+        :rtype: list[Job]
         """
 
         filter_chunks = filter_chunks.upper()
@@ -4926,22 +4988,40 @@ class Autosubmit:
         """Set status of jobs.
 
         :param expid: experiment id
+        :type expid: str
         :param noplot: do not plot
+        :type noplot: bool
         :param save: save
+        :type save: bool
         :param final: final status
+        :type final: str
         :param filter_list: list of jobs
+        :type filter_list: str
         :param filter_chunks: filter chunks
+        :type filter_chunks: str
         :param filter_status: filter status
+        :type filter_status: str
         :param filter_section: filter section
+        :type filter_section: str
         :param filter_type_chunk: filter type chunk
+        :type filter_type_chunk: str
         :param filter_type_chunk_split: filter chunk split
+        :type filter_type_chunk_split: str
         :param hide: hide
+        :type hide: bool
         :param group_by: group by
+        :type group_by: Optional[str]
         :param expand: Whether to expand during job grouping or not.
+        :type expand: Optional[list]
         :param expand_status: The status to use when expanding.
+        :type expand_status: Optional[str]
         :param check_wrapper: check wrapper
+        :type check_wrapper: bool
         :param detail: detail
+        :type detail: bool
         :return: ``True`` if executed successfully.
+        :rtype: bool
+        :raises AutosubmitCritical: if any of the filters is malformed or if no filter is provided, with a message describing the errors found.
         """
         if filter_status:
             filter_status = filter_status.upper()
@@ -5034,13 +5114,15 @@ class Autosubmit:
                 
                 final_status = Autosubmit._get_status(final)
                 if filter_section:
-                    ft = filter_section.split()
-                    if not (len(ft) == 1 and ft[0].upper() == 'ANY'):
-                        selected_job_names &= {job.name for job in all_jobs if job.section in ft}
+                    ft_entries = [section for section in separate_section_entries(filter_section)]
+                    if not (len(ft_entries) == 1 and ft_entries[0] == 'ANY'):
+                        section_filtered_jobs = Autosubmit._filter_sections_splits(ft_entries, all_jobs)
+                        selected_job_names &= {job.name for job in all_jobs if job in section_filtered_jobs}
 
                 if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
-                    selected_job_names &={job.name for job in Autosubmit.filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)}
+                    chunk_filtered_jobs = Autosubmit._filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)
+                    selected_job_names &={job.name for job in chunk_filtered_jobs}
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
                 if filter_status:
@@ -5052,15 +5134,9 @@ class Autosubmit:
 
                 if filter_list:
                     jobs = filter_list.split()
-                    expidJoblist = defaultdict(int)
-                    for x in jobs:
-                        expidJoblist[str(x[0:4])] += 1
-                    if str(expid) in expidJoblist:
-                        wrongExpid = len(jobs) - expidJoblist[expid]
-                    if wrongExpid > 0:
-                        Log.warning(f"There are {wrongExpid} job.name with an invalid Expid")
                     if not (len(jobs) == 1 and jobs[0].upper() == 'ANY'):
                         selected_job_names &= {job.name for job in all_jobs if job.name in jobs}
+
                 # preserve job list ordering
                 final_list = [job for job in all_jobs if job.name in selected_job_names]
                 # Time to change status

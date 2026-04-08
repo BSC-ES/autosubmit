@@ -77,3 +77,48 @@ def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", 
                     yaml_data['DEFAULT']['CUSTOM_CONFIG'] = f"%PROJDIR%/{git_as_conf}"
 
             yaml.dump(yaml_data, as_conf_file)
+
+def separate_section_entries(filter_entries: str) -> list[str]:
+    """Separate section entries with optional splits separated by comma into a list.
+
+    :param filter_entries: string with the entries separated by comma
+    :return: list of entries
+    """
+    text = filter_entries.strip()
+    if not text:
+        return []
+
+    entries = []
+    for entry in text.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        entries.append(entry.upper())
+    return entries
+
+def expand_values(raw_value: str, known_values: list[str]) -> set[str]:
+    """Expand ranges, colon, dash, space-separated values.
+
+    'ANY' expands to known_values if given.
+    :param raw_value: string with the values to expand
+    :param known_values: list of known valuses to expand 'ANY' to
+    :return: set of expanded values
+    """
+    set_known_values: set[str] = set(known_values) if known_values else set()
+
+    if raw_value is None:
+        return set_known_values
+
+    value = str(raw_value).strip().upper()
+    if not value or value == "ANY":
+        return set_known_values
+
+    expanded_values: set[str] = set()
+    for token in value.split():
+        if "-" in token or ":" in token:
+            sep = "-" if "-" in token else ":"
+            start, end = token.split(sep, 1)
+            expanded_values.update(str(i) for i in range(int(start), int(end) + 1))
+        else:
+            expanded_values.add(token)
+    return expanded_values

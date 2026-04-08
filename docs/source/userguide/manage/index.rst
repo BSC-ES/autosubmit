@@ -175,7 +175,7 @@ Mandatory arguments:
 
 * ``<EXPID>``: experiment identifier
 * ``-f{ l | s | t | c } <VALUE_TO_FILTER>``: at least one filter is required to select jobs (see below for filter options)
-* ``-t STATUS_FINAL``: target status (``READY``, ``COMPLETED``, ``WAITING``, ``SUSPENDED``, ``FAILED``, ``UNKNOWN``)
+* ``-t STATUS_FINAL``: target status (``READY``, ``COMPLETED``, ``WAITING``, ``SUSPENDED``, ``HELD``, ``UNKNOWN``)
 
 Optional filter arguments (combine multiple for granular selection):
 
@@ -191,17 +191,18 @@ Optional filter arguments (combine multiple for granular selection):
 
     autosubmit setstatus <EXPID> -fc "[ 19601101 [ fc1 [1] ] ]" -t READY -s
 
-* ``-fs``: space-separated job statuses. The available statuses are: ``READY``, ``COMPLETED``, ``WAITING``, ``SUSPENDED``, ``FAILED``, and ``UNKNOWN``.
+* ``-fs``: space-separated job statuses. The available statuses are: ``READY``, ``COMPLETED``, ``WAITING``, ``SUSPENDED``, ``HELD``, and ``UNKNOWN``.
 
 ::
 
     autosubmit setstatus <EXPID> -fs FAILED -t READY -s
 
-* ``-ft``: space-separated job types
+* ``-ft``: space-separated job types with optional split selection
 
 ::
 
     autosubmit setstatus <EXPID> -ft TRANSFER -t SUSPENDED -s
+    autosubmit setstatus <EXPID> -ft "TRANSFER[1 2]" -t SUSPENDED -s
 
 * ``-ftc``: **[DEPRECATED]** legacy chunk/type filter (use a combination of ``-fc`` and ``-ft`` instead).
 
@@ -257,6 +258,11 @@ Single filter, by job type:
 ::
 
     autosubmit setstatus <EXPID> -ft TRANSFER -t SUSPENDED -s
+
+Single filter, by job type and split:
+::
+
+    autosubmit setstatus <EXPID> -ft "TRANSFER[1:5]" -t SUSPENDED -s
 
 Multiple filters combined (AND logic, selects jobs matching ALL filters):
 ::
