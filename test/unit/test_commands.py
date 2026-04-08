@@ -94,3 +94,24 @@ def test_setstatus_accepts_combined_filters(mocker):
     assert args.filter_chunks == "[20200101 [ fc0 [1] ] ]"
     assert args.filter_type == "LOCALJOB"
     assert args.filter_status == "WAITING"
+
+
+def test_setstatus_accepts_section_splits_in_ft(mocker):
+    """Test that ``setstatus`` accepts section/split syntax in ``-ft``."""
+    mocker.patch(
+        "sys.argv",
+        [
+            "autosubmit",
+            "setstatus",
+            "a000",
+            "-ft",
+            "LOCALJOB [ 1 2 5-8 ]",
+            "-t",
+            "READY",
+        ],
+    )
+    status, args = Autosubmit.parse_args()
+
+    assert status == 0
+    assert args.command == "setstatus"
+    assert args.filter_type == "LOCALJOB [ 1 2 5-8 ]"

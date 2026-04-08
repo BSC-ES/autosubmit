@@ -24,6 +24,7 @@ from autosubmit.job.job_common import Status
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical
+from bscearth.utils.date import date2str
 
 
 @pytest.fixture(scope="function")
@@ -145,6 +146,34 @@ def test_set_status(as_exp, slurm_server, reset_target):
             if job.status == Status.COMPLETED
         ]
         assert len(completed_jobs) == len(job_list_.get_job_list())
+
+
+def test_set_status_filter_chunks_matches_exact_job_fields(as_exp):
+    """``-fc`` must only match the exact date/member/chunk combination."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list_ = do_setstatus(
+        as_exp,
+        fc="[20200101 [ fc0 [1] ] ]",
+        target="COMPLETED",
+    )
+
+    completed_jobs = [
+        job
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED
+    ]
+
+    assert len(completed_jobs) == 9
+    # datetime object
+    assert all(date2str(job.date) == "20200101" for job in completed_jobs)
+    assert all(job.member == "fc0" for job in completed_jobs)
+    assert all(job.chunk == 1 for job in completed_jobs)
 
 
 def test_set_status_combined_filters(as_exp):
@@ -309,8 +338,124 @@ def test_set_status_section_any_with_chunk_filter_does_not_restrict(as_exp):
     assert len(completed_jobs) == 9
 
 
+@pytest.mark.parametrize(
+    "ft_filter, expected_jobs",
+    [
+        ("LOCALJOB [2]", 8),
+        ("LOCALJOB [2-3]", 16),
+        ("LOCALJOB [2:3]", 16),
+        ("LOCALJOB [ANY]", 24),
+        ("LOCALJOB [2], LOCALJOB [3]", 16),
+        ("SLURMJOB, PSJOB [2]", 0),
+        ("SLURMJOB [2], PSJOB", 0),
+    ],
+)
+def test_set_status_filter_type_with_splits(as_exp, ft_filter, expected_jobs):
+    """Test ``-ft`` with splits per section."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list_ = do_setstatus(
+        as_exp,
+        ft=ft_filter,
+        target="COMPLETED",
+    )
+
+    completed_jobs = [
+        job
+        for job in job_list_.get_job_list()
+        if job.status == Status.COMPLETED and job.section == "LOCALJOB"
+    ]
+    assert len(completed_jobs) == expected_jobs
+
+
+@pytest.mark.parametrize(
+    "ft_filter",
+    [
+        ("DOES NOT EXIST [1]"),
+        (" "),
+        ("LOCALJOB [[2:3]"),
+        ("LOCALJOB [ANY]]"),
+    ],
+)
+def test_set_status_filter_type_invalid_section_raises_validation_error(as_exp, ft_filter):
+    """Invalid sections in ``-ft`` raises AutosubmitCritical."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    with pytest.raises(AutosubmitCritical):
+        do_setstatus(
+            as_exp,
+            ft=ft_filter,
+            target="COMPLETED",
+        )
+
+@pytest.mark.parametrize(
+    "ft_filter, expected_jobs",
+    [
+        ("LOCALJOB [999]", 0),
+        ("LOCALJOB [2-999]", 16),
+        ("LOCALJOB [2:999]", 16),
+    ],
+)
+def test_set_status_filter_type_with_splits_invalid_split_logs_warning(as_exp, mocker, ft_filter, expected_jobs):
+    """Unknown split in ``-ft`` logs a warning and does not stop execution."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
+
+    job_list_ = do_setstatus(
+        as_exp,
+        ft=ft_filter,
+        target="COMPLETED",
+    )
+
+    completed_jobs = [
+        job for job in job_list_.get_job_list() if job.status == Status.COMPLETED
+    ]
+    assert len(completed_jobs) == expected_jobs
+
+    warning_messages = [
+        str(call.args[0]) for call in mocked_warning.call_args_list if call.args
+    ]
+    assert any(
+        "Some jobs do not exist in section 'LOCALJOB' with the requested splits." in message
+        for message in warning_messages
+    )
+
+
+def test_set_status_filter_chunks_invalid_section_raises_validation_error(as_exp):
+    """Unknown sections in ``-fc`` raises AutosubmitCritical."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    with pytest.raises(AutosubmitCritical):
+        do_setstatus(
+            as_exp,
+            fc="[20200101 [ fc0 [1] ] ],DOES_NOT_EXIST [1]",
+            target="COMPLETED",
+        )
+
+
 def test_set_status_invalid_job_in_list_raises_validation_error(as_exp):
-    """Invalid job IDs in ``-fl`` must fail validation without bypassing validators."""
+    """Invalid job IDs ``-fl`` raises AutosubmitCritical."""
     db_manager = SqlAlchemyExperimentHistoryDbManager(
         as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
     )
