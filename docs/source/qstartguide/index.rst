@@ -200,7 +200,8 @@ Now open platforms_<EXPID>.yml. Note: This will be an example for marenostrum4
 
 .. runcmd:: cat /home/docs/autosubmit/a000/conf/platforms_a000.yml
 
-``autosubmit create <EXPID>`` will generate the new workflow and ``autosubmit run <EXPID>`` will run the experiment with the latest changes.
+``autosubmit create <EXPID>`` will generate the new workflow and ``autosubmit run <EXPID>`` will run the experiment with the latest changes. 
+If you want to visualize the workflow when creating it, use the command ``autosubmit create <EXPID> -plt`` instead.
 
 .. warning::
     If you are using an encrypted key, you will need to add it to the ssh-agent before running the experiment. To do so, run ``ssh-add <path_to_key>``.

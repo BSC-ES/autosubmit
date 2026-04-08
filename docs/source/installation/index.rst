@@ -82,7 +82,7 @@ For a very quick test, you can follow the next instructions to configure and run
 
     # Create with
     # Since it was a new install, the <EXPID> will be a000
-    autosubmit create a000 -plt
+    autosubmit create a000
 
     # In case you want to use a remote platform
 
@@ -152,7 +152,7 @@ For a very quick test, you can follow the next instructions to configure and run
 
     # Create with
     # Since it was a new install, the <EXPID> will be a000
-    autosubmit create a000 -plt
+    autosubmit create a000
 
     # In case you want to use a remote platform
 

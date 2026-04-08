@@ -60,7 +60,7 @@ The ``create`` command will use the ``expdef_<EXPID>.yml`` file to generate the 
 
 Additionally, you can have re-run only jobs that won't be included in the default job_list. In order to do that, you have to set RERUN_ONLY in the jobs conf of the corresponding job.
 
-By default, ``create`` does **not** generate plots (``-np`` is the default). To generate plots of the new job list, use the ``-plt`` or ``--plot`` option.
+By default, ``create`` does **not** generate plots. To generate plots of the new job list, use the ``-plt`` or ``--plot`` option.
 
 ::
 
