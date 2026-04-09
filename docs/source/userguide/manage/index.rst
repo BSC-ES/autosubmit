@@ -162,7 +162,7 @@ How to change the job status
 This procedure allows you to modify the status of your jobs.
 
 .. warning:: Beware that Autosubmit must be stopped to use ``setstatus``.
-    Otherwise a running instance of Autosubmit, at some point, will overwrite any change you may have done.
+    Otherwise a running instance of Autosubmit, at some point, will overwrite any changes you may have done.
 
 You must execute:
 ::
@@ -177,17 +177,17 @@ By default, plots are **not** generated when changing status. To generate plots 
 
 Where:
 
-+------+----------------------------------------------+----------------------------------------------+
++--------+----------------------------------------------+----------------------------------------------+
 | FILTER | Meaning                                      | Example of VALUE_TO_FILTER                   |
-+======+==============================================+==============================================+
-| -fl    | filter by job name                           | ``-fl a000_20101101_fc3_21_SIM"``            |
-+------+----------------------------------------------+----------------------------------------------+
++========+==============================================+==============================================+
+| -fl    | filter by job name                           | ``-fl "a000_20101101_fc3_21_SIM"``           |
++--------+----------------------------------------------+----------------------------------------------+
 | -fs    | filter by job status                         | ``-fs FAILED``                               |
-+------+----------------------------------------------+----------------------------------------------+
-| -ft    | filter by job type (and optionally split)    | ``-ft TRANSFER``                             |
-+------+----------------------------------------------+----------------------------------------------+
++--------+----------------------------------------------+----------------------------------------------+
+| -ft    | filter by job type  (and optionally split)   | ``-ft TRANSFER``                             |
++--------+----------------------------------------------+----------------------------------------------+
 | -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
-+------+----------------------------------------------+----------------------------------------------+
++--------+----------------------------------------------+----------------------------------------------+
 
 If multiple filters are provided (``-f{ l | s | t | c }``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
 
