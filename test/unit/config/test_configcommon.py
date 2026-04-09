@@ -396,7 +396,7 @@ def test_get_cpmip_thresholds_different_cases(autosubmit_config, experiment_data
     thresholds = as_conf.get_cpmip_thresholds('SIM')
     assert thresholds == expected
 
-def test_validate_wallclock():
+def test_validate_wallclock(autosubmit_config: 'AutosubmitConfigFactory'):
     as_conf: AutosubmitConfig = autosubmit_config(
         expid="a000",
         experiment_data={
