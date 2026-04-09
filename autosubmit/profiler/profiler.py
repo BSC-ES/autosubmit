@@ -27,10 +27,12 @@ from enum import Enum
 from pathlib import Path
 from pstats import SortKey
 
+from exceptiongroup import suppress
 from psutil import Process
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitCritical
+import socket as _socket
 
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
 
@@ -342,6 +344,13 @@ class Profiler:
         if self._obj_grow and self._fd_grow:
             report += f"\nOBJECTS GROW: {self._obj_total_grow} objects."
             report += f"\nFILE DESCRIPTORS GROW: {self._fd_total_grow} file descriptors.\n"
+
+        # final list of fds opened.
+        fd_names = _get_current_open_fds_names()
+        report += f"\nFINAL OPEN FILE DESCRIPTORS:\n"
+        for fd in fd_names:
+            report += f"  {fd}\n"
+
         if self._trace_enabled:
             report += "\n\nUnique object tracebacks between iterations:\n"
             for traceback in self._obj_diffs_between_iter:
@@ -403,15 +412,87 @@ def _get_current_open_fds() -> int:
     if hasattr(proc, "num_handles"):
         return proc.num_handles()
 
+def _get_fd_connection_map(proc: Process) -> dict:
+    """Build a map of fd number to a human-readable connection string using psutil.
+
+    Handles inet (TCP/UDP) and Unix domain sockets.
+
+    :param proc: The psutil Process to inspect.
+    :type proc: Process
+    :return: A dict mapping fd integer -> descriptive connection string.
+    :rtype: dict
+    """
+    fd_to_conn: dict = {}
+    with suppress(Exception):
+        for conn in proc.connections(kind='all'):
+            if conn.fd < 0:
+                continue
+            if conn.family == _socket.AF_UNIX:
+                path = getattr(conn.laddr, 'path', None) or (
+                    conn.laddr if isinstance(conn.laddr, str) else ''
+                )
+                fd_to_conn[conn.fd] = f"unix-socket: {path or '(unnamed)'}"
+            else:
+                def _fmt(addr) -> str:
+                    return f"{addr.ip}:{addr.port}" if addr else ""
+                laddr, raddr = _fmt(conn.laddr), _fmt(conn.raddr)
+                direction = f"{laddr} -> {raddr}" if raddr else laddr
+                status = f" [{conn.status}]" if conn.status else ""
+                fd_to_conn[conn.fd] = f"socket: {direction}{status}"
+    return fd_to_conn
+
+
+def _get_pipe_direction(pid: int, fd_num: int) -> str:
+    """Return the access direction of a pipe file descriptor by reading fdinfo.
+
+    :param pid: The process ID.
+    :type pid: int
+    :param fd_num: The file descriptor number to inspect.
+    :type fd_num: int
+    :return: One of 'read', 'write', or 'unknown'.
+    :rtype: str
+    """
+    with suppress(OSError):
+        with open(f"/proc/{pid}/fdinfo/{fd_num}") as f:
+            for line in f:
+                if line.startswith("flags:"):
+                    access_mode = int(line.split()[1], 8) & 3
+                    return "read" if access_mode == 0 else "write"
+    return "unknown"
+
 
 def _get_current_open_fds_names() -> list:
-    """Return a list of names of open file descriptors.
+    """Return a  list of all open file descriptors for the current process.
 
-    :return: A list of names of open file descriptors or handles.
+    On Linux, reads /proc/<pid>/fd/ directly to match num_fds() exactly.
+    Resolves sockets to IP:port pairs, pipes to read/write direction,
+    and labels stdin/stdout/stderr by fd number.
+
+    :return: A list of annotated FD descriptor strings.
     :rtype: list
     """
-    proc = Process(os.getpid())
-    if hasattr(proc, "open_files"):
-        return [f.path for f in proc.open_files()]
-    if hasattr(proc, "num_handles"):
-        return [h.path for h in proc.open_files()]
+    pid = os.getpid()
+    fd_dir = f"/proc/{pid}/fd"
+
+    proc = Process(pid)
+    fd_to_conn = _get_fd_connection_map(proc)
+    std_fds = {0: "stdin", 1: "stdout", 2: "stderr"}
+
+    names = []
+    for fd_name in sorted(os.listdir(fd_dir), key=lambda x: int(x) if x.isdigit() else 0):
+        with suppress(OSError, ValueError):
+            fd_num = int(fd_name)
+            target = os.readlink(Path(fd_dir, fd_name))
+
+            if fd_num in fd_to_conn:
+                label = fd_to_conn[fd_num]
+            elif fd_num in std_fds:
+                label = f"{std_fds[fd_num]} ({target})"
+            elif target.startswith("pipe:"):
+                direction = _get_pipe_direction(pid, fd_num)
+                label = f"pipe ({direction}) {target}"
+            else:
+                label = target
+
+            names.append(f"[fd={fd_num}] {label}")
+    return names
