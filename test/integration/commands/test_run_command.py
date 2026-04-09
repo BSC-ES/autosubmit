@@ -35,7 +35,7 @@ def set_up_test(
         autosubmit_exp: 'AutosubmitExperimentFixture',
         mocker
 ) -> tuple['AutosubmitExperiment', argparse.Namespace, list[str]]:
-    test_files_path = Path(__file__).resolve().parents[1]
+    test_files_path = Path(__file__).resolve().parents[2]
     fake_jobs: dict = YAML().load(test_files_path / "files/fake-jobs.yml")
     fake_platforms: dict = YAML().load(test_files_path / "files/fake-platforms.yml")
     exp = autosubmit_exp(
