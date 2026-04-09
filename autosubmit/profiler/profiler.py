@@ -72,6 +72,7 @@ class Profiler:
 
         # File descriptor / handle profiling variables
         self._fd_iteration: list = []
+        self._fd_names_iteration: list = []
         self._fd_grow: list = []
 
         # Workflow stats
@@ -132,11 +133,11 @@ class Profiler:
         :rtype: bool
         """
         gc.collect()
-
         self._mem_iteration.append(_get_current_memory())
         self._obj_iteration.append(_get_current_object_count())
 
         self._fd_iteration.append(_get_current_open_fds())
+        self._fd_names_iteration.append(_get_current_open_fds_names())
         if self._trace_enabled and tracemalloc.is_tracing():
             snapshot = tracemalloc.take_snapshot()
             self._trace_stats_by_iter.append(
@@ -148,7 +149,7 @@ class Profiler:
         self._edges_iteration.append(loaded_edges)
 
         self._mem_iteration[-1] -= sys.getsizeof(self._mem_iteration) + sys.getsizeof(self._obj_iteration) + sys.getsizeof(self._fd_iteration) + sys.getsizeof(
-            self._jobs_iteration) + sys.getsizeof(self._edges_iteration)
+            self._jobs_iteration) + sys.getsizeof(self._edges_iteration) + sys.getsizeof(self._fd_names_iteration)
         if self.max_checkpoints != 0:
             self.checkpoints += 1
             if self.checkpoints > self.max_checkpoints:
@@ -209,6 +210,7 @@ class Profiler:
             mem = self._mem_iteration[i]
             obj = self._obj_iteration[i]
             fd = self._fd_iteration[i]
+            fd_names = self._fd_names_iteration[i]
 
             mem_unit = 0
             while mem >= 1024 and mem_unit <= len(_UNITS):
@@ -220,6 +222,15 @@ class Profiler:
             report += f"{current_iter} File Descriptors: {fd}\n"
             report += f"{current_iter} Loaded jobs: {self._jobs_iteration[i]}\n"
             report += f"{current_iter} Loaded edges: {self._edges_iteration[i]}\n"
+            if i > 0:
+                for names in fd_names:
+                    if names not in self._fd_names_iteration[i - 1]:
+                        report += f"{current_iter} Opened file descriptor: {names}\n"
+
+                for names in self._fd_names_iteration[i - 1]:
+                    if names not in fd_names:
+                        report += f"{current_iter} Closed file descriptor: {names}\n"
+
 
             if i < len(self._trace_stats_by_iter):
                 report += self._format_top_allocations(self._trace_stats_by_iter[i])
@@ -382,19 +393,25 @@ def _get_current_object_count() -> int:
 def _get_current_open_fds() -> int:
     """Return count of open file descriptors.
 
-    Falls back to approximating using open files and connections
-    if direct FD/handle count is unavailable.
-
     :return: The number of open file descriptors or handles.
     :rtype: int
     """
+
     proc = Process(os.getpid())
     if hasattr(proc, "num_fds"):
         return proc.num_fds()
     if hasattr(proc, "num_handles"):
         return proc.num_handles()
 
-    # Fallback: approximate using open files + connections
-    open_files = len(proc.open_files())
-    connections = len(proc.net_connections(kind="all"))
-    return open_files + connections
+
+def _get_current_open_fds_names() -> list:
+    """Return a list of names of open file descriptors.
+
+    :return: A list of names of open file descriptors or handles.
+    :rtype: list
+    """
+    proc = Process(os.getpid())
+    if hasattr(proc, "open_files"):
+        return [f.path for f in proc.open_files()]
+    if hasattr(proc, "num_handles"):
+        return [h.path for h in proc.open_files()]

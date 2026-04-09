@@ -205,8 +205,17 @@ class Autosubmit:
                                    help='Sets a experiment expid which completion will trigger the start of this experiment.')
             subparser.add_argument('-rom', '--run_only_members', required=False,
                                    help='Sets members allowed on this run.')
-            subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
-                                   help='Prints performance parameters of the execution of this command.')
+            subparser.add_argument(
+                '-p', '--profile',
+                nargs='?',
+                const=0,  # profiling ON, no cap
+                default=None,  # value when -p is absent  → profiling OFF
+                type=int,
+                metavar='MAX_ITER',
+                help='Enables profiling. Optionally pass the maximum number of iterations (0 = no cap).'
+            )
+            subparser.add_argument('-t', '--trace', action='store_true', default=False, required=False,
+                                   help='Enables trace output for profiling (requires --profile).')
 
             # Expid
             subparser = subparsers.add_parser(
@@ -832,10 +841,10 @@ class Autosubmit:
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
         if args.command == 'run':
-            if args.trace and not args.profile:
+            if args.trace and args.profile is None:
                 raise AutosubmitCritical('Tracing is only available with profiling. Please add -p/--profile flag to run with tracing.', 7012)
             return Autosubmit.run_experiment(args.expid, args.start_time, args.start_after, args.run_only_members,
-                                             args.profile, args.trace, args.profile_max_iterations)
+                                             args.profile, args.trace)
         elif args.command == 'expid':
             return Autosubmit.expid(args.description, args.HPC, args.copy, args.dummy, args.minimal_configuration,
                                     args.git_repo, args.git_branch, args.git_as_conf, args.operational, args.testcase,
@@ -2065,23 +2074,22 @@ class Autosubmit:
 
     @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
-                       run_only_members: Optional[str] = None, profile: bool = False, trace: bool = False, profile_max_iterations: int = 0) -> int:
+                       run_only_members: Optional[str] = None, profile: int = 0, trace: bool = False) -> int:
         """Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
 
         :param expid: the experiment id
         :param start_time: the time at which the experiment should start
         :param start_after: the expid after which the experiment should start
         :param run_only_members: the members to run
-        :param profile: if True, the function will be profiled
+        :param profile: if >0, profile will stop after N iterations, if 0, profile will not stop until the experiment finishes or is stopped by the user
         :param trace: if True, the function will be traced
-        :param profile_max_iterations: the maximum number of iterations to run when profiling, 0 means no limit
         :return: exit status
 
         """
         # Start profiling if the flag has been used
-        if profile:
+        if profile is not None:
             from .profiler.profiler import Profiler
-            profiler = Profiler(expid, trace_enabled=trace, max_checkpoints=profile_max_iterations)
+            profiler = Profiler(expid, trace_enabled=trace, max_checkpoints=profile)
             profiler.start()
             profiler.iteration_checkpoint(0, 0)
         else:
@@ -2142,8 +2150,17 @@ class Autosubmit:
                                                                                       3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
+                if profile is not None:
+                    loaded_jobs = len(job_list.get_job_list())
+                    loaded_edges = 0
+                    for job in job_list.get_job_list():
+                        loaded_edges += len(job.children)
+
                 while job_list.get_active():
                     try:
+                        if profile is not None:
+                            Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
+
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             if job_list.get_failed():
@@ -2330,6 +2347,8 @@ class Autosubmit:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
                     Log.result("Run successful")
+                    if profile is not None:
+                        profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
                     # Updating finish time for job data header
                     # Database is locked, may be related to my local db todo 4.1.1
                     try:
@@ -2349,7 +2368,7 @@ class Autosubmit:
         except BaseException:
             raise
         finally:
-            if profile:
+            if profile is not None:
                 profiler.stop()
 
         # Suppress in case ``job_list`` was not defined yet...
