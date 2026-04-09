@@ -167,7 +167,7 @@ This procedure allows you to modify the status of your jobs.
 You must execute:
 ::
 
-    autosubmit setstatus <EXPID> -f{ l | s | t | c } <VALUE_TO_FILTER> -t <STATUS_FINAL> -s
+    autosubmit setstatus <EXPID> -<FILTER> <VALUE_TO_FILTER> -t <STATUS_FINAL> -s
 
 By default, plots are **not** generated when changing status. To generate plots showing the updated job statuses, use the ``-plt`` or ``--plot`` option.
 
@@ -178,19 +178,15 @@ By default, plots are **not** generated when changing status. To generate plots 
 Where:
 
 +------+----------------------------------------------+----------------------------------------------+
-| Flag | Meaning                                      | Example                                      |
+| FILTER | Meaning                                      | Example of VALUE_TO_FILTER                   |
 +======+==============================================+==============================================+
-| -fl  | filter by job name                           | ``-fl a000_20101101_fc3_21_SIM"``            |
+| -fl    | filter by job name                           | ``-fl a000_20101101_fc3_21_SIM"``            |
 +------+----------------------------------------------+----------------------------------------------+
-| -fs  | filter by job status                         | ``-fs FAILED``                               |
+| -fs    | filter by job status                         | ``-fs FAILED``                               |
 +------+----------------------------------------------+----------------------------------------------+
-| -ft  | filter by job type (and optionally split)    | ``-ft TRANSFER``                             |
+| -ft    | filter by job type (and optionally split)    | ``-ft TRANSFER``                             |
 +------+----------------------------------------------+----------------------------------------------+
-| -fc  | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
-+------+----------------------------------------------+----------------------------------------------+
-| -t   | target status                                | ``-t READY``                                 |
-+------+----------------------------------------------+----------------------------------------------+
-| -s   | save changes                                 | ``-s``                                       |
+| -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
 +------+----------------------------------------------+----------------------------------------------+
 
 If multiple filters are provided (``-f{ l | s | t | c }``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
