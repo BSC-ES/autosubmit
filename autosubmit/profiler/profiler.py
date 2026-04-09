@@ -347,7 +347,7 @@ class Profiler:
 
         # final list of fds opened.
         fd_names = _get_current_open_fds_names()
-        report += f"\nFINAL OPEN FILE DESCRIPTORS:\n"
+        report += "\nFINAL OPEN FILE DESCRIPTORS:\n"
         for fd in fd_names:
             report += f"  {fd}\n"
 
