@@ -27,7 +27,7 @@ from enum import Enum
 from pathlib import Path
 from pstats import SortKey
 
-from exceptiongroup import suppress
+from contextlib import suppress
 from psutil import Process
 
 from autosubmit.config.basicconfig import BasicConfig
