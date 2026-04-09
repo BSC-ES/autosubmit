@@ -180,11 +180,11 @@ Where:
 +------+----------------------------------------------+----------------------------------------------+
 | Flag | Meaning                                      | Example                                      |
 +======+==============================================+==============================================+
-| -fl  | filter by section (and optionally split)     | ``-fl "19601101_fc3_21_sim ..."``            |
+| -fl  | filter by job name                           | ``-fl a000_20101101_fc3_21_SIM"``            |
 +------+----------------------------------------------+----------------------------------------------+
 | -fs  | filter by job status                         | ``-fs FAILED``                               |
 +------+----------------------------------------------+----------------------------------------------+
-| -ft  | filter by job type                           | ``-ft TRANSFER``                             |
+| -ft  | filter by job type (and optionally split)    | ``-ft TRANSFER``                             |
 +------+----------------------------------------------+----------------------------------------------+
 | -fc  | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
 +------+----------------------------------------------+----------------------------------------------+
@@ -207,7 +207,7 @@ Optional filter arguments (combine multiple for granular selection):
 
 ::
 
-    autosubmit setstatus <EXPID> -fl "<EXPID>_20101101_fc3_21_sim <EXPID>_20111101_fc4_26_sim" -t READY -s
+    autosubmit setstatus <EXPID> -fl "<EXPID>_20101101_fc3_21_SIM <EXPID>_20111101_fc4_26_SIM" -t READY -s
 
 * ``-fc``: chunk/section/split filter (JSON-like format, takes precedence over legacy filters)
 
@@ -266,7 +266,7 @@ Filter Examples
 Single filter, by job list:
 ::
 
-    autosubmit setstatus <EXPID> -fl "<EXPID>_20101101_fc3_21_sim <EXPID>_20111101_fc4_26_sim" -t READY -s
+    autosubmit setstatus <EXPID> -fl "<EXPID>_20101101_fc3_21_SIM <EXPID>_20111101_fc4_26_SIM" -t READY -s
 
 Single filter, by chunk/section/split:
 ::
@@ -389,8 +389,8 @@ Example:
 
 .. code-block:: ini
 
-    <EXPID>_20101101_fc3_21_sim    READY
-    <EXPID>_20111101_fc4_26_sim    READY
+    <EXPID>_20101101_fc3_21_SIM    READY
+    <EXPID>_20111101_fc4_26_SIM    READY
 
 If Autosubmit finds the above file, it will process it. You can check that the processing was OK at a given date and time,
 if you see that the file name has changed to:
