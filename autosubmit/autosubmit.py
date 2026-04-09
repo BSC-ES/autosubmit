@@ -3143,7 +3143,7 @@ class Autosubmit:
                     section for section in separate_section_entries(filter_section)
                 ]
                 if not (len(ft_entries) == 1 and ft_entries[0] == "Any"):
-                    section_filtered_jobs = Autosubmit._filter_section_splits(
+                    section_filtered_jobs = Autosubmit._filter_sections_splits(
                         ft_entries, all_jobs
                     )
                     selected_job_names &= {
