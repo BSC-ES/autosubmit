@@ -395,3 +395,28 @@ def test_get_cpmip_thresholds_different_cases(autosubmit_config, experiment_data
     as_conf = autosubmit_config(expid='a000', experiment_data=experiment_data)
     thresholds = as_conf.get_cpmip_thresholds('SIM')
     assert thresholds == expected
+
+def test_validate_wallclock():
+    as_conf = autosubmit_config(
+        expid="a000",
+        experiment_data={
+            "PLATFORMS": {
+                "MARENOSTRUM5": {
+                    "MAX_WALLCLOCK": "1:00"
+                },
+            },
+            "DEFAULT": {"HPCARCH": "MARENOSTRUM5"},
+            "CONFIG": {
+                "JOB_WALLCLOCK": "2:00"
+            },
+            "JOBS": {
+                "AQUA_ANALYSIS": {
+                    "PLATFORM": "MARENOSTRUM5",
+                    "WALLCLOCK": "2:00"
+                }
+            },
+        },
+    )
+
+    res = as_conf.validate_wallclock()
+    assert res is "Job AQUA_ANALYSIS has a wallclock value of 7200s, which is greater than the platform's 3600s wallclock time"
