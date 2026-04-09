@@ -3121,6 +3121,8 @@ class Autosubmit:
         else:
             jobs_to_recover = job_list.get_active()
         
+        selected_job_names = {job.name for job in jobs_to_recover}
+        
         if filter_section or filter_chunks or filter_status or filter_list:
             # Validate filters. Raises AutosubmitCritical if any filter is invalid, with a message specifying the issue.
             Autosubmit._validate_set_status_filters(
@@ -3135,7 +3137,6 @@ class Autosubmit:
             # Starts the filtering process
             Log.info("Filtering jobs...")
             all_jobs = job_list.get_job_list()
-            selected_job_names = {job.name for job in jobs_to_recover}
 
             if filter_section:
                 ft_entries = [
