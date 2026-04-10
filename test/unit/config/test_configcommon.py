@@ -397,6 +397,33 @@ def test_get_cpmip_thresholds_different_cases(autosubmit_config, experiment_data
     assert thresholds == expected
 
 def test_validate_wallclock(autosubmit_config: 'AutosubmitConfigFactory'):
+    """Test should succeed"""
+    as_conf: AutosubmitConfig = autosubmit_config(
+        expid="a000",
+        experiment_data={
+            "PLATFORMS": {
+                "MARENOSTRUM5": {
+                    "MAX_WALLCLOCK": "2:00"
+                },
+            },
+            "DEFAULT": {"HPCARCH": "MARENOSTRUM5"},
+            "CONFIG": {
+                "JOB_WALLCLOCK": "2:00"
+            },
+            "JOBS": {
+                "AQUA_ANALYSIS": {
+                    "PLATFORM": "MARENOSTRUM5",
+                    "WALLCLOCK": "2:00"
+                }
+            },
+        },
+    )
+
+    res = as_conf.validate_wallclock()
+    assert res == ""
+
+def test_validate_wallclock_errors(autosubmit_config: 'AutosubmitConfigFactory'):
+    """Test should produce an error that the job WALLCLOCK is greater than the platform MAX_WALLCLOCK"""
     as_conf: AutosubmitConfig = autosubmit_config(
         expid="a000",
         experiment_data={
