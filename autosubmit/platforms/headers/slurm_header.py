@@ -27,8 +27,7 @@ if TYPE_CHECKING:
 
 
 def check_directive(directive: str, job_parameters: Union[dict, list, str], het: int = -1) -> bool:
-    """
-    Returns if directive the directive exists and has value
+    """Returns if directive the directive exists and has value
 
     :param directive: Which directive needs to be found
     :type directive: str
@@ -77,7 +76,7 @@ class SlurmHeader(object):
         Log.warning(f"No QUEUE was found for the JOB: {job.name}")
         return ""
 
-    def get_processors_directive(self, job: 'Job', het: int = -1) -> str:
+    def get_processors_directive(self, job: 'Job', parameters: dict = None, het: int = -1) -> str:
         """
         Returns processors directive for the specified job
 
@@ -86,6 +85,8 @@ class SlurmHeader(object):
 
         :param job: job to create directive `PROCESSORS` for SLURM HEADER
         :type job: Job
+        :param parameters: set of values found in the config files used to generate the values of the SLURM HEADER
+        :type parameters: dict
         :param het: Value of the interation in which the value will be validated for specific directive
         :type het: int
         :return: `NODES` or `PROCESSORS` directive
@@ -102,7 +103,7 @@ class SlurmHeader(object):
             return f"SBATCH -n {job.processors}"
         return ""
 
-    def get_partition_directive(self, job: 'Job', het: int = -1) -> str:
+    def get_partition_directive(self, job: 'Job', parameters: dict = None, het: int = -1) -> str:
         """
         Returns partition directive for the specified job
 
@@ -117,6 +118,8 @@ class SlurmHeader(object):
             return f"SBATCH --partition={job.het['PARTITION'][het]}"
         if check_directive('PARTITION', job.het, -1):
             return f"SBATCH --partition={job.het['PARTITION']}"
+        if check_directive('PARTITION', parameters):
+            return f"SBATCH --partition={parameters['PARTITION']}"
         elif job.partition != '':
             return f"SBATCH --partition={job.partition}"
         return ""
@@ -137,6 +140,8 @@ class SlurmHeader(object):
         """
         if check_directive('CURRENT_PROJ', job.het, het):
             return f"SBATCH -A {job.het['CURRENT_PROJ'][het]}"
+        if check_directive('CURRENT_PROJ', job.het):
+            return f"SBATCH -A {job.het['CURRENT_PROJ']}"
         if check_directive('CURRENT_PROJ', parameters):
                 return f"SBATCH -A {parameters['CURRENT_PROJ']}"
         return ""
@@ -395,7 +400,7 @@ class SlurmHeader(object):
             header = header.replace(
                 f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(wr_job, het=components))
             header = header.replace(
-                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(wr_job, components))
+                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(wr_job, het=components))
             header = header.replace(
                 f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(wr_job, het=components))
             header = header.replace(
@@ -407,7 +412,7 @@ class SlurmHeader(object):
             header = header.replace(
                 f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(wr_job, het=components))
             header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(wr_job, components))
+                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(wr_job, het=components))
             header = header.replace(
                 f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(wr_job, het=components))
             header = header.replace(
@@ -436,7 +441,7 @@ class SlurmHeader(object):
             header = header.replace(
                 f'%QUEUE_DIRECTIVE_{components}%', self.get_queue_directive(job, parameters, components))
             header = header.replace(
-                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(job, components))
+                f'%PARTITION_DIRECTIVE_{components}%', self.get_partition_directive(job, het=components))
             header = header.replace(
                 f'%ACCOUNT_DIRECTIVE_{components}%', self.get_account_directive(job, parameters, components))
             header = header.replace(
@@ -449,7 +454,7 @@ class SlurmHeader(object):
             header = header.replace(
                 f'%NODES_DIRECTIVE_{components}%', self.get_nodes_directive(job, parameters, components))
             header = header.replace(
-                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(job, components))
+                f'%NUMPROC_DIRECTIVE_{components}%', self.get_processors_directive(job, het=components))
             header = header.replace(
                 f'%RESERVATION_DIRECTIVE_{components}%', self.get_reservation_directive(job, parameters, components))
             header = header.replace(
