@@ -419,4 +419,4 @@ def test_validate_wallclock(autosubmit_config: 'AutosubmitConfigFactory'):
     )
 
     res = as_conf.validate_wallclock()
-    assert res is "Job AQUA_ANALYSIS has a wallclock value of 7200.0s, which is greater than the platform's 3600.0s wallclock time\n"
+    assert res == "Job AQUA_ANALYSIS has a wallclock value of 7200.0s, which is greater than the platform's 3600.0s wallclock time\n"
