@@ -644,3 +644,49 @@ def test_recovery_filter_type_invalid_section_raises_validation_error(
 
     with pytest.raises(AutosubmitCritical):
         do_recovery(as_exp, ft=ft_filter)
+
+
+@pytest.mark.parametrize(
+    "ft_filter, expected_jobs",
+    [
+        ("LOCALJOB [999]", 0),
+        ("LOCALJOB [2-999]", 16),
+        ("LOCALJOB [2:999]", 16),
+    ],
+)
+def test_recovery_filter_with_splits_invalid_splits_logs_warning(
+    as_exp, mocker, ft_filter, expected_jobs
+):
+    """Invalid splits in ``-ft`` logs a warning and does not recover any job."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
+    mocker.patch(
+        "autosubmit.autosubmit.Autosubmit.online_recovery",
+        return_value=[job.name for job in job_list.get_job_list()],
+    )
+    mocker.patch(
+        "autosubmit.job.job_list.JobList.check_completed_jobs_after_recovery",
+        return_value=None,
+    )
+    job_list = do_recovery(as_exp, ft=ft_filter)
+
+    completed_jobs = [
+        job for job in job_list.get_job_list() if job.status == Status.COMPLETED
+    ]
+    assert len(completed_jobs) == expected_jobs
+    warning_messages = [
+        call.args[0] for call in mocked_warning.call_args_list if call.args
+    ]
+    assert any(
+        "Some jobs do not exist in section 'LOCALJOB' with the requested splits."
+        in message
+        for message in warning_messages
+    )
+
