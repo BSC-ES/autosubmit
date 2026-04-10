@@ -51,6 +51,10 @@ class Profiler:
 
         :param expid: The experiment identifier.
         :type expid: str
+        :param trace_enabled:
+        :type trace_enabled: bool
+        :param max_checkpoints:
+        :type max_checkpoints: int
         """
         self._profiler = cProfile.Profile()
         self._expid = expid
