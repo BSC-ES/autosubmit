@@ -30,6 +30,21 @@ Examples:
     # check for completion files of all jobs
     autosubmit recovery <EXPID> --all
 
+    # check for completion files of all jobs filtered by a space-separated list of job names
+    autosubmit recovery <EXPID> --all -fl "<EXPID>_20101101_fc3_21_SIM <EXPID>_20111101_fc4_26_SIM"
+
+    # check for completion files of all jobs filtered by chunk/section/split
+    autosubmit recovery <EXPID> --all -fc "[20100101 [ fc0 [1] ] ]"
+
+    # check for completion files of all jobs filtered by job statuses
+    autosubmit recovery <EXPID> --all -fs "WAITING"
+
+    # check for completion files of all jobs filtered by job types
+    autosubmit recovery <EXPID> --all -ft "LOCALJOB PSJOB"
+
+    # check for completion files of all jobs filtered by multiple job types and status
+    autosubmit recovery <EXPID> --all -ft "LOCALJOB, PSJOB" -fs "WAITING"
+
     # Save changes
     autosubmit recovery <EXPID> -s
 

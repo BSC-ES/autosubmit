@@ -3123,6 +3123,7 @@ class Autosubmit:
         
         selected_job_names = {job.name for job in jobs_to_recover}
         
+        # filters will be applied to all_jobs or only active_jobs, depending on the all_jobs flag
         if filter_section or filter_chunks or filter_status or filter_list:
             # Validate filters. Raises AutosubmitCritical if any filter is invalid, with a message specifying the issue.
             Autosubmit._validate_set_status_filters(
@@ -3136,18 +3137,18 @@ class Autosubmit:
 
             # Starts the filtering process
             Log.info("Filtering jobs...")
-            all_jobs = job_list.get_job_list()
+            jobs_scope = job_list.get_job_list()
 
             if filter_section:
                 ft_entries = [
                     section for section in separate_section_entries(filter_section)
                 ]
-                if not (len(ft_entries) == 1 and ft_entries[0] == "Any"):
+                if not (len(ft_entries) == 1 and ft_entries[0].upper() == "ANY"):
                     section_filtered_jobs = Autosubmit._filter_sections_splits(
-                        ft_entries, all_jobs
+                        ft_entries, jobs_scope
                     )
                     selected_job_names &= {
-                        job.name for job in all_jobs if job in section_filtered_jobs
+                        job.name for job in jobs_scope if job in section_filtered_jobs
                     }
 
             if filter_chunks:
@@ -3161,14 +3162,14 @@ class Autosubmit:
                 if not (len(status_list) == 1 and status_list[0].upper() == "ANY"):
                     allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
                     selected_job_names &= {
-                        job.name for job in all_jobs if job.status in allowed_statuses
+                        job.name for job in jobs_scope if job.status in allowed_statuses
                     }
 
             if filter_list:
                 jobs = filter_list.split()
-                if not (len(jobs) == 1 and jobs[0] == "Any"):
+                if not (len(jobs) == 1 and jobs[0].upper() == "ANY"):
                     selected_job_names &= {
-                        job.name for job in all_jobs if job.name in jobs
+                        job.name for job in jobs_scope if job.name in jobs
                     }
 
         jobs_to_recover = [
@@ -3231,9 +3232,9 @@ class Autosubmit:
                     expid, job_list.get_job_list(), os.path.join(exp_path, "/tmp/LOG_", expid),
                     output_format=output_type, packages=packages, show=not hide, groups=groups_dict,
                     job_list_object=job_list)
-        except Exception:
+        except Exception as e:
             Log.warning("An error has occurred while plotting the jobs list after recovery. "
-                        "Check if you have X11 redirection and an img viewer correctly set. Trace: {str(e)}")
+                        f"Check if you have X11 redirection and an img viewer correctly set. Trace: {str(e)}")
         try:
             if detail:
                 Autosubmit.detail(job_list)
@@ -4786,7 +4787,7 @@ class Autosubmit:
                 if reference not in status_list:
                     status_list.append(reference)
             for status in status_filter:
-                if status == "ANY":
+                if status.upper() == "ANY":
                     continue
                 if status not in status_list:
                     status_validation_error = True
@@ -5345,15 +5346,15 @@ class Autosubmit:
                                                         filter_section)
                 #### Starts the filtering process ####
                 Log.info("Filtering jobs...")
-                all_jobs = job_list.get_job_list()
-                selected_job_names = {job.name for job in all_jobs}
-
+                jobs_scope = job_list.get_job_list()
+                selected_job_names = {job.name for job in jobs_scope}
+                
                 final_status = Autosubmit._get_status(final)
                 if filter_section:
                     ft_entries = [section for section in separate_section_entries(filter_section)]
                     if not (len(ft_entries) == 1 and ft_entries[0] == 'ANY'):
-                        section_filtered_jobs = Autosubmit._filter_sections_splits(ft_entries, all_jobs)
-                        selected_job_names &= {job.name for job in all_jobs if job in section_filtered_jobs}
+                        section_filtered_jobs = Autosubmit._filter_sections_splits(ft_entries, jobs_scope)
+                        selected_job_names &= {job.name for job in jobs_scope if job in section_filtered_jobs}
 
                 if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
@@ -5365,15 +5366,15 @@ class Autosubmit:
                     Log.debug(f"Filtering jobs with status {filter_status}")
                     if not (len(status_list) == 1 and status_list[0].upper() == 'ANY'):
                         allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
-                        selected_job_names &= {job.name for job in all_jobs if job.status in allowed_statuses}
+                        selected_job_names &= {job.name for job in jobs_scope if job.status in allowed_statuses}
 
                 if filter_list:
                     jobs = filter_list.split()
                     if not (len(jobs) == 1 and jobs[0].upper() == 'ANY'):
-                        selected_job_names &= {job.name for job in all_jobs if job.name in jobs}
+                        selected_job_names &= {job.name for job in jobs_scope if job.name in jobs}
 
                 # preserve job list ordering
-                final_list = [job for job in all_jobs if job.name in selected_job_names]
+                final_list = [job for job in jobs_scope if job.name in selected_job_names]
                 # Time to change status
                 performed_changes = {}
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")
