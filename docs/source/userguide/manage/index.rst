@@ -167,7 +167,7 @@ This procedure allows you to modify the status of your jobs.
 You must execute:
 ::
 
-    autosubmit setstatus <EXPID> -<FILTER> <VALUE_TO_FILTER> -t <STATUS_FINAL> -s
+    autosubmit setstatus <EXPID> <FILTER> <VALUE_TO_FILTER> -t <STATUS_FINAL> -s
 
 By default, plots are **not** generated when changing status. To generate plots showing the updated job statuses, use the ``-plt`` or ``--plot`` option.
 
