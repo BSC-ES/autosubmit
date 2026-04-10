@@ -313,3 +313,35 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
     except BaseException as e:  # TODO fix this test to work in parallel
         print(str(e))
         pytest.xfail("Offline recovery test is flaky, needs investigation. It always works when launched alone or with setstatus/recovery tests")
+
+
+@pytest.mark.parametrize("noplot", [True, False])
+def test_recovery_noplot_calls_generate_output(as_exp, mocker, noplot):
+    """Test that recovery calls generate_output when noplot is False and does not call it when noplot is True."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    mock_generate_output = mocker.patch(
+        "autosubmit.monitor.monitor.Monitor.generate_output"
+    )
+
+    as_exp.autosubmit.recovery(
+        as_exp.expid,
+        noplot=noplot,
+        save=True,
+        all_jobs=True,
+        hide=True,
+        group_by="date",
+        expand=[],
+        expand_status=[],
+        detail=True,
+        force=False,
+        offline=True,
+    )
+
+    if noplot:
+        mock_generate_output.assert_not_called()
+    else:
+        mock_generate_output.assert_called_once()

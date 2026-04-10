@@ -33,6 +33,7 @@ be finished before launching the job that has the DEPENDENCIES attribute.
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: simple.png
@@ -91,6 +92,7 @@ The resulting workflow can be seen in Figure  for a experiment with 2 startdates
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: running.png
@@ -151,6 +153,7 @@ The resulting workflow can be seen in Figure `dprevious`
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: dependencies_previous.png
@@ -196,6 +199,7 @@ The resulting workflow can be seen in Figure `dependencies`
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: dependencies_running.png
@@ -415,6 +419,7 @@ The resulting workflow can be seen in Figure `frequency`
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: frequency.png
@@ -464,6 +469,7 @@ The resulting workflow can be seen in Figure `nosync`
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: no_synchronize.png
@@ -485,6 +491,7 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be s
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: synchronize.png
@@ -506,6 +513,7 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be see
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: dsynchronize.png
@@ -563,6 +571,7 @@ The 3rd part of the post job will depend on the 3rd part of the asim job.
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: splits.png
@@ -604,6 +613,7 @@ Example 1: 1-to-1 dependency
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: splits_1_to_1.png
@@ -635,6 +645,7 @@ Example 2: N-to-1 dependency
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: splits_n_to_1.png
@@ -666,6 +677,7 @@ Example 3: 1-to-N dependency
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: splits_1_to_n.png
@@ -766,6 +778,7 @@ Example4: Auto split
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: splits_auto.png
@@ -823,6 +836,7 @@ The resulting workflow can be seen in Figure `delay`
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: delay.png
@@ -905,6 +919,7 @@ Example 1: How to select an specific chunk
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: select_chunks.png
@@ -948,6 +963,7 @@ In this workflow you can see an illustrated example of ``SKIPPABLE`` parameter u
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: skip.png
@@ -999,6 +1015,7 @@ Weak dependencies, work like this way:
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: dashed.png
@@ -1051,6 +1068,7 @@ In this workflow you can see an illustrated example of select member. Using 4 me
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: select_members.png
@@ -1173,6 +1191,7 @@ One can use now the following configuration:
 
 .. autosubmitfigure::
     :command: create
+    :args: -plt
     :expid: a000
     :type: png
     :figure: for.png

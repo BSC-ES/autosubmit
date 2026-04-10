@@ -628,3 +628,42 @@ def test_set_status_ftcs(as_exp: object, ftcs_filter: str, expected_jobs: int):
             if job.status == Status.COMPLETED
         ]
         assert len(completed_jobs) == expected_jobs
+
+
+@pytest.mark.parametrize("noplot", [True, False])
+def test_set_status_noplot_calls_generate_output(as_exp, mocker, noplot):
+    """Test that set_status calls generate_output when noplot is False and does not call it when noplot is True."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    mock_generate_output = mocker.patch(
+        "autosubmit.monitor.monitor.Monitor.generate_output"
+    )
+
+    as_exp.autosubmit.set_status(
+        as_exp.expid,
+        noplot=noplot,
+        save=True,
+        final="COMPLETED",
+        filter_list="Any",
+        filter_chunks=None,
+        filter_status=None,
+        filter_section=None,
+        filter_type_chunk=None,
+        filter_type_chunk_split=None,
+        hide=False,
+        group_by=None,
+        expand=[],
+        expand_status=[],
+        check_wrapper=False,
+        detail=False,
+    )
+
+    if noplot:
+        mock_generate_output.assert_not_called()
+    else:
+        mock_generate_output.assert_called_once()
