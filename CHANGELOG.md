@@ -27,6 +27,7 @@
 - Add issues URL to error message #2888
 - Allow multiple filters in `setstatus` command #1250
 - Allow filtering by section and split in the `ft` command #2910
+- Improved profiler adding tracing and stopping capabilities  #2933
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
