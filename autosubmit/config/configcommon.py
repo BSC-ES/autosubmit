@@ -921,7 +921,7 @@ class AutosubmitConfig(object):
         :returns: A tuple containing the dynamic variables, the regex pattern, and the start index.
         :rtype: tuple
         """
-        return copy.deepcopy(self.dynamic_variables), '%[a-zA-Z0-9_.-]*%', 1
+        return copy.deepcopy(self.dynamic_variables), "%[a-zA-Z0-9_.-]*(\^\^|,,)?%", 1
 
     def _process_dynamic_variables(
             self,
@@ -1028,12 +1028,10 @@ class AutosubmitConfig(object):
         :rtype: tuple[dict[str, Any], dict[str, Any]]
         """
         for i, key in enumerate(filter(None, keys)):
-            matches = list()
-            if in_the_end and ("^" in key or "," in key):
-                pattern_special_variables = "%[\^]?[a-zA-Z0-9_.-]*(\^\^|,,)?%"
+            matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
+            if in_the_end and "^" in key:
+                pattern_special_variables = "%\^[a-zA-Z0-9_.-]*(\^\^|,,)?%"
                 matches.extend(list(re.finditer(pattern_special_variables, key, flags=re.IGNORECASE))[::-1])
-            else:
-                matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
             for match in matches:
                 value = self._get_substituted_value(key, match, parameters, start_long, dict_keys_type)
                 if value:
@@ -1054,7 +1052,7 @@ class AutosubmitConfig(object):
             parameters: dict[str, Any],
             start_long: int,
             dict_keys_type: str
-    ) -> str:
+    ) -> Optional[str]:
         """
         Get the substituted value for a dynamic variable in the key.
 
@@ -1074,21 +1072,30 @@ class AutosubmitConfig(object):
         rest_of_key_start = key[:match.start()]
         rest_of_key_end = key[match.end():]
         key_parts = key[match.start():match.end()]
+        param = parameters
+        upper_validate, lower_validate = False, False
+
+        if "^^" == key[match.start():match.end()][-3:-1]:
+            key_parts = key_parts.replace("^^", "")
+            upper_validate = True
+        if ",," == key[match.start():match.end()][-3:-1]:
+            key_parts = key_parts.replace(",,", "")
+            lower_validate = True
+
         key_parts = key_parts[start_long:-1].split(".") if "." in key_parts and dict_keys_type != "long" else [
             key_parts[start_long:-1]]
-        param = parameters
+
         for k in key_parts:
-            upper_validate = True if "^^" in k else False
-            lower_validate = True if ",," in k else False
             k = k.strip("^")
             k = k.strip(",")
             param = param.get(k.upper(), {})
             if isinstance(param, int):
                 param = str(param)
-            if upper_validate:
-                param = param.upper()
-            if lower_validate:
-                param = param.lower()
+            if isinstance(param, str):
+                if upper_validate:
+                    param = param.upper()
+                if lower_validate:
+                    param = param.lower()
         return str(rest_of_key_start) + str(param) + str(rest_of_key_end) if param else None
 
     def _update_parameters(

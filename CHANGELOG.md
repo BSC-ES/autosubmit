@@ -38,6 +38,7 @@
 - Added `DEFAULT.DESCRIPTION` from the database into the list of job parameters #2857
 - Every YAML file loaded is now printed in the debug log (use -lc DEBUG in the
   command line if you want this) #2879
+- Allow to set AS variables as lowercase/uppercase (,,/^^) #2504
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
