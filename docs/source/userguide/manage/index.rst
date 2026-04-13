@@ -173,7 +173,7 @@ By default, plots are **not** generated when changing status. To generate plots 
 
 ::
 
-    autosubmit setstatus <EXPID> -f{ l | s | t | c } <VALUE_TO_FILTER> -t <STATUS_FINAL> -s -plt
+    autosubmit setstatus <EXPID> <FILTER> <VALUE_TO_FILTER> -t <STATUS_FINAL> -s -plt
 
 Where:
 
@@ -189,12 +189,12 @@ Where:
 | -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
 +--------+----------------------------------------------+----------------------------------------------+
 
-If multiple filters are provided (``-f{ l | s | t | c }``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
+If multiple filters are provided (``-fl, fs, ft, fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
 
 Mandatory arguments:
 
 * ``<EXPID>``: experiment identifier
-* ``-f{ l | s | t | c } <VALUE_TO_FILTER>``: at least one filter is required to select jobs (see below for filter options)
+* ``<FILTER> <VALUE_TO_FILTER>``: at least one filter is required to select jobs (see below for filter options)
 * ``-t STATUS_FINAL``: target status (``READY``, ``COMPLETED``, ``WAITING``, ``SUSPENDED``, ``HELD``, ``UNKNOWN``)
 
 Optional filter arguments (combine multiple for granular selection):
