@@ -8,9 +8,12 @@ How to recover an experiment
 
 We use the ``recovery`` command when an experiment was interrupted in an ungraceful way (e.g. scheduler failure, network failure, etc.) and Autosubmit job states are no loger consistent with the actual state of the jobs on the platform.
 
-The ``recovery`` command checks which jobs are already finished and updates their status to ``COMPLETED``. 
+The ``recovery`` command checks which jobs are already finished and updates their status to ``COMPLETED``.
+
 - By default, it checks for the completion files for active jobs (i.e. jobs in ``SUBMITTED``, ``QUEUING`` or ``RUNNING`` status).
+
 - With the ``--all`` flag, it checks for the completion files for all jobs, regardless of their status.
+
 - If a platform is unreachable, we can use the ``--offline`` flag to force the recovery without checking for completion files in remote. In this case, Autosubmit will only check for the completion files in the local file system. This option is useful when some platforms are not reachable (e.g. due to network failure) but we want to recover the experiment based on the completion files that are available locally.
 
 .. warning:: Without the -s flag, Autosubmit will only perform a dry-run (i.e. it will not take effect) of the command.  
@@ -19,12 +22,14 @@ The ``recovery`` command checks which jobs are already finished and updates thei
 Typical workflow of recovery
 ----------------------------
 
-1. Run a dry-run first and inspect the generated report. We will check for the completion files of all jobs in the experiment, so we will use the ``--all`` flag.
+1. Run a dry-run first and inspect the generated report. 
+We will check for the completion files of all jobs in the experiment, so we will use the ``--all`` flag.
 ::
 
     autosubmit recovery <EXPID> --all
 
-2. If needed, apply filters to limit which jobs are checked for completion files. For example, we can filter by job names, chunk/section/split, job statuses, or job types.
+2. If needed, apply filters to limit which jobs are checked for completion files. 
+For example, we can filter by job names, chunk/section/split, job statuses, or job types.
 ::
     
     # check for completion files of all jobs filtered by a space-separated list of job names
@@ -43,41 +48,51 @@ Typical workflow of recovery
     autosubmit recovery <EXPID> --all -ft "LOCALJOB, PSJOB" -fs "WAITING"
 
 3. Apply changes with ``-s``
-
 ::
+
     autosubmit recovery <EXPID> --all -s
 
-4. Resume the workflow with ``autosubmit run <EXPID>``
-
+4. Resume the workflow with the ``run`` command.
 ::
+    
     autosubmit run <EXPID>
 
 
 Important options for recovery
 ------------------------------
 
-- ``-s`` or ``--save``: Apply and persist state changes. Without this option, nothing is saved.
+.. list-table::
+   :header-rows: 1
 
-- ``-f`` or ``--force``: Cancel active remote jobs before resetting their state. Use when jobs are still running remotely but we want to reset their state in Autosubmit. This option is useful when the platform is reachable and we want to ensure that no jobs are still running remotely after recovery.
+   * - Command
+     - Explanation
+   * - ``-s``, ``--save``
+     - Apply and persist state changes. Without this option, nothing is saved.
+   * - ``-f``, ``--force``
+     - Cancel active remote jobs before resetting their state. Use when jobs are still running remotely but we want to reset their state in Autosubmit.
+   * - ``--offline``
+     - Complete recovery without remote platform checks, using local history instead.
+   * - ``--all``
+     - Check completion files for all jobs, not only active jobs.
+   * - ``-fl``
+     - Filter by job names. Example: ``-fl "job1 job2 job3"``.
+   * - ``-fc``
+     - Filter by chunk/section/split. Example: ``-fc "[20100101 [ fc0 [1] ] ]"``.
+   * - ``-fs``
+     - Filter by job statuses. Example: ``-fs "WAITING RUNNING"``.
+   * - ``-ft``
+     - Filter by job types. Example: ``-ft "LOCALJOB, PSJOB"`` or ``LOCALJOB[1,2]``.
+   * - ``-np``, ``--noplot``
+     - Do not generate plots during recovery (default).
+   * - ``-plt``, ``--plot``
+     - Generate plots during recovery.
 
-- ``--offline``: Complete recovery without remote platform checks, using local history instead. 
+.. warning::
 
-- ``--all``: Check completion files for all jobs, not only active jobs. By default, Autosubmit only checks for completion files of active jobs (i.e. jobs in SUBMITTED, QUEUING or RUNNING status). With this option, it will check for completion files of all jobs, regardless of their status.
-
-- ``-fl``: Filter by job names. Provide a space-separated list of job names to check for completion files. For example, ``-fl "job1 job2 job3"`` will check for completion files of jobs with names "job1", "job2", and "job3".
-
-- ``-fc``: Filter by chunk/section/split. Provide a filter in the format of "[chunk [section [split] ] ]". For example, ``-fc "[20100101 [ fc0 [1] ] ]"`` will check for completion files of jobs that belong to chunk "20100101", section "fc0", and split "1".
-
-- ``-fs``: Filter by job statuses. Provide a space-separated list of job statuses to check for completion files. For example, ``-fs "WAITING RUNNING"`` will check for completion files of jobs that are in WAITING or RUNNING status.
-
-- ``-ft``: Filter by job types (and optionally by splits). Provide a comma-separated list of job types to check for completion files. For example, ``-ft "LOCALJOB, PSJOB"`` will check for completion files of jobs that are of type LOCALJOB or PSJOB. We can also specify splits for each job type in the format of "JOBTYPE[split1, split2]". For example, ``-ft "LOCALJOB[1,2], PSJOB[3]"`` will check for completion files of LOCALJOB jobs that belong to splits 1 and 2, and PSJOB jobs that belong to split 3.
-
-.. warning:: Keep in mind that that filter --all is applied before the other job filters. If --all is selected, the job filters will be applied to all jobs. If --all is not selected, the job filters will be applied only to active jobs (i.e. jobs in SUBMITTED, QUEUING or RUNNING status).
-
-- ``-np`` or ``--noplot``: Do not generate plots during recovery. This is the default behavior.
-
-- ``-plt`` or ``--plot``: Generate plots during recovery.
-
+   Keep in mind that the filter ``--all`` is applied before the other job filters.
+   If ``--all`` is selected, the job filters will be applied to all jobs.
+   If ``--all`` is not selected, the job filters will be applied only to active jobs
+   (i.e. jobs in SUBMITTED, QUEUING or RUNNING status).
 
 Examples:
 ----------------------------
