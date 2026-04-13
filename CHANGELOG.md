@@ -14,6 +14,7 @@
 - Updated Slurm wallclock truncation, allowing users to use e.g., 01:00:00 correctly #2059
 - Fixed exception trace in AutosubmitCritical and AutosubmitError not being displayed to the user #2109
 - Fix `Jobs.running` to case-insensitive #2916
+- Fixed the wallclock validation error message to display the platform's wallclock time instead of the job time twice #2492
 
 **Enhancements:**
 

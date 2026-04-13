@@ -1228,7 +1228,8 @@ class AutosubmitConfig(object):
             platform_wallclock = wallclock_per_platform.get(job_data.get("PLATFORM", ""), default_wallclock)
             total_seconds = _calculate_wallclock(job_data.get("WALLCLOCK", "00:01"))
             if total_seconds > platform_wallclock:
-                err_msg += f"Job {job_name} has a wallclock {total_seconds}s time greater than the platform's {total_seconds}s wallclock time\n"
+                err_msg += (f"Job {job_name} has a wallclock value of {total_seconds}s, which is greater than "
+                            f"the platform's {platform_wallclock}s wallclock time\n")
         return err_msg
 
     def validate_jobs_conf(self) -> str:
