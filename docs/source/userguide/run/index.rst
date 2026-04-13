@@ -63,8 +63,8 @@ Once you've already loaded / installed the Autosubmit version do you want:
 
 .. code-block:: bash
 
-    autosubmit create <EXPID> -np
-    autosubmit recovery <EXPID> -s --all -f -np
+    autosubmit create <EXPID>
+    autosubmit recovery <EXPID> -s --all -f
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID> -v
@@ -89,8 +89,8 @@ Once you've already loaded / installed the Autosubmit version do you want:
 .. code-block:: bash
 
     autosubmit upgrade <EXPID>
-    autosubmit create <EXPID> -np
-    autosubmit recovery <EXPID> -s --all -f -np
+    autosubmit create <EXPID>
+    autosubmit recovery <EXPID> -s --all -f
     # Add your key to ssh agent ( if encrypted )
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID> -v
@@ -390,7 +390,7 @@ Example 2: Crossdate wrappers using the the new dependencies
     :command: create
     :expid: a000
     :type: png
-    :args: -cw
+    :args: -cw -plt
     :figure: monarch_da.png
     :name: monarch_da
     :width: 100%

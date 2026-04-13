@@ -378,7 +378,7 @@ So add the following the instruction below to one or more ``Bash`` files created
 How to run the experiment
 ------------------------------------
 
-``autosubmit create -np -f -v <EXPID>``
+``autosubmit create -f -v <EXPID>``
 
 Once the experiment is generated, we can execute it and check the experiment by running the command below
 

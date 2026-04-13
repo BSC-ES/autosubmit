@@ -28,6 +28,7 @@
 - Allow multiple filters in `setstatus` command #1250
 - Allow filtering by section and split in the `ft` command #2910
 - Improved profiler adding tracing and stopping capabilities  #2933
+- Commands `setstatus, create and recovery` do not display tre plot by default #1347
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

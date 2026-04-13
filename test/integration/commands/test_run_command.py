@@ -35,7 +35,7 @@ def set_up_test(
         autosubmit_exp: 'AutosubmitExperimentFixture',
         mocker
 ) -> tuple['AutosubmitExperiment', argparse.Namespace, list[str]]:
-    test_files_path = Path(__file__).resolve().parents[1]
+    test_files_path = Path(__file__).resolve().parents[2]
     fake_jobs: dict = YAML().load(test_files_path / "files/fake-jobs.yml")
     fake_platforms: dict = YAML().load(test_files_path / "files/fake-platforms.yml")
     exp = autosubmit_exp(
@@ -132,6 +132,153 @@ def test_run_command(
     if 'create' in command or 'pklfix' in command:
         assert exp.autosubmit.run_command(args=args) == 0
     else:
+        assert exp.autosubmit.run_command(args=args)
+    
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        [
+            "autosubmit",
+            "setstatus",
+            "{expid}",
+            "-t",
+            "READY",
+            "-fs",
+            "WAITING",
+            "--hide",
+        ],
+        [
+            "autosubmit",
+            "setstatus",
+            "{expid}",
+            "-t",
+            "READY",
+            "-fs",
+            "WAITING",
+            "--hide",
+            "-plt",
+        ],
+        [
+            "autosubmit",
+            "setstatus",
+            "{expid}",
+            "-t",
+            "READY",
+            "-fs",
+            "WAITING",
+            "--hide",
+            "-np",
+        ],
+        [
+            "autosubmit",
+            "setstatus",
+            "{expid}",
+            "-t",
+            "READY",
+            "-fs",
+            "WAITING",
+            "--hide",
+            "-np",
+            "-plt",
+        ],
+        [
+            "autosubmit",
+            "create",
+            "{expid}",
+            "--hide",
+        ],
+        [
+            "autosubmit",
+            "create",
+            "{expid}",
+            "--hide",
+            "-plt",
+        ],
+        [
+            "autosubmit",
+            "create",
+            "{expid}",
+            "--hide",
+            "-np",
+        ],
+        [
+            "autosubmit",
+            "create",
+            "{expid}",
+            "--hide",
+            "-np",
+            "-plt",
+        ],
+        [
+            "autosubmit",
+            "recovery",
+            "{expid}",
+            "--hide",
+            "--offline", # prevent connection to platform
+        ],
+        [
+            "autosubmit",
+            "recovery",
+            "{expid}",
+            "--hide",
+            "--offline", # prevent connection to platform
+            "-plt",
+        ],
+        [
+            "autosubmit",
+            "recovery",
+            "{expid}",
+            "--hide",
+            "--offline", # prevent connection to platform
+            "-np",
+        ],
+        [
+            "autosubmit",
+            "recovery",
+            "{expid}",
+            "--hide",
+            "--offline", # prevent connection to platform
+            "-np",
+            "-plt",
+        ],
+    ],
+    ids=[
+        "setstatus",
+        "setstatus with plot",
+        "setstatus with no plot",
+        "setstatus with no plot and plot",
+        "create",
+        "create with plot",
+        "create with no plot",
+        "create with no plot and plot",
+        "recovery",
+        "recovery with plot",
+        "recovery with no plot",
+        "recovery with no plot and plot",
+    ],
+)
+def test_run_command_plot_behavior(
+    command: list[str],
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    mocker: "MockerFixture",
+    get_next_expid: Callable[[], str],
+):
+    """Test the plot behavior of the setstatus, create and recovery commands."""
+    exp, args, command = set_up_test(get_next_expid(), command, autosubmit_exp, mocker)
+    has_both_plot_flags = "-np" in command and "-plt" in command
+
+    if has_both_plot_flags:
+        assert args is None
+        return
+    
+    assert args is not None
+
+    if "create" in command:
+        assert exp.autosubmit.run_command(args=args) == 0
+    elif "setstatus" in command:
+        assert exp.autosubmit.run_command(args=args)
+    elif "recovery" in command:
         assert exp.autosubmit.run_command(args=args)
 
 
