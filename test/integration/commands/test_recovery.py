@@ -407,6 +407,47 @@ def test_recovery_noplot_calls_generate_output(as_exp, mocker, noplot):
         mock_generate_output.assert_called_once()
 
 
+def test_recovery_plotting_error_logs_warning(as_exp, mocker):
+    """Test that plotting errors are handled and logged as warning during recovery."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    mocker.patch(
+        "autosubmit.autosubmit.Autosubmit.online_recovery",
+        return_value=[],
+    )
+    mocker.patch(
+        "autosubmit.monitor.monitor.Monitor.generate_output",
+        side_effect=Exception("plotting error"),
+    )
+    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
+
+    as_exp.autosubmit.recovery(
+        as_exp.expid,
+        noplot=False,
+        save=True,
+        all_jobs=True,
+        hide=True,
+        group_by="date",
+        expand=[],
+        expand_status=[],
+        detail=False,
+        force=False,
+        offline=True,
+    )
+
+    warning_messages = [
+        call.args[0] for call in mocked_warning.call_args_list if call.args
+    ]
+    assert any(
+        "An error has occurred while plotting the jobs list after recovery."
+        in message
+        for message in warning_messages
+    )
+
+
 def test_recovery_combined_filters(as_exp, mocker):
     """Test that the recovery when multiple filters are used, selected jobs must match the intersection of the filters."""
     # Just test that the combination of filters works, not to check the recovery itself
@@ -429,6 +470,7 @@ def test_recovery_combined_filters(as_exp, mocker):
     mocker.patch(
         "autosubmit.autosubmit.Autosubmit.online_recovery", return_value=all_job_names
     )
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
 
     job_list = do_recovery(
         as_exp, fl=filter_list, fc="[20200101 [fc0 [1] ] ]", ft="LOCALJOB", fs="WAITING"
@@ -440,6 +482,12 @@ def test_recovery_combined_filters(as_exp, mocker):
 
     assert len(completed_jobs) == 1
     assert completed_jobs[0] == target_job
+    assert mocked_log.info.called
+    assert any(
+        'Filtering jobs...' in call.args[0]
+        for call in mocked_log.info.call_args_list
+        if call.args
+    )
 
 
 def test_recovery_filter_list(as_exp, mocker):
