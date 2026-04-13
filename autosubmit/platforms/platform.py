@@ -242,6 +242,10 @@ class Platform:
     def remove_workers(cls, event_worker: Event) -> None:
         """Remove the given even worker from the list of workers in this class. """
         if event_worker in cls.worker_events:
+            try:
+                event_worker.set()
+            except Exception as err:
+                Log.warning(f"Calling the worker raised an issue: {err.message}")
             cls.worker_events.remove(event_worker)
 
     @property
@@ -838,16 +842,24 @@ class Platform:
         """
         if self.cleanup_event:
             self.cleanup_event.set()  # Indicates to old child ( if reachable ) to finish.
-        if self.log_recovery_process and self.log_recovery_process.is_alive():
-            # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
+
+        if self.log_recovery_process:
+            self.log_recovery_process.terminate()
             self.log_recovery_process.join(timeout=60)
+
         # Resets everything related to the log recovery process.
+        if self.recovery_queue is not None:
+            self.recovery_queue.close()
+            self.recovery_queue.join_thread()
+
         self.recovery_queue = self.ctx.Queue()
         self.log_retrieval_process_active = False
-        self.remove_workers(self.work_event)
+        if self.work_event:
+            self.remove_workers(self.work_event)
         self.work_event = self.ctx.Event()
         self.cleanup_event = self.ctx.Event()
-        self.log_recovery_process = self.ctx.Process()
+        self.log_recovery_process = None
+        self.log_retrieval_process_active = False
         self.processed_wrapper_logs = set()
 
     def load_process_info(self, platform):
