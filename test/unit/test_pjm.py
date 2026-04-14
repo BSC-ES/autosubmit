@@ -21,7 +21,6 @@ from pathlib import Path
 
 import pytest
 
-from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
