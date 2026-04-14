@@ -362,7 +362,7 @@ def create_rocrate_archive(
 
     _init_mimetypes()
 
-    crate = ROCrate(gen_preview=True)
+    crate = ROCrate(version="1.1", gen_preview=True)
     crate.name = expid
     # Fetch the experiment description from the main database
     crate.description = get_experiment_description(expid)[0][0]
