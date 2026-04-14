@@ -10,11 +10,11 @@ We use the ``recovery`` command when an experiment was interrupted in an ungrace
 
 The ``recovery`` command checks which jobs are already finished and updates their status to ``COMPLETED``.
 
-- By default, it checks for the completion files for active jobs (i.e. jobs in ``SUBMITTED``, ``QUEUING`` or ``RUNNING`` status).
+- By default, it checks for the completion files for active jobs (i.e. jobs in ``SUBMITTED``, ``QUEUING``, ``RUNNING`` or ``READY`` status).
 
 - With the ``--all`` flag, it checks for the completion files for all jobs, regardless of their status.
 
-- If a platform is unreachable, we can use the ``--offline`` flag to force the recovery without checking for completion files in remote. In this case, Autosubmit will only check for the completion files in the local file system. This option is useful when some platforms are not reachable (e.g. due to network failure) but we want to recover the experiment based on the completion files that are available locally.
+- If a platform is unreachable, we can use the ``--offline`` flag to force the recovery without checking completion files remotely. In this case, Autosubmit reads ``job_data_<EXPID>.db``, gets the last ``run_id``, and checks only the jobs that were run in that run.
 
 .. warning:: Without the -s flag, Autosubmit will only perform a dry-run (i.e. it will not take effect) of the command.  
 
@@ -71,7 +71,7 @@ Important options for recovery
    * - ``-f``, ``--force``
      - Cancel active remote jobs before resetting their state. Use when jobs are still running remotely but we want to reset their state in Autosubmit.
    * - ``--offline``
-     - Complete recovery without remote platform checks, using local history instead.
+     - Complete recovery without remote platform checks.
    * - ``--all``
      - Check completion files for all jobs, not only active jobs.
    * - ``-fl``
@@ -114,7 +114,7 @@ Examples:
     # Apply recovery changes over all jobs, canceling remote jobs first
     autosubmit recovery <EXPID> --all -f -s
 
-    # Apply recovery when some platforms are not reachable, using local history instead
+    # Apply recovery when some platforms are not reachable
     autosubmit recovery <EXPID> --offline -f --all -s
 
     # Resume the experiment after recovery
