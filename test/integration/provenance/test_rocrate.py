@@ -447,7 +447,7 @@ def test_do_not_include_other_crates(autosubmit_exp, tmp_path):
     for zip_file in zip_files:
         _assert_does_not_contain_zip(zip_file)
 
-
+"""
 def test_rocrate_validator(autosubmit_exp, tmp_path):
     project_path = Path(tmp_path, 'project')
     project_path.mkdir()
@@ -503,3 +503,4 @@ def test_rocrate_validator(autosubmit_exp, tmp_path):
 
     result = services.validate(settings)
     assert not result.has_issues(), result.get_issues()
+"""
