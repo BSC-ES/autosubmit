@@ -18,6 +18,8 @@
 from collections import namedtuple
 
 import os
+import re
+from autosubmit.history.utils import get_current_datetime
 import pytest
 import time
 import traceback
@@ -38,6 +40,13 @@ BasicConfig.read()
 JOBDATA_DIR = BasicConfig.JOBDATA_DIR
 LOCAL_ROOT_DIR = BasicConfig.LOCAL_ROOT_DIR
 job = namedtuple("Job", ["name", "date", "member", "status_str", "children"])
+
+
+def test_get_current_datetime():
+    current_datetime = get_current_datetime()
+    assert isinstance(current_datetime, str)
+    pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$"
+    assert re.match(pattern, current_datetime) is not None
 
 
 @pytest.mark.skip()
