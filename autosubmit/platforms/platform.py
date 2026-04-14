@@ -843,7 +843,7 @@ class Platform:
         if self.cleanup_event:
             self.cleanup_event.set()  # Indicates to old child ( if reachable ) to finish.
 
-        if self.log_recovery_process:
+        if self.log_recovery_process and self.log_recovery_process.is_alive():
             self.log_recovery_process.terminate()
             self.log_recovery_process.join(timeout=60)
 
