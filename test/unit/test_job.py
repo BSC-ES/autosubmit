@@ -752,12 +752,28 @@ CONFIG:
         assert 1 == len(self.job.children)
         assert child == list(self.job.children)[0]
 
-    def test_auto_calendar_split(self):
+
+    @pytest.mark.parametrize(
+        "chunk_size_unit, split_size_unit, expected_splits",
+        [
+            ("day", "hour", 24),
+            ("day", "month", 1 / 30),
+            ("day", "year", 1 / 365),
+            ("month", "hour", pytest.raises(AutosubmitCritical)),
+            ("month", "month", pytest.raises(AutosubmitCritical)),
+            ("month", "year", pytest.raises(AutosubmitCritical)),
+            ("year", "hour", pytest.raises(AutosubmitCritical)),
+            ("year", "month", pytest.raises(AutosubmitCritical)),
+            ("year", "year", pytest.raises(AutosubmitCritical)),
+        ]
+    )
+    def test_auto_calendar_split(self, chunk_size_unit, split_size_unit, expected_splits):
+        """Test the calendar_chunk_section function for different chunk size units and split units."""
         self.experiment_data = {
             'EXPERIMENT': {
                 'DATELIST': '20000101',
                 'MEMBERS': 'fc0',
-                'CHUNKSIZEUNIT': 'day',
+                'CHUNKSIZEUNIT': chunk_size_unit,
                 'CHUNKSIZE': '1',
                 'NUMCHUNKS': '2',
                 'CALENDAR': 'standard'
@@ -768,14 +784,16 @@ CONFIG:
                     'PLATFORM': 'test',
                     'RUNNING': 'chunk',
                     'SPLITS': 'auto',
-                    'SPLITSIZE': 1
+                    'SPLITSIZE': 1,
+                    'SPLITSIZEUNIT': split_size_unit
                 },
                 'B': {
                     'FILE': 'b',
                     'PLATFORM': 'test',
                     'RUNNING': 'chunk',
                     'SPLITS': 'auto',
-                    'SPLITSIZE': 2
+                    'SPLITSIZE': 2,
+                    'SPLITSIZEUNIT': split_size_unit
                 }
             }
         }
