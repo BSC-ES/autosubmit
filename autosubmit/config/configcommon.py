@@ -1075,10 +1075,10 @@ class AutosubmitConfig(object):
         param = parameters
         upper_validate, lower_validate = False, False
 
-        if "^^" == key[match.start():match.end()][-3:-1]:
+        if key_parts.endswith("^^%"):
             key_parts = key_parts.replace("^^", "")
             upper_validate = True
-        if ",," == key[match.start():match.end()][-3:-1]:
+        if key_parts.endswith(",,%"):
             key_parts = key_parts.replace(",,", "")
             lower_validate = True
 
@@ -1087,7 +1087,6 @@ class AutosubmitConfig(object):
 
         for k in key_parts:
             k = k.strip("^")
-            k = k.strip(",")
             param = param.get(k.upper(), {})
             if isinstance(param, int):
                 param = str(param)
