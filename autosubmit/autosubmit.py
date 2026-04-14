@@ -80,7 +80,8 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
-from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values
+from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values, apply_job_filters
+
 
 if TYPE_CHECKING:
     from rocrate.rocrate import ROCrate
@@ -3136,40 +3137,18 @@ class Autosubmit:
 
             # Starts the filtering process
             Log.info("Filtering jobs...")
-            jobs_scope = job_list.get_job_list()
 
-            if filter_section:
-                ft_entries = [
-                    section for section in separate_section_entries(filter_section)
-                ]
-                if not (len(ft_entries) == 1 and ft_entries[0].upper() == "ANY"):
-                    section_filtered_jobs = Autosubmit._filter_sections_splits(
-                        ft_entries, jobs_scope
-                    )
-                    selected_job_names &= {
-                        job.name for job in jobs_scope if job in section_filtered_jobs
-                    }
-
-            if filter_chunks:
-                chunk_filtered_jobs = Autosubmit._filter_jobs_by_chunks_splits(
-                    job_list, filter_chunks
-                )
-                selected_job_names &= {job.name for job in chunk_filtered_jobs}
-
-            if filter_status:
-                status_list = filter_status.split()
-                if not (len(status_list) == 1 and status_list[0].upper() == "ANY"):
-                    allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
-                    selected_job_names &= {
-                        job.name for job in jobs_scope if job.status in allowed_statuses
-                    }
-
-            if filter_list:
-                jobs = filter_list.split()
-                if not (len(jobs) == 1 and jobs[0].upper() == "ANY"):
-                    selected_job_names &= {
-                        job.name for job in jobs_scope if job.name in jobs
-                    }
+            selected_job_names = apply_job_filters(
+                job_list=job_list,
+                base_job_names=selected_job_names,
+                filter_section=filter_section,
+                filter_chunk=filter_chunks,
+                filter_status=filter_status,
+                filter_list=filter_list,
+                filter_sections_splits_fn=Autosubmit._filter_sections_splits,
+                filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
+                status_from_str_fn=Autosubmit._get_status,
+            )
 
         jobs_to_recover = [
             job for job in jobs_to_recover if job.name in selected_job_names
@@ -5344,36 +5323,26 @@ class Autosubmit:
                 Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunk_section_split, filter_status,
                                                         filter_section)
                 #### Starts the filtering process ####
-                Log.info("Filtering jobs...")
-                jobs_scope = job_list.get_job_list()
-                selected_job_names = {job.name for job in jobs_scope}
-                
+                jobs_to_set_status = job_list.get_job_list()
+                selected_job_names = {job.name for job in jobs_to_set_status}
                 final_status = Autosubmit._get_status(final)
-                if filter_section:
-                    ft_entries = [section for section in separate_section_entries(filter_section)]
-                    if not (len(ft_entries) == 1 and ft_entries[0] == 'ANY'):
-                        section_filtered_jobs = Autosubmit._filter_sections_splits(ft_entries, jobs_scope)
-                        selected_job_names &= {job.name for job in jobs_scope if job in section_filtered_jobs}
-
-                if filter_chunks or filter_type_chunk or filter_type_chunk_split:
-                    start = time.time()
-                    selected_job_names &= {job.name for job in Autosubmit._filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)}
-                    Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
-
-                if filter_status:
-                    status_list = filter_status.split()
-                    Log.debug(f"Filtering jobs with status {filter_status}")
-                    if not (len(status_list) == 1 and status_list[0].upper() == 'ANY'):
-                        allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
-                        selected_job_names &= {job.name for job in jobs_scope if job.status in allowed_statuses}
-
-                if filter_list:
-                    jobs = filter_list.split()
-                    if not (len(jobs) == 1 and jobs[0].upper() == 'ANY'):
-                        selected_job_names &= {job.name for job in jobs_scope if job.name in jobs}
-
+                
+                Log.info("Filtering jobs...")
+                
+                selected_job_names = apply_job_filters(
+                    job_list=job_list,
+                    base_job_names=selected_job_names,
+                    filter_section=filter_section,
+                    filter_chunk=filter_chunk_section_split,
+                    filter_status=filter_status,
+                    filter_list=filter_list,
+                    filter_sections_splits_fn=Autosubmit._filter_sections_splits,
+                    filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
+                    status_from_str_fn=Autosubmit._get_status,
+                )
+                
                 # preserve job list ordering
-                final_list = [job for job in jobs_scope if job.name in selected_job_names]
+                final_list = [job for job in jobs_to_set_status if job.name in selected_job_names]
                 # Time to change status
                 performed_changes = {}
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")
