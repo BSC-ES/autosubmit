@@ -17,10 +17,11 @@
 
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Union
 
-DATETIME_FORMAT = '%Y-%m-%d-%H:%M:%S'
+LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
+DATETIME_FORMAT = '%Y-%m-%d-%H:%M:%S%z'
 
 
 def get_fields_as_comma_str(model):
@@ -43,13 +44,13 @@ def calculate_run_time_in_seconds(start_time: float, finish_time: float) -> int:
 
 
 def get_current_datetime() -> str:
-    """Returns the current time in format '%Y-%m-%d-%H:%M:%S'."""
-    return datetime.today().strftime(DATETIME_FORMAT)
+    """Returns the current time in format '%Y-%m-%d-%H:%M:%S%z'."""
+    return datetime.now(LOCAL_TZ).strftime(DATETIME_FORMAT)
 
 
 def get_current_datetime_if_none(argument: Any) -> Union[str, None]:
     # type : (Any) -> Union[Any, str]
-    """ Returns the current time in format '%Y-%m-%d-%H:%M:%S' if the supplied argument is None, else return argument. """
+    """ Returns the current time in format '%Y-%m-%d-%H:%M:%S%z' if the supplied argument is None, else return argument. """
     if argument is None:
         return get_current_datetime()
     else:
