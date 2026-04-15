@@ -8,16 +8,21 @@ How to recover an experiment
 
 We use the ``recovery`` command when an experiment was interrupted in an ungraceful way and Autosubmit job states are no longer consistent with the actual state of the jobs on the platform.
 
-In practice, this command is used as a last resort when resuming an experiment with ``run`` is not working as expected. Typical cases include:
+In practice, this command is used as a last resort when resuming an experiment is not working as expected. Example of such case:
 
-- configuration files were modified,
-- Autosubmit was upgraded,
-- the ``job_list`` pickle files were corrupted, or
-- ``autosubmit run <EXPID>`` fails for any other reason.
+::
+
+    autosubmit run <EXPID>
+    autosubmit stop <EXPID>
+    # we modify the configuration files of the experiment
+    # or upgrade the experiment to a new version of Autosubmit
+    # or the job_list pickle file is corrupted
+
+And after this modifications executing again ``autosubmit run <EXPID>`` does not work as expected.
 
 The ``recovery`` command checks which jobs have already finished and updates their status to ``COMPLETED``. It also tries to recover missing logs and missing ``job_data`` information when possible.
 
-- By default, it checks for the completion files for active jobs (i.e. jobs in ``SUBMITTED``, ``QUEUING``, ``RUNNING`` or ``READY`` status).
+- By default, it checks for the completion files for active jobs (i.e. jobs in ``SUBMITTED``, ``RUNNING``, ``QUEUING``, ``UNKNOWN``, ``HELD``, ``READY`` or ``DELAYED`` status).
 
 - With the ``--all`` flag, it checks for the completion files for all jobs, regardless of their status.
 
@@ -99,7 +104,7 @@ Important options for recovery
    Keep in mind that the filter ``--all`` is applied before the other job filters.
    If ``--all`` is selected, the job filters will be applied to all jobs.
    If ``--all`` is not selected, the job filters will be applied only to active jobs
-   (i.e. jobs in SUBMITTED, QUEUING or RUNNING status).
+   (i.e. jobs in SUBMITTED, QUEUING, RUNNING, UNKNOWN, HELD, READY or DELAYED status).
 
 Examples:
 ----------------------------
