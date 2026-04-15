@@ -168,11 +168,9 @@ Dependencies between running levels
 As seen on the previous examples, jobs can run at different levels (for example: ``member`` or ``chunk`` levels),
 and dependencies behave differently depending on this.
 
-- If a job depends on a **higher-level job** (e.g. a ``chunk`` job depends on a ``member`` job): the low-level job will wait for **ONLY ITS DEPENDENCIES** high-level jobs to be finished. That is the case on the ``ini sim-1`` dependency of Figure `dependency_previous`.
-Job ``a000_19900101_Member1_SIM`` (chunk level) must wait for job ``a000_19900101_Member1_INI`` (member level) to be finished before being launched.
+* If a job depends on a **higher-level job** (e.g. a ``chunk`` job depends on a ``member`` job): the low-level job will wait for **ONLY ITS DEPENDENCIES** high-level jobs to be finished. That is the case on the ``ini sim-1`` dependency of Figure `dependency_previous`. Job ``a000_19900101_Member1_SIM`` (chunk level) must wait for job ``a000_19900101_Member1_INI`` (member level) to be finished before being launched.
 
-- If a job depends on a **lower-level job** (e.g. a ``member`` job depends on a ``chunk`` job): the high-level job will wait for **ALL** the low-level jobs to be finished. In Figure `dependencies` you can see that ``a000_19900101_Member1_COMBINE`` job (member level) 
-must wait for both ``a000_19900101_Member1_1_POSTPROCESS`` and ``a000_19900101_Member1_2_POSTPROCESS`` jobs (chunk level) to be finished before being launched.
+* If a job depends on a **lower-level job** (e.g. a ``member`` job depends on a ``chunk`` job): the high-level job will wait for **ALL** the low-level jobs to be finished. In Figure `dependencies` you can see that ``a000_19900101_Member1_COMBINE`` job (member level)  must wait for both ``a000_19900101_Member1_1_POSTPROCESS`` and ``a000_19900101_Member1_2_POSTPROCESS`` jobs (chunk level) to be finished before being launched.
 
 In short:
 
@@ -245,23 +243,23 @@ The ``DEPENDENCIES`` key is used to define the dependencies of a job. It can be 
     * ``MEMBERS_TO``: Links current selected tasks to the dependency tasks of the members specified.
     * ``CHUNKS_TO``: Links current selected tasks to the dependency tasks of the chunks specified.
 
-  * Important keywords for [DATES|MEMBERS|CHUNKS]_TO:
+  * Important keywords for ``[DATES|MEMBERS|CHUNKS]_TO``:
 
-    * "natural": Will keep the default linkage. Will link if it would be normally. Example, SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1.
-    * "all": Will link all selected tasks of the dependency with current selected tasks. Example, SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1, DA_FC00_CHUNK_2, DA_FC00_CHUNK_3...
+    * "natural": Will keep the default linkage. Will link if it would be normally. Example, ``SIM_FC00_CHUNK_1`` -> ``DA_FC00_CHUNK_1``.
+    * "all": Will link all selected tasks of the dependency with current selected tasks. Example, ``SIM_FC00_CHUNK_1`` -> ``DA_FC00_CHUNK_1``, ``DA_FC00_CHUNK_2``, ``DA_FC00_CHUNK_3``...
     * "none": Will unlink selected tasks of the dependency with current selected tasks.
 
-For the new format, consider that the priority is hierarchy and goes like this DATES_FROM -(includes)-> MEMBERS_FROM -(includes)-> CHUNKS_FROM.
+For the new format, consider that the priority is hierarchy and goes like this ``DATES_FROM`` -(includes)-> ``MEMBERS_FROM`` -(includes)-> ``CHUNKS_FROM``.
 
-* You can define a DATES_FROM inside the DEPENDENCY.
-* You can define a MEMBERS_FROM inside the DEPENDENCY and DEPENDENCY.DATES_FROM.
-* You can define a CHUNKS_FROM inside the DEPENDENCY, DEPENDENCY.DATES_FROM, DEPENDENCY.MEMBERS_FROM, DEPENDENCY.DATES_FROM.MEMBERS_FROM
+* You can define a ``DATES_FROM`` inside the ``DEPENDENCY``.
+* You can define a ``MEMBERS_FROM`` inside the ``DEPENDENCY`` and ``DEPENDENCY.DATES_FROM``.
+* You can define a ``CHUNKS_FROM`` inside the ``DEPENDENCY``, ``DEPENDENCY.DATES_FROM``, ``DEPENDENCY.MEMBERS_FROM``, ``DEPENDENCY.DATES_FROM.MEMBERS_FROM``
 
 Start conditions
 ~~~~~~~~~~~~~~~~
 
 Sometimes you want to run a job only when a certain condition is met. For example, you may want to run a job only when a certain task is running.
-This can be achieved using the START_CONDITIONS feature based on the dependencies rework.
+This can be achieved using the ``START_CONDITIONS`` feature based on the dependencies rework.
 
 Start conditions are achieved by adding the keyword ``STATUS`` and optionally ``FROM_STEP`` keywords into any dependency that you want.
 
@@ -543,14 +541,38 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be see
 Job split
 ~~~~~~~~~
 
-For jobs running at any level, it may be useful to split each task into different parts.
+For jobs running at any level (once/date/member/chunk), it may be useful to split each task into different parts.
 This behaviour can be achieved using the ``SPLITS`` attribute to specify the number of parts.
 
-It is also possible to specify the splits for each task using the ``SPLITS_FROM`` and ``SPLITS_TO`` attributes.
+**Basic behaviour**
+* ``SPLITS: N``: With ``N >= 2``, creates N split jobs per task.
+* ``SPLITS: auto``: only valid with ``RUNNING: chunk``. With ``SPLITS: auto``, the number of splits is computed per chunk automatically using the calendar settings.
 
-There is also an special character '*' that can be used to specify that the split is 1-to-1 dependency. In order to use this character, you have to specify both SPLITS_FROM and SPLITS_TO attributes.
+**How split dependencies are evaluated**
+* ``SPLITS_FROM``: Selects which child splits this rule applies to. If a split is not selected by any rule, it will be connected to all parent splits.
+* ``SPLITS_TO``: Selects which parent splits will be connected.
+* Keywords accepted in ``SPLITS_TO``:
+
+    * ``all``: connect to all parent splits.
+    * ``none``: connect to no parent splits.
+    * ``previous``: connect split i to parent split i - 1 if exists, otherwise do not connect.
+
+You can use star mapping in ``SPLITS_TO``:
+* ``K*``: means 1-to-1 mapping for split K. This means that split K of the child will be connected to split K of the parent, if it exists.
+* ``[A:B]*\G``: means grouped mapping with group size G. Usefull for N-to-1 or 1-to-N split relationships.
+In order to use this character, you have to specify both ``SPLITS_FROM`` and ``SPLITS_TO`` attributes.
+
+Example 1: explicit split mapping
 
 .. code-block:: yaml
+
+    EXPERIMENT:
+      DATELIST: 19600101
+      MEMBERS: "00"
+      CHUNKSIZEUNIT: day
+      CHUNKSIZE: '1'
+      NUMCHUNKS: '2'
+      CALENDAR: standard
 
     JOBS:
       INI:
@@ -580,11 +602,10 @@ There is also an special character '*' that can be used to specify that the spli
 
 In this example:
 
-Post job will be split into 2 parts.
-Each part will depend on the 1st part of the asim job.
-The 2nd part of the post job will depend on the 2nd part of the asim job.
-The 3rd part of the post job will depend on the 3rd part of the asim job.
-
+``POST`` job will be split into 3 parts.
+``POST`` job split 1 will depend on all the splits of the ``ASIM`` job due to not being present in ``SPLITS_FROM``.
+``POST`` job split 2 will depend on the splits 1 and 2 of the ``ASIM`` job due to the 2* mapping.
+``POST`` job split 3 will depend on the splits 2 and 3 of the ``ASIM`` job due to the 3* mapping.
 
 .. autosubmitfigure::
     :command: create
@@ -597,7 +618,7 @@ The 3rd part of the post job will depend on the 3rd part of the asim job.
     :align: center
     :caption: Example showing dependencies between jobs running at different frequencies.
 
-Example 1: 1-to-1 dependency
+Example 2: 1-to-1 dependency
 
 .. code-block:: yaml
 
@@ -639,7 +660,7 @@ Example 1: 1-to-1 dependency
     :align: center
     :caption: Example showing dependencies between jobs running at different frequencies.
 
-Example 2: N-to-1 dependency
+Example 3: N-to-1 dependency
 
 .. code-block:: yaml
 
