@@ -503,4 +503,3 @@ def test_rocrate_validator(autosubmit_exp, tmp_path):
 
     result = services.validate(settings)
     assert not result.has_issues(), result.get_issues()
-
