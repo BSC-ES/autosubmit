@@ -901,6 +901,9 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
             try:
                 yield conn, tmp
+            except Exception:
+                conn.rollback()
+                raise
             finally:
                 conn.execute(text("DROP TABLE IF EXISTS _tmp_job_names"))
                 conn.commit()
