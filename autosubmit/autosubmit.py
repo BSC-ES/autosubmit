@@ -3126,7 +3126,7 @@ class Autosubmit:
         # filters will be applied to all_jobs or only active_jobs, depending on the all_jobs flag
         if filter_section or filter_chunks or filter_status or filter_list:
             # Validate filters. Raises AutosubmitCritical if any filter is invalid, with a message specifying the issue.
-            Autosubmit._validate_set_status_filters(
+            Autosubmit._validate_job_filters(
                 as_conf,
                 job_list,
                 filter_list,
@@ -4937,12 +4937,15 @@ class Autosubmit:
             raise AutosubmitCritical("Error in the supplied input for -fc // -ftc // -ftcs.", 7011, validation_message)
 
     @staticmethod
-    def _validate_set_status_filters(as_conf: AutosubmitConfig, job_list: JobList,
-                                     filter_list: Optional[str],
-                                     filter_chunk_section_split: Optional[str],
-                                     filter_status: Optional[str],
-                                     filter_section: Optional[str]) -> None:
-        """Validate filters provided to the setstatus command.
+    def _validate_job_filters(
+        as_conf: AutosubmitConfig,
+        job_list: JobList,
+        filter_list: Optional[str],
+        filter_chunk_section_split: Optional[str],
+        filter_status: Optional[str],
+        filter_section: Optional[str],
+    ) -> None:
+        """Validate filters provided to the setstatus and recovery command.
 
         Each non-empty filter is validated by its corresponding helper. Raises
         AutosubmitCritical (code 7014) if all filters are empty or whitespace-only.
@@ -4978,11 +4981,16 @@ class Autosubmit:
 
         if filter_chunk_section_split:
             valid_sections = {str(section).upper() for section in as_conf.jobs_data}
-            Autosubmit._validate_chunk_section_split(filter_chunk_section_split, valid_sections=valid_sections)
+            Autosubmit._validate_chunk_section_split(
+                filter_chunk_section_split, valid_sections=valid_sections
+            )
             all_empty = False
 
         if all_empty:
-            raise AutosubmitCritical("At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.", 7014)
+            raise AutosubmitCritical(
+                "At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.",
+                7014,
+            )
 
     @staticmethod
     def _split_match(j: Job, split_list: list[str]) -> bool:
@@ -5320,7 +5328,7 @@ class Autosubmit:
                         pass
                 ##### End of the ""function""
                 # This will raise an autosubmit critical if any of the filters has issues in the format specified by the user
-                Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunk_section_split, filter_status,
+                Autosubmit._validate_job_filters(as_conf, job_list, filter_list, filter_chunk_section_split, filter_status,
                                                         filter_section)
                 #### Starts the filtering process ####
                 jobs_to_set_status = job_list.get_job_list()
