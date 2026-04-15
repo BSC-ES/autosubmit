@@ -157,7 +157,7 @@ def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event,
     if recovery_queue_full:
         for i in range(max_items):
             local.recovery_queue.put(Job('t000', f'000{i}', Status.COMPLETED, 0))
-    process_log = local.wait_until_timeout(2)
+    process_log = local.wait_mandatory_time(2)
     assert process_log == result
 
 

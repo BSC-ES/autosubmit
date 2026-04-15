@@ -2368,6 +2368,7 @@ class Autosubmit:
                     Log.info("Connecting to the platforms, to recover missing logs")
                     submitter = ParamikoSubmitter(as_conf=as_conf)
                     if submitter.platforms is None:
+                        Log.error("Failed to retrieve platforms configuration from ParamikoSubmitter.")
                         raise AutosubmitCritical("No platforms configured!!!", 7014)
                     platforms_to_test = [value for value in submitter.platforms.values()]
                     Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf, expid=expid)
@@ -2375,14 +2376,18 @@ class Autosubmit:
                 for p in platforms_to_test:
                     if p.log_recovery_process and p.log_recovery_process.is_alive():
                         p.cleanup_event.set()  # Send cleanup event
-                        p.log_recovery_process.join()
+                        p.log_recovery_process.join(timeout=60)
+                        if p.log_recovery_process.is_alive():
+                            Log.warning(f"Process for platform {p.name} failed to terminate within the timeout.")
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                 job_list.save()
-                if len(job_list.get_completed_failed_without_logs()) == 0:
+                failed_jobs = job_list.get_completed_failed_without_logs()
+                if len(failed_jobs) == 0:
                     Log.result("Autosubmit recovered all job logs.")
                 else:
                     Log.warning(
-                        f"Autosubmit couldn't recover the following job logs: {[job.name for job in job_list.get_completed_failed_without_logs()]}")
+                        f"Autosubmit couldn't recover the following job logs: {[job.name for job in failed_jobs]}")
+                    Log.warning(f"Failed jobs details: {', '.join([str(job) for job in failed_jobs])}")
                 try:
                     exp_history = ExperimentHistory(expid)
                     exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
