@@ -30,6 +30,7 @@
 - Fixes 1-N grouped split dependencies #2958
 - Fixed inconsistent log paths in status txt output #3040
 - Follow-up fix for #3007: recover job times that were lost when an experiment was interrupted.
+- Fixed `num_max_spits` unit conversion to months when `split_unit` is "month" #2944
 
 **Enhancements:**
 
