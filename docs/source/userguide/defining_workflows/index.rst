@@ -126,20 +126,20 @@ example will show how to make a simulation job wait for the previous chunk of th
       CHUNKINI: ''
       CALENDAR: standard
 
-   JOBS:
-    INI:
-      FILE: ini.sh
-      RUNNING: member
+    JOBS:
+      INI:
+        FILE: ini.sh
+        RUNNING: member
 
-    SIM:
-      FILE: sim.sh
-      DEPENDENCIES: ini sim-1
-      RUNNING: chunk
+      SIM:
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
 
-    POSTPROCESS:
-      FILE: postprocess.sh
-      DEPENDENCIES: sim
-      RUNNING: chunk
+      POSTPROCESS:
+        FILE: postprocess.sh
+        DEPENDENCIES: sim
+        RUNNING: chunk
 
 
 The resulting workflow can be seen in Figure `dprevious`
