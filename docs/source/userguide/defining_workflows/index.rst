@@ -14,11 +14,11 @@ Simple workflow
 ---------------
 
 The simplest workflow that can be defined is a sequence of two jobs, with the second one triggering at the end of
-the first. To define it, we define the two jobs and then add a DEPENDENCIES attribute to the second job referring to the
+the first. To define it, we define the two jobs and then add a ``DEPENDENCIES`` attribute to the second job referring to the
 first one.
 
-It is important to remember when defining workflows that DEPENDENCIES on autosubmit always refer to jobs that should
-be finished before launching the job that has the DEPENDENCIES attribute.
+It is important to remember when defining workflows that ``DEPENDENCIES`` on autosubmit always refer to jobs that should
+be finished before launching the job that has the ``DEPENDENCIES`` attribute.
 
 .. code-block:: yaml
 
@@ -53,8 +53,8 @@ Running jobs once per startdate, member or chunk
 Autosubmit is capable of running ensembles made of various startdates and members. It also has the capability to
 divide member execution on different chunks.
 
-To set at what level a job has to run you have to use the RUNNING attribute. It has four possible values: once, date,
-member and chunk corresponding to running once, once per startdate, once per member or once per chunk respectively.
+To set at what level a job has to run you have to use the ``RUNNING`` attribute. It has four possible values: ``once``, ``date``,
+``member`` and ``chunk`` corresponding to running once, once per startdate, once per member or once per chunk respectively.
 
 
 .. code-block:: yaml
@@ -88,7 +88,7 @@ member and chunk corresponding to running once, once per startdate, once per mem
           RUNNING: chunk
 
 
-The resulting workflow can be seen in Figure  for a experiment with 2 startdates, 2 members and 2 chunks.
+The resulting workflow can be seen in Figure  for a experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
 
 .. autosubmitfigure::
     :command: create
@@ -113,7 +113,7 @@ Dependencies with previous jobs
 
 Autosubmit can manage dependencies between jobs that are part of different chunks, members or startdates. The next
 example will show how to make a simulation job wait for the previous chunk of the simulation. To do that, we add
-sim-1 on the DEPENDENCIES attribute. As you can see, you can add as much dependencies as you like separated by spaces
+``sim-1`` on the ``DEPENDENCIES`` attribute. As you can see, you can add as much dependencies as you like separated by spaces
 
 .. code-block:: yaml
 
