@@ -17,6 +17,7 @@
 
 import os
 import textwrap
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Generator, Optional, Protocol, cast
@@ -889,14 +890,15 @@ class SqlAlchemyExperimentHistoryDbManager:
         # Local import avoids shadowing any `table` / `column` parameter.
         from sqlalchemy import column as _col, table as _tbl
 
-        tmp = _tbl("_tmp_job_names", _col("job_name"))
+        table_name = f"_tmp_job_names_{time.time_ns()}"
+        tmp = _tbl(table_name, _col("job_name"))
         with self.engine.connect() as conn:
             conn.execute(text(
-                "CREATE TEMPORARY TABLE IF NOT EXISTS _tmp_job_names (job_name TEXT)"
+                f"CREATE TEMPORARY TABLE IF NOT EXISTS {table_name} (job_name TEXT)"
             ))
-            conn.execute(text("DELETE FROM _tmp_job_names"))
+            conn.execute(text(f"DELETE FROM {table_name}"))
             conn.execute(
-                text("INSERT INTO _tmp_job_names (job_name) VALUES (:name)"),
+                text(f"INSERT INTO {table_name} (job_name) VALUES (:name)"),
                 [{"name": n} for n in job_names],
             )
             try:
@@ -905,7 +907,7 @@ class SqlAlchemyExperimentHistoryDbManager:
                 conn.rollback()
                 raise
             finally:
-                conn.execute(text("DROP TABLE IF EXISTS _tmp_job_names"))
+                conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
                 conn.commit()
 
     def select_jobs_data(self, table, job_names: list[str]) -> list[tuple[str, Any]]:
