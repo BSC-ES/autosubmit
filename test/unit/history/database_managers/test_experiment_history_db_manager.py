@@ -56,9 +56,8 @@ def test_select_jobs_data_regression_sqlite_variable_limit(tmp_path, monkeypatch
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
 
     with sqlite3.connect(":memory:") as raw:
-        # Python 3.11+ exposes getlimit(); older builds default to 999 or 32766.
-        sqlite_limit = raw.getlimit(9) if hasattr(raw, 'getlimit') else 32766
-
+        # Python 3.11+ exposes getlimit() default seems to be 250000; older builds default to unknown number (32766 fails in the CI/CD)
+        sqlite_limit = raw.getlimit(9) if hasattr(raw, 'getlimit') else 250000
     n_jobs = sqlite_limit + 1
 
     db_manager = SqlAlchemyExperimentHistoryDbManager(
