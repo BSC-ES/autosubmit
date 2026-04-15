@@ -168,19 +168,17 @@ Dependencies between running levels
 As seen on the previous examples, jobs can run at different levels (for example: ``member`` or ``chunk`` levels),
 and dependencies behave differently depending on this.
 
-- If a job depends on a **higher-level job** (e.g. a ``chunk`` job depends on a ``member`` job):
-the low-level job will wait for **ONLY ITS DEPENDENCIES** high-level jobs to be finished. That is the case on the ``ini sim`` dependency of the previous example.
+- If a job depends on a **higher-level job** (e.g. a ``chunk`` job depends on a ``member`` job): the low-level job will wait for **ONLY ITS DEPENDENCIES** high-level jobs to be finished. That is the case on the ``ini sim-1`` dependency of Figure `dependency_previous`.
 Job ``a000_19900101_Member1_SIM`` (chunk level) must wait for job ``a000_19900101_Member1_INI`` (member level) to be finished before being launched.
 
-- If a job depends on a **lower-level job** (e.g. a ``member`` job depends on a ``chunk`` job): 
-the high-level job will wait for **ALL** the low-level jobs to be finished. In Figure `dependencies` you can see that job ``a000_19900101_Member1_POSTPROCESS`` (chunk level) must wait for all the jobs of the sim job (chunk level) to be finished before being launched.
- 
-On the previous examples we have seen that when a job depends on a higher level job (a running chunk job depending
-on a member running job) all jobs wait for the higher running level job to be finished. That is the case on the ini sim dependency
-on the next example.
+- If a job depends on a **lower-level job** (e.g. a ``member`` job depends on a ``chunk`` job): the high-level job will wait for **ALL** the low-level jobs to be finished. In Figure `dependencies` you can see that ``a000_19900101_Member1_COMBINE`` job (member level) 
+must wait for both ``a000_19900101_Member1_1_POSTPROCESS`` and ``a000_19900101_Member1_2_POSTPROCESS`` jobs (chunk level) to be finished before being launched.
 
-In the other case, a job depending on a lower running level job, the higher level job will wait for ALL the lower level
-jobs to be finished. That is the case of the postprocess combine dependency on the next example.
+In short:
+
+- A lower to higher dependency will be 1-to-1: wait for one job
+
+- A higher to lower dependency will be 1-to-all: wait for all jobs
 
 .. code-block:: yaml
 
@@ -230,22 +228,22 @@ The resulting workflow can be seen in Figure `dependencies`
 Dependencies rework
 ~~~~~~~~~~~~~~~~~~~
 
-The DEPENDENCIES key is used to define the dependencies of a job. It can be used in the following ways:
+The ``DEPENDENCIES`` key is used to define the dependencies of a job. It can be used in the following ways:
 
 * Basic: The dependencies are a list of jobs, separated by " ", that runs before the current task is submitted.
-* New: The dependencies is a list of YAML sections, separated by "\n", that runs before the current job is submitted.
+* New: The dependencies is a list of YAML sections, separated by "\\n", that runs before the current job is submitted.
 
   * For each dependency section, you can designate the following keywords to control the current job-affected tasks:
 
-    * DATES_FROM: Selects the job dates that you want to alter.
-    * MEMBERS_FROM: Selects the job members that you want to alter.
-    * CHUNKS_FROM: Selects the job chunks that you want to alter.
+    * ``DATES_FROM``: Selects the job dates that you want to alter.
+    * ``MEMBERS_FROM``: Selects the job members that you want to alter.
+    * ``CHUNKS_FROM``: Selects the job chunks that you want to alter.
 
-  * For each dependency section and \*_FROM keyword, you can designate the following keywords to control the destination of the dependency:
+  * For each dependency section and ``\*_FROM`` keyword, you can designate the following keywords to control the destination of the dependency:
 
-    * DATES_TO: Links current selected tasks to the dependency tasks of the dates specified.
-    * MEMBERS_TO: Links current selected tasks to the dependency tasks of the members specified.
-    * CHUNKS_TO: Links current selected tasks to the dependency tasks of the chunks specified.
+    * ``DATES_TO``: Links current selected tasks to the dependency tasks of the dates specified.
+    * ``MEMBERS_TO``: Links current selected tasks to the dependency tasks of the members specified.
+    * ``CHUNKS_TO``: Links current selected tasks to the dependency tasks of the chunks specified.
 
   * Important keywords for [DATES|MEMBERS|CHUNKS]_TO:
 
