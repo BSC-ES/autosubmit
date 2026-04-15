@@ -1112,7 +1112,7 @@ class JobList(object):
                         if not skip:
                             # get max value in distances_of_current_section.values
                             if job.running == "chunk":
-                                if parent.chunk <= (len(chunk_list) - max_distance):
+                                if parent.chunk <= (chunk_list[-1] - max_distance):
                                     skip = False
                         if not skip:
                             problematic_dependencies.add(parent.name)
@@ -1123,7 +1123,7 @@ class JobList(object):
                         problematic_dependencies.add(parent.name)
                         graph.add_edge(parent.name, job.name)
                     if parent.running == "chunk":
-                        if parent.chunk > (len(chunk_list) - max_distance):
+                        if parent.chunk > (chunk_list[-1] - max_distance):
                             graph.add_edge(parent.name, job.name)
         JobList.handle_frequency_interval_dependencies(chunk, chunk_list, date, date_list, dic_jobs, job,
                                                        member,
@@ -1514,7 +1514,7 @@ class JobList(object):
         skip = False
         if dependency.sign == '-':
             if chunk is not None and len(str(chunk)) > 0 and dependency.running == 'chunk':
-                chunk_index = chunk - 1
+                chunk_index = chunk_list.index(chunk)
                 if chunk_index >= dependency.distance:
                     chunk = chunk_list[chunk_index - dependency.distance]
                 else:

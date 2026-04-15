@@ -16,6 +16,7 @@
 - Fixed exception trace in AutosubmitCritical and AutosubmitError not being displayed to the user #2109
 - Fix `Jobs.running` to case-insensitive #2916
 - Fixed the wallclock validation error message to display the platform's wallclock time instead of the job time twice #2492
+- Fixes chunkini setting not working correctly #2712
 - Fixed recovery and setstatus for experiments with more than > 32k jobs #2894
 - Removed invalid message about the template script showing the error with a difference of ~5 lines #2962
 - Fix queuing time for the first vertical job

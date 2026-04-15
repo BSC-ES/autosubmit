@@ -435,6 +435,38 @@ def test_run_debug(
         assert exc_info.value.code == 7014
 
 
+def test_run_with_chunk_ini_greater_than_one(
+        autosubmit_exp,
+        general_data,
+        prepare_scratch,
+):
+    yaml = YAML(typ='rt')
+    jobs_data = dedent("""\
+        EXPERIMENT:
+            DATELIST: "200001[01-03]"
+            MEMBERS: "fc[00-02]"
+            NUMCHUNKS: '3'
+            CHUNKINI: '2'
+        JOBS:
+            job:
+                SCRIPT: |
+                    echo "Hello World with id=Success"
+                DEPENDENCIES:
+                    SIM-1:
+                SPLITS: 3
+                PLATFORM: LOCAL
+                RUNNING: chunk
+                wallclock: 00:01
+    """)
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
+    as_exp.as_conf.set_last_as_command('run')
+
+    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+
+    assert exit_code == 0
+
+
 @pytest.mark.parametrize(
     "jobs_data, expected_db_entries, final_status, get_call_option",
     [
