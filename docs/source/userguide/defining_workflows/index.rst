@@ -165,7 +165,17 @@ The resulting workflow can be seen in Figure `dprevious`
 Dependencies between running levels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-On the previous examples we have seen that when a job depends on a job on a higher level (a running chunk job depending
+As seen on the previous examples, jobs can run at different levels (for example: ``member`` or ``chunk`` levels),
+and dependencies behave differently depending on this.
+
+- If a job depends on a **higher-level job** (e.g. a ``chunk`` job depends on a ``member`` job):
+the low-level job will wait for **ONLY ITS DEPENDENCIES** high-level jobs to be finished. That is the case on the ``ini sim`` dependency of the previous example.
+Job ``a000_19900101_Member1_SIM`` (chunk level) must wait for job ``a000_19900101_Member1_INI`` (member level) to be finished before being launched.
+
+- If a job depends on a **lower-level job** (e.g. a ``member`` job depends on a ``chunk`` job): 
+the high-level job will wait for **ALL** the low-level jobs to be finished. In Figure `dependencies` you can see that job ``a000_19900101_Member1_POSTPROCESS`` (chunk level) must wait for all the jobs of the sim job (chunk level) to be finished before being launched.
+ 
+On the previous examples we have seen that when a job depends on a higher level job (a running chunk job depending
 on a member running job) all jobs wait for the higher running level job to be finished. That is the case on the ini sim dependency
 on the next example.
 
@@ -173,6 +183,15 @@ In the other case, a job depending on a lower running level job, the higher leve
 jobs to be finished. That is the case of the postprocess combine dependency on the next example.
 
 .. code-block:: yaml
+
+    EXPERIMENT:
+      DATELIST: 19900101 20000101
+      MEMBERS: Member1 Member2
+      CHUNKSIZEUNIT: month
+      CHUNKSIZE: 4
+      NUMCHUNKS: 2
+      CHUNKINI: ''
+      CALENDAR: standard
 
     JOBS:
       INI:
