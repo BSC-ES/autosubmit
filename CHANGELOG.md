@@ -18,6 +18,7 @@
 - Fixed recovery and setstatus for experiments with more than > 32k jobs #2894
 - Removed invalid message about the template script showing the error with a difference of ~5 lines #2962
 - Fix queuing time for the first vertical job
+- Fixed `num_max_spits` unit conversion to months when `split_unit` is "month" #2944
 
 **Enhancements:**
 
