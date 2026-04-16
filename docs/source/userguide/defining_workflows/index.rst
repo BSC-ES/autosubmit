@@ -36,12 +36,12 @@ be finished before launching the job that has the ``DEPENDENCIES`` attribute.
     :args: -plt
     :expid: a000
     :type: png
-    :figure: alternative_name.png
-    :name: alternative_name
+    :figure: simple.png
+    :name: simple
     :width: 100%
     :align: center
-    :alt: Example showing dependencies between jobs running at different frequencies.
-    :caption: Example showing dependencies between jobs running at different frequencies.
+    :alt: simple workflow plot
+    :caption: Example showing a simple workflow with two sequential jobs
 
 
 The resulting workflow can be seen in Figure
@@ -487,11 +487,12 @@ The resulting workflow can be seen in Figure `nosync`
     :args: -plt
     :expid: a000
     :type: png
-    :figure: no_synchronize.png
-    :name: no_synchronize
+    :figure: alternative_name.png
+    :name: alternative_name
     :width: 100%
     :align: center
-    :caption: Example showing dependencies between chunk jobs running without synchronize.
+    :alt: Example showing dependencies between jobs running at different frequencies.
+    :caption: Example showing dependencies between jobs running at different frequencies.
 
 .. code-block:: yaml
 
@@ -603,6 +604,7 @@ Example 1: explicit split mapping
               2,3: # [2:3] is also valid
                 SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
         SPLITS: 3
+
 
 In this example:
 
