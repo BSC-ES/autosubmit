@@ -9,18 +9,6 @@ be able to exploit autosubmit's full potential.
    This section is NOT intended to show how to define your jobs. Please go to :doc:`/qstartguide/index` section for a comprehensive
    list of job options.
 
-.. autosubmitfigure::
-    :command: create
-    :args: -plt
-    :expid: a000
-    :type: png
-    :figure: alternative_name.png
-    :name: alternative_name
-    :width: 100%
-    :align: center
-    :alt: Example showing dependencies between jobs running at different frequencies.
-    :caption: Example showing dependencies between jobs running at different frequencies.
-
 
 Simple workflow
 ---------------
@@ -48,12 +36,12 @@ be finished before launching the job that has the ``DEPENDENCIES`` attribute.
     :args: -plt
     :expid: a000
     :type: png
-    :figure: simple.png
-    :name: simple
+    :figure: alternative_name.png
+    :name: alternative_name
     :width: 100%
     :align: center
-    :alt: simple workflow plot
-    :caption: Example showing a simple workflow with two sequential jobs
+    :alt: Example showing dependencies between jobs running at different frequencies.
+    :caption: Example showing dependencies between jobs running at different frequencies.
 
 
 The resulting workflow can be seen in Figure
