@@ -505,7 +505,6 @@ The resulting workflow can be seen in Figure `nosync`
 
 The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be seen in Figure `msynchronize`
 
-
 .. autosubmitfigure::
     :command: create
     :args: -plt
