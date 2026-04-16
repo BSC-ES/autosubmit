@@ -482,6 +482,7 @@ of synchronization do you want. See the below examples with and without this par
 
 The resulting workflow can be seen in Figure `nosync`
 
+
 .. autosubmitfigure::
     :command: create
     :args: -plt
