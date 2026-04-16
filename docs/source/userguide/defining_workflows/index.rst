@@ -9,6 +9,18 @@ be able to exploit autosubmit's full potential.
    This section is NOT intended to show how to define your jobs. Please go to :doc:`/qstartguide/index` section for a comprehensive
    list of job options.
 
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: alternative_name.png
+    :name: alternative_name
+    :width: 100%
+    :align: center
+    :alt: Example showing dependencies between jobs running at different frequencies.
+    :caption: Example showing dependencies between jobs running at different frequencies.
+
 
 Simple workflow
 ---------------
@@ -603,18 +615,6 @@ Example 1: explicit split mapping
               2,3: # [2:3] is also valid
                 SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
         SPLITS: 3
-
-.. autosubmitfigure::
-    :command: create
-    :args: -plt
-    :expid: a000
-    :type: png
-    :figure: alternative_name.png
-    :name: alternative_name
-    :width: 100%
-    :align: center
-    :alt: Example showing dependencies between jobs running at different frequencies.
-    :caption: Example showing dependencies between jobs running at different frequencies.
 
 In this example:
 
