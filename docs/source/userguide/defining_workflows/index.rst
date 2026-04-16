@@ -612,10 +612,11 @@ In this example:
     :args: -plt
     :expid: a000
     :type: png
-    :figure: splits.png
-    :name: splits
+    :figure: splits_simple.png
+    :name: splits_simple
     :width: 100%
     :align: center
+    :alt: Example showing dependencies between jobs running at different frequencies.
     :caption: Example showing dependencies between jobs running at different frequencies.
 
 Example 2: 1-to-1 dependency
