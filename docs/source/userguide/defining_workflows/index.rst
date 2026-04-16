@@ -545,12 +545,16 @@ For jobs running at any level (once/date/member/chunk), it may be useful to spli
 This behaviour can be achieved using the ``SPLITS`` attribute to specify the number of parts.
 
 **Basic behaviour**
+
 * ``SPLITS: N``: With ``N >= 2``, creates N split jobs per task.
+
 * ``SPLITS: auto``: only valid with ``RUNNING: chunk``. With ``SPLITS: auto``, the number of splits is computed per chunk automatically using the calendar settings.
 
 **How split dependencies are evaluated**
+
 * ``SPLITS_FROM``: Selects which child splits this rule applies to. If a split is not selected by any rule, it will be connected to all parent splits.
 * ``SPLITS_TO``: Selects which parent splits will be connected.
+
 * Keywords accepted in ``SPLITS_TO``:
 
     * ``all``: connect to all parent splits.
@@ -558,9 +562,9 @@ This behaviour can be achieved using the ``SPLITS`` attribute to specify the num
     * ``previous``: connect split i to parent split i - 1 if exists, otherwise do not connect.
 
 You can use star mapping in ``SPLITS_TO``:
+
 * ``K*``: means 1-to-1 mapping for split K. This means that split K of the child will be connected to split K of the parent, if it exists.
-* ``[A:B]*\G``: means grouped mapping with group size G. Usefull for N-to-1 or 1-to-N split relationships.
-In order to use this character, you have to specify both ``SPLITS_FROM`` and ``SPLITS_TO`` attributes.
+* ``[A:B]*\G``: means grouped mapping with group size G. Usefull for N-to-1 or 1-to-N split relationships. In order to use this character, you have to specify both ``SPLITS_FROM`` and ``SPLITS_TO`` attributes.
 
 Example 1: explicit split mapping
 
@@ -600,13 +604,6 @@ Example 1: explicit split mapping
                 SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
         SPLITS: 3
 
-In this example:
-
-``POST`` job will be split into 3 parts.
-``POST`` job split 1 will depend on all the splits of the ``ASIM`` job due to not being present in ``SPLITS_FROM``.
-``POST`` job split 2 will depend on the splits 1 and 2 of the ``ASIM`` job due to the 2* mapping.
-``POST`` job split 3 will depend on the splits 2 and 3 of the ``ASIM`` job due to the 3* mapping.
-
 .. autosubmitfigure::
     :command: create
     :args: -plt
@@ -618,6 +615,13 @@ In this example:
     :align: center
     :alt: Example showing dependencies between jobs running at different frequencies.
     :caption: Example showing dependencies between jobs running at different frequencies.
+
+In this example:
+
+* ``POST`` job will be split into 3 parts.  
+* ``POST`` job split 1 will depend on all the splits of the ``ASIM`` job due to not being present in ``SPLITS_FROM``.  
+* ``POST`` job split 2 will depend on the splits 1 and 2 of the ``ASIM`` job due to the 2* mapping.  
+* ``POST`` job split 3 will depend on the splits 2 and 3 of the ``ASIM`` job due to the 3* mapping.  
 
 Example 2: 1-to-1 dependency
 
@@ -659,6 +663,7 @@ Example 2: 1-to-1 dependency
     :name: splits_1_to_1
     :width: 100%
     :align: center
+    :alt: Example showing dependencies between jobs running at different frequencies.
     :caption: Example showing dependencies between jobs running at different frequencies.
 
 Example 3: N-to-1 dependency

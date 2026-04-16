@@ -20,6 +20,6 @@ JOBS:
     DEPENDENCIES:
       ASIM:
         SPLITS_FROM:
-          2,3: # [2:3] is also valid
-            SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
+          2,3:
+            SPLITS_TO: 1,2*,3*
     SPLITS: 3
