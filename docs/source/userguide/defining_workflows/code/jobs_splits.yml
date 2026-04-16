@@ -1,24 +1,24 @@
 JOBS:
-  INI:
+  FIRST:
     SCRIPT: 'sleep 0'
     RUNNING: once
     
-  SIM:
+  SECOND:
     SCRIPT: 'sleep 0'
-    DEPENDENCIES: INI SIM-1
+    DEPENDENCIES: FIRST SECOND-1
     RUNNING: once
 
-  ASIM:
+  THIRD:
     SCRIPT: 'sleep 0'
-    DEPENDENCIES: SIM
+    DEPENDENCIES: SECOND THIRD-1
     RUNNING: once
     SPLITS: 3
 
-  POST:
+  FOURTH:
     SCRIPT: 'sleep 0'
     RUNNING: once
     DEPENDENCIES:
-      ASIM:
+      THIRD:
         SPLITS_FROM:
           2,3:
             SPLITS_TO: 1,2*,3*

@@ -579,26 +579,26 @@ Example 1: explicit split mapping
       CALENDAR: standard
 
     JOBS:
-      INI:
+      FIRST:
         FILE: INI.sh
         RUNNING: once
 
-      SIM:
+      SECOND:
         FILE: SIM.sh
-        DEPENDENCIES: INI SIM-1
+        DEPENDENCIES: FIRST SECOND-1
         RUNNING: once
 
-      ASIM:
+      THIRD:
         FILE: ASIM.sh
-        DEPENDENCIES: SIM
+        DEPENDENCIES: SECOND THIRD-1
         RUNNING: once
         SPLITS: 3
 
-      POST:
+      FOURTH:
         FILE: POST.sh
         RUNNING: once
         DEPENDENCIES:
-          ASIM:
+          THIRD:
             SPLITS_FROM:
               2,3: # [2:3] is also valid
                 SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
@@ -610,8 +610,8 @@ Example 1: explicit split mapping
     :args: -plt
     :expid: a000
     :type: png
-    :figure: alternative_name.png
-    :name: alternative_name
+    :figure: splits.png
+    :name: splits
     :width: 100%
     :align: center
     :alt: Example showing dependencies between jobs running at different frequencies.
@@ -619,10 +619,10 @@ Example 1: explicit split mapping
 
 In this example:
 
-* ``POST`` job will be split into 3 parts.  
-* ``POST`` job split 1 will depend on all the splits of the ``ASIM`` job due to not being present in ``SPLITS_FROM``.  
-* ``POST`` job split 2 will depend on the splits 1 and 2 of the ``ASIM`` job due to the 2* mapping.  
-* ``POST`` job split 3 will depend on the splits 2 and 3 of the ``ASIM`` job due to the 3* mapping.  
+* ``FOURTH`` job will be split into 3 parts.  
+* ``FOURTH`` job split 1 will depend on all the splits of the ``THIRD`` job due to not being present in ``SPLITS_FROM``.  
+* ``FOURTH`` job split 2 will depend on the splits 1 and 2 of the ``THIRD`` job due to the 2* mapping.  
+* ``FOURTH`` job split 3 will depend on the splits 2 and 3 of the ``THIRD`` job due to the 3* mapping.  
 
 Example 2: 1-to-1 dependency
 
