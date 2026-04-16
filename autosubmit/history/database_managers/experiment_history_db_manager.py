@@ -17,10 +17,12 @@
 
 import os
 import textwrap
+import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Optional, Protocol, cast
+from typing import Any, Generator, Optional, Protocol, cast
 
-from sqlalchemy import and_, func, inspect, desc, insert, select, update
+from sqlalchemy import and_, func, inspect, desc, insert, select, text, update
 from sqlalchemy.schema import CreateTable, CreateSchema
 
 import autosubmit.history.utils as HUtils
@@ -331,10 +333,10 @@ class ExperimentHistoryDbManager(DatabaseManager):
                 failed, queuing, running, 
                 submitted, suspended, metadata) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
         arguments = (
-        HUtils.get_current_datetime(), HUtils.get_current_datetime(), experiment_run.start, experiment_run.finish,
-        experiment_run.chunk_unit, experiment_run.chunk_size, experiment_run.completed, experiment_run.total,
-        experiment_run.failed, experiment_run.queuing, experiment_run.running,
-        experiment_run.submitted, experiment_run.suspended, experiment_run.metadata)
+            HUtils.get_current_datetime(), HUtils.get_current_datetime(), experiment_run.start, experiment_run.finish,
+            experiment_run.chunk_unit, experiment_run.chunk_size, experiment_run.completed, experiment_run.total,
+            experiment_run.failed, experiment_run.queuing, experiment_run.running,
+            experiment_run.submitted, experiment_run.suspended, experiment_run.metadata)
         return self.insert_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
 
     def update_many_job_data_change_status(self, changes):
@@ -364,7 +366,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
             job_data_dc.job_id, job_data_dc.status, job_data_dc.energy, job_data_dc.extra_data,
             job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus, job_data_dc.out, job_data_dc.err,
             job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc.workflow_commit, job_data_dc._id
-            )
+        )
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
     def _update_experiment_run(self, experiment_run_dc):
@@ -871,15 +873,56 @@ class SqlAlchemyExperimentHistoryDbManager:
                 jobs_data_by_name[job['job_name']] = job
         return jobs_data_by_name
 
-    def select_jobs_data(self, table, job_names) -> list[tuple[str, Any]]:
-        query = select(table).where(
-            and_(
-                table.c.last == 1,
-                table.c.job_name.in_(job_names)
-            )
-        )
+    @contextmanager
+    def _job_names_tmp_table(
+            self, job_names: list[str]
+    ) -> Generator[tuple[Any, Any], None, None]:
+        """Context manager that populates a temporary table with job names.
+
+        Yields ``(conn, tmp)`` where ``conn`` is the active SQLAlchemy connection
+        and ``tmp`` is a table expression for ``_tmp_job_names``.  The table is
+        created, cleared, populated, and dropped automatically, so callers only
+        need to write the query itself.
+
+        :param job_names: Job names to load into the temporary table.
+        :yields: ``(conn, tmp)`` — the connection and the temp table expression.
+        """
+        # Local import avoids shadowing any `table` / `column` parameter.
+        from sqlalchemy import column as _col, table as _tbl
+
+        table_name = f"_tmp_job_names_{time.time_ns()}"
+        tmp = _tbl(table_name, _col("job_name"))
         with self.engine.connect() as conn:
-            rows = conn.execute(query).fetchall()
+            conn.execute(text(
+                f"CREATE TEMPORARY TABLE IF NOT EXISTS {table_name} (job_name TEXT)"
+            ))
+            conn.execute(text(f"DELETE FROM {table_name}"))
+            conn.execute(
+                text(f"INSERT INTO {table_name} (job_name) VALUES (:name)"),
+                [{"name": n} for n in job_names],
+            )
+            try:
+                yield conn, tmp
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
+                conn.commit()
+
+    def select_jobs_data(self, table, job_names: list[str]) -> list[tuple[str, Any]]:
+        """Return last=1 job_data rows for the requested job names.
+
+        :param table: The SQLAlchemy ``job_data`` Table object to query.
+        :param job_names: Job names to look up.
+        :return: List of ``(column_name, value)`` tuples, one per matching row.
+        """
+        with self._job_names_tmp_table(job_names) as (conn, tmp):
+            rows = conn.execute(
+                select(table)
+                .join(tmp, table.c.job_name == tmp.c.job_name)
+                .where(table.c.last == 1)
+            ).fetchall()
         columns = table.c.keys()
         return [tuple(zip(columns, row)) for row in rows]
 
