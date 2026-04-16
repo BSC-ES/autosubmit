@@ -482,18 +482,16 @@ of synchronization do you want. See the below examples with and without this par
 
 The resulting workflow can be seen in Figure `nosync`
 
-
 .. autosubmitfigure::
     :command: create
     :args: -plt
     :expid: a000
     :type: png
-    :figure: alternative_name.png
-    :name: alternative_name
+    :figure: no_synchronize.png
+    :name: no_synchronize
     :width: 100%
     :align: center
-    :alt: Example showing dependencies between jobs running at different frequencies.
-    :caption: Example showing dependencies between jobs running at different frequencies.
+    :caption: Example showing dependencies between chunk jobs running without synchronize.
 
 .. code-block:: yaml
 
@@ -504,6 +502,7 @@ The resulting workflow can be seen in Figure `nosync`
         SYNCHRONIZE: member
 
 The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be seen in Figure `msynchronize`
+
 
 .. autosubmitfigure::
     :command: create
@@ -605,6 +604,18 @@ Example 1: explicit split mapping
                 SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
         SPLITS: 3
 
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: alternative_name.png
+    :name: alternative_name
+    :width: 100%
+    :align: center
+    :alt: Example showing dependencies between jobs running at different frequencies.
+    :caption: Example showing dependencies between jobs running at different frequencies.
 
 In this example:
 
