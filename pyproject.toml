@@ -55,7 +55,7 @@ dependencies = [
     "psutil<=7.2.2",
     "py3dotplus==1.1.0",
     "numpy<3",
-    "rocrate==0.14",
+    "rocrate==0.15.0",
     "configparser",
     "setproctitle",
     "invoke>=2.0",
