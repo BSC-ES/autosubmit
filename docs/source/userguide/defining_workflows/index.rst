@@ -609,8 +609,8 @@ Example 1: explicit split mapping
     :args: -plt
     :expid: a000
     :type: png
-    :figure: splits_simple.png
-    :name: splits_simple
+    :figure: alternative_name.png
+    :name: alternative_name
     :width: 100%
     :align: center
     :alt: Example showing dependencies between jobs running at different frequencies.
