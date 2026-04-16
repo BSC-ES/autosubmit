@@ -2116,7 +2116,7 @@ class Autosubmit:
 
     @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
-                       run_only_members: Optional[str] = None, profile: int = 0, trace: bool = False) -> int:
+                       run_only_members: Optional[str] = None, profile: int = None, trace: bool = False) -> int:
         """Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
 
         :param expid: the experiment id
@@ -2290,7 +2290,7 @@ class Autosubmit:
                         Log.result("Storing failed job count...done")
                         while not recovery and (
                                 recovery_retrials < max_recovery_retrials or max_recovery_retrials <= 0):
-                            delay = min(15 * consecutive_retrials, 120)
+                            delay = min(2 * consecutive_retrials, 120)
                             recovery_retrials += 1
                             sleep(delay)
                             consecutive_retrials = consecutive_retrials + 1

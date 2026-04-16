@@ -158,6 +158,11 @@ class LocalPlatform(ParamikoPlatform):
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
         :type log_recovery_process: bool
         """
+        # Stop any previously active log retrieval process so it can be properly joined
+        # and a fresh process is started after the connection is re-established.
+        if not log_recovery_process and self.log_retrieval_process_active:
+            Log.debug(f"Cleaning up existing log recovery process for platform '{self.name}' before reconnecting.")
+            self.clean_log_recovery_process()
         self.connected = True
 
     def check_all_jobs(self, job_list, as_conf, retries=5):

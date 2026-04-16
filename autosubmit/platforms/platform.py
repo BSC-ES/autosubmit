@@ -844,6 +844,13 @@ class Platform:
         if self.log_recovery_process is not None:
             # Waits for old child ( if reachable ) to finish. Timeout in case of it being blocked.
             self.log_recovery_process.join(timeout=60)
+            # If the process is still alive after the timeout, terminate it forcefully to avoid zombie/unjoinable processes.
+            if self.log_recovery_process.is_alive():
+                Log.warning(
+                    f"Log recovery process '{self.log_recovery_process.name}' did not finish in time, terminating it."
+                )
+                self.log_recovery_process.terminate()
+                self.log_recovery_process.join(timeout=10)
         # Resets everything related to the log recovery process.
         self.recovery_queue = self.ctx.Queue()
         self.log_retrieval_process_active = False

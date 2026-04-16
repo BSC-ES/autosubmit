@@ -261,6 +261,12 @@ class ParamikoPlatform(Platform):
         :raises AutosubmitError: If the connection was not established even with multiple connection retries.
         """
         Log.info('Restoring SSH connection...')
+        # If there was a previously active log retrieval process (spawned on the last connection),
+        # stop it gracefully before reconnecting so that it can be properly joined later and a
+        # fresh process is started after the new connection is established.
+        if not log_recovery_process and self.log_retrieval_process_active:
+            Log.debug(f"Cleaning up existing log recovery process for platform '{self.name}' before reconnecting.")
+            self.clean_log_recovery_process()
         with suppress(Exception):
             self.reset()
         # TODO: Configure this https://github.com/BSC-ES/autosubmit/issues/986

@@ -31,7 +31,7 @@ from contextlib import suppress
 from psutil import Process
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 import socket as _socket
 
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
@@ -154,13 +154,25 @@ class Profiler:
         self._jobs_iteration.append(loaded_jobs)
         self._edges_iteration.append(loaded_edges)
 
-        self._mem_iteration[-1] -= sys.getsizeof(self._mem_iteration) + sys.getsizeof(self._obj_iteration) + sys.getsizeof(self._fd_iteration) + sys.getsizeof(
+        self._mem_iteration[-1] -= sys.getsizeof(self._mem_iteration) + sys.getsizeof(
+            self._obj_iteration) + sys.getsizeof(self._fd_iteration) + sys.getsizeof(
             self._jobs_iteration) + sys.getsizeof(self._edges_iteration) + sys.getsizeof(self._fd_names_iteration)
-        if self.max_checkpoints != 0:
+        return self._stop_run_loop(mode="raise_error")
+
+    def _stop_run_loop(self, mode: str = "exit") -> bool:
+        """Check if the maximum number of checkpoints has been reached and handle it according to the specified mode.
+        :param mode: The mode to handle reaching the maximum number of checkpoints. Can be "raise_error" or "exit".
+        :return: True if the maximum number of checkpoints has been reached and the mode is "exit", False otherwise.
+        :rtype: bool
+        """
+        if self.max_checkpoints > 0:
             self.checkpoints += 1
             if self.checkpoints > self.max_checkpoints:
-                # send signal so Autosubmit.exit is 1
-                return True
+                if mode == "raise_error":
+                    self.max_checkpoints *= 2
+                    raise AutosubmitError("Maximum number of checkpoints reached. Stopping the loop for restart", 6014)
+                else:
+                    return True
         return False
 
     def stop(self) -> None:
@@ -237,7 +249,6 @@ class Profiler:
                     if names not in fd_names:
                         report += f"{current_iter} Closed file descriptor: {names}\n"
 
-
             if i < len(self._trace_stats_by_iter):
                 report += self._format_top_allocations(self._trace_stats_by_iter[i])
         return report
@@ -257,13 +268,15 @@ class Profiler:
             self._obj_by_iter.append(gc.get_objects())
             if len(self._obj_by_iter) >= 2:
                 prev_objs = set(id(obj) for obj in self._obj_by_iter[-2])
-                diff = [tracemalloc.get_object_traceback(obj) for obj in self._obj_by_iter[-1] if id(obj) not in prev_objs]
+                diff = [tracemalloc.get_object_traceback(obj) for obj in self._obj_by_iter[-1] if
+                        id(obj) not in prev_objs]
                 # only unique tracebacks
                 unique_diff = []
                 seen_tracebacks = set()
                 for obj in diff:
                     # get only traces for /home/dbeltran/Autosubmit
-                    if obj and any("Autosubmit" in frame.filename and "profiler.py" not in frame.filename for frame in obj) and obj not in seen_tracebacks:
+                    if obj and any("Autosubmit" in frame.filename and "profiler.py" not in frame.filename for frame in
+                                   obj) and obj not in seen_tracebacks:
                         unique_diff.append(obj)
                         seen_tracebacks.add(obj)
                 self._obj_by_iter.pop(0)
@@ -416,6 +429,7 @@ def _get_current_open_fds() -> int:
     if hasattr(proc, "num_handles"):
         return proc.num_handles()
 
+
 def _get_fd_connection_map(proc: Process) -> dict:
     """Build a map of fd number to a human-readable connection string using psutil.
 
@@ -439,6 +453,7 @@ def _get_fd_connection_map(proc: Process) -> dict:
             else:
                 def _fmt(addr) -> str:
                     return f"{addr.ip}:{addr.port}" if addr else ""
+
                 laddr, raddr = _fmt(conn.laddr), _fmt(conn.raddr)
                 direction = f"{laddr} -> {raddr}" if raddr else laddr
                 status = f" [{conn.status}]" if conn.status else ""
