@@ -31,7 +31,7 @@ from contextlib import suppress
 from psutil import Process
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 import socket as _socket
 
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
@@ -156,10 +156,13 @@ class Profiler:
 
         self._mem_iteration[-1] -= sys.getsizeof(self._mem_iteration) + sys.getsizeof(self._obj_iteration) + sys.getsizeof(self._fd_iteration) + sys.getsizeof(
             self._jobs_iteration) + sys.getsizeof(self._edges_iteration) + sys.getsizeof(self._fd_names_iteration)
-        if self.max_checkpoints != 0:
+        return self._stop_run_loop()
+
+    def _stop_run_loop(self) -> bool:
+        """Check if the maximum number of checkpoints has been reached and signal to stop the run loop if so."""
+        if self.max_checkpoints > 0:
             self.checkpoints += 1
             if self.checkpoints > self.max_checkpoints:
-                # send signal so Autosubmit.exit is 1
                 return True
         return False
 

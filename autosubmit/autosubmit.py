@@ -81,7 +81,6 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values
 
-
 if TYPE_CHECKING:
     from rocrate.rocrate import ROCrate
 
@@ -207,16 +206,36 @@ class Autosubmit:
                                    help='Sets members allowed on this run.')
             subparser.add_argument(
                 '-p', '--profile',
-                nargs='?',
-                const=0,  # profiling ON, no cap
-                default=None,  # value when -p is absent  → profiling OFF
+                action='store_true',
+                default=False,
+                help='Enables profiling for the experiment run.'
+            )
+            subparser.add_argument(
+                '-pi', '--profile-iterations',
+                dest='profile_iterations',
                 type=int,
+                default=0,
                 metavar='MAX_ITER',
-                help='Enables profiling. Optionally pass the maximum number of iterations (0 = no cap).'
+                help='Maximum number of profiling iterations (0 = no cap). Only used when --profile is set.'
             )
             subparser.add_argument('-t', '--trace', action='store_true', default=False, required=False,
                                    help='Enables trace output for profiling (requires --profile).')
-
+            subparser.add_argument(
+                '-d', '--debug',
+                dest='debug',
+                action='store_true',
+                default=False,
+                help='Run the experiment main loop in debug mode: raises a recoverable AutosubmitError '
+                     'after --debug-loop-iterations iterations, exercising the error-recovery path Mutually exclusive with --profile.',
+            )
+            subparser.add_argument(
+                '-di', '--debug-iterations',
+                dest='debug_iterations',
+                type=int,
+                default=1,
+                help='Number of main-loop iterations to run before raising the debug error '
+                     '(default: 1). Only used when --debug is set.',
+            )
             # Expid
             subparser = subparsers.add_parser(
                 'expid', description="Creates a new experiment")
@@ -256,7 +275,7 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 'delete', description="delete specified experiment")
             subparser.add_argument('expid', help='experiment identifiers separated by commas',
-                               nargs='?')
+                                   nargs='?')
             subparser.add_argument(
                 '-f', '--force', action='store_true', help='deletes experiment without confirmation')
             subparser.add_argument('-v', '--update_version', action='store_true',
@@ -521,7 +540,7 @@ class Autosubmit:
             subparser = subparsers.add_parser(
                 "configure",
                 description="configure database and path for autosubmit. It "
-                "can be done at machine, user or local level.",
+                            "can be done at machine, user or local level.",
             )
             subparser.add_argument(
                 '--advanced', action="store_true", help="Open advanced configuration of autosubmit")
@@ -618,28 +637,28 @@ class Autosubmit:
                 "--list",
                 type=str,
                 help='Supply the list of job names to be changed. Default = "Any". '
-                'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
+                     'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
             )
             subparser.add_argument(
                 "-fc",
                 "--filter_chunks",
                 type=str,
                 help='Supply the list of chunks to change the status. Default = "Any". '
-                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
             )
             subparser.add_argument(
                 "-fs",
                 "--filter_status",
                 type=str,
                 help="Select the status (one or more) to filter the list of jobs."
-                "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
+                     "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
             )
             subparser.add_argument(
                 "-ft",
                 "--filter_type",
                 type=str,
                 help='Select the job type and split to filter the list of jobs. Default split = "Any". '
-                'LIST = "LOCALJOB [5-10] SIM"',
+                     'LIST = "LOCALJOB [5-10] SIM"',
             )
             subparser.add_argument(
                 "-ftc",
@@ -649,7 +668,7 @@ class Autosubmit:
                                Supply the list of chunks to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                    chunks 1 for all the members will be updated. Follow the format: '
-                '"[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+                     '"[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
             )
             subparser.add_argument(
                 "-ftcs",
@@ -659,7 +678,7 @@ class Autosubmit:
                                 Supply the list of chunks & splits to change the status. Default = "Any". When the member name "all" is set, all the chunks \
                                            selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
                                                chunks 1 for all the members will be updated. Follow the format: '
-                '"[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+                     '"[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
             )
 
             subparser.add_argument(
@@ -675,7 +694,7 @@ class Autosubmit:
                 "-expand",
                 type=str,
                 help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
-                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
             )
             subparser.add_argument(
                 "-expand_status", type=str, help="Select the statuses to be expanded"
@@ -883,10 +902,18 @@ class Autosubmit:
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
         if args.command == 'run':
-            if args.trace and args.profile is None:
-                raise AutosubmitCritical('Tracing is only available with profiling. Please add -p/--profile flag to run with tracing.', 7012)
+            if args.trace and not args.profile:
+                raise AutosubmitCritical(
+                    'Tracing is only available with profiling. Please add -p/--profile flag to run with tracing.', 7012)
+            if args.debug and args.profile:
+                raise AutosubmitCritical('--debug and --profile are mutually exclusive. Use one at a time.', 7012)
+            if args.debug and args.debug_iterations < 1:
+                raise AutosubmitCritical('--debug_iterations must be greater than 0 when --debug is enabled.', 7012)
+
             return Autosubmit.run_experiment(args.expid, args.start_time, args.start_after, args.run_only_members,
-                                             args.profile, args.trace)
+                                             args.profile_iterations, args.trace,
+                                             debug=args.debug,
+                                             debug_iterations=args.debug_iterations)
         elif args.command == 'expid':
             return Autosubmit.expid(args.description, args.HPC, args.copy, args.dummy, args.minimal_configuration,
                                     args.git_repo, args.git_branch, args.git_as_conf, args.operational, args.testcase,
@@ -1215,9 +1242,9 @@ class Autosubmit:
     @staticmethod
     def generate_as_config(
             exp_id: str,
-            dummy: bool=False,
-            minimal_configuration: bool=False,
-            local: bool=False,
+            dummy: bool = False,
+            minimal_configuration: bool = False,
+            local: bool = False,
             parameters: Optional[dict[str, Union[dict, list, str]]] = None
     ) -> None:
         """Retrieve the configuration from autosubmit.config package.
@@ -1424,7 +1451,8 @@ class Autosubmit:
             raise AutosubmitCritical(f"Error while creating the experiment configuration: {str(e)}", 7011)
         # Change template values by default values specified from the commandline
         try:
-            as_conf_default_values(Autosubmit.autosubmit_version, exp_id, hpc, minimal_configuration, git_repo, git_branch, git_as_conf)
+            as_conf_default_values(Autosubmit.autosubmit_version, exp_id, hpc, minimal_configuration, git_repo,
+                                   git_branch, git_as_conf)
         except Exception as e:
             try:
                 Autosubmit._delete_expid(exp_id, True)
@@ -2073,7 +2101,7 @@ class Autosubmit:
             # establish the connection to all platforms
             # Restore is misleading, it is actually a "connect" function when the recover flag is not set.
             Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf)
-            return job_list, submitter , exp_history, host , as_conf, list(platforms_to_test), packages_persistence, False
+            return job_list, submitter, exp_history, host, as_conf, list(platforms_to_test), packages_persistence, False
         else:
             return job_list, submitter, None, None, as_conf, list(platforms_to_test), packages_persistence, True
 
@@ -2116,26 +2144,45 @@ class Autosubmit:
 
     @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
-                       run_only_members: Optional[str] = None, profile: int = 0, trace: bool = False) -> int:
+                       run_only_members: Optional[str] = None, profile: bool = None, profile_iterations: int = 0,
+                       trace: bool = False, debug: bool = False, debug_iterations: int = 1) -> int:
         """Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
 
         :param expid: the experiment id
+        :type expid: str
         :param start_time: the time at which the experiment should start
+        :type start_time: Optional[str]
         :param start_after: the expid after which the experiment should start
+        :type start_after: Optional[str]
         :param run_only_members: the members to run
-        :param profile: if >0, profile will stop after N iterations, if 0, profile will not stop until the experiment finishes or is stopped by the user
-        :param trace: if True, the function will be traced
+        :type run_only_members: Optional[str]
+        :param profile: if True, the function will be profiled and a report will be generated at the end of the execution (requires cProfile)
+        :type profile: bool
+        :param profile_iterations: number of iterations before the profiler generates a report and exits. If None, the report will be generated at the end of the execution.
+        :type profile_iterations: int
+        :param trace: if True, the function will be traced (requires profile)
+        :type trace: bool
+        :param debug: if True, autosubmit will force recoverable failures every N iterations
+        :type debug: bool
+        :param debug_iterations: number of iterations before the AutosubmitError is raised.
+        :type debug_iterations: int
         :return: exit status
-
+        :rtype: int
         """
-        # Start profiling if the flag has been used
-        if profile is not None:
+        # Resolve which loop-control helper to use.
+        # Both Profiler and LoopDebugger expose the same interface subset:
+        #   start(), iteration_checkpoint(jobs, edges), stop()
+        if debug:
+            from .helpers.loop_debugger import LoopDebugger
+            loop_controler = LoopDebugger(max_iterations=debug_iterations)
+            loop_controler.start()
+        elif profile is not None:
             from .profiler.profiler import Profiler
-            profiler = Profiler(expid, trace_enabled=trace, max_checkpoints=profile)
-            profiler.start()
-            profiler.iteration_checkpoint(0, 0)
+            loop_controler = Profiler(expid, trace_enabled=trace, max_checkpoints=profile_iterations)
+            loop_controler.start()
+            loop_controler.iteration_checkpoint(0, 0)
         else:
-            profiler = None
+            loop_controler = None
 
         # Initialize common folders'
         try:
@@ -2169,8 +2216,9 @@ class Autosubmit:
                     Log.warning('Git operational check disabled by user')
 
                 Log.debug("Running main running loop")
-                Log.warning("Known issue: Due to recent changes in Autosubmit's script generation, error line numbers in "
-                            "`script.cmd.err` files may be offset by ~5 lines. Please adjust accordingly when debugging.")
+                Log.warning(
+                    "Known issue: Due to recent changes in Autosubmit's script generation, error line numbers in "
+                    "`script.cmd.err` files may be offset by ~5 lines. Please adjust accordingly when debugging.")
                 did_run = False
                 #########################
                 # AUTOSUBMIT - MAIN LOOP
@@ -2192,7 +2240,7 @@ class Autosubmit:
                                                                                       3650)  # (72h - 122h )
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
-                if profile is not None:
+                if profile or debug:
                     loaded_jobs = len(job_list.get_job_list())
                     loaded_edges = 0
                     for job in job_list.get_job_list():
@@ -2200,8 +2248,12 @@ class Autosubmit:
 
                 while job_list.get_active():
                     try:
-                        if profile is not None:
-                            Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
+                        if loop_controler is not None:
+                            if debug:
+                                # We want to test the recovery of the loop as if there were a failure in the middle of the execution
+                                for p in platforms_to_test:
+                                    p.connected = False
+                            Autosubmit.exit = loop_controler.iteration_checkpoint(loaded_jobs, loaded_edges)
 
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
@@ -2290,7 +2342,7 @@ class Autosubmit:
                         Log.result("Storing failed job count...done")
                         while not recovery and (
                                 recovery_retrials < max_recovery_retrials or max_recovery_retrials <= 0):
-                            delay = min(15 * consecutive_retrials, 120)
+                            delay = min(2 * consecutive_retrials, 120)
                             recovery_retrials += 1
                             sleep(delay)
                             consecutive_retrials = consecutive_retrials + 1
@@ -2345,7 +2397,8 @@ class Autosubmit:
                             except BaseException:
                                 reconnected = False
                         if recovery_retrials == max_recovery_retrials and max_recovery_retrials > 0:
-                            raise AutosubmitCritical(f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials*120} reached",
+                            raise AutosubmitCritical(
+                                f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials * 120} reached",
                                 7051, e.message)
                     except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
                         raise AutosubmitCritical(e.message, e.code, e.trace)
@@ -2389,8 +2442,8 @@ class Autosubmit:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
                     Log.result("Run successful")
-                    if profile is not None:
-                        profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
+                    if profile:
+                        loop_controler.iteration_checkpoint(loaded_jobs, loaded_edges)
                     # Updating finish time for job data header
                     # Database is locked, may be related to my local db todo 4.1.1
                     try:
@@ -2410,8 +2463,8 @@ class Autosubmit:
         except BaseException:
             raise
         finally:
-            if profile is not None:
-                profiler.stop()
+            if loop_controler is not None:
+                loop_controler.stop()
 
         # Suppress in case ``job_list`` was not defined yet...
         with suppress(NameError):
@@ -2881,7 +2934,8 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def online_recovery(as_conf: AutosubmitConfig, platforms: list[ParamikoPlatform], job_list: JobList, offline: bool = False) -> list[str]:
+    def online_recovery(as_conf: AutosubmitConfig, platforms: list[ParamikoPlatform], job_list: JobList,
+                        offline: bool = False) -> list[str]:
         """Return a list of completed job names recovered from the given platforms.
 
         Test each platform connection and collect completed job names. If a platform
@@ -2902,7 +2956,8 @@ class Autosubmit:
             message = p.test_connection(as_conf)
             if not p.connected:
                 if offline:
-                    Log.warning(f"Platform {p.name} is not reachable, proceeding with offline recovery for this platform")
+                    Log.warning(
+                        f"Platform {p.name} is not reachable, proceeding with offline recovery for this platform")
                     completed_jobnames.update(job_list.recover_all_completed_jobs_from_exp_history(p))
                 else:
                     raise AutosubmitCritical(f"Couldn't connect to platform {p.name} during recovery: {message}", 7050)
@@ -2976,7 +3031,8 @@ class Autosubmit:
             raise AutosubmitCritical(f"Experiment can't be recovered due being {len(current_active_jobs)} "
                                      f"active jobs in your experiment, If you want to recover the experiment,"
                                      f" please use the flag -f and all active jobs will be cancelled. "
-                                     f"Be warned that -f and --offline won't cancel jobs if the connection can't be established", 7053)
+                                     f"Be warned that -f and --offline won't cancel jobs if the connection can't be established",
+                                     7053)
         elif current_active_jobs and force and save and not offline:
             all_connected = True
             for p in platforms_to_test:
@@ -2984,7 +3040,9 @@ class Autosubmit:
                     all_connected = False
                     Log.warning(f"Platform {p.name} is not reachable")
             if not all_connected:
-                raise AutosubmitCritical("Some platforms are not reachable, cannot proceed with forced recovery. You can add --offline with -f to don't cancel jobs", 7050)
+                raise AutosubmitCritical(
+                    "Some platforms are not reachable, cannot proceed with forced recovery. You can add --offline with -f to don't cancel jobs",
+                    7050)
         # TODO: https://github.com/BSC-ES/autosubmit/issues/1251 don't need force flag
         if save:
             offline_jobs = []
@@ -3000,7 +3058,8 @@ class Autosubmit:
                     except AutosubmitError as e:
                         # Not sure if this is the best way to check for invalid job id error for non-slurm
                         if "invalid job id" in e.message.lower():
-                            Log.warning(f"Job {job.name} could not be cancelled because it was not found on the platform")
+                            Log.warning(
+                                f"Job {job.name} could not be cancelled because it was not found on the platform")
                         else:
                             Log.warning(f"Job {job.name} could not be cancelled: {e.message}")
             if offline_jobs:
@@ -3057,7 +3116,8 @@ class Autosubmit:
                             for s in expand_status:
                                 status.append(Autosubmit._get_status(s.upper()))
                         else:
-                            Log.warning("Grouping status has an invalid format, it should be a string or a list of strings")
+                            Log.warning(
+                                "Grouping status has an invalid format, it should be a string or a list of strings")
                 job_grouping = JobGrouping(group_by, copy.deepcopy(job_list.get_job_list()), job_list,
                                            expand_list=expand,
                                            expanded_status=status)
@@ -3075,7 +3135,8 @@ class Autosubmit:
             if detail:
                 Autosubmit.detail(job_list)
         except Exception as e:
-            Log.warning(f"An error has occurred while generating the detailed view of the jobs after recovery. Trace: {str(e)}")
+            Log.warning(
+                f"An error has occurred while generating the detailed view of the jobs after recovery. Trace: {str(e)}")
 
         return True
 
@@ -4471,7 +4532,7 @@ class Autosubmit:
                     Log.info("Local project destination already exists, will not sync project files.")
 
         return True
-    
+
     @staticmethod
     def change_status(final, final_status, job, save):
         """Set job status to final.
@@ -4694,7 +4755,8 @@ class Autosubmit:
         return validation_message
 
     @staticmethod
-    def _validate_section_split_formula(section_split_formula: str, validation_message: str, valid_sections: Optional[set[str]] = None) -> str:
+    def _validate_section_split_formula(section_split_formula: str, validation_message: str,
+                                        valid_sections: Optional[set[str]] = None) -> str:
         """Validate section/split formula syntax.
 
         Expects to receive the second part of the -ftcs filter. ex: SIM [ Any ], SIM2 [1 2], SIM3.
@@ -4716,7 +4778,7 @@ class Autosubmit:
             section_name = section.strip().split("[")[0].strip().upper()
             if valid_sections is not None and section_name not in valid_sections and section_name != "ANY":
                 validation_message += f"\n\tSpecified section not found: {section_name}."
-            
+
             if '[' not in section and ']' not in section:
                 if len(section.split()) > 1:
                     validation_message += f"\n\tMalformed section/split entry: {section}. "
@@ -4784,7 +4846,8 @@ class Autosubmit:
         section_split_formula = ",".join(filter_string_parts[1:]) if len(filter_string_parts) > 1 else ''
 
         validation_message = Autosubmit._validate_chunk_formula(chunk_formula, validation_message)
-        validation_message = Autosubmit._validate_section_split_formula(section_split_formula, validation_message, valid_sections=valid_sections)
+        validation_message = Autosubmit._validate_section_split_formula(section_split_formula, validation_message,
+                                                                        valid_sections=valid_sections)
 
         if validation_message != "## -fc // -ftc // -ftcs Validation Message ##":
             raise AutosubmitCritical("Error in the supplied input for -fc // -ftc // -ftcs.", 7011, validation_message)
@@ -4835,7 +4898,9 @@ class Autosubmit:
             all_empty = False
 
         if all_empty:
-            raise AutosubmitCritical("At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.", 7014)
+            raise AutosubmitCritical(
+                "At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.",
+                7014)
 
     @staticmethod
     def _split_match(j: Job, split_list: list[str]) -> bool:
@@ -4862,7 +4927,7 @@ class Autosubmit:
 
     @staticmethod
     def _filter_sections_splits(
-        filter_section_splits: list[str], jobs: list[Job]
+            filter_section_splits: list[str], jobs: list[Job]
     ) -> list[Job]:
         """Filter jobs by sections and splits.
 
@@ -4881,7 +4946,7 @@ class Autosubmit:
                 if job.splits and int(job.splits) >= 2 and job.split is not None
             }
         )
-        
+
         for section in filter_section_splits:
             section_name = section.strip().split("[")[0].strip()
             section_name_upper = section_name.upper()
@@ -4896,9 +4961,9 @@ class Autosubmit:
                 job_splits = set(all_splits)
 
             if (
-                has_split_selector
-                and job_splits_str.strip()
-                and job_splits_str.strip().upper() != "ANY"
+                    has_split_selector
+                    and job_splits_str.strip()
+                    and job_splits_str.strip().upper() != "ANY"
             ):
                 if section_name_upper == "ANY":
                     available_section_splits = set(all_splits)
@@ -4907,9 +4972,9 @@ class Autosubmit:
                         str(job.split).upper()
                         for job in jobs
                         if job.section.upper() == section_name_upper
-                        and job.splits
-                        and int(job.splits) >= 2
-                        and job.split is not None
+                           and job.splits
+                           and int(job.splits) >= 2
+                           and job.split is not None
                     }
 
                 missing_splits = set(job_splits) - available_section_splits
@@ -4926,9 +4991,9 @@ class Autosubmit:
                     j
                     for j in jobs
                     if j.section.upper() == section_name_upper
-                    and Autosubmit._split_match(j, job_splits)
+                       and Autosubmit._split_match(j, job_splits)
                 ]
-            
+
             section_matching_jobs.extend(filtered_jobs)
             # Deduplicate
             section_matching_jobs = list(dict.fromkeys(section_matching_jobs))
@@ -4941,7 +5006,7 @@ class Autosubmit:
 
     @staticmethod
     def _filter_chunks(
-        filter_chunk_str: str, job_list: "JobList", matching_jobs: list[Job]
+            filter_chunk_str: str, job_list: "JobList", matching_jobs: list[Job]
     ) -> list[Job]:
         """Filter jobs by exact date, member and chunk matches.
 
@@ -5012,14 +5077,14 @@ class Autosubmit:
                     for job_tuple in pruned_jobs:
                         job, job_date, job_member, job_chunk = job_tuple
                         if (
-                            job_date in date_values
-                            and job_member in member_values
-                            and job_chunk in chunk_values
+                                job_date in date_values
+                                and job_member in member_values
+                                and job_chunk in chunk_values
                         ):
                             final_list.append(job)
 
         return list(set(final_list))
-    
+
     @staticmethod
     def _filter_jobs_by_chunks_splits(job_list: "JobList", filter_chunks: str) -> list[Job]:
         """Select jobs from *job_list* according to *filter_chunks* specification.
@@ -5111,7 +5176,7 @@ class Autosubmit:
         selected_chunk_filters = [name for name, value in provided_chunk_filters if value]
         if len(selected_chunk_filters) > 1:
             Log.warning(
-                "Multiple chunk filters provided (%s). Using -fc first, then -ftc, and finally -ftcs." 
+                "Multiple chunk filters provided (%s). Using -fc first, then -ftc, and finally -ftcs."
                 " Use only one of them to avoid ambiguity."
                 % ", ".join(selected_chunk_filters)
             )
@@ -5173,13 +5238,14 @@ class Autosubmit:
                         pass
                 ##### End of the ""function""
                 # This will raise an autosubmit critical if any of the filters has issues in the format specified by the user
-                Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunk_section_split, filter_status,
+                Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunk_section_split,
+                                                        filter_status,
                                                         filter_section)
                 #### Starts the filtering process ####
                 Log.info("Filtering jobs...")
                 all_jobs = job_list.get_job_list()
                 selected_job_names = {job.name for job in all_jobs}
-                
+
                 final_status = Autosubmit._get_status(final)
                 if filter_section:
                     ft_entries = [section for section in separate_section_entries(filter_section)]
@@ -5190,7 +5256,7 @@ class Autosubmit:
                 if filter_chunks or filter_type_chunk or filter_type_chunk_split:
                     start = time.time()
                     chunk_filtered_jobs = Autosubmit._filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)
-                    selected_job_names &={job.name for job in chunk_filtered_jobs}
+                    selected_job_names &= {job.name for job in chunk_filtered_jobs}
                     Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
 
                 if filter_status:
