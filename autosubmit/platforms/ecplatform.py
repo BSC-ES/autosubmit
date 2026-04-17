@@ -433,8 +433,9 @@ class EcPlatform(ParamikoPlatform):
 
     def _check_and_cancel_duplicated_job_names(self, scripts_to_submit: dict) -> None:
         """Check for duplicated job names in the submitted packages.
+
         :param scripts_to_submit: Package script names and their info.
-        :type: dict
+        :type scripts_to_submit: dict
         """
         # There isen't a reliable way to check for duplicated job names in ecaccess, as the job list command doesn't return all the information needed to identify them,
         pass  # pragma: no cover
