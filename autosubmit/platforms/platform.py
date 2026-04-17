@@ -395,11 +395,11 @@ class Platform:
         :param only_wrappers: If ``True``, prepare only wrapper-related metadata
             and skip the regular package submission flow.
         :type only_wrappers: bool
+        :raises Exception: Propagate any exception raised while preparing packages, generating scripts, or transferring files.
         :return: A list containing the jobs gathered while preparing the given
             packages for submission.
         :rtype: list
-        :raises Exception: Propagate any exception raised while preparing
-            packages, generating scripts, or transferring files.
+
         """
         Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self))}")
         # Submitting by sections allows to detect Scheduler misconfiguration derived from a bad configuration without submitting any job.
@@ -438,13 +438,11 @@ class Platform:
         :type packages_persistence: JobPackagePersistence
         :param as_conf: Autosubmit configuration for the current experiment.
         :type as_conf: AutosubmitConfig
-        :return: None
-        :rtype: None
         :raises Exception: Propagate any exception raised while creating wrapper
             job metadata or saving the package.
         """
         if only_wrappers or inspect:
-            # Now name is used for submit scripts, before this was used to determine if a package has a wrapper or not
+            # Now name is used for submit scripts, before it was used to determine if a package had a wrapper or not
             if package.is_wrapped:
                 job_list.packages_dict[package.name] = package.jobs
                 from ..job.job import WrapperJob
@@ -740,7 +738,7 @@ class Platform:
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):
+    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig'):
         for job, job_prev_status in job_list:
             self.check_job(job)
 

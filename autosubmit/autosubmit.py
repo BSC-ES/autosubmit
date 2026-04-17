@@ -2526,7 +2526,11 @@ class Autosubmit:
             packager = JobPackager(as_conf, p, job_list)
             packages_to_submit = packager.build_packages()
 
-            scripts_to_submit_by_section, x11_scripts_to_submit_by_section = p.prepare_submission(as_conf, job_list, packages_persistence, packages_to_submit, inspect=inspect,
+            scripts_to_submit_by_section, x11_scripts_to_submit_by_section = p.prepare_submission(as_conf,
+                                                                                                  job_list,
+                                                                                                  packages_persistence,
+                                                                                                  packages_to_submit,
+                                                                                                  inspect=inspect,
                                                                                                   only_wrappers=only_wrappers)
 
             # Divided by section in case of finding any unrecoverable error due a bad configuration

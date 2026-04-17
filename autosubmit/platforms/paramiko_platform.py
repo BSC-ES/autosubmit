@@ -710,12 +710,12 @@ class ParamikoPlatform(Platform):
         :param script_names: Script filenames to submit on the remote
             platform.
         :type script_names: list[str]
-        :return: Submitted Slurm job identifiers in submission order.
-        :rtype: list[int]
         :raises AutosubmitError: If the submission command fails or no submit
             output can be parsed.
         :raises AutosubmitCritical: If Slurm reports a critical submission
             failure.
+        :return: Submitted Slurm job identifiers in submission order.
+        :rtype: list[int]
         """
 
         if not script_names:
@@ -1052,7 +1052,7 @@ class ParamikoPlatform(Platform):
         if slurm_error:
             raise AutosubmitError(e_msg, 6000)
 
-    def get_jobid_by_jobname(self, job_name, retries=2):
+    def get_job_id_by_job_name(self, job_name, retries=2):
         """Get job id by job name
 
         :param job_name:
@@ -1061,7 +1061,7 @@ class ParamikoPlatform(Platform):
         :return: job id
         """
         job_ids = ""
-        cmd = self.get_jobid_by_jobname_cmd(job_name)
+        cmd = self.get_job_id_by_job_name_cmd(job_name)
         self.send_command(cmd)
         job_id_name = self.get_ssh_output()
         while len(job_id_name) <= 0 < retries:
@@ -1105,7 +1105,7 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_jobid_by_jobname_cmd(self, job_name: str) -> str:
+    def get_job_id_by_job_name_cmd(self, job_name: str) -> str:
         """Returns command to get job id by job name on remote platforms
 
         :param job_name:
@@ -1370,6 +1370,7 @@ class ParamikoPlatform(Platform):
 
     def get_multi_submit_cmd(self, job_scripts: dict) -> str:
         """Gets command to submit all the current active jobs on HPC
+
         :param job_scripts: dict of job names and their info (export, x11_options)
         :return: command to submit all the current active jobs on HPC
         :rtype: str
@@ -1417,6 +1418,7 @@ class ParamikoPlatform(Platform):
     def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
         """Gets the command to submit a job, for the current platform, with the given parameters.
          This needs to be adapted to each scheduler, the default assumes that is being launched directly.
+
         :param script_name: name of the script to submit
         :type script_name: str
         :param pre: command part to be placed before the script name, e.g. timeout, export, executable
@@ -1431,6 +1433,7 @@ class ParamikoPlatform(Platform):
 
     def get_call(self, script_name, timeout: float, export: str, executable: str, x11_options: str, fail_count: int, sub_queue: str, redirect_out_err: bool = False) -> str:
         """Gets execution command for given job. it builds the command to execute the script on the remote platform.
+
         :param script_name: script to run
         :param timeout: timeout for the execution
         :param export: export command to set environment variables
@@ -1440,6 +1443,7 @@ class ParamikoPlatform(Platform):
         :param sub_queue: alternative queue to run the job, used for some platforms like ECaccess
         :param redirect_out_err: whether to redirect stdout and stderr to files
         :return: command to execute script
+        :rtype: str
         """
         # Some platforms (right now only ECaccess) has a dual queue system, one to run the job and another to submit the job.
         self._set_submit_cmd(sub_queue)
@@ -1462,6 +1466,7 @@ class ParamikoPlatform(Platform):
 
     def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
+
         :param output: output of the submit command.
         :param x11: whether the job is an x11 job, which has a different output format.
         :return: job ID of the submitted job.

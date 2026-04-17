@@ -240,7 +240,7 @@ class PJMPlatform(ParamikoPlatform):
     def get_queue_status_cmd(self, job_id):
         return self.get_check_all_jobs_cmd(job_id)
 
-    def get_jobid_by_jobname_cmd(self, job_name):
+    def get_job_id_by_job_name_cmd(self, job_name):
         if job_name[-1] == ",":
             job_name = job_name[:-1]
         return f'pjstat -v --choose jid,st,ermsg --filter \"jnam={job_name}\"'

@@ -148,6 +148,7 @@ class EcPlatform(ParamikoPlatform):
     def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
         """Gets the command to submit a job, for the current platform, with the given parameters.
          This needs to be adapted to each scheduler, the default assumes that is being launched directly.
+
         :param script_name: name of the script to submit
         :param pre: command part to be placed before the script name, e.g. timeout, export, executable
         :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
@@ -175,6 +176,7 @@ class EcPlatform(ParamikoPlatform):
 
     def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
+
         :param output: output of the submit command.
         :param x11: whether the job is an x11 job, which has a different output format.
         :return: job ID of the submitted job.
@@ -186,7 +188,7 @@ class EcPlatform(ParamikoPlatform):
         return self._checkjob_cmd + str(job_id)
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
-"""Establishes an SSH connection to the host.
+        """Establishes an SSH connection to the host.
 
         :param as_conf: The Autosubmit configuration object.
         :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
@@ -508,14 +510,14 @@ class EcPlatform(ParamikoPlatform):
         :param script_names: Script filenames about to be submitted.
         :type script_names: list[str]
         """
-        stems = {Path(name).stem for name in script_names}
+
         with suppress(Exception):
             self.send_command("ecaccess-job-list")
             output = self.get_ssh_output()
             pre: dict[str, set[int]] = {}
             for line in output.splitlines():
                 parts = line.split()
-                if len(parts) >= 2 and parts[0].isdigit() and parts[-1] in stems:
+                if len(parts) >= 2 and parts[0].isdigit() and parts[-1] in script_names:
                     pre.setdefault(parts[-1], set()).add(int(parts[0]))
             self._pre_submission_ids = pre
 

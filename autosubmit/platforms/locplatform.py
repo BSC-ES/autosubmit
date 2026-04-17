@@ -89,6 +89,7 @@ class LocalPlatform(ParamikoPlatform):
 
     def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
+
         :param raw_output: output of the submit command.
         :param x11: whether the job is an x11 job, which has a different output format.
         :return: job ID of the submitted job.
@@ -376,6 +377,7 @@ class LocalPlatform(ParamikoPlatform):
 
     def cancel_jobs(self, job_ids: list[str]) -> None:
         """Cancel local processes by their PIDs.
+
         :param job_ids: List of local process IDs to cancel.
         :type job_ids: list[str]
         """

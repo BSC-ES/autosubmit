@@ -153,6 +153,15 @@ class SlurmPlatform(ParamikoPlatform):
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
 
     def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
+        """Gets the command to submit a job, for the current platform, with the given parameters.
+         This needs to be adapted to each scheduler, the default assumes that is being launched directly.
+
+        :param script_name: name of the script to submit
+        :param pre: command part to be placed before the script name, e.g. timeout, export, executable
+        :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
+        :param x11_options: x11 options to run the script, if any
+        :return: command to submit a job
+        """
         return f"cd {self.remote_log_dir} ; {pre} salloc {x11_options} {script_name} {post}" if x11_options else f"{pre} {self._submit_cmd} {script_name} {post}"
 
     def get_mkdir_cmd(self) -> str:
@@ -195,6 +204,7 @@ class SlurmPlatform(ParamikoPlatform):
 
     def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
+
         :param output: output of the submit command.
         :param x11: whether the job is an x11 job, which has a different output format.
         :return: job ID of the submitted job.
@@ -227,7 +237,7 @@ class SlurmPlatform(ParamikoPlatform):
         for script_name in script_names:
             job_name = Path(script_name).stem
 
-            matched_ids = [int(job_id) for job_id in self.get_jobid_by_jobname(job_name)]
+            matched_ids = [int(job_id) for job_id in self.get_job_id_by_job_name(job_name)]
 
             if not matched_ids:
                 return []
@@ -273,7 +283,7 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return f'squeue -j {job_id} -o %A,%R'
 
-    def get_jobid_by_jobname_cmd(self, job_name: str) -> str:
+    def get_job_id_by_job_name_cmd(self, job_name: str) -> str:
         """Looks for a job based on its name.
 
         :param job_name: Name given to a job

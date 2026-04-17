@@ -77,10 +77,10 @@ def test_get_submitted_jobs_by_name_returns_latest_id_per_script(
         "job_b": ["202"],
     }
 
-    def _get_jobid_by_jobname(job_name: str) -> list[str]:
+    def _get_job_id_by_job_name(job_name: str) -> list[str]:
         return job_ids_by_name[job_name]
 
-    monkeypatch.setattr(slurm_platform, "get_jobid_by_jobname", _get_jobid_by_jobname)
+    monkeypatch.setattr(slurm_platform, "get_job_id_by_job_name", _get_job_id_by_job_name)
 
     assert slurm_platform.get_submitted_jobs_by_name(["job_a.cmd", "job_b.cmd"]) == [103, 202]
 
@@ -99,10 +99,10 @@ def test_get_submitted_jobs_by_name_returns_empty_when_any_job_is_missing(
         "job_b": [],
     }
 
-    def _get_jobid_by_jobname(job_name: str) -> list[str]:
+    def _get_job_id_by_job_name(job_name: str) -> list[str]:
         return job_ids_by_name[job_name]
 
-    monkeypatch.setattr(slurm_platform, "get_jobid_by_jobname", _get_jobid_by_jobname)
+    monkeypatch.setattr(slurm_platform, "get_job_id_by_job_name", _get_job_id_by_job_name)
 
     assert slurm_platform.get_submitted_jobs_by_name(["job_a.cmd", "job_b.cmd"]) == []
 

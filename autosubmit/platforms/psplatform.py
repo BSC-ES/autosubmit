@@ -81,6 +81,7 @@ class PsPlatform(ParamikoPlatform):
 
     def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
+
         :param raw_output: output of the submit command.
         :param x11: whether the job is an x11 job, which has a different output format.
         :return: job ID of the submitted job.
@@ -125,6 +126,11 @@ class PsPlatform(ParamikoPlatform):
 
         1) Checks if there is a job name already present on the remote platform.
         2) If there any, it returns the oldest ID ( process or job_id) entry for each duplicated job name, separated by commas.
+
+        :param job_names: List of job names to check for duplicates.
+        :type job_names: list[str]
+        :return: Command to check for duplicated job names on remote platforms.
+        :rtype: str
         """
         # check processes with the same name, and return the oldest one (if any)
         return f"ps -eo pid,cmd | grep -E '({'|'.join(job_names)})' | awk '{{print $1}}' | sort -n | uniq -d"
