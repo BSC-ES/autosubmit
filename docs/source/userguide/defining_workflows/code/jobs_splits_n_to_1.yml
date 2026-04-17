@@ -9,7 +9,7 @@ JOBS:
     DEPENDENCIES:
       TEST_DEPENDENCY:
         SPLITS_FROM:
-          "[1:2]":
-            SPLITS_TO: "[1:4]*\\2"
+          '[1:2]':
+            SPLITS_TO: '[1:4]*\2'
     RUNNING: once
     SPLITS: '2'

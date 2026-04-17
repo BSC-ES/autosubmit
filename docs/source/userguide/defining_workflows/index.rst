@@ -228,7 +228,7 @@ Dependencies rework
 
 The ``DEPENDENCIES`` key is used to define the dependencies of a job. It can be used in the following ways:
 
-* Basic: The dependencies are a list of jobs, separated by " ", that runs before the current task is submitted.
+* Basic: The dependencies are a list of jobs, separated by '', that runs before the current task is submitted.
 * New: The dependencies is a list of YAML sections, separated by "\\n", that runs before the current job is submitted.
 
   * For each dependency section, you can designate the following keywords to control the current job-affected tasks:
@@ -245,9 +245,9 @@ The ``DEPENDENCIES`` key is used to define the dependencies of a job. It can be 
 
   * Important keywords for ``[DATES|MEMBERS|CHUNKS]_TO``:
 
-    * "natural": Will keep the default linkage. Will link if it would be normally. Example, ``SIM_FC00_CHUNK_1`` -> ``DA_FC00_CHUNK_1``.
-    * "all": Will link all selected tasks of the dependency with current selected tasks. Example, ``SIM_FC00_CHUNK_1`` -> ``DA_FC00_CHUNK_1``, ``DA_FC00_CHUNK_2``, ``DA_FC00_CHUNK_3``...
-    * "none": Will unlink selected tasks of the dependency with current selected tasks.
+    * 'natural': Will keep the default linkage. Will link if it would be normally. Example, ``SIM_FC00_CHUNK_1`` -> ``DA_FC00_CHUNK_1``.
+    * 'all': Will link all selected tasks of the dependency with current selected tasks. Example, ``SIM_FC00_CHUNK_1`` -> ``DA_FC00_CHUNK_1``, ``DA_FC00_CHUNK_2``, ``DA_FC00_CHUNK_3``...
+    * 'none': Will unlink selected tasks of the dependency with current selected tasks.
 
 For the new format, consider that the priority is hierarchy and goes like this ``DATES_FROM`` -(includes)-> ``MEMBERS_FROM`` -(includes)-> ``CHUNKS_FROM``.
 
@@ -317,7 +317,7 @@ The status are ordered, so if you select ``RUNNING`` status, the task will be ru
           FILE: postprocess.sh
           DEPENDENCIES:
               SIM:
-                  STATUS: "RUNNING"
+                  STATUS: 'RUNNING'
           RUNNING: chunk
 
 
@@ -335,8 +335,8 @@ The ``FROM_STEP`` keyword can be used to select the **internal** step of the dep
       RUNNING: once
       DEPENDENCIES:
         A:
-          SPLIT_TO: "2"
-          STATUS: "RUNNING"
+          SPLITS_TO: '2'
+          STATUS: 'RUNNING'
           FROM_STEP: 2
 
 There is now a new function that is automatically added in your scripts which is called ``as_checkpoint``. This is the function that is generating the checkpoint file. You can see the function below:
@@ -392,8 +392,8 @@ To select an specific task, you have to combine the ``STATUS`` and ``CHUNKS_TO``
       RUNNING: once
       DEPENDENCIES:
         B:
-          SPLIT_TO: "2"
-          STATUS: "RUNNING"
+          SPLITS_TO: '2'
+          STATUS: 'RUNNING'
 
 Job frequency
 ~~~~~~~~~~~~~
@@ -572,7 +572,7 @@ Example 1: explicit split mapping
 
     EXPERIMENT:
       DATELIST: 19600101
-      MEMBERS: "00"
+      MEMBERS: '00'
       CHUNKSIZEUNIT: day
       CHUNKSIZE: '1'
       NUMCHUNKS: '2'
@@ -580,22 +580,22 @@ Example 1: explicit split mapping
 
     JOBS:
       FIRST:
-        FILE: INI.sh
+        FILE: FIRST.sh
         RUNNING: once
 
       SECOND:
-        FILE: SIM.sh
+        FILE: SECOND.sh
         DEPENDENCIES: FIRST SECOND-1
         RUNNING: once
 
       THIRD:
-        FILE: ASIM.sh
+        FILE: THIRD.sh
         DEPENDENCIES: SECOND THIRD-1
         RUNNING: once
         SPLITS: 3
 
       FOURTH:
-        FILE: POST.sh
+        FILE: FOURTH.sh
         RUNNING: once
         DEPENDENCIES:
           THIRD:
@@ -630,7 +630,7 @@ Example 2: 1-to-1 dependency
 
   EXPERIMENT:
     DATELIST: 19600101
-    MEMBERS: "00"
+    MEMBERS: '00'
     CHUNKSIZEUNIT: day
     CHUNKSIZE: '1'
     NUMCHUNKS: '2'
@@ -682,8 +682,8 @@ Example 3: N-to-1 dependency
       DEPENDENCIES:
         TEST:
           SPLITS_FROM:
-            "[1:2]":
-              SPLITS_TO: "[1:4]*\\2"
+            '[1:2]':
+              SPLITS_TO: '[1:4]*\2'
       RUNNING: once
       SPLITS: '2'
 
@@ -714,8 +714,8 @@ Example 3: 1-to-N dependency
       DEPENDENCIES:
         TEST:
           SPLITS_FROM:
-            "[1:4]":
-              SPLITS_TO: "[1:2]*\\2"
+            '[1:4]':
+              SPLITS_TO: '[1:2]*\2'
       RUNNING: once
       SPLITS: '4'
 
@@ -795,7 +795,7 @@ Example4: Auto split
           - DN:
               SPLITS_FROM:
                 all:
-                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+                  SPLITS_TO: '[1:%JOBS.DN.SPLITS%]*\1'
             OPA_ENERGY_ONSHORE_1:
               SPLITS_FROM:
                 all:
@@ -803,7 +803,7 @@ Example4: Auto split
           - DN:
               SPLITS_FROM:
                 all:
-                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+                  SPLITS_TO: '[1:%JOBS.DN.SPLITS%]*\1'
             OPA_ENERGY_ONSHORE_2:
               SPLITS_FROM:
                 all:
@@ -905,7 +905,7 @@ Example 1: How to select an specific chunk
 
     EXPERIMENT:
       DATELIST: 19600101
-      MEMBERS: "00"
+      MEMBERS: '00'
       CHUNKSIZEUNIT: day
       CHUNKSIZE: '10'
       NUMCHUNKS: '10'
@@ -1079,7 +1079,7 @@ In this workflow you can see an illustrated example of select member. Using 4 me
 
     EXPERIMENT:
       DATELIST: 19600101
-      MEMBERS: "00 01 02 03"
+      MEMBERS: '00 01 02 03'
       CHUNKSIZE: 1
       NUMCHUNKS: 2
       CHUNKINI: ''
@@ -1133,7 +1133,7 @@ the job in the loop.
 .. note:: If you use a value in ``NAME`` that is not a string, like ``0_2``,
           it will be parsed first by the YAML 1.2 parser, and that value will
           be converted to the string ``2``. To avoid issues like this, it is
-          recommended to wrap such values in quotes, i.e. ``"0_2"`` or ``'0_2'``.
+          recommended to wrap such values in quotes, i.e. ``'0_2'``.
 
 To generate the following jobs:
 
@@ -1141,7 +1141,7 @@ To generate the following jobs:
 
     EXPERIMENT:
       DATELIST: 19600101
-      MEMBERS: "00"
+      MEMBERS: '00'
       CHUNKSIZEUNIT: day
       CHUNKSIZE: '1'
       NUMCHUNKS: '2'

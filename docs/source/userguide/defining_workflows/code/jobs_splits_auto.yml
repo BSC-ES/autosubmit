@@ -41,7 +41,7 @@ JOBS:
       - DN:
           SPLITS_FROM:
             all:
-              SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+              SPLITS_TO: '[1:%JOBS.DN.SPLITS%]*\1'
         OPA_ENERGY_ONSHORE_1:
           SPLITS_FROM:
             all:
@@ -49,7 +49,7 @@ JOBS:
       - DN:
           SPLITS_FROM:
             all:
-              SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+              SPLITS_TO: '[1:%JOBS.DN.SPLITS%]*\1'
         OPA_ENERGY_ONSHORE_2:
           SPLITS_FROM:
             all:
