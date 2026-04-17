@@ -185,12 +185,12 @@ class JobPackageBase(object):
             # This sets the log names but also the submission time for non-vertical wrapped jobs.
             job.update_local_logs()
             # Clean previous run logs on local
-            log_completed = os.path.join(self._tmp_path, job.name + '_COMPLETED')
-            log_stat = os.path.join(self._tmp_path, job.name + '_STAT')
-            if Path(log_completed).exists():
-                os.remove(log_completed)
-            if Path(log_stat).exists():
-                os.remove(log_stat)
+            log_completed = Path(f"{self._tmp_path}/{job.name}_COMPLETED'")
+            log_stat = Path(f"{self._tmp_path}/{job.name}_STAT'")
+            if log_completed.exists():
+                log_completed.unlink(missing_ok=True)
+            if log_stat.exists():
+                log_stat.unlink(missing_ok=True)
             self.platform.remove_stat_file(job)
             self.platform.remove_completed_file(job.name)
 
