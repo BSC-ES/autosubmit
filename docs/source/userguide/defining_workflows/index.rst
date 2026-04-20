@@ -407,6 +407,15 @@ an integer I for this attribute and the job will run only once for each I iterat
 
 .. code-block:: yaml
 
+    EXPERIMENT:
+      DATELIST: 19900101
+      MEMBERS: Member1 Member2
+      CHUNKSIZEUNIT: month
+      CHUNKSIZE: '1'
+      NUMCHUNKS: '5'
+      CHUNKINI: ''
+      CALENDAR: standard
+
     JOBS:
       INI:
           FILE: ini.sh
@@ -1031,7 +1040,7 @@ The resulting workflow can be seen in Figure `delay`
 
 .. _loops_for_key:
 
-Loops (FOR key)
+Loops (FOR jobs)
 ---------------
 
 The ``FOR`` key lets you generate multiple job variants from a single section.
