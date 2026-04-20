@@ -560,6 +560,7 @@ Basic behavior
 ^^^^^^^^^^^^^^
 
 * ``SPLITS: N``: with ``N >= 2``, creates ``N`` split jobs per task.
+* ``SPLITS: 1``: no split, the job will run as a single task.
 * ``SPLITS: auto``: only valid with ``RUNNING: chunk``. The number of splits is computed automatically from calendar settings.
 
 How split dependencies are resolved
@@ -665,7 +666,7 @@ In this example:
 * ``FOURTH`` job will be split into 3 parts.  
 * ``FOURTH`` job split 1 will depend on all the splits of the ``THIRD`` job due to not being present in ``SPLITS_FROM`` (default split linkage).
 * ``FOURTH`` job split 2 will depend on the splits 1 and 2 of the ``THIRD`` job due to the 2* mapping.  
-* ``FOURTH`` job split 3 will depend on the splits 2 and 3 of the ``THIRD`` job due to the 3* mapping.  
+* ``FOURTH`` job split 3 will depend on the splits 1 and 3 of the ``THIRD`` job due to the 3* mapping.  
 
 Example 2: 1-to-1 dependency
 
@@ -880,9 +881,9 @@ Detailed example: auto split with split-aware dependencies
     EXPERIMENT:
       DATELIST: 19900101
       MEMBERS: fc0
-      CHUNKSIZEUNIT: day
+      CHUNKSIZEUNIT: month
       SPLITSIZEUNIT: day
-      CHUNKSIZE: 30
+      CHUNKSIZE: 1
       SPLITSIZE: 15
       SPLITPOLICY: flexible
       NUMCHUNKS: 2
