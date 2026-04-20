@@ -1051,9 +1051,6 @@ resources, or dependencies.
   For split-to-split dependency mapping rules, see :ref:`job_split`.
   For complete YAML examples, see :ref:`workflow_examples`.
 
-.. note::
-   If you search for terms like "FOR JOBS" or "FOR key", this is the section you need.
-
 You need to use the ``FOR`` and ``NAME`` keys to define a loop.
 The ``NAME`` key defines the list of suffixes used to build each generated job name.
 
@@ -1170,7 +1167,7 @@ One can use now the following configuration:
     :name: for
     :width: 100%
     :align: center
-    :caption: Example showing jobs generated with the ``FOR`` key.
+    :caption: Example showing jobs generated with the FOR key.
     :alt: for
 
 
