@@ -1345,7 +1345,6 @@ class ParamikoPlatform(Platform):
 
             channel = stdout.channel
             if not x11:
-                channel.settimeout()
                 stdin.close()
                 channel.shutdown_write()
                 stdout_chunks.append(stdout.channel.recv(len(stdout.channel.in_buffer)))
