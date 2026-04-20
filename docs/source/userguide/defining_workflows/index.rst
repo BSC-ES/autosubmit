@@ -1058,7 +1058,7 @@ You need to use the ``FOR`` and ``NAME`` keys to define a loop.
 The ``NAME`` key defines the list of suffixes used to build each generated job name.
 
 .. note:: If you use a value in ``NAME`` that is not a string, like ``0_2``,
-          it will be parsed first by the YAML 1.2 parser, and that value will
+          it will be parsed first by the YAML parser, and that value will
           be converted to the string ``2``. To avoid issues like this, it is
           recommended to wrap such values in quotes, i.e. ``'0_2'``.
 
