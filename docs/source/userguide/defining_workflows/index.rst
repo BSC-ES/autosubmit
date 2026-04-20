@@ -546,14 +546,12 @@ Job split
 For jobs running at any level (``once``, ``date``, ``member``, ``chunk``), you can split each logical task into
 multiple sub-tasks with the ``SPLITS`` attribute.
 
-This is useful when a task can run in parallel (for example, domain decomposition, tiled post-processing,
-or multiple independent app instances for the same chunk).
+This is useful when you want multiple tasks to be run in parallel (e.g. multiple independent APP instances for the same chunk).
 
 Basic behavior
 ^^^^^^^^^^^^^^
 
 * ``SPLITS: N``: with ``N >= 2``, creates ``N`` split jobs per task.
-* ``SPLITS: 1``: means no split.
 * ``SPLITS: auto``: only valid with ``RUNNING: chunk``. The number of splits is computed automatically from calendar settings.
 
 How split dependencies are resolved
@@ -565,18 +563,16 @@ When a child job depends on a parent job and both have splits, Autosubmit decide
 * ``SPLITS_FROM`` selects child splits where a rule applies.
 * ``SPLITS_TO`` selects parent splits to connect for that child selection.
 
-If a child split is not selected by any ``SPLITS_FROM`` rule, Autosubmit uses the default linkage for that split
-(typically the natural/full linkage for the dependency).
+If a child split is not selected by any ``SPLITS_FROM`` rule, Autosubmit will link it to all parent splits by default.
 
 Supported values in ``SPLITS_FROM`` and ``SPLITS_TO``
 
 ``SPLITS_FROM`` (child selection):
 
 * ``all``: apply the rule to all child splits.
-* ``none`` and ``natural``: accepted keywords.
 * explicit indices/ranges, for example ``1,2,3`` or ``[1:3]``.
 * open ranges are supported, for example ``[2:auto]``.
-* in split expressions, ``auto``, ``last``, and ``-1`` are accepted aliases for the last split index.
+* in split expressions, ``auto``, ``last``, and ``-1`` are accepted keywords for the last split index.
 
 ``SPLITS_TO`` (parent selection/mapping):
 
@@ -585,7 +581,7 @@ Supported values in ``SPLITS_FROM`` and ``SPLITS_TO``
 * ``natural``: keep natural/default split linkage.
 * ``previous``: connect child split ``i`` to parent split ``i-1`` if it exists.
 * explicit indices/ranges, for example ``1,2,3`` or ``[1:3]``.
-* in split expressions, ``auto``, ``last``, and ``-1`` are accepted aliases for the last split index.
+* in split expressions, ``auto``, ``last``, and ``-1`` are accepted keywords for the last split index.
 
 Advanced mapping syntax in ``SPLITS_TO``:
 
