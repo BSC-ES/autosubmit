@@ -1333,9 +1333,6 @@ class ParamikoPlatform(Platform):
         :return: True if executed, False if failed
         """
         lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
-        timeout = None
-        if not ignore_log:
-            Log.debug(f"send_command timeout used: {timeout} seconds (None = infinity)")
 
         stderr_readlines = []
         stdout_chunks = []
@@ -1348,7 +1345,7 @@ class ParamikoPlatform(Platform):
 
             channel = stdout.channel
             if not x11:
-                channel.settimeout(timeout)
+                channel.settimeout()
                 stdin.close()
                 channel.shutdown_write()
                 stdout_chunks.append(stdout.channel.recv(len(stdout.channel.in_buffer)))
