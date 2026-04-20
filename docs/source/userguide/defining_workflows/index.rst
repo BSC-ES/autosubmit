@@ -1041,7 +1041,7 @@ The resulting workflow can be seen in Figure `delay`
 .. _loops_for_key:
 
 Loops (FOR jobs)
----------------
+----------------
 
 The ``FOR`` key lets you generate multiple job variants from a single section.
 This is useful when several jobs share the same template but differ in values such as name,
