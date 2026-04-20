@@ -1141,7 +1141,7 @@ One can use now the following configuration:
           PROCESSORS: [ 20,40,80 ]
           THREADS: [ 1,1,1 ]
           DEPENDENCIES: [ SIM_20-1,SIM_40-1,SIM_80-1 ]
-        FILE: POST.sh
+        FILE: SIM.sh
         RUNNING: chunk
         WALLCLOCK: '00:05'
 
