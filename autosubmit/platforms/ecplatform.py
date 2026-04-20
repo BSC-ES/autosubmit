@@ -33,7 +33,6 @@ from autosubmit.platforms.wrappers.wrapper_factory import EcWrapperFactory
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
-    from autosubmit.job.job_packages import JobPackageBase
 
 _EC_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
     # ecaccess-job-submit: returns a bare numeric job ID on success.
