@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+import sys
 
 from multiprocessing import Process
 from pathlib import Path
@@ -505,7 +506,7 @@ def test_run_debug(
             "executable_bash",
         ),
         (
-            dedent("""\
+            dedent(f"""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -516,7 +517,7 @@ def test_run_debug(
                     RUNNING: chunk
                     WALLCLOCK: 00:01
                     TYPE: python
-                    EXECUTABLE: /usr/bin/python3
+                    EXECUTABLE: {sys.executable}
             """),
             1,
             "COMPLETED",

@@ -2114,7 +2114,7 @@ class Autosubmit:
 
     @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
-                       run_only_members: Optional[str] = None, profile: int = 0, trace: bool = False) -> int:
+                       run_only_members: Optional[str] = None, profile: Optional[int] = None, trace: bool = False) -> int:
         """Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
 
         :param expid: the experiment id

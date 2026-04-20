@@ -397,6 +397,17 @@ class LocalPlatform(ParamikoPlatform):
         # avoid truncating
         return f"ps -eo pid,cmd | grep -E '({'|'.join(job_names)})' | awk '{{print $1}}' | sort -n | uniq -d"
 
+    def _get_process_list_output(self) -> str:
+        """Return the local ``ps -eo pid,cmd`` output via subprocess.
+
+        :return: Raw process list output, or an empty string on failure.
+        :rtype: str
+        """
+        try:
+            return subprocess.check_output("ps -eo pid,cmd", shell=True).decode("utf-8", errors="replace")
+        except subprocess.CalledProcessError:
+            return ""
+
     def _check_for_unrecoverable_errors(self) -> None:
         """Return immediately; local commands raise exceptions on failure."""
         return

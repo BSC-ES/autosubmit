@@ -25,7 +25,6 @@ from _pytest._py.path import LocalPath
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.ecplatform import EcPlatform
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
 
 @pytest.fixture
@@ -367,15 +366,16 @@ def test_check_for_unrecoverable_errors_unknown_output_does_not_raise(
     ec_platform._check_for_unrecoverable_errors()  # must not raise
 
 
-def test_submit_multiple_jobs_clears_and_snapshots_before_parent(
+def test_pre_submission_snapshot_clears_and_captures_ids(
     ec_platform: EcPlatform,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Reset state, call snapshot, then delegate to ParamikoPlatform.
+    """Verify _pre_submission_snapshot clears stale state then delegates to the inner snapshot.
 
-    Verifies that _pre_submission_ids is cleared to an empty dict at the
-    start of the call, that _snapshot_job_ids_before_submission receives the
-    correct script stem list, and that the parent return value is forwarded.
+    ParamikoPlatform.submit_multiple_jobs calls ``self._pre_submission_snapshot``
+    before issuing the submission command.  EcPlatform overrides this to
+    reset ``_pre_submission_ids`` and record current job IDs so that
+    ``get_submitted_jobs_by_name`` can exclude stale entries afterwards.
 
     :param ec_platform: EcPlatform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
@@ -384,51 +384,36 @@ def test_submit_multiple_jobs_clears_and_snapshots_before_parent(
 
     snapshot_calls: list[list[str]] = []
 
-    def _snapshot(script_names: list) -> None:
+    def _inner_snapshot(script_names: list) -> None:
         snapshot_calls.append(list(script_names))
 
-    parent_calls: list[list[str]] = []
+    monkeypatch.setattr(ec_platform, "_snapshot_job_ids_before_submission", _inner_snapshot)
 
-    def _parent_submit(self, scripts: dict) -> list[int]:
-        parent_calls.append(list(scripts.keys()))
-        return [42]
-
-    monkeypatch.setattr(ec_platform, "_snapshot_job_ids_before_submission", _snapshot)
-    monkeypatch.setattr(ParamikoPlatform, "submit_multiple_jobs", _parent_submit)
-
-    result = ec_platform.submit_multiple_jobs({"a.cmd": None, "b.cmd": None})
+    ec_platform._pre_submission_snapshot(["a.cmd", "b.cmd"])
 
     assert ec_platform._pre_submission_ids == {}
     assert snapshot_calls == [["a.cmd", "b.cmd"]]
-    assert parent_calls == [["a.cmd", "b.cmd"]]
-    assert result == [42]
 
 
-def test_submit_multiple_jobs_empty_input_returns_empty(
+def test_pre_submission_snapshot_called_with_empty_list(
     ec_platform: EcPlatform,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Return an empty list immediately when no scripts are provided.
+    """Verify _pre_submission_snapshot still clears state for an empty script list.
 
     :param ec_platform: EcPlatform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    snapshot_calls: list = []
+    ec_platform._pre_submission_ids = {"stale": {1}}
+
+    snapshot_calls: list[list[str]] = []
     monkeypatch.setattr(
         ec_platform,
         "_snapshot_job_ids_before_submission",
-        lambda names: snapshot_calls.append(names),
+        lambda names: snapshot_calls.append(list(names)),
     )
 
-    parent_calls: list = []
+    ec_platform._pre_submission_snapshot([])
 
-    def _parent_submit(self, scripts: dict) -> list[int]:
-        parent_calls.append(scripts)
-        return []
-
-    monkeypatch.setattr(ParamikoPlatform, "submit_multiple_jobs", _parent_submit)
-
-    result = ec_platform.submit_multiple_jobs({})
-
-    assert result == []
+    assert ec_platform._pre_submission_ids == {}
     assert snapshot_calls == [[]]

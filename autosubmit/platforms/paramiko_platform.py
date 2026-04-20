@@ -174,6 +174,9 @@ class ParamikoPlatform(Platform):
                 "REMOVE_LOG_FILES_ON_TRANSFER", False
             )
         self._uses_local_api: bool = False
+        # Pre-submission snapshot used by get_submitted_jobs_by_name to exclude
+        # stale processes from previous runs on process-based platforms.
+        self._pre_submission_pids: dict[str, set[int]] = {}
 
     @property
     def header(self) -> 'PlatformHeader':
@@ -721,6 +724,9 @@ class ParamikoPlatform(Platform):
         if not script_names:
             return []
 
+        self._pre_submission_pids = {}
+        self._pre_submission_snapshot(list(script_names.keys()))
+
         cmd = self.get_multi_submit_cmd(script_names)
         self.send_command(cmd)
         jobs_ids = None
@@ -742,18 +748,88 @@ class ParamikoPlatform(Platform):
 
         return jobs_ids
 
-    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
-        """Get the IDs of the submitted jobs by their script names.
+    def _get_process_list_output(self) -> str:
+        """Return the output of ``ps -eo pid,cmd`` for this platform.
 
-        This is a fallback method to retrieve job IDs when the submission command does not return them directly.
-        It relies on the assumption that the job script names are unique identifiers for the submitted jobs.
+        The default implementation returns an empty string, which means no
+        PID-based snapshot or fallback lookup is performed. Platforms that
+        manage jobs as OS processes (local, ps) override this to return the
+        actual process list — via subprocess for local execution or via SSH
+        for remote execution.
+
+        :return: Raw ``ps -eo pid,cmd`` output, or an empty string if not supported.
+        :rtype: str
+        """
+        return ""
+
+    def _pre_submission_snapshot(self, script_names: list[str]) -> None:
+        """The default implementation snapshots currently running process IDs for
+        the given script names using `_get_process_list_output`, so that
+        `get_submitted_jobs_by_name` can filter out pre-existing PIDs.
+
+        Platforms that track jobs differently (e.g. ecaccess job IDs) override
+        this method to populate their own pre-submission state instead.
+
+        :param script_names: Script filenames about to be submitted.
+        :type script_names: list[str]
+        """
+        with suppress(Exception):
+            output = self._get_process_list_output()
+            if not output:
+                return
+            pre: dict[str, set[int]] = {}
+            for line in output.splitlines():
+                parts = line.split(None, 1)
+                if len(parts) == 2 and parts[0].isdigit():
+                    pid, cmd = int(parts[0]), parts[1]
+                    for script_name in script_names:
+                        stem = Path(script_name).stem
+                        if stem in cmd:
+                            pre.setdefault(stem, set()).add(pid)
+            self._pre_submission_pids = pre
+
+    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
+        """Return submitted process IDs by script name.
+
+        This is a fallback used when the submission command does not return
+        one recoverable ID per submitted script. It reads the current process
+        list via `_get_process_list_output`, filters out any PIDs that
+        existed before submission (captured by `_pre_submission_snapshot`),
+        and returns the highest new PID for each script.
+
+        Platforms that do not override `_get_process_list_output` will
+        always get an empty list, which signals the caller to raise an error.
 
         :param script_names: List of script filenames that were submitted.
         :type script_names: list[str]
-        :return: List of job IDs corresponding to the submitted scripts, in the same order as the input list.
+        :return: Matching process IDs in submission order, one per script.
+            Returns an empty list if any script has no newly submitted process.
         :rtype: list[int]
         """
-        raise NotImplementedError  # pragma: no cover
+        output = self._get_process_list_output()
+        if not output:
+            return []
+
+        name_to_pids: dict[str, set[int]] = {}
+        for line in output.splitlines():
+            parts = line.split(None, 1)
+            if len(parts) == 2 and parts[0].isdigit():
+                pid, cmd = int(parts[0]), parts[1]
+                for script_name in script_names:
+                    stem = Path(script_name).stem
+                    if stem in cmd:
+                        name_to_pids.setdefault(stem, set()).add(pid)
+
+        submitted_pids: list[int] = []
+        for script_name in script_names:
+            stem = Path(script_name).stem
+            all_pids = name_to_pids.get(stem, set())
+            new_pids = all_pids - self._pre_submission_pids.get(stem, set())
+            if not new_pids:
+                return []
+            submitted_pids.append(max(new_pids))
+
+        return submitted_pids
 
     def get_estimated_queue_time_cmd(self, job_id):
         """Returns command to get estimated queue time on remote platforms
@@ -1387,7 +1463,7 @@ class ParamikoPlatform(Platform):
             timeout = package.timeout if package.timeout else 0
             x11_options = package.x11_options.strip("")
             cmd_list.append(
-                f"{self.get_call(abs_path, timeout, export, package.executable if not self.has_scheduler else None, x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if not self.has_scheduler and not x11_options else False)}")
+                f"{self.get_call(abs_path, timeout, export, package.executable if not self.has_scheduler and not self._uses_local_api else None, x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if not self.has_scheduler and not x11_options else False)}")
 
         return " ;".join(cmd_list)
 

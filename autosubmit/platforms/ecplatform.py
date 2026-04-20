@@ -532,19 +532,18 @@ class EcPlatform(ParamikoPlatform):
                     pre.setdefault(parts[-1], set()).add(int(parts[0]))
             self._pre_submission_ids = pre
 
-    def submit_multiple_jobs(self, script_names: dict[str, 'JobPackageBase']) -> list[int]:
-        """Records which ecaccess job IDs already exist for the submitted script
-        names so that `get_submitted_jobs_by_name` can distinguish freshly
-        submitted jobs from leftover jobs of a previous run.
+    def _pre_submission_snapshot(self, script_names: list[str]) -> None:
+        """Snapshot currently active ecaccess job IDs before a submission batch.
 
-        :param script_names: Script filenames mapped to their job packages.
-        :type script_names: dict[str, JobPackageBase]
-        :return: Submitted ecaccess job IDs in submission order.
-        :rtype: list[int]
+        Overrides the base to populate `_pre_submission_ids` with
+        ecaccess job IDs so that `get_submitted_jobs_by_name` can
+        distinguish freshly submitted jobs from those of a previous run.
+
+        :param script_names: Script filenames about to be submitted.
+        :type script_names: list[str]
         """
         self._pre_submission_ids = {}
-        self._snapshot_job_ids_before_submission(list(script_names.keys()))
-        return super().submit_multiple_jobs(script_names)
+        self._snapshot_job_ids_before_submission(script_names)
 
     def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
         """Return submitted ecaccess job IDs by script name.

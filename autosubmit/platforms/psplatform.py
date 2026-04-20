@@ -42,6 +42,7 @@ class PsPlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = []
         self.job_status['FAILED'] = []
         self.update_cmds()
+        self.has_scheduler = False
 
     def get_check_all_jobs_cmd(self, jobs_id):
         pass  # pragma: no cover
@@ -86,7 +87,7 @@ class PsPlatform(ParamikoPlatform):
         :param x11: whether the job is an x11 job, which has a different output format.
         :return: job ID of the submitted job.
         """
-        return [output.strip() for output in raw_output.splitlines() if output.strip()]
+        return [line for line in (line.strip() for line in raw_output.splitlines()) if line.isdigit()]
 
     def get_check_job_cmd(self, job_id):
         return self.get_pscall(job_id)
@@ -134,6 +135,16 @@ class PsPlatform(ParamikoPlatform):
         """
         # check processes with the same name, and return the oldest one (if any)
         return f"ps -eo pid,cmd | grep -E '({'|'.join(job_names)})' | awk '{{print $1}}' | sort -n | uniq -d"
+
+    def _get_process_list_output(self) -> str:
+        """Return the remote ``ps -eo pid,cmd`` output via SSH.
+
+        :return: Raw process list output, or an empty string on failure.
+        :rtype: str
+        """
+        if self.send_command("ps -eo pid,cmd", ignore_log=True):
+            return self.get_ssh_output()
+        return ""
 
     def _check_for_unrecoverable_errors(self) -> None:
         """Check process-platform output for recoverable and unrecoverable errors."""
