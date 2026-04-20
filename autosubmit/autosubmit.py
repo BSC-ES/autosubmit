@@ -2522,11 +2522,11 @@ class Autosubmit:
                     raise AutosubmitCritical(f"Job {section} does not have a correct template// template not found",
                                              7014)
 
-        for p in platforms_to_test:
-            packager = JobPackager(as_conf, p, job_list)
+        for platform_interface in platforms_to_test:
+            packager = JobPackager(as_conf, platform_interface, job_list)
             packages_to_submit = packager.build_packages()
 
-            scripts_to_submit_by_section, x11_scripts_to_submit_by_section = p.prepare_submission(as_conf,
+            scripts_to_submit_by_section, x11_scripts_to_submit_by_section = platform_interface.prepare_submission(as_conf,
                                                                                                   job_list,
                                                                                                   packages_persistence,
                                                                                                   packages_to_submit,
@@ -2536,7 +2536,7 @@ class Autosubmit:
             # Divided by section in case of finding any unrecoverable error due a bad configuration
             for section, scripts_to_submit_by_name in scripts_to_submit_by_section.items():
                 try:
-                    p.process_ready_jobs(scripts_to_submit_by_name)
+                    platform_interface.process_ready_jobs(scripts_to_submit_by_name)
                     any_job_submitted = True
                 except Exception:
                     if not inspect:
@@ -2548,7 +2548,7 @@ class Autosubmit:
                 # X11 only works sequentially, so we need to process them one by one, and not in parallel by section like the normal scripts.
                 for script_name, package in x11_scripts.items():
                     try:
-                        p.process_ready_jobs({script_name: package})
+                        platform_interface.process_ready_jobs({script_name: package})
                         any_job_submitted = True
                     except Exception:
                         if not inspect:
