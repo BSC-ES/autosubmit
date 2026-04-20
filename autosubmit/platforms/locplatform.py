@@ -51,8 +51,8 @@ class LocalPlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = []
         self.job_status['FAILED'] = []
         self._allow_wrappers = False
-
         self.update_cmds()
+        self.has_scheduler = False
 
     def parse_all_jobs_output(self, output, job_id):
         pass

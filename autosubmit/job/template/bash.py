@@ -19,6 +19,8 @@
 
 from textwrap import dedent
 
+from autosubmit.job.template.common import shebang_from_executable
+
 _DEFAULT_EXECUTABLE = "/bin/bash\n"
 """The default executable used when none provided."""
 
@@ -173,7 +175,7 @@ wait
 
 def as_header(platform_header: str, executable: str) -> str:
     executable = executable or _DEFAULT_EXECUTABLE
-    shebang = f'#!{executable}'
+    shebang = shebang_from_executable(executable)
 
     return '\n'.join(
         [

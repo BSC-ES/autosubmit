@@ -2558,8 +2558,7 @@ class Autosubmit:
                 job_list.save()
 
             wrapper_errors.update(packager.wrappers_with_error)
-            job_list.save_wrappers(scripts_to_submit_by_section, as_conf, packages_persistence,
-                                   hold=False, inspect=inspect)
+            job_list.save_wrappers(scripts_to_submit_by_section, as_conf, packages_persistence, inspect=inspect)
 
         Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
 

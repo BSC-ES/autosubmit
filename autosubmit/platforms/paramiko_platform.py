@@ -1387,7 +1387,7 @@ class ParamikoPlatform(Platform):
             timeout = package.timeout if package.timeout else 0
             x11_options = package.x11_options.strip("")
             cmd_list.append(
-                f"{self.get_call(abs_path, timeout, export, package.executable, x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if self.type.lower() in ['local', 'ps'] and not x11_options else False)}")
+                f"{self.get_call(abs_path, timeout, export, package.executable if not self.has_scheduler else None, x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if not self.has_scheduler and not x11_options else False)}")
 
         return " ;".join(cmd_list)
 
@@ -1444,12 +1444,13 @@ class ParamikoPlatform(Platform):
         :param redirect_out_err: whether to redirect stdout and stderr to files
         :return: command to execute script
         :rtype: str
+        :rtype: str
         """
         # Some platforms (right now only ECaccess) has a dual queue system, one to run the job and another to submit the job.
         self._set_submit_cmd(sub_queue)
         pre = f"timeout {str(timeout)} " if float(timeout) > 0 else ""
         pre += f"{export} " if export else ""
-        pre += f"{executable} " if executable else ""
+        pre += f"{executable} " if executable and not self.has_scheduler else ""
         post = f"> {script_name.replace('.cmd', f'.cmd.out.{fail_count}')} 2> {script_name.replace('.cmd', f'.cmd.err.{fail_count}')}" if redirect_out_err else ""
         return self._construct_final_call(script_name, pre.strip(), post.strip(), x11_options).strip(" ;,")
 

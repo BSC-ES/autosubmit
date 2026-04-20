@@ -891,3 +891,56 @@ def test_rerun_expid(
     as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=False)
     exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
     _assert_exit_code("SUCCESS", exit_code)
+
+
+@pytest.mark.ssh
+@pytest.mark.slurm
+@pytest.mark.docker
+@pytest.mark.parametrize("jobs_data,final_status", [
+    (dedent("""\
+    CONFIG:
+        SAFETYSLEEPTIME: 0
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                print("Hello World with id=Success")
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 1
+            type: python3
+    """), "COMPLETED"),
+    (dedent("""\
+    CONFIG:
+        SAFETYSLEEPTIME: 0
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                raise RuntimeError("Intentional failure")
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 1
+            type: python3
+    """), "FAILED"),
+], ids=["Python3 script succeeds", "Python3 script fails"])
+def test_run_python3_job(
+        autosubmit_exp,
+        general_data,
+        jobs_data,
+        final_status,
+        slurm_server
+):
+    """Run a job using python3 script type and assert the expected final status."""
+    yaml = YAML(typ='rt')
+    jobs_data_yaml = yaml.load(jobs_data)
+    as_exp = autosubmit_exp(experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
+    as_conf = as_exp.as_conf
+    as_conf.set_last_as_command('run')
+
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+    _assert_exit_code(final_status, exit_code)

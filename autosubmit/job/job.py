@@ -284,9 +284,9 @@ class Job(object):
         self._notify_on = None
         # The three variables under this message are related to the #PR2918 that is a development
         # focused on adding the key information for computing the simulated years for the CPMIPS metrics.
-        self._cpmip_thresholds = {} 
-        self._chunk_size = None 
-        self._chunk_size_unit = None 
+        self._cpmip_thresholds = {}
+        self._chunk_size = None
+        self._chunk_size_unit = None
         self._processors_per_node = None
         self.ec_queue = None
         self.platform_name = None
@@ -1804,8 +1804,7 @@ class Job(object):
             self.exclusive = self.het['HYPERTHREADING'][0]
         else:
             self.hyperthreading = self.hyperthreading
-        # Doesn't make sense to have executable as heterogeneous parameter
-        self._calculate_executable()
+        self.executable = self.executable if self.executable else Language.get_executable(self.type)
         if type(self.queue) is list:
             # Get the queue, each element can be only be bool
             self.het['CURRENT_QUEUE'] = list()
@@ -2472,7 +2471,6 @@ class Job(object):
             template_content, parameters, as_conf, self.undefined_variables
         )
 
-
         script_name = f'{self.name}.cmd'
         self.script_name = script_name
         script_path = Path(self._tmp_path) / script_name
@@ -2940,14 +2938,6 @@ class Job(object):
                         '%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
 
-    def _calculate_executable(self):
-        """Calculate the executable for the job based on the platform type and job type.
-         This setting only makes sense when the remote platform is not being used within a scheduler.
-        """
-        if self.platform.type.upper() in ["PS", "LOCAL"]:
-            self.executable = self.executable if self.executable else Language.get_executable(self.type)
-        else:
-            self.executable = None
 
 class WrapperJob(Job):
     """Defines a wrapper from a package.

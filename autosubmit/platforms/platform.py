@@ -235,6 +235,7 @@ class Platform:
 
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
+        self.has_scheduler = True
 
     @classmethod
     def update_workers(cls, event_worker):

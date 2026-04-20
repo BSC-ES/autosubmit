@@ -16,8 +16,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Autosubmit template scripts written in Python 3."""
-
-from textwrap import dedent
+from autosubmit.job.template.common import shebang_from_executable
+from textwrap import dedent, indent
 
 _DEFAULT_EXECUTABLE = "/usr/bin/env python3"
 """The default executable used when none provided."""
@@ -75,7 +75,7 @@ _AS_PY3_TAILER = dedent("""\
 
 def as_header(platform_header: str, executable: str) -> str:
     executable = executable or _DEFAULT_EXECUTABLE
-    shebang = f'#!{executable}'
+    shebang = shebang_from_executable(executable)
 
     return '\n'.join(
         [
@@ -86,21 +86,23 @@ def as_header(platform_header: str, executable: str) -> str:
 
 
 def as_body(body: str) -> str:
-    return dedent(f"""\
+    indented_body = indent(body, '    ')
+    template = dedent("""\
         ###################
         # Autosubmit job
         ###################
-        
+
         try:
-            {body}
+        __BODY__
         finally:
             stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'a')
-            stat_file.write(f'{{int(time.time())}}\\n')
+            stat_file.write(f'{int(time.time())}\\n')
             stat_file.close()
-        
+
         # Now, we let the execution of the tailer happen, where the _COMPLETED
         # file will be created.
         """)
+    return template.replace('__BODY__', indented_body)
 
 
 def as_tailer() -> str:

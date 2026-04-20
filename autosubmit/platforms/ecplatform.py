@@ -106,6 +106,7 @@ class EcPlatform(ParamikoPlatform):
         # Pre-submission snapshot used by get_submitted_jobs_by_name to exclude
         # stale jobs from previous runs.
         self._pre_submission_ids: dict[str, set[int]] = {}
+        self.has_scheduler = False
 
     def update_cmds(self):
         """
@@ -140,10 +141,20 @@ class EcPlatform(ParamikoPlatform):
         return self.mkdir_cmd
 
     def _set_submit_cmd(self, ec_queue: str):
-        """Sets the command to submit a job, for the current platform, with the given parameters."""
-        # Sometimes ecaccess-job-submit doesn't submit anything due the SSL connection being unstable
-        # Don't confuse retry by the amount of retries of the job itself.
-        self._submit_cmd = f"{self._submit_command_name} -retry 20 -distant -queueName {ec_queue} {self.host}:"
+        """Set the ecaccess-job-submit command for the given queue.
+
+        The ``-retry 3w0`` flag tells ecaccess to retry the **initial SSL handshake**
+        up to 30 times (one attempt per ~5 s) before giving up. This guards against
+        transient SSL failures that occasionally occur when first connecting to the
+        ECMWF gateway; without it, a single bad handshake would abort the submission
+        entirely. It does **not** affect job-level retries or any subsequent requests
+        made after the connection is established.
+
+        See: https://confluence.ecmwf.int/display/ECAC/ecaccess-job-submit
+
+        :param ec_queue: Queue to submit the job to.
+        """
+        self._submit_cmd = f"{self._submit_command_name} -retry 30 -distant -queueName {ec_queue} {self.host}:"
 
     def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
         """Gets the command to submit a job, for the current platform, with the given parameters.

@@ -14,25 +14,30 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+"""This package contains unit tests for R templates."""
 
-"""This package contains unit tests for Bash templates."""
-
+import shutil
 from subprocess import run
 from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import pytest
 
-from autosubmit.job.template.bash import _DEFAULT_EXECUTABLE, as_body, as_header, as_tailer
+from autosubmit.job.template.r import _DEFAULT_EXECUTABLE, as_body, as_header, as_tailer
 
 if TYPE_CHECKING:
     from pathlib import Path
-    # noinspection PyProtectedMember
-    from _pytest._py.path import LocalPath
+
+_RSCRIPT = shutil.which('Rscript')
+_JOBNAME = 't000_test'
+_FAIL_COUNT = '0'
+
+pytestmark = pytest.mark.skipif(_RSCRIPT is None, reason='Rscript not found on PATH')
 
 
-def _build_script(tmp_path: 'Path', body: str, executable: str = '/bin/bash') -> 'Path':
-    """Assemble and write a runnable Bash script, returning its path."""
+def _build_script(tmp_path: 'Path', body: str, executable: str = None) -> 'Path':
+    """Assemble and write a runnable R script, returning its path."""
+    executable = executable or _RSCRIPT
     h = as_header(platform_header='', executable=executable)
     b = as_body(dedent(body))
     t = as_tailer()
@@ -41,10 +46,10 @@ def _build_script(tmp_path: 'Path', body: str, executable: str = '/bin/bash') ->
     script = script.replace('%EXTENDED_HEADER%', '')
     script = script.replace('%EXTENDED_TAILER%', '')
     script = script.replace('%CURRENT_LOGDIR%', str(tmp_path))
-    script = script.replace('%JOBNAME%', 't000_test')
-    script = script.replace('%FAIL_COUNT%', '0')
+    script = script.replace('%JOBNAME%', _JOBNAME)
+    script = script.replace('%FAIL_COUNT%', _FAIL_COUNT)
 
-    script_path = tmp_path / 'the_script.sh'
+    script_path = tmp_path / 'the_script.R'
     script_path.write_text(script)
     script_path.chmod(0o755)
     return script_path
@@ -53,25 +58,25 @@ def _build_script(tmp_path: 'Path', body: str, executable: str = '/bin/bash') ->
 def test_header_default_executable_used_when_empty():
     """Use the default executable when an empty string is given."""
     header = as_header(platform_header='', executable='')
-    assert header.startswith(f'#!{_DEFAULT_EXECUTABLE.strip()}')
+    assert _DEFAULT_EXECUTABLE.strip() in header.splitlines()[0]
 
 
 def test_header_default_executable_used_when_none():
     """Use the default executable when ``None`` is given."""
     header = as_header(platform_header='', executable=None)
-    assert header.startswith(f'#!{_DEFAULT_EXECUTABLE.strip()}')
+    assert _DEFAULT_EXECUTABLE.strip() in header.splitlines()[0]
 
 
 def test_header_absolute_executable_produces_direct_shebang():
     """An absolute path executable is used directly in the shebang."""
-    header = as_header(platform_header='', executable='/bin/bash')
-    assert header.startswith('#!/bin/bash')
+    header = as_header(platform_header='', executable='/usr/bin/Rscript')
+    assert header.startswith('#!/usr/bin/Rscript')
 
 
 def test_header_bare_executable_uses_env():
     """A bare executable name is wrapped with ``/usr/bin/env``."""
-    header = as_header(platform_header='', executable='bash')
-    assert header.startswith('#!/usr/bin/env bash')
+    header = as_header(platform_header='', executable='Rscript')
+    assert header.startswith('#!/usr/bin/env Rscript')
 
 
 def test_header_platform_header_included():
@@ -87,13 +92,6 @@ def test_header_autosubmit_section_present():
     assert 'Autosubmit header' in header
 
 
-def test_header_trap_functions_present():
-    """Signal trap functions are present in the header."""
-    header = as_header(platform_header='', executable='')
-    assert 'as_signals_handler' in header
-    assert 'as_exit_handler' in header
-
-
 def test_header_checkpoint_function_present():
     """The checkpoint function is present in the header."""
     header = as_header(platform_header='', executable='')
@@ -101,9 +99,9 @@ def test_header_checkpoint_function_present():
 
 
 @pytest.mark.parametrize('executable,expected_shebang', [
-    ('/bin/bash', '#!/bin/bash'),
-    ('/usr/local/bin/bash', '#!/usr/local/bin/bash'),
-    ('bash', '#!/usr/bin/env bash'),
+    ('/usr/bin/Rscript', '#!/usr/bin/Rscript'),
+    ('/usr/local/bin/Rscript', '#!/usr/local/bin/Rscript'),
+    ('Rscript', '#!/usr/bin/env Rscript'),
 ])
 def test_header_shebang_variants(executable: str, expected_shebang: str):
     """Various executable inputs produce the correct shebang line."""
@@ -114,14 +112,21 @@ def test_header_shebang_variants(executable: str, expected_shebang: str):
 
 def test_body_contains_user_code():
     """The user's code is present in the body."""
-    body = as_body("echo hello")
-    assert "echo hello" in body
+    body = as_body("print('hello')")
+    assert "print('hello')" in body
 
 
 def test_body_has_autosubmit_job_marker():
     """The Autosubmit job section marker is present."""
-    body = as_body("echo hello")
+    body = as_body("print('hello')")
     assert 'Autosubmit job' in body
+
+
+def test_body_wraps_in_trycatch():
+    """The body is wrapped in a ``tryCatch`` block for stat file writing."""
+    body = as_body("print('hello')")
+    assert 'tryCatch' in body
+    assert 'finally' in body
 
 
 def test_tailer_has_autosubmit_marker():
@@ -130,25 +135,25 @@ def test_tailer_has_autosubmit_marker():
     assert 'Autosubmit tailer' in tailer
 
 
-def test_tailer_has_wait():
-    """The tailer contains a ``wait`` statement for background jobs."""
+def test_tailer_creates_completed_file():
+    """The tailer contains the logic to create the ``_COMPLETED`` file."""
     tailer = as_tailer()
-    assert 'wait' in tailer
+    assert '_COMPLETED' in tailer
 
 
 def test_completed_file_created_on_success(tmp_path: 'Path'):
     """A successful script produces a ``_COMPLETED`` marker file."""
-    script_path = _build_script(tmp_path, "echo 'ok'")
-    result = run([str(script_path)], capture_output=True, text=True)
+    script_path = _build_script(tmp_path, "cat('ok\\n')")
+    result = run([_RSCRIPT, str(script_path)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert (tmp_path / 't000_test_COMPLETED').exists()
+    assert (tmp_path / f'{_JOBNAME}_COMPLETED').exists()
 
 
 def test_stat_file_written_on_success(tmp_path: 'Path'):
     """A successful script writes a ``_STAT_`` file with two timestamps."""
-    script_path = _build_script(tmp_path, "echo 'ok'")
-    run([str(script_path)], capture_output=True, text=True)
-    stat_file = tmp_path / 't000_test_STAT_0'
+    script_path = _build_script(tmp_path, "cat('ok\\n')")
+    run([_RSCRIPT, str(script_path)], capture_output=True, text=True)
+    stat_file = tmp_path / f'{_JOBNAME}_STAT_{_FAIL_COUNT}'
     assert stat_file.exists()
     lines = [line for line in stat_file.read_text().strip().splitlines() if line.strip()]
     assert len(lines) == 2  # start + end timestamps
@@ -156,66 +161,37 @@ def test_stat_file_written_on_success(tmp_path: 'Path'):
 
 def test_completed_file_not_created_on_failure(tmp_path: 'Path'):
     """A failing script does NOT produce a ``_COMPLETED`` marker file."""
-    script_path = _build_script(tmp_path, "exit 1")
-    result = run([str(script_path)], capture_output=True, text=True)
+    script_path = _build_script(tmp_path, "stop('fail')")
+    result = run([_RSCRIPT, str(script_path)], capture_output=True, text=True)
     assert result.returncode != 0
-    assert not (tmp_path / 't000_test_COMPLETED').exists()
+    assert not (tmp_path / f'{_JOBNAME}_COMPLETED').exists()
 
 
 def test_stat_file_written_on_failure(tmp_path: 'Path'):
-    """A failing script still writes the ``_STAT_`` file (via EXIT trap)."""
-    script_path = _build_script(tmp_path, "exit 1")
-    run([str(script_path)], capture_output=True, text=True)
-    assert (tmp_path / 't000_test_STAT_0').exists()
+    """A failing script still writes the ``_STAT_`` file (via finally block)."""
+    script_path = _build_script(tmp_path, "stop('fail')")
+    run([_RSCRIPT, str(script_path)], capture_output=True, text=True)
+    assert (tmp_path / f'{_JOBNAME}_STAT_{_FAIL_COUNT}').exists()
 
 
 def test_checkpoint_file_created(tmp_path: 'Path'):
-    """Calling ``as_checkpoint`` creates a ``_CHECKPOINT_N`` file."""
-    script_path = _build_script(tmp_path, "as_checkpoint")
-    run([str(script_path)], capture_output=True, text=True)
-    assert (tmp_path / 't000_test_CHECKPOINT_1').exists()
+    """Calling ``as_checkpoint()`` creates a ``_CHECKPOINT_N`` file."""
+    script_path = _build_script(tmp_path, "as_checkpoint()")
+    run([_RSCRIPT, str(script_path)], capture_output=True, text=True)
+    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_1').exists()
 
 
-def test_error_line_numbering(tmp_path: 'LocalPath'):
-    h = as_header(platform_header='', executable='/bin/bash')
-    b = as_body(dedent('''
-    a="42"
-    q="The answer?"
-    echo $q
-    d_echo "And the answer: "
-    echo $a
-    '''))
-    t = as_tailer()
-
-    the_script = '\n'.join([h, b, t])
-    the_script_path = tmp_path / 'the_script.sh'
-
-    # TODO: maybe it'd be better to have this as an integration test?
-    the_script = the_script.replace('%EXTENDED_HEADER%', '')
-    the_script = the_script.replace('%CURRENT_LOGDIR%', str(tmp_path))
-    the_script = the_script.replace('%JOBNAME%', 't000_test')
-    the_script = the_script.replace('%FAIL_COUNT%', '0')
-    the_script_path.write_text(the_script)
-
-    the_script_path.chmod(0o755)
-
-    result = run([the_script_path], capture_output=True, text=True)
-
-    assert result.returncode == 127  # 127 is nix exit code for cmd not found (d_echo)
-
-    stderr = result.stderr
-
-    assert "The answer?" in stderr, stderr
-    assert "d_echo" in stderr, stderr
-
-    assert the_script_path.exists()
-    error_line = -1
-    with open(the_script_path) as f:
-        for i, line in enumerate(f, start=1):
-            if 'd_echo' in line:
-                error_line = i
-                break
-
-    # Here we verify that the first line where d_echo (typo) appears
-    # is where Bash shell reports the error, not a line with a heredoc anymore.
-    assert f'line {error_line}: d_echo: command not found' in stderr, stderr
+def test_multiple_checkpoints_create_sequential_files(tmp_path: 'Path'):
+    """Each ``as_checkpoint()`` call creates a sequentially numbered file."""
+    script_path = _build_script(
+        tmp_path,
+        dedent("""\
+            as_checkpoint()
+            as_checkpoint()
+            as_checkpoint()
+        """),
+    )
+    run([_RSCRIPT, str(script_path)], capture_output=True, text=True)
+    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_1').exists()
+    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_2').exists()
+    assert (tmp_path / f'{_JOBNAME}_CHECKPOINT_3').exists()

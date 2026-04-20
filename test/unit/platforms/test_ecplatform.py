@@ -227,7 +227,7 @@ def test_snapshot_resets_and_captures_pre_existing_ids(
 
     monkeypatch.setattr(ec_platform, "send_command", _send_command)
 
-    ec_platform._snapshot_job_ids_before_submission(["a000_INI.cmd", "a000_SIM.cmd"])
+    ec_platform._snapshot_job_ids_before_submission(["a000_INI", "a000_SIM"])
 
     # Old entry must be gone; only the stems present in the job list remain.
     assert ec_platform._pre_submission_ids == {
