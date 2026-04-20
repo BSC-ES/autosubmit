@@ -1236,7 +1236,6 @@ Example 1: How to select a specific chunk
         WALLCLOCK: 00:05
 
 
-
 .. autosubmitfigure::
     :command: create
     :args: -plt
