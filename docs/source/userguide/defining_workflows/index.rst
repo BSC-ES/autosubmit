@@ -907,7 +907,7 @@ Detailed example: auto split with split-aware dependencies
                 all:
                   SPLITS_TO: all
           NAME: '%RUN.APP_NAMES%'
-          SPLITS: '1'
+          SPLITS: '[1]'
         PLATFORM: 'local'
         RUNNING: chunk
         WALLCLOCK: 00:05
