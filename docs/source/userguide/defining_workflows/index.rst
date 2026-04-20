@@ -31,6 +31,8 @@ be finished before launching the job that has the ``DEPENDENCIES`` attribute.
       DEPENDENCIES: One
 
 
+The resulting workflow can be seen in Figure `simple`
+
 .. autosubmitfigure::
     :command: create
     :args: -plt
@@ -42,9 +44,6 @@ be finished before launching the job that has the ``DEPENDENCIES`` attribute.
     :align: center
     :alt: simple workflow plot
     :caption: Example showing a simple workflow with two sequential jobs
-
-
-The resulting workflow can be seen in Figure
 
 
 Running jobs once per startdate, member or chunk
@@ -88,7 +87,7 @@ To set at what level a job has to run you have to use the ``RUNNING`` attribute.
           RUNNING: chunk
 
 
-The resulting workflow can be seen in Figure  for a experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
+The resulting workflow can be seen in Figure `running` for a experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
 
 .. autosubmitfigure::
     :command: create
@@ -147,8 +146,8 @@ The resulting workflow can be seen in Figure `dprevious`
 .. warning::
 
    Autosubmit simplifies the dependencies, so the final graph usually does not show all the lines that you may expect to
-   see. In this example you can see that there are no lines between the ini and the sim jobs for chunks 2 to 5 because
-   that dependency is redundant with the one on the previous sim
+   see. In this example you can see that there are no lines between the `ini` and the `sim` jobs for chunks 2 to 5 because
+   that dependency is redundant with the one on the previous `sim`
 
 
 .. autosubmitfigure::
@@ -546,7 +545,7 @@ Job split
 For jobs running at any level (``once``, ``date``, ``member``, ``chunk``), you can split each logical task into
 multiple sub-tasks with the ``SPLITS`` attribute.
 
-This is useful when you want multiple tasks to be run in parallel (e.g. multiple independent APP instances for the same chunk).
+This is useful when you want multiple tasks to be run in parallel (e.g. multiple independent ``APP`` instances for the same chunk).
 
 Basic behavior
 ^^^^^^^^^^^^^^
@@ -571,7 +570,7 @@ Supported values in ``SPLITS_FROM`` and ``SPLITS_TO``
 
 * ``all``: apply the rule to all child splits.
 * explicit indices/ranges, for example ``1,2,3`` or ``[1:3]``.
-* open ranges are supported, for example ``[2:auto]``.
+* open ranges, for example ``[2:auto]``.
 * in split expressions, ``auto``, ``last``, and ``-1`` are accepted keywords for the last split index.
 
 ``SPLITS_TO`` (parent selection/mapping):
@@ -585,7 +584,7 @@ Supported values in ``SPLITS_FROM`` and ``SPLITS_TO``
 
 Advanced mapping syntax in ``SPLITS_TO``:
 
-* ``K*``: index-based mapping for index ``K``.
+* ``K*``: index-based mapping for index ``K``. For example, ``2*`` maps child split 2 to parent split 2.
 * ``[A:B]*\G``: grouped mapping with group size ``G``. This is useful for N-to-1 and 1-to-N relationships.
 
 .. note::
@@ -655,7 +654,7 @@ Example 1: explicit split mapping
 In this example:
 
 * ``FOURTH`` job will be split into 3 parts.  
-* ``FOURTH`` job split 1 will depend on all the splits of the ``THIRD`` job due to not being present in ``SPLITS_FROM``.  
+* ``FOURTH`` job split 1 will depend on all the splits of the ``THIRD`` job due to not being present in ``SPLITS_FROM`` (default split linkage).
 * ``FOURTH`` job split 2 will depend on the splits 1 and 2 of the ``THIRD`` job due to the 2* mapping.  
 * ``FOURTH`` job split 3 will depend on the splits 2 and 3 of the ``THIRD`` job due to the 3* mapping.  
 
@@ -695,6 +694,7 @@ Example 2: 1-to-1 dependency
     :caption: Example showing dependencies between jobs with 1-to-1 split relationships.
 
 In this example:
+
 * ``TEST`` and ``TEST2`` jobs will be split into 2 parts each.
 * ``[1:auto]*\1`` mapping creates one-to-one mapping across all existing splits indices.
 * So ``TEST2`` job split 1 will depend on ``TEST`` job split 1 and ``TEST2`` job split 2 will depend on ``TEST`` job split 2. 
@@ -732,6 +732,7 @@ Example 3: N-to-1 dependency
     :caption: Example showing dependencies between jobs with N-to-1 split relationships.
 
 In this example:
+
 * ``TEST`` job will be split into 4 parts and ``TEST2`` job will be split into 2 parts.
 * ``[1:4]*\2`` mapping creates a grouped mapping with group size 2. 
 * So split 1 of ``TEST2`` job will depend on splits 1 and 2 of ``TEST`` job and split 2 of ``TEST2`` job will depend on splits 3 and 4 of ``TEST`` job.
@@ -769,6 +770,7 @@ Example 4: 1-to-N dependency
     :caption: Example showing dependencies between jobs with 1-to-N split relationships.
 
 In this example:
+
 * ``TEST`` job will be split into 2 parts and ``TEST2`` job will be split into 4 parts.
 * ``[1:2]*\2`` mapping creates a grouped mapping with group size 2. 
 * So splits 1 and 2 of ``TEST2`` job will depend on split 1 of ``TEST`` job and splits 3 and 4 of ``TEST2`` job will depend on split 2 of ``TEST`` job.
@@ -843,7 +845,24 @@ Quick example: simple auto split
         RUNNING: chunk
         SPLITS: auto
 
-With this setup, each chunk produces 2 splits (30/15).
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: splits_auto_simple.png
+    :name: splits_auto_simple
+    :width: 100%
+    :align: center
+    :caption: Simple example showing automatically computed splits based on calendar settings.
+    :alt: Simple example showing automatically computed splits based on calendar settings.
+
+
+In this example:
+
+* The experiment has a chunk size of 30 days and a split size of 15 days.
+* The ``DN`` job will be split into 2 parts, with the first split covering days 1-15 and the second split covering days 16-30.
 
 Detailed example: auto split with split-aware dependencies
 

@@ -1,0 +1,5 @@
+JOBS:
+  DN:
+    SCRIPT: 'sleep 0'
+    RUNNING: chunk
+    SPLITS: auto
