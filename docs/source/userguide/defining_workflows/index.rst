@@ -807,6 +807,19 @@ Example 5: using ``previous`` and ``none``
             '1':
               SPLITS_TO: none
 
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: splits_prev_none.png
+    :name: splits_prev_none
+    :width: 100%
+    :align: center
+    :caption: Example showing dependencies between jobs using 'previous' and 'none' split mapping.
+
+
 In this example:
 
 * ``B`` split 1 has no dependency on ``A`` (``none``).

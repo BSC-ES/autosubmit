@@ -1,0 +1,17 @@
+JOBS:
+  A:
+    FILE: A.sh
+    RUNNING: once
+    SPLITS: 4
+
+  B:
+    FILE: B.sh
+    RUNNING: once
+    SPLITS: 4
+    DEPENDENCIES:
+      A:
+        SPLITS_FROM:
+          '[2:auto]':
+            SPLITS_TO: previous
+          '1':
+            SPLITS_TO: none
