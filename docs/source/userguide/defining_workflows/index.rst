@@ -1331,7 +1331,7 @@ Weak dependencies, work like this way:
     :alt: dashed_workflow
 
 Example 4: Select a member
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this workflow you can see an illustrated example of select member. Using 4 members 1 datelist and 4 different job sections.
 
