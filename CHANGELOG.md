@@ -16,6 +16,7 @@
 - Fix `Jobs.running` to case-insensitive #2916
 - Fixed the wallclock validation error message to display the platform's wallclock time instead of the job time twice #2492
 - Fixed recovery and setstatus for experiments with more than > 32k jobs #2894
+- Removed invalid message about the template script showing the error with a difference of ~5 lines #2962
 
 **Enhancements:**
 
