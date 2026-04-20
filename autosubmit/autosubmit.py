@@ -2169,27 +2169,28 @@ class Autosubmit:
                     Log.warning('Git operational check disabled by user')
 
                 Log.debug("Running main running loop")
-                Log.warning("Known issue: Due to recent changes in Autosubmit's script generation, error line numbers in "
-                            "`script.cmd.err` files may be offset by ~5 lines. Please adjust accordingly when debugging.")
                 did_run = False
                 #########################
                 # AUTOSUBMIT - MAIN LOOP
                 #########################
                 # Main loop
-                # Recovery retrials, when platforms have issues. Hard limit is set just in case is an Autosubmit bug or bad config and the minium duration is the weekend (72 h).
+                # Recovery retries, when platforms have issues. The hard limit is set just in case an Autosubmit bug or
+                # wrong configuration. The minimum duration is the weekend (72 h).
                 # Run experiment steps:
                 # 0. Prepare the experiment to start running it.
-                # 1. Check if there are jobs in the workflow that has to run (get_active)
+                # 1. Check if there are jobs in the workflow that have to run (get_active)
                 # For each platform:
-                #  2. Check the status of all jobs in the current workflow that are queuing or running. Also updates all workflow jobs status by checking the status in the platform machines and job parent status.
+                #  2. Check the status of all jobs in the current workflow that are queuing or running. Also updates
+                #  all workflow jobs status by checking the status in the platform machines and job parent status.
                 #  3. Submit jobs that are on ready status.
-                # 4. When there are no more active jobs, wait until all log recovery threads finishes and exit Autosubmit.
-                # In case of issues, the experiment is reinitialized and the process starts with the last non-corrupted workflow status.
+                # 4. When there are no more active jobs, wait until all log recovery threads finish and exit Autosubmit.
+                # In case of issues, the experiment is reinitialized and the process starts with the last
+                # non-corrupted workflow status.
                 # User can always stop the run, and unless force killed, Autosubmit will exit in a clean way.
                 # Experiment run will always start from the last known workflow status.
 
-                max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get("RECOVERY_RETRIALS",
-                                                                                      3650)  # (72h - 122h )
+                # 3650 = (72h - 122h)
+                max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get("RECOVERY_RETRIALS", 3650)
                 recovery_retrials = 0
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=True)
                 if profile is not None:
@@ -2216,7 +2217,8 @@ class Autosubmit:
                         Log.debug("Reloading parameters...")
                         try:
                             # This function name is not clear after the transformation it received across years.
-                            # What it does, is to load and transform all as_conf.experiment_data into a 1D dict stored in job_list object.
+                            # Load and transform all ``as_conf.experiment_data`` into a 1D dict stored in
+                            # ``job_list object``.
                             Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
                         except BaseException as e:
                             raise AutosubmitError("Config files seems to not be accessible", 6040, str(e))
@@ -2238,7 +2240,7 @@ class Autosubmit:
                             Log.info(f"Checking {len(platform_jobs)} jobs for platform {platform.name}")
                             # Check all non-wrapped jobs status for the current platform
                             platform.check_all_jobs(platform_jobs, as_conf)
-                            # mail notification ( in case of changes )
+                            # Mail notifications to user in case of changes
                             for job, job_prev_status in jobs_to_check[platform.name]:
                                 if job_prev_status != job.update_status(as_conf):
                                     Autosubmit.job_notify(as_conf, expid, job, job_prev_status, job_changes_tracker)
@@ -2264,9 +2266,9 @@ class Autosubmit:
                                 Autosubmit.database_fix(expid)
                                 exp_history = Autosubmit.process_historical_data_iteration(job_list,
                                                                                            job_changes_tracker, expid)
-                            except Exception:
-                                Log.warning(
-                                    "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
+                            except Exception as e:
+                                Log.warning("Couldn't recover the Historical database. "
+                                            f"Autosubmit will continue without it, GUI may be affected: {str(e)}")
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             job_list.save()
@@ -2285,8 +2287,8 @@ class Autosubmit:
                             for job in job_list.get_job_list():
                                 if job.fail_count > 0:
                                     failed_names[job.name] = job.fail_count
-                        except BaseException:
-                            Log.printlog("Error trying to store failed job count", Log.WARNING)
+                        except Exception:
+                            Log.printlog(f"Error trying to store failed job count: {str(e)}", Log.WARNING)
                         Log.result("Storing failed job count...done")
                         while not recovery and (
                                 recovery_retrials < max_recovery_retrials or max_recovery_retrials <= 0):
@@ -2311,7 +2313,8 @@ class Autosubmit:
                             except BaseException as e:
                                 recovery = False
                                 Log.result(f"Recover of job_list has fail {str(e)}")
-                        # Restore platforms and try again, to avoid endless loop with failed configuration, a hard limit is set.
+                        # Restore platforms and try again to avoid endless loop with failed configuration.
+                        # A hard limit is set.
                         reconnected = False
                         times = 0
                         max_times = 10
