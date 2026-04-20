@@ -68,21 +68,18 @@ def test_svn_submodules_dirty(
 
     svn_repo = svn_repos_path / 'svn-project'
 
-    svn_repo_url = f'{svn_url}/{svn_repo.name}'
-
     experiment_data = _get_experiment_data()
     experiment_data['PROJECT']['PROJECT_TYPE'] = 'svn'
-    experiment_data['PROJECT']['PROJECT_DESTINATION'] = svn_repo.name
-    experiment_data['SVN']['PROJECT_URL'] = svn_repo_url
+    experiment_data['SVN']['PROJECT_URL'] = f'{svn_url}/{svn_repo.name}'
     experiment_data['SVN']['PROJECT_REVISION'] = '1'
     experiment_data['CUSTOM_CONFIG']['USER'] = 'svnadmin'
     experiment_data['CUSTOM_CONFIG']['PASSWORD'] = 'test'
 
-    as_exp = autosubmit_exp(experiment_data=experiment_data)
-    as_conf = as_exp.as_conf
+    as_exp = autosubmit_exp('t001', experiment_data=experiment_data)
+    proj_dir = Path(as_exp.as_conf.get_project_dir())
 
-    proj_dir = Path(as_conf.get_project_dir())
-
-    assert (proj_dir / 'LOCAL_SETUP.sh').exists()
-    assert (proj_dir / 'REMOTE_SETUP.sh').exists()
+    assert proj_dir.parts[-1] == 'svn-project'
+    assert (proj_dir / 'branches').exists()
+    assert (proj_dir / 'tags').exists()
+    assert (proj_dir / 'trunk').exists()
 

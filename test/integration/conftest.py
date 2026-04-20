@@ -326,7 +326,7 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
 
 @pytest.fixture(scope="function")
 def git_server(request, tmp_path) -> Generator[tuple['DockerContainer', Path, str], Any, None]:
-    # Start a container to server it -- otherwise, we would have to use
+    # Start a container to serve it -- otherwise, we would have to use
     # `git -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
     # code design choices).
@@ -347,7 +347,7 @@ def git_server(request, tmp_path) -> Generator[tuple['DockerContainer', Path, st
 
 @pytest.fixture(scope="function")
 def svn_server(request, tmp_path) -> Generator[tuple['DockerContainer', Path, str], Any, None]:
-    # Start a container to server it -- otherwise, we would have to use
+    # Start a container to serve it -- otherwise, we would have to use
     # `svn -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
     # code design choices).

@@ -45,7 +45,9 @@ __all__ = [
     'prepare_and_test_slurm_container',
     'get_ssh_container',
     'prepare_and_test_ssh_container',
-    'stop_test_containers'
+    'stop_test_containers',
+    'get_svn_container',
+    'prepare_and_test_svn_container'
 ]
 
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
@@ -185,9 +187,14 @@ def prepare_and_test_svn_container(container: 'DockerContainer', http_port: int)
     container.exec("sed -i 's/= r/= rw/g' /etc/subversion/subversion-access-control")
     container.exec("svnadmin create home/svn/svn-project")
     container.exec("chown -R apache:apache /home/svn/svn-project")
-    container.exec("touch /home/svn/svn-project/LOCAL_SETUP.sh")
-    container.exec("touch /home/svn/svn-project/REMOTE_SETUP.sh")
-    container.exec("svn mkdir file:///home/svn/svn-project/trunk file:///home/svn/svn-project/branches file:///home/svn/svn-project/tags file:///home/svn/svn-project/LOCAL_SETUP.sh file:///home/svn/svn-project/REMOTE_SETUP.sh -m 'first commit'")
+    container.exec(
+        "svn mkdir "
+        "file:///home/svn/svn-project/trunk "
+        "file:///home/svn/svn-project/branches "
+        "file:///home/svn/svn-project/tags "
+        "-m 'init dirs'"
+    )
+    container.exec("echo -e 'store-plaintext-passwords = yes' >> /home/.subversion/servers")
 
     wait_for_tcp_port('localhost', http_port)
 
