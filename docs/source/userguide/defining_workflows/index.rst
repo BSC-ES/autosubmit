@@ -802,7 +802,7 @@ Example 5: using ``previous`` and ``none``
       DEPENDENCIES:
         A:
           SPLITS_FROM:
-            '[2:auto]':
+            '[2:-1]':
               SPLITS_TO: previous
             '1':
               SPLITS_TO: none
@@ -831,7 +831,7 @@ Job Splits with calendar
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``SPLITS: auto`` lets Autosubmit compute the split count from calendar configuration.
-This mode requires ``RUNNING: chunk``.
+This mode requires ``RUNNING: chunk``. This is usefull for instance when you want to split a monthly chunk into daily splits, but you don't want to compute the exact amount of days for each month.
 
 Autosubmit computes split count from:
 
