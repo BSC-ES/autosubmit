@@ -712,15 +712,15 @@ Example 3: N-to-1 dependency
 .. code-block:: yaml
 
   JOBS:
-    TEST:
-      FILE: TEST.sh
+    TEST_DEPENDENCY:
+      SCRIPT: TEST_DEPENDENCY.sh
       RUNNING: once
       SPLITS: '4'
 
-    TEST2:
-      FILE: TEST2.sh
+    TEST_DEPENDENCY2:
+      SCRIPT: TEST_DEPENDENCY2.sh
       DEPENDENCIES:
-        TEST:
+        TEST_DEPENDENCY:
           SPLITS_FROM:
             '[1:2]':
               SPLITS_TO: '[1:4]*\2'
@@ -741,9 +741,9 @@ Example 3: N-to-1 dependency
 
 In this example:
 
-* ``TEST`` job will be split into 4 parts and ``TEST2`` job will be split into 2 parts.
+* ``TEST_DEPENDENCY`` job will be split into 4 parts and ``TEST_DEPENDENCY2`` job will be split into 2 parts.
 * ``[1:4]*\2`` mapping creates a grouped mapping with group size 2. 
-* So split 1 of ``TEST2`` job will depend on splits 1 and 2 of ``TEST`` job and split 2 of ``TEST2`` job will depend on splits 3 and 4 of ``TEST`` job.
+* So split 1 of ``TEST_DEPENDENCY2`` job will depend on splits 1 and 2 of ``TEST_DEPENDENCY`` job and split 2 of ``TEST_DEPENDENCY2`` job will depend on splits 3 and 4 of ``TEST_DEPENDENCY`` job.
 
 Example 4: 1-to-N dependency
 
