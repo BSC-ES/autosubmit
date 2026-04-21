@@ -579,9 +579,7 @@ Supported values in ``SPLITS_FROM`` and ``SPLITS_TO``
 ``SPLITS_FROM`` (child selection):
 
 * ``all``: apply the rule to all child splits.
-* explicit indices/ranges, for example ``1,2,3`` or ``[1:3]``.
-* open ranges, for example ``[2:auto]``.
-* in split expressions, ``auto``, ``last``, and ``-1`` are accepted keywords for the last split index.
+* explicit indices/ranges, for example ``1,2,3`` or ``[1:3]``. Only positive numbers are accepted as range limits.
 
 ``SPLITS_TO`` (parent selection/mapping):
 
@@ -590,7 +588,7 @@ Supported values in ``SPLITS_FROM`` and ``SPLITS_TO``
 * ``natural``: keep natural/default split linkage.
 * ``previous``: connect child split ``i`` to parent split ``i-1`` if it exists.
 * explicit indices/ranges, for example ``1,2,3`` or ``[1:3]``.
-* in split expressions, ``auto``, ``last``, and ``-1`` are accepted keywords for the last split index.
+* open ranges, for example ``[2:-1]`` or ``[2:auto]``. Accepted keywords for last split index are ``auto``, ``last``, and ``-1``.
 
 Advanced mapping syntax in ``SPLITS_TO``:
 

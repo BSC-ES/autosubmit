@@ -11,7 +11,7 @@ JOBS:
     DEPENDENCIES:
       A:
         SPLITS_FROM:
-          '[2:-1]':
+          '[2:4]':
             SPLITS_TO: previous
           '1':
             SPLITS_TO: none
