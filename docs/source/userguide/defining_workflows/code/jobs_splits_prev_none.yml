@@ -1,11 +1,11 @@
 JOBS:
   A:
-    FILE: A.sh
+    FILE: 'sleep 0'
     RUNNING: once
     SPLITS: 4
 
   B:
-    FILE: B.sh
+    FILE: 'sleep 0'
     RUNNING: once
     SPLITS: 4
     DEPENDENCIES:
