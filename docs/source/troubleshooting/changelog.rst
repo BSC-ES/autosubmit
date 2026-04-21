@@ -645,7 +645,7 @@ Example 2: Crossdate wrappers using the the new dependencies
           REMOTE_COMPILE: {}
           SIM-1: {}
           DA-1: {}
-        RUNNING: chunck
+        RUNNING: chunk
         PROCESSORS: '4'
         WALLCLOCK: 00:01
         NOTIFY_ON: FAILED

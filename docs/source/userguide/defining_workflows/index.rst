@@ -81,7 +81,7 @@ To set at what level a job has to run you have to use the ``RUNNING`` attribute.
           DEPENDENCIES: date
           RUNNING: member
 
-      CHUNCK:
+      CHUNK:
           FILE: Chunk.sh
           DEPENDENCIES: member
           RUNNING: chunk
@@ -304,20 +304,20 @@ The status are ordered, so if you select ``RUNNING`` status, the task will be ru
 
     JOBS:
       INI:
-          FILE: ini.sh
-          RUNNING: member
+        FILE: ini.sh
+        RUNNING: member
 
       SIM:
-          FILE: sim.sh
-          DEPENDENCIES: ini sim-1
-          RUNNING: chunk
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
 
       POSTPROCESS:
-          FILE: postprocess.sh
-          DEPENDENCIES:
-              SIM:
-                  STATUS: 'RUNNING'
-          RUNNING: chunk
+        FILE: postprocess.sh
+        DEPENDENCIES:
+          SIM:
+            STATUS: 'RUNNING'
+        RUNNING: chunk
 
 
 The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. The possible value is an integer. Additionally, the target dependency, must call to `%AS_CHECKPOINT%` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.
@@ -418,24 +418,24 @@ an integer I for this attribute and the job will run only once for each I iterat
 
     JOBS:
       INI:
-          FILE: ini.sh
-          RUNNING: member
+        FILE: ini.sh
+        RUNNING: member
 
       SIM:
-          FILE: sim.sh
-          DEPENDENCIES: ini sim-1
-          RUNNING: chunk
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
 
       POSTPROCESS:
-          FILE: postprocess.sh
-          DEPENDENCIES: sim
-          RUNNING: chunk
-          FREQUENCY: 3
+        FILE: postprocess.sh
+        DEPENDENCIES: sim
+        RUNNING: chunk
+        FREQUENCY: 3
 
       COMBINE:
-          FILE: combine.sh
-          DEPENDENCIES: postprocess
-          RUNNING: member
+        FILE: combine.sh
+        DEPENDENCIES: postprocess
+        RUNNING: member
 
 
 The resulting workflow can be seen in Figure `frequency`
@@ -475,18 +475,18 @@ of synchronization do you want. See the below examples with and without this par
 
     JOBS:
       INI:
-          FILE: ini.sh
-          RUNNING: member
+        FILE: ini.sh
+        RUNNING: member
 
       SIM:
-          FILE: sim.sh
-          DEPENDENCIES: INI SIM-1
-          RUNNING: chunk
+        FILE: sim.sh
+        DEPENDENCIES: INI SIM-1
+        RUNNING: chunk
 
       ASIM:
-          FILE: asim.sh
-          DEPENDENCIES: SIM
-          RUNNING: chunk
+        FILE: asim.sh
+        DEPENDENCIES: SIM
+        RUNNING: chunk
 
 The resulting workflow can be seen in Figure `nosync`
 
@@ -829,7 +829,7 @@ Job Splits with calendar
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``SPLITS: auto`` lets Autosubmit compute the split count from calendar configuration.
-This mode requires ``RUNNING: chunk``. This is usefull for instance when you want to split a monthly chunk into daily splits, but you don't want to compute the exact amount of days for each month.
+This mode requires ``RUNNING: chunk``. This is useful for instance when you want to split a monthly chunk into daily splits, but you don't want to compute the exact amount of days for each month.
 
 Autosubmit computes split count from:
 
@@ -1015,24 +1015,24 @@ an integer N for this attribute and the job will run only after N chunks.
 
     JOBS:
       INI:
-          FILE: ini.sh
-          RUNNING: member
+        FILE: ini.sh
+        RUNNING: member
 
       SIM:
-          FILE: sim.sh
-          DEPENDENCIES: ini sim-1
-          RUNNING: chunk
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
 
       ASIM:
-          FILE: asim.sh
-          DEPENDENCIES: sim asim-1
-          RUNNING: chunk
-          DELAY: 2
+        FILE: asim.sh
+        DEPENDENCIES: sim asim-1
+        RUNNING: chunk
+        DELAY: 2
 
       POST:
-          FILE: post.sh
-          DEPENDENCIES: sim asim
-          RUNNING: chunk
+        FILE: post.sh
+        DEPENDENCIES: sim asim
+        RUNNING: chunk
 
 The resulting workflow can be seen in Figure `delay`
 
