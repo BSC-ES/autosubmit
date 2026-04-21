@@ -46,17 +46,6 @@ ONE_DIM = {
     },
 }
 
-TEST_NESTED_DICT = {
-    "TEST": "VARIABLEX",
-    "TEST2": "VARIABLEY",
-    "FOO": {
-        "BAR": {
-            "VAR": ["%NOTFOUND%", "%TEST%", "%TEST2%"],
-            "VAR_STRING": "%NOTFOUND% %TEST% %TEST2%"
-        }
-    }
-}
-
 
 @pytest.mark.skip('references /home/dbeltran/...')
 def test_substitute_dynamic_variables_yaml_files_short_format_for(autosubmit_config):
@@ -137,6 +126,37 @@ def test_substitute_keys_short_strings(autosubmit_config):
     assert result == ({'FOO': 'a/bar/b'}, {'A': 'a', 'B': 'b', 'FOO': 'a/bar/b'})
 
 
+@pytest.mark.parametrize("dynamic_var,variable,expected", [
+    ("%variables.Z,,%/bar/%VARIABLES.Y%", {"Z": "Z", "Y": "Y"}, "z/bar/Y"),
+    ("%variables.Z,,%/bar/%VARIABLES.Y,,%", {"Z": "Z", "Y": "Y"}, "z/bar/y"),
+    ("%variables.Z%/bar/%VARIABLES.Y,,%", {"Z": "Z", "Y": "Y"}, "Z/bar/y"),
+    ("%variables.Z^^%/bar/%VARIABLES.Y%", {"Z": "z", "Y": "y"}, "Z/bar/y"),
+    ("%variables.Z^^%/bar/%VARIABLES.Y^^%", {"Z": "z", "Y": "y"}, "Z/bar/Y"),
+    ("%variables.Z%/bar/%VARIABLES.Y^^%", {"Z": "z", "Y": "y"}, "z/bar/Y"),
+    ("%variables.Z^^%/bar/%VARIABLES.Y,,%", {"Z": "z", "Y": "Y"}, "Z/bar/y"),
+    ("%variables.Z,,%/bar/%VARIABLES.Y^^%", {"Z": "Z", "Y": "y"}, "z/bar/Y"),
+    ("%variables.Z%/bar/%VARIABLES.Y%", {"Z": "z", "Y": "Y"}, "z/bar/Y")
+], ids=["Lower case at the start", "Lower case all", "Lower case at the end",
+        "Upper case at the start", "Upper case all", "Upper case at the end",
+        "Upper then Lower case", "Lower then Upper case", "No change case"])
+def test_substitute_keys_upper_lower_strings(autosubmit_config, dynamic_var, variable, expected):
+    as_conf = autosubmit_config(
+        expid='a000',
+        experiment_data=ONE_DIM)
+    result = as_conf._substitute_keys(
+        [dynamic_var],
+        ("FOO", dynamic_var),
+        {"FOO": dynamic_var, "VARIABLES": variable},
+        "%[a-zA-Z0-9_.-]*(\^\^|,,)?%",
+        1,
+        "short",
+        {"FOO": dynamic_var},
+        True
+    )
+
+    assert result[0] == {"FOO": expected}
+
+
 def test_substitute_keys_short_strings_dict(autosubmit_config):
     as_conf = autosubmit_config(
         expid='a000',
@@ -154,17 +174,51 @@ def test_substitute_keys_short_strings_dict(autosubmit_config):
     assert result[0] == {'FOO': 'z/bar/y'}
 
 
-def test_substitute_dynamic_variables_yaml_files_short_format_nested(autosubmit_config):
+@pytest.mark.parametrize("test_nested_dict, result_var, result_var_string,", [
+     (
+        {
+            "TEST": "VARIABLEX",
+            "TEST2": "variabley",
+            "FOO": {
+                "BAR": {
+                    "VAR": ["%NOTFOUND%", "%TEST,,%", "%TEST2^^%"],
+                    "VAR_STRING": "%NOTFOUND% %TEST% %TEST2%"
+                }
+            }
+        },
+        ['%NOTFOUND%', 'variablex', 'VARIABLEY'],
+        '%NOTFOUND% VARIABLEX variabley'),
+    (
+        {
+            "TEST": "VARIABLEX",
+            "TEST2": "VARIABLEY",
+            "FOO": {
+                "BAR": {
+                    "VAR": ["%NOTFOUND%", "%TEST%", "%TEST2%"],
+                    "VAR_STRING": "%NOTFOUND% %TEST% %TEST2%"
+                }
+            }
+        },
+        ['%NOTFOUND%', 'VARIABLEX', 'VARIABLEY'],
+        '%NOTFOUND% VARIABLEX VARIABLEY',
+    )
+])
+def test_substitute_dynamic_variables_yaml_files_upper_lower_case(
+        autosubmit_config,
+        test_nested_dict,
+        result_var,
+        result_var_string
+):
     as_conf = autosubmit_config(
         expid='a000',
-        experiment_data=TEST_NESTED_DICT)
+        experiment_data=test_nested_dict)
     as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
     as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
-    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data, in_the_end=True)
     as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
 
-    assert as_conf.experiment_data['FOO']['BAR']['VAR'] == ['%NOTFOUND%', 'VARIABLEX', 'VARIABLEY']
-    assert as_conf.experiment_data['FOO']['BAR']['VAR_STRING'] == '%NOTFOUND% VARIABLEX VARIABLEY'
+    assert as_conf.experiment_data['FOO']['BAR']['VAR'] == result_var
+    assert as_conf.experiment_data['FOO']['BAR']['VAR_STRING'] == result_var_string
 
 
 def test_substitute_placeholders_after_all_files_loaded(autosubmit_config, tmpdir):
