@@ -68,7 +68,7 @@ def test_strtobool(val, expected):
         (Path('/etc/autosubmitrc'), True, True, {}),
         (Path('/etc/autosubmitrc'), True, False, {}),
         (Path('./.autosubmitrc'), False, True, {}),
-        (Path(Path.home(), '.autosubmitrc'), False, False, {})
+        (Path('/fake/home/.autosubmitrc'), False, False, {})
     ],
     ids=[
         'Use env var',
@@ -80,6 +80,7 @@ def test_strtobool(val, expected):
 )
 def test_get_rc_path(expected: Path, machine: bool, local: bool, env_vars: dict, mocker):
     mocker.patch.dict('autosubmit.helpers.utils.os.environ', env_vars, clear=True)
+    mocker.patch("pathlib.Path.home", return_value=Path("/fake/home"))
 
     assert expected == get_rc_path(machine, local)
 

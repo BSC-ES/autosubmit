@@ -12,6 +12,10 @@ on:
       - master
 permissions:
   contents: read
+  packages: read
+
+env:
+  TESTCONTAINERS_RYUK_DISABLED: true
 
 jobs:
   test-unit:
@@ -19,6 +23,9 @@ jobs:
       COVERAGE_PROCESS_START: .coveragerc
     # needs: lint
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
+      options: --init --user $(id -u):$(id -g)
     timeout-minutes: 10
 
     strategy:
@@ -29,20 +36,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-          # See: https://github.com/actions/setup-python#caching-packages-dependencies
-          cache: 'pip' # caching pip dependencies
-
-      - name: Install system dependencies
-        run: sudo apt-get install -y curl graphviz rsync r-base
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       # NOTE: We used `--trace --full-trace` with pytest but had strange
       #       bugs in unit tests with py3.11:
@@ -74,6 +71,9 @@ jobs:
     env:
       COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
+      options: --init --user 0 -v /var/run/docker.sock:/var/run/docker.sock
     timeout-minutes: 10
 
     strategy:
@@ -96,20 +96,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-          # See: https://github.com/actions/setup-python#caching-packages-dependencies
-          cache: 'pip' # caching pip dependencies
-
-      - name: Install system dependencies
-        run: sudo apt-get install -y curl git graphviz rsync xvfb r-base
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       - name: Set up Git
         run: |
@@ -118,6 +108,26 @@ jobs:
           git --version
           git config --global user.email "test@bsc.es"
           git config --global user.name "GitHub Actions"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pre-pull Docker images from docker.py constants
+        run: |
+          set -e
+          echo "Extracting Docker images from test/integration/test_utils/docker.py..."
+          IMAGES=$(grep -oP "^[_A-Za-z0-9]+_IMAGE\s*=\s*['\"]\K[^'\"]+" test/integration/test_utils/docker.py)
+          echo "Found images:"
+          echo "$IMAGES"
+
+          for IMAGE in $IMAGES; do
+            echo "Pulling $IMAGE ..."
+            docker pull "$IMAGE" || echo "Warning: failed to pull $IMAGE, continuing..."
+          done
 
       # In GitHub Actions we run all the integration tests, including those that require
       # dependencies such as Docker (see `-m ''`, which means all markers). Read the
@@ -154,7 +164,7 @@ jobs:
 
       - name: Upload logs to GitHub
         if: failure()
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v7
         with:
           name: container_logs_integration_${{ github.run_id }}
           path: |
@@ -165,6 +175,8 @@ jobs:
 
   test-regression:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 10
 
     strategy:
@@ -177,18 +189,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install system dependencies
-        run: sudo apt-get install -y curl graphviz rsync
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       # Run regression tests
       - name: Regression tests
@@ -214,6 +218,9 @@ jobs:
 
   test-slurm:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
+      options: --user 0 -v /var/run/docker.sock:/var/run/docker.sock
 
     strategy:
       matrix:
@@ -223,18 +230,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install system dependencies
-        run: sudo apt-get install -y curl git graphviz rsync
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       - name: Set up Git
         run: |
@@ -244,7 +243,29 @@ jobs:
           git config --global user.email "test@bsc.es"
           git config --global user.name "GitHub Actions"
 
-      - name: Integration tests
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pre-pull Docker images from docker.py constants
+        run: |
+          set -e
+          echo "Extracting Docker images from test/integration/test_utils/docker.py..."
+          IMAGES=$(grep -oP "^[_A-Za-z0-9]+_IMAGE\s*=\s*['\"]\K[^'\"]+" test/integration/test_utils/docker.py)
+          echo "Found images:"
+          echo "$IMAGES"
+
+          for IMAGE in $IMAGES; do
+            echo "Pulling $IMAGE ..."
+            docker pull "$IMAGE" || echo "Warning: failed to pull $IMAGE, continuing..."
+          done
+
+      - name: Slurm integration tests
+        # Here, instead of `nproc` we use 4 to reduce the number of concurrent
+        # Slurm jobs as these are expensive tests.
         run: |
           pytest \
             -n $(nproc) \
@@ -272,7 +293,7 @@ jobs:
 
       - name: Upload logs to GitHub
         if: failure()
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v7
         with:
           name: container_logs_slurm_${{ github.run_id }}
           path: |
@@ -285,6 +306,8 @@ jobs:
   #       we can build it and ii) collect the coverage of the examples executed.
   test-docs:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 10
 
     strategy:
@@ -295,18 +318,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install system dependencies
-        run: sudo apt-get install -y curl graphviz rsync
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
-          pip install --upgrade -e .[all]
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
       # Run regression tests
       - name: Build docs
@@ -328,6 +343,8 @@ jobs:
 
   test-misc:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 5
 
     strategy:
@@ -338,16 +355,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip packaging setuptools twine
+          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
           # To validate CFF citation files.
-          python -m pip install cffconvert
+          python${{ matrix.python-version }} -m pip install cffconvert
 
       - name: Validate citation file
         run: |
