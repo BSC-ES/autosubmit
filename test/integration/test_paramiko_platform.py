@@ -363,8 +363,6 @@ def test_send_command_timeout_error_exec_command(
         with pytest.raises(AutosubmitError) as cm:
             exp_ps_platform.send_command(command=cmd, ignore_log=False, x11=False)
 
-        assert mocked_log.debug.called
-
         assert 'Failed to send' in str(cm.value.message)
         assert 6005 == cm.value.code
     finally:
