@@ -87,7 +87,7 @@ To set at what level a job has to run you have to use the ``RUNNING`` attribute.
           RUNNING: chunk
 
 
-The resulting workflow can be seen in Figure `running` for a experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
+The resulting workflow can be seen in Figure `running` for an experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
 
 .. autosubmitfigure::
     :command: create
@@ -1119,7 +1119,7 @@ To generate the following jobs:
       SIM_20:
         DEPENDENCIES:
           SIM_20-1:
-        FILE: POST.sh
+        FILE: SIM.sh
         PROCESSORS: '20'
         RUNNING: chunk
         THREADS: '1'
@@ -1128,7 +1128,7 @@ To generate the following jobs:
       SIM_40:
         DEPENDENCIES:
           SIM_40-1:
-        FILE: POST.sh
+        FILE: SIM.sh
         PROCESSORS: '40'
         RUNNING: chunk
         THREADS: '1'
@@ -1137,7 +1137,7 @@ To generate the following jobs:
       SIM_80:
         DEPENDENCIES:
           SIM_80-1:
-        FILE: POST.sh
+        FILE: SIM.sh
         PROCESSORS: '80'
         RUNNING: chunk
         THREADS: '1'
