@@ -169,8 +169,9 @@ def test_run_uninterrupted(
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid, wrapper_type=wrapper_type)
     e_msg = f"Current folder: {str(run_tmpdir)}\n"
+    e_msg += f"job_data file: {Path(BasicConfig.JOBDATA_DIR)}/job_data_{as_exp.expid}.db\n"
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     for check, value in db_check_list.items():
         if not value:
