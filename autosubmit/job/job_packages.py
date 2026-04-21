@@ -92,8 +92,10 @@ class JobPackageBase(object):
             raise Exception('No jobs given')
         self.fail_count = jobs[0].fail_count
         self.ec_queue = jobs[0].ec_queue if hasattr(jobs[0], "ec_queue") and jobs[0].ec_queue else None
-        self.sections = set(job.section for job in jobs if job.section)
-        self.sections = "&".join(sorted(self.sections))
+        self.sections = "&".join(
+            sorted(
+                set(job.section for job in jobs if job.section)
+            ))
         self._wallclock = '00:00'
 
     def __len__(self):
@@ -532,7 +534,6 @@ class JobPackageThreadWrapped(JobPackageThread):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
         self._common_script = self._create_common_script()
 
-    # TODO: I believe this might not be working as intended since _common_script_content is not defined (code from 31/03/2017)
     def _create_common_script(self, filename: str = ""):
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'

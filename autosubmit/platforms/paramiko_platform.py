@@ -1516,7 +1516,6 @@ class ParamikoPlatform(Platform):
         :param redirect_out_err: whether to redirect stdout and stderr to files
         :return: command to execute script
         :rtype: str
-        :rtype: str
         """
         # Some platforms (right now only ECaccess) has a dual queue system, one to run the job and another to submit the job.
         self._set_submit_cmd(sub_queue)
