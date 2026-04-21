@@ -356,7 +356,7 @@ def test_send_command_timeout_error_exec_command(
         exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
         # Capture platform log.
-        mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+        mocker.patch('autosubmit.platforms.paramiko_platform.Log')
         # Simulate an error occurred, and retrying did not fix it.
         mocker.patch.object(exp_ps_platform, 'exec_command', return_value=(False, False, False))
 
