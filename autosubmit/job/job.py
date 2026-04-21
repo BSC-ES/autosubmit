@@ -284,9 +284,9 @@ class Job(object):
         self._notify_on = None
         # The three variables under this message are related to the #PR2918 that is a development
         # focused on adding the key information for computing the simulated years for the CPMIPS metrics.
-        self._cpmip_thresholds = {} 
-        self._chunk_size = None 
-        self._chunk_size_unit = None 
+        self._cpmip_thresholds = {}
+        self._chunk_size = None
+        self._chunk_size_unit = None
         self._processors_per_node = None
         self.ec_queue = None
         self.platform_name = None
@@ -1804,18 +1804,7 @@ class Job(object):
             self.exclusive = self.het['HYPERTHREADING'][0]
         else:
             self.hyperthreading = self.hyperthreading
-        if type(self.executable) is list:
-            # Get the executable, each element can be only be bool
-            self.het['EXECUTABLE'] = list()
-            if len(self.executable) == 1:
-                for x in range(self.het['HETSIZE']):
-                    self.het['EXECUTABLE'].append(self.executable)
-            else:
-                for x in self.executable:
-                    self.het['EXECUTABLE'].append(x)
-            self.executable = str(self.het['EXECUTABLE'][0])
-        else:
-            self.executable = self.executable
+        self.executable = self.executable if self.executable else Language.get_executable(self.type)
         if type(self.queue) is list:
             # Get the queue, each element can be only be bool
             self.het['CURRENT_QUEUE'] = list()
@@ -2481,7 +2470,6 @@ class Job(object):
         template_content = self._substitute_placeholders(
             template_content, parameters, as_conf, self.undefined_variables
         )
-
 
         script_name = f'{self.name}.cmd'
         self.script_name = script_name

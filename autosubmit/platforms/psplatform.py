@@ -17,7 +17,7 @@
 
 import os
 
-from autosubmit.log.log import Log
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.headers.ps_header import PsHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
@@ -42,6 +42,7 @@ class PsPlatform(ParamikoPlatform):
         self.job_status['QUEUING'] = []
         self.job_status['FAILED'] = []
         self.update_cmds()
+        self.has_scheduler = False
 
     def get_check_all_jobs_cmd(self, jobs_id):
         pass  # pragma: no cover
@@ -54,9 +55,6 @@ class PsPlatform(ParamikoPlatform):
 
     def create_a_new_copy(self):
         return PsPlatform(self.expid, self.name, self.config)
-
-    def submit_script(self, hold=False):
-        pass  # pragma: no cover
 
     def update_cmds(self):
         """Updates commands for platforms."""
@@ -72,8 +70,6 @@ class PsPlatform(ParamikoPlatform):
         self.mkdir_checker = "mkdir -p " + os.path.join(self.scratch, self.project_dir, self.user,
                                                         "ps_permission_checker_azxbyc")
 
-    def get_checkhost_cmd(self):
-        return self._checkhost_cmd
 
     def get_remote_log_dir(self):
         return self.remote_log_dir
@@ -84,15 +80,14 @@ class PsPlatform(ParamikoPlatform):
     def parse_job_output(self, output):
         return output
 
-    def get_submitted_job_id(self, output, x11=False):
-        return output
+    def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
+        """Parses the output of the submit command to get the job ID.
 
-    def get_submit_cmd(self, job_script, job, hold=False, export=""):
-        if export == "none" or export == "None" or export is None or export == "":
-            export = ""
-        else:
-            export += " ; "
-        return self.get_call(job_script, job, export=export, timeout=job.wallclock_in_seconds)
+        :param raw_output: output of the submit command.
+        :param x11: whether the job is an x11 job, which has a different output format.
+        :return: job ID of the submitted job.
+        """
+        return [line for line in (line.strip() for line in raw_output.splitlines()) if line.isdigit()]
 
     def get_check_job_cmd(self, job_id):
         return self.get_pscall(job_id)
@@ -114,3 +109,92 @@ class PsPlatform(ParamikoPlatform):
             Log.debug(f'Failed to check remote dependencies for PS platform: {e}')
 
         return False
+
+    def cancel_jobs(self, job_ids: list[str]) -> None:
+        """Cancel remote processes by their PIDs.
+
+        :param job_ids: List of remote process IDs to cancel.
+        :type job_ids: list[str]
+        """
+        if not job_ids:
+            return
+        pids = " ".join(str(job_id) for job_id in job_ids)
+        self.send_command(f"{self.cancel_cmd} {pids}")
+
+    def _get_job_names_cmd(self, job_names: list) -> str:
+        """Gets command to check for duplicated job names on remote platforms (UNIX)
+        It receives a list of job names, and returns a command that:
+
+        1) Checks if there is a job name already present on the remote platform.
+        2) If there any, it returns the oldest ID ( process or job_id) entry for each duplicated job name, separated by commas.
+
+        :param job_names: List of job names to check for duplicates.
+        :type job_names: list[str]
+        :return: Command to check for duplicated job names on remote platforms.
+        :rtype: str
+        """
+        # check processes with the same name, and return the oldest one (if any)
+        return f"ps -eo pid,cmd | grep -E '({'|'.join(job_names)})' | awk '{{print $1}}' | sort -n | uniq -d"
+
+    def _get_process_list_output(self) -> str:
+        """Return the remote ``ps -eo pid,cmd`` output via SSH.
+
+        :return: Raw process list output, or an empty string on failure.
+        :rtype: str
+        """
+        if self.send_command("ps -eo pid,cmd", ignore_log=True):
+            return self.get_ssh_output()
+        return ""
+
+    def _check_for_unrecoverable_errors(self) -> None:
+        """Check process-platform output for recoverable and unrecoverable errors."""
+        out = self._ssh_output or ""
+        err = self._ssh_output_err or ""
+
+        # Fast-exit: stdout is a single digit (process status from get_pscall)
+        # or contains lines starting with numeric PIDs (ps output).
+        out_stripped = out.strip()
+        if out_stripped in ("0", "1"):
+            return
+        if any(line.strip() and line.strip()[0].isdigit() for line in out.splitlines()):
+            return
+
+        err_lower = err.lower()
+        if not err_lower.strip():
+            return
+
+        transient_patterns: list[tuple[str, str]] = [
+            ("socket timed out", "Socket timed out on the remote SSH connection"),
+            ("socket error", "Socket error on the remote SSH connection"),
+            ("connection timed out", "SSH connection timed out"),
+            ("connection refused", "SSH connection refused"),
+            ("connection reset by peer", "SSH connection reset"),
+            ("broken pipe", "Broken pipe on the remote SSH connection"),
+            ("network is unreachable", "Network unreachable; cannot reach remote host"),
+            ("not active", "SSH session not active"),
+            ("temporary failure in name resolution", "DNS resolution failed temporarily"),
+        ]
+
+        for pattern, message in transient_patterns:
+            if pattern in err_lower:
+                raise AutosubmitError(
+                    f"Transient PS platform error: {message}",
+                    6016,
+                    err,
+                )
+
+        # Permanent / unrecoverable patterns → AutosubmitCritical (7014).
+        critical_patterns: list[tuple[str, str]] = [
+            ("command not found", "Command not found on the remote host"),
+            ("kill: invalid signal", "Invalid signal specified for kill"),
+            ("no such process", "Process no longer exists on the remote host"),
+            ("permission denied", "Permission denied on the remote host"),
+        ]
+
+        for pattern, message in critical_patterns:
+            if pattern in err_lower:
+                raise AutosubmitCritical(
+                    f"Permanent PS platform error: {message}",
+                    7014,
+                    err,
+                )

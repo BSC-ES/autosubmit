@@ -2849,20 +2849,24 @@ class JobList(object):
         except Exception as exp:
             Log.warning(str(exp))
 
-    def save_wrappers(self, packages_to_save, failed_packages, as_conf, packages_persistence,
-                      hold=False, inspect=False):
-        for package in packages_to_save:
-            if package.jobs[0].id not in failed_packages:
-                if hasattr(package, "name"):
+    def save_wrappers(self, submitted_scripts: dict, as_conf: AutosubmitConfig, packages_persistence: JobPackagePersistence,
+                      inspect: bool = False):
+        """Saves the wrapper jobs in the job list and the packages dict.
+
+        :param submitted_scripts: dict with the submitted scripts to save
+        :param as_conf: experiment configuration
+        :param packages_persistence: persistence for the job packages
+        :param inspect: if True, the wrapper jobs will be stored in a separated db
+        """
+        for section, scripts_to_submit_by_name in submitted_scripts.items():
+            for package in scripts_to_submit_by_name.values():
+                if isinstance(package, JobPackageThread):
                     self.packages_dict[package.name] = package.jobs
                     from ..job.job import WrapperJob
                     wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
-                                             package.jobs, package._wallclock, package.platform, as_conf, hold)
+                                             package.jobs, package._wallclock, package.platform, as_conf, False)
                     self.job_package_map[package.jobs[0].id] = wrapper_job
-                    if isinstance(package, JobPackageThread):
-                        # Saving only when it is a real multi job package
-                        # Need to store the wallclock for the is_overwallclock function
-                        packages_persistence.save(package, inspect)
+                    packages_persistence.save(package, inspect)
 
     def check_scripts(self, as_conf) -> bool:
         """When we have created the scripts, all parameters should have been substituted.

@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+import sys
 
 from multiprocessing import Process
 from pathlib import Path
@@ -24,8 +25,13 @@ from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
-from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
-    _assert_db_fields, _assert_files_recovered
+from test.integration.commands.run.conftest import (
+    _assert_db_fields,
+    _assert_exit_code,
+    _assert_files_recovered,
+    _check_db_fields,
+    _check_files_recovered,
+)
 from test.integration.test_utils.misc import wait_locker
 
 
@@ -427,3 +433,238 @@ def test_run_debug(
         assert "Syntax error" in exc_info.value.message
         assert "Generated script" in exc_info.value.message
         assert exc_info.value.code == 7014
+
+
+@pytest.mark.parametrize(
+    "jobs_data, expected_db_entries, final_status, get_call_option",
+    [
+        (
+            dedent("""\
+            EXPERIMENT:
+                NUMCHUNKS: '1'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        echo "Hello from default bash"
+                    PLATFORM: LOCAL
+                    RUNNING: chunk
+                    WALLCLOCK: 00:01
+            """),
+            1,
+            "COMPLETED",
+            "default_bash",
+        ),
+        (
+            dedent("""\
+            EXPERIMENT:
+                NUMCHUNKS: '1'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        print("Hello from Python")
+                    PLATFORM: LOCAL
+                    RUNNING: chunk
+                    WALLCLOCK: 00:01
+                    TYPE: python
+            """),
+            1,
+            "COMPLETED",
+            "type_python",
+        ),
+        (
+            dedent("""\
+            EXPERIMENT:
+                NUMCHUNKS: '1'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        print("Hello from R")
+                    PLATFORM: LOCAL
+                    RUNNING: chunk
+                    WALLCLOCK: 00:01
+                    TYPE: r
+            """),
+            1,
+            "COMPLETED",
+            "type_r",
+        ),
+        (
+            dedent("""\
+            EXPERIMENT:
+                NUMCHUNKS: '1'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        echo "Hello with explicit /bin/bash executable"
+                    PLATFORM: LOCAL
+                    RUNNING: chunk
+                    WALLCLOCK: 00:01
+                    EXECUTABLE: /bin/bash
+            """),
+            1,
+            "COMPLETED",
+            "executable_bash",
+        ),
+        (
+            dedent(f"""\
+            EXPERIMENT:
+                NUMCHUNKS: '1'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        print("Hello with explicit python3 executable")
+                    PLATFORM: LOCAL
+                    RUNNING: chunk
+                    WALLCLOCK: 00:01
+                    TYPE: python
+                    EXECUTABLE: {sys.executable}
+            """),
+            1,
+            "COMPLETED",
+            "executable_python3",
+        ),
+        (
+            dedent("""\
+            EXPERIMENT:
+                NUMCHUNKS: '1'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        %CURRENT_EXPORT%
+                        echo "AS_INTEGRATION_VAR=${AS_INTEGRATION_VAR}"
+                        test "${AS_INTEGRATION_VAR}" = "hello_from_export"
+                    PLATFORM: LOCAL
+                    RUNNING: chunk
+                    WALLCLOCK: 00:01
+                    EXPORT: "export AS_INTEGRATION_VAR=hello_from_export"
+            """),
+            1,
+            "COMPLETED",
+            "export_placeholder",
+        ),
+        (
+            dedent("""\
+            EXPERIMENT:
+                NUMCHUNKS: '1'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        echo "Hello with X11 explicitly disabled"
+                    PLATFORM: LOCAL
+                    RUNNING: chunk
+                    WALLCLOCK: 00:01
+                    X11: False
+            """),
+            1,
+            "COMPLETED",
+            "x11_false",
+        ),
+        (
+            dedent("""\
+            EXPERIMENT:
+                NUMCHUNKS: '1'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        echo "Hello with X11 enabled but no x11 options"
+                    PLATFORM: LOCAL
+                    RUNNING: chunk
+                    WALLCLOCK: 00:01
+                    X11: True
+            """),
+            1,
+            "COMPLETED",
+            "x11_true_no_options",
+        ),
+        (
+            dedent("""\
+            EXPERIMENT:
+                NUMCHUNKS: '1'
+            JOBS:
+                job:
+                    SCRIPT: |
+                        echo "Hello with custom wallclock"
+                        sleep 1
+                    PLATFORM: LOCAL
+                    RUNNING: chunk
+                    WALLCLOCK: 00:05
+            """),
+            1,
+            "COMPLETED",
+            "wallclock",
+        ),
+    ],
+    ids=[
+        "default_bash",
+        "type_python",
+        "type_r",
+        "executable_bash",
+        "executable_python3",
+        "export_placeholder",
+        "x11_false",
+        "x11_true_no_options",
+        "wallclock",
+    ],
+)
+def test_run_uninterrupted_get_call_options(
+    autosubmit_exp,
+    jobs_data: str,
+    expected_db_entries: int,
+    final_status: str,
+    get_call_option: str,
+    prepare_scratch,
+    general_data: dict,
+) -> None:
+    """Test that all JOBS.job YAML keys that feed get_call work end-to-end.
+
+    Each parametrized case sets one or more of the following options in the
+    job YAML configuration:
+
+    - ``EXECUTABLE`` — explicit interpreter placed in the shebang and as a
+      command prefix in the get_call execution command.
+    - ``TYPE``       — selects the script language (bash / python / r) and
+      therefore the default interpreter used when EXECUTABLE is not set.
+    - ``EXPORT``     — value exposed as ``%CURRENT_EXPORT%`` placeholder so
+      the script body can source or export environment variables.
+    - ``X11``        — enables or disables X11 forwarding; with no
+      ``X11_OPTIONS`` the submission still uses the standard nohup path.
+    - ``WALLCLOCK``  — controls the ``timeout`` prefix injected by get_call.
+
+    Every case runs to COMPLETED and the usual DB / log-file assertions are
+    applied to confirm a correct end-to-end execution.
+
+    :param autosubmit_exp: Fixture that creates and manages an Autosubmit experiment.
+    :param jobs_data: YAML string with the JOBS section for the experiment.
+    :param expected_db_entries: Expected number of rows in the job_data table.
+    :param final_status: Expected final job status (``COMPLETED`` or ``FAILED``).
+    :param get_call_option: Label identifying the get_call option under test.
+    :param prepare_scratch: Fixture that sets up the remote scratch directory.
+    :param general_data: Fixture providing base experiment configuration.
+    """
+    yaml = YAML(typ="rt")
+    as_exp = autosubmit_exp(
+        experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True
+    )
+    prepare_scratch(expid=as_exp.expid)
+    as_conf = as_exp.as_conf
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    log_dir = tmp_path / f"LOG_{as_exp.expid}"
+    as_conf.set_last_as_command("run")
+
+    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    _assert_exit_code(final_status, exit_code)
+
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
+    files_check_list = _check_files_recovered(
+        as_conf, log_dir, expected_files=expected_db_entries * 2
+    )
+
+    e_msg = f"get_call_option={get_call_option!r}, experiment folder: {run_tmpdir}\n"
+
+    try:
+        _assert_db_fields(db_check_list)
+        _assert_files_recovered(files_check_list)
+    except AssertionError as e:
+        pytest.fail(e_msg + str(e))

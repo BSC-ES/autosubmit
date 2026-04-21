@@ -24,7 +24,6 @@ from shutil import copy
 from typing import TYPE_CHECKING
 
 import pytest
-from mock import Mock, patch
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
@@ -34,8 +33,6 @@ from autosubmit.database.db_common import get_experiment_description
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
-from autosubmit.job.job_packages import JobPackageBase
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.platform import Platform
 from autosubmit.scripts.autosubmit import main
@@ -366,44 +363,6 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
 def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
     with context_mgr:
         autosubmit_exp('t000', experiment_data, create=False, include_jobs=False)
-
-
-def test_submit_ready_jobs(autosubmit_exp, mocker):
-
-    exp = autosubmit_exp('a000', experiment_data={})
-
-    platform_config = {
-        "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
-        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'exp_tmp_dir'),
-        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR+'aslogs_dir')
-    }
-    platform = Platform('a000', "Platform", platform_config)
-
-    job_list = JobList('a000', exp.as_conf, YAMLParserFactory(), JobListPersistencePkl())
-
-    for i in range(3):
-        job = Job(f"job{i}", i, 2, 0)
-        job.section = f"SECTION{i}"
-        job.platform = platform
-        job_list._job_list.append(job)
-    packages_to_submit = JobPackageBase(job_list.get_job_list())
-    packages_to_submit.name = "test"
-    packages_to_submit.x11 = "false"
-
-    with patch("autosubmit.job.job_utils.JobPackagePersistence") as mock_persistence:
-        job_persistence = mock_persistence.return_value.load.return_value = [
-            ['dummy/expid', '0005_job_packages', 'dummy/expid']
-        ]
-
-    mocker.patch('autosubmit.platforms.platform.Platform.generate_submit_script', Mock())
-    mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit', Mock())
-    save, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(
-        exp.as_conf, job_list, job_persistence, [packages_to_submit])
-    assert save
-    assert len(failed_packages) == 0
-    assert error_message == ''
-    assert len(valid_packages_to_submit) == 1
-    assert any_job_submitted
 
 
 @pytest.mark.parametrize(

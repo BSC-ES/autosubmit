@@ -33,7 +33,7 @@ import setproctitle
 
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -235,6 +235,7 @@ class Platform:
 
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
+        self.has_scheduler = True
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -367,103 +368,93 @@ class Platform:
     def root_dir(self, value):
         self._root_dir = value
 
-    def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages, error_message="", hold=False):
-        return True, valid_packages_to_submit
+    def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
+                           packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
+                           inspect=False, only_wrappers=False) -> tuple[dict[str, dict[str, 'JobPackageBase']], dict[str, dict[str, 'JobPackageBase']]]:
+        """Prepare job packages for submission on the current platform.
 
-    def submit_ready_jobs(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
-                          packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
-                          inspect=False, only_wrappers=False, hold=False):
-        """Gets READY jobs and send them to the platforms if there is available space on the queues.
+        Log the number of ready jobs, optionally initialize the platform submit
+        script, and process each package selected for submission. Depending on
+        the ``inspect`` and ``only_wrappers`` flags, this method updates wrapper
+        metadata, generates job scripts, transfers files to the platform, and
+        collects the jobs prepared for later submission handling.
 
-        :param hold:
-        :param packages_to_submit:
-        :param as_conf: autosubmit config object
-        :type as_conf: AutosubmitConfig object
-        :param job_list: job list to check
-        :type job_list: JobList object
-        :param packages_persistence: Handles database per experiment.
-        :type packages_persistence: JobPackagePersistence object
-        :param inspect: True if coming from generate_scripts_andor_wrappers().
-        :type inspect: Boolean
-        :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
-        :type only_wrappers: Boolean
-        :return: True if at least one job was submitted, False otherwise \n
-        :rtype: Boolean
+        :param as_conf: Autosubmit configuration for the current experiment.
+        :type as_conf: AutosubmitConfig
+        :param job_list: Job container used to inspect ready jobs and register
+            wrapper information.
+        :type job_list: JobList
+        :param packages_persistence: Persistence helper used to store package
+            metadata during inspect or wrapper-only workflows.
+        :type packages_persistence: JobPackagePersistence
+        :param packages_to_submit: Packages built for this platform and ready to
+            be prepared.
+        :type packages_to_submit: list[JobPackageBase]
+        :param inspect: If ``True``, prepare packages for inspect mode without
+            generating the platform submit script or sending files.
+        :type inspect: bool
+        :param only_wrappers: If ``True``, prepare only wrapper-related metadata
+            and skip the regular package submission flow.
+        :type only_wrappers: bool
+        :raises Exception: Propagate any exception raised while preparing packages, generating scripts, or transferring files.
+        :return: A list containing the jobs gathered while preparing the given
+            packages for submission.
+        :rtype: list
+
         """
-        any_job_submitted = False
-        save = False
-        failed_packages = list()
-        error_message = ""
-        if not inspect:
-            job_list.save()
-        if not hold:
-            Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self, hold=hold))}")
-        else:
-            Log.debug(f"\nJobs prepared for {self.name}: {len(job_list.get_prepared(self))}")
-        if not inspect:
-            self.generate_submit_script()
-        valid_packages_to_submit: list['JobPackageBase'] = []
+        Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self))}")
+        # Submitting by sections allows to detect Scheduler misconfiguration derived from a bad configuration without submitting any job.
+        scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
+        x11_scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
         for package in packages_to_submit:
-            try:
-                # If called from inspect command or -cw
-                if only_wrappers or inspect:
-                    if hasattr(package, "name"):
-                        job_list.packages_dict[package.name] = package.jobs
-                        from ..job.job import WrapperJob
-                        wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                                 package.jobs, package._wallclock, package.platform, as_conf, hold)
-                        job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                        packages_persistence.save(package, inspect)
-                    for innerJob in package._jobs:
-                        any_job_submitted = True
-                        # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
-                        innerJob.status = Status.COMPLETED
-                        innerJob.updated_log = False
+            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, packages_persistence, as_conf)
+            if not only_wrappers:
+                package.generate_scripts(as_conf, inspect)
+                if not inspect:
+                    package.send_files()
+                    if package.x11:
+                        x11_scripts_to_submit_by_section.setdefault(package.sections, {})[f"{package.name}.cmd"] = package
+                    else:
+                        scripts_to_submit_by_section.setdefault(package.sections, {})[f"{package.name}.cmd"] = package
 
-                # If called from RUN or inspect command
-                if not only_wrappers:
-                    try:
-                        package.submit(as_conf, job_list.parameters, inspect, hold=hold)
-                        save = True
-                        # Save takes 15 seconds per job in operational experiments, but there is no need to save here as the sbatch didn't happen yet
-                        # TODO: apply the same for all platforms and remove the save() calls after each submit()
-                        if not inspect and package.platform.type.lower() not in ["slurm", "pjm"]:
-                            job_list.save()
-                        if package.x11 != "true":
-                            valid_packages_to_submit.append(package)
-                    except (IOError, OSError) as e:
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        Log.warning(f'An unexpected error happened while submitting the package: {str(e)}')
-                        continue
-                    except AutosubmitError as e:
-                        if package.jobs[0].id != 0:
-                            failed_packages.append(package.jobs[0].id)
-                        self.connected = False
-                        if e.message.lower().find("bad parameters") != -1 or e.message.lower().find(
-                                "scheduler is not installed") != -1:
-                            error_msg = ""
-                            for package_tmp in valid_packages_to_submit:
-                                for job_tmp in package_tmp.jobs:
-                                    if job_tmp.section not in error_msg:
-                                        error_msg += job_tmp.section + "&"
-                            for job_tmp in package.jobs:
-                                if job_tmp.section not in error_msg:
-                                    error_msg += job_tmp.section + "&"
-                            if e.message.lower().find("bad parameters") != -1:
-                                error_message += f"\ncheck job and queue specified in your JOBS definition in YAML. Sections that could be affected: {error_msg[:-1]}"
-                            else:
-                                error_message += f"\ncheck that {self.name} platform has set the correct scheduler. Sections that could be affected: {error_msg[:-1]}"
-                    except AutosubmitCritical:
-                        raise
-                    except Exception:
-                        self.connected = False
-                        raise
-            except Exception:
-                raise
-        if valid_packages_to_submit:
-            any_job_submitted = True
-        return save, failed_packages, error_message, valid_packages_to_submit, any_job_submitted
+        return scripts_to_submit_by_section, x11_scripts_to_submit_by_section
+
+    @staticmethod
+    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool, inspect: bool,
+                                      packages_persistence: 'JobPackagePersistence', as_conf: 'AutosubmitConfig') -> None:
+        """Dry-run preparation of a package to emulate that the package was submitted, without following the normal submission flow.
+
+        :param job_list: Job container used to register wrapper package and job
+            mappings.
+        :type job_list: JobList
+        :param package: Package being prepared for inspect or wrapper-only mode.
+        :type package: JobPackageBase
+        :param only_wrappers: If ``True``, prepare wrapper metadata without
+            following the normal submission flow.
+        :type only_wrappers: bool
+        :param inspect: If ``True``, prepare package metadata for inspect mode.
+        :type inspect: bool
+        :param packages_persistence: Persistence helper used to store package
+            data for later recovery or visualization.
+        :type packages_persistence: JobPackagePersistence
+        :param as_conf: Autosubmit configuration for the current experiment.
+        :type as_conf: AutosubmitConfig
+        :raises Exception: Propagate any exception raised while creating wrapper
+            job metadata or saving the package.
+        """
+        if only_wrappers or inspect:
+            # Now name is used for submit scripts, before it was used to determine if a package had a wrapper or not
+            if package.is_wrapped:
+                job_list.packages_dict[package.name] = package.jobs
+                from ..job.job import WrapperJob
+                wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
+                                         package.jobs, package._wallclock, package.platform, as_conf, hold=False)
+                job_list.job_package_map[package.jobs[0].id] = wrapper_job
+                packages_persistence.save(package, inspect)
+            for innerJob in package._jobs:
+                # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
+                innerJob.status = Status.COMPLETED
+                innerJob.updated_log = False
 
     @property
     def serial_platform(self):
@@ -672,7 +663,6 @@ class Platform:
                 job.current_checkpoint_step += 1
                 self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
 
-
     def remove_stat_file(self, job: Any) -> bool:
         """Removes STAT files from remote.
 
@@ -749,27 +739,11 @@ class Platform:
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def submit_job(self, job: 'Job', script_name: str, hold: bool = False, export: str = "none"):
-        """Submit a job from a given job object.
-
-        :param job: job object
-        :type job: autosubmit.job.job.Job
-        :param script_name: job script's name
-        :rtype script_name: str
-        :param hold: if True, the job will be submitted in hold state
-        :type hold: bool
-        :param export: export environment variables
-        :type export: str
-        :return: job id for the submitted job
-        :rtype: int
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def check_all_jobs(self, job_list: list['Job'], as_conf:'AutosubmitConfig', retries: int = 5):
+    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig'):
         for job, job_prev_status in job_list:
             self.check_job(job)
 
-    def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries:int = 5,
+    def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries: int = 5,
                   submit_hold_check: bool = False, is_wrapper: bool = False):
         """Checks job running status.
 
@@ -797,13 +771,6 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
-    def generate_submit_script(self) -> None:
-        """Opens Submit script file. """
-        raise NotImplementedError  # pragma: no cover
-
-    def submit_script(self, hold: bool = False) -> Union[list[str], str]:
-        """Sends a Submit file Script, execute it  in the platform and retrieves the Jobs_ID of all jobs at once. """
-        raise NotImplementedError  # pragma: no cover
 
     def add_job_to_log_recover(self, job):
         if job.id and int(job.id) != 0:

@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from collections import OrderedDict
 from pathlib import Path
 
 import pytest
@@ -23,7 +24,7 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from autosubmit.log.log import AutosubmitError
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 """Unit tests for the Slurm platform."""
@@ -63,28 +64,15 @@ def test_properties(platform):
         assert value == getattr(platform, prop)
 
 
-def test_slurm_platform_submit_script_raises_autosubmit_critical_with_trace(mocker, platform):
-    package = mocker.MagicMock()
-    package.jobs.return_value = []
-    valid_packages_to_submit = [
-        package
-    ]
+def test_submit_multiple_jobs_raises_when_no_job_ids_are_recovered(mocker, platform):
+    platform.get_submit_cmd = mocker.MagicMock(return_value="dummy-command")
+    platform.send_command = mocker.MagicMock(return_value=True)
+    platform.get_submitted_job_id = mocker.MagicMock(return_value=[])
+    platform.get_submitted_jobs_by_name = mocker.MagicMock(return_value=[])
+    platform._ssh_output = "submission output without recoverable ids"
 
-    ae = AutosubmitError(message='invalid partition', code=123, trace='ERR!')
-    platform.submit_script = mocker.MagicMock(side_effect=ae)
-
-    # AS will handle the AutosubmitError above, but then raise an AutosubmitCritical.
-    # This new error won't contain all the info from the upstream error.
-    with pytest.raises(AutosubmitCritical) as cm:
-        platform.process_batch_ready_jobs(
-            valid_packages_to_submit=valid_packages_to_submit,
-            failed_packages=[]
-        )
-
-    # AS will handle the error and then later will raise another error message.
-    # But the AutosubmitError object we created will have been correctly used
-    # without raising any exceptions (such as AttributeError).
-    assert cm.value.message != ae.message
+    with pytest.raises(AutosubmitError):
+        platform.submit_multiple_jobs({"job.cmd": mocker.MagicMock()})
 
 
 @pytest.fixture
@@ -150,42 +138,27 @@ def create_packages(as_conf, slurm_platform):
     return packages
 
 
-def test_process_batch_ready_jobs_valid_packages_to_submit(mocker, slurm_platform, as_conf, create_packages):
-    valid_packages_to_submit = create_packages
-    failed_packages = []
-    slurm_platform.get_jobid_by_jobname = mocker.MagicMock()
-    slurm_platform.send_command = mocker.MagicMock()
-    slurm_platform.submit_script = mocker.MagicMock()
+def test_process_ready_jobs_valid_packages_to_submit(mocker, slurm_platform, create_packages):
     jobs_id = [1, 2, 3]
-    slurm_platform.submit_script.return_value = jobs_id
-    slurm_platform.process_batch_ready_jobs(valid_packages_to_submit, failed_packages)
-    for i, package in enumerate(valid_packages_to_submit):
+    scripts_to_submit = OrderedDict(
+        [
+            ("dummy-1.cmd", create_packages[0]),
+            ("wrapped-1.cmd", create_packages[1]),
+            ("wrapped-2.cmd", create_packages[2]),
+        ]
+    )
+
+    mocker.patch.object(slurm_platform, "submit_multiple_jobs", return_value=jobs_id)
+    mocker.patch.object(slurm_platform, "_check_and_cancel_duplicated_job_names", return_value=None)
+
+    slurm_platform.process_ready_jobs(scripts_to_submit)
+
+    for i, package in enumerate(create_packages):
         for job in package.jobs:
-            assert job.hold is False
             assert job.id == str(jobs_id[i])
             assert job.status == Status.SUBMITTED
-            if not isinstance(package, JobPackageSimple):
-                assert job.wrapper_name == "wrapped"
-            else:
-                assert job.wrapper_name is None
-    assert failed_packages == []
+            assert isinstance(package, (JobPackageSimple, JobPackageVertical, JobPackageHorizontal))
 
 
-def test_submit_job(mocker, slurm_platform):
-    slurm_platform.get_submit_cmd = mocker.MagicMock(returns="dummy")
-    slurm_platform.send_command = mocker.MagicMock(returns="dummy")
-    slurm_platform._ssh_output = "10000"
-    job = Job("dummy", 10000, Status.SUBMITTED, 0)
-    job._platform = slurm_platform
-    job.platform_name = slurm_platform.name
-    jobs_id = slurm_platform.submit_job(job, "dummy")
-    assert not jobs_id
-    job.x11 = True
-    jobs_id = slurm_platform.submit_job(job, "dummy")
-    assert jobs_id == 10000
-    job.workflow_commit = "dummy"
-    jobs_id = slurm_platform.submit_job(job, "dummy")
-    assert jobs_id == 10000
-    slurm_platform._ssh_output = "10000\n"
-    jobs_id = slurm_platform.submit_job(job, "dummy")
-    assert jobs_id == 10000
+def test_get_submitted_job_id_x11(slurm_platform):
+    assert slurm_platform.get_submitted_job_id("10000\n", x11=True) == 10000

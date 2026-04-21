@@ -29,6 +29,7 @@ from autosubmit.log.log import AutosubmitError, AutosubmitCritical
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException, _get_user_config_file
 from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
     from _pytest._py.path import LocalPath
@@ -93,9 +94,6 @@ def test_paramiko_platform_constructor(paramiko_platform):
     assert platform.wrapper is None
     assert platform.header is None
     assert len(platform.job_status) == 4
-    # These calls are not implemented but should not raise any error
-    platform.get_submit_script()
-    platform.generate_submit_script()
 
 
 def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_platform):
@@ -151,20 +149,23 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
     assert cm.value.trace is None
 
 
-def test_ps_get_submit_cmd(ps_platform):
+def test_ps_get_multi_submit_cmd(ps_platform):
     platform, _ = ps_platform
-    job = Job('TEST', 'TEST', Status.WAITING, 1)
-    job.wallclock = '00:01'
-    job.processors = 1
-    job.section = 'dummysection'
-    job.platform_name = 'pytest-ps'
-    job.platform = platform
-    job.script_name = "echo hello world"
-    job.fail_count = 0
-    command = platform.get_submit_cmd(job.script_name, job)
-    assert job.wallclock_in_seconds == 60 * 1.3
-    assert f"{job.script_name}" in command
-    assert f"timeout {job.wallclock_in_seconds}" in command
+    platform.remote_log_dir = str(platform.root_dir)
+
+    package = type("DummyPackage", (), {
+        "export": "",
+        "timeout": 78,
+        "x11_options": "",
+        "executable": "/bin/bash",
+        "fail_count": 0,
+        "ec_queue": None,
+    })()
+
+    command = platform.get_multi_submit_cmd({"job.cmd": package})
+
+    assert "job.cmd" in command
+    assert "timeout 78" in command
 
 
 def add_ssh_config_file(tmpdir, user, content):
@@ -250,7 +251,7 @@ def test__get_user_config_file_invalid_settings():
         _get_user_config_file(False, None, None)
 
 
-def test_submit_job(mocker, autosubmit_config, tmpdir):
+def test_submit_multiple_jobs(mocker, autosubmit_config, tmpdir):
     experiment_data = {
         "ROOTDIR": str(tmpdir),
         "PROJDIR": str(tmpdir),
@@ -260,15 +261,12 @@ def test_submit_job(mocker, autosubmit_config, tmpdir):
     }
     platform = ParamikoPlatform(expid='a000', name='local', config=experiment_data)
     platform._ssh_config = mocker.MagicMock()
-    platform.get_submit_cmd = mocker.MagicMock(returns="dummy")
-    platform.send_command = mocker.MagicMock(returns="dummy")
-    platform.get_submitted_job_id = mocker.MagicMock(return_value="10000")
+    platform.get_submit_cmd = mocker.MagicMock(return_value="dummy")
+    platform.send_command = mocker.MagicMock(return_value=True)
+    platform.get_submitted_job_id = mocker.MagicMock(return_value=[10000])
     platform._ssh_output = "10000"
-    job = Job("dummy", 10000, Status.SUBMITTED, 0)
-    job._platform = platform
-    job.platform_name = platform.name
-    jobs_id = platform.submit_job(job, "dummy")
-    assert jobs_id == 10000
+    jobs_id = platform.submit_multiple_jobs({"dummy.cmd": mocker.MagicMock()})
+    assert jobs_id == [10000]
 
 
 def test_get_pscall(paramiko_platform):
@@ -504,24 +502,38 @@ def test_check_remote_log_dir_errors(paramiko_platform: ParamikoPlatform, mocker
     ]
 )
 def test_get_call(executable: str, timeout, paramiko_platform: ParamikoPlatform):
-    job = Job(name='test', job_id='test')
-    job.executable = executable
-    job.type = 'bash'
-
-    call = paramiko_platform.get_call(export='', job_script='job_a', job=job, timeout=timeout)
+    call = paramiko_platform.get_call(
+        script_name='job_a',
+        timeout=timeout,
+        export='',
+        executable=executable,
+        x11_options='',
+        fail_count=0,
+        sub_queue=None,
+    )
 
     call = call.strip()
 
     if timeout > 0:
-        assert call.startswith('timeout')
+        assert 'timeout' in call
     else:
         assert call.startswith('nohup')
+    assert call.startswith('nohup')
     assert 'job_a' in call
 
 
 def test_get_call_no_job(paramiko_platform: ParamikoPlatform):
-    call = paramiko_platform.get_call(export='', job_script='job_a', job=None, timeout=-1)
-    assert 'python3' in call  # Because it will be a wrapper, without the job.
+    call = paramiko_platform.get_call(
+        script_name='job_a',
+        timeout=-1,
+        export='',
+        executable='',
+        x11_options='',
+        fail_count=0,
+        sub_queue=None,
+    )
+    assert 'nohup' in call
+    assert 'job_a' in call
 
 
 @pytest.mark.parametrize(
@@ -589,3 +601,145 @@ def test__load_ssh_config_missing_ssh_config(
             platform.close_connection()
 
     assert mocked_log.warning.called
+
+@pytest.mark.parametrize("output,expected", [
+    ("", {}),
+    ("   \n\n  \n", {}),
+    ("job_a:1001\n", {"job_a": ["1001"]}),
+    ("job_a:1003,1001,1002\n", {"job_a": ["1001", "1002", "1003"]}),
+    ("job_a:101\njob_b:202,203\n", {"job_a": ["101"], "job_b": ["202", "203"]}),
+    ("job_a:\n", {"job_a": []}),
+])
+def test_parse_job_names(output: str, expected: dict) -> None:
+    """Parse grouped job-name output into the expected name-to-IDs mapping.
+
+    :param output: Raw command output in ``JobName:id,id2`` format.
+    :param expected: Mapping of job name to sorted job IDs.
+    """
+    assert ParamikoPlatform._parse_job_names(output) == expected
+
+
+def test_check_and_cancel_duplicated_job_names_no_duplicates(
+    slurm_platform: SlurmPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not call cancel_jobs when no job name appears more than once.
+
+    :param slurm_platform: Slurm platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)
+    slurm_platform._ssh_output = "job_a:1001\n"
+
+    cancelled: list[str] = []
+    monkeypatch.setattr(slurm_platform, "cancel_jobs", lambda ids: cancelled.extend(ids))
+
+    slurm_platform._check_and_cancel_duplicated_job_names({"job_a.cmd": None})
+
+    assert cancelled == []
+
+
+def test_check_and_cancel_duplicated_job_names_with_duplicates(
+    slurm_platform: SlurmPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cancel the oldest (lowest-sorted) ID when a job name has multiple entries.
+
+    :param slurm_platform: Slurm platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)
+    slurm_platform._ssh_output = "job_a:1001,1002\n"
+
+    cancelled: list[str] = []
+    monkeypatch.setattr(slurm_platform, "cancel_jobs", lambda ids: cancelled.extend(ids))
+
+    slurm_platform._check_and_cancel_duplicated_job_names({"job_a.cmd": None})
+
+    assert cancelled == ["1001"]
+
+
+def test_check_and_cancel_duplicated_job_names_empty_output(
+    slurm_platform: SlurmPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not cancel anything when the command returns empty output.
+
+    :param slurm_platform: Slurm platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)
+    slurm_platform._ssh_output = ""
+
+    cancelled: list[str] = []
+    monkeypatch.setattr(slurm_platform, "cancel_jobs", lambda ids: cancelled.extend(ids))
+
+    slurm_platform._check_and_cancel_duplicated_job_names({"job_a.cmd": None})
+
+    assert cancelled == []
+
+
+def test_submit_multiple_jobs_empty_input_returns_empty(
+    paramiko_platform: ParamikoPlatform,
+) -> None:
+    """Return an empty list immediately when no scripts are provided.
+
+    :param paramiko_platform: ParamikoPlatform under test.
+    """
+    assert paramiko_platform.submit_multiple_jobs({}) == []
+
+
+def test_submit_multiple_jobs_uses_fallback_when_count_mismatch(
+    paramiko_platform: ParamikoPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Use get_submitted_jobs_by_name when direct parse returns the wrong count.
+
+    :param paramiko_platform: ParamikoPlatform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(paramiko_platform, "send_command", lambda cmd, **_: None)
+    monkeypatch.setattr(paramiko_platform, "get_multi_submit_cmd", lambda _: "dummy_cmd")
+    paramiko_platform._ssh_output = ""
+    monkeypatch.setattr(paramiko_platform, "get_submitted_job_id", lambda out, **_: [])
+    monkeypatch.setattr(paramiko_platform, "get_submitted_jobs_by_name", lambda names: [101])
+
+    result = paramiko_platform.submit_multiple_jobs({"job_a.cmd": object()})
+
+    assert result == [101]
+
+
+def test_submit_multiple_jobs_raises_when_both_paths_fail(
+    paramiko_platform: ParamikoPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Raise AutosubmitError (6005) when both direct and fallback ID parsing fail.
+
+    :param paramiko_platform: ParamikoPlatform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(paramiko_platform, "send_command", lambda cmd, **_: None)
+    monkeypatch.setattr(paramiko_platform, "get_multi_submit_cmd", lambda _: "dummy_cmd")
+    monkeypatch.setattr(paramiko_platform, "cancel_jobs", lambda ids: None)
+    paramiko_platform._ssh_output = ""
+    monkeypatch.setattr(paramiko_platform, "get_submitted_job_id", lambda out, **_: [])
+    monkeypatch.setattr(paramiko_platform, "get_submitted_jobs_by_name", lambda names: [])
+
+    with pytest.raises(AutosubmitError) as exc_info:
+        paramiko_platform.submit_multiple_jobs({"job_a.cmd": object()})
+
+    assert exc_info.value.code == 6005
+
+
+def test_ps_get_job_names_cmd_contains_expected_components(
+    ps_platform: tuple,
+) -> None:
+    """The PS command must use ps and grep to filter by job name.
+
+    :param ps_platform: Local ps_platform fixture (platform, tmpdir).
+    """
+    platform, _ = ps_platform
+    cmd = platform._get_job_names_cmd(["job_a", "job_b"])
+
+    assert "job_a" in cmd
+    assert "job_b" in cmd

@@ -480,15 +480,21 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status=Opti
         Log.info(f"No active jobs found for expid {job_list.expid}")
         return
 
+    jobs_by_platform = {}
     for job in active_jobs:
-        # Cancel from the remote platform
-        Log.info(f'Cancelling job {job.name} on platform {job.platform.name}')
-        try:
-            job.platform.send_command(f'{job.platform.cancel_cmd} {str(job.id)}', ignore_log=True)
-        except Exception as e:
-            Log.warning(f"Failed to cancel job {job.name} on platform {job.platform.name}: {str(e)}")
+        jobs_by_platform.setdefault(job.platform, []).append(job)
 
-        Log.info(f"Changing status of job {job.name} to {target_status}")
-        job.status = Status.KEY_TO_VALUE[target_status]
+    for platform, jobs in jobs_by_platform.items():
+        job_ids = [str(job.id) for job in jobs]
+        Log.info(f'Cancelling jobs {", ".join(job_ids)} on platform {platform.name}')
+
+        try:
+            platform.cancel_jobs(job_ids)
+        except Exception as e:
+            Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform.name}: {str(e)}")
+
+        for job in jobs:
+            Log.info(f"Changing status of job {job.name} to {target_status}")
+            job.status = Status.KEY_TO_VALUE[target_status]
 
     job_list.save()

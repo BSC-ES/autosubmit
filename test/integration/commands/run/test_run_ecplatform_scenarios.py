@@ -27,7 +27,6 @@ from shutil import copy
         job:
             SCRIPT: |
                 echo "Hello World with id=Success"
-                sleep 1
             PLATFORM: TEST_EC
             RUNNING: chunk
             wallclock: 00:01

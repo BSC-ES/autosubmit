@@ -17,13 +17,14 @@
 
 import locale
 import os
+import re
 import subprocess
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING, Optional
 
-from autosubmit.log.log import Log, AutosubmitError
+from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
 from autosubmit.platforms.headers.ec_header import EcHeader
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
@@ -32,6 +33,17 @@ from autosubmit.platforms.wrappers.wrapper_factory import EcWrapperFactory
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
+
+_EC_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
+    # ecaccess-job-submit: returns a bare numeric job ID on success.
+    re.compile(r"^\s*\d+\s*$", re.MULTILINE),
+    # ecaccess-job-list: known ecaccess job-state words in the tabular output.
+    re.compile(r"\b(done|exec|init|retr|stdby|wait|stop)\b", re.IGNORECASE),
+    # ecaccess-job-list: column-header row ("JOB Id ... Status ...").
+    re.compile(r"\bStatus\b|\bJOB\s+Id\b", re.IGNORECASE),
+    # ecaccess-file-dir: directory listing contains completion markers or logs.
+    re.compile(r"_COMPLETED|\.out\b|\.err\b", re.IGNORECASE),
+)
 
 
 class EcPlatform(ParamikoPlatform):
@@ -51,9 +63,6 @@ class EcPlatform(ParamikoPlatform):
         pass  # pragma: no cover
 
     def get_check_all_jobs_cmd(self, jobs_id):
-        pass  # pragma: no cover
-
-    def submit_script(self, hold=False):
         pass  # pragma: no cover
 
     def __init__(self, expid, name, config, scheduler):
@@ -92,6 +101,11 @@ class EcPlatform(ParamikoPlatform):
         self.check_remote_permissions_remove_cmd = ""
         self.update_cmds()
         self.scheduler = scheduler
+        self._uses_local_api = True
+        # Pre-submission snapshot used by get_submitted_jobs_by_name to exclude
+        # stale jobs from previous runs.
+        self._pre_submission_ids: dict[str, set[int]] = {}
+        self.has_scheduler = False
 
     def update_cmds(self):
         """
@@ -119,18 +133,44 @@ class EcPlatform(ParamikoPlatform):
                                                                                                            self.user,
                                                                                                            "_permission_checker_azxbyc")
 
-    def get_checkhost_cmd(self):
-        return self._checkhost_cmd
-
     def get_remote_log_dir(self):
         return self.remote_log_dir
 
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
 
-    def set_submit_cmd(self, ec_queue):
-        self._submit_cmd = ("ecaccess-job-submit -distant -queueName " + ec_queue + " " + self.host + ":" +
-                            self.remote_log_dir + "/")
+    def _set_submit_cmd(self, ec_queue: str):
+        """Set the ecaccess-job-submit command for the given queue.
+
+        The ``-retry 3w0`` flag tells ecaccess to retry the **initial SSL handshake**
+        up to 30 times (one attempt per ~5 s) before giving up. This guards against
+        transient SSL failures that occasionally occur when first connecting to the
+        ECMWF gateway; without it, a single bad handshake would abort the submission
+        entirely. It does **not** affect job-level retries or any subsequent requests
+        made after the connection is established.
+
+        See: https://confluence.ecmwf.int/display/ECAC/ecaccess-job-submit
+
+        :param ec_queue: Queue to submit the job to.
+        """
+        self._submit_cmd = f"{self._submit_command_name} -retry 30 -distant -queueName {ec_queue} {self.host}:"
+
+    def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
+        """Gets the command to submit a job, for the current platform, with the given parameters.
+         This needs to be adapted to each scheduler, the default assumes that is being launched directly.
+
+        :param script_name: name of the script to submit
+        :param pre: command part to be placed before the script name, e.g. timeout, export, executable
+        :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
+        :param x11_options: x11 options to run the script, if any
+        :return: command to submit a job
+        """
+
+        if x11_options:
+            raise AutosubmitCritical(
+                "X11 options are not supported for ecaccess jobs, as they need to be launched within an iterative node , which is not compatible with the current submission method. Please remove x11 options from your job configuration.")
+
+        return f"{pre} {self._submit_cmd}{script_name} {post}"
 
     def check_all_jobs(self, job_list, as_conf, retries=5):
         for job, prev_status in job_list:
@@ -144,23 +184,21 @@ class EcPlatform(ParamikoPlatform):
                 return job_state[1]
         return 'DONE'
 
-    def get_submitted_job_id(self, output, x11=False):
-        return output
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
+        """Parses the output of the submit command to get the job ID.
+
+        :param output: output of the submit command.
+        :param x11: whether the job is an x11 job, which has a different output format.
+        :return: job ID of the submitted job.
+        """
+
+        return [out.strip() for out in output.splitlines()]
 
     def get_check_job_cmd(self, job_id):
         return self._checkjob_cmd + str(job_id)
 
-    def get_submit_cmd(self, job_script, job, hold=False, export=""):
-        self.set_submit_cmd(job.ec_queue)
-        if export == "none" or export == "None" or export is None or export == "":
-            export = ""
-        else:
-            export += " ; "
-        return export + self._submit_cmd + job_script
-
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
-        """
-        Establishes an SSH connection to the host.
+        """Establishes an SSH connection to the host.
 
         :param as_conf: The Autosubmit configuration object.
         :param reconnect: Indicates whether to attempt reconnection if the initial connection fails.
@@ -174,7 +212,8 @@ class EcPlatform(ParamikoPlatform):
             if output.lower().find("yes") != -1:
                 self.connected = True
             else:
-                Log.warning(f"Connection to {self.host} could not be established. Please remember to weekly renew your ecaccess-certificate if you are using one.")
+                Log.warning(
+                    f"Connection to {self.host} could not be established. Please remember to weekly renew your ecaccess-certificate if you are using one.")
                 self.connected = False
         except Exception:
             self.connected = False
@@ -248,6 +287,7 @@ class EcPlatform(ParamikoPlatform):
                 break
         else:  # if break was not called in the for, all attemps failed!
             raise AutosubmitError(f'Could not execute command {command} on {self.host}', 7500, str(err_message))
+        self._check_for_unrecoverable_errors()
         return True
 
     def send_file(self, filename, check=True) -> bool:
@@ -391,3 +431,147 @@ class EcPlatform(ParamikoPlatform):
                 completed_job_names.append(file_name.removesuffix("_COMPLETED"))
 
         return completed_job_names
+
+    def cancel_jobs(self, job_ids: list[str]) -> None:
+        """Cancel ecaccess jobs by their IDs.
+
+        :param job_ids: List of ecaccess job IDs to cancel.
+        :type job_ids: list[str]
+        """
+        if not job_ids:
+            return
+        command = " ; ".join(f"{self.cancel_cmd} {job_id}" for job_id in job_ids)
+        self.send_command(command)
+
+    def _check_and_cancel_duplicated_job_names(self, scripts_to_submit: dict) -> None:
+        """Check for duplicated job names in the submitted packages.
+
+        :param scripts_to_submit: Package script names and their info.
+        :type scripts_to_submit: dict
+        """
+        # There isen't a reliable way to check for duplicated job names in ecaccess, as the job list command doesn't return all the information needed to identify them,
+        pass  # pragma: no cover
+
+    def _check_for_unrecoverable_errors(self) -> None:
+        """Check ecaccess command output for recoverable and unrecoverable errors.
+
+        :raises AutosubmitError: For transient errors.
+        :raises AutosubmitCritical: For permanent errors.
+        """
+        out = self._ssh_output or ""
+        err = self._ssh_output_err or ""
+
+        # Fast-exit: stdout matches a known ecaccess success pattern.
+        if any(pat.search(out) for pat in _EC_EXPECTED_OUTPUT):
+            return
+
+        # ecaccess errors appear in stdout, not stderr; search both together.
+        combined = (out + "\n" + err).lower()
+        if not combined.strip():
+            return
+
+        # Transient / recoverable patterns → AutosubmitError (6016).
+        transient_patterns: list[tuple[str, str]] = [
+            ("not active", "SSH session not active"),
+            ("git clone", "Git clone failed during submission; likely a transient network issue"),
+            ("no gateway", "ecaccess gateway not available"),
+            ("connection refused", "Connection to ecaccess gateway refused"),
+            ("connection timed out", "Connection to ecaccess gateway timed out"),
+            ("socket timed out", "Socket timed out communicating with ecaccess"),
+            ("network is unreachable", "Network unreachable; cannot reach ecaccess gateway"),
+            ("ssl", "ecaccess SSL or certificate issue"),
+            ("temporary failure in name resolution", "DNS resolution failed temporarily"),
+        ]
+
+        for pattern, message in transient_patterns:
+            if pattern in combined:
+                raise AutosubmitError(
+                    f"Transient ecaccess error: {message}",
+                    6016,
+                    (out + "\n" + err).strip(),
+                )
+
+        # Permanent / unrecoverable patterns → AutosubmitCritical (7014).
+        critical_patterns: list[tuple[str, str]] = [
+            ("invalid queue", "Invalid ecaccess queue specified"),
+            ("certificate not found", "ecaccess certificate not found or expired"),
+            ("queue does not exist", "ecaccess queue does not exist"),
+            ("no permission", "No permission to submit to this ecaccess queue"),
+            ("not authorized", "Not authorised for this ecaccess operation"),
+            ("access denied", "Access denied by ecaccess gateway"),
+            ("job not found", "ecaccess job not found"),
+            ("invalid job", "Invalid ecaccess job specification"),
+            ("not submitted", "Job was not submitted to ecaccess; check directives"),
+            ("submission failed", "ecaccess submission failed; check directives"),
+            ("command not found", "ecaccess command not found on the gateway host"),
+        ]
+
+        for pattern, message in critical_patterns:
+            if pattern in combined:
+                raise AutosubmitCritical(
+                    f"Permanent ecaccess error: {message}",
+                    7014,
+                    (out + "\n" + err).strip(),
+                )
+
+    def _snapshot_job_ids_before_submission(self, script_names: list[str]) -> None:
+        """Snapshot currently active ecaccess job IDs for the given script names.
+
+        :param script_names: Script filenames about to be submitted.
+        :type script_names: list[str]
+        """
+
+        with suppress(Exception):
+            self.send_command("ecaccess-job-list")
+            output = self.get_ssh_output()
+            pre: dict[str, set[int]] = {}
+            for line in output.splitlines():
+                parts = line.split()
+                if len(parts) >= 2 and parts[0].isdigit() and parts[-1] in script_names:
+                    pre.setdefault(parts[-1], set()).add(int(parts[0]))
+            self._pre_submission_ids = pre
+
+    def _pre_submission_snapshot(self, script_names: list[str]) -> None:
+        """Snapshot currently active ecaccess job IDs before a submission batch.
+
+        Overrides the base to populate `_pre_submission_ids` with
+        ecaccess job IDs so that `get_submitted_jobs_by_name` can
+        distinguish freshly submitted jobs from those of a previous run.
+
+        :param script_names: Script filenames about to be submitted.
+        :type script_names: list[str]
+        """
+        self._pre_submission_ids = {}
+        self._snapshot_job_ids_before_submission(script_names)
+
+    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
+        """Return submitted ecaccess job IDs by script name.
+
+        This fallback is used when the batched submit command does not return
+        one recoverable job identifier per submitted script.
+
+        :param script_names: Submitted script filenames.
+        :type script_names: list[str]
+        :return: Matching ecaccess job IDs in submission order, one per script.
+            Returns an empty list if any script name has no newly submitted job.
+        :rtype: list[int]
+        """
+        self.send_command("ecaccess-job-list")
+        output = self.get_ssh_output()
+
+        name_to_ids: dict[str, set[int]] = {}
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].isdigit():
+                name_to_ids.setdefault(parts[-1], set()).add(int(parts[0]))
+
+        submitted_job_ids: list[int] = []
+        for script_name in script_names:
+            job_name = Path(script_name).stem
+            all_ids = name_to_ids.get(job_name, set())
+            new_ids = all_ids - self._pre_submission_ids.get(job_name, set())
+            if not new_ids:
+                return []
+            submitted_job_ids.append(max(new_ids))
+
+        return submitted_job_ids

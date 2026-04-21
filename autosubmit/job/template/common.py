@@ -62,3 +62,17 @@ class TemplateSnippet(Protocol):
         Otherwise, Autosubmit misses the ``_COMPLETED`` file and marks the
         job as ``FAILED``.
         """
+
+
+def shebang_from_executable(executable: str) -> str:
+    """Return the shebang line for the given executable.
+
+    If the executable is an absolute path, use it directly.
+    Otherwise, use ``/usr/bin/env`` for portability.
+
+    :param executable: Executable name or absolute path.
+    :return: A shebang line string.
+    """
+    if executable.startswith('/'):
+        return f'#!{executable}'
+    return f'#!/usr/bin/env {executable}'

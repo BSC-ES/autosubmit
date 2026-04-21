@@ -109,7 +109,7 @@ def test_cancel_jobs_platform_error(create_job_list, mocker):
         }
     ])
 
-    job_list.get_job_list()[0].platform.send_command.side_effect = ValueError('platypus')
+    job_list.get_job_list()[0].platform.cancel_jobs.side_effect = ValueError('platypus')
 
     mocked_log = mocker.patch('autosubmit.job.job_utils.Log')
 
