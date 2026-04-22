@@ -686,6 +686,44 @@ Example 3: 1-to-N dependency
     :align: center
     :caption: Example showing dependencies between jobs running at different frequencies.
 
+Example 5: ``previous-N`` split dependency
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``previous`` keyword in ``SPLITS_TO`` creates a dependency on the immediately preceding split
+(i.e. ``previous-1``). You can generalise this with ``previous-N`` to depend on the split that is
+**N positions earlier**. ``previous`` and ``previous-1`` are therefore equivalent.
+
+In the example below ``DN`` has 4 splits and each split depends on the split that is 2 positions
+behind it (split 3 → split 1, split 4 → split 2). Splits 1 and 2 have no prior split at that
+distance and therefore run without that dependency.
+
+.. code-block:: yaml
+
+    EXPERIMENT:
+      DATELIST: 19900101
+      MEMBERS: fc0
+      CHUNKSIZEUNIT: day
+      CHUNKSIZE: 1
+      NUMCHUNKS: 1
+      CALENDAR: standard
+
+    JOBS:
+      DN:
+        FILE: dn.sh
+        RUNNING: chunk
+        SPLITS: 4
+
+      POST:
+        FILE: post.sh
+        RUNNING: chunk
+        SPLITS: 4
+        DEPENDENCIES:
+          DN:
+            SPLITS_FROM:
+              all:
+                SPLITS_TO: previous-2   # equivalent to previous-1 when N=1; default is previous (= previous-1)
+
+
 Job Splits with calendar
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
