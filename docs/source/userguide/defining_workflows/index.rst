@@ -88,7 +88,7 @@ To set at what level a job has to run you have to use the ``RUNNING`` attribute.
           RUNNING: chunk
 
 
-The resulting workflow can be seen in :numref:`fig-running` for an experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
+The resulting workflow can be seen in :numref:`fig-running`.
 
 .. autosubmitfigure::
     :command: create
@@ -101,6 +101,7 @@ The resulting workflow can be seen in :numref:`fig-running` for an experiment wi
     :width: 100%
     :align: center
     :alt: Example showing how to run jobs once per startdate, member or chunk.
+    :caption: Example showing how to run jobs once per startdate, member or chunk.
 
 
 Dependencies
@@ -163,6 +164,7 @@ The resulting workflow can be seen in :numref:`fig-dependencies-previous` for an
     :width: 100%
     :align: center
     :alt: Example showing dependencies between sim jobs on different chunks.
+    :caption: Example showing dependencies between sim jobs on different chunks.
 
 Dependencies between running levels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -225,6 +227,7 @@ The resulting workflow can be seen in :numref:`fig-dependencies-running`.
     :width: 100%
     :align: center
     :alt: Example showing dependencies between jobs running at different levels.
+    :caption: Example showing dependencies between jobs running at different levels.
 
 Dependencies rework
 ~~~~~~~~~~~~~~~~~~~
@@ -530,6 +533,7 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be s
     :width: 100%
     :align: center
     :alt: Example showing dependencies between chunk jobs running with member synchronize.
+    :caption: Example showing dependencies between chunk jobs running with member synchronize.
 
 .. code-block:: yaml
 
@@ -890,8 +894,8 @@ Quick example: simple auto split
     :figname: fig-splits-auto-simple
     :width: 100%
     :align: center
-    :caption: Simple example showing automatically computed splits based on calendar settings.
     :alt: Simple example showing automatically computed splits based on calendar settings.
+    :caption: Simple example showing automatically computed splits based on calendar settings.
 
 
 In this example:
