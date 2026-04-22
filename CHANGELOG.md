@@ -23,6 +23,8 @@
 - Fixes Split-dependencies #2958
 - Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
 - Fixed `autosubmit stats` command that was not considering parameters defined in the platform, like NODES, TASKS, etc. #2978
+- Fixes 1-N grouped split dependencies #2958
+
 
 **Enhancements:**
 
@@ -55,6 +57,7 @@
 - verbosity adjusted #2976
 - Implement filters for `recovery` command #2923
 - Enchanced previous to accept previous-N #
+- Enchanced splits_to previous keyword to accept previous-N #2958
 - Add detection of inneficiencies for key CPMIP metrics #3022
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
