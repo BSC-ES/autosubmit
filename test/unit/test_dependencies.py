@@ -3,6 +3,7 @@ import pytest
 from datetime import datetime
 from mock.mock import MagicMock
 from networkx import DiGraph
+from datetime import datetime as dt
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
@@ -762,6 +763,81 @@ def test_job_dict_get_jobs_filtered(mocker, joblist):
     assert expected_output == result
 
 
+@pytest.mark.parametrize("parent_splits,child_splits,slice_size", [
+    (8, 8, 1),
+    (16, 8, 2),
+    (15, 5, 3),
+    (31, 16, 2),
+    (4, 8, 2),
+    (3, 9, 3),
+])
+def test_get_jobs_filtered_grouped_splits(parent_splits, child_splits, slice_size, as_conf):
+    """Test grouped split dependency mapping (*\\N) for N-to-1, 1-to-1, and 1-to-N ratios.
+
+    Verifies that every child split resolves to the correct parent split(s) regardless
+    of the parent-to-child split ratio and slice size.  The SPLITS_TO filter is set to
+    the minimal form ``1*\\<slice_size>`` so the only information used is the slice size
+    encoded in the ``*\\N`` suffix; the actual index computation must be purely arithmetic.
+    """
+    from datetime import datetime as dt
+
+    date = dt(2000, 1, 1)
+    as_conf.experiment_data = {
+        'DEFAULT': {'EXPID': 'a000'},
+        'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
+        'EXPERIMENT': {
+            'DATELIST': '20000101', 'MEMBERS': 'fc0', 'CHUNKSIZEUNIT': 'day',
+            'CHUNKSIZE': 1, 'NUMCHUNKS': 1, 'CHUNKINI': '', 'CALENDAR': 'standard',
+        },
+        'JOBS': {
+            'PARENT': {
+                'FILE': 'parent.sh', 'RUNNING': 'chunk',
+                'SPLITS': parent_splits, 'WALLCLOCK': '00:10',
+            },
+        },
+    }
+    as_conf.experiment_data["JOBS"] = as_conf.experiment_data["JOBS"]
+    as_conf.experiment_data["JOBS"] = as_conf.experiment_data["JOBS"]
+
+    dictionary = DicJobs([date], ["fc0"], [1], "", default_retrials=0, as_conf=as_conf)
+    dictionary.read_section("PARENT", 1, "bash")
+
+    parent_jobs = dictionary._dic["PARENT"][date]["fc0"][1]
+    # Minimal filter: only the slice suffix matters; index arithmetic does the rest.
+    filters_to = {'SPLITS_TO': f"1*\\{slice_size}"}
+    filters_to_of_parent = {}
+
+    is_n_to_1 = child_splits <= parent_splits
+
+    for child_split in range(1, child_splits + 1):
+        child_job = Job(f"a000_20000101_fc0_1_{child_split}_CHILD", 1, Status.WAITING, 1)
+        child_job.running = "chunk"
+        child_job.section = "CHILD"
+        child_job.date = date
+        child_job.member = "fc0"
+        child_job.chunk = 1
+        child_job.split = child_split
+        child_job.splits = child_splits
+
+        result = dictionary.get_jobs_filtered(
+            "PARENT", child_job, filters_to, date, "fc0", 1, filters_to_of_parent,
+        )
+
+        if is_n_to_1:
+            start = (child_split - 1) * slice_size
+            end = min(start + slice_size, parent_splits)
+            expected = set(j.name for j in parent_jobs[start:end])
+            assert set(j.name for j in result) == expected, (
+                f"child_split={child_split}: expected parents {expected}, got {[j.name for j in result]}"
+            )
+        else:
+            parent_index = min((child_split - 1) // slice_size, parent_splits - 1)
+            expected_name = parent_jobs[parent_index].name
+            assert len(result) == 1 and result[0].name == expected_name, (
+                f"child_split={child_split}: expected parent {expected_name}, got {[j.name for j in result]}"
+            )
+
+
 def test_normalize_auto_keyword(as_conf, mocker):
     job_list = JobList(
         as_conf.expid,
@@ -833,3 +909,56 @@ def test_normalize_auto_keyword(as_conf, mocker):
     parameters = job.update_job_parameters(as_conf, parameters, True)
     assert job.splits == "50"
     assert parameters["SPLITS"] == "50"
+
+
+@pytest.mark.parametrize("steps_back,job_split,total_splits,expected_split", [
+    ("", 3, 10, 2),
+    ("1", 3, 10, 2),
+    ("1", 1, 10, None),
+    ("2", 5, 10, 3),
+    ("2", 2, 10, None),
+    ("2", 3, 10, 1),
+    ("3", 4, 10, 1),
+    ("3", 3, 10, None),
+    ("10", 6, 6, None),
+    ("10", 10, 6, None),
+    ("6", 6, 6, None),
+    ("6", 1, 6, None),
+    ("4", 4, 10, None),
+    ("4", 5, 10, 1),
+    ("1", -1, 10, None),
+])
+def test_apply_splits_filter_previous_n(steps_back, job_split, total_splits, expected_split, as_conf):
+    """Test that ``previous`` and ``previous-N`` resolve to the correct split"""
+    date = dt(2000, 1, 1)
+    as_conf.experiment_data = {
+        'DEFAULT': {'EXPID': 'a000'},
+        'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
+        'EXPERIMENT': {
+            'DATELIST': '20000101', 'MEMBERS': 'fc0', 'CHUNKSIZEUNIT': 'day',
+            'CHUNKSIZE': 1, 'NUMCHUNKS': 1, 'CHUNKINI': '', 'CALENDAR': 'standard',
+        },
+        'JOBS': {
+            'SIM': {
+                'FILE': 'sim.sh', 'RUNNING': 'chunk',
+                'SPLITS': total_splits, 'WALLCLOCK': '00:05',
+            },
+        },
+    }
+    dictionary = DicJobs([date], ["fc0"], [1], "", default_retrials=0, as_conf=as_conf)
+    dictionary.read_section("SIM", 1, "bash")
+    splits_filter = f"previous-{steps_back}" if steps_back else "previous"
+    filters_to = {"SPLITS_TO": splits_filter}
+    job = Job(f"a000_20000101_fc0_1_{job_split}_SIM", 0, Status.WAITING, 1)
+    job.date = date
+    job.member = "fc0"
+    job.chunk = 1
+    job.running = "chunk"
+    job.split = job_split
+    job.splits = total_splits
+    result = dictionary.get_jobs_filtered("SIM", job, filters_to, date, "fc0", 1, {})
+    if expected_split is None:
+        assert result == [], f"Expected no result for split={job_split}, filter={splits_filter}"
+    else:
+        assert len(result) == 1, f"Expected exactly one result for split={job_split}, filter={splits_filter}"
+        assert result[0].split == expected_split
