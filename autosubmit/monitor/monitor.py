@@ -486,7 +486,7 @@ class Monitor:
         try:
             Log.info('Plotting...')
             now = time.localtime()
-            output_date = time.strftime("%Y%m%d_%H%M", now)
+            output_date = time.strftime("%Y%m%d_%H%M%S", now)
             plot_file_name = f'{expid}_{output_date}.{output_format}'
             output_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "plot", plot_file_name)
 
@@ -551,7 +551,7 @@ class Monitor:
         Log.info('Writing status txt...')
 
         now = time.localtime()
-        output_date = time.strftime("%Y%m%d_%H%M", now)
+        output_date = time.strftime("%Y%m%d_%H%M%S", now)
 
         status_dir = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "status")
         if not status_dir.exists():
