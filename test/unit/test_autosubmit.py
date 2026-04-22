@@ -79,3 +79,52 @@ def test_database_backup_postgres(monkeypatch, autosubmit, mocker):
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
     autosubmit.database_backup('a000')
     assert mocked_log.debug.called
+
+
+@pytest.mark.parametrize(
+    'completed,failed',
+    [
+        (0, 0),
+        (1, 0),
+        (2, 0),
+        (1, 1),
+        (1, 2)
+    ]
+)
+def test_iteration_info(completed, failed, mocker):
+    """Test that we return and print the iteration info.
+
+    Autosubmit has a function that prints the information about the current main loop iteration.
+    This includes total and failed jobs, and other information about the current loop step.
+    """
+    total_jobs = completed + failed
+    job_list = mocker.MagicMock()
+    job_list.get_job_list.return_value = list(range(total_jobs))
+    job_list.get_completed.return_value = list(range(completed))
+    job_list.get_failed.return_value = list(range(failed))
+
+    expected_safety_time = 42
+    expected_default_retries = 22
+    expected_check_wrapper_time = 1984
+
+    as_conf = mocker.MagicMock()
+    as_conf.get_safetysleeptime.return_value = expected_safety_time
+    as_conf.get_retrials.return_value = expected_default_retries
+    as_conf.get_wrapper_check_time.return_value = expected_check_wrapper_time
+
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+
+    total, safety_time, default_retries, check_wrapper_time = Autosubmit.get_iteration_info(as_conf, job_list)
+
+    assert expected_default_retries == default_retries
+    assert expected_check_wrapper_time == check_wrapper_time
+    assert expected_safety_time == safety_time
+
+    log_info_called = mocked_log.info.call_count
+    expected_info_called = 2 if failed > 0 else 1
+    assert log_info_called == expected_info_called
+
+    if failed > 0:
+        failed_text = "job has" if failed == 1 else "jobs have"
+        assert failed_text in mocked_log.info.call_args_list[1][0][0]
+

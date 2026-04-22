@@ -2080,7 +2080,7 @@ class Autosubmit:
             return job_list, submitter, None, None, as_conf, list(platforms_to_test), packages_persistence, True
 
     @staticmethod
-    def get_iteration_info(as_conf, job_list):
+    def get_iteration_info(as_conf, job_list) -> tuple[int, int, int, bool]:
         """Prints the current iteration information.
 
         :param as_conf: autosubmit configuration object
@@ -2090,8 +2090,10 @@ class Autosubmit:
         total_jobs = len(job_list.get_job_list())
         Log.info(f"{(total_jobs - len(job_list.get_completed()))} of {total_jobs} jobs remaining "
                  f"({time.strftime('%H:%M')})")
-        if len(job_list.get_failed()) > 0:
-            Log.info(f"{len(job_list.get_failed())} jobs have failed ({time.strftime('%H:%M')})")
+        failed_jobs = len(job_list.get_failed())
+        if failed_jobs > 0:
+            failed_text = "job has failed" if failed_jobs == 1 else "jobs have failed"
+            Log.info(f"{len(job_list.get_failed())} {failed_text} ({time.strftime('%H:%M')})")
         safetysleeptime = as_conf.get_safetysleeptime()
         default_retrials = as_conf.get_retrials()
         check_wrapper_jobs_sleeptime = as_conf.get_wrapper_check_time()
