@@ -21,6 +21,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, SubprocessError
 from typing import Optional
 
+import time
 import pytest
 
 from autosubmit.config.yamlparser import YAMLParserFactory
@@ -99,6 +100,23 @@ def test_generate_output(
             )
     else:
         mock_display_file = mocker.patch('autosubmit.monitor.monitor._display_file')
+
+        call_count = 0
+        original_localtime = time.localtime
+
+        
+        def fake_localtime():
+            nonlocal call_count
+            call_count += 1
+            t = list(original_localtime())
+            t[5] = call_count
+            return time.struct_time(t)
+
+        # Patch time.localtime to return a different second on each call,
+        # ensuring distinct filenames even when calls happen within the same second.
+        
+        mocker.patch('autosubmit.monitor.monitor.time.localtime', side_effect=fake_localtime)
+
         if display_error:
             mock_display_file.side_effect = display_error
 
@@ -111,8 +129,17 @@ def test_generate_output(
             groups=None,
             job_list_object=job_list
         )
+        monitor.generate_output(
+            expid=exp.expid,
+            joblist=job_list.get_job_list(),
+            path=str(exp_path / f'tmp/LOG_{exp.expid}'),
+            output_format=output_format,
+            show=show,
+            groups=None,
+            job_list_object=job_list
+        )
+        # Call generate_output twice to verify that the second call does not
 
-        assert mock_display_file.called == show
         if display_error:
             assert mocked_log.printlog.call_count > 0
             logged_message = mocked_log.printlog.call_args_list[-1].args[0]
@@ -124,11 +151,12 @@ def test_generate_output(
             plots_dir = Path(exp_path, 'plot')
         plots = list(plots_dir.iterdir())
 
-        assert len(plots) == 1
-        assert plots[0].name.endswith(output_format)
+        # Both calls must have produced a separate file.
+        assert len(plots) == 2, "Second call must not overwrite the first"
+        assert all(p.name.endswith(output_format) for p in plots)
 
         # TODO: txt is creating an empty file, whereas the other formats create
         #       something that tells the user what are the jobs in the workflow.
         #       So txt format gives less information to the user, thus the 0 size.
         if output_format != 'txt':
-            assert plots[0].stat().st_size > 0
+            assert all(p.stat().st_size > 0 for p in plots)

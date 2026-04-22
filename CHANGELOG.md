@@ -2,6 +2,7 @@
 
 **Bug fixes:**
 
+- Fixed generate_output and generate_output_txt in Monitor to include seconds in the output filename timestamp, preventing files from being overwritten when generated within the same minute #1159 #1368
 - Fix for energy data that was not being stored for the last job of the batch #2657 #2418
 - Reduce the frequency with which energy data was not being stored for the last job of the batch #2657 #2418
 - Fixed issue with experiments running on LOCAL platform without a defined LOCAL entry in platforms.yml config file #1131
