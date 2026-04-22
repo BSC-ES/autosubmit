@@ -17,12 +17,11 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import locale
 import os
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import Union, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job_common import Status
@@ -70,12 +69,6 @@ class PBSPlatform(ParamikoPlatform):
         self._allow_arrays: bool = False
         self.update_cmds()
         self.config: dict = config
-        exp_id_path: Path = Path(self.config.get("LOCAL_ROOT_DIR"), self.expid)
-        tmp_path: Path = Path(exp_id_path, "tmp")
-        self._submit_script_path: Path = Path(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
-        self._submit_script_base_name: Path = Path(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
 
     def create_a_new_copy(self):
         """Return a copy of a PBSPlatform object with the same
@@ -127,224 +120,8 @@ class PBSPlatform(ParamikoPlatform):
                 '%MEMORY_PER_TASK_DIRECTIVE%', self.header.get_memory_per_task_directive(job, parameters))
         return header
 
-    def generate_new_name_submit_script_file(self) -> None:
-        """
-        Delete the current file and generates a new one with a new name.
-
-        :rtype: None
-        """
-        self._submit_script_path.unlink(missing_ok=True)
-        self._submit_script_path = Path(str(self._submit_script_base_name) + os.urandom(16).hex() + ".sh")
-
-    def process_batch_ready_jobs(self, valid_packages_to_submit, failed_packages: list[str],
-                                 error_message: str = "", hold: bool = False) -> tuple[bool, list]:
-        """
-        Retrieve multiple jobs identifiers.
-
-        :param valid_packages_to_submit: List of valid Job Packages to be processes
-        :type valid_packages_to_submit: List[JobPackageBase]
-        :param failed_packages: List of packages that have failed to be submitted
-        :type failed_packages: list[str]
-        :param error_message: concatenated error message
-        :type error_message: str
-        :param hold: if True, the job will be held for 5 retries
-        :type hold: bool
-
-        :return: retrieve the ID of the Jobs
-        :rtype: tuple[bool, list[JobPackageBase]]
-        """
-        try:
-            valid_packages_to_submit = [package for package in valid_packages_to_submit if package.x11 is not True]
-            if len(valid_packages_to_submit) > 0:
-                duplicated_jobs_already_checked = False
-                platform = valid_packages_to_submit[0].jobs[0].platform
-                try:
-                    jobs_id = self.submit_script(hold=hold)
-                except AutosubmitError as e:
-                    job_names = []
-                    duplicated_jobs_already_checked = True
-                    with suppress(Exception):
-                        for package_ in valid_packages_to_submit:
-                            if hasattr(package_, "name"):
-                                job_names.append(package_.name)  # wrapper_name
-                            else:
-                                job_names.append(package_.jobs[0].name)  # job_name
-                        Log.error(f'TRACE:{e.trace}\n{e.message} JOBS:{job_names}')
-                        for job_name in job_names:
-                            jobs_id = self.get_jobs_id_by_job_name(job_name)
-                            # cancel bad submitted job if jobs_id is encountered
-                            for id_ in jobs_id:
-                                self.send_command(self.cancel_job(id_))
-                    jobs_id = None
-                    self.connected = False
-                    if e.trace is not None:
-                        has_trace_bad_parameters = (e.trace.lower().find("violates resource limits") != -1 or
-                                e.trace.lower().find("Illegal attribute or resource value") != -1)
-                    else:
-                        has_trace_bad_parameters = False
-                    if (has_trace_bad_parameters or e.message.lower().find("violates resource limits") != -1 or
-                            e.message.lower().find("Illegal attribute or resource value") != -1 or
-                            e.message.lower().find("Unknown Resource") != -1 or
-                            e.message.lower().find("Job violates queue") != -1 or
-                            e.message.lower().find("scheduler is not installed") != -1 or
-                            e.message.lower().find("failed") != -1 or e.message.lower().find("not available") != -1):
-                        error_msg = ""
-                        for package_tmp in valid_packages_to_submit:
-                            for job_tmp in package_tmp.jobs:
-                                if job_tmp.section not in error_msg:
-                                    error_msg += job_tmp.section + "&"
-                        if has_trace_bad_parameters:
-                            error_message += (
-                                f"Check job and queue specified in your JOBS definition in YAML. Sections "
-                                f"that could be affected: {error_msg[:-1]}"
-                            )
-                        else:
-                            error_message += (
-                                f"\ncheck that {self.name} platform has set the correct scheduler. "
-                                f"Sections that could be affected: {error_msg[:-1]}"
-                            )
-
-                        raise AutosubmitCritical(error_message, 7014, e.error_message) from e
-                except IOError as e:
-                    raise AutosubmitError("IO issues ", 6016, str(e)) from e
-                except BaseException as e:
-                    if str(e).find("scheduler") != -1:
-                        raise AutosubmitCritical(
-                            f"Are you sure that [{self.type.upper()}] scheduler is the "
-                            f"correct type for platform [{self.name.upper()}]?.\n Please, double check that "
-                            f"{self.type.upper()} is loaded for {self.name.upper()} before "
-                            f"autosubmit launch any job.", 7070
-                        ) from e
-                    raise AutosubmitError(
-                        "Submission failed, this can be due a failure on the platform", 6015, str(e)) from e
-                if jobs_id is None or len(jobs_id) <= 0:
-                    raise AutosubmitError(
-                        "Submission failed, this can be due a failure on the platform",
-                        6015, f"Jobs_id {jobs_id}")
-                if hold:
-                    sleep(10)
-                jobs_id_index = 0
-                for package in valid_packages_to_submit:
-                    if jobs_id_index >= len(jobs_id):
-                        jobs_id_index = 0
-                        sleep(10)
-                    job_name = package.name if hasattr(package, "name") else package.jobs[0].name
-                    job_id_running = self.get_jobs_id_by_job_name(job_name)
-                    if job_id_running is not None and job_id_running != '':
-                        current_package_id = str(jobs_id[jobs_id_index])
-                        package.process_jobs_to_submit(current_package_id, hold)
-                        duplicated_jobs_already_checked = True
-                    # Check if there are duplicated job_name
-                    if not duplicated_jobs_already_checked:
-                        if len(job_id_running) > 1:  # Cancel each job that is not the associated
-                            ids_to_check = [package.jobs[0].id]
-                            if package.jobs[0].het:
-                                for i in range(1, package.jobs[0].het.get("HETSIZE", 1)):  # noqa
-                                    ids_to_check.append(str(int(ids_to_check[0]) + i))
-                            # TODO to optimize cancel all jobs at once
-                            for id_ in [job_id_running for job_id_running in job_id_running if job_id_running not in ids_to_check]:
-                                self.send_command(self.cancel_job(id_))
-                                Log.debug(f'Job {id_} with the assigned name: {job_name} has been cancelled')
-                            Log.debug(f'Job {package.jobs[0].id} with the assigned name: {job_name} has been submitted')
-                    jobs_id_index += 1
-                if len(failed_packages) > 0:
-                    for job_id in failed_packages:
-                        platform.send_command(platform.cancel_cmd + f" {job_id}")
-                    raise AutosubmitError(f"{self.name} submission failed, some hold jobs failed to be held", 6015)
-            save = True
-        except AutosubmitError:
-            raise
-        except AutosubmitCritical:
-            raise
-        except AttributeError:
-            raise
-        except Exception as e:
-            raise AutosubmitError(f"{self.name} submission failed", 6015, str(e)) from e
-        return save, valid_packages_to_submit
-
-    def generate_submit_script(self) -> None:
-        """
-        Delete the current file and generates a new one with a new name.
-
-        :rtype: None
-        """
-        # remove file
-        self._submit_script_path.unlink(missing_ok=True)
-        self.generate_new_name_submit_script_file()
-
-    def get_submit_script(self) -> str:
-        """
-        Change file permissions to 0o750 and return the path of the file.
-
-        :return: Path to the file
-        :rtype: str
-        """
-        self._submit_script_path.chmod(mode=0o750)
-        return str(self._submit_script_path)
-
-    def submit_job(self, job: 'Job', script_name: str, hold: bool = False, export: str = "none") -> Optional[
-        list[Optional[int]]]:
-        """
-        Submit a job from a given job object.
-
-        :param job: Job object
-        :type job: autosubmit.job.job.Job
-        :param script_name: Name of the script of the job.
-        :type script_name: str
-        :param hold: Send job hold.
-        :type hold: bool
-        :param export: Set within the jobs.yaml, used to export environment script to use before the job is launched.
-        :type export: str
-
-        :return: job id for the submitted job.
-        :rtype: int
-        """
-        cmd = self.get_submit_cmd(script_name, job, hold=hold, export=export)
-        if cmd is None:
-            return None
-        if self.send_command(cmd):
-            job_id = self.get_submitted_job_id(self.get_ssh_output())
-            if job and len(job_id) > 0:
-                Log.result(f"Job: {job.name} submitted with job_id: {str(job_id).strip()} and workflow commit: "
-                           f"{job.workflow_commit}")
-            return job_id
-        return None
-
-    def submit_script(self, hold: bool = False) -> Union[list[int], int]:
-        """
-        Sends a Submit file Script with sbatch instructions, execute it in the platform and
-        retrieves the Jobs_ID of all jobs at once.
-
-        :param hold: Submit a job in held status. Held jobs will only earn priority status if the
-            remote machine allows it.
-        :type hold: bool
-        :return: job id for submitted jobs.
-        :rtype: Union[List[int], int]
-        """
-        try:
-            self.send_file(self.get_submit_script(), False)
-            cmd = os.path.join(self.get_files_path(),
-                               os.path.basename(self._submit_script_path))
-            # remove file after submission
-            cmd = f"{cmd} ; rm {cmd}"
-            try:
-                self.send_command(cmd)
-            except Exception:
-                raise
-            jobs_id = self.get_submitted_job_id(self.get_ssh_output())
-            return jobs_id
-        except IOError as e:
-            raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e)) from e
-        except AutosubmitError:
-            raise
-        except AutosubmitCritical:
-            raise
-        except Exception as e:
-            raise AutosubmitError("Submit script is not found, retry again in next AS iteration", 6008, str(e)) from e
-
     def check_remote_log_dir(self) -> None:
-        """
-        Creates log dir on remote host.
+        """Creates log dir on remote host.
 
         :rtype: None
         """
@@ -365,8 +142,7 @@ class PBSPlatform(ParamikoPlatform):
                 raise AutosubmitError("SFTP session not active ", 6007, str(e)) from e
 
     def update_cmds(self) -> None:
-        """
-        Updates commands for platforms.
+        """Updates commands for platforms.
 
         :rtype: None
         """
@@ -374,7 +150,7 @@ class PBSPlatform(ParamikoPlatform):
             self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "qdel"
-        self._submit_cmd = f' qsub {self.remote_log_dir}/'
+        self._submit_cmd = 'qsub'
         self._submit_command_name = "qsub"
         self._submit_hold_cmd = 'qhold '  # Needs the JOB_ID to hold a JOB
         self.put_cmd = "scp"
@@ -382,9 +158,129 @@ class PBSPlatform(ParamikoPlatform):
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
 
-    def get_mkdir_cmd(self) -> str:
+    def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str) -> str:
+        """Build the PBS qsub submission command for a single script.
+
+        :param script_name: Absolute path to the script to submit.
+        :param pre: Command prefix (e.g. export, timeout).
+        :param post: Command suffix (e.g. output redirection).
+        :param x11_options: X11 forwarding options; unused for PBS.
+        :return: Complete qsub submission command.
+        :rtype: str
         """
-        Get the variable mkdir_cmd that stores the mkdir command.
+        return f"{pre} {self._submit_cmd} {script_name} {post}"
+
+    def _check_for_unrecoverable_errors(self) -> None:
+        """Check PBS command output for transient and permanent errors."""
+
+        err = self._ssh_output_err or ""
+        err_lower = err.lower()
+        if not err_lower.strip():
+            return
+
+        transient_patterns: list[tuple[str, str]] = [
+            ("not active", "SSH session not active"),
+            ("socket timed out", "Socket timed out communicating with PBS"),
+            ("socket error", "Socket error communicating with PBS"),
+            ("connection timed out", "Connection to PBS daemon timed out"),
+            ("connection refused", "Connection to PBS daemon refused"),
+            ("connection reset by peer", "Connection reset by PBS daemon"),
+            ("broken pipe", "Broken pipe while communicating with PBS"),
+            ("network is unreachable", "Network unreachable; cannot reach PBS daemon"),
+            ("unable to connect to pbs server", "Unable to connect to PBS server"),
+            ("communication failure", "PBS communication failure"),
+            ("communication error", "PBS communication error"),
+            ("temporary failure in name resolution", "DNS resolution failed temporarily"),
+        ]
+
+        for pattern, message in transient_patterns:
+            if pattern in err_lower:
+                raise AutosubmitError(f"Transient PBS error: {message}", 6016, err)
+
+        critical_patterns: list[tuple[str, str]] = [
+            ("violates resource limits", "Job violates resource limits; check YAML JOBS definition"),
+            ("illegal attribute or resource value", "Illegal attribute or resource value in job script"),
+            ("unknown resource", "Unknown resource requested in job script"),
+            ("job violates queue", "Job violates queue constraints; check queue configuration"),
+            ("invalid queue", "Invalid PBS queue specified"),
+            ("not authorized", "User not authorised to submit to this queue"),
+            ("bad uid", "Bad UID for job execution; check user configuration"),
+            ("not allowed to submit", "User is not permitted to submit jobs to this platform"),
+            ("scheduler is not installed", "PBS scheduler is not installed or not reachable"),
+            ("qsub: error", "qsub reported an error; check job directives"),
+            ("command not found", "PBS command not found on the remote host"),
+            ("syntax error", "Syntax error in job script or directives"),
+        ]
+
+        for pattern, message in critical_patterns:
+            if pattern in err_lower:
+                raise AutosubmitCritical(f"Permanent PBS error: {message}", 7014, err)
+
+    def cancel_jobs(self, job_ids: list[str]) -> None:
+        """Cancel PBS jobs by their IDs.
+
+        :param job_ids: List of job IDs to cancel.
+        :type job_ids: list[str]
+        """
+        if job_ids:
+            cancel_by_space = " ".join(str(job_id) for job_id in job_ids)
+            self.send_command(f"{self.cancel_cmd} {cancel_by_space}")
+
+    def _get_job_names_cmd(self, job_names: list[str]) -> str:
+        """Return a command that groups PBS job IDs by job name.
+
+        The command produces one line per job name in the format
+        ``JobName:id1,id2`` so that the parent's ``_parse_job_names`` can
+        process it for duplicate detection.
+
+        :param job_names: Job names to query.
+        :type job_names: list[str]
+        :return: Shell command that groups matching job IDs by job name.
+        :rtype: str
+        """
+        if not job_names:
+            return ""
+
+        names_pattern = "|".join(job_names)
+        return (
+            f"qstat -l | awk '{{print $1, $2}}' | grep -E '{names_pattern}' "
+            "| awk '{split($1,a,\".\"); jobs[$2] = jobs[$2] ? jobs[$2] \",\" a[1] : a[1]} "
+            "END {for (name in jobs) print name \":\" jobs[name]}'"
+        )
+
+    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
+        """Return submitted PBS job IDs by script name using a single scheduler query.
+
+        All names are batched into one ``qstat``
+
+        :param script_names: Submitted script filenames.
+        :type script_names: list[str]
+        :return: Matching PBS job IDs in submission order.
+        :rtype: list[int]
+        """
+        job_names = [Path(s).stem for s in script_names]
+        names_pattern = "|".join(job_names)
+        self.send_command(f"qstat -l | awk '{{print $1, $2}}' | grep -E '{names_pattern}'")
+
+        name_to_ids: dict[str, list[int]] = {}
+        for line in self.get_ssh_output().splitlines():
+            parts = line.split()
+            if len(parts) >= 2:
+                jid = int(parts[0].split('.')[0])
+                jnam = parts[1]
+                name_to_ids.setdefault(jnam, []).append(jid)
+
+        submitted_job_ids: list[int] = []
+        for job_name in job_names:
+            ids = name_to_ids.get(job_name, [])
+            if not ids:
+                return []
+            submitted_job_ids.append(max(ids))
+
+        return submitted_job_ids
+
+    def get_mkdir_cmd(self) -> str:
+        """Get the variable mkdir_cmd that stores the mkdir command.
 
         :return: Mkdir command
         :rtype: str
@@ -392,8 +288,7 @@ class PBSPlatform(ParamikoPlatform):
         return self.mkdir_cmd
 
     def get_remote_log_dir(self) -> str:
-        """
-        Get the variable remote_log_dir that stores the directory of the Log of the experiment.
+        """Get the variable remote_log_dir that stores the directory of the Log of the experiment.
 
         :return: The remote_log_dir variable.
         :rtype: str
@@ -401,8 +296,7 @@ class PBSPlatform(ParamikoPlatform):
         return self.remote_log_dir
 
     def parse_job_output(self, output: str) -> str:
-        """
-        Parses check job command output, so it can be interpreted by autosubmit.
+        """Parse check job command output so it can be interpreted by autosubmit.
 
         :param output: output to parse.
         :type output: str
@@ -412,8 +306,7 @@ class PBSPlatform(ParamikoPlatform):
         return output.strip().split(' ')[0].strip()
 
     def parse_all_jobs_output(self, output: str, job_id: str) -> str:  # noqa
-        """
-        Filter one or more status of a specific Job ID.
+        """Filter one or more status of a specific Job ID.
 
         :param output: Output of the status of the jobs.
         :type output: str
@@ -434,8 +327,7 @@ class PBSPlatform(ParamikoPlatform):
         return ''
 
     def get_submitted_job_id(self, output_lines: str, x11: bool = False) -> list[int]:
-        """
-        Will interate through jobs that didn't fail the submission and retrieve its ID
+        """Iterate through jobs that didn't fail the submission and retrieve their ID.
 
         :param output_lines: Output of the ssh command.
         :type output_lines: str
@@ -456,53 +348,20 @@ class PBSPlatform(ParamikoPlatform):
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
 
-    def get_submit_cmd(self, job_script: str, job, hold: bool = False, export: str = "") -> str:
-        """
-        Create a file that stores a CMD command to be executed
-
-        :param job_script: Name of the script of the job.
-        :type job_script: str
-        :param job: Job object.
-        :type job: autosubmit.job.job.Job
-        :param hold: Send job hold.
-        :type hold: bool
-        :param export: Set within the jobs.yaml, used to export environment script to use before the job is launched.
-        :type export: str
-        :return: Command for the script.
-        :rtype: str
-        """
-        with suppress(Exception):
-            lang = locale.getlocale()[1]
-            if lang is None:
-                lang = locale.getdefaultlocale()[1]
-                if lang is None:
-                    lang = 'UTF-8'
-
-            if not hold:
-                cmd = (export + self._submit_cmd + job_script + "\n").encode(lang)
-            else:
-                cmd = (export + self._submit_hold_cmd + job_script + "\n").encode(lang)
-
-            with open(self._submit_script_path, "ab") as submit_script_file:
-                submit_script_file.write(cmd)
-        return str(cmd)
-
     def get_check_job_cmd(self, job_id: str) -> str:  # noqa
-        """
-        Generates qstat command to the job selected.
+        """Generate qstat command for the selected job.
 
         :param job_id: ID of a job.
         :param job_id: str
 
-        :return: Generates the qstat command to be executes.
+        :return: Generates the qstat command to be executed.
         :rtype: str
         """
         job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat {job_id} | awk " + "'{print $3}' && " + f"qstat -H {job_id} | awk " + "'{print $3}'"
 
     def get_check_all_jobs_cmd(self, jobs_id: str) -> str:  # noqa
-        """
-        Generates qstat command to all the jobs passed down.
+        """Generate qstat command for all the jobs passed down.
 
         :param jobs_id: ID of one or more jobs.
         :param jobs_id: str
@@ -513,35 +372,8 @@ class PBSPlatform(ParamikoPlatform):
         jobs_id = jobs_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat {jobs_id} | awk" + " '{print $1, $3}' && " + f"qstat -H {jobs_id} | awk" + " '{print $1, $3}'"
 
-    def get_jobs_id_by_job_name(self, job_name, retries=2):
-        """
-        Get job id by job name
-
-        :param job_name:
-        :param retries: retries
-        :type retries: int
-        :return: job id
-        """
-        # sleep(5)
-        job_ids = ""
-        cmd = self.get_jobs_id_by_job_name_cmd(job_name)
-        self.send_command(cmd)
-        job_id_name = self.get_ssh_output()
-        while len(job_id_name) <= 0 < retries:
-            self.send_command(cmd)
-            job_id_name = self.get_ssh_output()
-            retries -= 1
-            sleep(2)
-        if retries >= 0:
-            # get id last line
-            job_ids_names = job_id_name.split('\n')[:-1]
-            # get all ids by job-name
-            job_ids = [job_id.split(' ')[0] for job_id in job_ids_names]
-        return job_ids
-
     def get_estimated_queue_time_cmd(self, job_id: str) -> str:
-        """
-        Gets an estimated queue time to the job selected.
+        """Get an estimated queue time to the job selected.
 
         :param job_id: ID of a job.
         :param job_id: str
@@ -552,8 +384,7 @@ class PBSPlatform(ParamikoPlatform):
         return f"qstat -f {job_id} | grep 'eligible_time = [0-9:0-9:0-9]*' && echo \"BREAK\" && " + f"qstat -H -f {job_id} | grep 'eligible_time = [0-9:0-9:0-9]*'"
 
     def get_queue_status_cmd(self, job_id: str) -> str:
-        """
-        Get queue generating qstat command to the job selected.
+        """Get queue generating qstat command to the job selected.
 
         :param job_id: ID of a job.
         :param job_id: str
@@ -563,33 +394,8 @@ class PBSPlatform(ParamikoPlatform):
         job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat {job_id} && echo \"BREAK\" && " + f"qstat -H {job_id}"
 
-    def get_jobs_id_by_job_name_cmd(self, job_name: str) -> str:  # noqa
-        """
-        Looks for a job based on its name.
-
-        :param job_name: Name given to a job
-        :param job_name: str
-        :return: Command to look for a job in the queue.
-        :rtype: str
-        """
-        return "qstat -l | awk '{print $1, $2}'" + f" | grep -E {job_name}"
-
-    @staticmethod
-    def cancel_job(job_id: str) -> str:
-        """
-        Command to cancel a job.
-
-        :param job_id: ID of a job.
-        :param job_id: str
-        :return: Cancel job command.
-        :rtype: str
-        """
-        # job_id = str(job_id).replace('{','').replace('}','').replace(',', ' ')
-        return f'qdel {job_id}'
-
     def parse_queue_reason(self, output: str, job_id: str) -> str:
-        """
-        Parses the queue reason from the output of the command.
+        """Parse the queue reason from the output of the command.
 
         :param output: output of the command.
         :type output: str
@@ -606,8 +412,7 @@ class PBSPlatform(ParamikoPlatform):
         return reason  # noqa F501
 
     def get_queue_status(self, in_queue_jobs: list['Job'], list_queue_jobs_id: str, as_conf: AutosubmitConfig) -> None:
-        """
-        get_queue_status
+        """Get queue status for in-queue jobs.
 
         :param in_queue_jobs: List of Job.
         :type in_queue_jobs: list[Job]
@@ -639,10 +444,8 @@ class PBSPlatform(ParamikoPlatform):
                 else:
                     job.new_status = Status.HELD
 
-
     def wrapper_header(self, **kwargs: dict) -> str:
-        """
-        It generates the header of the wrapper configuring it to execute the Experiment.
+        """Generate the header of the wrapper configuring it to execute the Experiment.
 
         :param kwargs: Key arguments associated to the Job/Experiment to configure the wrapper.
         :type kwargs: Any
@@ -651,22 +454,18 @@ class PBSPlatform(ParamikoPlatform):
         """
         return self._header.wrapper_header(**kwargs)
 
-
     @staticmethod
     def allocated_nodes() -> None:
-        """
-        It sets the allocated nodes of the wrapper
+        """Set the allocated nodes of the wrapper.
 
         :return: A command that changes the num of Node per job
         :rtype: str
         """
         Log.warning("Permission denied: Not enough permission to execute the command that sets the allocated nodes of the wrapper")
 
-
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5,
                           max_retries: int = 3) -> bool:
-        """
-        Checks if a file exists on the FTP server.
+        """Check if a file exists on the FTP server.
 
         :param src: The name of the file to check.
         :type src: str

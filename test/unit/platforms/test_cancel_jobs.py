@@ -25,6 +25,7 @@ import pytest
     "ec_platform",
     "local_platform",
     "ps_platform",
+    "pbs_platform",
 ])
 def test_cancel_jobs_empty_list_sends_no_command(
         platform_fixture: str,
@@ -46,6 +47,7 @@ def test_cancel_jobs_empty_list_sends_no_command(
     ("ec_platform", "9001", "ecaccess-job-delete 9001"),
     ("local_platform", "1234", "kill -2 1234"),
     ("ps_platform", "5678", "kill -2 5678"),
+    ("pbs_platform", "9876", "qdel 9876"),
 ])
 def test_cancel_jobs_single_id(
         platform_fixture: str,
@@ -71,6 +73,8 @@ def test_cancel_jobs_single_id(
     ("local_platform", ["10", "20"], "kill -2 10 20"),
     ("ps_platform", ["10", "20", "30"], "kill -2 10 20 30"),
     ("ps_platform", ["11", "22"], "kill -2 11 22"),
+    ("pbs_platform", ["1", "2", "3"], "qdel 1 2 3"),
+    ("pbs_platform", ["100", "200"], "qdel 100 200"),
 ])
 def test_cancel_jobs_multiple_ids(
         platform_fixture: str,

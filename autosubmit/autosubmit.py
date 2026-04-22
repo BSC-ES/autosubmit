@@ -2292,7 +2292,7 @@ class Autosubmit:
                             for job in job_list.get_job_list():
                                 if job.fail_count > 0:
                                     failed_names[job.name] = job.fail_count
-                        except Exception:
+                        except Exception as e:
                             Log.printlog(f"Error trying to store failed job count: {str(e)}", Log.WARNING)
                         Log.result("Storing failed job count...done")
                         while not recovery and (

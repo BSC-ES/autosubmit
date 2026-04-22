@@ -29,7 +29,6 @@ _ssh_output_err is never populated; errors are looked up in the combined
 stdout + stderr string instead.
 """
 
-
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
@@ -373,3 +372,61 @@ def test_local_always_returns_without_raising(local_platform, stdout, stderr):
     """LocalPlatform._check_for_unrecoverable_errors."""
     _set_output(local_platform, stdout, stderr)
     local_platform._check_for_unrecoverable_errors()  # must never raise
+
+
+def test_pbs_no_exception_when_stderr_empty(pbs_platform):
+    """Return silently when stderr is empty."""
+    _set_output(pbs_platform, stdout="", stderr="")
+    pbs_platform._check_for_unrecoverable_errors()
+
+
+@pytest.mark.parametrize("stderr,expected_fragment", [
+    ("not active\n", "not active"),
+    ("qsub: Socket timed out on send/recv operation\n", "socket timed out"),
+    ("qsub: Socket error\n", "socket error"),
+    ("qsub: Connection timed out\n", "connection timed out"),
+    ("qsub: Connection refused\n", "connection refused"),
+    ("qsub: Connection reset by peer\n", "connection reset by peer"),
+    ("qsub: Broken pipe\n", "broken pipe"),
+    ("qsub: Network is unreachable\n", "network is unreachable"),
+    ("qsub: Unable to connect to PBS server\n", "unable to connect to pbs server"),
+    ("PBS: Communication failure\n", "communication failure"),
+    ("PBS: Communication error\n", "communication error"),
+    ("Temporary failure in name resolution\n", "temporary failure in name resolution"),
+])
+def test_pbs_raises_autosubmit_error_for_transient(pbs_platform, stderr, expected_fragment):
+    """Raise AutosubmitError (6016) for transient PBS connectivity issues."""
+    _set_output(pbs_platform, stdout="", stderr=stderr)
+    with pytest.raises(AutosubmitError) as exc_info:
+        pbs_platform._check_for_unrecoverable_errors()
+    assert exc_info.value.code == 6016
+
+
+@pytest.mark.parametrize("stderr,expected_fragment", [
+    ("qsub: Job violates resource limits\n", "violates resource limits"),
+    ("qsub: Illegal attribute or resource value\n", "illegal attribute or resource value"),
+    ("qsub: Unknown resource\n", "unknown resource"),
+    ("qsub: Job violates queue constraints\n", "job violates queue"),
+    ("qsub: Invalid queue specified\n", "invalid queue"),
+    ("qsub: Not authorized to submit to this queue\n", "not authorized"),
+    ("qsub: Bad UID for job execution\n", "bad uid"),
+    ("qsub: Not allowed to submit\n", "not allowed to submit"),
+    ("PBS scheduler is not installed\n", "scheduler is not installed"),
+    ("qsub: error: Syntax error in job script\n", "qsub: error"),
+    ("qsub: command not found\n", "command not found"),
+    ("PBS syntax error in directives\n", "syntax error"),
+])
+def test_pbs_raises_autosubmit_critical_for_permanent(pbs_platform, stderr, expected_fragment):
+    """Raise AutosubmitCritical (7014) for permanent PBS configuration errors."""
+    _set_output(pbs_platform, stdout="", stderr=stderr)
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        pbs_platform._check_for_unrecoverable_errors()
+    assert exc_info.value.code == 7014
+
+
+def test_pbs_transient_wins_over_critical(pbs_platform):
+    """Transient patterns are checked first, even if critical keywords also present."""
+    stderr = "qsub: Connection refused\nqsub: Invalid queue specified\n"
+    _set_output(pbs_platform, stdout="", stderr=stderr)
+    with pytest.raises(AutosubmitError):
+        pbs_platform._check_for_unrecoverable_errors()

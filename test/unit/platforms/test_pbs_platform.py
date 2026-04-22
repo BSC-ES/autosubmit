@@ -15,28 +15,23 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Unit tests for the PBS platform."""
 
-from pathlib import Path
+from collections import OrderedDict
 
 import pytest
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from autosubmit.log.log import AutosubmitError
 from autosubmit.platforms.pbsplatform import PBSPlatform
-
-"""Unit tests for the PBS platform."""
 
 
 @pytest.fixture
 def platform(autosubmit_config):
     expid = 'a000'
     as_conf = autosubmit_config(expid, experiment_data={})
-    exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, expid)
-    aslogs_dir = exp_path / as_conf.basic_config.LOCAL_TMP_DIR / as_conf.basic_config.LOCAL_ASLOG_DIR
-    submit_platform_script = aslogs_dir / 'submit_local.sh'
-    Path(submit_platform_script).touch()
     return PBSPlatform(expid='a000', name='local', config=as_conf.experiment_data)
 
 
@@ -63,30 +58,6 @@ def test_properties(platform):
         assert value == getattr(platform, prop)
 
 
-def test_pbs_platform_submit_script_raises_autosubmit_critical_with_trace(mocker, platform):
-    package = mocker.MagicMock()
-    package.jobs.return_value = []
-    valid_packages_to_submit = [
-        package
-    ]
-
-    ae = AutosubmitError(message='violates resource limits', code=123, trace='ERR!')
-    platform.submit_script = mocker.MagicMock(side_effect=ae)
-
-    # AS will handle the AutosubmitError above, but then raise an AutosubmitCritical.
-    # This new error won't contain all the info from the upstream error.
-    with pytest.raises(AutosubmitCritical) as cm:
-        platform.process_batch_ready_jobs(
-            valid_packages_to_submit=valid_packages_to_submit,
-            failed_packages=[]
-        )
-
-    # AS will handle the error and then later will raise another error message.
-    # But the AutosubmitError object we created will have been correctly used
-    # without raising any exceptions (such as AttributeError).
-    assert cm.value.message != ae.message
-
-
 @pytest.fixture
 def as_conf(autosubmit_config, tmpdir):
     exp_data = {
@@ -109,14 +80,7 @@ def as_conf(autosubmit_config, tmpdir):
         "LOCAL_PROJ_DIR": str(tmpdir),
         "LOCAL_ASLOG_DIR": str(tmpdir),
     }
-    as_conf = autosubmit_config("dummy-expid", exp_data)
-    return as_conf
-
-
-@pytest.fixture
-def pbs_platform(as_conf):
-    platform = PBSPlatform(expid="dummy-expid", name='pytest-pbs', config=as_conf.experiment_data)
-    return platform
+    return autosubmit_config("dummy-expid", exp_data)
 
 
 @pytest.fixture
@@ -142,47 +106,6 @@ def create_packages(as_conf, pbs_platform):
         JobPackageSimple(simple_jobs_3),
     ]
     return packages
-
-
-def test_process_batch_ready_jobs_valid_packages_to_submit(mocker, pbs_platform, as_conf, create_packages):
-    valid_packages_to_submit = create_packages
-    jobs_id = [1, [1, 2, 3], [1, 2, 3]]
-    failed_packages = []
-
-    pbs_platform.get_jobs_id_by_job_name = mocker.MagicMock()
-    pbs_platform.submit_script = mocker.MagicMock()
-    pbs_platform.send_command = mocker.MagicMock()
-
-    pbs_platform.get_jobs_id_by_job_name.return_value = jobs_id
-    pbs_platform.submit_script.return_value = jobs_id
-
-    pbs_platform.process_batch_ready_jobs(valid_packages_to_submit, failed_packages)
-
-    for i, package in enumerate(valid_packages_to_submit):
-        for job in package.jobs:
-            assert job.hold is False
-            assert job.id == str(jobs_id[i])
-            assert job.status == Status.SUBMITTED
-            assert job.wrapper_name is None
-    assert failed_packages == []
-
-
-def test_submit_job(mocker, pbs_platform):
-    pbs_platform.get_submit_cmd = mocker.MagicMock(returns="dummy")
-    pbs_platform.send_command = mocker.MagicMock(returns="dummy")
-    pbs_platform._ssh_output = "10000"
-    job = Job("dummy", 10000, Status.SUBMITTED, 0)
-    job._platform = pbs_platform
-    job.platform_name = pbs_platform.name
-    jobs_id = pbs_platform.submit_job(job, "dummy")
-    assert jobs_id == [10000]
-    job.workflow_commit = "dummy"
-    jobs_id = pbs_platform.submit_job(job, "dummy")
-    assert jobs_id == [10000]
-    pbs_platform._ssh_output = "10000\n"
-    jobs_id = pbs_platform.submit_job(job, "dummy")
-    assert jobs_id == [10000]
-
 
 def test_get_header(pbs_platform):
     job = Job("dummy", 10000, Status.SUBMITTED, 0)
@@ -216,76 +139,269 @@ def test_get_header(pbs_platform):
     parameters['CUSTOM_DIRECTIVES'] = 'custom'
 
     pbs_platform.header.HEADER = '%OUT_LOG_DIRECTIVE%%ERR_LOG_DIRECTIVE%%QUEUE_DIRECTIVE%%TASKS_PER_NODE_DIRECTIVE%%THREADS_PER_TASK_DIRECTIVE%%CUSTOM_DIRECTIVES%%ACCOUNT_DIRECTIVE%%NODES_DIRECTIVE%%RESERVATION_DIRECTIVE%%MEMORY_DIRECTIVE%%MEMORY_PER_TASK_DIRECTIVE%'
-    assert pbs_platform.get_header(job, parameters) == 'dummy.cmd.out.0dummy.cmd.err.0PBS -q debug:mpiprocs=2:ompthreads=2c\nu\ns\nt\no\nmPBS -W group_list=projectPBS -l select=2PBS -W x=x:mem=100kb:vmem=100kb'
+    assert pbs_platform.get_header(job,
+                                   parameters) == 'dummy.cmd.out.0dummy.cmd.err.0PBS -q debug:mpiprocs=2:ompthreads=2c\nu\ns\nt\no\nmPBS -W group_list=projectPBS -l select=2PBS -W x=x:mem=100kb:vmem=100kb'
 
 
 def test_pbs_platform_constructor(mocker, tmp_path, pbs_platform):
     assert pbs_platform.name == 'pytest-pbs'
-    assert pbs_platform.expid == 'dummy-expid'
-    assert pbs_platform.config["LOCAL_ROOT_DIR"] == pbs_platform.config["LOCAL_ROOT_DIR"]
+    assert pbs_platform.expid == 'a000'
     assert pbs_platform.header is not None
     assert pbs_platform.wrapper is None
     assert len(pbs_platform.job_status) == 4
-    # These calls are not implemented but should not raise any error
-    pbs_platform._submit_script_path.touch()
-    pbs_platform.get_submit_script()
-    pbs_platform.generate_submit_script()
 
 
-@pytest.mark.parametrize('ssh_return, result, length', [
-    ("", [], 0),
-    ("1116786.opbs", [1116786], 1),
-    ("1116786.opbs\n1116787.opbs", [1116786, 1116787], 2)
-], ids=['empty', 'one job', 'multiple jobs'])
-def test_submit_script(mocker, pbs_platform, ssh_return, result, length):
-    pbs_platform._ftpChannel = mocker.MagicMock()
-    pbs_platform.transport = mocker.MagicMock()
-    pbs_platform.send_command = mocker.MagicMock()
-    pbs_platform.get_ssh_output = mocker.MagicMock()
-    pbs_platform.get_ssh_output.return_value = ssh_return
-    pbs_platform._submit_script_path.touch()
-    job_ids = pbs_platform.submit_script()
+def test_pbs_platform_submit_multiple_jobs_raises_autosubmit_error_with_trace(
+        platform: PBSPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AutosubmitError from submit_multiple_jobs propagates through process_ready_jobs.
 
-    assert job_ids == result
-    assert len(job_ids) == length
+    :param platform: PBS platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    ae = AutosubmitError(message='violates resource limits', code=123, trace='ERR!')
+    monkeypatch.setattr(platform, "submit_multiple_jobs", lambda _: (_ for _ in ()).throw(ae))
 
-@pytest.mark.parametrize('ssh_return, job_id, result', [
+    with pytest.raises(AutosubmitError) as cm:
+        platform.process_ready_jobs(OrderedDict([("dummy.cmd", object())]))
+
+    assert cm.value.trace == ae.trace
+    assert cm.value.message == ae.message
+
+
+def test_submit_multiple_jobs_raises_when_no_job_ids_are_recovered(
+        pbs_platform: PBSPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Raise AutosubmitError when no job IDs can be recovered after submission.
+
+    :param pbs_platform: PBS platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(pbs_platform, "send_command", lambda *a, **k: True)
+    monkeypatch.setattr(pbs_platform, "get_multi_submit_cmd", lambda *a, **k: "qsub job.cmd")
+    monkeypatch.setattr(pbs_platform, "get_submitted_job_id", lambda *a, **k: [])
+    monkeypatch.setattr(pbs_platform, "get_submitted_jobs_by_name", lambda *a, **k: [])
+    monkeypatch.setattr(pbs_platform, "_pre_submission_snapshot", lambda *a, **k: None)
+    pbs_platform._ssh_output = "submission output without recoverable ids"
+
+    with pytest.raises(AutosubmitError):
+        pbs_platform.submit_multiple_jobs({"job.cmd": object()})
+
+
+@pytest.mark.parametrize('ssh_return,job_id,result', [
     ("Miyabi stop\n\nNo job", '', ''),
     ("Miyabi stop\n\nJOB_ID STATUS\n1116786 FINISH", '1116786', 'FINISH'),
     ("Miyabi stop\n\nJOB_ID STATUS\n1116786 FINISH\n1116787 QUEUED", '1116787', 'QUEUED')
 ], ids=['empty', 'one job', 'multiple jobs'])
 def test_parse_all_jobs_output(pbs_platform, ssh_return, job_id, result):
-    status = pbs_platform.parse_all_jobs_output(ssh_return, job_id)
-    assert status == result
+    """Parse the status of a specific job ID from qstat output.
 
-def test_get_submit_cmd(pbs_platform):
-    job = Job("dummy", 10000, Status.SUBMITTED, 0)
-    pbs_platform.get_submit_cmd('submit_pytest-pbs.sh', job)
-    with open(pbs_platform._submit_script_path, "r") as f:
-        for line in f.read():
-            if line.find('submit_pytest-pbs.sh'):
-                assert True
-            else:
-                assert False
-    pbs_platform._submit_script_path.unlink()
-    pbs_platform.get_submit_cmd('submit_pytest-pbs.sh', job, True)
-    with open(pbs_platform._submit_script_path, "r") as f:
-        for line in f.read():
-            if line.find('submit_pytest-pbs.sh'):
-                assert True
-            else:
-                assert False
+    :param pbs_platform: PBS platform under test.
+    :param ssh_return: Simulated qstat output.
+    :param job_id: Job ID to look up.
+    :param result: Expected status string.
+    """
+    assert pbs_platform.parse_all_jobs_output(ssh_return, job_id) == result
 
 
-@pytest.mark.parametrize('ssh_return, result', [
-    ("", []),
-    ("1116967 a00b_20000101_fc0_1_LOCAL_SETUP\n", ['1116967']),
-    ("1116967 a00b_20000101_fc0_1_LOCAL_SETUP\n1116968 a00b_20000101_fc0_1_LOCAL_SETUP\n", ['1116967', '1116968'])
-], ids=['empty', 'one job', 'multiple jobs'])
-def test_get_jobs_id_by_job_name(mocker, pbs_platform, as_conf, ssh_return, result):
-    pbs_platform.send_command = mocker.MagicMock()
-    pbs_platform.get_ssh_output = mocker.MagicMock()
-    pbs_platform.get_ssh_output.return_value = ssh_return
-    ids = pbs_platform.get_jobs_id_by_job_name("a00b_20000101_fc0_1_LOCAL_SETUP")
-    assert ids == result
+@pytest.mark.parametrize("output,expected_job_ids", [
+    ("1116786.opbs\n1116787.opbs\n", [1116786, 1116787]),
+    ("1116786.opbs\n", [1116786]),
+    ("1116786\n", [1116786]),
+], ids=["multiple-submissions", "single-submission", "no-server-suffix"])
+def test_get_submitted_job_id_parses_batched_output(
+        pbs_platform: PBSPlatform,
+        output: str,
+        expected_job_ids: list,
+) -> None:
+    """Parse all PBS job IDs from a batched qsub output.
 
+    :param pbs_platform: PBS platform under test.
+    :param output: Raw qsub command output.
+    :param expected_job_ids: Expected parsed job identifiers.
+    """
+    assert pbs_platform.get_submitted_job_id(output) == expected_job_ids
+
+
+@pytest.mark.parametrize("script_names,ssh_output,expected_ids,expected_cmd_count,expected_filter", [
+    (["job_a.cmd"], "1001.server  job_a\n", [1001], 1, "job_a"),
+    (["job_a.cmd"], "1001.server  job_a\n1002.server  job_a\n", [1002], 1, "job_a"),
+    (["job_a.cmd"], "", [], 1, "job_a"),
+    (["job_a.cmd", "job_b.cmd"], "1001.server  job_a\n2001.server  job_b\n", [1001, 2001], 1, "job_a|job_b"),
+    (["job_a.cmd", "job_b.cmd"], "1001.server  job_a\n", [], 1, "job_a|job_b"),
+    (["job_a.cmd", "job_b.cmd"], "1001.server  job_a\n1002.server  job_a\n2001.server  job_b\n", [1002, 2001], 1, "job_a|job_b"),
+], ids=["single-single", "single-max", "single-empty", "multi-all", "multi-missing", "multi-max"])
+def test_get_submitted_jobs_by_name(
+        pbs_platform: PBSPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+        script_names: list[str],
+        ssh_output: str,
+        expected_ids: list[int],
+        expected_cmd_count: int,
+        expected_filter: str,
+) -> None:
+    """Return correct job IDs and issue exactly one batched qstat call.
+
+    :param pbs_platform: PBS platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param script_names: Script filenames passed to ``get_submitted_jobs_by_name``.
+    :param ssh_output: Simulated ``qstat`` output.
+    :param expected_ids: Expected list of job IDs.
+    :param expected_cmd_count: Expected number of SSH commands issued.
+    :param expected_filter: Expected substring in the issued command.
+    """
+    sent: list[str] = []
+
+    def _send(cmd, **_):
+        sent.append(cmd)
+
+    monkeypatch.setattr(pbs_platform, "send_command", _send)
+    monkeypatch.setattr(pbs_platform, "get_ssh_output", lambda: ssh_output)
+
+    assert pbs_platform.get_submitted_jobs_by_name(script_names) == expected_ids
+    assert len(sent) == expected_cmd_count
+    assert expected_filter in sent[0]
+
+
+@pytest.mark.parametrize("job_ids,expected_commands", [
+    ([], []),
+    (["101"], ["qdel 101"]),
+    (["101", "202"], ["qdel 101 202"]),
+    (["101", "202", "303"], ["qdel 101 202 303"]),
+], ids=["empty", "single", "two", "three"])
+def test_cancel_jobs(
+        pbs_platform: PBSPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+        job_ids: list[str],
+        expected_commands: list[str],
+) -> None:
+    """Send the correct ``qdel`` command (or none) for the given job IDs.
+
+    :param pbs_platform: PBS platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param job_ids: Job IDs to cancel.
+    :param expected_commands: Expected sequence of sent commands.
+    """
+    sent: list[str] = []
+    monkeypatch.setattr(pbs_platform, "send_command", lambda cmd, **_: sent.append(cmd))
+
+    pbs_platform.cancel_jobs(job_ids)
+
+    assert sent == expected_commands
+
+
+@pytest.mark.parametrize("job_names,expect_empty", [
+    ([], True),
+    (["job_a"], False),
+    (["job_a", "job_b"], False),
+    (["job_a", "job_b", "job_c"], False),
+], ids=["empty-list", "single", "two", "three"])
+def test_get_job_names_cmd(
+        pbs_platform: PBSPlatform,
+        job_names: list[str],
+        expect_empty: bool,
+) -> None:
+    """Return empty string for no names; otherwise a single qstat call with pipe-joined filter.
+
+    :param pbs_platform: PBS platform under test.
+    :param job_names: Job names to query.
+    :param expect_empty: Whether an empty string is expected.
+    """
+    cmd = pbs_platform._get_job_names_cmd(job_names)
+
+    if expect_empty:
+        assert cmd == ""
+    else:
+        assert "qstat" in cmd
+        assert "|".join(job_names) in cmd
+        assert "awk" in cmd
+        assert cmd.count("qstat") == 1
+
+
+def test_process_ready_jobs_valid_packages_to_submit(
+        pbs_platform: PBSPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+        create_packages,
+) -> None:
+    """Assign submitted job IDs to packages in submission order.
+
+    :param pbs_platform: PBS platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param create_packages: Pre-built job packages fixture.
+    """
+    jobs_id = [1, 2, 3]
+    scripts_to_submit = OrderedDict([
+        ("dummy-1.cmd", create_packages[0]),
+        ("dummy-1-2-3.cmd", create_packages[1]),
+        ("dummy-1-2-3-b.cmd", create_packages[2]),
+    ])
+
+    monkeypatch.setattr(pbs_platform, "submit_multiple_jobs", lambda _: jobs_id)
+    monkeypatch.setattr(pbs_platform, "_check_and_cancel_duplicated_job_names", lambda _: None)
+
+    pbs_platform.process_ready_jobs(scripts_to_submit)
+
+    for i, package in enumerate(create_packages):
+        for job in package.jobs:
+            assert job.id == str(jobs_id[i])
+            assert job.status == Status.SUBMITTED
+
+
+def test_process_ready_jobs_assigns_string_job_ids(
+        pbs_platform: PBSPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Assign package identifiers as strings when the scheduler returns integers.
+
+    :param pbs_platform: PBS platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    assigned_job_ids: list[str] = []
+
+    class DummyPackage:
+        """Capture the package job identifier assigned by the platform."""
+
+        def process_jobs_to_submit(self, job_id: str) -> None:
+            """Store the assigned job identifier."""
+            assigned_job_ids.append(job_id)
+
+    scripts_to_submit = OrderedDict([
+        ("job_a.cmd", DummyPackage()),
+        ("job_b.cmd", DummyPackage()),
+    ])
+    monkeypatch.setattr(pbs_platform, "submit_multiple_jobs", lambda _: [1116786, 1116787])
+    monkeypatch.setattr(pbs_platform, "_check_and_cancel_duplicated_job_names", lambda _: None)
+
+    pbs_platform.process_ready_jobs(scripts_to_submit)
+
+    assert assigned_job_ids == ["1116786", "1116787"]
+
+
+@pytest.mark.parametrize("ssh_output,expected_cancelled", [
+    ("job_a:1116786\n", []),
+    ("job_a:1116786,1116787\n", ["1116786"]),
+], ids=["no-duplicates", "with-duplicates"])
+def test_check_and_cancel_duplicated_job_names(
+        pbs_platform: PBSPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+        ssh_output: str,
+        expected_cancelled: list[str],
+) -> None:
+    """Cancel the oldest ID only when a job name appears more than once.
+
+    :param pbs_platform: PBS platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param ssh_output: Simulated scheduler output with job-name groups.
+    :param expected_cancelled: Expected list of cancelled job IDs.
+    """
+    monkeypatch.setattr(pbs_platform, "send_command", lambda cmd, **_: None)
+    pbs_platform._ssh_output = ssh_output
+
+    cancelled: list[str] = []
+    monkeypatch.setattr(pbs_platform, "cancel_jobs", lambda ids: cancelled.extend(ids))
+
+    pbs_platform._check_and_cancel_duplicated_job_names({"job_a.cmd": None})
+
+    assert cancelled == expected_cancelled
