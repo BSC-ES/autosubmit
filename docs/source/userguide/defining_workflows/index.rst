@@ -88,7 +88,7 @@ To set at what level a job has to run you have to use the ``RUNNING`` attribute.
           RUNNING: chunk
 
 
-The resulting workflow can be seen in Figure `running` for an experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
+The resulting workflow can be seen in :numref:`fig-running` for an experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
 
 .. autosubmitfigure::
     :command: create
@@ -97,6 +97,7 @@ The resulting workflow can be seen in Figure `running` for an experiment with 2 
     :type: png
     :figure: running.png
     :name: running
+    :figname: fig-running
     :width: 100%
     :align: center
     :alt: Example showing how to run jobs once per startdate, member or chunk.
@@ -142,7 +143,7 @@ example will show how to make a simulation job wait for the previous chunk of th
         RUNNING: chunk
 
 
-The resulting workflow can be seen in Figure `dprevious`
+The resulting workflow can be seen in :numref:`fig-dependencies-previous` for an experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
 
 .. warning::
 
@@ -158,6 +159,7 @@ The resulting workflow can be seen in Figure `dprevious`
     :type: png
     :figure: dependencies_previous.png
     :name: dependency_previous
+    :figname: fig-dependencies-previous
     :width: 100%
     :align: center
     :alt: Example showing dependencies between sim jobs on different chunks.
@@ -168,9 +170,9 @@ Dependencies between running levels
 As seen on the previous examples, jobs can run at different levels (for example: ``member`` or ``chunk`` levels),
 and dependencies behave differently depending on this.
 
-* If a job depends on a **higher-level job** (e.g. a ``chunk`` job depends on a ``member`` job): the low-level job will wait for **ONLY ITS DEPENDENCIES** high-level jobs to be finished. That is the case on the ``ini sim-1`` dependency of Figure `dependency_previous`. Job ``a000_19900101_Member1_SIM`` (chunk level) must wait for job ``a000_19900101_Member1_INI`` (member level) to be finished before being launched.
+* If a job depends on a **higher-level job** (e.g. a ``chunk`` job depends on a ``member`` job): the low-level job will wait for **ONLY ITS DEPENDENCIES** high-level jobs to be finished. That is the case on the ``ini sim-1`` dependency of :numref:`fig-dependencies-previous`. Job ``a000_19900101_Member1_SIM`` (chunk level) must wait for job ``a000_19900101_Member1_INI`` (member level) to be finished before being launched.
 
-* If a job depends on a **lower-level job** (e.g. a ``member`` job depends on a ``chunk`` job): the high-level job will wait for **ALL** the low-level jobs to be finished. In Figure `dependencies` you can see that ``a000_19900101_Member1_COMBINE`` job (member level)  must wait for both ``a000_19900101_Member1_1_POSTPROCESS`` and ``a000_19900101_Member1_2_POSTPROCESS`` jobs (chunk level) to be finished before being launched.
+* If a job depends on a **lower-level job** (e.g. a ``member`` job depends on a ``chunk`` job): the high-level job will wait for **ALL** the low-level jobs to be finished. In :numref:`fig-dependencies-running` you can see that ``a000_19900101_Member1_COMBINE`` job (member level)  must wait for both ``a000_19900101_Member1_1_POSTPROCESS`` and ``a000_19900101_Member1_2_POSTPROCESS`` jobs (chunk level) to be finished before being launched.
 
 In short:
 
@@ -210,7 +212,7 @@ In short:
         RUNNING: member
 
 
-The resulting workflow can be seen in Figure `dependencies`
+The resulting workflow can be seen in :numref:`fig-dependencies-running`.
 
 .. autosubmitfigure::
     :command: create
@@ -219,6 +221,7 @@ The resulting workflow can be seen in Figure `dependencies`
     :type: png
     :figure: dependencies_running.png
     :name: dependencies_running
+    :figname: fig-dependencies-running
     :width: 100%
     :align: center
     :alt: Example showing dependencies between jobs running at different levels.
@@ -440,7 +443,7 @@ an integer I for this attribute and the job will run only once for each I iterat
         RUNNING: member
 
 
-The resulting workflow can be seen in Figure `frequency`
+The resulting workflow can be seen in :numref:`fig-frequency`
 
 .. autosubmitfigure::
     :command: create
@@ -449,6 +452,7 @@ The resulting workflow can be seen in Figure `frequency`
     :type: png
     :figure: frequency.png
     :name: frequency
+    :figname: fig-frequency
     :width: 100%
     :align: center
     :caption: Example showing dependencies between jobs running at different frequencies.
@@ -490,7 +494,7 @@ of synchronization do you want. See the below examples with and without this par
         DEPENDENCIES: SIM
         RUNNING: chunk
 
-The resulting workflow can be seen in Figure `nosync`
+The resulting workflow can be seen in :numref:`fig-nosync`
 
 .. autosubmitfigure::
     :command: create
@@ -499,6 +503,7 @@ The resulting workflow can be seen in Figure `nosync`
     :type: png
     :figure: no_synchronize.png
     :name: no_synchronize
+    :figname: fig-nosync
     :width: 100%
     :align: center
     :caption: Example showing dependencies between chunk jobs running without synchronize.
@@ -511,7 +516,7 @@ The resulting workflow can be seen in Figure `nosync`
         RUNNING: chunk
         SYNCHRONIZE: member
 
-The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be seen in Figure `msynchronize`
+The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be seen in :numref:`fig-synchronize`
 
 
 .. autosubmitfigure::
@@ -521,6 +526,7 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be s
     :type: png
     :figure: synchronize.png
     :name: synchronize
+    :figname: fig-synchronize
     :width: 100%
     :align: center
     :alt: Example showing dependencies between chunk jobs running with member synchronize.
@@ -533,7 +539,7 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be s
         RUNNING: chunk
         SYNCHRONIZE: date
 
-The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be seen in Figure `dsynchronize`
+The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be seen in :numref:`fig-dsynchronize`
 
 
 .. autosubmitfigure::
@@ -543,6 +549,7 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be see
     :type: png
     :figure: dsynchronize.png
     :name: dsynchronize
+    :figname: fig-dsynchronize
     :width: 100%
     :align: center
     :alt: simple workflow plot
@@ -656,6 +663,7 @@ Example 1: explicit split mapping
     :type: png
     :figure: splits.png
     :name: splits
+    :figname: fig-splits
     :width: 100%
     :align: center
     :alt: Example showing dependencies between jobs with different split relationships.
@@ -737,6 +745,7 @@ Example 3: N-to-1 dependency
     :type: png
     :figure: splits_n_to_1.png
     :name: splits_n_to_1
+    :figname: fig-splits-n-to-1
     :width: 100%
     :align: center
     :caption: Example showing dependencies between jobs with N-to-1 split relationships.
@@ -775,6 +784,7 @@ Example 4: 1-to-N dependency
     :type: png
     :figure: splits_1_to_n.png
     :name: splits_1_to_n
+    :figname: fig-splits-1-to-n
     :width: 100%
     :align: center
     :caption: Example showing dependencies between jobs with 1-to-N split relationships.
@@ -815,6 +825,7 @@ Example 5: using ``previous`` and ``none``
     :type: png
     :figure: splits_prev_none.png
     :name: splits_prev_none
+    :figname: fig-splits-prev-none
     :width: 100%
     :align: center
     :caption: Example showing dependencies between jobs using 'previous' and 'none' split mapping.
@@ -876,6 +887,7 @@ Quick example: simple auto split
     :type: png
     :figure: splits_auto_simple.png
     :name: splits_auto_simple
+    :figname: fig-splits-auto-simple
     :width: 100%
     :align: center
     :caption: Simple example showing automatically computed splits based on calendar settings.
@@ -978,6 +990,7 @@ Detailed example: auto split with split-aware dependencies
     :type: png
     :figure: splits_auto.png
     :name: splits_auto
+    :figname: fig-splits-auto
     :width: 100%
     :align: center
     :caption: Example showing dependencies between jobs when splits are automatically computed based on the calendar settings.
@@ -1036,7 +1049,7 @@ an integer N for this attribute and the job will run only after N chunks.
         DEPENDENCIES: sim asim
         RUNNING: chunk
 
-The resulting workflow can be seen in Figure `delay`
+The resulting workflow can be seen in :numref:`fig-delay`
 
 
 .. autosubmitfigure::
@@ -1046,6 +1059,7 @@ The resulting workflow can be seen in Figure `delay`
     :type: png
     :figure: delay.png
     :name: delay
+    :figname: fig-delay
     :width: 100%
     :align: center
     :caption: Example showing the asim job starting only from chunk 3.
@@ -1179,6 +1193,7 @@ One can use now the following configuration:
     :type: png
     :figure: for.png
     :name: for
+    :figname: fig-for
     :width: 100%
     :align: center
     :caption: Example showing jobs generated with the FOR key.
@@ -1263,6 +1278,7 @@ Example 1: How to select a specific chunk
     :type: png
     :figure: select_chunks.png
     :name: select_chunks
+    :figname: fig-select-chunks
     :width: 100%
     :align: center
 
@@ -1359,6 +1375,7 @@ Weak dependencies, work like this way:
     :type: png
     :figure: dashed.png
     :name: dashed
+    :figname: fig-dashed
     :width: 100%
     :align: center
     :caption: Example showing the asim job starting only from chunk 3.
@@ -1412,6 +1429,7 @@ In this workflow you can see an illustrated example of select member. Using 4 me
     :type: png
     :figure: select_members.png
     :name: select_members
+    :figname: fig-select-members
     :width: 100%
     :align: center
     :caption: Example showing the asim job starting only from chunk 3.
