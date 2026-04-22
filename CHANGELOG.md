@@ -40,6 +40,7 @@
   command line if you want this) #2879
 - Allow to set AS variables as lowercase/uppercase (,,/^^) #2504
 - Slurm tests in CICD are using a new container by @giovtorres #2871
+- Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
