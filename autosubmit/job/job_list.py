@@ -1857,7 +1857,7 @@ class JobList(object):
             return [job for job in completed_jobs if job.packed is False]
         return completed_jobs
 
-    def get_completed_failed_without_logs(self) -> list[Any]:
+    def get_completed_failed_without_logs(self) -> list[Job]:
         """Returns a list of completed or failed jobs without updated logs.
 
         :return: List of completed and failed jobs without updated logs.

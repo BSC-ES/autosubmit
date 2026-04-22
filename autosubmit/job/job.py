@@ -3199,9 +3199,8 @@ class WrapperJob(Job):
 
             log_dir = Path(str(self._tmp_path) + f'/LOG_{self.expid}')
             multiple_checker_inner_jobs = Path(log_dir / "inner_jobs_checker.sh")
-            if not os.stat(log_dir):
-                os.mkdir(log_dir)
-                os.chmod(log_dir, 0o770)
+            if not log_dir.exists():
+                log_dir.mkdir(parents=True, exist_ok=True, mode=0o770)
             open(multiple_checker_inner_jobs, 'w+').write(command)
             os.chmod(multiple_checker_inner_jobs, 0o770)
             if self.platform.name != "local":  # already "sent"...

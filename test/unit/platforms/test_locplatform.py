@@ -16,7 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Unit tests for the Local Platform."""
+from multiprocessing.process import BaseProcess
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -94,3 +96,22 @@ def test_get_job_names_cmd_contains_expected_jobs() -> None:
 
     assert "job_a" in cmd
     assert "job_b" in cmd
+
+
+def test_refresh_log_recovery_process(autosubmit, autosubmit_config, mocker):
+    as_conf = autosubmit_config('t000', {}, reload=False, create=False)
+    as_conf.misc_data["AS_COMMAND"] = 'run'
+
+    local = LocalPlatform(expid='t000', name='local', config=as_conf.experiment_data)
+
+    spy = mocker.spy(local, 'clean_log_recovery_process')
+    spy2 = mocker.spy(local, 'spawn_log_retrieval_process')
+
+    local.clean_log_recovery_process()
+    local.log_recovery_process = BaseProcess()
+
+    with patch('multiprocessing.process.BaseProcess.is_alive', return_value=True):
+        autosubmit.refresh_log_recovery_process(platforms=[local], as_conf=as_conf)
+        spy.assert_called()
+        spy2.assert_not_called()
+        assert local.work_event.is_set()

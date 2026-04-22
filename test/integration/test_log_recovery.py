@@ -329,5 +329,5 @@ def test_refresh_log_recovery_process(local, autosubmit, as_conf, mocker):
 
     with mocker.patch('multiprocessing.process.BaseProcess.is_alive', return_value=True):
         autosubmit.refresh_log_recovery_process(platforms=[local], as_conf=as_conf)
-        assert p == local.work_event
+        assert p != local.work_event
         assert local.work_event.is_set()

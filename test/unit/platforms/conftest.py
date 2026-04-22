@@ -15,17 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Fixtures for unit tests."""
+"""Fixtures for platform unit tests."""
 
 import pytest
 
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.pbsplatform import PBSPlatform
 from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-
-"""Fixtures for unit tests."""
 
 
 @pytest.fixture
@@ -50,6 +49,30 @@ def slurm_platform(autosubmit_config, tmp_path):
     aslogs.mkdir(parents=True, exist_ok=True)
     (aslogs / "submit_local.sh").touch()
     return SlurmPlatform(expid="a000", name="local", config=as_conf.experiment_data)
+
+
+@pytest.fixture
+def pbs_platform(autosubmit_config, tmp_path):
+    """Minimal PBSPlatform with the directory structure it expects."""
+    exp_data = {
+        "LOCAL_ROOT_DIR": str(tmp_path),
+        "LOCAL_TMP_DIR": "tmp",
+        "LOCAL_ASLOG_DIR": "ASLOGS",
+        "PLATFORMS": {
+            "local": {
+                "type": "pbs",
+                "host": "localhost",
+                "user": "user",
+                "project": "project",
+                "scratch_dir": str(tmp_path),
+            }
+        },
+    }
+    as_conf = autosubmit_config("a000", experiment_data=exp_data)
+    aslogs = tmp_path / "a000" / "tmp" / "ASLOGS"
+    aslogs.mkdir(parents=True, exist_ok=True)
+    (aslogs / "submit_local.sh").touch()
+    return PBSPlatform(expid="a000", name="pytest-pbs", config=as_conf.experiment_data)
 
 
 @pytest.fixture
