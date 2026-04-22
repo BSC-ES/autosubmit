@@ -1,0 +1,13 @@
+## String representation of Job List [12]  ## 
+a00h_1_PARENT ~ [1 child] [READY] 
+|  a00h_1_CHILD [WAITING] 
+a00h_2_PARENT ~ [1 child] [READY] 
+a00h_3_PARENT ~ [1 child] [READY] 
+|  a00h_2_CHILD [WAITING] 
+a00h_4_PARENT ~ [1 child] [READY] 
+a00h_5_PARENT ~ [1 child] [READY] 
+|  a00h_3_CHILD [WAITING] 
+a00h_6_PARENT ~ [1 child] [READY] 
+a00h_7_PARENT ~ [1 child] [READY] 
+|  a00h_4_CHILD [WAITING] 
+a00h_8_PARENT ~ [1 child] [READY] 

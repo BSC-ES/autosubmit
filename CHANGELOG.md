@@ -18,6 +18,8 @@
 - Fixed recovery and setstatus for experiments with more than > 32k jobs #2894
 - Removed invalid message about the template script showing the error with a difference of ~5 lines #2962
 - Fix queuing time for the first vertical job
+- Fixes 1-N grouped split dependencies #2958
+
 
 **Enhancements:**
 
@@ -41,6 +43,7 @@
 - Allow to set AS variables as lowercase/uppercase (,,/^^) #2504
 - Slurm tests in CICD are using a new container by @giovtorres #2871
 - Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
+- Enchanced splits_to previous keyword to accept previous-N #2958
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
