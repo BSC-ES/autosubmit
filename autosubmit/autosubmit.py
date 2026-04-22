@@ -2088,10 +2088,10 @@ class Autosubmit:
         :return: common parameters for the iteration
         """
         total_jobs = len(job_list.get_job_list())
-        Log.info(f"\n\n{(total_jobs - len(job_list.get_completed()))} of {total_jobs} jobs remaining "
+        Log.info(f"{(total_jobs - len(job_list.get_completed()))} of {total_jobs} jobs remaining "
                  f"({time.strftime('%H:%M')})")
         if len(job_list.get_failed()) > 0:
-            Log.info(f"{len(job_list.get_failed())} jobs has been  failed ({time.strftime('%H:%M')})")
+            Log.info(f"{len(job_list.get_failed())} jobs have failed ({time.strftime('%H:%M')})")
         safetysleeptime = as_conf.get_safetysleeptime()
         default_retrials = as_conf.get_retrials()
         check_wrapper_jobs_sleeptime = as_conf.get_wrapper_check_time()
