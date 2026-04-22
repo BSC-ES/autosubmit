@@ -31,7 +31,7 @@ be finished before launching the job that has the ``DEPENDENCIES`` attribute.
       DEPENDENCIES: One
 
 
-The resulting workflow can be seen in Figure `simple`
+The resulting workflow can be seen in :numref:`fig-simple`.
 
 .. autosubmitfigure::
     :command: create
@@ -40,6 +40,7 @@ The resulting workflow can be seen in Figure `simple`
     :type: png
     :figure: simple.png
     :name: simple
+    :figname: fig-simple
     :width: 100%
     :align: center
     :alt: simple workflow plot
@@ -263,6 +264,7 @@ This can be achieved using the ``START_CONDITIONS`` feature based on the depende
 Start conditions are achieved by adding the keyword ``STATUS`` and optionally ``FROM_STEP`` keywords into any dependency that you want.
 
 The ``STATUS`` keyword can be used to select the status of the dependency that you want to check. The possible values ( case-insensitive ) are:
+See :ref:`job_status_reference` for a complete reference and meanings.
 
 
 .. list-table::
