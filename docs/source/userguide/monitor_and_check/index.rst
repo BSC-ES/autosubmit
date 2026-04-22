@@ -157,8 +157,8 @@ The location where the user can find the txt output containing the status of eac
 
 .. _job_status_reference:
 
-Job status reference
-~~~~~~~~~~~~~~~~~~~~
+Possible job status
+~~~~~~~~~~~~~~~~~~~
 
 Autosubmit jobs can move through the following statuses.
 
