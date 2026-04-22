@@ -31,7 +31,7 @@
 - Allow multiple filters in `setstatus` command #1250
 - Allow filtering by section and split in the `ft` command #2910
 - Improved profiler adding tracing and stopping capabilities  #2933
-- Commands `setstatus, create and recovery` do not display tre plot by default #1347
+- Commands `setstatus, create and recovery` do not display the plot by default #1347
 - Improved submission readability, performance and logic flow #2939
 - Improved profiler adding tracing and stopping capabilities #2933
 - Creation and modification dates are now timezone-aware in the `job_data` table #2943
@@ -41,6 +41,7 @@
 - Allow to set AS variables as lowercase/uppercase (,,/^^) #2504
 - Slurm tests in CICD are using a new container by @giovtorres #2871
 - Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
+- Updated `Defining the workflow` documentation section #2954
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

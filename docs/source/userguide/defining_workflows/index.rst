@@ -14,11 +14,11 @@ Simple workflow
 ---------------
 
 The simplest workflow that can be defined is a sequence of two jobs, with the second one triggering at the end of
-the first. To define it, we define the two jobs and then add a DEPENDENCIES attribute to the second job referring to the
+the first. To define it, we define the two jobs and then add a ``DEPENDENCIES`` attribute to the second job referring to the
 first one.
 
-It is important to remember when defining workflows that DEPENDENCIES on autosubmit always refer to jobs that should
-be finished before launching the job that has the DEPENDENCIES attribute.
+It is important to remember when defining workflows that ``DEPENDENCIES`` on autosubmit always refer to jobs that should
+be finished before launching the job that has the ``DEPENDENCIES`` attribute.
 
 .. code-block:: yaml
 
@@ -31,6 +31,8 @@ be finished before launching the job that has the DEPENDENCIES attribute.
       DEPENDENCIES: One
 
 
+The resulting workflow can be seen in :numref:`fig-simple`.
+
 .. autosubmitfigure::
     :command: create
     :args: -plt
@@ -38,13 +40,11 @@ be finished before launching the job that has the DEPENDENCIES attribute.
     :type: png
     :figure: simple.png
     :name: simple
+    :figname: fig-simple
     :width: 100%
     :align: center
     :alt: simple workflow plot
     :caption: Example showing a simple workflow with two sequential jobs
-
-
-The resulting workflow can be seen in Figure
 
 
 Running jobs once per startdate, member or chunk
@@ -53,8 +53,8 @@ Running jobs once per startdate, member or chunk
 Autosubmit is capable of running ensembles made of various startdates and members. It also has the capability to
 divide member execution on different chunks.
 
-To set at what level a job has to run you have to use the RUNNING attribute. It has four possible values: once, date,
-member and chunk corresponding to running once, once per startdate, once per member or once per chunk respectively.
+To set at what level a job has to run you have to use the ``RUNNING`` attribute. It has four possible values: ``once``, ``date``,
+``member`` and ``chunk`` corresponding to running once, once per startdate, once per member or once per chunk respectively.
 
 
 .. code-block:: yaml
@@ -82,13 +82,13 @@ member and chunk corresponding to running once, once per startdate, once per mem
           DEPENDENCIES: date
           RUNNING: member
 
-      CHUNCK:
+      CHUNK:
           FILE: Chunk.sh
           DEPENDENCIES: member
           RUNNING: chunk
 
 
-The resulting workflow can be seen in Figure  for a experiment with 2 startdates, 2 members and 2 chunks.
+The resulting workflow can be seen in :numref:`fig-running`.
 
 .. autosubmitfigure::
     :command: create
@@ -97,9 +97,11 @@ The resulting workflow can be seen in Figure  for a experiment with 2 startdates
     :type: png
     :figure: running.png
     :name: running
+    :figname: fig-running
     :width: 100%
     :align: center
     :alt: Example showing how to run jobs once per startdate, member or chunk.
+    :caption: Example showing how to run jobs once per startdate, member or chunk.
 
 
 Dependencies
@@ -113,7 +115,7 @@ Dependencies with previous jobs
 
 Autosubmit can manage dependencies between jobs that are part of different chunks, members or startdates. The next
 example will show how to make a simulation job wait for the previous chunk of the simulation. To do that, we add
-sim-1 on the DEPENDENCIES attribute. As you can see, you can add as much dependencies as you like separated by spaces
+``sim-1`` on the ``DEPENDENCIES`` attribute. As you can see, you can add as much dependencies as you like separated by spaces
 
 .. code-block:: yaml
 
@@ -126,29 +128,29 @@ sim-1 on the DEPENDENCIES attribute. As you can see, you can add as much depende
       CHUNKINI: ''
       CALENDAR: standard
 
-   JOBS:
-    INI:
-      FILE: ini.sh
-      RUNNING: member
+    JOBS:
+      INI:
+        FILE: ini.sh
+        RUNNING: member
 
-    SIM:
-      FILE: sim.sh
-      DEPENDENCIES: ini sim-1
-      RUNNING: chunk
+      SIM:
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
 
-    POSTPROCESS:
-      FILE: postprocess.sh
-      DEPENDENCIES: sim
-      RUNNING: chunk
+      POSTPROCESS:
+        FILE: postprocess.sh
+        DEPENDENCIES: sim
+        RUNNING: chunk
 
 
-The resulting workflow can be seen in Figure `dprevious`
+The resulting workflow can be seen in :numref:`fig-dependencies-previous` for an experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
 
 .. warning::
 
    Autosubmit simplifies the dependencies, so the final graph usually does not show all the lines that you may expect to
-   see. In this example you can see that there are no lines between the ini and the sim jobs for chunks 2 to 5 because
-   that dependency is redundant with the one on the previous sim
+   see. In this example you can see that there are no lines between the `ini` and the `sim` jobs for chunks 2 to 5 because
+   that dependency is redundant with the one on the previous `sim`
 
 
 .. autosubmitfigure::
@@ -158,21 +160,38 @@ The resulting workflow can be seen in Figure `dprevious`
     :type: png
     :figure: dependencies_previous.png
     :name: dependency_previous
+    :figname: fig-dependencies-previous
     :width: 100%
     :align: center
     :alt: Example showing dependencies between sim jobs on different chunks.
+    :caption: Example showing dependencies between sim jobs on different chunks.
 
 Dependencies between running levels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-On the previous examples we have seen that when a job depends on a job on a higher level (a running chunk job depending
-on a member running job) all jobs wait for the higher running level job to be finished. That is the case on the ini sim dependency
-on the next example.
+As seen on the previous examples, jobs can run at different levels (for example: ``member`` or ``chunk`` levels),
+and dependencies behave differently depending on this.
 
-In the other case, a job depending on a lower running level job, the higher level job will wait for ALL the lower level
-jobs to be finished. That is the case of the postprocess combine dependency on the next example.
+* If a job depends on a **higher-level job** (e.g. a ``chunk`` job depends on a ``member`` job): the low-level job will wait for **ONLY ITS DEPENDENCIES** high-level jobs to be finished. That is the case on the ``ini sim-1`` dependency of :numref:`fig-dependencies-previous`. Job ``a000_19900101_Member1_SIM`` (chunk level) must wait for job ``a000_19900101_Member1_INI`` (member level) to be finished before being launched.
+
+* If a job depends on a **lower-level job** (e.g. a ``member`` job depends on a ``chunk`` job): the high-level job will wait for **ALL** the low-level jobs to be finished. In :numref:`fig-dependencies-running` you can see that ``a000_19900101_Member1_COMBINE`` job (member level)  must wait for both ``a000_19900101_Member1_1_POSTPROCESS`` and ``a000_19900101_Member1_2_POSTPROCESS`` jobs (chunk level) to be finished before being launched.
+
+In short:
+
+- A lower to higher dependency will be 1-to-1: wait for one job
+
+- A higher to lower dependency will be 1-to-all: wait for all jobs
 
 .. code-block:: yaml
+
+    EXPERIMENT:
+      DATELIST: 19900101 20000101
+      MEMBERS: Member1 Member2
+      CHUNKSIZEUNIT: month
+      CHUNKSIZE: 4
+      NUMCHUNKS: 2
+      CHUNKINI: ''
+      CALENDAR: standard
 
     JOBS:
       INI:
@@ -195,7 +214,7 @@ jobs to be finished. That is the case of the postprocess combine dependency on t
         RUNNING: member
 
 
-The resulting workflow can be seen in Figure `dependencies`
+The resulting workflow can be seen in :numref:`fig-dependencies-running`.
 
 .. autosubmitfigure::
     :command: create
@@ -204,51 +223,54 @@ The resulting workflow can be seen in Figure `dependencies`
     :type: png
     :figure: dependencies_running.png
     :name: dependencies_running
+    :figname: fig-dependencies-running
     :width: 100%
     :align: center
     :alt: Example showing dependencies between jobs running at different levels.
+    :caption: Example showing dependencies between jobs running at different levels.
 
 Dependencies rework
 ~~~~~~~~~~~~~~~~~~~
 
-The DEPENDENCIES key is used to define the dependencies of a job. It can be used in the following ways:
+The ``DEPENDENCIES`` key is used to define the dependencies of a job. It can be used in the following ways:
 
-* Basic: The dependencies are a list of jobs, separated by " ", that runs before the current task is submitted.
-* New: The dependencies is a list of YAML sections, separated by "\n", that runs before the current job is submitted.
+* Basic: The dependencies are a list of jobs, separated by '', that runs before the current task is submitted.
+* New: The dependencies is a list of YAML sections, separated by "\\n", that runs before the current job is submitted.
 
   * For each dependency section, you can designate the following keywords to control the current job-affected tasks:
 
-    * DATES_FROM: Selects the job dates that you want to alter.
-    * MEMBERS_FROM: Selects the job members that you want to alter.
-    * CHUNKS_FROM: Selects the job chunks that you want to alter.
+    * ``DATES_FROM``: Selects the job dates that you want to alter.
+    * ``MEMBERS_FROM``: Selects the job members that you want to alter.
+    * ``CHUNKS_FROM``: Selects the job chunks that you want to alter.
 
-  * For each dependency section and \*_FROM keyword, you can designate the following keywords to control the destination of the dependency:
+  * For each dependency section and ``\*_FROM`` keyword, you can designate the following keywords to control the destination of the dependency:
 
-    * DATES_TO: Links current selected tasks to the dependency tasks of the dates specified.
-    * MEMBERS_TO: Links current selected tasks to the dependency tasks of the members specified.
-    * CHUNKS_TO: Links current selected tasks to the dependency tasks of the chunks specified.
+    * ``DATES_TO``: Links current selected tasks to the dependency tasks of the dates specified.
+    * ``MEMBERS_TO``: Links current selected tasks to the dependency tasks of the members specified.
+    * ``CHUNKS_TO``: Links current selected tasks to the dependency tasks of the chunks specified.
 
-  * Important keywords for [DATES|MEMBERS|CHUNKS]_TO:
+  * Important keywords for ``[DATES|MEMBERS|CHUNKS]_TO``:
 
-    * "natural": Will keep the default linkage. Will link if it would be normally. Example, SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1.
-    * "all": Will link all selected tasks of the dependency with current selected tasks. Example, SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1, DA_FC00_CHUNK_2, DA_FC00_CHUNK_3...
-    * "none": Will unlink selected tasks of the dependency with current selected tasks.
+    * 'natural': Will keep the default linkage. Will link if it would be normally. Example, ``SIM_FC00_CHUNK_1`` -> ``DA_FC00_CHUNK_1``.
+    * 'all': Will link all selected tasks of the dependency with current selected tasks. Example, ``SIM_FC00_CHUNK_1`` -> ``DA_FC00_CHUNK_1``, ``DA_FC00_CHUNK_2``, ``DA_FC00_CHUNK_3``...
+    * 'none': Will unlink selected tasks of the dependency with current selected tasks.
 
-For the new format, consider that the priority is hierarchy and goes like this DATES_FROM -(includes)-> MEMBERS_FROM -(includes)-> CHUNKS_FROM.
+For the new format, consider that the priority is hierarchy and goes like this ``DATES_FROM`` -(includes)-> ``MEMBERS_FROM`` -(includes)-> ``CHUNKS_FROM``.
 
-* You can define a DATES_FROM inside the DEPENDENCY.
-* You can define a MEMBERS_FROM inside the DEPENDENCY and DEPENDENCY.DATES_FROM.
-* You can define a CHUNKS_FROM inside the DEPENDENCY, DEPENDENCY.DATES_FROM, DEPENDENCY.MEMBERS_FROM, DEPENDENCY.DATES_FROM.MEMBERS_FROM
+* You can define a ``DATES_FROM`` inside the ``DEPENDENCY``.
+* You can define a ``MEMBERS_FROM`` inside the ``DEPENDENCY`` and ``DEPENDENCY.DATES_FROM``.
+* You can define a ``CHUNKS_FROM`` inside the ``DEPENDENCY``, ``DEPENDENCY.DATES_FROM``, ``DEPENDENCY.MEMBERS_FROM``, ``DEPENDENCY.DATES_FROM.MEMBERS_FROM``
 
 Start conditions
 ~~~~~~~~~~~~~~~~
 
 Sometimes you want to run a job only when a certain condition is met. For example, you may want to run a job only when a certain task is running.
-This can be achieved using the START_CONDITIONS feature based on the dependencies rework.
+This can be achieved using the ``START_CONDITIONS`` feature based on the dependencies rework.
 
 Start conditions are achieved by adding the keyword ``STATUS`` and optionally ``FROM_STEP`` keywords into any dependency that you want.
 
 The ``STATUS`` keyword can be used to select the status of the dependency that you want to check. The possible values ( case-insensitive ) are:
+See :ref:`job_status_reference` for a complete reference and meanings.
 
 
 .. list-table::
@@ -290,20 +312,20 @@ The status are ordered, so if you select ``RUNNING`` status, the task will be ru
 
     JOBS:
       INI:
-          FILE: ini.sh
-          RUNNING: member
+        FILE: ini.sh
+        RUNNING: member
 
       SIM:
-          FILE: sim.sh
-          DEPENDENCIES: ini sim-1
-          RUNNING: chunk
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
 
       POSTPROCESS:
-          FILE: postprocess.sh
-          DEPENDENCIES:
-              SIM:
-                  STATUS: "RUNNING"
-          RUNNING: chunk
+        FILE: postprocess.sh
+        DEPENDENCIES:
+          SIM:
+            STATUS: 'RUNNING'
+        RUNNING: chunk
 
 
 The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. The possible value is an integer. Additionally, the target dependency, must call to `%AS_CHECKPOINT%` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.
@@ -320,8 +342,8 @@ The ``FROM_STEP`` keyword can be used to select the **internal** step of the dep
       RUNNING: once
       DEPENDENCIES:
         A:
-          SPLIT_TO: "2"
-          STATUS: "RUNNING"
+          SPLITS_TO: '2'
+          STATUS: 'RUNNING'
           FROM_STEP: 2
 
 There is now a new function that is automatically added in your scripts which is called ``as_checkpoint``. This is the function that is generating the checkpoint file. You can see the function below:
@@ -377,8 +399,8 @@ To select an specific task, you have to combine the ``STATUS`` and ``CHUNKS_TO``
       RUNNING: once
       DEPENDENCIES:
         B:
-          SPLIT_TO: "2"
-          STATUS: "RUNNING"
+          SPLITS_TO: '2'
+          STATUS: 'RUNNING'
 
 Job frequency
 ~~~~~~~~~~~~~
@@ -393,29 +415,38 @@ an integer I for this attribute and the job will run only once for each I iterat
 
 .. code-block:: yaml
 
+    EXPERIMENT:
+      DATELIST: 19900101
+      MEMBERS: Member1 Member2
+      CHUNKSIZEUNIT: month
+      CHUNKSIZE: '1'
+      NUMCHUNKS: '5'
+      CHUNKINI: ''
+      CALENDAR: standard
+
     JOBS:
       INI:
-          FILE: ini.sh
-          RUNNING: member
+        FILE: ini.sh
+        RUNNING: member
 
       SIM:
-          FILE: sim.sh
-          DEPENDENCIES: ini sim-1
-          RUNNING: chunk
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
 
       POSTPROCESS:
-          FILE: postprocess.sh
-          DEPENDENCIES: sim
-          RUNNING: chunk
-          FREQUENCY: 3
+        FILE: postprocess.sh
+        DEPENDENCIES: sim
+        RUNNING: chunk
+        FREQUENCY: 3
 
       COMBINE:
-          FILE: combine.sh
-          DEPENDENCIES: postprocess
-          RUNNING: member
+        FILE: combine.sh
+        DEPENDENCIES: postprocess
+        RUNNING: member
 
 
-The resulting workflow can be seen in Figure `frequency`
+The resulting workflow can be seen in :numref:`fig-frequency`
 
 .. autosubmitfigure::
     :command: create
@@ -424,6 +455,7 @@ The resulting workflow can be seen in Figure `frequency`
     :type: png
     :figure: frequency.png
     :name: frequency
+    :figname: fig-frequency
     :width: 100%
     :align: center
     :caption: Example showing dependencies between jobs running at different frequencies.
@@ -452,20 +484,20 @@ of synchronization do you want. See the below examples with and without this par
 
     JOBS:
       INI:
-          FILE: ini.sh
-          RUNNING: member
+        FILE: ini.sh
+        RUNNING: member
 
       SIM:
-          FILE: sim.sh
-          DEPENDENCIES: INI SIM-1
-          RUNNING: chunk
+        FILE: sim.sh
+        DEPENDENCIES: INI SIM-1
+        RUNNING: chunk
 
       ASIM:
-          FILE: asim.sh
-          DEPENDENCIES: SIM
-          RUNNING: chunk
+        FILE: asim.sh
+        DEPENDENCIES: SIM
+        RUNNING: chunk
 
-The resulting workflow can be seen in Figure `nosync`
+The resulting workflow can be seen in :numref:`fig-nosync`
 
 .. autosubmitfigure::
     :command: create
@@ -474,6 +506,7 @@ The resulting workflow can be seen in Figure `nosync`
     :type: png
     :figure: no_synchronize.png
     :name: no_synchronize
+    :figname: fig-nosync
     :width: 100%
     :align: center
     :caption: Example showing dependencies between chunk jobs running without synchronize.
@@ -486,7 +519,7 @@ The resulting workflow can be seen in Figure `nosync`
         RUNNING: chunk
         SYNCHRONIZE: member
 
-The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be seen in Figure `msynchronize`
+The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be seen in :numref:`fig-synchronize`
 
 
 .. autosubmitfigure::
@@ -496,9 +529,11 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be s
     :type: png
     :figure: synchronize.png
     :name: synchronize
+    :figname: fig-synchronize
     :width: 100%
     :align: center
     :alt: Example showing dependencies between chunk jobs running with member synchronize.
+    :caption: Example showing dependencies between chunk jobs running with member synchronize.
 
 .. code-block:: yaml
 
@@ -508,7 +543,7 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'member' can be s
         RUNNING: chunk
         SYNCHRONIZE: date
 
-The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be seen in Figure `dsynchronize`
+The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be seen in :numref:`fig-dsynchronize`
 
 
 .. autosubmitfigure::
@@ -518,55 +553,111 @@ The resulting workflow of setting ``SYNCHRONIZE`` parameter to 'date' can be see
     :type: png
     :figure: dsynchronize.png
     :name: dsynchronize
+    :figname: fig-dsynchronize
     :width: 100%
     :align: center
     :alt: simple workflow plot
     :caption: Example showing dependencies between chunk jobs running with date synchronize.
 
+.. _job_split:
+
 Job split
 ~~~~~~~~~
 
-For jobs running at any level, it may be useful to split each task into different parts.
-This behaviour can be achieved using the ``SPLITS`` attribute to specify the number of parts.
+For jobs running at any level (``once``, ``date``, ``member``, ``chunk``), you can split each logical task into
+multiple sub-tasks with the ``SPLITS`` attribute.
 
-It is also possible to specify the splits for each task using the ``SPLITS_FROM`` and ``SPLITS_TO`` attributes.
+This is useful when you want multiple tasks to be run in parallel (e.g. multiple independent ``APP`` instances for the same chunk).
 
-There is also an special character '*' that can be used to specify that the split is 1-to-1 dependency. In order to use this character, you have to specify both SPLITS_FROM and SPLITS_TO attributes.
+Basic behavior
+^^^^^^^^^^^^^^
+
+* ``SPLITS: N``: with ``N >= 2``, creates ``N`` split jobs per task.
+* ``SPLITS: 1``: no split, the job will run as a single task.
+* ``SPLITS: auto``: only valid with ``RUNNING: chunk``. The number of splits is computed automatically from calendar settings.
+
+How split dependencies are resolved
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a child job depends on a parent job and both have splits, Autosubmit decides parent-child split links using
+``SPLITS_FROM`` and ``SPLITS_TO``:
+
+* ``SPLITS_FROM`` selects child splits where a rule applies.
+* ``SPLITS_TO`` selects parent splits to connect for that child selection.
+
+If a child split is not selected by any ``SPLITS_FROM`` rule, Autosubmit will link it to all parent splits by default.
+
+Supported values in ``SPLITS_FROM`` and ``SPLITS_TO``
+
+``SPLITS_FROM`` (child selection):
+
+* ``all``: apply the rule to all child splits.
+* explicit indices/ranges, for example ``1,2,3`` or ``[1:3]``. Only positive numbers are accepted as range limits.
+
+``SPLITS_TO`` (parent selection/mapping):
+
+* ``all``: connect to all parent splits.
+* ``none``: connect to no parent splits.
+* ``natural``: keep natural/default split linkage.
+* ``previous``: connect child split ``i`` to parent split ``i-1`` if it exists.
+* explicit indices/ranges, for example ``1,2,3`` or ``[1:3]``.
+* open ranges, for example ``[2:-1]`` or ``[2:auto]``. Accepted keywords for last split index are ``auto``, ``last``, and ``-1``.
+
+Advanced mapping syntax in ``SPLITS_TO``:
+
+* ``K*``: index-based mapping for index ``K``. For example, ``2*`` maps child split 2 to parent split 2.
+* ``[A:B]*\G``: grouped mapping with group size ``G``. This is useful for N-to-1 and 1-to-N relationships.
+
+.. note::
+  ``none`` and ``natural`` are accepted in both ``SPLITS_FROM`` and ``SPLITS_TO``.
+  In practice, they are most useful in ``SPLITS_TO``:
+
+  * ``SPLITS_TO: none`` removes parent split links for the selected child splits.
+  * ``SPLITS_TO: natural`` keeps the default split linkage.
+
+  For ``SPLITS_FROM`` selection, prefer explicit indices/ranges when possible for clearer and more predictable rules.
+
+.. hint::
+   Expressions containing ``*`` and ``\`` should be quoted in YAML.
+   Example: ``'[1:auto]*\1'``.
+
+Example 1: explicit split mapping
 
 .. code-block:: yaml
 
+    EXPERIMENT:
+      DATELIST: 19600101
+      MEMBERS: '00'
+      CHUNKSIZEUNIT: day
+      CHUNKSIZE: '1'
+      NUMCHUNKS: '2'
+      CALENDAR: standard
+
     JOBS:
-      INI:
-        FILE: INI.sh
+      FIRST:
+        FILE: FIRST.sh
         RUNNING: once
 
-      SIM:
-        FILE: SIM.sh
-        DEPENDENCIES: INI SIM-1
+      SECOND:
+        FILE: SECOND.sh
+        DEPENDENCIES: FIRST SECOND-1
         RUNNING: once
 
-      ASIM:
-        FILE: ASIM.sh
-        DEPENDENCIES: SIM
+      THIRD:
+        FILE: THIRD.sh
+        DEPENDENCIES: SECOND THIRD-1
         RUNNING: once
         SPLITS: 3
 
-      POST:
-        FILE: POST.sh
+      FOURTH:
+        FILE: FOURTH.sh
         RUNNING: once
         DEPENDENCIES:
-          ASIM:
+          THIRD:
             SPLITS_FROM:
               2,3: # [2:3] is also valid
                 SPLITS_TO: 1,2*,3* # 1,[2:3]* is also valid, you can also specify the step with [2:3:step]
         SPLITS: 3
-
-In this example:
-
-Post job will be split into 2 parts.
-Each part will depend on the 1st part of the asim job.
-The 2nd part of the post job will depend on the 2nd part of the asim job.
-The 3rd part of the post job will depend on the 3rd part of the asim job.
 
 
 .. autosubmitfigure::
@@ -576,27 +667,28 @@ The 3rd part of the post job will depend on the 3rd part of the asim job.
     :type: png
     :figure: splits.png
     :name: splits
+    :figname: fig-splits
     :width: 100%
     :align: center
-    :caption: Example showing dependencies between jobs running at different frequencies.
+    :alt: Example showing dependencies between jobs with different split relationships.
+    :caption: Example showing dependencies between jobs with different split relationships.
 
-Example 1: 1-to-1 dependency
+In this example:
+
+* ``FOURTH`` job will be split into 3 parts.  
+* ``FOURTH`` job split 1 will depend on all the splits of the ``THIRD`` job due to not being present in ``SPLITS_FROM`` (default split linkage).
+* ``FOURTH`` job split 2 will depend on the splits 1 and 2 of the ``THIRD`` job due to the 2* mapping.  
+* ``FOURTH`` job split 3 will depend on the splits 1 and 3 of the ``THIRD`` job due to the 3* mapping.  
+
+Example 2: 1-to-1 dependency
 
 .. code-block:: yaml
-
-  EXPERIMENT:
-    DATELIST: 19600101
-    MEMBERS: "00"
-    CHUNKSIZEUNIT: day
-    CHUNKSIZE: '1'
-    NUMCHUNKS: '2'
-    CALENDAR: standard
 
   JOBS:
     TEST:
       FILE: TEST.sh
-      RUNNING: chunk
-      SPLITS: 1
+      RUNNING: once
+      SPLITS: 2
       WALLCLOCK: 00:30
 
     TEST2:
@@ -606,8 +698,8 @@ Example 1: 1-to-1 dependency
           SPLITS_FROM:
             all:
               SPLITS_TO: '[1:auto]*\1'
-      RUNNING: chunk
-      SPLITS: 1
+      RUNNING: once
+      SPLITS: 2
       WALLCLOCK: 00:30
 
 
@@ -620,25 +712,32 @@ Example 1: 1-to-1 dependency
     :name: splits_1_to_1
     :width: 100%
     :align: center
-    :caption: Example showing dependencies between jobs running at different frequencies.
+    :alt: Example showing dependencies between jobs with 1-to-1 split relationships.
+    :caption: Example showing dependencies between jobs with 1-to-1 split relationships.
 
-Example 2: N-to-1 dependency
+In this example:
+
+* ``TEST`` and ``TEST2`` jobs will be split into 2 parts each.
+* ``[1:auto]*\1`` mapping creates one-to-one mapping across all existing splits indices.
+* So ``TEST2`` job split 1 will depend on ``TEST`` job split 1 and ``TEST2`` job split 2 will depend on ``TEST`` job split 2. 
+
+Example 3: N-to-1 dependency
 
 .. code-block:: yaml
 
   JOBS:
-    TEST:
-      FILE: TEST.sh
+    TEST_DEPENDENCY:
+      SCRIPT: TEST_DEPENDENCY.sh
       RUNNING: once
       SPLITS: '4'
 
-    TEST2:
-      FILE: TEST2.sh
+    TEST_DEPENDENCY2:
+      SCRIPT: TEST_DEPENDENCY2.sh
       DEPENDENCIES:
-        TEST:
+        TEST_DEPENDENCY:
           SPLITS_FROM:
-            "[1:2]":
-              SPLITS_TO: "[1:4]*\\2"
+            '[1:2]':
+              SPLITS_TO: '[1:4]*\2'
       RUNNING: once
       SPLITS: '2'
 
@@ -650,11 +749,18 @@ Example 2: N-to-1 dependency
     :type: png
     :figure: splits_n_to_1.png
     :name: splits_n_to_1
+    :figname: fig-splits-n-to-1
     :width: 100%
     :align: center
-    :caption: Example showing dependencies between jobs running at different frequencies.
+    :caption: Example showing dependencies between jobs with N-to-1 split relationships.
 
-Example 3: 1-to-N dependency
+In this example:
+
+* ``TEST_DEPENDENCY`` job will be split into 4 parts and ``TEST_DEPENDENCY2`` job will be split into 2 parts.
+* ``[1:4]*\2`` mapping creates a grouped mapping with group size 2. 
+* So split 1 of ``TEST_DEPENDENCY2`` job will depend on splits 1 and 2 of ``TEST_DEPENDENCY`` job and split 2 of ``TEST_DEPENDENCY2`` job will depend on splits 3 and 4 of ``TEST_DEPENDENCY`` job.
+
+Example 4: 1-to-N dependency
 
 .. code-block:: yaml
 
@@ -669,8 +775,8 @@ Example 3: 1-to-N dependency
       DEPENDENCIES:
         TEST:
           SPLITS_FROM:
-            "[1:4]":
-              SPLITS_TO: "[1:2]*\\2"
+            '[1:4]':
+              SPLITS_TO: '[1:2]*\2'
       RUNNING: once
       SPLITS: '4'
 
@@ -682,17 +788,81 @@ Example 3: 1-to-N dependency
     :type: png
     :figure: splits_1_to_n.png
     :name: splits_1_to_n
+    :figname: fig-splits-1-to-n
     :width: 100%
     :align: center
-    :caption: Example showing dependencies between jobs running at different frequencies.
+    :caption: Example showing dependencies between jobs with 1-to-N split relationships.
+
+In this example:
+
+* ``TEST`` job will be split into 2 parts and ``TEST2`` job will be split into 4 parts.
+* ``[1:2]*\2`` mapping creates a grouped mapping with group size 2. 
+* So splits 1 and 2 of ``TEST2`` job will depend on split 1 of ``TEST`` job and splits 3 and 4 of ``TEST2`` job will depend on split 2 of ``TEST`` job.
+
+Example 5: using ``previous`` and ``none``
+
+.. code-block:: yaml
+
+  JOBS:
+    A:
+      FILE: A.sh
+      RUNNING: once
+      SPLITS: 4
+
+    B:
+      FILE: B.sh
+      RUNNING: once
+      SPLITS: 4
+      DEPENDENCIES:
+        A:
+          SPLITS_FROM:
+            '[2:-1]':
+              SPLITS_TO: previous
+            '1':
+              SPLITS_TO: none
+
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: splits_prev_none.png
+    :name: splits_prev_none
+    :figname: fig-splits-prev-none
+    :width: 100%
+    :align: center
+    :caption: Example showing dependencies between jobs using 'previous' and 'none' split mapping.
+
+
+In this example:
+
+* ``B`` split 1 has no dependency on ``A`` (``none``).
+* ``B`` split 2 depends on ``A`` split 1.
+* ``B`` split 3 depends on ``A`` split 2.
+* ``B`` split 4 depends on ``A`` split 3.
 
 Job Splits with calendar
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-For jobs running at any level, it may be useful to split each task into different parts based on the calendar.
-This behaviour can be achieved setting the ``SPLITS: auto`` and using the ``%EXPERIMENT.SPLITSIZE%`` and ``%EXPERIMENT.SPLITSIZEUNIT%`` variables.
+``SPLITS: auto`` lets Autosubmit compute the split count from calendar configuration.
+This mode requires ``RUNNING: chunk``. This is useful for instance when you want to split a monthly chunk into daily splits, but you don't want to compute the exact amount of days for each month.
 
-Example4: Auto split
+Autosubmit computes split count from:
+
+* ``CHUNKSIZE`` and ``CHUNKSIZEUNIT``: defines the chunk size of the experiment. For example, if you have a monthly experiment, you can set ``CHUNKSIZE: 1`` and ``CHUNKSIZEUNIT: month``.
+* ``SPLITSIZE`` and ``SPLITSIZEUNIT``: defines the size of each split. For example, if you want each split to cover 15 days, you can set ``SPLITSIZE: 15`` and ``SPLITSIZEUNIT: day``.
+* ``SPLITPOLICY``: ``flexible`` (default) or ``strict``.
+
+  * ``flexible``: rounds up when the division is not exact.
+  * ``strict``: requires an exact division; otherwise workflow creation fails.
+
+Notes:
+
+* ``SPLITSIZEUNIT`` cannot be larger than ``CHUNKSIZEUNIT``
+* ``CHUNKSIZEUNIT`` in hours is not supported for auto splits.
+
+Quick example: simple auto split
 
 .. code-block:: yaml
 
@@ -700,8 +870,49 @@ Example4: Auto split
       DATELIST: 19900101
       MEMBERS: fc0
       CHUNKSIZEUNIT: day
+      CHUNKSIZE: 30
       SPLITSIZEUNIT: day
-      CHUNKSIZE: 3
+      SPLITSIZE: 15
+      SPLITPOLICY: flexible
+      NUMCHUNKS: 1
+      CALENDAR: standard
+
+    JOBS:
+      DN:
+        FILE: dn.sh
+        RUNNING: chunk
+        SPLITS: auto
+
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: splits_auto_simple.png
+    :name: splits_auto_simple
+    :figname: fig-splits-auto-simple
+    :width: 100%
+    :align: center
+    :alt: Simple example showing automatically computed splits based on calendar settings.
+    :caption: Simple example showing automatically computed splits based on calendar settings.
+
+
+In this example:
+
+* The experiment has a chunk size of 30 days and a split size of 15 days.
+* The ``DN`` job will be split into 2 parts, with the first split covering days 1-15 and the second split covering days 16-30.
+
+Detailed example: auto split with split-aware dependencies
+
+.. code-block:: yaml
+
+    EXPERIMENT:
+      DATELIST: 19900101
+      MEMBERS: fc0
+      CHUNKSIZEUNIT: month
+      SPLITSIZEUNIT: day
+      CHUNKSIZE: 1
       SPLITSIZE: 15
       SPLITPOLICY: flexible
       NUMCHUNKS: 2
@@ -725,7 +936,7 @@ Example4: Auto split
                 all:
                   SPLITS_TO: all
           NAME: '%RUN.APP_NAMES%'
-          SPLITS: '1'
+          SPLITS: '[1]'
         PLATFORM: 'local'
         RUNNING: chunk
         WALLCLOCK: 00:05
@@ -750,7 +961,7 @@ Example4: Auto split
           - DN:
               SPLITS_FROM:
                 all:
-                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+                  SPLITS_TO: '[1:%JOBS.DN.SPLITS%]*\1'
             OPA_ENERGY_ONSHORE_1:
               SPLITS_FROM:
                 all:
@@ -758,7 +969,7 @@ Example4: Auto split
           - DN:
               SPLITS_FROM:
                 all:
-                  SPLITS_TO: "[1:%JOBS.DN.SPLITS%]*\\1"
+                  SPLITS_TO: '[1:%JOBS.DN.SPLITS%]*\1'
             OPA_ENERGY_ONSHORE_2:
               SPLITS_FROM:
                 all:
@@ -783,9 +994,20 @@ Example4: Auto split
     :type: png
     :figure: splits_auto.png
     :name: splits_auto
+    :figname: fig-splits-auto
     :width: 100%
     :align: center
-    :caption: Example showing dependencies between jobs running at different frequencies.
+    :caption: Example showing dependencies between jobs when splits are automatically computed based on the calendar settings.
+    :alt: Example showing dependencies between jobs when splits are automatically computed based on the calendar settings.
+
+In this example:
+
+* ``DN`` uses ``SPLITS: auto``, so splits are computed from chunk/split calendar settings.
+* ``OPA`` uses ``[1:%JOBS.DN.SPLITS%]*\1`` to map each OPA split to the corresponding DN split.
+* ``previous`` is used to create split-wise chaining across chunks/runs where required.
+
+.. seealso::
+  For patterns that generate multiple related jobs, see :ref:`loops_for_key`.
 
 Job delay
 ~~~~~~~~~
@@ -812,26 +1034,26 @@ an integer N for this attribute and the job will run only after N chunks.
 
     JOBS:
       INI:
-          FILE: ini.sh
-          RUNNING: member
+        FILE: ini.sh
+        RUNNING: member
 
       SIM:
-          FILE: sim.sh
-          DEPENDENCIES: ini sim-1
-          RUNNING: chunk
+        FILE: sim.sh
+        DEPENDENCIES: ini sim-1
+        RUNNING: chunk
 
       ASIM:
-          FILE: asim.sh
-          DEPENDENCIES: sim asim-1
-          RUNNING: chunk
-          DELAY: 2
+        FILE: asim.sh
+        DEPENDENCIES: sim asim-1
+        RUNNING: chunk
+        DELAY: 2
 
       POST:
-          FILE: post.sh
-          DEPENDENCIES: sim asim
-          RUNNING: chunk
+        FILE: post.sh
+        DEPENDENCIES: sim asim
+        RUNNING: chunk
 
-The resulting workflow can be seen in Figure `delay`
+The resulting workflow can be seen in :numref:`fig-delay`
 
 
 .. autosubmitfigure::
@@ -841,16 +1063,153 @@ The resulting workflow can be seen in Figure `delay`
     :type: png
     :figure: delay.png
     :name: delay
+    :figname: fig-delay
     :width: 100%
     :align: center
     :caption: Example showing the asim job starting only from chunk 3.
     :alt: simple workflow with delay option
 
 
+.. _loops_for_key:
+
+Loops (FOR jobs)
+----------------
+
+The ``FOR`` key lets you generate multiple job variants from a single section.
+This is useful when several jobs share the same template but differ in values such as name,
+resources, or dependencies.
+
+.. seealso::
+  For split-to-split dependency mapping rules, see :ref:`job_split`.
+  For complete YAML examples, see :ref:`workflow_examples`.
+
+You need to use the ``FOR`` and ``NAME`` keys to define a loop.
+The ``NAME`` key defines the list of suffixes used to build each generated job name.
+
+.. note:: If you use a value in ``NAME`` that is not a string, like ``0_2``,
+          it will be parsed first by the YAML parser, and that value will
+          be converted to the string ``2``. To avoid issues like this, it is
+          recommended to wrap such values in quotes, i.e. ``'0_2'``.
+
+To generate the following jobs:
+
+.. code-block:: yaml
+
+    EXPERIMENT:
+      DATELIST: 19600101
+      MEMBERS: '00'
+      CHUNKSIZEUNIT: day
+      CHUNKSIZE: '1'
+      NUMCHUNKS: '2'
+      CALENDAR: standard
+
+    JOBS:
+      POST_20:
+        DEPENDENCIES:
+          POST_20:
+          SIM_20:
+        FILE: POST.sh
+        PROCESSORS: '20'
+        RUNNING: chunk
+        THREADS: '1'
+        WALLCLOCK: 00:05
+
+      POST_40:
+        DEPENDENCIES:
+          POST_40:
+          SIM_40:
+        FILE: POST.sh
+        PROCESSORS: '40'
+        RUNNING: chunk
+        THREADS: '1'
+        WALLCLOCK: 00:05
+
+      POST_80:
+        DEPENDENCIES:
+          POST_80:
+          SIM_80:
+        FILE: POST.sh
+        PROCESSORS: '80'
+        RUNNING: chunk
+        THREADS: '1'
+        WALLCLOCK: 00:05
+
+      SIM_20:
+        DEPENDENCIES:
+          SIM_20-1:
+        FILE: SIM.sh
+        PROCESSORS: '20'
+        RUNNING: chunk
+        THREADS: '1'
+        WALLCLOCK: 00:05
+
+      SIM_40:
+        DEPENDENCIES:
+          SIM_40-1:
+        FILE: SIM.sh
+        PROCESSORS: '40'
+        RUNNING: chunk
+        THREADS: '1'
+        WALLCLOCK: 00:05
+
+      SIM_80:
+        DEPENDENCIES:
+          SIM_80-1:
+        FILE: SIM.sh
+        PROCESSORS: '80'
+        RUNNING: chunk
+        THREADS: '1'
+        WALLCLOCK: 00:05
+
+One can use now the following configuration:
+
+.. code-block:: yaml
+
+    JOBS:
+      SIM:
+        FOR:
+          NAME: [ 20,40,80 ]
+          PROCESSORS: [ 20,40,80 ]
+          THREADS: [ 1,1,1 ]
+          DEPENDENCIES: [ SIM_20-1,SIM_40-1,SIM_80-1 ]
+        FILE: SIM.sh
+        RUNNING: chunk
+        WALLCLOCK: '00:05'
+
+      POST:
+          FOR:
+            NAME: [ 20,40,80 ]
+            PROCESSORS: [ 20,40,80 ]
+            THREADS: [ 1,1,1 ]
+            DEPENDENCIES: [ SIM_20 POST_20,SIM_40 POST_40,SIM_80 POST_80 ]
+          FILE: POST.sh
+          RUNNING: chunk
+          WALLCLOCK: '00:05'
+
+
+.. warning:: The mutable parameters must be inside the ``FOR`` key.
+
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: for.png
+    :name: for
+    :figname: fig-for
+    :width: 100%
+    :align: center
+    :caption: Example showing jobs generated with the FOR key.
+    :alt: for
+
+
+.. _workflow_examples:
+
 Workflow examples:
 ------------------
 
-Example 1: How to select an specific chunk
+Example 1: How to select a specific chunk
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. WARNING::
@@ -860,7 +1219,7 @@ Example 1: How to select an specific chunk
 
     EXPERIMENT:
       DATELIST: 19600101
-      MEMBERS: "00"
+      MEMBERS: '00'
       CHUNKSIZEUNIT: day
       CHUNKSIZE: '10'
       NUMCHUNKS: '10'
@@ -916,7 +1275,6 @@ Example 1: How to select an specific chunk
         WALLCLOCK: 00:05
 
 
-
 .. autosubmitfigure::
     :command: create
     :args: -plt
@@ -924,6 +1282,7 @@ Example 1: How to select an specific chunk
     :type: png
     :figure: select_chunks.png
     :name: select_chunks
+    :figname: fig-select-chunks
     :width: 100%
     :align: center
 
@@ -1020,13 +1379,14 @@ Weak dependencies, work like this way:
     :type: png
     :figure: dashed.png
     :name: dashed
+    :figname: fig-dashed
     :width: 100%
     :align: center
     :caption: Example showing the asim job starting only from chunk 3.
     :alt: dashed_workflow
 
-Example 4: Select Member
-~~~~~~~~~~~~~~~~~~~~~~~~
+Example 4: Select a member
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this workflow you can see an illustrated example of select member. Using 4 members 1 datelist and 4 different job sections.
 
@@ -1034,7 +1394,7 @@ In this workflow you can see an illustrated example of select member. Using 4 me
 
     EXPERIMENT:
       DATELIST: 19600101
-      MEMBERS: "00 01 02 03"
+      MEMBERS: '00 01 02 03'
       CHUNKSIZE: 1
       NUMCHUNKS: 2
       CHUNKINI: ''
@@ -1073,130 +1433,10 @@ In this workflow you can see an illustrated example of select member. Using 4 me
     :type: png
     :figure: select_members.png
     :name: select_members
+    :figname: fig-select-members
     :width: 100%
     :align: center
     :caption: Example showing the asim job starting only from chunk 3.
     :alt: select_members
 
-Loops definition
-~~~~~~~~~~~~~~~~
 
-You need to use the ``FOR`` and ``NAME`` keys to define a loop.
-The ``NAME`` key defines a list of values to be used when creating
-the job in the loop.
-
-.. note:: If you use a value in ``NAME`` that is not a string, like ``0_2``,
-          it will be parsed first by the YAML 1.2 parser, and that value will
-          be converted to the string ``2``. To avoid issues like this, it is
-          recommended to wrap such values in quotes, i.e. ``"0_2"`` or ``'0_2'``.
-
-To generate the following jobs:
-
-.. code-block:: yaml
-
-    EXPERIMENT:
-      DATELIST: 19600101
-      MEMBERS: "00"
-      CHUNKSIZEUNIT: day
-      CHUNKSIZE: '1'
-      NUMCHUNKS: '2'
-      CALENDAR: standard
-
-    JOBS:
-      POST_20:
-        DEPENDENCIES:
-          POST_20:
-          SIM_20:
-        FILE: POST.sh
-        PROCESSORS: '20'
-        RUNNING: chunk
-        THREADS: '1'
-        WALLCLOCK: 00:05
-
-      POST_40:
-        DEPENDENCIES:
-          POST_40:
-          SIM_40:
-        FILE: POST.sh
-        PROCESSORS: '40'
-        RUNNING: chunk
-        THREADS: '1'
-        WALLCLOCK: 00:05
-
-      POST_80:
-        DEPENDENCIES:
-          POST_80:
-          SIM_80:
-        FILE: POST.sh
-        PROCESSORS: '80'
-        RUNNING: chunk
-        THREADS: '1'
-        WALLCLOCK: 00:05
-
-      SIM_20:
-        DEPENDENCIES:
-          SIM_20-1:
-        FILE: POST.sh
-        PROCESSORS: '20'
-        RUNNING: chunk
-        THREADS: '1'
-        WALLCLOCK: 00:05
-
-      SIM_40:
-        DEPENDENCIES:
-          SIM_40-1:
-        FILE: POST.sh
-        PROCESSORS: '40'
-        RUNNING: chunk
-        THREADS: '1'
-        WALLCLOCK: 00:05
-
-      SIM_80:
-        DEPENDENCIES:
-          SIM_80-1:
-        FILE: POST.sh
-        PROCESSORS: '80'
-        RUNNING: chunk
-        THREADS: '1'
-        WALLCLOCK: 00:05
-
-One can use now the following configuration:
-
-.. code-block:: yaml
-
-    JOBS:
-      SIM:
-        FOR:
-          NAME: [ 20,40,80 ]
-          PROCESSORS: [ 20,40,80 ]
-          THREADS: [ 1,1,1 ]
-          DEPENDENCIES: [ SIM_20-1,SIM_40-1,SIM_80-1 ]
-        FILE: POST.sh
-        RUNNING: chunk
-        WALLCLOCK: '00:05'
-
-      POST:
-          FOR:
-            NAME: [ 20,40,80 ]
-            PROCESSORS: [ 20,40,80 ]
-            THREADS: [ 1,1,1 ]
-            DEPENDENCIES: [ SIM_20 POST_20,SIM_40 POST_40,SIM_80 POST_80 ]
-          FILE: POST.sh
-          RUNNING: chunk
-          WALLCLOCK: '00:05'
-
-
-.. warning:: The mutable parameters must be inside the ``FOR`` key.
-
-
-.. autosubmitfigure::
-    :command: create
-    :args: -plt
-    :expid: a000
-    :type: png
-    :figure: for.png
-    :name: for
-    :width: 100%
-    :align: center
-    :caption: Example showing the asim job starting only from chunk 3.
-    :alt: for

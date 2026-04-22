@@ -7,6 +7,7 @@
 # linking to https://www.commonwl.org/ ),...
 # Ref: https://github.com/common-workflow-language/user_guide/blob/8abf537144d7b63c3561c1ff2b660543effd0eb0/LICENSE.md
 from pathlib import Path
+from html import escape
 from shutil import copy, move
 from typing import cast, Optional
 from sphinx.util import logging
@@ -46,6 +47,7 @@ class AutosubmitFigureDirective(SphinxDirective):
         "output": directives.unchanged_required,
         "figure": directives.path,
         "name": directives.unchanged_required,
+        "figname": directives.unchanged,
         "width": directives.unchanged,
         "align": directives.unchanged,
         "alt": directives.unchanged,
@@ -95,27 +97,28 @@ class AutosubmitFigureDirective(SphinxDirective):
         figure_uri_relative = builder.get_relative_uri(self.env.docname, img_rel_path).split('.html')[0]
 
         figure_node = nodes.figure()
-        image_node = nodes.image(src=figure_uri_relative)
-        image_node['width'] = self.options.get('width', '100%')
-        image_node['align'] = self.options.get('align', 'center')
-        image_node['alt'] = self.options.get('alt', '')
+        figure_node['align'] = self.options.get('align', 'center')
+
+        figure_label = self.options.get('figname', None)
+        if figure_label:
+            figure_node['names'].append(figure_label)
+            self.state.document.note_explicit_target(figure_node)
+
+        image_raw_html = (
+            f'<img src="{escape(figure_uri_relative)}" '
+            f'width="{escape(self.options.get("width", "100%"))}" '
+            f'alt="{escape(self.options.get("alt", ""))}" />'
+        )
+        image_raw_node = nodes.raw('', image_raw_html, format='html')
+        figure_node += image_raw_node
 
         if caption:
-            image_node += nodes.caption(text=caption)
+            figure_node += nodes.caption('', caption)
 
-        figure_node += image_node
+        logger.debug('The figure node we will use:')
+        logger.debug(str(figure_node))
 
-        # NOTE: If we return the ``figure`` node, it will fail as the image does not exist.
-        #       If we modify the state machine (``self.state_machine.insert_input(bla, source=rst_file)`` or so)
-        #       it will render it incorrectly (or treat it as title?).
-        #       So we re-use what ``figure`` did, but add it as raw HTML! It just works TM.
-
-        raw_node = nodes.raw('', str(figure_node), format='html')
-
-        logger.debug('The raw HTML we will use:')
-        logger.debug(str(raw_node))
-
-        return [raw_node]
+        return [figure_node]
 
     def _run_command(self, command: str) -> None:
         """Uses the existing ``runcmd`` directive to execute a command that produces images.
@@ -191,11 +194,15 @@ def _move_latest_image(experiment_plot_path: Path, target_path: Path, figure_nam
     :param target_path: Path where we will move the latest image produced with the ``runcmd`` directive to.
     :param figure_name: The name of the image used in our documentation.
     """
-    images = [png for png in experiment_plot_path.glob('*.png')]
+    image_suffix = Path(figure_name).suffix.lower()
+    pattern = f'*{image_suffix}' if image_suffix else '*.png'
+    images = [img for img in experiment_plot_path.glob(pattern)]
+    if not images and pattern != '*.png':
+        images = [img for img in experiment_plot_path.glob('*.png')]
     if not images:
         logger.warning(f'Could not find latest image in {experiment_plot_path}')
         return
-    latest_image = max([png for png in experiment_plot_path.glob('*.png')], key=lambda f: f.stat().st_ctime)
+    latest_image = max(images, key=lambda f: f.stat().st_ctime)
     if figure_name.startswith('/'):
         figure_name = figure_name[1:]
     path_to = target_path / figure_name

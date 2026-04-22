@@ -12,7 +12,7 @@ JOBS:
     DEPENDENCIES: date
     RUNNING: member
 
-  CHUNCK:
+  CHUNK:
     SCRIPT: 'sleep 0'
     DEPENDENCIES: member
     RUNNING: chunk

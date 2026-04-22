@@ -155,6 +155,27 @@ The location where the user can find the txt output containing the status of eac
 
     <experiments_directory>/<EXPID>/status/<EXPID>_<DATE>_<TIME>.txt
 
+.. _job_status_reference:
+
+Possible job status
+~~~~~~~~~~~~~~~~~~~
+
+Autosubmit jobs can move through the following statuses.
+
+* ``WAITING`` - The job is waiting for dependencies to reach the required conditions.
+* ``DELAYED`` - The job is temporarily postponed and will be reconsidered later.
+* ``PREPARED`` - The job is prepared for submission.
+* ``READY`` - The job is eligible to be submitted.
+* ``SUBMITTED`` - The job has been submitted to the platform.
+* ``HELD`` - The job is held in the queue, for example by scheduler policy or manual hold.
+* ``QUEUING`` - The job is queued in the scheduler and waiting for resources.
+* ``RUNNING`` - The job is currently executing.
+* ``SKIPPED`` - The job execution was intentionally skipped.
+* ``FAILED`` - The job execution finished with an error.
+* ``UNKNOWN`` - Autosubmit could not determine the current job state from the platform.
+* ``COMPLETED`` - The job finished successfully.
+* ``SUSPENDED`` - The running or queued job was suspended.
+
 .. hint::
     Very large plots may be a problem for some pdf and image viewers.
     If you are having trouble with your usual monitoring tool, try using svg output and opening it with Google Chrome with the SVG Navigator extension installed.
