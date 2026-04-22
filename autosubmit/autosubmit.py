@@ -5491,7 +5491,28 @@ class Autosubmit:
 
     # TODO: To be moved to utils
     @staticmethod
-    def load_job_list(expid, as_conf, monitor=False, new=True) -> JobList:
+    def load_job_list(expid: str, as_conf: AutosubmitConfig, monitor: bool = False, new: bool = True) -> JobList:
+        """Load and generate the job list for an experiment.
+
+        Builds a :class:`JobList` from the experiment configuration. When ``new``
+        is ``True`` (the default), a fresh job list is generated from the current
+        configuration, discarding any previously persisted state. Set ``new`` to
+        ``False`` to load the previously persisted job list state — this is the
+        expected usage when inspecting or operating on an already-created
+        experiment (e.g. ``recovery``, ``setstatus``, statistics).
+
+        :param expid: Experiment identifier (e.g. ``"a000"``).
+        :param as_conf: Autosubmit configuration object for the experiment.
+        :param monitor: When ``True``, the job list is generated in monitor mode.
+            This flag is forwarded to :meth:`JobList.generate` and
+            :meth:`JobList.rerun`.
+        :param new: When ``True`` (default), generates a brand-new job list from
+            the experiment configuration. When ``False``, loads the previously
+            saved/persisted job list state instead of regenerating it. Use
+            ``new=False`` when the experiment already exists and you need its
+            current state (e.g. for recovery or status queries).
+        :return: The populated job list for the experiment.
+        """
         rerun = as_conf.get_rerun()
         job_list = JobList(expid, as_conf, YAMLParserFactory(),
                            Autosubmit._get_job_list_persistence(expid, as_conf))
