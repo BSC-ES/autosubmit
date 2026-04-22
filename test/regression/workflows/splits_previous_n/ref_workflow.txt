@@ -1,0 +1,13 @@
+## String representation of Job List [12]  ## 
+a00z_1_SIM ~ [7 children] [READY] 
+|  a00z_1_POST [WAITING] 
+|  a00z_2_POST [WAITING] 
+|  a00z_3_POST [WAITING] 
+|  a00z_3_SIM ~ [7 children] [WAITING] 
+|  |  a00z_4_POST [WAITING] 
+|  |  a00z_5_POST [WAITING] 
+|  |  a00z_5_SIM ~ [6 children] [WAITING] 
+|  |  |  a00z_6_POST [WAITING] 
+a00z_2_SIM ~ [7 children] [READY] 
+|  a00z_4_SIM ~ [7 children] [WAITING] 
+|  |  a00z_6_SIM ~ [6 children] [WAITING] 
