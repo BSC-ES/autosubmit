@@ -1,0 +1,26 @@
+JOBS:
+  DN:
+    SCRIPT: 'sleep 0'
+    RUNNING: chunk
+    SPLITS: 4
+    WALLCLOCK: 00:01
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          all:
+            SPLITS_TO: previous
+
+  POST:
+    SCRIPT: 'sleep 0'
+    RUNNING: chunk
+    SPLITS: 4
+    WALLCLOCK: 00:01
+    DEPENDENCIES:
+      DN:
+        SPLITS_FROM:
+          all:
+            SPLITS_TO: previous-2
+      POST:
+        SPLITS_FROM:
+          all:
+            SPLITS_TO: previous

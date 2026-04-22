@@ -686,16 +686,13 @@ Example 3: 1-to-N dependency
     :align: center
     :caption: Example showing dependencies between jobs running at different frequencies.
 
-Example 5: ``previous-N`` split dependency
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example 4: ``previous-N`` split dependency
 
-The ``previous`` keyword in ``SPLITS_TO`` creates a dependency on the immediately preceding split
-(i.e. ``previous-1``). You can generalise this with ``previous-N`` to depend on the split that is
-**N positions earlier**. ``previous`` and ``previous-1`` are therefore equivalent.
+The ``previous`` keyword in ``SPLITS_TO`` links each split to its **immediately preceding** split.
+The generalised form ``previous-N`` links each split to the split that is **N positions earlier**.
 
-In the example below ``DN`` has 4 splits and each split depends on the split that is 2 positions
-behind it (split 3 → split 1, split 4 → split 2). Splits 1 and 2 have no prior split at that
-distance and therefore run without that dependency.
+In the example below ``DN`` uses ``previous`` (= ``previous-1``) for its own self-dependency while
+``POST`` uses ``previous-2`` for its dependency on ``DN`` and ``previous`` for its self-dependency.
 
 .. code-block:: yaml
 
@@ -712,6 +709,11 @@ distance and therefore run without that dependency.
         FILE: dn.sh
         RUNNING: chunk
         SPLITS: 4
+        DEPENDENCIES:
+          DN:
+            SPLITS_FROM:
+              all:
+                SPLITS_TO: previous       # same as previous-1
 
       POST:
         FILE: post.sh
@@ -721,8 +723,27 @@ distance and therefore run without that dependency.
           DN:
             SPLITS_FROM:
               all:
-                SPLITS_TO: previous-2   # equivalent to previous-1 when N=1; default is previous (= previous-1)
+                SPLITS_TO: previous-2     # each POST split waits for DN split N-2
+          POST:
+            SPLITS_FROM:
+              all:
+                SPLITS_TO: previous       # each POST split waits for POST split N-1
 
+.. note::
+
+   ``SPLITS_TO: previous`` and ``SPLITS_TO: previous-1`` are identical. Use ``previous-N`` with
+   N > 1 when you need a larger look-back window between splits.
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: splits_previous.png
+    :name: splits_previous
+    :width: 100%
+    :align: center
+    :caption: Example showing ``previous`` (``previous-1``) and ``previous-2`` split dependencies.
 
 Job Splits with calendar
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -730,7 +751,7 @@ Job Splits with calendar
 For jobs running at any level, it may be useful to split each task into different parts based on the calendar.
 This behaviour can be achieved setting the ``SPLITS: auto`` and using the ``%EXPERIMENT.SPLITSIZE%`` and ``%EXPERIMENT.SPLITSIZEUNIT%`` variables.
 
-Example4: Auto split
+Example5: Auto split
 
 .. code-block:: yaml
 
