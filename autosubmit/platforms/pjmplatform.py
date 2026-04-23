@@ -402,7 +402,7 @@ class PJMPlatform(ParamikoPlatform):
         """
         if not job_ids:
             return
-        ids = " ".join(str(job_id) for job_id in job_ids)
+        ids = "+".join(str(job_id) for job_id in job_ids)
         self.send_command(f"{self.cancel_cmd} {ids}")
 
     def _check_for_unrecoverable_errors(self) -> None:
