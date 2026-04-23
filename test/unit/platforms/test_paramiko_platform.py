@@ -27,6 +27,7 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical
+from autosubmit.platforms.locplatform import LocalPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException, _get_user_config_file
 from autosubmit.platforms.psplatform import PsPlatform
