@@ -511,7 +511,6 @@ class EcPlatform(ParamikoPlatform):
                 raise AutosubmitCritical(
                     f"Permanent ecaccess error: {message}",
                     7014,
-                    (out + "\n" + err).strip(),
                 )
 
     def _snapshot_job_ids_before_submission(self, script_names: list[str]) -> None:

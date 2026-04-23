@@ -214,7 +214,7 @@ class PBSPlatform(ParamikoPlatform):
 
         for pattern, message in critical_patterns:
             if pattern in err_lower:
-                raise AutosubmitCritical(f"Permanent PBS error: {message}", 7014, err)
+                raise AutosubmitCritical(f"Permanent PBS error: {message}", 7014)
 
     def cancel_jobs(self, job_ids: list[str]) -> None:
         """Cancel PBS jobs by their IDs.

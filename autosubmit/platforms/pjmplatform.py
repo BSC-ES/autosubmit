@@ -464,5 +464,4 @@ class PJMPlatform(ParamikoPlatform):
                 raise AutosubmitCritical(
                     f"Permanent PJM error: {message}",
                     7014,
-                    err,
                 )

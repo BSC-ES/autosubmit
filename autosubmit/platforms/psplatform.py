@@ -196,5 +196,4 @@ class PsPlatform(ParamikoPlatform):
                 raise AutosubmitCritical(
                     f"Permanent PS platform error: {message}",
                     7014,
-                    err,
                 )
