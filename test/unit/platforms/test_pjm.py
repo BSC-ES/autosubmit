@@ -52,11 +52,7 @@ _EXPECTED_OUTPUT = """JOB_ID     ST  REASON
 @pytest.fixture
 def as_conf(autosubmit_config, tmpdir):
     exp_data = {
-        "WRAPPERS": {
-            "WRAPPERS": {
-                "JOBS_IN_WRAPPER": "dummysection"
-            }
-        },
+        "WRAPPERS": {"WRAPPERS": {"JOBS_IN_WRAPPER": "dummysection"}},
         "PLATFORMS": {
             "pytest-slurm": {
                 "type": "slurm",
@@ -82,17 +78,25 @@ def as_conf(autosubmit_config, tmpdir):
 
 @pytest.fixture
 def pjm_platform(as_conf):
-    platform = PJMPlatform(expid="dummy-expid", name='pytest-slurm', config=as_conf.experiment_data)
+    platform = PJMPlatform(
+        expid="dummy-expid", name="pytest-slurm", config=as_conf.experiment_data
+    )
     return platform
 
 
 @pytest.fixture
 def create_packages(as_conf, pjm_platform):
     simple_jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0)]
-    vertical_jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0), Job("dummy-2", 2, Status.SUBMITTED, 0),
-                     Job("dummy-3", 3, Status.SUBMITTED, 0)]
-    horizontal_jobs = [Job("dummy-1", 1, Status.SUBMITTED, 0), Job("dummy-2", 2, Status.SUBMITTED, 0),
-                       Job("dummy-3", 3, Status.SUBMITTED, 0)]
+    vertical_jobs = [
+        Job("dummy-1", 1, Status.SUBMITTED, 0),
+        Job("dummy-2", 2, Status.SUBMITTED, 0),
+        Job("dummy-3", 3, Status.SUBMITTED, 0),
+    ]
+    horizontal_jobs = [
+        Job("dummy-1", 1, Status.SUBMITTED, 0),
+        Job("dummy-2", 2, Status.SUBMITTED, 0),
+        Job("dummy-3", 3, Status.SUBMITTED, 0),
+    ]
     for job in simple_jobs + vertical_jobs + horizontal_jobs:
         job._platform = pjm_platform
         job._platform.name = pjm_platform.name
@@ -114,11 +118,7 @@ def create_packages(as_conf, pjm_platform):
 
 @pytest.fixture
 def remote_platform(autosubmit_config, autosubmit):
-    as_conf = autosubmit_config("a000", {
-        'DEFAULT': {
-            'HPCARCH': 'ARM'
-        }
-    })
+    as_conf = autosubmit_config("a000", {"DEFAULT": {"HPCARCH": "ARM"}})
 
     yml_file = Path(__file__).resolve().parents[2] / "files/fake-jobs.yml"
     factory = YAMLParserFactory()
@@ -132,7 +132,7 @@ def remote_platform(autosubmit_config, autosubmit):
     as_conf.experiment_data.update(parser.data)
 
     submitter = ParamikoSubmitter(as_conf=as_conf)
-    return submitter.platforms['ARM']
+    return submitter.platforms["ARM"]
 
 
 def test_parse_all_jobs_output(remote_platform):
@@ -142,17 +142,25 @@ def test_parse_all_jobs_output(remote_platform):
     failed_jobs = ["167737", "167738", "167739"]
     jobs_that_arent_listed = ["3442432423", "238472364782", "1728362138712"]
     for job_id in _EXPECTED_COMPLETED_JOBS:
-        assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
-            "COMPLETED"]
+        assert (
+            remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id)
+            in remote_platform.job_status["COMPLETED"]
+        )
     for job_id in failed_jobs:
-        assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
-            "FAILED"]
+        assert (
+            remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id)
+            in remote_platform.job_status["FAILED"]
+        )
     for job_id in queued_jobs:
-        assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
-            "QUEUING"]
+        assert (
+            remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id)
+            in remote_platform.job_status["QUEUING"]
+        )
     for job_id in running_jobs:
-        assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) in remote_platform.job_status[
-            "RUNNING"]
+        assert (
+            remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id)
+            in remote_platform.job_status["RUNNING"]
+        )
     for job_id in jobs_that_arent_listed:
         assert remote_platform.parse_all_jobs_output(_EXPECTED_OUTPUT, job_id) == []
 
@@ -160,7 +168,9 @@ def test_parse_all_jobs_output(remote_platform):
 def test_get_submitted_job_id(remote_platform):
     """Test parsing of submitted job id."""
     submitted_ok = "[INFO] PJM 0000 pjsub Job 167661 submitted."
-    submitted_fail = "[ERR.] PJM 0057 pjsub node=32 is greater than the upper limit (24)."
+    submitted_fail = (
+        "[ERR.] PJM 0057 pjsub node=32 is greater than the upper limit (24)."
+    )
     output = remote_platform.get_submitted_job_id(submitted_ok)
     assert output == [167661]
     output = remote_platform.get_submitted_job_id(submitted_fail)
@@ -169,11 +179,15 @@ def test_get_submitted_job_id(remote_platform):
 
 def test_parse_queue_reason(remote_platform):
     """Test parsing of queue reason."""
-    output = remote_platform.parse_queue_reason(_EXPECTED_OUTPUT, _EXPECTED_COMPLETED_JOBS[0])
+    output = remote_platform.parse_queue_reason(
+        _EXPECTED_OUTPUT, _EXPECTED_COMPLETED_JOBS[0]
+    )
     assert output == "COMPLETED"
 
 
-def test_process_ready_jobs_valid_packages_to_submit(mocker, pjm_platform, create_packages):
+def test_process_ready_jobs_valid_packages_to_submit(
+    mocker, pjm_platform, create_packages
+):
     jobs_id = [1, 2, 3]
     scripts_to_submit = OrderedDict(
         [
@@ -184,7 +198,9 @@ def test_process_ready_jobs_valid_packages_to_submit(mocker, pjm_platform, creat
     )
 
     mocker.patch.object(pjm_platform, "submit_multiple_jobs", return_value=jobs_id)
-    mocker.patch.object(pjm_platform, "_check_and_cancel_duplicated_job_names", return_value=None)
+    mocker.patch.object(
+        pjm_platform, "_check_and_cancel_duplicated_job_names", return_value=None
+    )
 
     pjm_platform.process_ready_jobs(scripts_to_submit)
 
@@ -195,8 +211,8 @@ def test_process_ready_jobs_valid_packages_to_submit(mocker, pjm_platform, creat
 
 
 def test_get_submitted_jobs_by_name_returns_max_id(
-        pjm_platform: PJMPlatform,
-        monkeypatch: pytest.MonkeyPatch,
+    pjm_platform: "PJMPlatform",
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Return the highest job ID found for each queried script.
 
@@ -215,8 +231,8 @@ def test_get_submitted_jobs_by_name_returns_max_id(
 
 
 def test_get_submitted_jobs_by_name_returns_empty_when_no_digits(
-        pjm_platform: PJMPlatform,
-        monkeypatch: pytest.MonkeyPatch,
+    pjm_platform: "PJMPlatform",
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Return an empty list when the output contains no numeric job IDs.
 
@@ -235,8 +251,8 @@ def test_get_submitted_jobs_by_name_returns_empty_when_no_digits(
 
 
 def test_get_submitted_jobs_by_name_returns_empty_when_one_script_missing(
-        pjm_platform: PJMPlatform,
-        monkeypatch: pytest.MonkeyPatch,
+    pjm_platform: "PJMPlatform",
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Return an empty list when one of the queried scripts has no match.
 
@@ -256,7 +272,7 @@ def test_get_submitted_jobs_by_name_returns_empty_when_one_script_missing(
 
 
 def test_get_job_names_cmd_empty_list_returns_empty(
-        pjm_platform: PJMPlatform,
+    pjm_platform: "PJMPlatform",
 ) -> None:
     """Return empty when no job names are given.
 
@@ -266,7 +282,7 @@ def test_get_job_names_cmd_empty_list_returns_empty(
 
 
 def test_get_job_names_cmd_nonempty(
-        pjm_platform: PJMPlatform,
+    pjm_platform: "PJMPlatform",
 ) -> None:
     """grouping for a non-empty job-name list.
 
@@ -279,8 +295,8 @@ def test_get_job_names_cmd_nonempty(
 
 
 def test_cancel_jobs_empty_list_sends_no_command(
-        pjm_platform: PJMPlatform,
-        monkeypatch: pytest.MonkeyPatch,
+    pjm_platform: "PJMPlatform",
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Send no command when the list of job IDs to cancel is empty.
 
@@ -296,8 +312,8 @@ def test_cancel_jobs_empty_list_sends_no_command(
 
 
 def test_cancel_jobs_single_id_sends_pjdel_command(
-        pjm_platform: PJMPlatform,
-        monkeypatch: pytest.MonkeyPatch,
+    pjm_platform: "PJMPlatform",
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Send a single pjdel command for one job ID.
 
@@ -312,15 +328,18 @@ def test_cancel_jobs_single_id_sends_pjdel_command(
     assert sent == ["pjdel 1001"]
 
 
-@pytest.mark.parametrize("job_ids,expected_command", [
-    (["1001", "1002", "1003"], "pjdel 1001 1002 1003"),
-    (["1001", "1002"], "pjdel 1001 1002"),
-])
+@pytest.mark.parametrize(
+    "job_ids,expected_command",
+    [
+        (["1001", "1002", "1003"], "pjdel 1001 1002 1003"),
+        (["1001", "1002"], "pjdel 1001 1002"),
+    ],
+)
 def test_cancel_jobs_multiple(
-        pjm_platform: PJMPlatform,
-        monkeypatch: pytest.MonkeyPatch,
-        job_ids: list[str],
-        expected_command: str,
+    pjm_platform: "PJMPlatform",
+    monkeypatch: pytest.MonkeyPatch,
+    job_ids: list[str],
+    expected_command: str,
 ) -> None:
     """Send one space-joined pjdel command for multiple job IDs.
 
@@ -336,3 +355,53 @@ def test_cancel_jobs_multiple(
 
     assert len(sent) == 1
     assert sent[0] == expected_command
+
+
+@pytest.mark.parametrize(
+    "script_name,post,x11_options,expected_command",
+    [
+        (
+            "script_test_1.cmd",
+            "",
+            "x11",
+            "pjsub --no-check-directory script_test_1.cmd x11  & echo $!",
+        ),
+        (
+            "script_test_1.cmd",
+            "-o stdout.cmd",
+            "x11",
+            "pjsub --no-check-directory script_test_1.cmd x11 -o stdout.cmd & echo $!",
+        ),
+        (
+            "script_test_1.cmd",
+            "",
+            "",
+            "pjsub --no-check-directory script_test_1.cmd   & echo $!",
+        ),
+        (
+            "script_test_1.cmd",
+            "-e stderr.cmd",
+            "",
+            "pjsub --no-check-directory script_test_1.cmd  -e stderr.cmd & echo $!",
+        ),
+    ],
+)
+def test__construct_final_call(
+    pjm_platform: "PJMPlatform",
+    script_name: str,
+    post: str,
+    x11_options: str,
+    expected_command: str,
+) -> None:
+    """Build the job submit command to be sent to the platform.
+
+    :param pjm_platform: PJM platform under test.
+    :param script_name: Name of the script to be sent.
+    :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
+    :param x11_options: x11 options to run the script, if any
+    :param expected_command: Expected command string.
+    """
+    assert (
+        pjm_platform._construct_final_call(script_name, "", post, x11_options)
+        == expected_command
+    )
