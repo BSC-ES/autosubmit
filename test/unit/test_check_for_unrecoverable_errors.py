@@ -70,25 +70,25 @@ def test_slurm_no_exception_when_stderr_empty(slurm_platform):
     slurm_platform._check_for_unrecoverable_errors()
 
 
-@pytest.mark.parametrize("stderr,expected_fragment", [
-    ("sbatch: error: Socket timed out on send/recv operation\n", "socket timed out"),
-    ("sbatch: error: slurm_persist_conn_open_without_init: ...\n", "slurm_persist_conn_open_without_init"),
-    ("slurmctld: error: reached\n", "slurmctld"),
-    ("slurmdbd: error: ...\n", "slurmdbd"),
-    ("sbatch: error: Connection refused\n", "connection refused"),
-    ("sbatch: error: Broken pipe\n", "broken pipe"),
-    ("sbatch: error: Communication failure\n", "communication failure"),
-    ("Temporary failure in name resolution\n", "temporary failure in name resolution"),
-    ("SSH session not active\n", "not active"),
-    ("git clone failed: network error\n", "git clone"),
-    ("sbatch: error: Socket error on connection\n", "socket error"),
-    ("sbatch: error: Connection timed out\n", "connection timed out"),
-    ("sbatch: error: Connection reset by peer\n", "connection reset by peer"),
-    ("sbatch: error: Network is unreachable\n", "network is unreachable"),
-    ("sbatch: error: Unable to connect to slurm daemon\n", "unable to connect to slurm daemon"),
-    ("sbatch: error: Communication error\n", "communication error"),
+@pytest.mark.parametrize("stderr", [
+    "sbatch: error: Socket timed out on send/recv operation\n",
+    "sbatch: error: slurm_persist_conn_open_without_init: ...\n",
+    "slurmctld: error: reached\n",
+    "slurmdbd: error: ...\n",
+    "sbatch: error: Connection refused\n",
+    "sbatch: error: Broken pipe\n",
+    "sbatch: error: Communication failure\n",
+    "Temporary failure in name resolution\n",
+    "SSH session not active\n",
+    "git clone failed: network error\n",
+    "sbatch: error: Socket error on connection\n",
+    "sbatch: error: Connection timed out\n",
+    "sbatch: error: Connection reset by peer\n",
+    "sbatch: error: Network is unreachable\n",
+    "sbatch: error: Unable to connect to slurm daemon\n",
+    "sbatch: error: Communication error\n",
 ])
-def test_slurm_raises_autosubmit_error_for_transient(slurm_platform, stderr, expected_fragment):
+def test_slurm_raises_autosubmit_error_for_transient(slurm_platform, stderr):
     """Raise AutosubmitError (6016) for transient connectivity issues."""
     _set_output(slurm_platform, stdout="", stderr=stderr)
     with pytest.raises(AutosubmitError) as exc_info:
@@ -96,39 +96,38 @@ def test_slurm_raises_autosubmit_error_for_transient(slurm_platform, stderr, exp
     assert exc_info.value.code == 6016
 
 
-@pytest.mark.parametrize("stderr,expected_fragment", [
-    ("sbatch: error: Invalid partition name specified\n", "invalid partition"),
-    ("sbatch: error: Batch job submission failed: Invalid QOS\n", "invalid qos"),
-    ("sbatch: error: Batch job submission failed: Invalid account\n", "invalid account"),
-    ("sbatch: error: Unrecognized option '--bla-flag'\n", "unrecognized option"),
-    ("sbatch: error: Batch job submission failed: ...\n", "batch job submission failed"),
-    ("sbatch: error: Requested node configuration is not available\n",
-     "requested node configuration is not available"),
-    ("sbatch: error: Job violates accounting/qos policy\n", "violates accounting/qos policy"),
-    ("sbatch: error: User is not allowed to submit\n", "not allowed to submit"),
-    ("sbatch: error: Invalid --time specification\n", "invalid time specification"),
-    ("sacct: error: syntax error\n", "syntax error"),
-    ("sbatch: command not found\n", "command not found"),
-    ("sbatch: error: Job exceeds limit\n", "job exceeds"),
-    ("sbatch: error:\n", "sbatch: error:"),
-    ("sbatch: error: Invalid constraint specified\n", "invalid constraint"),
-    ("sbatch: error: Invalid --time value\n", "invalid --time"),
-    ("sbatch: error: Invalid --mem value\n", "invalid --mem"),
-    ("sbatch: error: Invalid --nodes specification\n", "invalid --nodes"),
-    ("sbatch: error: Invalid --ntasks specification\n", "invalid --ntasks"),
-    ("sbatch: error: Invalid --cpus-per-task value\n", "invalid --cpus-per-task"),
-    ("sbatch: error: Job not submitted to the scheduler\n", "not submitted"),
-    ("sbatch: error: Job violates accounting policy\n", "violates accounting policy"),
-    ("sbatch: error: user/account not found on this system\n", "user/account not found"),
-    ("sbatch: error: account has insufficient quota\n", "account has insufficient"),
-    ("salloc: error: too many CPUs requested\n", "salloc: error"),
-    ("sbatch: error: unknown option 'bla'\n", "unknown option"),
-    ("sbatch: error: cpu count per node too high\n", "error: cpu count per node"),
-    ("sbatch: error: Invalid --partition bla\n", "invalid --partition"),
-    ("sbatch: error: Invalid --qos bla\n", "invalid --qos"),
-    ("sbatch: error: Invalid --account bla\n", "invalid --account"),
+@pytest.mark.parametrize("stderr", [
+    "sbatch: error: Invalid partition name specified\n",
+    "sbatch: error: Batch job submission failed: Invalid QOS\n",
+    "sbatch: error: Batch job submission failed: Invalid account\n",
+    "sbatch: error: Unrecognized option '--bla-flag'\n",
+    "sbatch: error: Batch job submission failed: ...\n",
+    "sbatch: error: Requested node configuration is not available\n",
+    "sbatch: error: Job violates accounting/qos policy\n",
+    "sbatch: error: User is not allowed to submit\n",
+    "sbatch: error: Invalid --time specification\n",
+    "sacct: error: syntax error\n",
+    "sbatch: command not found\n",
+    "sbatch: error: Job exceeds limit\n",
+    "sbatch: error:\n",
+    "sbatch: error: Invalid constraint specified\n",
+    "sbatch: error: Invalid --time value\n",
+    "sbatch: error: Invalid --mem value\n",
+    "sbatch: error: Invalid --nodes specification\n",
+    "sbatch: error: Invalid --ntasks specification\n",
+    "sbatch: error: Invalid --cpus-per-task value\n",
+    "sbatch: error: Job not submitted to the scheduler\n",
+    "sbatch: error: Job violates accounting policy\n",
+    "sbatch: error: user/account not found on this system\n",
+    "sbatch: error: account has insufficient quota\n",
+    "salloc: error: too many CPUs requested\n",
+    "sbatch: error: unknown option 'bla'\n",
+    "sbatch: error: cpu count per node too high\n",
+    "sbatch: error: Invalid --partition bla\n",
+    "sbatch: error: Invalid --qos bla\n",
+    "sbatch: error: Invalid --account bla\n",
 ])
-def test_slurm_raises_autosubmit_critical_for_permanent(slurm_platform, stderr, expected_fragment):
+def test_slurm_raises_autosubmit_critical_for_permanent(slurm_platform, stderr):
     """Raise AutosubmitCritical (7014) for permanent configuration errors."""
     _set_output(slurm_platform, stdout="", stderr=stderr)
     with pytest.raises(AutosubmitCritical) as exc_info:
@@ -380,21 +379,21 @@ def test_pbs_no_exception_when_stderr_empty(pbs_platform):
     pbs_platform._check_for_unrecoverable_errors()
 
 
-@pytest.mark.parametrize("stderr,expected_fragment", [
-    ("not active\n", "not active"),
-    ("qsub: Socket timed out on send/recv operation\n", "socket timed out"),
-    ("qsub: Socket error\n", "socket error"),
-    ("qsub: Connection timed out\n", "connection timed out"),
-    ("qsub: Connection refused\n", "connection refused"),
-    ("qsub: Connection reset by peer\n", "connection reset by peer"),
-    ("qsub: Broken pipe\n", "broken pipe"),
-    ("qsub: Network is unreachable\n", "network is unreachable"),
-    ("qsub: Unable to connect to PBS server\n", "unable to connect to pbs server"),
-    ("PBS: Communication failure\n", "communication failure"),
-    ("PBS: Communication error\n", "communication error"),
-    ("Temporary failure in name resolution\n", "temporary failure in name resolution"),
+@pytest.mark.parametrize("stderr", [
+    "not active\n",
+    "qsub: Socket timed out on send/recv operation\n",
+    "qsub: Socket error\n",
+    "qsub: Connection timed out\n",
+    "qsub: Connection refused\n",
+    "qsub: Connection reset by peer\n",
+    "qsub: Broken pipe\n",
+    "qsub: Network is unreachable\n",
+    "qsub: Unable to connect to PBS server\n",
+    "PBS: Communication failure\n",
+    "PBS: Communication error\n",
+    "Temporary failure in name resolution\n",
 ])
-def test_pbs_raises_autosubmit_error_for_transient(pbs_platform, stderr, expected_fragment):
+def test_pbs_raises_autosubmit_error_for_transient(pbs_platform, stderr):
     """Raise AutosubmitError (6016) for transient PBS connectivity issues."""
     _set_output(pbs_platform, stdout="", stderr=stderr)
     with pytest.raises(AutosubmitError) as exc_info:
@@ -402,21 +401,21 @@ def test_pbs_raises_autosubmit_error_for_transient(pbs_platform, stderr, expecte
     assert exc_info.value.code == 6016
 
 
-@pytest.mark.parametrize("stderr,expected_fragment", [
-    ("qsub: Job violates resource limits\n", "violates resource limits"),
-    ("qsub: Illegal attribute or resource value\n", "illegal attribute or resource value"),
-    ("qsub: Unknown resource\n", "unknown resource"),
-    ("qsub: Job violates queue constraints\n", "job violates queue"),
-    ("qsub: Invalid queue specified\n", "invalid queue"),
-    ("qsub: Not authorized to submit to this queue\n", "not authorized"),
-    ("qsub: Bad UID for job execution\n", "bad uid"),
-    ("qsub: Not allowed to submit\n", "not allowed to submit"),
-    ("PBS scheduler is not installed\n", "scheduler is not installed"),
-    ("qsub: error: Syntax error in job script\n", "qsub: error"),
-    ("qsub: command not found\n", "command not found"),
-    ("PBS syntax error in directives\n", "syntax error"),
+@pytest.mark.parametrize("stderr", [
+    "qsub: Job violates resource limits\n",
+    "qsub: Illegal attribute or resource value\n",
+    "qsub: Unknown resource\n",
+    "qsub: Job violates queue constraints\n",
+    "qsub: Invalid queue specified\n",
+    "qsub: Not authorized to submit to this queue\n",
+    "qsub: Bad UID for job execution\n",
+    "qsub: Not allowed to submit\n",
+    "PBS scheduler is not installed\n",
+    "qsub: error: Syntax error in job script\n",
+    "qsub: command not found\n",
+    "PBS syntax error in directives\n",
 ])
-def test_pbs_raises_autosubmit_critical_for_permanent(pbs_platform, stderr, expected_fragment):
+def test_pbs_raises_autosubmit_critical_for_permanent(pbs_platform, stderr):
     """Raise AutosubmitCritical (7014) for permanent PBS configuration errors."""
     _set_output(pbs_platform, stdout="", stderr=stderr)
     with pytest.raises(AutosubmitCritical) as exc_info:

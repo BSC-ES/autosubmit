@@ -471,45 +471,44 @@ class EcPlatform(ParamikoPlatform):
             return
 
         # Transient / recoverable patterns → AutosubmitError (6016).
-        transient_patterns: list[tuple[str, str]] = [
-            ("not active", "SSH session not active"),
-            ("git clone", "Git clone failed during submission; likely a transient network issue"),
-            ("no gateway", "ecaccess gateway not available"),
-            ("connection refused", "Connection to ecaccess gateway refused"),
-            ("connection timed out", "Connection to ecaccess gateway timed out"),
-            ("socket timed out", "Socket timed out communicating with ecaccess"),
-            ("network is unreachable", "Network unreachable; cannot reach ecaccess gateway"),
-            ("ssl", "ecaccess SSL or certificate issue"),
-            ("temporary failure in name resolution", "DNS resolution failed temporarily"),
+        transient_patterns: list[str] = [
+            "not active",
+            "git clone",
+            "no gateway",
+            "connection refused",
+            "connection timed out",
+            "socket timed out",
+            "network is unreachable",
+            "ssl",
+            "temporary failure in name resolution",
         ]
 
-        for pattern, message in transient_patterns:
+        for pattern in transient_patterns:
             if pattern in combined:
                 raise AutosubmitError(
-                    f"Transient ecaccess error: {message}",
+                    f"Transient ecaccess error: {combined}",
                     6016,
-                    (out + "\n" + err).strip(),
                 )
 
         # Permanent / unrecoverable patterns → AutosubmitCritical (7014).
-        critical_patterns: list[tuple[str, str]] = [
-            ("invalid queue", "Invalid ecaccess queue specified"),
-            ("certificate not found", "ecaccess certificate not found or expired"),
-            ("queue does not exist", "ecaccess queue does not exist"),
-            ("no permission", "No permission to submit to this ecaccess queue"),
-            ("not authorized", "Not authorised for this ecaccess operation"),
-            ("access denied", "Access denied by ecaccess gateway"),
-            ("job not found", "ecaccess job not found"),
-            ("invalid job", "Invalid ecaccess job specification"),
-            ("not submitted", "Job was not submitted to ecaccess; check directives"),
-            ("submission failed", "ecaccess submission failed; check directives"),
-            ("command not found", "ecaccess command not found on the gateway host"),
+        critical_patterns: list[str] = [
+            "invalid queue",
+            "certificate not found",
+            "queue does not exist",
+            "no permission",
+            "not authorized",
+            "access denied",
+            "job not found",
+            "invalid job",
+            "not submitted",
+            "submission failed",
+            "command not found",
         ]
 
-        for pattern, message in critical_patterns:
+        for pattern in critical_patterns:
             if pattern in combined:
                 raise AutosubmitCritical(
-                    f"Permanent ecaccess error: {message}",
+                    f"Permanent ecaccess error: {combined}",
                     7014,
                 )
 
