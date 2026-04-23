@@ -104,7 +104,7 @@ jobs:
           cache: 'pip' # caching pip dependencies
 
       - name: Install system dependencies
-        run: sudo apt-get install -y curl git graphviz rsync xvfb r-base
+        run: sudo apt-get install -y curl git subversion graphviz rsync xvfb r-base
 
       - name: Install dependencies
         run: |
