@@ -21,6 +21,7 @@
 - Removed invalid message about the template script showing the error with a difference of ~5 lines #2962
 - Fix queuing time for the first vertical job
 - Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
+- Fixed `autosubmit stats` command that was not considering parameters defined in the platform, like NODES, TASKS, etc. #2978
 
 **Enhancements:**
 
