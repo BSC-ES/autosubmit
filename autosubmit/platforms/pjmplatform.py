@@ -354,7 +354,7 @@ class PJMPlatform(ParamikoPlatform):
         if not job_names:
             return ""
 
-        commands = " ; ".join(
+        commands = "+".join(
             f'pjstat -v --choose jid,jnam --filter "jnam={job_name}"'
             for job_name in job_names
         )
