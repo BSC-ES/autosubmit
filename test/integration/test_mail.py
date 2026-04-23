@@ -48,16 +48,18 @@ def fake_smtp_server() -> Generator[Tuple[int, str], None, None]:
 def mail_notifier(fake_smtp_server, tmp_path):
     smtp_port, _ = fake_smtp_server
 
-    def expid_aslog_dir(expid):
-        exp_dir = tmp_path / "aslog" / expid
-        exp_dir.mkdir(parents=True)
-        (exp_dir / "dummy_run.log").write_text("Log entry: simulation started.")
-        return exp_dir
+    def expid_log_dir(exp_id):
+        log_dir = tmp_path / f"LOG_{exp_id}"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        (log_dir / "dummy_run.err").write_text("Log entry: simulation started.")
+        (log_dir / "dummy_run.out").write_text("Log entry: simulation started.")
+        return log_dir
 
     config = type('Config', (), {
         'MAIL_FROM': 'notifier@localhost',
         'SMTP_SERVER': f'127.0.0.1:{smtp_port}',
-        'expid_aslog_dir': staticmethod(expid_aslog_dir),
+        'ATTACHMENT': False,
+        'expid_log_dir': staticmethod(expid_log_dir),
     })()
     return MailNotifier(config)
 
@@ -143,10 +145,13 @@ def test_experiment_status(mail_notifier, fake_smtp_server, mock_platform):
 
 @pytest.mark.parametrize(
     "list_recipients, expected_error_message",
-    [("test", "Recipients of mail notifications must be a list of emails!"),
+    [
+        ("test", "Recipients of mail notifications must be a list of emails!"),
         ([], "Empty recipient list"),
         (['test'], "Invalid email in recipient list"),
-        (['test@mail.com', 'test2@mail.com'], None)]
+        (['test@mail.com', 'test2@mail.com'], None)
+    ],
+    ids=['test', 'arr', 'arr_test', 'arr_email']
 )
 @pytest.mark.docker
 def test_recipients_list(
@@ -174,6 +179,5 @@ def test_recipients_list(
             Status.VALUE_TO_KEY[Status.FAILED],
             list_recipients
         )
-        resp = requests.get(f"{api_base}/api/v2/messages")
-        assert len(resp.json()["items"][0]["Raw"]
-                   ["To"]) == len(list_recipients)
+        resp = requests.get(f"{api_base}/api/v2/messages").json()
+        assert len(resp["items"]) == len(list_recipients)
