@@ -22,6 +22,8 @@ from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING
 
+from paramiko.ssh_exception import SSHException
+
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.pjm_header import PJMHeader
@@ -71,11 +73,10 @@ class PJMPlatform(ParamikoPlatform):
         self._header = PJMHeader()
         self._wrapper = PJMWrapperFactory(self)
         # https://software.fujitsu.com/jp/manual/manualfiles/m220008/j2ul2452/02enz007/j2ul-2452-02enz0.pdf page 16
-        self.job_status = {}
-        self.job_status['COMPLETED'] = ['EXT']
-        self.job_status['RUNNING'] = ['RNO', 'RNE', 'RUN']
-        self.job_status['QUEUING'] = ['ACC', 'QUE', 'RNA', 'RNP', 'HLD']  # TODO NOT SURE ABOUT HOLD HLD
-        self.job_status['FAILED'] = ['ERR', 'CCL', 'RJT']
+        self.job_status = {"COMPLETED": ["EXT"],
+                           "RUNNING": ["RNO", "RNE", "RUN"],
+                           "QUEUING": ["ACC", "QUE", "RNA", "RNP", "HLD"],
+                           "FAILED": ["ERR", "CCL", "RJT"]}
         self._pathdir = "\\$HOME/LOG_" + self.expid
         self._allow_arrays = False
         self._allow_wrappers = True  # NOT SURE IF WE NEED WRAPPERS
@@ -84,9 +85,11 @@ class PJMPlatform(ParamikoPlatform):
         exp_id_path = os.path.join(self.config.get("LOCAL_ROOT_DIR"), self.expid)
         tmp_path = os.path.join(exp_id_path, "tmp")
         self._submit_script_path = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
+            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh"
+        )
         self._submit_script_base_name = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
+            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_"
+        )
 
     def create_a_new_copy(self):
         return PJMPlatform(self.expid, self.name, self.config)
@@ -97,7 +100,9 @@ class PJMPlatform(ParamikoPlatform):
         :param output: output of the submit cmd
         :return: boolean
         """
-        return not all(part.lower() in output.lower() for part in ["pjsub", "[INFO] PJM 0000"])
+        return not all(
+            part.lower() in output.lower() for part in ["pjsub", "[INFO] PJM 0000"]
+        )
 
     def check_remote_log_dir(self):
         """Creates log dir on remote host"""
@@ -108,24 +113,29 @@ class PJMPlatform(ParamikoPlatform):
         except OSError:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
-                    Log.debug(f'{self.remote_log_dir} has been created on {self.host} .')
+                    Log.debug(
+                        f"{self.remote_log_dir} has been created on {self.host} ."
+                    )
                 else:
-                    raise AutosubmitError("SFTP session not active ", 6007,
-                                          f"Could not create the DIR {self.remote_log_dir} on HPC {self.host}'.format(self.remote_log_dir, self.host)")
-            except BaseException as e:
-                raise AutosubmitError(
-                    "SFTP session not active ", 6007, str(e))
+                    raise AutosubmitError(
+                        "SFTP session not active ",
+                        6007,
+                        f"Could not create the DIR {self.remote_log_dir} on HPC {self.host}'.format(self.remote_log_dir, self.host)",
+                    )
+            except SSHException as e:
+                raise AutosubmitError("SFTP session not active ", 6007, str(e))
 
     def update_cmds(self):
         """Update commands for platforms."""
         self.root_dir = os.path.join(
-            self.scratch, self.project_dir, self.user, self.expid)
+            self.scratch, self.project_dir, self.user, self.expid
+        )
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "pjdel"
         self._checkhost_cmd = "echo 1"
-        self._submit_cmd = f'cd {self.remote_log_dir} ; pjsub'
+        self._submit_cmd = f"cd {self.remote_log_dir} ; pjsub"
         self._submit_command_name = "pjsub"
-        self._submit_hold_cmd = f'cd {self.remote_log_dir} ; pjsub'
+        self._submit_hold_cmd = f"cd {self.remote_log_dir} ; pjsub"
         self.put_cmd = "scp"
         self.get_cmd = "scp"
         self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
@@ -137,33 +147,47 @@ class PJMPlatform(ParamikoPlatform):
         return self.remote_log_dir
 
     def queuing_reason_cancel(self, reason):
-        try:
-            if len(reason.split('(', 1)) > 1:
-                reason = reason.split('(', 1)[1].split(')')[0]
-                if 'Invalid' in reason or reason in ['ANOTHER JOB STARTED', 'DELAY', 'DEADLINE SCHEDULE STARTED',
-                                                     'ELAPSE LIMIT EXCEEDED', 'FILE IO ERROR', 'GATE CHECK',
-                                                     'IMPOSSIBLE SCHED', 'INSUFF CPU', 'INSUFF MEMORY', 'INSUFF NODE',
-                                                     'INSUFF', 'INTERNAL ERROR', 'INVALID HOSTFILE',
-                                                     'LIMIT OVER MEMORY', 'LOST COMM', 'NO CURRENT DIR', 'NOT EXIST',
-                                                     'RSCGRP NOT EXIST', 'RSCGRP STOP', 'RSCUNIT', 'USER', 'EXCEED',
-                                                     'WAIT SCHED']:
-                    return True
-            return False
-        except Exception:
-            return False
+        if reason is not None and len(reason.split("(", 1)) > 1:
+            reason = reason.split("(", 1)[1].split(")")[0]
+            if "Invalid" in reason or reason in [
+                "ANOTHER JOB STARTED",
+                "DELAY",
+                "DEADLINE SCHEDULE STARTED",
+                "ELAPSE LIMIT EXCEEDED",
+                "FILE IO ERROR",
+                "GATE CHECK",
+                "IMPOSSIBLE SCHED",
+                "INSUFF CPU",
+                "INSUFF MEMORY",
+                "INSUFF NODE",
+                "INSUFF",
+                "INTERNAL ERROR",
+                "INVALID HOSTFILE",
+                "LIMIT OVER MEMORY",
+                "LOST COMM",
+                "NO CURRENT DIR",
+                "NOT EXIST",
+                "RSCGRP NOT EXIST",
+                "RSCGRP STOP",
+                "RSCUNIT",
+                "USER",
+                "EXCEED",
+                "WAIT SCHED",
+            ]:
+                return True
+        return False
 
     def parse_all_jobs_output(self, output, job_id):
-        status = ""
-        try:
-            status = [x.split()[1] for x in output.splitlines()
-                      if x.split()[0] == str(job_id)]
-        except BaseException:
-            pass
+        status = []
+        if output is not None:
+            status = [
+                x.split()[1] for x in output.splitlines() if x.split()[0] == str(job_id)
+            ]
         if len(status) == 0:
             return status
         return status[0]
 
-    def parse_job_list(self, job_list: list[list['Job']]) -> str:
+    def parse_job_list(self, job_list: list[list["Job"]]) -> str:
         """Convert a list of job_list to job_list_cmd.
 
         :param job_list: list of jobs
@@ -173,14 +197,14 @@ class PJMPlatform(ParamikoPlatform):
         """
         job_list_cmd = ""
         for job in job_list:
-            job_list_cmd += str(job.id) + "+"
+            job_list_cmd += str(job.id) + "+" if hasattr(job, "id") else ""
         if job_list_cmd[-1] == "+":
             job_list_cmd = job_list_cmd[:-1]
 
         return job_list_cmd
 
     def _check_jobid_in_queue(self, ssh_output, job_list_cmd):
-        for job in job_list_cmd.split('+'):
+        for job in job_list_cmd.split("+"):
             if job not in ssh_output:
                 return False
         return True
@@ -212,22 +236,41 @@ class PJMPlatform(ParamikoPlatform):
         # -H == sacct
         if jobs_id[-1] == ",":
             jobs_id = jobs_id[:-1]  # deletes comma
-        return f"pjstat -H -v --choose jid,st,ermsg --filter \"jid={jobs_id}\" > as_checkalljobs.txt ; pjstat -v --choose jid,st,ermsg --filter \"jid={jobs_id}\" >> as_checkalljobs.txt ; cat as_checkalljobs.txt ; rm as_checkalljobs.txt"
+        return f'pjstat -H -v --choose jid,st,ermsg --filter "jid={jobs_id}" > as_checkalljobs.txt ; pjstat -v --choose jid,st,ermsg --filter "jid={jobs_id}" >> as_checkalljobs.txt ; cat as_checkalljobs.txt ; rm as_checkalljobs.txt'
 
     def get_job_id_by_job_name_cmd(self, job_name):
         if job_name[-1] == ",":
             job_name = job_name[:-1]
-        return f'pjstat -v --choose jid,st,ermsg --filter \"jnam={job_name}\"'
+        return f'pjstat -v --choose jid,st,ermsg --filter "jnam={job_name}"'
 
     def parse_queue_reason(self, output, job_id):
         # split() is used to remove the trailing whitespace but also \t and multiple spaces
         # split(" ") is not enough
-        reason = [x.split()[2] for x in output.splitlines()
-                  if x.split()[0] == str(job_id)]
+        reason = [
+            x.split()[2] for x in output.splitlines() if x.split()[0] == str(job_id)
+        ]
         # In case of duplicates we take the first one
         if len(reason) > 0:
             return reason[0]
         return reason
+
+    def _construct_final_call(
+        self, script_name: str, pre: str, post: str, x11_options: str
+    ):
+        """Gets the command to submit a job, for the current platform, with the given parameters.
+         This needs to be adapted to each scheduler, the default assumes that is being launched directly.
+
+        :param script_name: name of the script to submit
+        :type script_name: str
+        :param pre: command part to be placed before the script name, e.g. timeout, export, executable
+        :type pre: str
+        :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
+        :type post: str
+        :param x11_options: x11 options to run the script, if any
+        :type x11_options: str
+        :return: command to submit a job
+        """
+        return f"{self._submit_command_name} --no-check-directory {script_name} {x11_options} {post} & echo $!"
 
     def wrapper_header(self, **kwargs):
         wr_header = textwrap.dedent(f"""
@@ -262,7 +305,7 @@ class PJMPlatform(ParamikoPlatform):
     
     #
         """).ljust(13)
-        if kwargs["method"] == 'srun':
+        if kwargs["method"] == "srun":
             language = kwargs["executable"]
             if language is None or len(language) == 0:
                 language = "#!/bin/bash"
@@ -277,15 +320,21 @@ class PJMPlatform(ParamikoPlatform):
     def allocated_nodes():
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
-    def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3, show_logs: bool = True):
+    def check_file_exists(
+        self,
+        filename: str,
+        wrapper_failed: bool = False,
+        sleeptime: int = 5,
+        max_retries: int = 3,
+        show_logs: bool = True,
+    ):
         file_exist = False
         retries = 0
 
         while not file_exist and retries < max_retries:
             try:
                 # This return IOError if path doesn't exist
-                self._ftpChannel.stat(os.path.join(
-                    self.get_files_path(), filename))
+                self._ftpChannel.stat(os.path.join(self.get_files_path(), filename))
                 file_exist = True
             except OSError:  # File doesn't exist, retry in sleeptime
                 if not wrapper_failed:
@@ -294,12 +343,11 @@ class PJMPlatform(ParamikoPlatform):
                     retries = retries + 1
                 else:
                     retries = 9999
-            except Exception as e:
-                if "garbage" in str(e).lower():
-                    if not wrapper_failed:
-                        sleep(sleeptime)
-                        sleeptime = sleeptime + 5
-                        retries = retries + 1
+            except SSHException as e:  # Unrecoverable error
+                if "garbage" in str(e).lower() and not wrapper_failed:
+                    sleep(sleeptime)
+                    sleeptime = sleeptime + 5
+                    retries = retries + 1
                 else:
                     raise
         return file_exist
@@ -349,7 +397,7 @@ class PJMPlatform(ParamikoPlatform):
         if not job_names:
             return ""
 
-        commands = " ; ".join(
+        commands = "+".join(
             f'pjstat -v --choose jid,jnam --filter "jnam={job_name}"'
             for job_name in job_names
         )
@@ -358,10 +406,10 @@ class PJMPlatform(ParamikoPlatform):
             f"{commands} | "
             "awk '$1 ~ /^[0-9]+$/ {"
             "job_name = $NF; "
-            "sub(/\\.cmd$/, \"\", job_name); "
-            "jobs[job_name] = jobs[job_name] ? jobs[job_name] \",\" $1 : $1"
+            'sub(/\\.cmd$/, "", job_name); '
+            'jobs[job_name] = jobs[job_name] ? jobs[job_name] "," $1 : $1'
             "} END {"
-            "for (name in jobs) print name \":\" jobs[name]"
+            'for (name in jobs) print name ":" jobs[name]'
             "}'"
         )
 
