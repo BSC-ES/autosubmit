@@ -517,5 +517,4 @@ class SlurmPlatform(ParamikoPlatform):
                 raise AutosubmitCritical(
                     f"Permanent Slurm error: {message}",
                     7014,
-                    err,
                 )
