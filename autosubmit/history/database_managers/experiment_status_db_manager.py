@@ -92,7 +92,6 @@ class ExperimentStatusDbManager(DatabaseManager):
         experiment_row = self.get_experiment_row_by_expid(expid)
         return self.get_experiment_status_row_by_exp_id(experiment_row.id)
 
-    # TODO: it's fetching by name and not by exp_id column?
     def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow:
         """Get the experiment from ecearth.db by expid as Models.ExperimentRow."""
         statement = self.get_built_select_statement("experiment", "name=?")
@@ -128,6 +127,16 @@ class ExperimentStatusDbManager(DatabaseManager):
         arguments = (status, 0, HUtils.get_current_datetime(), expid)
         self.execute_statement_with_arguments_on_dbfile(
             self._as_times_file_path, statement, arguments)
+    
+    def set_exp_status(self, expid:str, status:str) -> None:
+        exp_status_now = self.get_experiment_status_row_by_expid(expid)
+        # if it already exists, update
+        if exp_status_now:
+            self.update_exp_status(expid, status)
+            return
+        # if it does not exist, create
+        exp_row = self.get_experiment_row_by_expid(expid)
+        self.create_exp_status(exp_row.id, expid, status)
 
 
 class ExperimentStatusDatabaseManager(Protocol):
@@ -143,6 +152,8 @@ class ExperimentStatusDatabaseManager(Protocol):
     def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Optional[Models.ExperimentStatusRow]: ...
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int: ...
+
+    def set_exp_status(self, expid: str, status: str) -> None: ...
 
     def update_exp_status(self, expid: str, status="RUNNING") -> None: ...
 
@@ -229,6 +240,16 @@ class SqlAlchemyExperimentStatusDbManager:
         with self.engine.connect() as conn:
             conn.execute(query)
             conn.commit()
+
+    def set_exp_status(self, expid:str, status:str) -> None:
+        exp_status_now = self.get_experiment_status_row_by_expid(expid)
+        # if it already exists, update
+        if exp_status_now:
+            self.update_exp_status(expid, status)
+            return
+        # if it does not exist, create
+        exp_row = self.get_experiment_row_by_expid(expid)
+        self.create_exp_status(exp_row.id, expid, status)
 
 
 def create_experiment_status_db_manager(db_engine: str, **options) -> ExperimentStatusDatabaseManager:
