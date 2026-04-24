@@ -28,6 +28,7 @@ from autosubmit.database import db_common
 from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import user_yes_no_query
+from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 __all__ = [
@@ -146,6 +147,7 @@ def _delete_experiment(expid: str, force: bool) -> None:
     # Try to delete the experiment details
     try:
         ExperimentDetails(expid).delete_details()
+        ExperimentStatus(expid).set_as_deleted() # TODO: unsure if we should set the experiment as deleted even with exceptions in the process
     except Exception as e:
         Log.warning(f'Failed to delete DB details for experiment {expid}: {str(e)}')
         raise
