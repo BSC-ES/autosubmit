@@ -2177,7 +2177,7 @@ class Autosubmit:
         """
         Autosubmit.exit = False
         status_tracker = ExperimentStatus(expid)
-        experiment_status = Optional[str] = None
+        experiment_status: Optional[str] = None
         # Start profiling if the flag has been used
         if profile is not None:
             from .profiler.profiler import Profiler

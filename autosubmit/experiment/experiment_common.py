@@ -148,7 +148,7 @@ def _delete_experiment(expid: str, force: bool) -> None:
     # Try to delete the experiment details
     try:
         ExperimentDetails(expid).delete_details()
-        ExperimentStatus(expid).set_as_not_running() # TODO: unsure if we should set the experiment as deleted even with exceptions in the process
+        ExperimentStatus(expid).set_as_deleted() # TODO: unsure if we should set the experiment as deleted even with exceptions in the process
     except Exception as e:
         Log.warning(f'Failed to delete DB details for experiment {expid}: {str(e)}')
         raise
