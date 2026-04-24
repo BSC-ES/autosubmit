@@ -148,7 +148,7 @@ class Platform:
         :param auth_password: Optional password for two-factor authentication.
         :type auth_password: str or list, optional
         """
-        self._atexit_registered = None
+        self._atexit_registered = False
         self.processed_wrapper_logs = None
         self.ctx = self.get_mp_context()
         self.connected = False
@@ -237,8 +237,17 @@ class Platform:
 
     @classmethod
     def update_workers(cls, event_worker):
-        # This is visible on all instances simultaneosly. Is to send the keep alive signal.
-        cls.worker_events.append(event_worker)
+        # This is visible on all instances simultaneously. Is to send the keep alive signal.
+        if event_worker is None:
+            return
+        with cls.lock:
+            try:
+                if event_worker in cls.worker_events:
+                    cls.worker_events.append(event_worker)
+            except ValueError:
+                pass
+            except AttributeError as e:
+                Log.warning(f"The event couldn't be stored, event has an invalid state: \n{str(e)}")
 
     @classmethod
     def remove_workers(cls, event_worker: Event) -> None:
@@ -777,7 +786,6 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
-
     def add_job_to_log_recover(self, job):
         if job.id and int(job.id) != 0:
             self.recovery_queue.put(job)
@@ -824,9 +832,15 @@ class Platform:
             if self.log_recovery_process.is_alive():
                 self.log_recovery_process.terminate()
                 self.log_recovery_process.join(timeout=60)
-
                 if self.log_recovery_process.is_alive():
                     Log.error("Log recovery process refused to terminate")
+                    self.log_recovery_process.kill()
+
+            if hasattr(self.log_recovery_process, "close"):
+                try:
+                    self.log_recovery_process.close()
+                except Exception as e:
+                    Log.warning(f"Failed to close process: {e}")
 
         if self.recovery_queue:
             try:
@@ -834,10 +848,20 @@ class Platform:
                 self.recovery_queue.join_thread()
             except Exception as e:
                 Log.warning(f"Queue cleanup failed: {e}")
+
         self.log_retrieval_process_active = False
+
+        # Reuse existing Event objects instead of destroying them.
+        # Clearing the events is sufficient to give the next child process a clean initial state.
+        if self.cleanup_event is not None:
+            self.cleanup_event.clear()
         if self.work_event is not None:
-            self.remove_workers(self.work_event)
-        self.work_event = self.ctx.Event()
+            self.work_event.clear()
+
+        self.cleanup_event = None
+        self.recovery_queue = None
+        self.log_recovery_process = None
+        self.work_event = None
         self.processed_wrapper_logs = set()
 
     def load_process_info(self, platform):
@@ -872,9 +896,14 @@ class Platform:
         new_platform = self.create_a_new_copy()
         if self.ctx is None:
             self.ctx = self.get_mp_context()
-        self.work_event = self.ctx.Event()
-        self.cleanup_event = self.ctx.Event()
-        Platform.update_workers(self.work_event)
+
+        # Allocate Events only on the first call.
+        # On subsequent respawn cycles the events are reused (cleared by clean_log_recovery_process)
+        if self.work_event is None:
+            self.work_event = self.ctx.Event()
+            Platform.update_workers(self.work_event)
+        if self.cleanup_event is None:
+            self.cleanup_event = self.ctx.Event()
         self.load_process_info(new_platform)
         if self.recovery_queue is not None:
             self.recovery_queue.close()
@@ -895,13 +924,11 @@ class Platform:
                 target=recover_platform_job_logs_wrapper,
                 args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event, as_conf),
                 name=f"{self.name}_log_recovery")
-            if self.log_recovery_process is not None:
-                self.log_recovery_process.start()
+            self.log_recovery_process.daemon = True
+            self.log_recovery_process.start()
         except Exception as e:
             Log.error(f"Failed to start log recovery process: {e}")
             self.log_recovery_process = None
-        if self.log_recovery_process is not None and not self.log_recovery_process.is_alive():
-            self.log_recovery_process.start()
 
     def get_mp_context(self):
         if not hasattr(self, 'ctx') or self.ctx is None:
@@ -914,9 +941,10 @@ class Platform:
             ret_pid, ret_status = os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
             if ret_pid == 0:  # Process is still running
                 Log.info(f"Process {self.log_recovery_process.pid} is still running.")
-                # Optionally, handle cleanup here (terminate / join)
             else:
                 Log.result(f"Process {self.log_recovery_process.name} finished with pid {self.log_recovery_process.pid}")
+        else:
+            Log.result("Log_Recovery_Process is empty no process joinned")
 
     def spawn_log_retrieval_process(self, as_conf: Optional['AutosubmitConfig']) -> None:
         """Spawns a process to recover the logs of the jobs that have been completed on this platform.
@@ -949,6 +977,11 @@ class Platform:
                 self.log_recovery_process.terminate()
                 self.log_recovery_process.join(timeout=60)
 
+        if self.work_event is not None:
+            self.remove_workers(self.work_event)
+            self.work_event = None
+            self.cleanup_event = None
+
     def wait_mandatory_time(self, sleep_time: int = 60) -> bool:
         """Waits for the work_event to be set or the cleanup_event to be set for a mandatory time.
 
@@ -964,8 +997,8 @@ class Platform:
                 if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
                     process_log = True
                     break
-            except queue.Empty:
-                Log.warning(f"Queue is empty and process log is {process_log} seconds.")
+            except OSError:
+                Log.warning(f"Queue is empty and process log is {sleep_time} seconds.")
         if not process_log:
             Log.warning(f"No work found within {sleep_time} seconds.")
         return process_log

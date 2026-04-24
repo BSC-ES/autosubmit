@@ -323,7 +323,7 @@ def test_refresh_log_recovery_process(local, autosubmit, as_conf, mocker):
 
     local.clean_log_recovery_process()
 
-    assert local.work_event is not None
+    assert local.work_event is None
 
     p = local.work_event
 
