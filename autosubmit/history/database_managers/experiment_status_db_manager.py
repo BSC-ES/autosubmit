@@ -62,6 +62,23 @@ class ExperimentStatusDbManager(DatabaseManager):
         )
         self.execute_statement_on_dbfile(self._as_times_file_path, create_table_query)
 
+        # keep only latest row by name
+        self.execute_statement_on_dbfile(
+            self._as_times_file_path,
+            '''DELETE FROM experiment_status
+               WHERE rowid NOT IN (
+                   SELECT MAX(rowid)
+                   FROM experiment_status
+                   GROUP BY name
+               );'''
+        )
+
+        # enforce name as a unique index
+        self.execute_statement_on_dbfile(
+            self._as_times_file_path,
+            '''CREATE UNIQUE INDEX IF NOT EXISTS uq_experiment_status_name ON experiment_status(name);'''
+        )
+
     def set_existing_experiment_status_as_running(self, expid: str) -> None:
         """ Set the experiment_status row as running. """
         self.update_exp_status(expid, Models.RunningStatus.RUNNING)
@@ -75,6 +92,7 @@ class ExperimentStatusDbManager(DatabaseManager):
         experiment_row = self.get_experiment_row_by_expid(expid)
         return self.get_experiment_status_row_by_exp_id(experiment_row.id)
 
+    # TODO: it's fetching by name and not by exp_id column?
     def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow:
         """Get the experiment from ecearth.db by expid as Models.ExperimentRow."""
         statement = self.get_built_select_statement("experiment", "name=?")

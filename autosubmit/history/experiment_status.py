@@ -43,10 +43,16 @@ class ExperimentStatus:
             message = "Error while trying to update {0} in experiment_status.".format(str(self.expid))
             Logging(self.expid, BasicConfig.HISTORICAL_LOG_DIR).log(message, traceback.format_exc())
             self.manager = None
+        
+    def set_status(self, status: str) -> None:
+        if self.manager:
+            self.manager.set_exp_status(self.expid, status)
 
     def set_as_running(self):
         # type : () -> None
-        """ Set the status of the experiment in experiment_status of as_times.db as RUNNING. Creates the database, table and row if necessary."""
+        if self.manager:
+            self.manager.set_exp_status(self.expid, "RUNNING")
+        """
         if self.manager:
             exp_status_row = self.manager.get_experiment_status_row_by_expid(self.expid)
             if exp_status_row:
@@ -54,3 +60,20 @@ class ExperimentStatus:
             else:
                 exp_row = self.manager.get_experiment_row_by_expid(self.expid)
                 self.manager.create_experiment_status_as_running(exp_row)
+        """
+    
+    def set_as_completed(self) -> None:
+        if self.manager:
+            self.manager.set_exp_status(self.expid, "COMPLETED")
+    
+    def set_as_failed(self) -> None:
+        if self.manager:
+            self.manager.set_exp_status(self.expid, "FAILED")
+    
+    def set_as_paused(self) -> None:
+        if self.manager:
+            self.manager.set_exp_status(self.expid, "PAUSED")
+    
+    def set_as_deleted(self) -> None:
+        if self.manager:
+            self.manager.set_exp_status(self.expid, "DELETED")
