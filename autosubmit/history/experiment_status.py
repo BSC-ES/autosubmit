@@ -52,15 +52,6 @@ class ExperimentStatus:
         # type : () -> None
         if self.manager:
             self.manager.set_exp_status(self.expid, "RUNNING")
-        """
-        if self.manager:
-            exp_status_row = self.manager.get_experiment_status_row_by_expid(self.expid)
-            if exp_status_row:
-                self.manager.set_existing_experiment_status_as_running(exp_status_row.name)
-            else:
-                exp_row = self.manager.get_experiment_row_by_expid(self.expid)
-                self.manager.create_experiment_status_as_running(exp_row)
-        """
     
     def set_as_completed(self) -> None:
         if self.manager:
