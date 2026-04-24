@@ -49,7 +49,6 @@ class ExperimentStatus:
             self.manager.set_exp_status(self.expid, status)
 
     def set_as_running(self):
-        # type : () -> None
         if self.manager:
             self.manager.set_exp_status(self.expid, "RUNNING")
     
