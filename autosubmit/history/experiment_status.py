@@ -53,18 +53,14 @@ class ExperimentStatus:
         if self.manager:
             self.manager.set_exp_status(self.expid, "RUNNING")
     
-    def set_as_completed(self) -> None:
+    def set_as_not_running(self) -> None:
         if self.manager:
-            self.manager.set_exp_status(self.expid, "COMPLETED")
-    
-    def set_as_failed(self) -> None:
-        if self.manager:
-            self.manager.set_exp_status(self.expid, "FAILED")
-    
-    def set_as_paused(self) -> None:
-        if self.manager:
-            self.manager.set_exp_status(self.expid, "PAUSED")
+            self.manager.set_exp_status(self.expid, "NOT_RUNNING")
     
     def set_as_deleted(self) -> None:
         if self.manager:
             self.manager.set_exp_status(self.expid, "DELETED")
+    
+    def set_as_archived(self) -> None:
+        if self.manager:
+            self.manager.set_exp_status(self.expid, "ARCHIVED")

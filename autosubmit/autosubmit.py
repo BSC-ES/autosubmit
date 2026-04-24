@@ -2494,11 +2494,11 @@ class Autosubmit:
             try:
                 # TODO: this should be an enum
                 if experiment_status == "COMPLETED":
-                    status_tracker.set_as_completed()
+                    status_tracker.set_as_not_running()
                 elif experiment_status == "PAUSED":
-                    status_tracker.set_as_paused()
+                    status_tracker.set_as_not_running()
                 elif experiment_status == "FAILED":
-                    status_tracker.set_as_failed()
+                    status_tracker.set_as_not_running()
             except Exception as e:
                 Log.warning(f"Autosubmit couldn't update the final experiment status for {expid}: {str(e)}", 7003)
             
