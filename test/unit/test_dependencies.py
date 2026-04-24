@@ -833,3 +833,79 @@ def test_normalize_auto_keyword(as_conf, mocker):
     parameters = job.update_job_parameters(as_conf, parameters, True)
     assert job.splits == "50"
     assert parameters["SPLITS"] == "50"
+
+
+@pytest.mark.parametrize(
+    "p1_status,p1_has_edge,p2_status,p2_has_edge,p3_status,p3_has_edge,expected",
+    [
+        (Status.RUNNING, True, Status.RUNNING, True, Status.RUNNING, True, True),
+        (Status.RUNNING, True, Status.SUSPENDED, True, Status.RUNNING, True, False),
+        (Status.COMPLETED, False, Status.RUNNING, True, Status.RUNNING, True, True),
+        (Status.COMPLETED, False, Status.SUSPENDED, True, Status.RUNNING, True, False),
+        (Status.RUNNING, False, Status.RUNNING, True, Status.RUNNING, True, False),
+        (Status.COMPLETED, True, Status.COMPLETED, True, Status.COMPLETED, True, True),
+        (Status.SUSPENDED, True, Status.RUNNING, True, Status.RUNNING, True, False),
+        (Status.SUSPENDED, True, Status.SUSPENDED, True, Status.SUSPENDED, True, False),
+        (Status.COMPLETED, False, Status.RUNNING, True, Status.SUSPENDED, True, False),
+    ],
+    ids=[
+        "all_running_with_edge",
+        "middle_parent_suspended_blocks",
+        "completed_parent_without_edge_counted",
+        "suspended_with_completed_sibling_blocks",
+        "running_parent_without_edge_uncounted",
+        "all_completed_with_edge",
+        "first_parent_suspended_blocks",
+        "all_suspended_blocks",
+        "completed_running_suspended_blocks",
+    ],
+)
+def test_check_special_status(
+    joblist: JobList,
+    p1_status: int,
+    p1_has_edge: bool,
+    p2_status: int,
+    p2_has_edge: bool,
+    p3_status: int,
+    p3_has_edge: bool,
+    expected: bool,
+) -> None:
+    """Test that check_special_status respects LOGICAL_ORDER including SUSPENDED.
+
+    A job is eligible to run when:
+
+        len(non_completed_parents) + len(completed_parents) == len(job.parents)
+        (special status check passes) + (normally completed parents) == (total parents)
+
+    :param joblist: A fresh JobList fixture.
+    :param p1_status: Numeric status of parent 1.
+    :param p1_has_edge: Whether parent 1 carries a STATUS=RUNNING edge condition.
+    :param p2_status: Numeric status of parent 2.
+    :param p2_has_edge: Whether parent 2 carries a STATUS=RUNNING edge condition.
+    :param p3_status: Numeric status of parent 3.
+    :param p3_has_edge: Whether parent 3 carries a STATUS=RUNNING edge condition.
+    :param expected: Whether the child job should appear in check_special_status().
+    """
+    target_status = "RUNNING"
+
+    parent1 = Job("parent1", 1, p1_status, 0)
+    parent2 = Job("parent2", 2, p2_status, 0)
+    parent3 = Job("parent3", 3, p3_status, 0)
+    child = Job("child", 4, Status.WAITING, 0)
+
+    child.parents = {parent1, parent2, parent3}
+
+    special_conditions = {"STATUS": target_status, "FROM_STEP": 0}
+    for parent, has_edge in (
+        (parent1, p1_has_edge),
+        (parent2, p2_has_edge),
+        (parent3, p3_has_edge),
+    ):
+        if has_edge:
+            child.add_edge_info(parent, special_conditions)
+
+    joblist.jobs_edges = {}
+    joblist._add_edges_map_info(child, target_status)
+
+    result = joblist.check_special_status()
+    assert (child in result) is expected
