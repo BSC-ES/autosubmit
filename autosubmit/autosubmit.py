@@ -1918,13 +1918,6 @@ class Autosubmit:
                 # This error is important
             except Exception:
                 pass
-        try:
-            ExperimentStatus(expid).set_as_running()
-        except Exception as e:
-            # Connection to status database ec_earth.db can fail.
-            # API worker will fix the status.
-            Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
-                      f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
         return exp_history
 
     @staticmethod
@@ -2183,6 +2176,8 @@ class Autosubmit:
 
         """
         Autosubmit.exit = False
+        status_tracker = ExperimentStatus(expid)
+        experiment_status = Optional[str] = None
         # Start profiling if the flag has been used
         if profile is not None:
             from .profiler.profiler import Profiler
@@ -2216,6 +2211,15 @@ class Autosubmit:
 
                 as_conf_config = as_conf.experiment_data.get('CONFIG', {})
                 git_operational_check_enabled = as_conf_config.get('GIT_OPERATIONAL_CHECK_ENABLED', True)
+
+                # set experiment as running in the experiment_status database
+                try:
+                    status_tracker.set_as_running()
+                except Exception as e:
+                    # Connection to status database ec_earth.db can fail.
+                    # API worker will fix the status.
+                    Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
+                            f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
 
                 if git_operational_check_enabled:
                     Log.debug('Checking for dirty local Git repository')
@@ -2256,13 +2260,16 @@ class Autosubmit:
 
                 while job_list.get_active():
                     try:
+                        # TODO: heartbeat should be here
                         if profile is not None:
                             Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
 
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             if job_list.get_failed():
+                                experiment_status = "FAILED"
                                 return 1
+                            experiment_status = "PAUSED" # TODO: not sure about this one
                             return 0
                         Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
                         for job in job_list.get_ready():
@@ -2456,8 +2463,10 @@ class Autosubmit:
                     p.close_connection()
                 if len(job_list.get_failed()) > 0:
                     Log.info("Some jobs have failed and reached maximum retrials")
+                    experiment_status = "FAILED"
                 else:
                     Log.result("Run successful")
+                    experiment_status = "COMPLETED"
                     if profile is not None:
                         profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
                     # Updating finish time for job data header
@@ -2473,12 +2482,26 @@ class Autosubmit:
                 else:
                     Log.info("ROCRATE not present in experiment YAML configuration. No RO-Crate archive created.")
         except BaseLockException:
+            experiment_status = "FAILED"
             raise
         except AutosubmitCritical:
+            experiment_status = "FAILED"
             raise
         except BaseException:
+            experiment_status = "FAILED"
             raise
         finally:
+            try:
+                # TODO: this should be an enum
+                if experiment_status == "COMPLETED":
+                    status_tracker.set_as_completed()
+                elif experiment_status == "PAUSED":
+                    status_tracker.set_as_paused()
+                elif experiment_status == "FAILED":
+                    status_tracker.set_as_failed()
+            except Exception as e:
+                Log.warning(f"Autosubmit couldn't update the final experiment status for {expid}: {str(e)}", 7003)
+            
             if profile is not None:
                 profiler.stop()
 
