@@ -4222,6 +4222,8 @@ class Autosubmit:
                         "Can not remove or rename experiments folder", 7012, str(e))
 
         Log.result("Experiment archived successfully")
+        with suppress(Exception):
+            ExperimentStatus(expid).set_as_archived() # TODO: unsure if we should archive the experiment even with exceptions in the process
         return True
 
     @staticmethod
