@@ -571,6 +571,19 @@ def _delete_experiment(experiment_id):
         raise AutosubmitCritical("Could not establish a connection to database", 7001, str(e))
     cursor.execute('DELETE FROM experiment '
                    'WHERE name=:name', {'name': experiment_id})
+    
+    # keep the experiment trace in experiment_status for deleted experiments
+    try:
+        cursor.execute('UPDATE experiment_status SET status=:status, seconds_diff=:seconds_diff, modified=CURRENT_TIMESTAMP '
+                       'WHERE name=:name',
+                       {
+                           'status': 'DELETED',
+                           'seconds_diff': 0,
+                           'name': experiment_id
+                       })
+    except Exception:
+        pass
+
     row = cursor.fetchone()
     if row is None:
         Log.debug(f'The experiment {experiment_id} has been deleted!!!')
@@ -832,10 +845,14 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
         conn.execute(text(f'DROP SCHEMA IF EXISTS "{experiment_id}" CASCADE'))
         conn.commit()
 
-        # Delete from experiment_status table
+        # Keep the experiment trace in experiment_status for deleted experiments
         try:
-            query = delete(tables.ExperimentStatusTable).where(
+            query = update(tables.ExperimentStatusTable).where(
                 tables.ExperimentStatusTable.c.name == experiment_id  # type: ignore
+            ).values(
+                status="DELETED",
+                seconds_diff=0,
+                modified=func.current_timestamp()
             )
             conn.execute(query)
             conn.commit()
