@@ -46,7 +46,7 @@ def test_get_submitted_jobs_by_name_returns_max_pid(
 
     result = ps_platform.get_submitted_jobs_by_name(["a000_INI.cmd", "a000_SIM.cmd"])
 
-    assert result == [12303, 12302]
+    assert result == ['12303', '12302']
 
 
 def test_get_submitted_jobs_by_name_returns_empty_when_any_missing(
@@ -104,7 +104,7 @@ def test_get_submitted_jobs_by_name_excludes_pre_existing_pids(
 
     result = ps_platform.get_submitted_jobs_by_name(["a000_INI.cmd", "a000_SIM.cmd"])
 
-    assert result == [12303, 12302]
+    assert result == ['12303', '12302']
 
 
 def test_get_submitted_jobs_by_name_returns_empty_when_all_pids_pre_existing(
