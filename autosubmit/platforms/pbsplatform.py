@@ -195,7 +195,7 @@ class PBSPlatform(ParamikoPlatform):
 
         for pattern in transient_patterns:
             if pattern in err_lower:
-                raise AutosubmitError(f"Transient PBS error: {err}", 6016, err)
+                raise AutosubmitError(f"Transient PBS error: {err}", 6016)
 
         critical_patterns: list[str] = [
             "violates resource limits",

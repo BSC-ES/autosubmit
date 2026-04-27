@@ -466,8 +466,9 @@ class EcPlatform(ParamikoPlatform):
             return
 
         # ecaccess errors appear in stdout, not stderr; search both together.
-        combined = (out + "\n" + err).lower()
-        if not combined.strip():
+        combined_raw = (out + "\n" + err).strip()
+        combined = combined_raw.lower()
+        if not combined:
             return
 
         # Transient / recoverable patterns → AutosubmitError (6016).
@@ -486,7 +487,7 @@ class EcPlatform(ParamikoPlatform):
         for pattern in transient_patterns:
             if pattern in combined:
                 raise AutosubmitError(
-                    f"Transient ecaccess error: {combined}",
+                    f"Transient ecaccess error: {combined_raw}",
                     6016,
                 )
 
@@ -508,7 +509,7 @@ class EcPlatform(ParamikoPlatform):
         for pattern in critical_patterns:
             if pattern in combined:
                 raise AutosubmitCritical(
-                    f"Permanent ecaccess error: {combined}",
+                    f"Permanent ecaccess error: {combined_raw}",
                     7014,
                 )
 
