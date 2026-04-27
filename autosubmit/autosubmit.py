@@ -80,7 +80,8 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
-from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values
+from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values, apply_job_filters
+
 
 if TYPE_CHECKING:
     from rocrate.rocrate import ROCrate
@@ -363,7 +364,40 @@ class Autosubmit:
             )
             subparser.set_defaults(noplot=True)
             subparser.add_argument(
-                '--all', action="store_true", default=False, help='Get completed files to synchronize pkl')
+                "--all",
+                action="store_true",
+                default=False,
+                help="Get completed files to synchronize pkl",
+            )
+            subparser.add_argument(
+                "-fl",
+                "--list",
+                type=str,
+                help='Supply the list of job names to be recovered. Default = "Any". '
+                'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
+            )
+            subparser.add_argument(
+                "-fc",
+                "--filter_chunks",
+                type=str,
+                help='Supply the list of chunks to be recovered. Default = "Any". '
+                'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+            )
+            subparser.add_argument(
+                "-fs",
+                "--filter_status",
+                type=str,
+                choices=('Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
+                help='Select the status (one or more) of jobs to be recovered. Default = "Any". '
+                "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
+            )
+            subparser.add_argument(
+                "-ft",
+                "--filter_type",
+                type=str,
+                help='Select the job type and split to be recovered. Default split = "Any". '
+                'LIST = "LOCALJOB [5-10] SIM"',
+            )
             subparser.add_argument(
                 '-s', '--save', action="store_true", default=False, help='Save changes to disk')
             subparser.add_argument(
@@ -906,8 +940,23 @@ class Autosubmit:
         elif args.command == 'recovery':
             if args.no_recover_logs:
                 warnings.warn('no_recover_logs is deprecated and will be removed in a future major release!')
-            return Autosubmit.recovery(args.expid, args.noplot, args.save, args.all, args.hide, args.group_by,
-                                       args.expand, args.expand_status, args.detail, args.force, args.offline)
+            return Autosubmit.recovery(
+                args.expid,
+                args.noplot,
+                args.save,
+                args.all,
+                args.hide,
+                args.group_by,
+                args.expand,
+                args.expand_status,
+                args.detail,
+                args.force,
+                args.offline,
+                args.list,
+                args.filter_chunks,
+                args.filter_status,
+                args.filter_type,
+            )
         elif args.command == 'check':
             return Autosubmit.check(args.expid)
         elif args.command == 'inspect':
@@ -2955,23 +3004,48 @@ class Autosubmit:
             detail: bool = False,
             force: bool = False,
             offline: bool = False,
+            filter_list: Optional[str] = None,
+            filter_chunks: Optional[str] = None,
+            filter_status: Optional[str] = None,
+            filter_section: Optional[str] = None,
+
     ) -> bool:
         """Recover job statuses for an experiment and update the job list.
 
         Return True when the recovery completed successfully.
 
         :param expid: Experiment identifier.
+        :type expid: str
         :param noplot: If True, do not generate a plot.
+        :type noplot: bool
         :param save: If True, persist changes to the job list.
+        :type save: bool
         :param all_jobs: If True, recover all jobs; otherwise only active jobs.
+        :type all_jobs: bool
         :param hide: If True, hide GUI/windows when generating plots.
+        :type hide: bool
         :param group_by: Optional grouping key for display.
+        :type group_by: Optional[str]
         :param expand: Optional list of job names/sections to expand in the view.
+        :type expand: Optional[list[str]]
         :param expand_status: Optional list of statuses to expand in the view.
+        :type expand_status: Optional[list[str]]
         :param detail: If True, produce a more detailed (and more expensive) textual representation.
+        :type detail: bool
         :param force: If True, cancel active jobs before recovery.
+        :type force: bool
         :param offline: If True, avoid connecting to remote platforms and use offline recovery.
+        :type offline: bool
+        :param filter_list: Optional list of job names to filter for recovery.
+        :type filter_list: Optional[str]
+        :param filter_chunks: Optional list of chunk identifiers to filter for recovery.
+        :type filter_chunks: Optional[str]
+        :param filter_status: Optional list of job statuses to filter for recovery.
+        :type filter_status: Optional[str]
+        :param filter_section: Optional list of job sections to filter for recovery.
+        :type filter_section: Optional[str]
         :return: True if recovery ran successfully, False otherwise.
+        :rtype: bool
         :raises AutosubmitCritical: On configuration/IO failures.
         """
         if not save:
@@ -3041,12 +3115,46 @@ class Autosubmit:
                 Log.warning(f"Jobs {''.join(offline_jobs)} could not be cancelled due to offline mode.")
 
         output_type = as_conf.get_output_type()
-        Log.info(f'Recovering experiment {expid}')
 
         if all_jobs:
             jobs_to_recover = job_list.get_job_list()
         else:
             jobs_to_recover = job_list.get_active()
+        
+        selected_job_names = {job.name for job in jobs_to_recover}
+        
+        # filters will be applied to all_jobs or only active_jobs, depending on the all_jobs flag
+        if filter_section or filter_chunks or filter_status or filter_list:
+            # Validate filters. Raises AutosubmitCritical if any filter is invalid, with a message specifying the issue.
+            Autosubmit._validate_job_filters(
+                as_conf,
+                job_list,
+                filter_list,
+                filter_chunks,
+                filter_status,
+                filter_section,
+            )
+
+            # Starts the filtering process
+            Log.info("Filtering jobs...")
+
+            selected_job_names = apply_job_filters(
+                job_list=job_list,
+                base_job_names=selected_job_names,
+                filter_section=filter_section,
+                filter_chunk=filter_chunks,
+                filter_status=filter_status,
+                filter_list=filter_list,
+                filter_sections_splits_fn=Autosubmit._filter_sections_splits,
+                filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
+                status_from_str_fn=Autosubmit._get_status,
+            )
+
+        jobs_to_recover = [
+            job for job in jobs_to_recover if job.name in selected_job_names
+        ]
+
+        Log.info(f"The selected number of jobs to recover is {len(jobs_to_recover)}")
 
         try:
             for job in jobs_to_recover:
@@ -3102,9 +3210,9 @@ class Autosubmit:
                     expid, job_list.get_job_list(), os.path.join(exp_path, "/tmp/LOG_", expid),
                     output_format=output_type, packages=packages, show=not hide, groups=groups_dict,
                     job_list_object=job_list)
-        except Exception:
+        except Exception as e:
             Log.warning("An error has occurred while plotting the jobs list after recovery. "
-                        "Check if you have X11 redirection and an img viewer correctly set. Trace: {str(e)}")
+                        f"Check if you have X11 redirection and an img viewer correctly set. Trace: {str(e)}")
         try:
             if detail:
                 Autosubmit.detail(job_list)
@@ -4657,7 +4765,7 @@ class Autosubmit:
                 if reference not in status_list:
                     status_list.append(reference)
             for status in status_filter:
-                if status == "ANY":
+                if status.upper() == "ANY":
                     continue
                 if status not in status_list:
                     status_validation_error = True
@@ -4829,12 +4937,15 @@ class Autosubmit:
             raise AutosubmitCritical("Error in the supplied input for -fc // -ftc // -ftcs.", 7011, validation_message)
 
     @staticmethod
-    def _validate_set_status_filters(as_conf: AutosubmitConfig, job_list: JobList,
-                                     filter_list: Optional[str],
-                                     filter_chunk_section_split: Optional[str],
-                                     filter_status: Optional[str],
-                                     filter_section: Optional[str]) -> None:
-        """Validate filters provided to the setstatus command.
+    def _validate_job_filters(
+        as_conf: AutosubmitConfig,
+        job_list: JobList,
+        filter_list: Optional[str],
+        filter_chunk_section_split: Optional[str],
+        filter_status: Optional[str],
+        filter_section: Optional[str],
+    ) -> None:
+        """Validate filters provided to the setstatus and recovery command.
 
         Each non-empty filter is validated by its corresponding helper. Raises
         AutosubmitCritical (code 7014) if all filters are empty or whitespace-only.
@@ -4870,11 +4981,16 @@ class Autosubmit:
 
         if filter_chunk_section_split:
             valid_sections = {str(section).upper() for section in as_conf.jobs_data}
-            Autosubmit._validate_chunk_section_split(filter_chunk_section_split, valid_sections=valid_sections)
+            Autosubmit._validate_chunk_section_split(
+                filter_chunk_section_split, valid_sections=valid_sections
+            )
             all_empty = False
 
         if all_empty:
-            raise AutosubmitCritical("At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.", 7014)
+            raise AutosubmitCritical(
+                "At least one filter must be provided and must be not empty when using -fs, -ft, -fc, -ftc or -ftcs.",
+                7014,
+            )
 
     @staticmethod
     def _split_match(j: Job, split_list: list[str]) -> bool:
@@ -5212,39 +5328,29 @@ class Autosubmit:
                         pass
                 ##### End of the ""function""
                 # This will raise an autosubmit critical if any of the filters has issues in the format specified by the user
-                Autosubmit._validate_set_status_filters(as_conf, job_list, filter_list, filter_chunk_section_split, filter_status,
+                Autosubmit._validate_job_filters(as_conf, job_list, filter_list, filter_chunk_section_split, filter_status,
                                                         filter_section)
                 #### Starts the filtering process ####
-                Log.info("Filtering jobs...")
-                all_jobs = job_list.get_job_list()
-                selected_job_names = {job.name for job in all_jobs}
-
+                jobs_to_set_status = job_list.get_job_list()
+                selected_job_names = {job.name for job in jobs_to_set_status}
                 final_status = Autosubmit._get_status(final)
-                if filter_section:
-                    ft_entries = [section for section in separate_section_entries(filter_section)]
-                    if not (len(ft_entries) == 1 and ft_entries[0] == 'ANY'):
-                        section_filtered_jobs = Autosubmit._filter_sections_splits(ft_entries, all_jobs)
-                        selected_job_names &= {job.name for job in all_jobs if job in section_filtered_jobs}
-
-                if filter_chunks or filter_type_chunk or filter_type_chunk_split:
-                    start = time.time()
-                    selected_job_names &= {job.name for job in Autosubmit._filter_jobs_by_chunks_splits(job_list, filter_chunk_section_split)}
-                    Log.info(f"Chunk filtering took {time.time() - start:.2f} seconds.")
-
-                if filter_status:
-                    status_list = filter_status.split()
-                    Log.debug(f"Filtering jobs with status {filter_status}")
-                    if not (len(status_list) == 1 and status_list[0].upper() == 'ANY'):
-                        allowed_statuses = {Autosubmit._get_status(s) for s in status_list}
-                        selected_job_names &= {job.name for job in all_jobs if job.status in allowed_statuses}
-
-                if filter_list:
-                    jobs = filter_list.split()
-                    if not (len(jobs) == 1 and jobs[0].upper() == 'ANY'):
-                        selected_job_names &= {job.name for job in all_jobs if job.name in jobs}
-
+                
+                Log.info("Filtering jobs...")
+                
+                selected_job_names = apply_job_filters(
+                    job_list=job_list,
+                    base_job_names=selected_job_names,
+                    filter_section=filter_section,
+                    filter_chunk=filter_chunk_section_split,
+                    filter_status=filter_status,
+                    filter_list=filter_list,
+                    filter_sections_splits_fn=Autosubmit._filter_sections_splits,
+                    filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
+                    status_from_str_fn=Autosubmit._get_status,
+                )
+                
                 # preserve job list ordering
-                final_list = [job for job in all_jobs if job.name in selected_job_names]
+                final_list = [job for job in jobs_to_set_status if job.name in selected_job_names]
                 # Time to change status
                 performed_changes = {}
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")

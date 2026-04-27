@@ -46,6 +46,7 @@
 - Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
 - Updated `Defining the workflow` documentation section #2954
 - Improving the handling of leakages that were happening when dealing with queues and processes #2900
+- Implement filters for `recovery` command #2923
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

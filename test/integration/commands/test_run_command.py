@@ -320,3 +320,26 @@ def test_run_command_raises_autosubmit(
             exp.autosubmit.run_command(args=args)
         # RO-Crate key is missing
         assert str(error.value.code) == '7012'
+
+
+@pytest.mark.parametrize(
+    "command, warning_log_message",
+    [
+        (
+            ["autosubmit", "recovery", "{expid}", "--no_recover_logs", "--offline"],
+            "no_recover_logs is deprecated",
+        ),
+    ],
+    ids=["recovery with no_recover_logs"],
+)
+def test_run_command_logs_warning(
+    command: list[str],
+    warning_log_message: str,
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    mocker: "MockerFixture",
+    get_next_expid: Callable[[], str],
+):
+    exp, args, command = set_up_test(get_next_expid(), command, autosubmit_exp, mocker)
+
+    with pytest.warns(UserWarning, match=warning_log_message):
+        exp.autosubmit.run_command(args=args)

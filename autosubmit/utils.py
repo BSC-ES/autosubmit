@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
+from typing import Callable, Optional
 
 from ruamel.yaml import YAML
 
@@ -122,3 +123,69 @@ def expand_values(raw_value: str, known_values: list[str]) -> set[str]:
         else:
             expanded_values.add(token)
     return expanded_values
+
+
+def apply_job_filters(
+    job_list,  # should be type JobList, avoid circular imports
+    base_job_names: set[str],
+    filter_section: Optional[str],
+    filter_chunk: Optional[str],
+    filter_status: Optional[str],
+    filter_list: Optional[str],
+    filter_sections_splits_fn: Callable,
+    filter_chunks_fn: Callable,
+    status_from_str_fn: Callable,
+) -> set[str]:
+    """Apply filters and return selected job names.
+
+    All provided filters are combined using intersection (AND). Jobs must match all filters.
+    :param job_list: job list object
+    :type job_list: JobList
+    :param base_job_names: set of job names before filtering
+    :type base_job_names: set[str]
+    :param filter_section: section filter
+    :type filter_section: Optional[str]
+    :param filter_chunk: chunk filter
+    :type filter_chunk: Optional[str]
+    :param filter_status: status filter
+    :type filter_status: Optional[str]
+    :param filter_list: list filter
+    :type filter_list: Optional[str]
+    :param filter_sections_splits_fn: function to filter sections and splits
+    :type filter_sections_splits_fn: Callable
+    :param filter_chunks_fn: function to filter chunks
+    :type filter_chunks_fn: Callable
+    :param status_from_str_fn: function to convert status from string
+    :type status_from_str_fn: Callable
+    :return: set of selected job names
+    :rtype: set[str]
+    """
+    jobs_scope = job_list.get_job_list()
+    selected_job_names = set(base_job_names)
+
+    if filter_section:
+        ft_entries = separate_section_entries(filter_section)
+        if not (len(ft_entries) == 1 and ft_entries[0].upper() == "ANY"):
+            section_filtered_jobs = filter_sections_splits_fn(ft_entries, jobs_scope)
+            selected_job_names &= {
+                job.name for job in jobs_scope if job in section_filtered_jobs
+            }
+
+    if filter_chunk:
+        chunk_filtered_jobs = filter_chunks_fn(job_list, filter_chunk)
+        selected_job_names &= {job.name for job in chunk_filtered_jobs}
+
+    if filter_status:
+        status_list = filter_status.split()
+        if not (len(status_list) == 1 and status_list[0].upper() == "ANY"):
+            allowed_statuses = {status_from_str_fn(s) for s in status_list}
+            selected_job_names &= {
+                job.name for job in jobs_scope if job.status in allowed_statuses
+            }
+
+    if filter_list:
+        jobs = filter_list.split()
+        if not (len(jobs) == 1 and jobs[0].upper() == "ANY"):
+            selected_job_names &= {job.name for job in jobs_scope if job.name in jobs}
+
+    return selected_job_names
