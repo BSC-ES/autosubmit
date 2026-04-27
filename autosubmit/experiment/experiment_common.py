@@ -20,6 +20,7 @@
 import os
 import pwd
 import string
+from contextlib import suppress
 from pathlib import Path
 from shutil import rmtree
 from typing import Optional
@@ -145,23 +146,19 @@ def _delete_experiment(expid: str, force: bool) -> None:
 
     Log.info(f'Deleting experiment {expid}')
 
-    # Try to delete the experiment details
-    try:
-        ExperimentDetails(expid).delete_details()
-        ExperimentStatus(expid).set_as_deleted() # TODO: unsure if we should set the experiment as deleted even with exceptions in the process
-    except Exception as e:
-        Log.warning(f'Failed to delete DB details for experiment {expid}: {str(e)}')
-        raise
-
     try:
         _delete_expid(expid, force)
+        ExperimentStatus(expid).set_as_deleted()
+        # Details cleanup should not fail deletion after files are removed and status updated. Supress exception
+        with suppress(Exception):
+            ExperimentDetails(expid).delete_details()
         Log.info(f'Experiment {expid} has been deleted')
     except Exception as e:
         raise AutosubmitCritical("Seems that something went wrong, please check the trace", 7012, str(e))
 
 
 def _delete_expid(expid_delete: str, force: bool = False) -> None:
-    """Removes an experiment from the path and database.
+    """Removes an experiment from disk and marks it as deleted in status metadata.
     If the current user is eadmin and the -f flag has been sent, it deletes regardless of experiment owner.
 
     :param expid_delete: Identifier of the experiment to delete.
@@ -207,7 +204,7 @@ def _delete_expid(expid_delete: str, force: bool = False) -> None:
                 f"Current user is not the owner of the experiment. {expid_delete} cannot be deleted!", 7012)
 
     message_parts = [
-        f"The {expid_delete} experiment was removed from the local disk and from the database.",
+        f"The {expid_delete} experiment was removed from local disk and marked as deleted in metadata.",
         "Note that this action does not delete any data written by the experiment.",
         "Complete list of files/directories deleted:",
         ""
@@ -246,13 +243,6 @@ def _perform_deletion(experiment_path: Path, structure_db_path: Path, job_data_d
 
     is_sqlite = BasicConfig.DATABASE_BACKEND == 'sqlite'
 
-    Log.info(f"Deleting experiment from {BasicConfig.DATABASE_BACKEND} database...")
-    try:
-        db_common.delete_experiment(expid_delete)
-        Log.result(f"Experiment {expid_delete} deleted from database")
-    except Exception as e:
-        error_message.append(f"Cannot delete experiment entry: {e}")
-
     Log.info("Removing experiment directory...")
     try:
         rmtree(experiment_path)
@@ -272,6 +262,15 @@ def _perform_deletion(experiment_path: Path, structure_db_path: Path, job_data_d
         db_path.unlink(missing_ok=True)
         sql_path.unlink(missing_ok=True)
         Log.info(f"Experiment {expid_delete} job_data db deleted")
+
+    # Mark experiment status as deleted only after cleanup successful
+    if not error_message:
+        Log.info(f"Updating experiment status in {BasicConfig.DATABASE_BACKEND} database...")
+        try:
+            db_common.delete_experiment(expid_delete)
+            Log.result(f"Experiment {expid_delete} marked as deleted in database")
+        except Exception as e:
+            error_message.append(f"Cannot update experiment metadata: {e}")
 
     return "\n".join(error_message)
 
