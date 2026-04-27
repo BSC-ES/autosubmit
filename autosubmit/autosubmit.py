@@ -1487,7 +1487,7 @@ class Autosubmit:
         except Exception:
             Log.warning(f"Could not update experiment details for {exp_id}. Omitting this step.")
 
-        ExperimentStatus(exp_id).set_as_not_running()
+        # ExperimentStatus(exp_id).set_as_not_running()
 
         Log.result(f"Experiment {exp_id} created")
         return exp_id
@@ -4496,7 +4496,7 @@ class Autosubmit:
                     Log.warning(
                         "Remember to MODIFY the MODEL config files!")
                     
-                    ExperimentStatus(expid).set_as_not_running()
+                    # ExperimentStatus(expid).set_as_not_running()
                     fh.flush()
                     os.fsync(fh.fileno())
                     if detail:
