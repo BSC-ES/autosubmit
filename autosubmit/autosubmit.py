@@ -48,6 +48,7 @@ from pyparsing import nestedExpr
 from ruamel.yaml import YAML
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
+from autosubmit.helpers.processes import process_id
 import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -4137,6 +4138,9 @@ class Autosubmit:
         :return: ``True`` if the experiment has been successfully archived. ``False`` otherwise.
         :rtype: bool
         """
+        if process_id(expid) is not None:
+            raise AutosubmitCritical("Ensure no processes are running in the experiment directory", 7076)
+        
         exp_folder = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
 
         if not noclean:
