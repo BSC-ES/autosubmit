@@ -20,6 +20,7 @@
 - Fixed recovery and setstatus for experiments with more than > 32k jobs #2894
 - Removed invalid message about the template script showing the error with a difference of ~5 lines #2962
 - Fix queuing time for the first vertical job
+- Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
 
 **Enhancements:**
 
