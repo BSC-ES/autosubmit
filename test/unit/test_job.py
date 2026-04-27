@@ -752,55 +752,92 @@ CONFIG:
         assert 1 == len(self.job.children)
         assert child == list(self.job.children)[0]
 
-    def test_auto_calendar_split(self):
+    @pytest.mark.parametrize(
+        # if chunksizeunit is hour, raises error
+        # if splitsizeunit is bigger than chunksizeunit, raises error
+        # TEST CASE CALCULATIONS:
+        # date = 20000-01-01, chunk lenght is 1
+        # for day chunk_size_unit, run_days = 1
+        # for month chunk_size_unit (jan 2000), run_days = 31
+        # for year chunk_size_unit (2000), run_days = 366 (leap year)
+        # So:
+        # day + hour -> 1 x 24 = 24
+        # day + day -> ceil(1 / 1) = 1
+        # month + hour -> 31 x 24 = 744
+        # month + day -> ceil(31 / 1) = 31
+        # month + month -> ceil(31 / 30) = 2
+        # month + year -> ceil(31 / 366) = 1
+        # year + hour -> 366 x 24 = 8784
+        # year + day -> ceil(366 / 1) = 366
+        # year + month -> ceil(366 / 30) = 13
+        # year + year -> ceil(366 / 366) = 1
+        "chunk_size_unit, split_size_unit, expected_splits_A, expected_splits_B",
+        [
+            ("hour", "hour", None, None),
+            ("hour", "day", None, None),
+            ("hour", "month", None, None),
+            ("hour", "year", None, None),
+            ("day", "hour", 24, 12),
+            ("day", "day", 1, None),
+            ("day", "month", None, None),
+            ("day", "year", None, None),
+            ("month", "hour", 744, 372),
+            ("month", "day", 31, 16),
+            ("month", "month", 2, None),
+            ("month", "year", None, None),
+            ("year", "hour", 8784, 4392),
+            ("year", "day", 366, 183),
+            ("year", "month", 13, 7),
+            ("year", "year", 1, None),
+        ],
+    )
+    def test_auto_calendar_split(
+        self, chunk_size_unit, split_size_unit, expected_splits_A, expected_splits_B
+    ):
+        """Test the calendar_chunk_section function for different chunk size units and split units."""
         self.experiment_data = {
-            'EXPERIMENT': {
-                'DATELIST': '20000101',
-                'MEMBERS': 'fc0',
-                'CHUNKSIZEUNIT': 'day',
-                'CHUNKSIZE': '1',
-                'NUMCHUNKS': '2',
-                'CALENDAR': 'standard'
+            "EXPERIMENT": {
+                "DATELIST": "20000101",
+                "MEMBERS": "fc0",
+                "CHUNKSIZEUNIT": chunk_size_unit,
+                "CHUNKSIZE": "1",
+                "NUMCHUNKS": "2",
+                "CALENDAR": "standard",
             },
-            'JOBS': {
-                'A': {
-                    'FILE': 'a',
-                    'PLATFORM': 'test',
-                    'RUNNING': 'chunk',
-                    'SPLITS': 'auto',
-                    'SPLITSIZE': 1
+            "JOBS": {
+                "A": {
+                    "FILE": "a",
+                    "PLATFORM": "test",
+                    "RUNNING": "chunk",
+                    "SPLITS": "auto",
+                    "SPLITSIZE": 1,
+                    "SPLITSIZEUNIT": split_size_unit,
                 },
-                'B': {
-                    'FILE': 'b',
-                    'PLATFORM': 'test',
-                    'RUNNING': 'chunk',
-                    'SPLITS': 'auto',
-                    'SPLITSIZE': 2
-                }
-            }
+                "B": {
+                    "FILE": "b",
+                    "PLATFORM": "test",
+                    "RUNNING": "chunk",
+                    "SPLITS": "auto",
+                    "SPLITSIZE": 2,
+                    "SPLITSIZEUNIT": split_size_unit,
+                },
+            },
         }
-        section = "A"
         date = datetime.strptime("20000101", "%Y%m%d")
         chunk = 1
-        splits = calendar_chunk_section(self.experiment_data, section, date, chunk)
-        assert splits == 24
-        splits = calendar_chunk_section(self.experiment_data, "B", date, chunk)
-        assert splits == 12
-        self.experiment_data['EXPERIMENT']['CHUNKSIZEUNIT'] = 'hour'
-        with pytest.raises(AutosubmitCritical):
-            calendar_chunk_section(self.experiment_data, "A", date, chunk)
+        if expected_splits_A is None:
+            with pytest.raises(AutosubmitCritical):
+                calendar_chunk_section(self.experiment_data, "A", date, chunk)
+        else:
+            splits_A = calendar_chunk_section(self.experiment_data, "A", date, chunk)
+            assert splits_A == expected_splits_A
 
-        self.experiment_data['EXPERIMENT']['CHUNKSIZEUNIT'] = 'month'
-        splits = calendar_chunk_section(self.experiment_data, "A", date, chunk)
-        assert splits == 31
-        splits = calendar_chunk_section(self.experiment_data, "B", date, chunk)
-        assert splits == 16
-
-        self.experiment_data['EXPERIMENT']['CHUNKSIZEUNIT'] = 'year'
-        splits = calendar_chunk_section(self.experiment_data, "A", date, chunk)
-        assert splits == 31
-        splits = calendar_chunk_section(self.experiment_data, "B", date, chunk)
-        assert splits == 16
+        if expected_splits_B is None:
+            with pytest.raises(AutosubmitCritical):
+                calendar_chunk_section(self.experiment_data, "B", date, chunk)
+        else:
+            splits_B = calendar_chunk_section(self.experiment_data, "B", date, chunk)
+            assert splits_B == expected_splits_B
 
 
 # TODO: remove this and use pytest fixtures.

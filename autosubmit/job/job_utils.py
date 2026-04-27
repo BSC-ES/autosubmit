@@ -171,7 +171,7 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
         if split_unit == "hour":
             num_max_splits = run_days * 24
         elif split_unit == "month":
-            num_max_splits = run_days / 12
+            num_max_splits = run_days / 30
         elif split_unit == "year":
             if not is_leap_year(chunk_start.year) or cal == "noleap":
                 num_max_splits = run_days / 365
