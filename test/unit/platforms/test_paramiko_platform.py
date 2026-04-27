@@ -604,6 +604,7 @@ def test__load_ssh_config_missing_ssh_config(
 
     assert mocked_log.warning.called
 
+
 @pytest.mark.parametrize("output,expected", [
     ("", {}),
     ("   \n\n  \n", {}),
@@ -622,8 +623,8 @@ def test_parse_job_names(output: str, expected: dict) -> None:
 
 
 def test_check_and_cancel_duplicated_job_names_no_duplicates(
-    slurm_platform: SlurmPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        slurm_platform: SlurmPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Do not call cancel_jobs when no job name appears more than once.
 
@@ -642,8 +643,8 @@ def test_check_and_cancel_duplicated_job_names_no_duplicates(
 
 
 def test_check_and_cancel_duplicated_job_names_with_duplicates(
-    slurm_platform: SlurmPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        slurm_platform: SlurmPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Cancel the oldest (lowest-sorted) ID when a job name has multiple entries.
 
@@ -662,8 +663,8 @@ def test_check_and_cancel_duplicated_job_names_with_duplicates(
 
 
 def test_check_and_cancel_duplicated_job_names_empty_output(
-    slurm_platform: SlurmPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        slurm_platform: SlurmPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Do not cancel anything when the command returns empty output.
 
@@ -682,7 +683,7 @@ def test_check_and_cancel_duplicated_job_names_empty_output(
 
 
 def test_submit_multiple_jobs_empty_input_returns_empty(
-    paramiko_platform: ParamikoPlatform,
+        paramiko_platform: ParamikoPlatform,
 ) -> None:
     """Return an empty list immediately when no scripts are provided.
 
@@ -692,8 +693,8 @@ def test_submit_multiple_jobs_empty_input_returns_empty(
 
 
 def test_submit_multiple_jobs_uses_fallback_when_count_mismatch(
-    paramiko_platform: ParamikoPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        paramiko_platform: ParamikoPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Use get_submitted_jobs_by_name when direct parse returns the wrong count.
 
@@ -712,8 +713,8 @@ def test_submit_multiple_jobs_uses_fallback_when_count_mismatch(
 
 
 def test_submit_multiple_jobs_raises_when_both_paths_fail(
-    paramiko_platform: ParamikoPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        paramiko_platform: ParamikoPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Raise AutosubmitError (6005) when both direct and fallback ID parsing fail.
 
@@ -734,7 +735,7 @@ def test_submit_multiple_jobs_raises_when_both_paths_fail(
 
 
 def test_ps_get_job_names_cmd_contains_expected_components(
-    ps_platform: tuple,
+        ps_platform: tuple,
 ) -> None:
     """The PS command must use ps and grep to filter by job name.
 
@@ -748,7 +749,7 @@ def test_ps_get_job_names_cmd_contains_expected_components(
 
 
 @pytest.mark.parametrize("mode", ["all", "specific"])
-def test_get_completed_job_names(tmp_path, mode):
+def test_get_completed_job_names(tmp_path: Path, mode: str) -> None:
     """Test that completed job names are correctly retrieved from the remote platform."""
     # Actually we want to test a paramiko function, but using local platform for simplicity with the "send_command" part.
     platform = LocalPlatform(expid='t001', name='local', config={})
@@ -799,20 +800,20 @@ def multi_platform_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dic
     [Status.QUEUING, Status.RUNNING, Status.SUBMITTED],
     ids=["QUEUING", "RUNNING", "SUBMITTED"],
 )
-def test_change_status_sends_batch_cancel_per_platform_with_mixed_job_list(
+def test_change_status_sends_batch_cancel_per_platform(
         active_status: int,
         multi_platform_setup: dict,
 ) -> None:
-    """Test that batched cancel commands are dispatched independently per platform."""
+    """Test that N active jobs per platform produce exactly one batched cancel call containing all IDs."""
     platforms = multi_platform_setup["platforms"]
     sent = multi_platform_setup["sent"]
 
-    jobs_by_platform = {
-        "local": [_make_job(f"job_local_{i}", f"l{i}", active_status, platforms["local"]) for i in range(3)],
-        "ps": [_make_job(f"job_ps_{i}", f"p{i}", active_status, platforms["ps"]) for i in range(3)],
-        "slurm": [_make_job(f"job_slurm_{i}", f"s{i}", active_status, platforms["slurm"]) for i in range(3)],
-    }
-    all_jobs = [job for jobs in jobs_by_platform.values() for job in jobs]
+    jobs_per_platform = 3
+    all_jobs = [
+        _make_job(f"job_{name}_{i}", f"{name[0]}{i}", active_status, platform)
+        for name, platform in platforms.items()
+        for i in range(jobs_per_platform)
+    ]
 
     changes = Autosubmit.change_status(
         final="FAILED",
@@ -823,20 +824,19 @@ def test_change_status_sends_batch_cancel_per_platform_with_mixed_job_list(
         platforms=platforms,
     )
 
-    assert len(changes) == 9
+    assert len(changes) == jobs_per_platform * len(platforms)
     for job in all_jobs:
         assert job.status == Status.FAILED
         assert job.name in changes
 
-    for platform_name in ("local", "ps", "slurm"):
+    for platform_name, platform in platforms.items():
         assert len(sent[platform_name]) == 1, (
             f"Expected one batched call for '{platform_name}', "
             f"got {len(sent[platform_name])}"
         )
-
-    assert platforms["local"].cancel_cmd in sent["local"][0]  # "kill -SIGINT"
-    assert platforms["ps"].cancel_cmd in sent["ps"][0]  # "kill -SIGINT"
-    assert platforms["slurm"].cancel_cmd in sent["slurm"][0]  # "scancel"
+        assert platform.cancel_cmd in sent[platform_name][0]
+        for i in range(jobs_per_platform):
+            assert f"{platform_name[0]}{i}" in sent[platform_name][0]
 
 
 @pytest.mark.parametrize(
@@ -929,45 +929,6 @@ def test_change_status_skips_active_job_with_unreachable_platform(
     assert changes == {}
     for job in jobs:
         assert job.status == active_status
-
-
-@pytest.mark.parametrize(
-    "active_status",
-    [Status.QUEUING, Status.RUNNING, Status.SUBMITTED],
-    ids=["QUEUING", "RUNNING", "SUBMITTED"],
-)
-def test_change_status_sends_one_batch_cancel_per_platform(
-        active_status: int,
-        multi_platform_setup: dict,
-) -> None:
-    """Test that N active jobs on a platform produce exactly one batched cancel call, not N."""
-    platforms = multi_platform_setup["platforms"]
-    sent = multi_platform_setup["sent"]
-
-    jobs_per_platform = 3
-    all_jobs = [
-        _make_job(f"job_{name}_{i}", f"{name[0]}{i}", active_status, platform)
-        for name, platform in platforms.items()
-        for i in range(jobs_per_platform)
-    ]
-
-    changes = Autosubmit.change_status(
-        final="FAILED",
-        final_status=Status.FAILED,
-        final_list=all_jobs,
-        save=True,
-        definitive_platforms=list(platforms.keys()),
-        platforms=platforms,
-    )
-
-    assert len(changes) == jobs_per_platform * len(platforms)
-    for platform_name in ("local", "ps", "slurm"):
-        assert len(sent[platform_name]) == 1, (
-            f"Expected one batched call for '{platform_name}', "
-            f"got {len(sent[platform_name])}"
-        )
-        for i in range(jobs_per_platform):
-            assert f"{platform_name[0]}{i}" in sent[platform_name][0]
 
 
 def test_change_status_no_cancel_when_save_is_false(
