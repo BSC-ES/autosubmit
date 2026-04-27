@@ -418,51 +418,49 @@ class PJMPlatform(ParamikoPlatform):
         if not err_lower.strip():
             return
 
-        transient_patterns: list[tuple[str, str]] = [
-            ("not active", "SSH session not active"),
-            ("socket timed out", "Socket timed out communicating with PJM"),
-            ("socket error", "Socket error communicating with PJM"),
-            ("connection timed out", "Connection to PJM server timed out"),
-            ("connection refused", "Connection to PJM server refused"),
-            ("connection reset by peer", "Connection reset by PJM server"),
-            ("broken pipe", "Broken pipe while communicating with PJM"),
-            ("network is unreachable", "Network unreachable; cannot reach PJM server"),
-            ("cannot connect to server", "Cannot connect to PJM server"),
-            ("server not responding", "PJM server not responding"),
-            ("communication failure", "PJM communication failure"),
-            ("communication error", "PJM communication error"),
-            ("temporary failure in name resolution", "DNS resolution failed temporarily"),
+        transient_patterns: list[str] = [
+            "not active",
+            "socket timed out",
+            "socket error",
+            "connection timed out",
+            "connection refused",
+            "connection reset by peer",
+            "broken pipe",
+            "network is unreachable",
+            "cannot connect to server",
+            "server not responding",
+            "communication failure",
+            "communication error",
+            "temporary failure in name resolution",
         ]
 
-        for pattern, message in transient_patterns:
+        for pattern in transient_patterns:
             if pattern in err_lower:
                 raise AutosubmitError(
-                    f"Transient PJM error: {message}",
+                    f"Transient PJM error: {err}",
                     6016,
-                    err,
                 )
 
-        critical_patterns: list[tuple[str, str]] = [
-            ("[err.] pjm", "PJM reported an error; check directives or resource group"),
-            ("invalid resource group", "Invalid PJM resource group specified"),
-            ("resource group does not exist", "PJM resource group does not exist"),
-            ("resource group stop", "PJM resource group is stopped"),
-            ("no permission", "No permission to submit to this PJM resource group"),
-            ("exceeds limit", "Job exceeds a configured PJM resource limit"),
-            ("not submitted", "Job was not submitted to PJM; check pjsub directives"),
-            ("submission failed", "PJM submission failed; check directives or resource group"),
-            ("invalid job name", "Invalid PJM job name"),
-            ("invalid elapse", "Invalid wallclock time specification"),
-            ("unrecognized option", "Unrecognised pjsub option"),
-            ("unknown option", "Unknown pjsub option in the job script"),
-            ("syntax error", "Syntax error in the job script or directives"),
-            ("command not found", "PJM command not found on the remote host"),
+        critical_patterns: list[str] = [
+            "[err.] pjm",
+            "invalid resource group",
+            "resource group does not exist",
+            "resource group stop",
+            "no permission",
+            "exceeds limit",
+            "not submitted",
+            "submission failed",
+            "invalid job name",
+            "invalid elapse",
+            "unrecognized option",
+            "unknown option",
+            "syntax error",
+            "command not found",
         ]
 
-        for pattern, message in critical_patterns:
+        for pattern in critical_patterns:
             if pattern in err_lower:
                 raise AutosubmitCritical(
-                    f"Permanent PJM error: {message}",
+                    f"Permanent PJM error: {err}",
                     7014,
-                    err,
                 )

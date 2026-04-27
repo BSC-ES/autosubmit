@@ -178,43 +178,43 @@ class PBSPlatform(ParamikoPlatform):
         if not err_lower.strip():
             return
 
-        transient_patterns: list[tuple[str, str]] = [
-            ("not active", "SSH session not active"),
-            ("socket timed out", "Socket timed out communicating with PBS"),
-            ("socket error", "Socket error communicating with PBS"),
-            ("connection timed out", "Connection to PBS daemon timed out"),
-            ("connection refused", "Connection to PBS daemon refused"),
-            ("connection reset by peer", "Connection reset by PBS daemon"),
-            ("broken pipe", "Broken pipe while communicating with PBS"),
-            ("network is unreachable", "Network unreachable; cannot reach PBS daemon"),
-            ("unable to connect to pbs server", "Unable to connect to PBS server"),
-            ("communication failure", "PBS communication failure"),
-            ("communication error", "PBS communication error"),
-            ("temporary failure in name resolution", "DNS resolution failed temporarily"),
+        transient_patterns: list[str] = [
+            "not active",
+            "socket timed out",
+            "socket error",
+            "connection timed out",
+            "connection refused",
+            "connection reset by peer",
+            "broken pipe",
+            "network is unreachable",
+            "unable to connect to pbs server",
+            "communication failure",
+            "communication error",
+            "temporary failure in name resolution",
         ]
 
-        for pattern, message in transient_patterns:
+        for pattern in transient_patterns:
             if pattern in err_lower:
-                raise AutosubmitError(f"Transient PBS error: {message}", 6016, err)
+                raise AutosubmitError(f"Transient PBS error: {err}", 6016)
 
-        critical_patterns: list[tuple[str, str]] = [
-            ("violates resource limits", "Job violates resource limits; check YAML JOBS definition"),
-            ("illegal attribute or resource value", "Illegal attribute or resource value in job script"),
-            ("unknown resource", "Unknown resource requested in job script"),
-            ("job violates queue", "Job violates queue constraints; check queue configuration"),
-            ("invalid queue", "Invalid PBS queue specified"),
-            ("not authorized", "User not authorised to submit to this queue"),
-            ("bad uid", "Bad UID for job execution; check user configuration"),
-            ("not allowed to submit", "User is not permitted to submit jobs to this platform"),
-            ("scheduler is not installed", "PBS scheduler is not installed or not reachable"),
-            ("qsub: error", "qsub reported an error; check job directives"),
-            ("command not found", "PBS command not found on the remote host"),
-            ("syntax error", "Syntax error in job script or directives"),
+        critical_patterns: list[str] = [
+            "violates resource limits",
+            "illegal attribute or resource value",
+            "unknown resource",
+            "job violates queue",
+            "invalid queue",
+            "not authorized",
+            "bad uid",
+            "not allowed to submit",
+            "scheduler is not installed",
+            "qsub: error",
+            "command not found",
+            "syntax error",
         ]
 
-        for pattern, message in critical_patterns:
+        for pattern in critical_patterns:
             if pattern in err_lower:
-                raise AutosubmitCritical(f"Permanent PBS error: {message}", 7014, err)
+                raise AutosubmitCritical(f"Permanent PBS error: {err}", 7014)
 
     def cancel_jobs(self, job_ids: list[str]) -> None:
         """Cancel PBS jobs by their IDs.

@@ -1831,9 +1831,9 @@ class AutosubmitConfig(object):
             self.dynamic_variables = {}
             self.set_default_parameters()
 
-        Log.result('YAML configuration loaded:')
-        for f in self.current_loaded_files:
-            Log.result(f'  {f}')
+            Log.result('YAML configuration loaded:')
+            for f in self.current_loaded_files:
+                Log.result(f'  {f}')
 
     def set_default_parameters(self) -> None:
         """Sets the default parameters for the experiment."""

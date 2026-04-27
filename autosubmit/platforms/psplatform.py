@@ -163,38 +163,36 @@ class PsPlatform(ParamikoPlatform):
         if not err_lower.strip():
             return
 
-        transient_patterns: list[tuple[str, str]] = [
-            ("socket timed out", "Socket timed out on the remote SSH connection"),
-            ("socket error", "Socket error on the remote SSH connection"),
-            ("connection timed out", "SSH connection timed out"),
-            ("connection refused", "SSH connection refused"),
-            ("connection reset by peer", "SSH connection reset"),
-            ("broken pipe", "Broken pipe on the remote SSH connection"),
-            ("network is unreachable", "Network unreachable; cannot reach remote host"),
-            ("not active", "SSH session not active"),
-            ("temporary failure in name resolution", "DNS resolution failed temporarily"),
+        transient_patterns: list[str] = [
+            "socket timed out",
+            "socket error",
+            "connection timed out",
+            "connection refused",
+            "connection reset by peer",
+            "broken pipe",
+            "network is unreachable",
+            "not active",
+            "temporary failure in name resolution",
         ]
 
-        for pattern, message in transient_patterns:
+        for pattern in transient_patterns:
             if pattern in err_lower:
                 raise AutosubmitError(
-                    f"Transient PS platform error: {message}",
+                    f"Transient PS platform error: {err}",
                     6016,
-                    err,
                 )
 
         # Permanent / unrecoverable patterns → AutosubmitCritical (7014).
-        critical_patterns: list[tuple[str, str]] = [
-            ("command not found", "Command not found on the remote host"),
-            ("kill: invalid signal", "Invalid signal specified for kill"),
-            ("no such process", "Process no longer exists on the remote host"),
-            ("permission denied", "Permission denied on the remote host"),
+        critical_patterns: list[str] = [
+            "command not found",
+            "kill: invalid signal",
+            "no such process",
+            "permission denied",
         ]
 
-        for pattern, message in critical_patterns:
+        for pattern in critical_patterns:
             if pattern in err_lower:
                 raise AutosubmitCritical(
-                    f"Permanent PS platform error: {message}",
+                    f"Permanent PS platform error: {err}",
                     7014,
-                    err,
                 )
