@@ -148,10 +148,8 @@ def _delete_experiment(expid: str, force: bool) -> None:
 
     try:
         _delete_expid(expid, force)
+        ExperimentDetails(expid).delete_details()
         ExperimentStatus(expid).set_as_deleted()
-        # Details cleanup should not fail deletion after files are removed and status updated. Supress exception
-        with suppress(Exception):
-            ExperimentDetails(expid).delete_details()
         Log.info(f'Experiment {expid} has been deleted')
     except Exception as e:
         raise AutosubmitCritical("Seems that something went wrong, please check the trace", 7012, str(e))
