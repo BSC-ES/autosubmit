@@ -174,7 +174,6 @@ class AutosubmitConfig(object):
         )
         return str(dir_templates)
 
-
     def get_section(self, section: list[str], d_value: Union[str, Any] = "", must_exists=False) -> str:
         """Gets any section.
 
@@ -222,7 +221,6 @@ class AutosubmitConfig(object):
         """
         return self.jobs_data.get(section, {}).get('WCHUNKINC', "")
 
-
     def get_current_user(self, section: str) -> str:
         """Returns the user to be changed from platform config file.
         This function is used by the autosubmit API.
@@ -241,7 +239,6 @@ class AutosubmitConfig(object):
         """
         return self.get_section([section, 'HOST'], "")
 
-
     def get_current_project(self, section: str) -> str:
         """Returns the project to be changed from platform config file.
         This function is used by the autosubmit API.
@@ -250,7 +247,6 @@ class AutosubmitConfig(object):
         :rtype: str
         """
         return self.get_section([section, 'PROJECT'], "")
-
 
     def set_new_user(self, section: str, new_user: str) -> None:
         """Sets new user for given platform.
@@ -283,7 +279,6 @@ class AutosubmitConfig(object):
         open(self._platforms_parser_file, 'w').write(content)
         open(self._platforms_parser_file, 'a').write(content_to_mod)
 
-
     def set_new_host(self, section: str, new_host: str) -> None:
         """Sets new host for given platform
         This function might be used for autosubmit API after complete migration of `AutosubmitConfigParser`.
@@ -314,7 +309,6 @@ class AutosubmitConfig(object):
         open(self._platforms_parser_file, 'w').write(content)
         open(self._platforms_parser_file, 'a').write(content_to_mod)
 
-
     def set_new_project(self, section: str, new_project: str) -> None:
         """Sets new project for given platform
         This function is used by the autosubmit API.
@@ -344,7 +338,6 @@ class AutosubmitConfig(object):
                 "PROJECT_TO:.*", content_to_mod).group(0)[1:], "PROJECT_TO: " + old_project)
         open(self._platforms_parser_file, 'w').write(content)
         open(self._platforms_parser_file, 'a').write(content_to_mod)
-
 
     def show_messages(self) -> bool:
 
@@ -452,10 +445,10 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def _normalize_jobs_in_wrapper(
-        wrapper: str,
-        wrapper_data: dict[str, Any],
-        job_sections: Iterable[str],
-        raise_exception: bool,
+            wrapper: str,
+            wrapper_data: dict[str, Any],
+            job_sections: Iterable[str],
+            raise_exception: bool,
     ) -> None:
         """Normalize the JOBS_IN_WRAPPER field for a wrapper.
 
@@ -1258,6 +1251,13 @@ class AutosubmitConfig(object):
         err_msg = self.validate_wallclock()
         return err_msg
 
+    def _validate_experiment_conf(self) -> str:
+        """Validate the experiment configuration."""
+        chunks = self.experiment_data.get("CONFIG", {}).get("CHUNKS", None)
+        if chunks and chunks.isdigit() and self.get_chunk_ini() > self.get_num_chunks():
+            return f"Chunk_ini value ({self.get_chunk_ini()}) cannot be greater than num_chunks value ({self.get_num_chunks()})"
+        return ""
+
     def validate_config(self, running_time: bool) -> bool:
         """
         Check if the configuration is valid.
@@ -1266,7 +1266,8 @@ class AutosubmitConfig(object):
         :type running_time: bool
         :raises AutosubmitCritical: If any validation error occurs during runtime.
         """
-        error_msg = self.validate_jobs_conf()
+        error_msg = [self._validate_experiment_conf(), self.validate_jobs_conf()]
+        error_msg = "\n".join([msg for msg in error_msg if msg])
         if not error_msg:
             Log.result('Partial configuration validated correctly')
             return True
@@ -2869,7 +2870,7 @@ class AutosubmitConfig(object):
             if isinstance(wrapper, dict) and section in wrapper.get("JOBS_IN_WRAPPER", []):
                 return wrapper
         return {}
-    
+
     def get_cpmip_thresholds(self, job_section: str) -> dict:
         """Returns the CPMIP thresholds for a given job section.
 

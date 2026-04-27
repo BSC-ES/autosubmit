@@ -17,12 +17,11 @@
 
 """Miscellaneous utilities for integration tests."""
 
-from contextlib import suppress
 from pathlib import Path
 from time import sleep, time
 from typing import TYPE_CHECKING
 
-from portalocker import Lock, AlreadyLocked
+from portalocker import Lock, AlreadyLocked, LockException
 
 if TYPE_CHECKING:
     pass
@@ -71,18 +70,17 @@ def wait_locker(file_lock: Path, expect_locked: bool, timeout: int, interval=0.0
         if expect_locked:
             # Check if the file is locked by attempting to acquire it non-blocking
             try:
-                with Lock(str(file_lock), timeout=0):
+                with Lock(str(file_lock), timeout=0, fail_when_locked=True):
                     # Lock acquired, so it's NOT locked — keep waiting
                     pass
-            except AlreadyLocked:
-                return  # Lock is held
+            except (AlreadyLocked, LockException):
+                return  # Lock is held by another process
         else:
             # Wait for the lock to be released
-            with suppress(AlreadyLocked):
-                try:
-                    with Lock(str(file_lock), timeout=0.01):
-                        return  # Lock released
-                except AlreadyLocked:
-                    pass
+            try:
+                with Lock(str(file_lock), timeout=0, fail_when_locked=True):
+                    return  # Lock released
+            except (AlreadyLocked, LockException):
+                pass
 
         sleep(interval)

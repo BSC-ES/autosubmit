@@ -93,6 +93,38 @@ from autosubmit.log.log import AutosubmitCritical
         False,
         id="Empty wallclock"
     ),
+    pytest.param(
+        {
+            "CONFIG": {"CHUNKS": "5"},
+            "EXPERIMENT": {"NUMCHUNKS": 5, "CHUNKINI": "3"},
+        },
+        False,
+        id="chunk_ini within bounds"
+    ),
+    pytest.param(
+        {
+            "CONFIG": {"CHUNKS": "5"},
+            "EXPERIMENT": {"NUMCHUNKS": 5, "CHUNKINI": "6"},
+        },
+        True,
+        id="chunk_ini exceeds num_chunks"
+    ),
+    pytest.param(
+        {
+            "CONFIG": {"CHUNKS": "not-a-digit"},
+            "EXPERIMENT": {"NUMCHUNKS": 5, "CHUNKINI": "10"},
+        },
+        False,
+        id="chunks not a digit skips chunk_ini validation"
+    ),
+    pytest.param(
+        {
+            "CONFIG": {"CHUNKS": "3"},
+            "EXPERIMENT": {"NUMCHUNKS": 3, "CHUNKINI": ""},
+        },
+        False,
+        id="empty chunk_ini defaults to 1 and is valid"
+    ),
 ])
 def test_validate_conf(autosubmit_config, data: dict, must_fail):
     as_conf = autosubmit_config(expid='t000', experiment_data=data)
