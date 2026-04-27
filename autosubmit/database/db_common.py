@@ -22,7 +22,7 @@ import os
 import sqlite3
 from contextlib import suppress
 from pathlib import Path
-from typing import List, Optional, cast
+from typing import List, Optional
 
 from autosubmit.config.basicconfig import BasicConfig
 from sqlalchemy import delete, select, Connection, insert, text, update, func
