@@ -449,7 +449,7 @@ def test_recovery_plotting_error_logs_warning(as_exp, mocker):
 
 
 def test_recovery_combined_filters(as_exp, mocker):
-    """Test that the recovery when multiple filters are used, selected jobs must match the intersection of the filters."""
+    """Test that when recovery and multiple filters are used, selected jobs must match the intersection of the filters."""
     # Just test that the combination of filters works, not to check the recovery itself
     # The recovery method is mocked to just check the filters
 

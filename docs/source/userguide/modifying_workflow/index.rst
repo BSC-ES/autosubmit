@@ -20,7 +20,7 @@ In practice, this command is used as a last resort when resuming an experiment i
 
 And after this modifications executing again ``autosubmit run <EXPID>`` does not work as expected.
 
-The ``recovery`` command checks which jobs have already finished and updates their status to ``COMPLETED``. It also tries to recover missing logs and missing ``job_data`` information when possible.
+The ``recovery`` command checks which jobs have already finished, and it updates their status to ``COMPLETED``. It also tries to recover missing logs and missing ``job_data`` information when possible.
 
 - By default, it checks for the completion files for active jobs (i.e. jobs in ``SUBMITTED``, ``RUNNING``, ``QUEUING``, ``UNKNOWN``, ``HELD``, ``READY`` or ``DELAYED`` status).
 
