@@ -103,6 +103,8 @@ def test_refresh_log_recovery_process(autosubmit, autosubmit_config, mocker):
     as_conf.misc_data["AS_COMMAND"] = 'run'
 
     local = LocalPlatform(expid='t000', name='local', config=as_conf.experiment_data)
+    local.prepare_process()
+    assert local.work_event is not None
 
     spy = mocker.spy(local, 'clean_log_recovery_process')
     spy2 = mocker.spy(local, 'spawn_log_retrieval_process')
@@ -114,4 +116,4 @@ def test_refresh_log_recovery_process(autosubmit, autosubmit_config, mocker):
         autosubmit.refresh_log_recovery_process(platforms=[local], as_conf=as_conf)
         spy.assert_called()
         spy2.assert_not_called()
-        assert local.work_event.is_set()
+        assert local.work_event is None

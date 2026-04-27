@@ -43,6 +43,7 @@
 - Slurm tests in CICD are using a new container by @giovtorres #2871
 - Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
 - Updated `Defining the workflow` documentation section #2954
+- Improving the handling of leakages that were happening when dealing with queues and processes #2900
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

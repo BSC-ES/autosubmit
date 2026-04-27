@@ -2368,21 +2368,32 @@ class Autosubmit:
                     Log.info("Connecting to the platforms, to recover missing logs")
                     submitter = ParamikoSubmitter(as_conf=as_conf)
                     if submitter.platforms is None:
+                        Log.error("Failed to retrieve platforms configuration from ParamikoSubmitter.")
                         raise AutosubmitCritical("No platforms configured!!!", 7014)
                     platforms_to_test = [value for value in submitter.platforms.values()]
                     Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf, expid=expid)
                 Log.info("Waiting for all logs to be updated")
                 for p in platforms_to_test:
-                    if p.log_recovery_process and p.log_recovery_process.is_alive():
+                    if (p.log_recovery_process is not None and p.log_recovery_process.is_alive()
+                            and p.cleanup_event is not None):
                         p.cleanup_event.set()  # Send cleanup event
-                        p.log_recovery_process.join()
+                        p.log_recovery_process.join(timeout=60)
+                        if p.log_recovery_process.is_alive():
+                            p.log_recovery_process.terminate()
+                            p.log_recovery_process.join(timeout=60)
+                            if p.log_recovery_process.is_alive():
+                                Log.error("Log recovery process refused to terminate")
+                                p.log_recovery_process.kill()
+                            Log.warning(f"Process for platform {p.name} failed to terminate within the timeout.")
                 Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                 job_list.save()
-                if len(job_list.get_completed_failed_without_logs()) == 0:
+                failed_jobs = job_list.get_completed_failed_without_logs()
+                if len(failed_jobs) == 0:
                     Log.result("Autosubmit recovered all job logs.")
                 else:
                     Log.warning(
-                        f"Autosubmit couldn't recover the following job logs: {[job.name for job in job_list.get_completed_failed_without_logs()]}")
+                        f"Autosubmit couldn't recover the following job logs: {[job.name for job in failed_jobs]}")
+                    Log.warning(f"Failed jobs details: {', '.join([str(job) for job in failed_jobs])}")
                 try:
                     exp_history = ExperimentHistory(expid)
                     exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
@@ -2981,13 +2992,13 @@ class Autosubmit:
         submitter.load_platforms(as_conf)
         platforms = submitter.platforms
 
-        platforms_to_test = set()
+        platforms_to_test: list['ParamikoPlatform'] = list()
         for job in job_list.get_job_list():
             job.submitter = submitter
             if not job.platform_name:
                 job.platform_name = hpcarch
             job.platform = platforms[job.platform_name]
-            platforms_to_test.add(job.platform)
+            platforms_to_test.append(job.platform)
 
         completed_jobnames = Autosubmit.online_recovery(as_conf, platforms_to_test, job_list, offline)
         current_active_jobs = job_list.get_in_queue()
@@ -3309,7 +3320,7 @@ class Autosubmit:
 
                 as_conf = AutosubmitConfig(experiment_id, BasicConfig, YAMLParserFactory())
                 as_conf.check_conf_files(False, no_log=True)
-                user = os.stat(as_conf.conf_folder_yaml).st_uid
+                user = int(Path(as_conf.conf_folder_yaml).stat().st_uid)
                 try:
                     user = pwd.getpwuid(user).pw_name
                 except Exception:
@@ -3317,7 +3328,7 @@ class Autosubmit:
                         "The user does not exist anymore in the system, using id instead")
                     continue
 
-                created = datetime.datetime.fromtimestamp(os.path.getmtime(as_conf.conf_folder_yaml))
+                created = datetime.datetime.fromtimestamp(Path(as_conf.conf_folder_yaml).stat().st_mtime)
 
                 if as_conf.get_svn_project_url():
                     model = as_conf.get_svn_project_url()
@@ -3497,8 +3508,10 @@ class Autosubmit:
 
                     sep = '\n\t'
                     Log.result(sep.join(['Directories configured successfully:'] + [str(d) for d in dirs]))
-                except (IOError, OSError) as e:
+                except (IOError) as e:
                     raise AutosubmitCritical(f"Can not write config file: {e.message}", 7012)
+                except (OSError) as e:
+                    raise AutosubmitCritical(f"Can not write config file: {e}", 7012)
         except (AutosubmitCritical, AutosubmitError):
             raise
         except BaseException as e:
@@ -3601,7 +3614,7 @@ class Autosubmit:
             # Look for %_%
             variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content, flags=re.IGNORECASE)
             variables = [variable[1:-1].upper() for variable in variables]
-            results = {}
+            results: dict = dict()
             # Change format
             for old_format_key in variables:
                 for key in as_conf.load_parameters().keys():
@@ -3991,7 +4004,7 @@ class Autosubmit:
         :return: ``True`` if the experiment has been successfully archived. ``False`` otherwise.
         :rtype: bool
         """
-        exp_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+        exp_folder = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
 
         if not noclean:
             # Cleaning to reduce file size.
@@ -4002,29 +4015,27 @@ class Autosubmit:
 
         # Getting year of last completed. If not, year of expid folder
         year = None
-        tmp_folder = os.path.join(exp_folder, BasicConfig.LOCAL_TMP_DIR)
-        if os.path.isdir(tmp_folder):
-            for filename in os.listdir(tmp_folder):
-                if filename.endswith("COMPLETED"):
-                    file_year = time.localtime(os.path.getmtime(
-                        os.path.join(tmp_folder, filename))).tm_year
+        tmp_folder = exp_folder.joinpath(BasicConfig.LOCAL_TMP_DIR)
+        if tmp_folder.is_dir():
+            for filename in tmp_folder.iterdir():
+                if filename.name.endswith("COMPLETED"):
+                    file_year = time.localtime(tmp_folder.joinpath(filename).stat().st_mtime).tm_year
                     if year is None or year < file_year:
                         year = file_year
 
         if year is None:
             year = time.localtime(os.path.getmtime(exp_folder)).tm_year
         try:
-            year_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, str(year))
-            if not os.path.exists(year_path):
-                os.mkdir(year_path)
-                os.chmod(year_path, 0o775)
+            year_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(str(year))
+            if not year_path.exists():
+                year_path.mkdir(mode=0o775, parents=True)
         except Exception as e:
             raise AutosubmitCritical(f"Failed to create year-directory {str(year)} for experiment {expid}", 7012,
                                      str(e))
         Log.info(f"Archiving in year {str(year)}")
 
         if rocrate:
-            Autosubmit.rocrate(expid, Path(year_path))
+            Autosubmit.rocrate(expid, year_path)
             Log.info('RO-Crate ZIP file created!')
         else:
             # Creating tar file
@@ -4036,10 +4047,11 @@ class Autosubmit:
                 else:
                     compress_type = "w"
                     output_filepath = f'{expid}.tar'
-                with tarfile.open(os.path.join(year_path, output_filepath), compress_type) as tar:
+                year_path_file = year_path.joinpath(output_filepath)
+                with tarfile.open(year_path_file, compress_type) as tar:
                     tar.add(exp_folder, arcname='')
                     tar.close()
-                    os.chmod(os.path.join(year_path, output_filepath), 0o775)
+                    year_path_file.chmod(mode=0o775)
             except Exception as e:
                 raise AutosubmitCritical("Can not write tar file", 7012, str(e))
 
@@ -4075,11 +4087,11 @@ class Autosubmit:
         :param rocrate: flag to enable RO-Crate
         :type rocrate: bool
         """
-        exp_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
+        exp_folder = Path(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
 
         # Searching by year. We will store it on database
         year = datetime.datetime.today().year
-        archive_path = None
+        archive_path = Path()
         if rocrate:
             compress_type = None
             output_pathfile = f'{experiment_id}.zip'
@@ -4090,9 +4102,8 @@ class Autosubmit:
             compress_type = "r:"
             output_pathfile = f'{experiment_id}.tar'
         while year > 2000:
-            archive_path = os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, str(year), output_pathfile)
-            if os.path.exists(archive_path):
+            archive_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(str(year), output_pathfile)
+            if archive_path.exists():
                 break
             year -= 1
 
@@ -4103,15 +4114,14 @@ class Autosubmit:
 
         # Creating tar file
         Log.info("Unpacking tar file ... ")
-        if not os.path.isdir(exp_folder):
-            os.mkdir(exp_folder)
+        exp_folder.mkdir(exist_ok=True, parents=True)
         try:
             if rocrate:
                 import zipfile
-                with zipfile.ZipFile(archive_path, 'r') as zip:
+                with zipfile.ZipFile(str(archive_path), 'r') as zip:
                     zip.extractall(exp_folder)
             else:
-                with tarfile.open(os.path.join(archive_path), compress_type) as tar:
+                with tarfile.open(archive_path, compress_type) as tar:
                     tar.extractall(exp_folder)
                     tar.close()
         except Exception as e:
@@ -4122,7 +4132,7 @@ class Autosubmit:
         Log.info("Unpacking finished")
 
         try:
-            os.remove(archive_path)
+            archive_path.unlink()
         except Exception as e:
             Log.printlog(f"Can not remove archived file folder: {str(e)}", 7012)
             Log.result(f"Experiment {experiment_id} unarchived successfully")
@@ -5730,35 +5740,35 @@ class Autosubmit:
         truthy_values = ["true", "yes", "y", "1", ""]
         if not force_all:
             expid_list: list[str] = [
-                expid
-                for expid in expid_list
+                expid_in_list
+                for expid_in_list in expid_list
                 if force_yes or input(
-                    f"Confirm stopping the experiment: {expid} (y/n)[enter=y]? ").lower() in truthy_values
+                    f"Confirm stopping the experiment: {expid_in_list} (y/n)[enter=y]? ").lower() in truthy_values
             ]
 
         sig_to_process = signal.SIGKILL if force else signal.SIGINT
         killed_expids = []
-        for expid in expid_list:
-            pid: int = process_id(expid)
+        for expid_in_list in expid_list:
+            pid: int = process_id(expid_in_list)
             if not pid or pid <= 1:
-                Log.info(f"Expid {expid} was not running")
+                Log.info(f"Expid {expid_in_list} was not running")
                 continue
             try:
                 os.kill(pid, sig_to_process)
-                killed_expids.append(expid)
+                killed_expids.append(expid_in_list)
             except Exception as e:
-                Log.warning(f"An error occurred while stopping the autosubmit process for expid '{expid}': {str(e)}")
+                Log.warning(f"An error occurred while stopping the autosubmit process for expid '{expid_in_list}': {str(e)}")
 
-        for expid in killed_expids:
+        for expid_in_list in killed_expids:
             if not force:
-                Log.info(f"Checking the status of the expid: {expid}")
+                Log.info(f"Checking the status of the expid: {expid_in_list}")
                 while True:
-                    if not process_id(expid):
-                        Log.info(f"Expid {expid} is stopped")
+                    if not process_id(expid_in_list):
+                        Log.info(f"Expid {expid_in_list} is stopped")
                         break
-                    Log.info(f"Waiting for the autosubmit run to safety stop: {expid}")
+                    Log.info(f"Waiting for the autosubmit run to safety stop: {expid_in_list}")
                     sleep(5)
             if cancel:
-                job_list, _, _, _, _, _, _, _ = Autosubmit.prepare_run(expid, check_scripts=False)
+                job_list, _, _, _, _, _, _, _ = Autosubmit.prepare_run(expid_in_list, check_scripts=False)
                 cancel_jobs(job_list, active_jobs_filter=current_status, target_status=status)
         return True
