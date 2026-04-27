@@ -20,7 +20,6 @@
 import os
 import pwd
 import string
-from contextlib import suppress
 from pathlib import Path
 from shutil import rmtree
 from typing import Optional
