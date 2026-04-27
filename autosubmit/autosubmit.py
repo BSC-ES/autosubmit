@@ -2348,7 +2348,8 @@ class Autosubmit:
                 else:
                     Log.info("ROCRATE not present in experiment YAML configuration. No RO-Crate archive created.")
         except BaseLockException:
-            experiment_status = "FAILED"
+            # Multiple instances of autosubmit running the same experiment or previous instance didn't release the lock file
+            # In both cases, we don't want to overwrite the status of the experiment to avoid errors with the API and GUI
             raise
         except AutosubmitCritical:
             experiment_status = "FAILED"
@@ -2358,7 +2359,6 @@ class Autosubmit:
             raise
         finally:
             try:
-                # TODO: this should be an enum
                 if experiment_status == "COMPLETED":
                     status_tracker.set_as_not_running()
                 elif experiment_status == "PAUSED":
@@ -3817,8 +3817,7 @@ class Autosubmit:
                         "Can not remove or rename experiments folder", 7012, str(e))
 
         Log.result("Experiment archived successfully")
-        with suppress(Exception):
-            ExperimentStatus(expid).set_as_archived() # TODO: unsure if we should archive the experiment even with exceptions in the process
+        ExperimentStatus(expid).set_as_archived()
         return True
 
     @staticmethod
@@ -3875,6 +3874,7 @@ class Autosubmit:
             return False
 
         Log.info("Unpacking finished")
+        ExperimentStatus(experiment_id).set_as_not_running()
 
         try:
             archive_path.unlink()
