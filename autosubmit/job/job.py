@@ -1490,46 +1490,15 @@ class Job(object):
         :return: The new status.
         """
         previous_status = self.status
+
         self.prev_status = previous_status
-        new_status = self.new_status
-        if new_status == Status.COMPLETED:
-            Log.debug(f"{self.name} job seems to have completed: checking...")
-            self.check_completion()
-        else:
-            self.status = new_status
+        if self.new_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
+            self.check_completion(default_status=Status.FAILED if self.new_status in [Status.COMPLETED, Status.FAILED] else Status.UNKNOWN)
+        if self.status != self.new_status:
+            Log.result(f"Job {self.name} changed from {self.status_str} to {Status.VALUE_TO_KEY.get(self.new_status, 'UNKNOWN')}")
+            self.status = self.new_status
+            Log.status(f"Job {self.name} and id: {self.id} is {self.status_str}")
 
-        if self.status == Status.RUNNING:
-            Log.info(f"Job {self.name} is RUNNING")
-        elif self.status == Status.QUEUING:
-            Log.info(f"Job {self.name} is QUEUING")
-        elif self.status == Status.HELD:
-            Log.info(f"Job {self.name} is HELD")
-        elif self.status == Status.COMPLETED:
-            Log.result(f"Job {self.name} is COMPLETED")
-        elif self.status == Status.FAILED:
-            if not failed_file:
-                if self.status == Status.COMPLETED:
-                    Log.result(f"Job {self.name} is COMPLETED")
-                else:
-                    self.update_children_status()
-        elif self.status == Status.UNKNOWN:
-            Log.printlog(f"Job {self.name} is UNKNOWN. Checking completed files to confirm the failure...", 3000)
-            self.check_completion(Status.UNKNOWN)
-            if self.status == Status.UNKNOWN:
-                Log.printlog(f"Job {self.name} is UNKNOWN. Checking completed files to confirm the failure...", 6009)
-            elif self.status == Status.COMPLETED:
-                Log.result(f"Job {self.name} is COMPLETED")
-        elif self.status == Status.SUBMITTED:
-            # after checking the jobs , no job should have the status "submitted"
-            Log.printlog(f"Job {self.name} in SUBMITTED status. This should never happen on this step..", 6008)
-
-        # Updating logs
-        if self.status in [Status.COMPLETED, Status.FAILED, Status.UNKNOWN]:
-            if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                          "false")).lower() == "true":
-                self.retrieve_logfiles(raise_error=True)
-            else:
-                self.platform.add_job_to_log_recover(self)
 
             # Read and store metrics here
             try:
@@ -1558,24 +1527,16 @@ class Job(object):
                 child.status = Status.FAILED
                 children += list(child.children)
 
-    def check_completion(self, default_status=Status.FAILED, over_wallclock=False):
-        """ Fetches the COMPLETED file from the platform and to COMPLETED if *COMPLETED* file exists and to FAILED otherwise.
+    def check_completion(self, default_status=Status.FAILED):
+        """Fetches the COMPLETED file from the platform and to COMPLETED if *COMPLETED* file exists and to FAILED otherwise.
 
-        :param over_wallclock:
         :param default_status: status to set if job is not completed. By default, it is FAILED
         :type default_status: Status
         """
         if self.platform.get_completed_job_names([self.name]):
-            if not over_wallclock:
-                self.status = Status.COMPLETED
-            else:
-                return Status.COMPLETED
+            self.new_status = Status.COMPLETED
         else:
-            Log.warning(f"Couldn't find {self.name} COMPLETED file")
-            if not over_wallclock:
-                self.status = default_status
-            else:
-                return default_status
+            self.new_status = default_status
 
     def get_metric_folder(self, as_conf: AutosubmitConfig) -> str:
         """
@@ -3005,141 +2966,81 @@ class WrapperJob(Job):
         except Exception:
             return False
 
-    def check_status(self, status: str) -> None:
-        """Update the status of a job, saving its previous status and update the current one.
+    def check_status(self, scheduler_fetched_status: str) -> bool:
+        """Check the status of the wrapper job and its inner jobs.
 
-        In case of failure it'll log all the files that were correctly created.
+        The method updates the status of the wrapper job based on the status fetched from the scheduler
+        and the statuses of its inner jobs.
 
-        :param status: Reason of a job to be cancelled
+        :param scheduler_fetched_status: Status fetched from the scheduler for the wrapper job.
+        :type scheduler_fetched_status: str
+        :return: True if the status of the wrapper job has changed, otherwise False.
+        :rtype: bool
         """
-        prev_status = self.status
-        self.prev_status = prev_status
-        self.status = status
-
-        Log.debug('Checking inner jobs status')
-        if self.status in [Status.HELD, Status.QUEUING]:  # If WRAPPER is QUEUED OR HELD
-            # This will update the inner jobs to QUEUE or HELD (normal behaviour) or WAITING ( if they fail to be held)
-            self._check_inner_jobs_queue(prev_status)
-        elif self.status == Status.RUNNING:  # If wrapper is running
-            # Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
-            # This will update the status from submitted or hold to running
-            # (if safety timer is high enough or queue is fast enough)
-            if prev_status in [Status.SUBMITTED]:
-                for job in self.job_list:
-                    job.status = Status.QUEUING
-            self._check_running_jobs()  # Check and update inner_jobs status that are eligible
-        # Completed wrapper will always come from check function.
-        elif self.status == Status.COMPLETED:
-            self._check_running_jobs()  # Check and update inner_jobs status that are eligible
-            self.check_inner_jobs_completed(self.job_list)
-
-        # Fail can come from check function or running/completed checkers.
-        if self.status in [Status.FAILED, Status.UNKNOWN]:
-            self.status = Status.FAILED
-            if self.prev_status in [Status.SUBMITTED, Status.QUEUING]:
-                self.update_failed_jobs(True)  # check false ready jobs
-            elif self.prev_status in [Status.FAILED, Status.UNKNOWN]:
-                self.failed = True
-                self._check_running_jobs()
-            if len(self.inner_jobs_running) > 0:
-                still_running = True
-                if not self.failed:
-                    if self._platform.check_file_exists('WRAPPER_FAILED', wrapper_failed=True):
-                        for job in self.inner_jobs_running:
-                            if job.platform.check_file_exists(f'{job.name}_FAILED', wrapper_failed=True):
-                                Log.info(
-                                    f"Wrapper {self.name} Failed, checking inner_jobs...")
-                                self.failed = True
-                                self._platform.delete_file('WRAPPER_FAILED')
-                                break
-                if self.failed:
-                    self.update_failed_jobs()
-                    if len(self.inner_jobs_running) <= 0:
-                        still_running = False
-            else:
-                still_running = False
-            if not still_running:
-                self.cancel_failed_wrapper_job()
-
-    def check_inner_jobs_completed(self, jobs: List[Job]) -> None:
-        """Will get all the jobs that the status are not completed and check if it was completed or not.
-
-        :param jobs: Jobs inside the wrapper
-        """
-        not_completed_jobs = [
-            job for job in jobs if job.status != Status.COMPLETED]
-        not_completed_job_names = [job.name for job in not_completed_jobs]
-        job_names = ' '.join(not_completed_job_names)
-        if job_names:
-            completed_files = self._platform.check_completed_files(job_names)
-            completed_jobs = []
-            for job in not_completed_jobs:
-                if completed_files and len(completed_files) > 0:
-                    if job.name in completed_files:
-                        completed_jobs.append(job)
-                        job.new_status = Status.COMPLETED
-                        job.updated_log = False
-                        job.update_status(self.as_config)
-
-            for job in completed_jobs:
-                self.running_jobs_start.pop(job, None)
-
-            not_completed_jobs = list(
-                set(not_completed_jobs) - set(completed_jobs))
-
-        for job in not_completed_jobs:
-            self._check_finished_job(job)
-
-    def _check_inner_jobs_queue(self, prev_status: str) -> None:
-        """Update previous status of a job and updating the job to a new status.
-
-        If the platform being used is slurm the function will get the status of all the jobs,
-        get the parsed queue reason and cancel and fail jobs that has a known reason.
-
-        If job is held by admin or user the job will be held to be executed later.
-
-        :param prev_status: previous status of a job
-        """
-        reason = str()
-        if self._platform.type == 'slurm':
-            self._platform.send_command(
-                self._platform.get_queue_status_cmd(self.id))
-            reason = self._platform.parse_queue_reason(
-                self._platform._ssh_output, self.id)
-            if self._queuing_reason_cancel(reason):
-                Log.printlog(f"Job {self.name} will be cancelled and set to FAILED as it was queuing due to {reason}",
-                             6009)
-                # while running jobs?
-                self._check_running_jobs()
-                self.update_failed_jobs(check_ready_jobs=True)
-                self.cancel_failed_wrapper_job()
-
-                return
-            if reason == '(JobHeldUser)':
-                if self.hold == "false":
-                    # SHOULD BE MORE CLASS
-                    # GET_scontrol release but not sure if this can be implemented on others PLATFORMS
-                    self._platform.send_command("scontrol release " + f"{self.id}")
-                    self.new_status = Status.QUEUING
-                    for job in self.job_list:
-                        job.hold = self.hold
-                        job.new_status = Status.QUEUING
-                        job.update_status(self.as_config)
-                    Log.info(f"Job {self.name} is QUEUING {reason}")
+        save = False
+        if scheduler_fetched_status not in [Status.COMPLETED, Status.FAILED]:
+            for job in [job for job in self.job_list]:
+                # Has the wrapped parent finished?
+                if all(parent.status == Status.COMPLETED for parent in job.parents):
+                    job.new_status = scheduler_fetched_status
                 else:
-                    self.status = Status.HELD
-                    Log.info(f"Job {self.name} is HELD")
-            elif reason == '(JobHeldAdmin)':
-                Log.debug(
-                    f"Job {self.name} Failed to be HELD, canceling... ", )
-                self._platform.send_command(self._platform.cancel_cmd + f" {self.id}")
-                self.status = Status.WAITING
-            else:
-                Log.info(f"Job {self.name} is QUEUING {reason}")
-        if prev_status != self.status:
+                    job.new_status = Status.WAITING
+                job.update_status(self.as_config)
+            self.status = scheduler_fetched_status
+            return save
+
+        self._check_running_jobs()
+
+        # TODO: It is very probable that weak/conditional dependencies never worked well with wrappers
+        if scheduler_fetched_status in [Status.FAILED, Status.UNKNOWN, Status.COMPLETED]:
+            completed_names = self.platform.get_completed_job_names([job.name for job in self.job_list])
+            failed_names = self.platform.get_failed_job_names([job.name for job in self.job_list])
             for job in self.job_list:
-                job.hold = self.hold
-                job.status = self.status
+                if job.name in failed_names:
+                    job.new_status = Status.FAILED
+                elif job.name in completed_names:
+                    job.new_status = Status.COMPLETED
+                elif all(parent.status == Status.COMPLETED for parent in job.parents if parent in self.job_list):
+                    job.new_status = Status.FAILED
+                else:
+                    job.new_status = Status.WAITING
+        else:
+            self.status = scheduler_fetched_status
+
+        for job in self.job_list:
+            if job.new_status is not None and job.status != job.new_status:
+                save = True
+                job.update_status(self.as_config)
+
+        if scheduler_fetched_status in [Status.FAILED, Status.UNKNOWN, Status.COMPLETED]:
+            all_completed = all(job.status == Status.COMPLETED for job in self.job_list)
+            # In case that there a false "COMPLETED" or false "FAILED" from scheduler, change the status to the corrected one
+            new_status = Status.COMPLETED if all_completed else scheduler_fetched_status
+            if new_status != scheduler_fetched_status:
+                Log.info(f"Wrapper job {self.name} changed from {Status.VALUE_TO_KEY.get(scheduler_fetched_status, 'UNKNOWN')} to "
+                         f"{Status.VALUE_TO_KEY.get(new_status, 'UNKNOWN')}")
+            scheduler_fetched_status = new_status
+
+        self.status = scheduler_fetched_status
+
+        if self.status in [Status.COMPLETED, Status.FAILED]:
+            save = True
+            if self.status == Status.COMPLETED:
+                Log.result(f"Wrapper job {self.name} and id {self.id} finished with status {self.status_str}.")
+            elif self.status == Status.FAILED:
+                Log.warning(f"Wrapper job {self.name} and id {self.id} finished with status {self.status_str}.")
+                for job in [job for job in self.job_list if job.status == Status.FAILED and job.wrapper_type == "vertical"]:
+                    job.fail_count = job.retrials
+
+            # Reset to waiting inner jobs that didn't run
+            for job in [job for job in self.job_list if job.status not in [Status.COMPLETED, Status.FAILED]]:
+                job.new_status = Status.WAITING
+                job.update_status(self.as_config)
+                save = True
+                # TODO: Recover  wrapper log here, maybe extend the wrapper table to add the submit, start and end times like normal jobs
+                self.platform.delete_failed_and_completed_names([job.name for job in self.job_list])
+
+        return save
 
     def _check_inner_job_wallclock(self, job: Job) -> bool:
         """This will check if the job is running longer than the wallclock was set to be run.
@@ -3158,19 +3059,33 @@ class WrapperJob(Job):
         return False
 
     def _check_running_jobs(self) -> None:
-        """Get all jobs that are not "COMPLETED" or "FAILED".
+        """Check all jobs that are not COMPLETED or FAILED, update their status, and handle wallclock overruns.
 
-        For each of the jobs still not completed that are still running a command will be
-        created and executed to either read the first few lines of the _STAT file created
-        or just print the JOB's name if the file don't exist.
+        This method prepares and sends a script to the remote platform to check the status of inner jobs,
+        parses the results, and updates job statuses accordingly.
+        """
+        not_finished_jobs_dict: OrderedDict[str, Job] = self._get_not_finished_jobs()
+        if not not_finished_jobs_dict:
+            return
+        not_finished_jobs_names = ' '.join(not_finished_jobs_dict.keys())
+        remote_log_dir = self._platform.get_remote_log_dir()
+        command = self._build_inner_jobs_checker_script(remote_log_dir, not_finished_jobs_names)
+        log_dir = Path(str(self._tmp_path) + f'/LOG_{self.expid}')
+        multiple_checker_inner_jobs = Path(log_dir / "inner_jobs_checker.sh")
+        self._prepare_checker_script(log_dir, multiple_checker_inner_jobs, command)
+        self._platform.send_file(multiple_checker_inner_jobs, False)
+        files_path = Path(self._platform.get_files_path())
+        script_path = files_path / 'inner_jobs_checker.sh'
+        exec_command = f"cd {files_path}; {script_path}"
+        self._process_inner_jobs_status(exec_command, not_finished_jobs_dict)
 
-        Depending on the output of the file the status of a job will be set to RUNNING if
-        not over wallclock FAILED if over wallclock and not vertical wrapper.
+    def _get_not_finished_jobs(self) -> dict[str, Job]:
+        """Get an ordered dictionary of jobs that are not COMPLETED or FAILED and are eligible for checking.
 
-        If after 5 retries no file is created the status of the job is set to FAILED.
+        :return: OrderedDict of job name to Job object.
+        :rtype: dict[str, Job]
         """
         not_finished_jobs_dict: OrderedDict[str, Job] = OrderedDict()
-        self.inner_jobs_running = list()
         not_finished_jobs = [job for job in self.job_list if job.status not in [
             Status.COMPLETED, Status.FAILED]]
         for job in not_finished_jobs:
@@ -3178,15 +3093,21 @@ class WrapperJob(Job):
                    Status.COMPLETED or self.status == Status.COMPLETED]
             if job.parents is None or len(tmp) == len(job.parents):
                 not_finished_jobs_dict[job.name] = job
-                self.inner_jobs_running.append(job)
-        if len(list(not_finished_jobs_dict.keys())) > 0:  # Only running jobs will enter there
-            not_finished_jobs_names = ' '.join(list(not_finished_jobs_dict.keys()))
-            remote_log_dir = self._platform.get_remote_log_dir()
-            # PREPARE SCRIPT TO SEND
-            # When an inner_job is running? When the job has an _STAT file
-            command = textwrap.dedent(f"""
-            cd {str(remote_log_dir)}
-            for job in {str(not_finished_jobs_names)}
+        return not_finished_jobs_dict
+
+    def _build_inner_jobs_checker_script(self, remote_log_dir: str, job_names: str) -> str:
+        """Build the shell script to check the status of inner jobs.
+
+        :param remote_log_dir: Remote log directory path.
+        :type remote_log_dir: str
+        :param job_names: Space-separated job names.
+        :type job_names: str
+        :return: Script content.
+        :rtype: str
+        """
+        return textwrap.dedent(f"""
+            cd {remote_log_dir}
+            for job in {job_names}
             do
                 if [ -f "${{job}}_STAT_{self.fail_count}" ]
                 then
@@ -3197,124 +3118,63 @@ class WrapperJob(Job):
             done
             """)
 
-            log_dir = Path(str(self._tmp_path) + f'/LOG_{self.expid}')
-            multiple_checker_inner_jobs = Path(log_dir / "inner_jobs_checker.sh")
-            if not log_dir.exists():
-                log_dir.mkdir(parents=True, exist_ok=True, mode=0o770)
-            open(multiple_checker_inner_jobs, 'w+').write(command)
-            os.chmod(multiple_checker_inner_jobs, 0o770)
-            if self.platform.name != "local":  # already "sent"...
-                self._platform.send_file(multiple_checker_inner_jobs, False)
-                command = (f"cd {self._platform.get_files_path()}; "
-                           f"{os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}")
-            else:
-                command = f"cd {self._platform.get_files_path()}; ./inner_jobs_checker.sh; cd {os.getcwd()}"
-            #
-            wait = 2
-            retries = 5
-            over_wallclock = False
-            content = ''
-            while content == '' and retries > 0:
-                self._platform.send_command(command, False)
-                content = self._platform._ssh_output.split('\n')
-                # content.reverse()
-                for line in content[:-1]:
-                    out = line.split()
-                    if out:
-                        job_name = out[0]
-                        job = not_finished_jobs_dict[job_name]
-                        if len(out) > 1:
-                            if job not in self.running_jobs_start:
-                                start_time = self._check_time(out, 1)
-                                Log.info(f"Job {job_name} started at {str(parse_date(start_time))}")
-                                self.running_jobs_start[job] = start_time
-                                job.new_status = Status.RUNNING
-                                # job.status = Status.RUNNING
-                                job.update_status(self.as_config)
-                            if len(out) == 2:
-                                Log.info(f"Job {job_name} is RUNNING")
-                                over_wallclock = self._check_inner_job_wallclock(
-                                    job)  # messaged included
-                                if over_wallclock:
-                                    if job.wrapper_type != "vertical":
-                                        job.status = Status.FAILED
-                                        Log.printlog(
-                                            f"Job {job_name} is FAILED", 6009)
-                            elif len(out) == 3:
-                                end_time = self._check_time(out, 2)
-                                self._check_finished_job(job)
-                                Log.info(f"Job {job_name} finished at {str(parse_date(end_time))}")
-                if content == '':
-                    sleep(wait)
-                retries = retries - 1
-            if retries == 0 or over_wallclock:
-                self.status = Status.FAILED
+    def _prepare_checker_script(self, log_dir: Path, script_path: Path, command: str) -> None:
+        """Prepare the checker script file on the local filesystem.
 
-    def _check_finished_job(self, job: 'Job', failed_file: bool = False) -> None:
-        """Will set the jobs status to failed, unless they're completed, in which,
-        the function will change it to complete.
-
-        :param job: The job to have its status updated.
-        :param failed_file: True if system has created a file for a failed execution
+        :param log_dir: Local log directory path.
+        :type log_dir: Path
+        :param script_path: Path to the checker script.
+        :type script_path: Path
+        :param command: Script content.
+        :type command: str
         """
-        job.new_status = Status.FAILED
-        if not failed_file:
-            wait = 2
-            retries = 2
-            output = ''
-            while output == '' and retries > 0:
-                output = self._platform.check_completed_files(job.name)
-                if output is None or len(output) == 0:
-                    sleep(wait)
-                retries = retries - 1
-            if (output is not None and len(str(output)) > 0) or 'COMPLETED' in output:
-                job.new_status = Status.COMPLETED
-            else:
-                failed_file = True
-        job.update_status(self.as_config, failed_file)
-        self.running_jobs_start.pop(job, None)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_dir.chmod(0o770)
+        script_path.write_text(command)
+        script_path.chmod(0o770)
 
-    def update_failed_jobs(self, check_ready_jobs: bool = False) -> None:
-        """Check all jobs associated, and update their status either to complete or to Failed,
-        and if job is still running appends it to they inner jobs of the wrapper.
+    def _process_inner_jobs_status(self, command: str, not_finished_jobs_dict: dict[str, Job]) -> None:
+        """Execute the checker script remotely and process the output to update job statuses.
 
-        :param check_ready_jobs: if true check for running jobs with status "READY", "SUBMITTED", "QUEUING"
+        :param command: Command to execute remotely.
+        :type command: str
+        :param not_finished_jobs_dict: OrderedDict of job name to Job object.
+        :type not_finished_jobs_dict: dict[str, Job]
         """
-        running_jobs = self.inner_jobs_running
-        real_running = copy.deepcopy(self.inner_jobs_running)
-        if check_ready_jobs:
-            running_jobs += [job for job in self.job_list if
-                             job.status == Status.READY or job.status == Status.SUBMITTED or job.status == Status.QUEUING]
-        self.inner_jobs_running = list()
-        for job in running_jobs:
-            if job.platform.check_file_exists(f'{job.name}_FAILED', wrapper_failed=True, max_retries=2):
-                if job.platform.get_file(f'{job.name}_FAILED', False, wrapper_failed=True):
-                    self._check_finished_job(job, True)
-            else:
-                if job in real_running:
-                    self.inner_jobs_running.append(job)
+        wait = 2
+        retries = 5
+        content: List[str] = []
+        while not content and retries > 0:
+            self._platform.send_command(command, False)
+            content = self._platform._ssh_output.split('\n')
+            for line in content[:-1]:
+                self._handle_job_status_line(line, not_finished_jobs_dict)
+            if not content:
+                sleep(wait)
+            retries -= 1
 
-    def cancel_failed_wrapper_job(self) -> None:
-        """When a wrapper is cancelled or run into some problem all its jobs are cancelled.
+    def _handle_job_status_line(self, line: str, not_finished_jobs_dict: 'OrderedDict[str, Job]') -> None:
+        """Handle a single line of job status output.
 
-        If there are jobs on the list that are not Running, and is not Completed, or Failed set it as WAITING.
-
-        If not on these status and it is a vertical wrapper it will set the fail_count to the number of retrials.
+        :param line: Output line.
+        :type line: str
+        :param not_finished_jobs_dict: OrderedDict of job name to Job object.
+        :type not_finished_jobs_dict: OrderedDict[str, Job]
         """
-        try:
-            Log.warning(f"Wrapper {self.name} failed, cancelling it")
-            self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
-        except Exception as e:
-            Log.info(f'Job with {self.id} was finished before canceling it: {str(e)}')
-        self._check_running_jobs()
-        for job in self.inner_jobs_running:
-            job.status = Status.FAILED
-        for job in self.job_list:
-            if job.status not in [Status.COMPLETED, Status.FAILED]:
-                job.status = Status.WAITING
-            else:
-                if job.wrapper_type == "vertical":  # job is being retrieved internally by the wrapper
-                    job.fail_count = job.retrials
+        out = line.split()
+        if not out:
+            return
+        job_name = out[0]
+        job = not_finished_jobs_dict[job_name]
+        if len(out) > 1:
+            if job not in self.running_jobs_start:
+                self.running_jobs_start[job] = self._check_time(out, 1)
+                job.new_status = Status.RUNNING
+
+            if len(out) > 2:
+                over_wallclock = self._check_inner_job_wallclock(job)
+                if over_wallclock and job.wrapper_type != "vertical":
+                    job.new_status = Status.FAILED
 
     def _is_over_wallclock(self, start_time: str, wallclock: str) -> bool:
         """This calculates if the job is over its wallclock time, which indicates that a jobs is running for too long.

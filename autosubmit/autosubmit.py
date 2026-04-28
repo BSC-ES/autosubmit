@@ -1759,11 +1759,11 @@ class Autosubmit:
             job.status = Status.WAITING
 
     @staticmethod
-    def manage_wrapper_job(as_conf, job_list, platform, wrapper_id, save=False):
+    def manage_wrapper_job(as_conf, job_list, wrapper_job):
+        save = False
         check_wrapper_jobs_sleeptime = as_conf.get_wrapper_check_time()
         Log.debug(f'WRAPPER CHECK TIME = {check_wrapper_jobs_sleeptime}')
         # Setting prev_status as an easy way to check status change for inner jobs
-        wrapper_job = job_list.job_package_map[wrapper_id]
         if as_conf.get_notifications() == "true":
             for inner_job in wrapper_job.job_list:
                 inner_job.prev_status = inner_job.status
@@ -1772,127 +1772,57 @@ class Autosubmit:
             check_wrapper = True if datetime.timedelta.total_seconds(datetime.datetime.now(
             ) - wrapper_job.checked_time) >= check_wrapper_jobs_sleeptime else False
         if check_wrapper:
-            Log.debug(f'Checking Wrapper {str(wrapper_id)}')
+            Log.debug(f'Checking Wrapper {str(wrapper_job.id)}')
             wrapper_job.checked_time = datetime.datetime.now()
-            platform.check_job(wrapper_job)
-            try:
-                if wrapper_job.status != wrapper_job.new_status:
-                    Log.info('Wrapper job ' + wrapper_job.name + ' changed from ' + str(
-                        Status.VALUE_TO_KEY[wrapper_job.status]) + ' to status ' + str(
-                        Status.VALUE_TO_KEY[wrapper_job.new_status]))
-                    save = True
-            except Exception:
-                raise AutosubmitCritical(
-                    "Wrapper is in Unknown Status couldn't get wrapper parameters", 7050)
-
+            wrapper_job.platform.check_job(wrapper_job)
             # New status will be saved and inner_jobs will be checked.
-            wrapper_job.check_status(
-                wrapper_job.new_status)
-            # Erase from packages if the wrapper failed to be queued ( Hold Admin bug )
-            if wrapper_job.status == Status.WAITING:
-                job_list.job_package_map.pop(
-                    wrapper_id, None)
-                job_list.packages_dict.pop(
-                    wrapper_id, None)
-            save = True
-        return wrapper_job, save
+            save |= wrapper_job.check_status(wrapper_job.new_status)
+            if wrapper_job.status != wrapper_job.new_status:
+                save = True
+                Log.info('Wrapper job ' + wrapper_job.name + ' changed from ' + str(
+                    Status.VALUE_TO_KEY[wrapper_job.new_status]) + ' to status ' + str(
+                    Status.VALUE_TO_KEY[wrapper_job.status]))
+            if save:
+                job_list.update_db_wrappers()
+                job_list.save()
+        return wrapper_job
 
     @staticmethod
     def wrapper_notify(as_conf, expid, wrapper_job):
         if as_conf.get_notifications() == "true":
             for inner_job in wrapper_job.job_list:
-                Autosubmit.job_notify(as_conf, expid, inner_job, inner_job.prev_status, {})
+                Autosubmit.job_notify(as_conf, expid, inner_job)
 
     @staticmethod
-    def job_notify(as_conf, expid, job, job_prev_status, job_changes_tracker):
-        job_changes_tracker[job.name] = (job_prev_status, job.status)
+    def job_notify(as_conf, expid, job):
         if as_conf.get_notifications() == "true":
             if Status.VALUE_TO_KEY[job.status] in job.notify_on:
                 Notifier.notify_status_change(MailNotifier(BasicConfig), expid, job.name,
-                                              Status.VALUE_TO_KEY[job_prev_status],
+                                              Status.VALUE_TO_KEY[job.prev_status],
                                               Status.VALUE_TO_KEY[job.status],
                                               as_conf.experiment_data["MAIL"]["TO"])
-        return job_changes_tracker
 
     @staticmethod
     def check_wrappers(
             as_conf: AutosubmitConfig,
             job_list: JobList,
-            platforms_to_test: set[Platform],
             expid: str,
-    ) -> tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]]:
-        """Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms.
+    ) -> None:
+        """Check wrappers and inner jobs status also order the non-wrapped jobs to be submitted by active platforms
 
         :param as_conf: a AutosubmitConfig object
         :param job_list: a JobList object
-        :param platforms_to_test: a list of Platform
         :param expid: a string with the experiment id
         :return: non-wrapped jobs to check and a dictionary with the changes in the jobs status
         """
-        jobs_to_check: dict[str, list[list[Job]]] = defaultdict(list)
-        job_changes_tracker: dict[str, tuple[Status, Status]] = dict()
-        for platform_to_test in platforms_to_test:
-            queuing_jobs = job_list.get_in_queue_grouped_id(platform_to_test)
-            platform_name = platform_to_test.name
-            Log.debug(f'Checking jobs for platform={platform_name}')
-            for job_id, jobs in queuing_jobs.items():
-                # Check Wrappers one-by-one
-                if job_list.job_package_map and job_id in job_list.job_package_map:
-                    wrapper_job, _ = Autosubmit.manage_wrapper_job(as_conf, job_list, platform_to_test, job_id)
-                    # Notifications e-mail
-                    Autosubmit.wrapper_notify(as_conf, expid, wrapper_job)
-                    # Detect and store changes for the GUI
-                    job_changes_tracker = {job.name: (
-                        job.prev_status, job.status) for job in wrapper_job.job_list if
-                        job.prev_status != job.status}
-                else:
-                    # TODO: ``JobList.get_in_queue_grouped_id`` appears to return only jobs that are submitted,
-                    #       running, queuing, unknown, and held. Is it possible to have failed jobs too?
-                    # Adds to a list all running jobs to be checked. Failed jobs are ignored.
-                    for job in [j for j in jobs if j.status != Status.FAILED]:
-                        job_prev_status = job.status
-                        # If exist key has been pressed and previous status was running, do not check
-                        if not Autosubmit.exit:
-                            jobs_to_check[platform_name].append([job, job_prev_status])
-        return jobs_to_check, job_changes_tracker
-
-    @staticmethod
-    def check_wrapper_stored_status(as_conf: AutosubmitConfig, job_list: JobList, wrapper_wallclock: str) -> JobList:
-        """Check if the wrapper job has been submitted and the inner jobs are in the queue after a load.
-
-        :param as_conf: A BasicConfig object.
-        :type as_conf: BasicConfig
-        :param job_list: A JobList object.
-        :type job_list: JobList
-        :param wrapper_wallclock: The wallclock of the wrapper.
-        :type wrapper_wallclock: str
-        :return: Updated JobList object.
-        :rtype: JobList
-        """
-        # if packages_dict attr is in job_list
-        if hasattr(job_list, "packages_dict"):
-            wrapper_status = Status.SUBMITTED
-            for package_name, jobs in job_list.packages_dict.items():
-                from .job.job import WrapperJob
-                # Ordered by higher priority status
-                if all(job.status == Status.COMPLETED for job in jobs):
-                    wrapper_status = Status.COMPLETED
-                elif any(job.status == Status.RUNNING for job in jobs):
-                    wrapper_status = Status.RUNNING
-                elif any(job.status == Status.FAILED for job in
-                         jobs):  # No more inner jobs running but inner job in failed
-                    wrapper_status = Status.FAILED
-                elif any(job.status == Status.QUEUING for job in jobs):
-                    wrapper_status = Status.QUEUING
-                elif any(job.status == Status.HELD for job in jobs):
-                    wrapper_status = Status.HELD
-                elif any(job.status == Status.SUBMITTED for job in jobs):
-                    wrapper_status = Status.SUBMITTED
-
-                wrapper_job = WrapperJob(package_name, jobs[0].id, wrapper_status, 0, jobs,
-                                         wrapper_wallclock, jobs[0].platform, as_conf, jobs[0].hold)
-                job_list.job_package_map[jobs[0].id] = wrapper_job
-        return job_list
+        for active_wrapper in list(job_list.job_package_map.values()):
+            wrapper_job = Autosubmit.manage_wrapper_job(as_conf, job_list, active_wrapper)
+            Autosubmit.wrapper_notify(as_conf, expid, wrapper_job)
+            if active_wrapper.status in [Status.FAILED, Status.COMPLETED]:
+                job_list.job_package_map.pop(
+                    active_wrapper.id, None)
+                job_list.packages_dict.pop(
+                    active_wrapper.name, None)
 
     @staticmethod
     def get_historical_database(expid, job_list, as_conf):
@@ -2169,6 +2099,28 @@ class Autosubmit:
                 p.work_event.set()
 
     @staticmethod
+    def check_non_wrapped_jobs(platforms_to_test: list[Platform], job_list: JobList, as_conf: AutosubmitConfig, expid: str) -> None:
+        """Check the status of non-wrapped jobs and notify if there are changes.
+        :param platforms_to_test: list of platforms to check
+        :param job_list: JobList object containing the jobs to check
+        :param as_conf: AutosubmitConfig object containing the configuration of the experiment
+        :param expid: experiment id
+        return: None, but updates the status of the jobs in the job_list and notifies if there are changes
+        """
+        for p in platforms_to_test:
+            platform_jobs = [job for job in job_list.get_in_queue(p) if job.id not in job_list.get_wrappers_id_from_db()]
+            if len(platform_jobs) == 0:
+                continue
+            Log.info(f"Checking {len(platform_jobs)} jobs for platform {p.name}")
+
+            if p.check_all_jobs(platform_jobs, as_conf):
+                job_list.save()
+
+            for job in platform_jobs:
+                if job.prev_status != job.status:
+                    Autosubmit.job_notify(as_conf, expid, job)
+
+    @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
                        run_only_members: Optional[str] = None, profile: Optional[int] = None, trace: bool = False) -> int:
         """Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
@@ -2269,39 +2221,19 @@ class Autosubmit:
                             job.update_parameters(as_conf, set_attributes=True)
                         did_run = True
                         # reload parameters changes
-                        Log.debug("Reloading parameters...")
                         try:
                             # This function name is not clear after the transformation it received across years.
                             # Load and transform all ``as_conf.experiment_data`` into a 1D dict stored in
                             # ``job_list object``.
-                            Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
+                            if as_conf.needs_reload():
+                                Log.debug("Reloading parameters...")
+                                Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
                         except BaseException as e:
                             raise AutosubmitError("Config files seems to not be accessible", 6040, str(e))
                         total_jobs, safetysleeptime, default_retrials, check_wrapper_jobs_sleeptime = Autosubmit.get_iteration_info(
                             as_conf, job_list)
 
-                        # This function name is totally misleading, yes it check the status of the wrappers,
-                        # but also orders jobs the jobs that  are not wrapped by platform.
-                        jobs_to_check, job_changes_tracker = Autosubmit.check_wrappers(as_conf, job_list,
-                                                                                       platforms_to_test, expid)
-                        # Jobs to check are grouped by platform.
-                        # platforms_to_test could be renamed to active_platforms or something like that.
-                        for platform in platforms_to_test:
-                            platform_jobs = jobs_to_check.get(platform.name, [])
-                            if len(platform_jobs) == 0:
-                                Log.info(f"No jobs to check for platform {platform.name}")
-                                continue
 
-                            Log.info(f"Checking {len(platform_jobs)} jobs for platform {platform.name}")
-                            # Check all non-wrapped jobs status for the current platform
-                            platform.check_all_jobs(platform_jobs, as_conf)
-                            # Mail notifications to user in case of changes
-                            for job, job_prev_status in jobs_to_check[platform.name]:
-                                if job_prev_status != job.update_status(as_conf):
-                                    Autosubmit.job_notify(as_conf, expid, job, job_prev_status, job_changes_tracker)
-                        # Updates all workflow status with the new information.
-                        job_list.update_list(as_conf, submitter=submitter)
-                        job_list.save()
                         # Submit jobs that are ready to run
                         if len(job_list.get_ready()) > 0:
                             Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence)
@@ -2309,8 +2241,23 @@ class Autosubmit:
                             job_list.save()
                             as_conf.save()
 
+                        # Check wrappers status and inner jobs
+                        Autosubmit.check_wrappers(as_conf, job_list, expid)
+                        # Check non-wrapped jobs
+                        Autosubmit.check_non_wrapped_jobs(platforms_to_test, job_list, as_conf, expid)
+
                         # Safe spot to store changes
                         try:
+                            # Track all jobs change for GUI
+                            job_changes_tracker = dict()
+                            # TODO: in 4.2 this is faster but not here adapt the change if the perfomance is bad
+                            for job in [job for job in job_list.get_active() if job.prev_status is not None and job.prev_status != job.status]:
+                                job_changes_tracker[job.name] = (Status.VALUE_TO_KEY[job.prev_status], Status.VALUE_TO_KEY[job.status])
+                            for job in [job for job in job_list.get_job_list() if job.prev_status not in [Status.COMPLETED, Status.FAILED] and job.status in [Status.COMPLETED, Status.FAILED]]:
+                                job.platform.add_job_to_log_recover(job)
+                            if job_changes_tracker:
+                                job_list.update_list(as_conf, submitter=submitter)
+                                job_list.save()
                             exp_history = Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker,
                                                                                        expid)
                         except BaseException:

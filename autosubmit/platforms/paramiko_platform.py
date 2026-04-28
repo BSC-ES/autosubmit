@@ -915,19 +915,7 @@ class ParamikoPlatform(Platform):
                 self.get_ssh_output()).strip("\n")
             # URi: define status list in HPC Queue Class
             if job_status in self.job_status['COMPLETED'] or retries == 0:
-                # The Local platform has only 0 or 1, so it necessary to look for the completed file.
-                if self.type == "local":
-                    if not job.is_wrapper:
-                        # Not sure why it is called over_wallclock but is the only way to return a value
-                        job_status = job.check_completion(over_wallclock=True)
-                    else:
-                        # wrapper has a different file name
-                        if Path(f"{self.remote_log_dir}/WRAPPER_FAILED").exists():
-                            job_status = Status.FAILED
-                        else:
-                            job_status = Status.COMPLETED
-                else:
-                    job_status = Status.COMPLETED
+                job_status = Status.COMPLETED
 
             elif job_status in self.job_status['RUNNING']:
                 job_status = Status.RUNNING
@@ -991,17 +979,16 @@ class ParamikoPlatform(Platform):
         :return: A comma-separated string containing the job IDs.
         """
         job_list_cmd: list[str] = []
-        # TODO: second item in tuple, _, is a ``job_prev_status``? What for?
-        for job, _ in job_list:
-            if job.id is None:
+        for job_id in job_list:
+            if job_id is None:
                 job_str = "0"
             else:
-                job_str = str(job.id)
+                job_str = str(job_id)
             job_list_cmd.append(job_str)
 
         return ','.join(job_list_cmd)
 
-    def check_all_jobs(self, job_list: list[list['Job']], as_conf, retries=5):
+    def check_all_jobs(self, job_list: list['Job'], as_conf, retries=5) -> bool:
         """Checks jobs running status
 
         :param job_list: list of jobs
@@ -1044,9 +1031,9 @@ class ParamikoPlatform(Platform):
             Log.debug('Successful check job command')
             in_queue_jobs = []
             list_queue_jobid = ""
-            for job, job_prev_status in job_list:
+            for job in job_list:
                 if not slurm_error:
-                    job_id = job.id
+                    job_id = str(job.id)
                     job_status = self.parse_all_jobs_output(job_list_status, job_id)
                     while len(job_status) <= 0 <= retries:
                         retries -= 1
@@ -1085,7 +1072,6 @@ class ParamikoPlatform(Platform):
                     job_status = Status.FAILED
                 elif retries == 0:
                     job_status = Status.COMPLETED
-                    job.update_status(as_conf)
                 else:
                     job_status = Status.UNKNOWN
                     Log.error(
@@ -1093,7 +1079,7 @@ class ParamikoPlatform(Platform):
                 job.new_status = job_status
             self.get_queue_status(in_queue_jobs, list_queue_jobid, as_conf)
         else:
-            for job, job_prev_status in job_list:
+            for job in job_list:
                 job_status = Status.UNKNOWN
                 Log.warning(f'check_job() The job id ({job.id}) from platform {self.name} has '
                             f'an status of {job_status}.')
@@ -1101,6 +1087,12 @@ class ParamikoPlatform(Platform):
             # job.new_status=job_status
         if slurm_error:
             raise AutosubmitError(e_msg, 6000)
+        save = False
+        for job in job_list:
+            if job.new_status != job.status:
+                job.update_status(as_conf)
+                save = True
+        return save
 
     def get_job_id_by_job_name(self, job_name, retries=2):
         """Get job id by job name

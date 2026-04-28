@@ -165,7 +165,6 @@ class PJMPlatform(ParamikoPlatform):
                              6000)
                 self.send_command(f"{self.cancel_cmd} {job.id}")
                 job.new_status = Status.FAILED
-                job.update_status(as_conf)
 
     def parse_all_jobs_output(self, output, job_id):
         status = ""

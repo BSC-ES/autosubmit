@@ -3398,6 +3398,9 @@ class JobList(object):
         else:
             return None
 
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self._as_conf = as_conf
+
     def recover_last_data(self, finished_jobs: Optional[list["Job"]] = None) -> None:
         """Recover job IDs and log names for completed, failed, and skipped jobs from experiment history.
 
@@ -3463,3 +3466,15 @@ class JobList(object):
             return {name for name, data in jobs_data.items() if data["status"] == "COMPLETED"}
 
         return set()
+
+    def get_wrappers_id_from_db(self) -> List[str]:
+        """Get the unique package names of all wrapper jobs from the database.
+
+        In 4.1.x, ``job_package`` stores no integer HPC job ID; the wrapper
+        identity is the ``package_name`` string. In 4.2.x this will return
+        integer HPC job IDs from the ``{name}_info`` table instead.
+
+        :return: List of unique wrapper package names.
+        """
+        persistence = JobPackagePersistence(self.expid)
+        return persistence.db_manager.get_wrappers_id_from_db()

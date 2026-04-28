@@ -341,7 +341,8 @@ class SlurmPlatform(ParamikoPlatform):
                 self.send_command(
                     self.cancel_cmd + f" {job.id}")
                 job.new_status = Status.FAILED
-                job.update_status(as_conf)
+                #TODO: Revise This was still on 4.2
+                # job.update_status(as_conf)
             elif reason == '(JobHeldUser)':
                 if not job.hold:
                     # should be self.release_cmd or something like that, but it is not implemented

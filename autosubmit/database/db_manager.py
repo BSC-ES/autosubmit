@@ -17,13 +17,13 @@
 
 """Contains code to manage a database via SQLAlchemy."""
 
-from typing import cast, Any, Optional
+from typing import cast, Any, Optional, List
 
 from sqlalchemy import Engine, delete, func, insert, select
 from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
 
 from autosubmit.database import session
-from autosubmit.database.tables import get_table_from_name
+from autosubmit.database.tables import JobPackageTable, get_table_from_name
 
 
 class DbManager:
@@ -110,3 +110,25 @@ class DbManager:
             result = conn.execute(query)
             conn.commit()
         return cast(int, result.rowcount)
+
+    # TODO: In 4.2.0 this is superseded by reading the ``{name}_info`` table,
+    #       which stores an explicit integer ``id`` (HPC job ID) per wrapper.
+    #       In 4.1.x there is no such integer; ``package_name`` from
+    #       ``job_package`` is the closest equivalent wrapper identifier.
+    def get_wrappers_id_from_db(self) -> list[str]:
+        """Get the unique package names of all wrapper jobs in the database.
+
+        In 4.1.x, wrapper identity is represented by the ``package_name``
+        column in the ``job_package`` table. Each wrapper package spans
+        multiple rows (one per contained job), so only distinct names are
+        returned.
+
+        In 4.2.x this is replaced by reading the ``{name}_info`` table,
+        whose ``id`` column holds the actual integer HPC job ID.
+
+        :return: List of unique wrapper package names.
+        """
+        self.create_table(JobPackageTable.name)
+        rows = self.select_all(JobPackageTable.name)
+        # row layout: (exp_id, package_name, job_name, wallclock)
+        return list({row[1] for row in rows})

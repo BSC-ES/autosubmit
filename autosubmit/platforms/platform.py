@@ -754,9 +754,16 @@ class Platform:
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig'):
-        for job, job_prev_status in job_list:
-            self.check_job(job)
+    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):
+        """Checks jobs running status.
+
+        :param job_list: list of jobs
+        :type job_list: list
+        :param as_conf: config
+        :type as_conf: AutosubmitConfig
+        :param retries: retries
+        :type retries: int
+        """
 
     def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries: int = 5,
                   submit_hold_check: bool = False, is_wrapper: bool = False):
@@ -863,6 +870,9 @@ class Platform:
         self.log_recovery_process = None
         self.work_event = None
         self.processed_wrapper_logs = set()
+
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self.config = as_conf.experiment_data
 
     def load_process_info(self, platform):
 
