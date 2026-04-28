@@ -2847,7 +2847,7 @@ class Autosubmit:
         Plot is created in experiment's plot folder with name <expid>_<date>_<time>.<file_format>
 
         :param expid: Identifier of the experiment to plot.
-        :param filter_type: type of the jobs to plot
+        :param filter_type: section of the jobs to plot
         :param filter_period: period to plot
         :param file_format: plot's file format. It can be pdf, png, ps or svg
         :param section_summary: shows summary statistics
@@ -2865,7 +2865,7 @@ class Autosubmit:
             job_list = Autosubmit.load_job_list(expid, as_conf, new=False)
             for job in job_list.get_job_list():
                 job._init_runtime_parameters()
-                job.update_dict_parameters(as_conf)
+                job.update_parameters(as_conf, set_attributes=True)
             Log.debug(f"Job list restored from {pkl_dir} files")
             jobs = StatisticsUtils.filter_by_section(job_list.get_job_list(), filter_type)
             jobs, period_ini, period_fi = StatisticsUtils.filter_by_time_period(jobs, filter_period)

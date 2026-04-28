@@ -57,7 +57,7 @@ class JobList(object):
         self._update_file = "updated_list_" + expid + ".txt"
         self._failed_file = "failed_job_list_" + expid + ".pkl"
         self._persistence_file = "job_list_" + expid
-        self._job_list = list()
+        self._job_list: list[Job] = list()
         self._base_job_list = list()
         self.jobs_edges = {}
         self._expid = expid

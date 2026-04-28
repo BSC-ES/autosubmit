@@ -18,7 +18,9 @@
 import functools
 import inspect
 from collections import defaultdict
-from typing import Any, Optional
+from typing import Any, Optional, TypeVar
+
+_C = TypeVar("_C")
 
 
 PARAMETERS: dict[str, Any] = defaultdict(defaultdict)
@@ -46,7 +48,7 @@ def autosubmit_parameters(cls=None, *, parameters: dict):
     This is useful for parameters that are not defined in a single function or
     class (e.g. parameters that are created on-the-fly in functions)."""
 
-    def wrap(cls) -> Any:
+    def wrap(cls: _C) -> _C:
         parameters = wrap.parameters  # type: ignore
 
         for group, group_parameters in parameters.items():
