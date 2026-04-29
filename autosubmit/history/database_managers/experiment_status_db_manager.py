@@ -57,10 +57,14 @@ class ExperimentStatusDbManager(DatabaseManager):
                 name text NOT NULL,
                 status text NOT NULL,
                 seconds_diff integer NOT NULL,
-                modified text NOT NULL
+                modified text NOT NULL,
+                last_heartbeat text
             );'''
         )
         self.execute_statement_on_dbfile(self._as_times_file_path, create_table_query)
+
+        # backward compatibility
+        self._add_column_if_missing("last_heartbeat", "text")
 
         # keep only latest row by name
         self.execute_statement_on_dbfile(
@@ -78,6 +82,15 @@ class ExperimentStatusDbManager(DatabaseManager):
             self._as_times_file_path,
             '''CREATE UNIQUE INDEX IF NOT EXISTS uq_experiment_status_name ON experiment_status(name);'''
         )
+    
+    def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
+        """ Add a column to the experiment_status table if it is missing. """
+        # check if column exists
+        query = "PRAGMA table_info(experiment_status);"
+        current_columns = [row[1] for row in self.get_from_statement(self._as_times_file_path, query)]
+        if column_name not in current_columns:
+            alter_query = f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type};"
+            self.execute_statement_on_dbfile(self._as_times_file_path, alter_query)
 
     def set_existing_experiment_status_as_running(self, expid: str) -> None:
         """ Set the experiment_status row as running. """
@@ -138,6 +151,10 @@ class ExperimentStatusDbManager(DatabaseManager):
         exp_row = self.get_experiment_row_by_expid(expid)
         self.create_exp_status(exp_row.id, expid, status)
 
+    def update_heartbeat(self, expid: str) -> None:
+        # dummy function
+        pass
+
 
 class ExperimentStatusDatabaseManager(Protocol):
 
@@ -156,6 +173,8 @@ class ExperimentStatusDatabaseManager(Protocol):
     def set_exp_status(self, expid: str, status: str) -> None: ...
 
     def update_exp_status(self, expid: str, status="RUNNING") -> None: ...
+
+    def update_heartbeat(self, expid: str) -> None: ...
 
 
 class SqlAlchemyExperimentStatusDbManager:
@@ -250,6 +269,10 @@ class SqlAlchemyExperimentStatusDbManager:
         # if it does not exist, create
         exp_row = self.get_experiment_row_by_expid(expid)
         self.create_exp_status(exp_row.id, expid, status)
+    
+    def update_heartbeat(self, expid: str) -> None:
+        # dummy function
+        pass
 
 
 def create_experiment_status_db_manager(db_engine: str, **options) -> ExperimentStatusDatabaseManager:
