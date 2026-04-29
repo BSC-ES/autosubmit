@@ -114,3 +114,12 @@ class ExperimentStatus:
         """
         if self.manager:
             self.manager.set_exp_status(self.expid, Models.RunningStatus.ARCHIVED)
+    
+    def update_heartbeat(self) -> None:
+        """
+        Updates the heartbeat of the experiment in experiment_status of as_times.db.
+        Creates the database, table and row if necessary.
+        :return: None
+        """
+        # do nothing for now
+        pass
