@@ -135,9 +135,11 @@ class ExperimentStatusDbManager(DatabaseManager):
         """
         Update status, seconds_diff, modified in experiment_status.
         """
+        now = HUtils.get_current_datetime()
         statement = ''' UPDATE experiment_status SET status = ?, 
-        seconds_diff = ?, modified = ? WHERE name = ? '''
-        arguments = (status, 0, HUtils.get_current_datetime(), expid)
+        seconds_diff = ?, modified = ?, last_heartbeat = CASE WHEN ? = ? THEN ? ELSE last_heartbeat END
+        WHERE name = ?''' 
+        arguments = (status, 0, now, status, Models.RunningStatus.RUNNING, now, expid)
         self.execute_statement_with_arguments_on_dbfile(
             self._as_times_file_path, statement, arguments)
     
