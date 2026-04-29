@@ -346,7 +346,8 @@ def test_send_command_timeout_error_exec_command(
         # Capture platform log.
         mocker.patch('autosubmit.platforms.paramiko_platform.Log')
         # Simulate an error occurred, and retrying did not fix it.
-        mocker.patch.object(exp_ps_platform, 'exec_command', return_value=(False, False, False))
+        mocker.patch('paramiko.channel.Channel.makefile', return_value=False)
+        mocker.patch('paramiko.channel.Channel.makefile_stderr', return_value=False)
 
         with pytest.raises(AutosubmitError) as cm:
             exp_ps_platform.send_command(command=cmd, ignore_log=False, x11=False)
@@ -585,10 +586,9 @@ def test_exec_command_ssh_session_not_active_cannot_restore(
         # This dummy mock prevents the platform from being able to restore its connection.
         mocker.patch.object(exp_ps_platform, 'restore_connection')
 
-        stdin, stdout, stderr = exp_ps_platform.exec_command('whoami')
-        assert stdin is False
-        assert stdout is False
-        assert stderr is False
+        with pytest.raises(AutosubmitError) as ae:
+            exp_ps_platform.exec_command('whoami')
+            assert 'Failed to send (with retries) SSH command' in str(ae.value.message)
     finally:
         exp_ps_platform.close_connection()
 

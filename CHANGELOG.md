@@ -49,6 +49,7 @@
 - Improving the handling of leakages that were happening when dealing with queues and processes #2900
 - verbosity adjusted #2976
 - Implement filters for `recovery` command #2923
+- Improved submission readability, performance and logic flow #2839
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

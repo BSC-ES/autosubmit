@@ -32,12 +32,11 @@ from io import BufferedReader
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import Optional, Union, TYPE_CHECKING, Any
+from typing import Optional, Union, TYPE_CHECKING
 
 import Xlib.support.connect as xlib_connect
 import paramiko
 from paramiko import ProxyCommand
-from paramiko.agent import Agent
 from paramiko.ssh_exception import (SSHException)
 
 from autosubmit.job.job_common import Status
@@ -140,19 +139,20 @@ class ParamikoPlatform(Platform):
         :param auth_password: Optional password for 2FA.
         """
         Platform.__init__(self, expid, name, config, auth_password=auth_password)
+        self.host: str = ""
         self._proxy: Optional[ProxyCommand] = None
         self._ssh_output_err = ""
         self.connected = False
         self._default_queue = None
         self.job_status: Optional[dict[str, list]] = None
-        self._ssh: Optional[paramiko.SSHClient] = None
-        self._ssh_config = None
-        self._ssh_output = None
-        self._host_config: Optional[dict] = None
+        self._ssh: paramiko.SSHClient = paramiko.SSHClient()
+        self._ssh_config: Optional[paramiko.SSHConfig] = None
+        self._ssh_output: str = ""
+        self._host_config: Optional[paramiko.SSHConfigDict] = None
         self._host_config_id = None
         self.submit_cmd = ""
-        self._ftpChannel: Optional[paramiko.SFTPClient] = None
         self.transport: Optional[paramiko.Transport] = None
+        self._ftpChannel: Optional[paramiko.SFTPClient] = None
         self.channels: dict = {}
         if sys.platform != "linux":
             self.poller = select.kqueue()
@@ -198,13 +198,13 @@ class ParamikoPlatform(Platform):
     def reset(self):
         self.close_connection()
         self.connected = False
-        self._ssh = None
+        self._ssh = paramiko.SSHClient()
         self._ssh_config = None
         self._ssh_output = None
-        self._host_config = None
+        self._host_config = {}
         self._host_config_id = None
-        self._ftpChannel = None
-        self.transport = None
+        self._ftpChannel = {}
+        self.transport = {}
         self.channels = {}
         if sys.platform != "linux":
             self.poller = select.kqueue()
@@ -303,8 +303,8 @@ class ParamikoPlatform(Platform):
         :return: True if authentication was successful, False otherwise
         """
         try:
-            self._ssh._agent = Agent()
-            for key in self._ssh._agent.get_keys():
+            self._agent = paramiko.Agent()
+            for key in self._agent.get_keys():
                 if not hasattr(key, "public_blob"):
                     key.public_blob = None
             self._ssh.connect(self._host_config['hostname'], port=port, username=self.user, timeout=60,
@@ -341,6 +341,59 @@ class ParamikoPlatform(Platform):
         except Exception as exc:
             Log.error("Writing Job Id Failed : " + str(exc))
 
+    def connect_two_factor(self, port: int):
+        Log.warning("2FA is enabled, this is an experimental feature and it may not work as expected")
+        Log.warning("nohup can't be used as the password will be asked")
+        Log.warning("If you are using a token, please type the token code when asked")
+
+        self.transport = paramiko.Transport((self._host_config['hostname'], port))
+        self.transport.start_client()
+
+        try:
+            self.transport.auth_publickey(self.user, paramiko.Ed25519Key.from_private_key_file(self._host_config_id[0]))
+            self.transport.auth_interactive_dumb(self.user)
+            self.transport.open_session()
+        except Exception as e:
+            Log.printlog(f"2FA authentication failed: {str(e)}", 7000)
+            raise
+        if self.transport.is_authenticated():
+            self._transport = self.transport
+            self.transport.banner_timeout = 60
+        else:
+            self.transport.close()
+            raise SSHException
+
+    def connect_ssh(self, port: int):
+        # Agent Auth
+        if not self.agent_auth(port):
+            # Public Key Auth
+            if 'proxycommand' in self._host_config:
+                self._proxy = paramiko.ProxyCommand(self._host_config['proxycommand'])
+                try:
+                    self._ssh.connect(self._host_config['hostname'], port, username=self.user,
+                                      key_filename=self._host_config_id, sock=self._proxy, timeout=60,
+                                      banner_timeout=60)
+                except Exception as e:
+                    Log.warning('SSH connect failed, will try again disabling RSA algorithms'
+                                f'sha-256 and sha-512, error: {str(e)}')
+                    self._ssh.connect(self._host_config['hostname'], port, username=self.user,
+                                      key_filename=self._host_config_id, sock=self._proxy, timeout=60,
+                                      banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256',
+                                                                                          'rsa-sha2-512']})
+            else:
+                try:
+                    self._ssh.connect(self._host_config['hostname'], port, username=self.user,
+                                      key_filename=self._host_config_id, timeout=60, banner_timeout=60)
+                except Exception as e:
+                    Log.warning(f'SSH connection to {self.user}@{self._host_config["hostname"]} -p {port} '
+                                f'failed (certificate: {self._host_config_id}), will try again '
+                                f'disabling RSA algorithms sha-256 and sha-512, error: {str(e)}')
+                    self._ssh.connect(self._host_config['hostname'], port, username=self.user,
+                                      key_filename=self._host_config_id, timeout=60, banner_timeout=60,
+                                      disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
+        self.transport = self._ssh.get_transport()
+        self.transport.banner_timeout = 60
+
     def connect(
             self,
             as_conf: Optional['AutosubmitConfig'],
@@ -356,16 +409,13 @@ class ParamikoPlatform(Platform):
         try:
             self._init_local_x11_display()
 
-            is_current_real_user_owner = True if not as_conf else as_conf.is_current_real_user_owner
-
             ssh_config_path: Path = _get_user_config_file(
-                is_current_real_user_owner,
+                True if not as_conf else as_conf.is_current_real_user_owner,
                 self.config.get('AS_ENV_SSH_CONFIG_PATH', None),
                 self.config.get('AS_ENV_CURRENT_USER')
             )
 
             self._ssh_config = _load_ssh_config(ssh_config_path)
-
             self._ssh = _create_ssh_client()
 
             self._host_config = self._ssh_config.lookup(self.host)
@@ -378,66 +428,19 @@ class ParamikoPlatform(Platform):
             if 'identityfile' in self._host_config:
                 self._host_config_id = self._host_config['identityfile']
             port = int(self._host_config.get('port', 22))
-            if not self.two_factor_auth:
-                # Agent Auth
-                if not self.agent_auth(port):
-                    # Public Key Auth
-                    if 'proxycommand' in self._host_config:
-                        self._proxy = paramiko.ProxyCommand(self._host_config['proxycommand'])
-                        try:
-                            self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60,
-                                              banner_timeout=60)
-                        except Exception as e:
-                            Log.warning('SSH connect failed, will try again disabling RSA algorithms'
-                                        f'sha-256 and sha-512, error: {str(e)}')
-                            self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60,
-                                              banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256',
-                                                                                                  'rsa-sha2-512']})
-                    else:
-                        try:
-                            self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, timeout=60, banner_timeout=60)
-                        except Exception as e:
-                            Log.warning(f'SSH connection to {self.user}@{self._host_config["hostname"]} -p {port} '
-                                        f'failed (certificate: {self._host_config_id}), will try again '
-                                        f'disabling RSA algorithms sha-256 and sha-512, error: {str(e)}')
-                            self._ssh.connect(self._host_config['hostname'], port, username=self.user,
-                                              key_filename=self._host_config_id, timeout=60, banner_timeout=60,
-                                              disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
-                self.transport = self._ssh.get_transport()
-                self.transport.banner_timeout = 60
+            if self.two_factor_auth:
+                self.connect_two_factor(port)
             else:
-                Log.warning("2FA is enabled, this is an experimental feature and it may not work as expected")
-                Log.warning("nohup can't be used as the password will be asked")
-                Log.warning("If you are using a token, please type the token code when asked")
-
-                self.transport = paramiko.Transport((self._host_config['hostname'], port))
-                self.transport.start_client()
-
-                try:
-                    self.transport.auth_publickey(self.user, paramiko.Ed25519Key.from_private_key_file(self._host_config_id[0]))
-                    self.transport.auth_interactive_dumb(self.user)
-                    self.transport.open_session()
-                except Exception as e:
-                    Log.printlog(f"2FA authentication failed: {str(e)}", 7000)
-                    raise
-                if self.transport.is_authenticated():
-                    self._ssh._transport = self.transport
-                    self.transport.banner_timeout = 60
-                else:
-                    self.transport.close()
-                    raise SSHException
+                self.connect_ssh(port)
             self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport, window_size=pow(4, 12),
                                                                   max_packet_size=pow(4, 12))
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
             if not log_recovery_process:
                 self.spawn_log_retrieval_process(as_conf)
-        except SSHException:
+        except SSHException as e:
             self.connected = False
-            raise
+            raise SSHException(f"SSH exception occurred: {e}")
         except IOError as e:
             self.connected = False
             if "refused" in str(e.strerror).lower():
@@ -514,9 +517,6 @@ class ParamikoPlatform(Platform):
         self.get_files(
             [job_out_filename, job_err_filename], False, "LOG_{0}".format(exp_id)
         )
-
-    def get_list_of_files(self):
-        return self._ftpChannel.get(self.get_files_path)
 
     def _chunked_md5(self, file_buffer: BufferedReader) -> str:
         """Calculate the MD5 checksum of a file in chunks to avoid high memory usage.
@@ -681,7 +681,7 @@ class ParamikoPlatform(Platform):
         self.send_command(check_energy_cmd)
         return self.get_ssh_output()
 
-    def submit_multiple_jobs(self, script_names: dict[str, 'JobPackageBase']) -> list[int]:
+    def submit_multiple_jobs(self, script_names: dict[str, 'JobPackageBase']) -> list[str]:
         """Submit multiple scripts to the platform.
 
         :param script_names: Script filenames to submit on the remote
@@ -692,7 +692,7 @@ class ParamikoPlatform(Platform):
         :raises AutosubmitCritical: If Slurm reports a critical submission
             failure.
         :return: Submitted Slurm job identifiers in submission order.
-        :rtype: list[int]
+        :rtype: list[str]
         """
 
         if not script_names:
@@ -762,7 +762,7 @@ class ParamikoPlatform(Platform):
                             pre.setdefault(stem, set()).add(pid)
             self._pre_submission_pids = pre
 
-    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
+    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[str]:
         """Return submitted process IDs by script name.
 
         This is a fallback used when the submission command does not return
@@ -778,7 +778,7 @@ class ParamikoPlatform(Platform):
         :type script_names: list[str]
         :return: Matching process IDs in submission order, one per script.
             Returns an empty list if any script has no newly submitted process.
-        :rtype: list[int]
+        :rtype: list[str]
         """
         output = self._get_process_list_output()
         if not output:
@@ -801,7 +801,7 @@ class ParamikoPlatform(Platform):
             new_pids = all_pids - self._pre_submission_pids.get(stem, set())
             if not new_pids:
                 return []
-            submitted_pids.append(max(new_pids))
+            submitted_pids.append(str(max(new_pids)))
 
         return submitted_pids
 
@@ -1230,8 +1230,8 @@ class ParamikoPlatform(Platform):
                             del self.channels[fd]
 
     def exec_command(
-            self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False
-    ) -> Union[tuple[paramiko.ChannelFile, paramiko.ChannelFile, paramiko.ChannelFile], tuple[bool, bool, bool]]:
+            self, command, bufsize=-1, retries=3, x11=False
+    ) -> Union[tuple[paramiko.ChannelFile, paramiko.ChannelFile, paramiko.ChannelFile]]:
         """Execute a command on the SSH server.
 
         A new ``.Channel`` is open and the requested command is executed.
@@ -1244,8 +1244,6 @@ class ParamikoPlatform(Platform):
         :type command: str
         :param bufsize: interpreted the same way as by the built-in ``file()`` function in Python.
         :type bufsize: int
-        :param timeout: set command's channel timeout. See ``Channel.settimeout``.
-        :type timeout: int
         :return: the stdin, stdout, and stderr of the executing command
         """
         for retry in range(0, retries):
@@ -1273,7 +1271,8 @@ class ParamikoPlatform(Platform):
                 stdin = chan.makefile('wb', bufsize)
                 stdout = chan.makefile('rb', bufsize)
                 stderr = chan.makefile_stderr('rb', bufsize)
-                return stdin, stdout, stderr
+                if (stdin, stdout, stderr) != (False, False, False):
+                    return stdin, stdout, stderr
             except (paramiko.SSHException, ConnectionError, socket.error, IOError) as e:
                 Log.warning(f'A networking error occurred while executing command [{command}]: {str(e)}')
                 if not self.connected or not self.transport or not self.transport.active:
@@ -1291,7 +1290,7 @@ class ParamikoPlatform(Platform):
                 #        https://github.com/BSC-ES/autosubmit/issues/2439
                 # chan.settimeout(timeout)
 
-        return False, False, False
+        raise AutosubmitError(f'Failed to send (with retries) SSH command {command}', 6005)
 
     def send_command_non_blocking(self, command, ignore_log):
         thread = threading.Thread(target=self.send_command, args=(command, ignore_log))
@@ -1313,9 +1312,6 @@ class ParamikoPlatform(Platform):
 
         try:
             stdin, stdout, stderr = self.exec_command(command, x11=x11)
-
-            if (False, False, False) == (stdin, stdout, stderr):
-                raise AutosubmitError(f'Failed to send (with retries) SSH command {command}', 6005)
 
             channel = stdout.channel
             if not x11:
@@ -1444,7 +1440,7 @@ class ParamikoPlatform(Platform):
             timeout = package.timeout if package.timeout else 0
             x11_options = package.x11_options.strip("")
             cmd_list.append(
-                f"{self.get_call(abs_path, timeout, export, package.executable if not self.has_scheduler and not self._uses_local_api else None, x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if not self.has_scheduler and not x11_options else False)}")
+                f"{self.get_call(abs_path, timeout, export, package.executable if not self.has_scheduler and not self._uses_local_api else '', x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if not self.has_scheduler and not x11_options else False)}")
 
         return " ;".join(cmd_list)
 
@@ -1611,12 +1607,12 @@ class ParamikoPlatform(Platform):
             if self._ftpChannel:
                 self._ftpChannel.close()
         with suppress(Exception):
-            if self._ssh._agent:  # May not be in all runs
-                self._ssh._agent.close()
+            if self._agent:  # May not be in all runs
+                self._agent.close()
         with suppress(Exception):
-            if self._ssh._transport:
-                self._ssh._transport.close()
-                self._ssh._transport.stop_thread()
+            if self._transport:
+                self._transport.close()
+                self._transport.stop_thread()
         with suppress(Exception):
             if self._ssh:
                 self._ssh.close()
@@ -1810,14 +1806,11 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def process_ready_jobs(self, scripts_to_submit: dict[str, 'JobPackageBase']) -> tuple[bool, list[Any]]:
+    def process_ready_jobs(self, scripts_to_submit: dict[str, 'JobPackageBase']) -> None:
         """Retrieve multiple jobs identifiers.
 
         :param scripts_to_submit: List of valid Job Packages to be processes
         :type scripts_to_submit: List[Any]
-
-        :return: retrieve the ID of the Jobs
-        :rtype: tuple[bool, list[Any]]
         """
         jobs_id: list[str] = self.submit_multiple_jobs(scripts_to_submit)
         for jobid_index, package in enumerate(scripts_to_submit.values()):
