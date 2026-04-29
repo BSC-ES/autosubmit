@@ -532,7 +532,7 @@ class Autosubmit:
                                    help='hides plot window')
             subparser.add_argument('-d', '--detail', action='store_true',
                                    default=False, help='Show Job List view in terminal')
-            subparser.add_argument('-o', '--output', choices=('pdf', 'png', 'ps', 'svg'),
+            subparser.add_argument('-o', '--output', choices=('pdf', 'png', 'ps', 'svg', 'txt'),
                                    help='chooses type of output for generated plot')  # Default -o value comes from .conf
             subparser.add_argument('-group_by', choices=('date', 'member', 'chunk', 'split', 'automatic'), default=None,
                                    help='Groups the jobs automatically or by date, member, chunk or split')
