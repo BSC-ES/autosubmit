@@ -4433,6 +4433,9 @@ class Autosubmit:
                         except Exception:
                             Log.warning(
                                 "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
+                    if detail:
+                        output = 'txt'
+                        noplot = False
                     if not noplot:
                         from .monitor.monitor import Monitor
                         if group_by:
