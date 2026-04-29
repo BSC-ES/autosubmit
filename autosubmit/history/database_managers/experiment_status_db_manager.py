@@ -252,14 +252,16 @@ class SqlAlchemyExperimentStatusDbManager:
         return row_count
 
     def update_exp_status(self, expid: str, status="RUNNING") -> None:
+        now = HUtils.get_current_datetime()
         query = (
             update(ExperimentStatusTable).
             where(ExperimentStatusTable.c.name == expid).  # type: ignore
             values(
                 status=status,
                 seconds_diff=0,
-                modified=HUtils.get_current_datetime(),
-                last_heartbeat=HUtils.get_current_datetime() if status == Models.RunningStatus.RUNNING else None
+                modified=now,
+                # Update last_heartbeat only if status is RUNNING, otherwise keep the previous value
+                last_heartbeat=now if status == Models.RunningStatus.RUNNING else ExperimentStatusTable.c.last_heartbeat  # type: ignore
             )
         )
         with self.engine.connect() as conn:
