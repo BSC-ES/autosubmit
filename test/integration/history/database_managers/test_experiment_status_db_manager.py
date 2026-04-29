@@ -80,9 +80,9 @@ def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, get_nex
     assert exp_status.status == "RUNNING"
 
     # Update status
-    database_manager.update_exp_status(experiment.name, "READY")
+    database_manager.update_exp_status(experiment.name, "NOT RUNNING")
     exp_status: ExperimentStatusRow = (database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id))
-    assert exp_status.status == "READY"
+    assert exp_status.status == "NOT RUNNING"
 
     # Set back to RUNNING
     database_manager.set_existing_experiment_status_as_running(exp_status.name)
