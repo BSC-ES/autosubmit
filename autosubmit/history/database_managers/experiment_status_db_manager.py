@@ -252,13 +252,15 @@ class SqlAlchemyExperimentStatusDbManager:
         return row_count
 
     def update_exp_status(self, expid: str, status="RUNNING") -> None:
+        now = HUtils.get_current_datetime()
         query = (
             update(ExperimentStatusTable).
             where(ExperimentStatusTable.c.name == expid).  # type: ignore
             values(
                 status=status,
                 seconds_diff=0,
-                modified=HUtils.get_current_datetime()
+                modified=now,
+                last_heartbeat=now if status == Models.RunningStatus.RUNNING else None
             )
         )
         with self.engine.connect() as conn:
@@ -276,9 +278,18 @@ class SqlAlchemyExperimentStatusDbManager:
         self.create_exp_status(exp_row.id, expid, status)
     
     def update_heartbeat(self, expid: str) -> None:
-        # dummy function
-        pass
-
+        now = HUtils.get_current_datetime()
+        query = (
+            update(ExperimentStatusTable).
+            where(ExperimentStatusTable.c.name == expid).  # type: ignore
+            values(
+                last_heartbeat=now,
+                modified=now
+            )
+        )
+        with self.engine.connect() as conn:
+            conn.execute(query)
+            conn.commit()
 
 def create_experiment_status_db_manager(db_engine: str, **options) -> ExperimentStatusDatabaseManager:
     """Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
