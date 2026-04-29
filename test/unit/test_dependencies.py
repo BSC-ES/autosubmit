@@ -776,17 +776,86 @@ def test_normalize_auto_keyword(as_conf, mocker):
 
 
 @pytest.mark.parametrize(
-    "p1_status,p1_has_edge,p2_status,p2_has_edge,p3_status,p3_has_edge,expected",
+    "parents_config,checkpoint_step,expected",
     [
-        (Status.RUNNING, True, Status.RUNNING, True, Status.RUNNING, True, True),
-        (Status.RUNNING, True, Status.SUSPENDED, True, Status.RUNNING, True, False),
-        (Status.COMPLETED, False, Status.RUNNING, True, Status.RUNNING, True, True),
-        (Status.COMPLETED, False, Status.SUSPENDED, True, Status.RUNNING, True, False),
-        (Status.RUNNING, False, Status.RUNNING, True, Status.RUNNING, True, False),
-        (Status.COMPLETED, True, Status.COMPLETED, True, Status.COMPLETED, True, True),
-        (Status.SUSPENDED, True, Status.RUNNING, True, Status.RUNNING, True, False),
-        (Status.SUSPENDED, True, Status.SUSPENDED, True, Status.SUSPENDED, True, False),
-        (Status.COMPLETED, False, Status.RUNNING, True, Status.SUSPENDED, True, False),
+        ([(Status.RUNNING, "RUNNING", 0, False)] * 3, 0, True),
+        (
+            [
+                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.SUSPENDED, "RUNNING", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+            ], 0, False,
+        ),
+        (
+            [
+                (Status.COMPLETED, "COMPLETED", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+            ], 0, True,
+        ),
+        (
+            [
+                (Status.COMPLETED, "COMPLETED", 0, False),
+                (Status.SUSPENDED, "RUNNING", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+            ], 0, False,
+        ),
+        (
+            [
+                (Status.RUNNING, "COMPLETED", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+            ], 0, False,
+        ),
+        ([(Status.COMPLETED, "RUNNING", 0, False)] * 3, 0, True),
+        (
+            [
+                (Status.SUSPENDED, "RUNNING", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+            ], 0, False,
+        ),
+        ([(Status.SUSPENDED, "RUNNING", 0, False)] * 3, 0, False),
+        (
+            [
+                (Status.COMPLETED, "COMPLETED", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+                (Status.SUSPENDED, "RUNNING", 0, False),
+            ], 0, False,
+        ),
+
+        ([(Status.FAILED, "FAILED", 0, False)] * 3, 0, True),
+        ([(Status.FAILED, "COMPLETED", 0, True)] * 3, 0, True),
+        ([(Status.FAILED, "COMPLETED", 0, False)] * 3, 0, False),
+        ([(Status.FAILED, "RUNNING", 0, False)] * 3, 0, False),
+        (
+            [
+                (Status.FAILED, "FAILED", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+            ], 0, True,
+        ),
+        (
+            [
+                (Status.FAILED, "COMPLETED", 0, True),
+                (Status.RUNNING, "RUNNING", 0, False),
+            ], 0, True,
+        ),
+        (
+            [
+                (Status.FAILED, "COMPLETED", 0, False),
+                (Status.RUNNING, "RUNNING", 0, False),
+            ], 0, False,
+        ),
+
+        ([(Status.COMPLETED, "FAILED", 0, True)] * 3, 0, True),
+        ([(Status.COMPLETED, "FAILED", 0, False)] * 3, 0, False),
+
+        ([(Status.RUNNING, "RUNNING", 3, False)], 0, False),
+        ([(Status.RUNNING, "RUNNING", 3, False)], 3, True),
+        ([(Status.RUNNING, "RUNNING", 3, False)], 5, True),
+        ([(Status.RUNNING, "RUNNING", 5, False)], 3, False),
+
+        ([(Status.COMPLETED, "FAILED", 1, False)], 3, True),
     ],
     ids=[
         "all_running_with_edge",
@@ -798,54 +867,52 @@ def test_normalize_auto_keyword(as_conf, mocker):
         "first_parent_suspended_blocks",
         "all_suspended_blocks",
         "completed_running_suspended_blocks",
+        "failed_parent_meets_failed_edge",
+        "failed_parent_fail_ok_meets_completed_edge",
+        "failed_parent_no_fail_ok_blocked_by_completed_edge",
+        "failed_parent_with_running_edge_blocked",
+        "mixed_failed_meets_failed_edge_and_running",
+        "mixed_failed_fail_ok_and_running",
+        "mixed_failed_no_fail_ok_blocks_child",
+        "completed_parent_fail_ok_meets_failed_edge",
+        "completed_parent_no_fail_ok_blocked_by_failed_edge",
+        "running_from_step_not_reached",
+        "running_from_step_exactly_reached",
+        "running_from_step_exceeded",
+        "running_from_step_partially_reached",
+        "completed_failed_edge_no_fail_ok_but_checkpoint_met",
     ],
 )
 def test_check_special_status(
     joblist: JobList,
-    p1_status: int,
-    p1_has_edge: bool,
-    p2_status: int,
-    p2_has_edge: bool,
-    p3_status: int,
-    p3_has_edge: bool,
+    parents_config: list,
+    checkpoint_step: int,
     expected: bool,
 ) -> None:
-    """Test that check_special_status respects LOGICAL_ORDER including SUSPENDED.
+    """Test that check_special_status respects all edge conditions.
 
-    A job is eligible to run when:
-
-        len(non_completed_parents) + len(completed_parents) == len(job.parents)
-        (special status check passes) + (normally completed parents) == (total parents)
+    A child job is eligible when all parents are considered completed (zero
+    non-completed parents, at least one completed parent).
 
     :param joblist: A fresh JobList fixture.
-    :param p1_status: Numeric status of parent 1.
-    :param p1_has_edge: Whether parent 1 carries a STATUS=RUNNING edge condition.
-    :param p2_status: Numeric status of parent 2.
-    :param p2_has_edge: Whether parent 2 carries a STATUS=RUNNING edge condition.
-    :param p3_status: Numeric status of parent 3.
-    :param p3_has_edge: Whether parent 3 carries a STATUS=RUNNING edge condition.
-    :param expected: Whether the child job should appear in check_special_status().
+    :param parents_config: List of ``(status, min_trigger_status, from_step, fail_ok)``
+        tuples, one per parent.
+    :param checkpoint_step: Value assigned to ``child.current_checkpoint_step``.
+    :param expected: Whether the child should appear in ``check_special_status()``.
     """
-    target_status = "RUNNING"
+    child = Job("child", 99, Status.WAITING, 0)
+    child.current_checkpoint_step = checkpoint_step
+    joblist.graph.add_node(child.name, job=child)
 
-    parent1 = Job("parent1", 1, p1_status, 0)
-    parent2 = Job("parent2", 2, p2_status, 0)
-    parent3 = Job("parent3", 3, p3_status, 0)
-    child = Job("child", 4, Status.WAITING, 0)
-
-    child.parents = {parent1, parent2, parent3}
-
-    special_conditions = {"STATUS": target_status, "FROM_STEP": 0}
-    for parent, has_edge in (
-        (parent1, p1_has_edge),
-        (parent2, p2_has_edge),
-        (parent3, p3_has_edge),
-    ):
-        if has_edge:
-            child.add_edge_info(parent, special_conditions)
-
-    joblist.jobs_edges = {}
-    joblist._add_edges_map_info(child, target_status)
+    for i, (p_status, min_trigger, from_step, fail_ok) in enumerate(parents_config):
+        parent = Job(f"parent{i + 1}", i + 1, p_status, 0)
+        joblist.graph.add_node(parent.name, job=parent)
+        joblist.graph.add_edge(
+            parent.name, child.name,
+            min_trigger_status=min_trigger,
+            from_step=from_step,
+            fail_ok=fail_ok,
+        )
 
     result = joblist.check_special_status()
     assert (child in result) is expected

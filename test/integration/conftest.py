@@ -417,6 +417,15 @@ def slurm_server(request, tmp_path, mocker) -> Generator['Container', Any, None]
         copy_content_from_containers(request, 'slurm_server', '/tmp/scratch/group/root/')
 
 
+@pytest.fixture(autouse=True)
+def clear_platform_worker_events() -> Generator[None, None, None]:
+    """Clear Platform.worker_events after each test to prevent state leakage."""
+    yield
+    with suppress(Exception):
+        from autosubmit.platforms.platform import Platform
+        Platform.worker_events.clear()
+
+
 @pytest.fixture
 def ssh_fixture(request):
     """Used for indirect Pytest parameters resolution.

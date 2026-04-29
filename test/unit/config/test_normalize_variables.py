@@ -535,6 +535,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'DEPENDENCIES': {},
                         'WALLCLOCK': "1:00",
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,
@@ -557,6 +560,9 @@ from autosubmit.log.log import AutosubmitCritical
                         'DEPENDENCIES': {},
                         'WALLCLOCK': "9:30",
                     },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
                 }
             },
             True,

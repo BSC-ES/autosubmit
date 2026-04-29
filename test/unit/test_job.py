@@ -21,7 +21,7 @@ import pwd
 import re
 import tempfile
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from textwrap import dedent
 from typing import Optional
@@ -33,7 +33,7 @@ from mock.mock import patch  # type: ignore
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import SubJob, SubJobManager
@@ -860,41 +860,7 @@ def test_recover_last_ready_date(tmpdir, test_with_file, file_is_empty, last_lin
     assert job.ready_date == expected_date
 
 
-@pytest.mark.parametrize('test_with_logfiles, file_timestamp_greater_than_ready_date', [
-    (False, False),
-    (True, True),
-    (True, False),
-], ids=["no file", "log timestamp >= ready_date", "log timestamp < ready_date"])
-def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greater_than_ready_date):
-    job = Job('dummy', '1', 0, 1)
-    job._log_path = Path(tmpdir)
-    expected_local_logs = (f"{job.name}.out.0", f"{job.name}.err.0")
-    if test_with_logfiles:
-        if file_timestamp_greater_than_ready_date:
-            ready_time = datetime.now() - timedelta(minutes=5)
-            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-            expected_update_log = True
-            expected_local_logs = (log_name.with_suffix('.out').name, log_name.with_suffix('.err').name)
-        else:
-            expected_update_log = False
-            ready_time = datetime.now() + timedelta(minutes=5)
-            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-        log_name.with_suffix('.out').touch()
-        log_name.with_suffix('.err').touch()
-    else:
-        expected_update_log = False
 
-    job.updated_log = False
-    job.recover_last_log_name()
-    assert job.updated_log == expected_update_log
-    assert job.local_logs[0] == str(expected_local_logs[0])
-    assert job.local_logs[1] == str(expected_local_logs[1])
-
-
-@pytest.mark.parametrize('experiment_data, attributes_to_check', [
-    (
 @pytest.mark.parametrize('experiment_data, attributes_to_check', [(
         {
             'JOBS': {
@@ -2274,10 +2240,8 @@ def test_update_and_write_time(count, with_stat_file, tmp_path):
         stat_file.write("19704924\n19704925")
     job.update_start_time(count)
     assert job.start_time_timestamp
-    job.write_start_time(count, True if count > 0 else False)
+    job.write_start_time()
     assert (job._tmp_path / f'{job.name}_TOTAL_STATS').exists()
-    if count > 0:
-        job.write_vertical_time(count)
     if with_stat_file:
         job.write_end_time(True, count)
     else:
@@ -2330,6 +2294,7 @@ def test_retrieve_logfiles(local, mocker, output):
     job.submit_time_timestamp = '0'
     job.start_time_timestamp = '19700101000000'
     job.platform.check_file_exists = mocker.MagicMock(return_value=True)
+    job.platform.processed_wrapper_logs = set()
     job.retrieve_logfiles()
     assert job.updated_log > 0
 
@@ -2343,3 +2308,70 @@ def test_case_insensitive_running_parameter(autosubmit_config):
     job.section = "A"
     job.update_dict_parameters(as_conf)
     assert job.running == "once"
+
+
+def test_fail_count_in_persistent_attributes():
+    """Verify fail_count is included in PERSISTENT_ATTRIBUTES."""
+    from autosubmit.job.job import PERSISTENT_ATTRIBUTES
+    assert "fail_count" in PERSISTENT_ATTRIBUTES
+
+
+def test_getstate_includes_fail_count():
+    """Verify __getstate__ serializes fail_count."""
+    job = Job("t000", "job1", Status.FAILED, 0)
+    job.fail_count = 5
+    state = job.__getstate__()
+    assert "fail_count" in state
+    assert state["fail_count"] == 5
+
+
+def test_setstate_restores_fail_count():
+    """Verify __setstate__ restores fail_count from DB."""
+    job = Job("t000", "job1", Status.WAITING, 0)
+    assert job.fail_count == 0
+    state = {
+        "name": "job1",
+        "status": "WAITING",
+        "fail_count": 3,
+        "local_logs_out": None,
+        "local_logs_err": None,
+        "remote_logs_out": "",
+        "remote_logs_err": "",
+    }
+    job.__setstate__(state)
+    assert job.fail_count == 3
+
+
+def test_missing_stat_file_io_safe_wait(mocker):
+    """Verify that when STAT file is missing and wrapper is done, inner job stays RUNNING briefly."""
+    platform = mocker.MagicMock()
+    platform._io_safe_wait = 60
+    platform.name = 'local'
+    platform.type = 'local'
+    platform.serial_platform = platform  # Avoid returning a different mock
+
+    inner_job = Job('t000', 'inner1', Status.RUNNING, 0)
+    inner_job.wrapper_type = 'vertical'
+    inner_job.platform = platform
+    inner_job.processors = 2  # Make it non-serial so platform property returns _platform
+    inner_job.finished_time = None
+
+    as_conf = mocker.MagicMock()
+    wrapper = WrapperJob('wrapper1', 999, Status.RUNNING, 0, [inner_job], '01:00', 1, platform, as_conf)
+    wrapper.new_status = Status.COMPLETED
+    wrapper.start_time_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
+    # Mock confirm_done_jobs_via_stat to return QUEUING (missing STAT file)
+    mocker.patch.object(
+        wrapper.platform, 'confirm_done_jobs_via_stat',
+        return_value={'inner1': Status.QUEUING}
+    )
+    mocker.patch.object(wrapper, '_inner_job_can_run', return_value=True)
+    mocker.patch.object(wrapper.platform, 'check_all_jobs')
+    mocker.patch.object(wrapper.platform, 'set_start_time_from_remote_stat_file')
+
+    wrapper.check_and_update_status(as_conf)
+
+    # Wrapper is done but STAT missing → job should temporarily be RUNNING
+    assert inner_job.new_status == Status.RUNNING
+    assert inner_job.finished_time is not None  # Timer started

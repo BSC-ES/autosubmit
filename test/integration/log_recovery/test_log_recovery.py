@@ -27,7 +27,7 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.platforms.platform import CopyQueue
+from autosubmit.platforms.platform import CopyQueue, Platform
 
 
 def _get_script_files_path() -> Path:
@@ -277,3 +277,62 @@ def test_refresh_log_recovery_process(local, autosubmit, as_conf, mocker):
         autosubmit.refresh_log_recovery_process(platforms=[local], as_conf=as_conf)
         assert p != local.work_event
         assert local.work_event.is_set()
+
+
+def test_worker_events_no_duplicates(local, mocker):
+    """Verify that update_workers() does not add the same event twice."""
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    Platform.worker_events.clear()
+    local.prepare_process()
+    # prepare_process adds one event; verify adding the same one again doesn't duplicate
+    count_after_prepare = len(Platform.worker_events)
+    assert count_after_prepare >= 1
+    Platform.update_workers(local.work_event)
+    assert len(Platform.worker_events) == count_after_prepare
+    Platform.worker_events.clear()
+
+
+def test_add_job_to_log_recover_failure_does_not_increment_updated_log(local, mocker):
+    """Verify that when recovery_queue.put fails, updated_log is NOT incremented."""
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    local.prepare_process()
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    job = Job('t000', '0000', Status.COMPLETED, 0)
+    job.name = 'test_job'
+    job.id = 123
+    job.updated_log = 0
+    local.log_recovery_process = mocker.MagicMock()
+    local.log_recovery_process.is_alive.return_value = True
+
+    # Patch put to simulate a failure
+    mocker.patch.object(local.recovery_queue, 'put', side_effect=Exception('Queue full'))
+    local.add_job_to_log_recover(job)
+    assert job.updated_log == 0
+
+
+def test_add_job_to_log_recover_no_queue(local):
+    """Verify graceful skip when recovery_queue is None."""
+    local.recovery_queue = None
+    job = Job('t000', '0000', Status.COMPLETED, 0)
+    job.name = 'test_job'
+    job.id = 123
+    job.updated_log = 0
+    # Should not raise and should not increment updated_log
+    local.add_job_to_log_recover(job)
+    assert job.updated_log == 0
+
+
+def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
+    """Verify cleanup does not hang when child has crashed."""
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    local.config['LOG_RECOVERY_TIMEOUT'] = 1
+    local.spawn_log_retrieval_process(as_conf)
+    assert local.log_recovery_process.is_alive()
+    # Abruptly kill the child to simulate a crash
+    local.log_recovery_process.kill()
+    local.log_recovery_process.join(timeout=5)
+    assert not local.log_recovery_process.is_alive()
+    # Cleanup should return promptly without hanging
+    local.clean_log_recovery_process()
+    assert local.recovery_queue is None
+    assert local.log_recovery_process is None

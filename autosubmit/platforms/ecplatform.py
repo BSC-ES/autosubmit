@@ -172,16 +172,6 @@ class EcPlatform(ParamikoPlatform):
 
         return f"{pre} {self._submit_cmd}{script_name} {post}"
 
-    def check_all_jobs(self, job_list, as_conf, retries=5):
-        save = False
-        for job in job_list:
-            self.check_job(job)
-            if job.new_status != job.status:
-                job.update_status(as_conf)
-                save = True
-
-        return save
-
     def parse_job_output(self, output):
         job_state = output.split('\n')
         if len(job_state) > 7:

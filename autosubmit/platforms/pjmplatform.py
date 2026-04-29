@@ -22,7 +22,6 @@ from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING
 
-from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.headers.pjm_header import PJMHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
@@ -152,20 +151,6 @@ class PJMPlatform(ParamikoPlatform):
         except Exception:
             return False
 
-    def get_queue_status(self, in_queue_jobs: list['Job'], list_queue_jobid, as_conf):
-        if not in_queue_jobs:
-            return
-        cmd = self.get_queue_status_cmd(list_queue_jobid)
-        self.send_command(cmd)
-        queue_status = self._ssh_output
-        for job in in_queue_jobs:
-            reason = self.parse_queue_reason(queue_status, job.id)
-            if job.queuing_reason_cancel(reason):
-                Log.printlog(f"Job {job.name} will be cancelled and set to FAILED as it was queuing due to {reason}",
-                             6000)
-                self.send_command(f"{self.cancel_cmd} {job.id}")
-                job.new_status = Status.FAILED
-
     def parse_all_jobs_output(self, output, job_id):
         status = ""
         try:
@@ -232,8 +217,6 @@ class PJMPlatform(ParamikoPlatform):
         return f"pjstat -H -v --choose st --filter \"jid={job_id}\" > as_checkjob.txt ; pjstat -v --choose st --filter \"jid={job_id}\" >> as_checkjob.txt ; cat as_checkjob.txt ; rm as_checkjob.txt"
         # return 'pjstat -v --choose jid,st,ermsg --filter \"jid={0}\"'.format(job_id)
 
-    def get_queue_status_cmd(self, job_id):
-        return self.get_check_all_jobs_cmd(job_id)
 
     def get_job_id_by_job_name_cmd(self, job_name):
         if job_name[-1] == ",":

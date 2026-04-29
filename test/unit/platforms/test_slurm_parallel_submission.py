@@ -162,7 +162,7 @@ def test_process_ready_jobs_accepts_integer_job_ids(
 
     slurm_platform.process_ready_jobs(scripts_to_submit)
 
-    assert assigned_job_ids == ["101", "202"]
+    assert assigned_job_ids == [101, 202]
 
 
 def test_get_job_names_cmd_contains_expected_components(

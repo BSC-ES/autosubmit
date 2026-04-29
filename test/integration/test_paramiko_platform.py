@@ -997,7 +997,7 @@ def test_deleted_failed_and_completed_names(
             completed_file = Path(platform.remote_log_dir) / f"{job_name}_COMPLETED"
             platform.send_command(f"touch {completed_file}", ignore_log=True)
 
-        platform.delete_failed_and_completed_names(
+        platform.delete_previous_run_files_by_job_names(
             job_names=jobs_to_delete
         )
 

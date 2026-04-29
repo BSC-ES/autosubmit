@@ -39,21 +39,21 @@ def test_local_platform_copy():
 
 
 @pytest.mark.parametrize(
-    'count,stats_file_exists,job_fail_count,remote_file_exists',
+    'stats_file_exists,job_fail_count,remote_file_exists',
     [
-        (-1, True, 0, True),
-        (0, False, 0, False),
-        (1, False, 1, True),
-        (100, True, 100, True)
+        (True, 0, True),
+        (False, 0, False),
+        (False, 1, True),
+        (True, 100, True)
     ],
     ids=[
-        'use fail_count, delete stats_file, remote file transferred',
-        'use count, no stats_file, failed to transfer',
-        'use count, no stats_file, remote file transferred',
-        'use count, delete stats_file, remote file transferred',
+        'delete stats_file, remote file transferred',
+        'no stats_file, failed to transfer',
+        'no stats_file, remote file transferred',
+        'delete stats_file, remote file transferred',
     ]
 )
-def test_get_stat_file(count: int, stats_file_exists: bool, job_fail_count: int, remote_file_exists: bool,
+def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file_exists: bool,
                        autosubmit_config, mocker):
     """Test that ``get_stat_file`` uses the correct file name."""
     mocked_os_remove = mocker.patch('os.remove')
@@ -68,10 +68,7 @@ def test_get_stat_file(count: int, stats_file_exists: bool, job_fail_count: int,
 
     # TODO: this is from ``job.py``; we can probably find an easier way to fetch the file name,
     #       so we can re-use it in tests (e.g. move the logic to a small function/property/etc.).
-    if count == -1:
-        filename = f"{job.stat_file}{job.fail_count}"
-    else:
-        filename = f'{job.name}_STAT_{str(count)}'
+    filename = f'{job.name}_STAT_{str(job.fail_count)}'
 
     if remote_file_exists:
         # Create fake remote stat file transferred.
@@ -81,7 +78,7 @@ def test_get_stat_file(count: int, stats_file_exists: bool, job_fail_count: int,
         # Create fake local stat file, to be deleted before copying the remote file (created above).
         Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, filename).touch()
 
-    assert remote_file_exists == local.get_stat_file(job=job, count=count)
+    assert remote_file_exists == local.get_stat_file(job=job, count=job.fail_count)
     assert mocked_os_remove.called == stats_file_exists
 
 
@@ -117,3 +114,104 @@ def test_refresh_log_recovery_process(autosubmit, autosubmit_config, mocker):
         spy.assert_called()
         spy2.assert_not_called()
         assert local.work_event is None
+
+
+def _make_simple_job(name: str, status: Status, fail_count: int = 0):
+    """Return a lightweight job object for check_all_jobs tests."""
+    job = type('Job', (), {})()
+    job.name = name
+    job.id = 1
+    job.fail_count = fail_count
+    job.status = status
+    job.new_status = status
+    job.finished_time = None
+    job.start_time_timestamp = None
+    job.wrapper_type = 'simple'
+    return job
+
+
+@pytest.mark.parametrize('stat_line,expected_final_status', [
+    ('COMPLETED', Status.COMPLETED),
+    ('FAILED', Status.FAILED),
+    ('', Status.RUNNING),  # STAT not flushed yet → defer
+])
+def test_check_all_jobs_stat_confirmation(
+        tmp_path: Path,
+        stat_line: str,
+        expected_final_status: Status,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """check_all_jobs confirms COMPLETED scheduler status via the STAT file.
+
+    :param tmp_path: Temporary directory for remote log files.
+    :param stat_line: Last line written to the STAT file (empty = absent).
+    :param expected_final_status: Expected status after check_all_jobs.
+    """
+    platform = LocalPlatform(expid=_EXPID, name='local', config={})
+    remote_log = tmp_path / f'LOG_{_EXPID}'
+    remote_log.mkdir(parents=True)
+    platform.remote_log_dir = str(remote_log)
+    platform.connected = True
+
+    job = _make_simple_job('t001_INI', status=Status.RUNNING)
+
+    if stat_line:
+        (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text(
+            f'1000\n1060\n{stat_line}\n'
+        )
+
+    as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
+
+    platform.check_all_jobs([job], as_conf)
+
+    assert job.new_status == expected_final_status
+
+
+def test_check_all_jobs_save_flag_set_when_status_changes(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """check_all_jobs updates job.new_status when the STAT file reports a new status.
+
+    :param tmp_path: Temporary directory for remote log files.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    platform = LocalPlatform(expid=_EXPID, name='local', config={})
+    remote_log = tmp_path / f'LOG_{_EXPID}'
+    remote_log.mkdir(parents=True)
+    platform.remote_log_dir = str(remote_log)
+    platform.connected = True
+
+    job = _make_simple_job('t001_INI', status=Status.RUNNING)
+    (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text('1000\n1060\nCOMPLETED\n')
+
+    as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
+
+    platform.check_all_jobs([job], as_conf)
+
+    assert job.new_status == Status.COMPLETED
+
+
+def test_check_all_jobs_no_change_returns_false(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """check_all_jobs keeps job.new_status as RUNNING when no STAT file is present.
+
+    :param tmp_path: Temporary directory for remote log files.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    platform = LocalPlatform(expid=_EXPID, name='local', config={})
+    remote_log = tmp_path / f'LOG_{_EXPID}'
+    remote_log.mkdir(parents=True)
+    platform.remote_log_dir = str(remote_log)
+    platform.connected = True
+
+    job = _make_simple_job('t001_INI', status=Status.RUNNING)
+
+
+    as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
+
+    platform.check_all_jobs([job], as_conf)
+
+    assert job.new_status == Status.RUNNING

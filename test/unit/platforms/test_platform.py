@@ -32,10 +32,8 @@ _EXPID = 't000'
 @pytest.mark.parametrize(
     'file_exists,count ',
     [
-        [True, -1],
         [True, 0],
         [True, 1],
-        [False, -1],
         [False, 0],
         [False, 1],
     ]
@@ -53,12 +51,8 @@ def test_get_stat_file(file_exists, count, tmp_path):
     job = TestJob()
     job.stat_file = "test_file"
     job.name = "test_name"
-    if count < 0:
-        job.fail_count = 0
-        filename = job.stat_file + "0"
-    else:
-        job.fail_count = count
-        filename = job.name + f'_STAT_{str(count)}'
+    job.fail_count = count
+    filename = job.name + f'_STAT_{str(job.fail_count)}'
 
     if file_exists:
         with open(f"{basic_config.LOCAL_ROOT_DIR}/{filename}", "w", encoding="utf-8") as f:

@@ -99,7 +99,6 @@ class JobsDbManager(DbManager):
 
         :param full_load: If True, load all jobs.
         :param load_failed_jobs: If True, include failed jobs when loading active jobs.
-        :param only_with_logs: If True, load only finished jobs.
         :param members: Optional list of member identifiers to filter jobs.
         :return: A list of job dictionaries.
         """

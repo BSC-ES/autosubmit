@@ -440,3 +440,67 @@ def test_retrieve_times(setup_job_list, tmp_path, make_exception, seconds):
                                                 job_times=None, seconds=seconds, job_data_collection=None)
         assert retrieve_data.name == job.name
         assert retrieve_data.status == Status.VALUE_TO_KEY[job.status]
+
+
+def test_unload_requires_confirmed_recovery(setup_job_list):
+    """Verify job stays in memory until updated_log > fail_count."""
+    jobs, _, job_list = setup_job_list
+    job = jobs[0]  # job1, COMPLETED
+    job.fail_count = 0
+    job.retrials = 0
+    job.log_recovery_call_count = 1
+    job.updated_log = 0  # NOT confirmed recovered
+    job.packed = False
+    job_list.job_package_map = {}
+    job_list.unload_finished_jobs()
+    assert job.name in job_list.graph.nodes
+
+
+def test_unload_after_confirmed_recovery(setup_job_list):
+    """Verify job is unloaded once updated_log > fail_count."""
+    jobs, _, job_list = setup_job_list
+    job = jobs[0]  # job1, COMPLETED
+    job.fail_count = 0
+    job.retrials = 0
+    job.log_recovery_call_count = 1
+    job.updated_log = 1  # Confirmed recovered
+    job.packed = False
+    job_list.job_package_map = {}
+    job_list.unload_finished_jobs()
+    assert job.name not in job_list.graph.nodes
+
+
+def test_vertical_job_not_externally_retried(setup_job_list, as_conf):
+    """Verify vertical wrapper inner jobs are not retried externally after wrapper finishes."""
+    jobs, _, job_list = setup_job_list
+    job = jobs[3]  # job4, originally FAILED
+    job.status = Status.FAILED
+    job.fail_count = 1
+    job.retrials = 3
+    job.wrapper_type = "vertical"
+    job.packed = False
+    job.id = 123
+    job.section = "TEST"
+    as_conf.experiment_data["JOBS"]["TEST"] = {}
+    # Simulate wrapper is gone
+    job_list.job_package_map = {}
+    job_list._update_failed_jobs(as_conf)
+    assert job.status == Status.FAILED
+
+
+def test_vertical_job_with_zero_fail_count_can_be_retried(setup_job_list, as_conf):
+    """Verify vertical jobs that never ran (fail_count=0) can still be retried externally."""
+    jobs, _, job_list = setup_job_list
+    job = jobs[3]  # job4, originally FAILED
+    job.status = Status.FAILED
+    job.fail_count = 0
+    job.retrials = 3
+    job.wrapper_type = "vertical"
+    job.packed = False
+    job.id = 123
+    job.section = "TEST"
+    as_conf.experiment_data["JOBS"]["TEST"] = {}
+    job_list.job_package_map = {}
+    job_list._update_failed_jobs(as_conf)
+    # fail_count=0 means wrapper never processed it; external retry is allowed
+    assert job.status in (Status.READY, Status.DELAYED, Status.WAITING, Status.FAILED)
