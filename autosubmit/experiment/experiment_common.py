@@ -146,9 +146,9 @@ def _delete_experiment(expid: str, force: bool) -> None:
     Log.info(f'Deleting experiment {expid}')
 
     try:
-        _delete_expid(expid, force)
-        ExperimentDetails(expid).delete_details()
         ExperimentStatus(expid).set_as_deleted()
+        ExperimentDetails(expid).delete_details()
+        _delete_expid(expid, force)
         Log.info(f'Experiment {expid} has been deleted')
     except Exception as e:
         raise AutosubmitCritical("Seems that something went wrong, please check the trace", 7012, str(e))
