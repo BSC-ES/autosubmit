@@ -97,19 +97,20 @@ def as_body(body: str) -> str:
             # Autosubmit job
             ###################
 
+            as_job_status <- "FAILED"
             tryCatch(
                 expr = {{
                     {body}
+                    as_job_status <<- "COMPLETED"
                 }},
                 finally = {{
-                    # Write the finish time in the job _STAT_
+                    # Write the finish time and final status in the job _STAT_
                     fileConn<-file(paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = ''),"a")
                     writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
+                    writeLines(as_job_status, fileConn)
                     close(fileConn)
                 }}
             )
-        # Now, we let the execution of the tailer happen, where the _COMPLETED
-        # file will be created.
         """)
 
 

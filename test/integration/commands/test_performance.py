@@ -391,7 +391,7 @@ def test_autosubmit_recovery_profile_metrics(tmp_path: Path, autosubmit_exp, gen
     prof.start()
     as_exp.autosubmit.recovery(
         as_exp.expid,
-        noplot=False,
+        noplot=True,
         save=True,
         all_jobs=True,
         hide=True,
@@ -475,7 +475,7 @@ def test_autosubmit_setstatus_profile_metrics(tmp_path: Path, autosubmit_exp, ge
     prepare_setstatus_recovery(as_exp, tmp_path, job_names, slurm_server)
     fl_filter_names = " ".join(job_names)
     ftcs_filter = "[20200101 [ fc0 fc1 fc2 fc3 fc4 [ 1-2 ] ] ],Any"
-    ft_filter = "LOCAL_SETUP SYNCHRONIZE REMOTE_SETUP DN OPA_ENERGY_INDICATORS APP_ENERGY_INDICATORS OPA_ENERGYTDIG1"
+    ft_filter = "LOCAL_SETUP, SYNCHRONIZE, REMOTE_SETUP, DN, OPA_ENERGY_INDICATORS, APP_ENERGY_INDICATORS, OPA_ENERGYTDIG1"
     fs = "WAITING"
     target = "COMPLETED"
 
