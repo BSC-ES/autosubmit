@@ -258,7 +258,8 @@ class SqlAlchemyExperimentStatusDbManager:
             values(
                 status=status,
                 seconds_diff=0,
-                modified=HUtils.get_current_datetime()
+                modified=HUtils.get_current_datetime(),
+                last_heartbeat=HUtils.get_current_datetime() if status == Models.RunningStatus.RUNNING else None
             )
         )
         with self.engine.connect() as conn:
