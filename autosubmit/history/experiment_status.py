@@ -122,4 +122,5 @@ class ExperimentStatus:
         :return: None
         """
         # do nothing for now
-        pass
+        if self.manager:
+            self.manager.update_heartbeat(self.expid)
