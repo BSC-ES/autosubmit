@@ -29,7 +29,6 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
 )
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from bscearth.utils.date import date2str
 
 if TYPE_CHECKING:

@@ -257,7 +257,6 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
-        self.first_wrapped_level = False
         self._wrapper_queue = None
         self._platform = None
         self._queue = None
@@ -341,6 +340,7 @@ class Job(object):
         self._cpmip_thresholds = {}
         self._chunk_size = None
         self._chunk_size_unit = None
+        self._validate_template = False
         self._processors_per_node = None
         self.ec_queue = None
         self.platform_name = None

@@ -14,7 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-import copy
 import datetime
 import json
 import locale
@@ -29,7 +28,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Optional, TYPE_CHECKING
 
-from bscearth.utils.date import sum_str_hours, date2str
+from bscearth.utils.date import sum_str_hours
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status

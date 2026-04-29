@@ -21,7 +21,7 @@ import pytest
 from sqlalchemy import and_, insert, select
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.tables import JobDataTable, get_table_with_schema
+from autosubmit.database.tables import JobDataTable
 from autosubmit.history.utils import get_current_datetime
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     create_experiment_history_db_manager,
@@ -68,7 +68,7 @@ def test_select_jobs_data_regression_sqlite_variable_limit(tmp_path, monkeypatch
     db_manager.initialize()
 
     job_names = [f"test_limit_20200101_fc0_{i}_SIM" for i in range(1, n_jobs + 1)]
-    job_data_table = get_table_with_schema(db_manager.schema, JobDataTable)
+    job_data_table = db_manager.table_registry.get(JobDataTable.name)
     now = get_current_datetime()
 
     rows = [

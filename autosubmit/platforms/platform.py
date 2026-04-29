@@ -384,8 +384,7 @@ class Platform:
     def root_dir(self, value):
         self._root_dir = value
 
-    def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
-                           packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
+    def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList', packages_to_submit: list['JobPackageBase'],
                            inspect=False, only_wrappers=False) -> tuple[dict[str, dict[str, 'JobPackageBase']], dict[str, dict[str, 'JobPackageBase']]]:
         """Prepare job packages for submission on the current platform.
 
@@ -400,9 +399,6 @@ class Platform:
         :param job_list: Job container used to inspect ready jobs and register
             wrapper information.
         :type job_list: JobList
-        :param packages_persistence: Persistence helper used to store package
-            metadata during inspect or wrapper-only workflows.
-        :type packages_persistence: JobPackagePersistence
         :param packages_to_submit: Packages built for this platform and ready to
             be prepared.
         :type packages_to_submit: list[JobPackageBase]
@@ -423,21 +419,22 @@ class Platform:
         scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
         x11_scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
         for package in packages_to_submit:
-            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, packages_persistence, as_conf)
+            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, as_conf)
             if not only_wrappers:
                 package.generate_scripts(as_conf, inspect)
                 if not inspect:
                     package.send_files()
                     if package.x11:
-                        x11_scripts_to_submit_by_section.setdefault(package.sections, {})[f"{package.name}.cmd"] = package
+                        x11_scripts_to_submit_by_section.setdefault(package.sections, {})[
+                            f"{package.name}.cmd"] = package
                     else:
                         scripts_to_submit_by_section.setdefault(package.sections, {})[f"{package.name}.cmd"] = package
 
         return scripts_to_submit_by_section, x11_scripts_to_submit_by_section
 
     @staticmethod
-    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool, inspect: bool,
-                                      packages_persistence: 'JobPackagePersistence', as_conf: 'AutosubmitConfig') -> None:
+    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool,
+                                      inspect: bool, as_conf: 'AutosubmitConfig') -> None:
         """Dry-run preparation of a package to emulate that the package was submitted, without following the normal submission flow.
 
         :param job_list: Job container used to register wrapper package and job
@@ -450,23 +447,22 @@ class Platform:
         :type only_wrappers: bool
         :param inspect: If ``True``, prepare package metadata for inspect mode.
         :type inspect: bool
-        :param packages_persistence: Persistence helper used to store package
-            data for later recovery or visualization.
-        :type packages_persistence: JobPackagePersistence
         :param as_conf: Autosubmit configuration for the current experiment.
         :type as_conf: AutosubmitConfig
         :raises Exception: Propagate any exception raised while creating wrapper
             job metadata or saving the package.
         """
+
         if only_wrappers or inspect:
             # Now name is used for submit scripts, before it was used to determine if a package had a wrapper or not
             if package.is_wrapped:
                 job_list.packages_dict[package.name] = package.jobs
                 from ..job.job import WrapperJob
                 wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                         package.jobs, package._wallclock, package.platform, as_conf, hold=False)
+                                         package.jobs, package._wallclock, package._num_processors, package.platform,
+                                         as_conf)
                 job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                packages_persistence.save(package, inspect)
+                job_list.save_wrappers([package], as_conf, inspect)
             for innerJob in package._jobs:
                 # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
                 innerJob.status = Status.COMPLETED
@@ -755,8 +751,7 @@ class Platform:
             path = Path(self.remote_log_dir)
         return str(path)
 
-
-    def check_all_jobs(self, job_list: list['Job'], as_conf:'AutosubmitConfig', retries: int = 5):
+    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):
         """Checks jobs running status
 
         :param job_list: list of jobs
@@ -955,7 +950,8 @@ class Platform:
             if ret_pid == 0:  # Process is still running
                 Log.info(f"Process {self.log_recovery_process.pid} is still running.")
             else:
-                Log.result(f"Process {self.log_recovery_process.name} finished with pid {self.log_recovery_process.pid}")
+                Log.result(
+                    f"Process {self.log_recovery_process.name} finished with pid {self.log_recovery_process.pid}")
         else:
             Log.result("Log_Recovery_Process is empty no process joinned")
 

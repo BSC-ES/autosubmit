@@ -21,7 +21,7 @@ import pwd
 import re
 import tempfile
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from textwrap import dedent
 from typing import Optional
@@ -860,41 +860,7 @@ def test_recover_last_ready_date(tmpdir, test_with_file, file_is_empty, last_lin
     assert job.ready_date == expected_date
 
 
-@pytest.mark.parametrize('test_with_logfiles, file_timestamp_greater_than_ready_date', [
-    (False, False),
-    (True, True),
-    (True, False),
-], ids=["no file", "log timestamp >= ready_date", "log timestamp < ready_date"])
-def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greater_than_ready_date):
-    job = Job('dummy', '1', 0, 1)
-    job._log_path = Path(tmpdir)
-    expected_local_logs = (f"{job.name}.out.0", f"{job.name}.err.0")
-    if test_with_logfiles:
-        if file_timestamp_greater_than_ready_date:
-            ready_time = datetime.now() - timedelta(minutes=5)
-            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-            expected_update_log = True
-            expected_local_logs = (log_name.with_suffix('.out').name, log_name.with_suffix('.err').name)
-        else:
-            expected_update_log = False
-            ready_time = datetime.now() + timedelta(minutes=5)
-            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-        log_name.with_suffix('.out').touch()
-        log_name.with_suffix('.err').touch()
-    else:
-        expected_update_log = False
 
-    job.updated_log = False
-    job.recover_last_log_name()
-    assert job.updated_log == expected_update_log
-    assert job.local_logs[0] == str(expected_local_logs[0])
-    assert job.local_logs[1] == str(expected_local_logs[1])
-
-
-@pytest.mark.parametrize('experiment_data, attributes_to_check', [
-    (
 @pytest.mark.parametrize('experiment_data, attributes_to_check', [(
         {
             'JOBS': {
@@ -2330,6 +2296,7 @@ def test_retrieve_logfiles(local, mocker, output):
     job.submit_time_timestamp = '0'
     job.start_time_timestamp = '19700101000000'
     job.platform.check_file_exists = mocker.MagicMock(return_value=True)
+    job.platform.processed_wrapper_logs = set()
     job.retrieve_logfiles()
     assert job.updated_log > 0
 

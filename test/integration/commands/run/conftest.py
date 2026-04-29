@@ -128,7 +128,7 @@ def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> tuple[Thread, 
     return thread, result["exception"], cast(int, result["exit_code"])
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, run_type: str = "simple") -> dict[str, (bool, str)]:
+def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wrapper_type="simple", run_type='simple') -> dict[str, (bool, str)]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.
@@ -141,7 +141,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, ru
     }
 
     # Check job_data info
-    with (sqlite3.connect(job_data_db) as conn):
+    with sqlite3.connect(job_data_db) as conn:
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute("SELECT * FROM job_data ORDER BY job_name, counter")
@@ -152,9 +152,8 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, ru
         rows_as_dicts: list[dict[str, Any]] = [dict(row) for row in rows]
         # add first level of a wrapper if wrapper_type != None
         for row_dict in rows_as_dicts:
-            # TODO: add splits in 4.2, and modify the check to be only for chunk 1 and split 1
-            # Change the check for assert internally retried jobs for the first submission
-            if wrapper_type != "vertical" or (wrapper_type == "vertical" and row_dict.get("chunk", -1) == 1 and row_dict.get("counter", -1) == 0):
+            # TODO: add splits == 1 instead of == -1 in 4.2
+            if wrapper_type != "vertical" or (wrapper_type == "vertical" and row_dict.get("chunk", -1) == 1 and ( run_type != 'split' or run_type == 'split' and row_dict.get("split", 1) == 1) and row_dict.get("counter", -1) == 0):
                 row_dict["first_level"] = True
             else:
                 row_dict["first_level"] = False

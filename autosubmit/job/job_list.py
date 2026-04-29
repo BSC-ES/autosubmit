@@ -24,7 +24,7 @@ import traceback
 from contextlib import suppress
 from pathlib import Path
 from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Optional, Union, Set
+from typing import List, Dict, Tuple, Any, Optional, Union
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
@@ -1596,7 +1596,8 @@ class JobList(object):
             else:
                 # In case we need to improve the perfomance while generating the workflow graph, this could be a point to check. (Workflows with splits and many dependencies).
                 if parent.name not in self.depends_on_previous_special_section.get(
-                        job.section, set()) or job.split > 0 or (job.section == parent.section and job.running != "chunk"):
+                        job.section, set()) or job.split > 0 or (
+                        job.section == parent.section and job.running != "chunk"):
                     graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED", completion_status="WAITING")
                     edge_added = True
 
@@ -2903,17 +2904,18 @@ class JobList(object):
                 ).VALUE_TO_KEY[job.status], platform_name, queue)
             except Exception:
                 Log.debug(f"Couldn't print job status for job {job.name}")
-        for job in failed_job_list:
-            if len(job.queue) < 1:
-                queue = "no-scheduler"
-            else:
-                queue = job.queue
-            # safeguard for older experiments
-            job_id = job.id if job.id else "no-id"
-            if not job.id:
-                Log.warning(f"Job {job.name} has {job_id}. This shouldn't happen.")
-            Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
-            ).VALUE_TO_KEY[job.status], job.platform.name, queue)
+        # TODO: Adaptation missing: for 4.2 this should be a db call
+        # for job in failed_job_list:
+        #     if len(job.queue) < 1:
+        #         queue = "no-scheduler"
+        #     else:
+        #         queue = job.queue
+        #     # safeguard for older experiments
+        #     job_id = job.id if job.id else "no-id"
+        #     if not job.id:
+        #         Log.warning(f"Job {job.name} has {job_id}. This shouldn't happen.")
+        #     Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
+        #     ).VALUE_TO_KEY[job.status], job.platform.name, queue)
 
     def update_from_file(self, store_change: bool = True) -> None:
         """Update jobs status  from an external status file.
@@ -3044,9 +3046,7 @@ class JobList(object):
         :type parents_edge_info: dict
         :param parents_nodes: Dictionary mapping parent job names to Job objects.
         :type parents_nodes: dict
-        :returns: A tuple containing two lists:
-            - non_completed_parents: List of parent jobs that are not completed.
-            - completed_parents: List of parent jobs that are completed.
+        :return A tuple containing two lists: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
         :rtype: Tuple[List[Job], List[Job]]
         """
         non_completed = []
@@ -3066,6 +3066,9 @@ class JobList(object):
                 if edge_status in [Status.COMPLETED, Status.SKIPPED]:
                     completed.append(parent)
                 elif edge_status == Status.FAILED and fail_ok or (job.current_checkpoint_step >= from_step > 0):
+                    completed.append(parent)
+                elif Status.VALUE_TO_KEY.get(edge_status, '') in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW:
+                    # COMPLETED/SKIPPED parent has surpassed any intermediate success-workflow status trigger.
                     completed.append(parent)
                 else:
                     non_completed.append(parent)
@@ -3107,7 +3110,8 @@ class JobList(object):
 
         return non_completed, completed
 
-    def _update_db_edges_completion_status(self, finished_parents: List[Job], non_finished_parents: List[Job], child: Job) -> None:
+    def _update_db_edges_completion_status(self, finished_parents: List[Job], non_finished_parents: List[Job],
+                                           child: Job) -> None:
         """ Update the completion status of edges in the database.
 
         :param finished_parents: List of parent jobs that have finished.
@@ -3131,7 +3135,8 @@ class JobList(object):
         :param job: The job object to recover the log for.
         :type job: Job
         """
-        if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
+        if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
+                                                                  "false")).lower() == "true":
             job.retrieve_logfiles()
         else:
             # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
@@ -3148,7 +3153,8 @@ class JobList(object):
 
         """
         jobs_to_recover = [job for job in self.job_list if
-                           not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
+                           not getattr(job, "x11",
+                                       False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
         for job in jobs_to_recover:
             self._recover_log(job)
 
@@ -3446,7 +3452,6 @@ class JobList(object):
     def save_wrappers(
             self,
             packages_to_save: List[Any],
-            failed_packages: Set[int],
             as_conf: Any,
             preview: bool = False
     ) -> None:
@@ -3454,8 +3459,6 @@ class JobList(object):
 
         :param packages_to_save: List of job package objects to process.
         :type packages_to_save: List[Any]
-        :param failed_packages: Set of job IDs that failed and should be skipped.
-        :type failed_packages: Set[int]
         :param as_conf: Autosubmit configuration object.
         :type as_conf: Any
         :param preview: Whether to run in preview mode.
@@ -3465,9 +3468,7 @@ class JobList(object):
         """
         packages_to_save_gen = (
             package for package in packages_to_save
-            if isinstance(package, JobPackageThread)
-               and package.jobs[0].id not in failed_packages
-               and hasattr(package, "name")
+            if isinstance(package, JobPackageThread) and hasattr(package, "name")
         )
         wrappers = []
         initial_status = Status.SUBMITTED if not preview else Status.COMPLETED
@@ -4111,7 +4112,8 @@ class JobList(object):
             if not jobs_ran_atleast_once:
                 job.updated_log = True
 
-    def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None, return_only_names=False) -> Union[List[str], List["Job"]]:
+    def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None,
+                          return_only_names=False) -> Union[List[str], List["Job"]]:
         """Return jobs filtered by status and/or platform as names or Job objects.
 
         :param status: Optional list of job statuses to filter by.
