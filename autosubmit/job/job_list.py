@@ -535,8 +535,6 @@ class JobList(object):
         :param new: If True, initializes new jobs.
         """
         for job in self.job_list:
-            if not self.run_mode and new:
-                job.fail_count = 0
             if new:
                 job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
             else:
@@ -2685,7 +2683,6 @@ class JobList(object):
         ]
         # update edges completion status before removing them
         for job in (job for job in jobs_to_unload):
-            job.fail_count = 0
             for child in job.children:
                 self.graph.edges[job.name, child.name]['completion_status'] = "COMPLETED"
             for parent in job.parents:
@@ -3152,9 +3149,7 @@ class JobList(object):
         have been recovered.
 
         """
-        jobs_to_recover = [job for job in self.job_list if
-                           not getattr(job, "x11",
-                                       False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
+        jobs_to_recover = [job for job in self.job_list if job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
         for job in jobs_to_recover:
             self._recover_log(job)
 

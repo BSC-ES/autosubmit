@@ -28,7 +28,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Optional, TYPE_CHECKING
 
-from bscearth.utils.date import sum_str_hours
+from bscearth.utils.date import sum_str_hours, date2str
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -208,6 +208,7 @@ class JobPackageBase(object):
 
     def process_jobs_to_submit(self, job_id: str) -> None:
         for job in self.jobs:
+            job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
             job.id = str(job_id)
             job.status = Status.SUBMITTED
             Log.result(

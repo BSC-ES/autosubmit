@@ -2111,7 +2111,7 @@ class Autosubmit:
         """
         Autosubmit.exit = False
         # Start profiling if the flag has been used
-        if profile is not None:
+        if profile:
             from .profiler.profiler import Profiler
             profiler = Profiler(expid, trace_enabled=trace, max_checkpoints=profile_max_iterations)
             profiler.start()
@@ -2198,7 +2198,7 @@ class Autosubmit:
 
                         # Submit ready jobs
                         if len(job_list.get_ready()) > 0:
-                            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, hold=False)
+                            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test)
                             save_jobs, save_edges = job_list.update_list(as_conf)
                             if save_jobs:
                                 job_list.save_jobs()
@@ -2349,7 +2349,7 @@ class Autosubmit:
         except BaseException:
             raise
         finally:
-            if profile is not None:
+            if profile:
                 profiler.stop()
 
         # Suppress in case ``job_list`` was not defined yet...
@@ -2499,10 +2499,10 @@ class Autosubmit:
                     any_job_submitted = True
                 except Exception:
                     if not inspect:
-                        job_list.save()
+                        job_list.save_jobs()
                     raise
             if not inspect:
-                job_list.save()
+                job_list.save_jobs()
             for section, x11_scripts in x11_scripts_to_submit_by_section.items():
                 # X11 only works sequentially, so we need to process them one by one, and not in parallel by section like the normal scripts.
                 for script_name, package in x11_scripts.items():
@@ -2511,10 +2511,10 @@ class Autosubmit:
                         any_job_submitted = True
                     except Exception:
                         if not inspect:
-                            job_list.save()
+                            job_list.save_jobs()
                         raise
             if not inspect:
-                job_list.save()
+                job_list.save_jobs()
 
             wrapper_errors.update(packager.wrappers_with_error)
             # TODO: rebase check if still works
@@ -3087,17 +3087,22 @@ class Autosubmit:
                                            expand_list=expand,
                                            expanded_status=status)
                 groups_dict = job_grouping.group_jobs()
-                Log.info("\nPlotting the jobs list...")
-                monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
-                monitor_exp.generate_output(expid,
-                                            job_list.get_job_list(),
-                                            os.path.join(
-                                                exp_path, "/tmp/LOG_", expid),
-                                            output_format=output_type,
-                                            packages=list(job_list.job_package_map.values()),
-                                            show=not hide,
-                                            groups=groups_dict,
-                                            job_list_object=job_list)
+                if not noplot:
+                    try:
+                        Log.info("\nPlotting the jobs list...")
+                        monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
+                        monitor_exp.generate_output(expid,
+                                                    job_list.get_job_list(),
+                                                    os.path.join(
+                                                        exp_path, "/tmp/LOG_", expid),
+                                                    output_format=output_type,
+                                                    packages=list(job_list.job_package_map.values()),
+                                                    show=hide,
+                                                    groups=groups_dict,
+                                                    job_list_object=job_list)
+                    except Exception as e:
+                        Log.warning(f'The command completed successfully, but the plot could not be generated: {e}')
+
         except Exception as e:
             raise AutosubmitCritical(
                 "An error has occurred while printing the workflow status. Check if you have X11 redirection and an img viewer correctly set",
@@ -4403,8 +4408,8 @@ class Autosubmit:
             elif final_status in [Status.QUEUING, Status.RUNNING] and (job.status == Status.SUSPENDED):
                 if job.platform_name and job.platform_name.upper() != "LOCAL":
                     job.platform.send_command("scontrol release " + f"{job.id}", ignore_log=True)
-        # if job.status == Status.FAILED and job.status != final_status:
-        #     job._fail_count = 0
+        if job.status == Status.FAILED and job.status != final_status:
+            job._fail_count = 0
         job.status = final_status
         Log.info("CHANGED: job: " + job.name + " status to: " + final)
         Log.status("CHANGED: job: " + job.name + " status to: " + final)

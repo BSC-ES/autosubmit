@@ -1380,6 +1380,9 @@ class Job(object):
                 self.remote_logs = backup_log
                 break
 
+        if log_recovered:
+            self.platform.processed_wrapper_logs.add(self.wrapper_name)
+
         return last_retrial, log_recovered
 
     def update_stat_file(self):
