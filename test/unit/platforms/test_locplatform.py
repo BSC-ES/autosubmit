@@ -117,3 +117,104 @@ def test_refresh_log_recovery_process(autosubmit, autosubmit_config, mocker):
         spy.assert_called()
         spy2.assert_not_called()
         assert local.work_event is None
+
+
+def _make_simple_job(name: str, status: Status, fail_count: int = 0):
+    """Return a lightweight job object for check_all_jobs tests."""
+    job = type('Job', (), {})()
+    job.name = name
+    job.id = 1
+    job.fail_count = fail_count
+    job.status = status
+    job.new_status = status
+    job.finished_time = None
+    job.start_time_timestamp = None
+    job.wrapper_type = 'simple'
+    return job
+
+
+@pytest.mark.parametrize('stat_line,expected_final_status', [
+    ('COMPLETED', Status.COMPLETED),
+    ('FAILED', Status.FAILED),
+    ('', Status.RUNNING),  # STAT not flushed yet → defer
+])
+def test_check_all_jobs_stat_confirmation(
+        tmp_path: Path,
+        stat_line: str,
+        expected_final_status: Status,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """check_all_jobs confirms COMPLETED scheduler status via the STAT file.
+
+    :param tmp_path: Temporary directory for remote log files.
+    :param stat_line: Last line written to the STAT file (empty = absent).
+    :param expected_final_status: Expected status after check_all_jobs.
+    """
+    platform = LocalPlatform(expid=_EXPID, name='local', config={})
+    remote_log = tmp_path / f'LOG_{_EXPID}'
+    remote_log.mkdir(parents=True)
+    platform.remote_log_dir = str(remote_log)
+    platform.connected = True
+
+    job = _make_simple_job('t001_INI', status=Status.RUNNING)
+
+    if stat_line:
+        (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text(
+            f'1000\n1060\n{stat_line}\n'
+        )
+
+    as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
+
+    platform.check_all_jobs([job], as_conf)
+
+    assert job.new_status == expected_final_status
+
+
+def test_check_all_jobs_save_flag_set_when_status_changes(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """check_all_jobs updates job.new_status when the STAT file reports a new status.
+
+    :param tmp_path: Temporary directory for remote log files.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    platform = LocalPlatform(expid=_EXPID, name='local', config={})
+    remote_log = tmp_path / f'LOG_{_EXPID}'
+    remote_log.mkdir(parents=True)
+    platform.remote_log_dir = str(remote_log)
+    platform.connected = True
+
+    job = _make_simple_job('t001_INI', status=Status.RUNNING)
+    (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text('1000\n1060\nCOMPLETED\n')
+
+    as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
+
+    platform.check_all_jobs([job], as_conf)
+
+    assert job.new_status == Status.COMPLETED
+
+
+def test_check_all_jobs_no_change_returns_false(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """check_all_jobs keeps job.new_status as RUNNING when no STAT file is present.
+
+    :param tmp_path: Temporary directory for remote log files.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    platform = LocalPlatform(expid=_EXPID, name='local', config={})
+    remote_log = tmp_path / f'LOG_{_EXPID}'
+    remote_log.mkdir(parents=True)
+    platform.remote_log_dir = str(remote_log)
+    platform.connected = True
+
+    job = _make_simple_job('t001_INI', status=Status.RUNNING)
+
+
+    as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
+
+    platform.check_all_jobs([job], as_conf)
+
+    assert job.new_status == Status.RUNNING

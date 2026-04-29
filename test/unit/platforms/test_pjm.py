@@ -186,7 +186,7 @@ def test_process_ready_jobs_valid_packages_to_submit(mocker, pjm_platform, creat
 
     for i, package in enumerate(create_packages):
         for job in package.jobs:
-            assert job.id == str(jobs_id[i])
+            assert job.id == jobs_id[i]
             assert job.status == Status.SUBMITTED
 
 

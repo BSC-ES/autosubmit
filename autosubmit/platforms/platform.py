@@ -235,6 +235,7 @@ class Platform:
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
         self.has_scheduler = True
+        self._io_safe_wait = self.config.get("PLATFORM", {}).get(self.name.upper(), {}).get("IO_SAFE_WAIT", 60)
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -384,8 +385,7 @@ class Platform:
     def root_dir(self, value):
         self._root_dir = value
 
-    def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
-                           packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
+    def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList', packages_to_submit: list['JobPackageBase'],
                            inspect=False, only_wrappers=False) -> tuple[dict[str, dict[str, 'JobPackageBase']], dict[str, dict[str, 'JobPackageBase']]]:
         """Prepare job packages for submission on the current platform.
 
@@ -400,9 +400,6 @@ class Platform:
         :param job_list: Job container used to inspect ready jobs and register
             wrapper information.
         :type job_list: JobList
-        :param packages_persistence: Persistence helper used to store package
-            metadata during inspect or wrapper-only workflows.
-        :type packages_persistence: JobPackagePersistence
         :param packages_to_submit: Packages built for this platform and ready to
             be prepared.
         :type packages_to_submit: list[JobPackageBase]
@@ -423,21 +420,25 @@ class Platform:
         scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
         x11_scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
         for package in packages_to_submit:
-            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, packages_persistence, as_conf)
+            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, as_conf)
             if not only_wrappers:
                 package.generate_scripts(as_conf, inspect)
                 if not inspect:
                     package.send_files()
                     if package.x11:
-                        x11_scripts_to_submit_by_section.setdefault(package.sections, {})[f"{package.name}.cmd"] = package
+                        x11_scripts_to_submit_by_section.setdefault(package.sections, {})[
+                            f"{package.name}.cmd"] = package
                     else:
                         scripts_to_submit_by_section.setdefault(package.sections, {})[f"{package.name}.cmd"] = package
+            elif package.is_wrapped:
+                # Register wrapped packages for preview saving (e.g., monitor -cw).
+                scripts_to_submit_by_section.setdefault(package.sections, {})[f"{package.name}.cmd"] = package
 
         return scripts_to_submit_by_section, x11_scripts_to_submit_by_section
 
     @staticmethod
-    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool, inspect: bool,
-                                      packages_persistence: 'JobPackagePersistence', as_conf: 'AutosubmitConfig') -> None:
+    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool,
+                                      inspect: bool, as_conf: 'AutosubmitConfig') -> None:
         """Dry-run preparation of a package to emulate that the package was submitted, without following the normal submission flow.
 
         :param job_list: Job container used to register wrapper package and job
@@ -450,23 +451,13 @@ class Platform:
         :type only_wrappers: bool
         :param inspect: If ``True``, prepare package metadata for inspect mode.
         :type inspect: bool
-        :param packages_persistence: Persistence helper used to store package
-            data for later recovery or visualization.
-        :type packages_persistence: JobPackagePersistence
         :param as_conf: Autosubmit configuration for the current experiment.
         :type as_conf: AutosubmitConfig
         :raises Exception: Propagate any exception raised while creating wrapper
             job metadata or saving the package.
         """
+
         if only_wrappers or inspect:
-            # Now name is used for submit scripts, before it was used to determine if a package had a wrapper or not
-            if package.is_wrapped:
-                job_list.packages_dict[package.name] = package.jobs
-                from ..job.job import WrapperJob
-                wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                         package.jobs, package._wallclock, package.platform, as_conf, hold=False)
-                job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                packages_persistence.save(package, inspect)
             for innerJob in package._jobs:
                 # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
                 innerJob.status = Status.COMPLETED
@@ -724,20 +715,14 @@ class Platform:
         return True
 
     def get_stat_file(self, job, count=-1):
-        if count == -1:  # No internal retrials
-            filename = f"{job.stat_file}{job.fail_count}"
-        else:
-            filename = f'{job.name}_STAT_{str(count)}'
+        filename = f'{job.name}_STAT_{str(count)}'
         stat_local_path = os.path.join(
             self.config.get("LOCAL_ROOT_DIR"), self.expid, self.config.get("LOCAL_TMP_DIR"), filename)
         if os.path.exists(stat_local_path):
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                if count == -1:
-                    Log.debug(f'{job.name}_STAT_{str(job.fail_count)} file have been transferred')
-                else:
-                    Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
+                Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
                 return True
         Log.warning(f'{job.name}_STAT_{str(count)} file not found')
         return False
@@ -755,8 +740,7 @@ class Platform:
             path = Path(self.remote_log_dir)
         return str(path)
 
-
-    def check_all_jobs(self, job_list: list['Job'], as_conf:'AutosubmitConfig', retries: int = 5):
+    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):
         """Checks jobs running status
 
         :param job_list: list of jobs
@@ -802,7 +786,7 @@ class Platform:
         else:
             Log.warning(
                 f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry. This shouldn't happen!")
-        job.updated_log += 1
+            job.updated_log += 1
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
@@ -955,7 +939,8 @@ class Platform:
             if ret_pid == 0:  # Process is still running
                 Log.info(f"Process {self.log_recovery_process.pid} is still running.")
             else:
-                Log.result(f"Process {self.log_recovery_process.name} finished with pid {self.log_recovery_process.pid}")
+                Log.result(
+                    f"Process {self.log_recovery_process.name} finished with pid {self.log_recovery_process.pid}")
         else:
             Log.result("Log_Recovery_Process is empty no process joinned")
 
@@ -1030,8 +1015,7 @@ class Platform:
             job.update_parameters(as_conf, True, False, True)
             for key in job_data:
                 setattr(job, key, job_data[key])
-            job.update_local_logs()
-            job.retrieve_logfiles(raise_error=True)
+            job.retrieve_logfiles()
             jobs_db_manager.save_job_log(job)
 
     def recover_platform_job_logs(self, as_conf: 'AutosubmitConfig') -> None:
@@ -1118,10 +1102,18 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
-    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
+    def delete_previous_run_files_by_job_names(self, job_names: list[str]) -> None:
         """Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
 
         :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
         :type job_names: List[str]
+        """
+        raise NotImplementedError  # pragma: no cover
+    def confirm_done_jobs_via_stat(self, job_list: list) -> dict[str, "Status"]:
+        """Confirm that jobs marked as done are actually completed by checking their STAT files.
+
+        :param job_list: List of jobs to confirm.
+        :param has_internal_retries: Indicates if the jobs have internal retries, which affects the STAT file naming convention.
+        :return: List of jobs that are confirmed as completed.
         """
         raise NotImplementedError  # pragma: no cover

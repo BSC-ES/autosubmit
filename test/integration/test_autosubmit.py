@@ -25,15 +25,16 @@ import pytest
 from mock import Mock
 import time
 
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_packages import JobPackageBase
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.platform import Platform
 
 if TYPE_CHECKING:
@@ -331,82 +332,6 @@ def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experim
         autosubmit_exp('t000', experiment_data, create=False, include_jobs=False)
 
 
-@pytest.mark.parametrize('error_type', [
-    'AutosubmitError_bad_parameters',
-    'AutosubmitError',
-    'IOError',
-    'Exception',
-    None,
-])
-def test_submit_ready_jobs(autosubmit_exp, mocker, error_type):
-    exp = autosubmit_exp('a000', experiment_data={})
-
-    platform_config = {
-        "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
-        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'exp_tmp_dir'),
-        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'aslogs_dir')
-    }
-    platform = Platform('a000', "Platform", platform_config)
-
-    job_list = JobList('a000', exp.as_conf, YAMLParserFactory())
-
-    for i in range(3):
-        job = Job(f"job{i}", i, 2, 0)
-        job.section = f"SECTION{i}"
-        job.platform = platform
-        job_list.add_job(job)
-    packages_to_submit = JobPackageBase(job_list.get_job_list())
-    packages_to_submit.name = "test"
-    packages_to_submit.x11 = "false"
-    mocker.patch('autosubmit.platforms.platform.Platform.generate_submit_script', Mock())
-
-    if error_type == 'AutosubmitError':
-        packages_to_submit.jobs[0].id = 1
-        mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit',
-                     side_effect=AutosubmitError("Test induced error"))
-    elif error_type == 'AutosubmitError_bad_parameters':
-        packages_to_submit.jobs[0].id = 1
-        mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit',
-                     side_effect=AutosubmitError("Test induced error with bad parameters"))
-    elif error_type == 'IOError':
-        packages_to_submit.jobs[0].id = 1
-        mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit',
-                     side_effect=IOError("Test induced IO error"))
-    elif error_type == 'Exception':
-        packages_to_submit.jobs[0].id = 1
-        mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit',
-                     side_effect=Exception("Test induced general exception"))
-    elif error_type == 'Exception_bad_parameters':
-        packages_to_submit.jobs[0].id = 1
-        mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit',
-                     side_effect=Exception("Test induced general exception with bad parameters"))
-    else:
-        mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit', Mock())
-        mocker.patch('autosubmit.job.job_packages.JobPackageBase.submit', Mock())
-    if error_type == 'Exception':
-        with pytest.raises(Exception) as cm:
-            platform.submit_ready_jobs(
-                exp.as_conf, job_list, [packages_to_submit])
-        assert 'Test induced general exception' in str(cm.value)
-        return
-
-    save, failed_packages, error_message, valid_packages_to_submit, any_job_submitted = platform.submit_ready_jobs(
-        exp.as_conf, job_list, [packages_to_submit])
-    if error_type:
-        assert not save
-        if error_type == 'AutosubmitError_bad_parameters':
-            assert error_message
-        else:
-            assert not error_message
-        assert len(failed_packages) == 1
-        assert len(valid_packages_to_submit) == 0
-        assert not any_job_submitted
-
-    else:
-        assert save
-        assert error_message == ''
-        assert len(valid_packages_to_submit) == 1
-        assert any_job_submitted
 
 @pytest.mark.parametrize(
     '_exit,job_previous_status,expected_jobs_to_check',
@@ -456,22 +381,18 @@ def test_check_wrappers_and_as_exit(
     exp = autosubmit_exp(experiment_data={})
     as_conf: AutosubmitConfig = exp.as_conf
 
+    job = Job('1', '1', job_previous_status)
     job_list: JobList = mocker.MagicMock(spec=JobList)
-    job_list.get_in_queue_grouped_id.return_value = {
-        '1': [
-            Job('1', '1', job_previous_status)
-        ]
-    }
+    job_list.get_job_list.return_value = [job]
     job_list.job_package_map = {}
 
     platform = mocker.MagicMock(spec=Platform)
     platform.name = 'test_platform'
-    platforms_to_test: set[Platform] = {platform}
 
     Autosubmit.exit = _exit
 
     t: tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]] = \
-        autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, exp.expid)
+        autosubmit.check_wrappers(as_conf, job_list, exp.expid)
     jobs_to_check, _ = t
 
     assert len(jobs_to_check) == expected_jobs_to_check

@@ -18,6 +18,7 @@
 
 from .platform_monitor import PlatformMonitor
 from .slurm_monitor_item import SlurmMonitorItem
+from ...log.log import Log
 
 
 class SlurmMonitor(PlatformMonitor):
@@ -74,5 +75,10 @@ class SlurmMonitor(PlatformMonitor):
         else:
             return None
 
-    def steps_plus_extern_approximate_header_energy(self):
+    def steps_plus_extern_approximate_header_energy(self) -> bool:
+        """Check if the sum of steps energy and extern energy approximately equals the header energy.
+        
+        :return: True if the sum of steps and extern energy is within 1% of the header energy, False otherwise.
+        :rtype: bool
+        """
         return abs(self.steps_energy + self.extern.energy - self.header.energy) <= 0.01 * self.header.energy

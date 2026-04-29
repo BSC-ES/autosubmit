@@ -383,16 +383,7 @@ class PBSPlatform(ParamikoPlatform):
         job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat -f {job_id} | grep 'eligible_time = [0-9:0-9:0-9]*' && echo \"BREAK\" && " + f"qstat -H -f {job_id} | grep 'eligible_time = [0-9:0-9:0-9]*'"
 
-    def get_queue_status_cmd(self, job_id: str) -> str:
-        """Get queue generating qstat command to the job selected.
 
-        :param job_id: ID of a job.
-        :param job_id: str
-        :return: Gets estimated queue time.
-        :rtype: str
-        """
-        job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
-        return f"qstat {job_id} && echo \"BREAK\" && " + f"qstat -H {job_id}"
 
     def parse_queue_reason(self, output: str, job_id: str) -> str:
         """Parse the queue reason from the output of the command.
@@ -411,38 +402,7 @@ class PBSPlatform(ParamikoPlatform):
             return ''.join(reason)
         return reason  # noqa F501
 
-    def get_queue_status(self, in_queue_jobs: list['Job'], list_queue_jobs_id: str, as_conf: AutosubmitConfig) -> None:
-        """Get queue status for in-queue jobs.
 
-        :param in_queue_jobs: List of Job.
-        :type in_queue_jobs: list[Job]
-        :param list_queue_jobs_id: List of Job IDs concatenated.
-        :type list_queue_jobs_id: str
-        :param as_conf: experiment configuration.
-        :type as_conf: autosubmit.config.AutosubmitConfig
-        :rtype: None
-        """
-        if not in_queue_jobs:
-            return
-        cmd = self.get_queue_status_cmd(list_queue_jobs_id)
-        self.send_command(cmd)
-        queue_status = self._ssh_output
-        for job in in_queue_jobs:
-            reason = self.parse_queue_reason(queue_status, job.id)
-            if job.queuing_reason_cancel(reason):  # this should be a platform method to be implemented
-                Log.error(
-                    f"Job {job.name} will be cancelled and set to FAILED as it was queuing due to {reason}")
-                self.send_command(
-                    self.cancel_cmd + f" {job.id}")
-                job.new_status = Status.FAILED
-                job.update_status(as_conf)
-            elif reason == '(JobHeldUser)':
-                if not job.hold:
-                    # should be self.release_cmd or something like that, but it is not implemented
-                    self.send_command(f"qrls {job.id}")
-                    job.new_status = Status.QUEUING  # If it was HELD and was released, it should be QUEUING next.
-                else:
-                    job.new_status = Status.HELD
 
     def wrapper_header(self, **kwargs: dict) -> str:
         """Generate the header of the wrapper configuring it to execute the Experiment.

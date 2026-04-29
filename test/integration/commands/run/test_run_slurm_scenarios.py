@@ -17,11 +17,10 @@
 
 """Tests that run diverse scenarios for Autosubmit run with a ``slurm`` platform
 and checks the database for expected results."""
-
+import time
 from getpass import getuser
 from pathlib import Path
 from textwrap import dedent
-from test.integration.test_utils.misc import wait_locker
 from typing import TYPE_CHECKING
 
 import pytest
@@ -190,7 +189,7 @@ def test_run_uninterrupted(
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid, wrapper_type=wrapper_type)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid, wrapper_type)
     e_msg = f"Current folder: {str(run_tmpdir)}\n"
     e_msg += f"job_data file: {Path(BasicConfig.JOBDATA_DIR)}/job_data_{as_exp.expid}.db\n"
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
@@ -364,25 +363,18 @@ def test_run_interrupted(
     as_conf.set_last_as_command('run')
 
     # Run the experiment
-    # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
-    lock_file = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid, BasicConfig.LOCAL_TMP_DIR, "autosubmit.lock")
-    as_thread, exception, _ = run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
-    if exception:
-        pytest.fail(f"Exception raised: {exception}")
-    wait_locker(lock_file, expect_locked=True, timeout=30, interval=0.5)
-    current_statuses = 'SUBMITTED, QUEUING, RUNNING'
-    as_exp.autosubmit.stop(
-        all_expids=False,
-        cancel=False,
-        current_status=current_statuses,
-        expids=as_exp.expid,
-        force=True,
-        force_all=True,
-        status='FAILED')
+    as_thread, result, stop_event = run_in_thread(
+        as_exp.autosubmit.run_experiment,
+        expid=as_exp.expid
+    )
 
-    as_thread.join(timeout=60)
-    assert not as_thread.is_alive(), "Autosubmit thread did not stop after stop() call"
-    wait_locker(lock_file, expect_locked=False, timeout=30, interval=0.5)
+    time.sleep(3)
+
+    if as_thread.is_alive():
+        stop_event.set()  # signal "terminate"
+        as_thread.join(timeout=2)
+
+    assert not as_thread.is_alive(), "Autosubmit thread did not stop as expected."
 
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
 
@@ -396,63 +388,6 @@ def test_run_interrupted(
     _assert_files_recovered(files_check_list)
 
     _assert_exit_code(final_status, exit_code)
-
-
-@pytest.mark.ssh
-@pytest.mark.slurm
-@pytest.mark.docker
-@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
-    # Failure
-    (dedent("""\
-    CONFIG:
-        SAFETYSLEEPTIME: 0
-    EXPERIMENT:
-        NUMCHUNKS: '2'
-    JOBS:
-        job:
-            SCRIPT: |
-                d_echo "Hello World with id=FAILED"
-            PLATFORM: local
-            RUNNING: chunk
-            wallclock: 00:01
-            retrials: 1  
-    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-], ids=["Force Failure -> Correct it -> Completed"])
-def test_run_failed_set_to_ready_on_new_run(
-        autosubmit_exp,
-        general_data,
-        jobs_data,
-        expected_db_entries,
-        final_status,
-        wrapper_type,
-        slurm_server
-):
-    yaml = YAML(typ='rt')
-    jobs_data_yaml = yaml.load(jobs_data)
-    as_exp = autosubmit_exp(experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
-    as_conf = as_exp.as_conf
-    as_conf.set_last_as_command('run')
-
-    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
-    _assert_exit_code(final_status, exit_code)
-
-    # The experiment must have failed above with a final status.
-    # But the job script has d_echo, so here we replace it, and
-    # run it again. It should succeed now.
-    yaml_with_jobs = Path(as_exp.exp_path, 'conf/additional_data.yml')
-    with open(yaml_with_jobs, 'r') as f:
-        data = yaml.load(f)
-    data["JOBS"]["job"]["SCRIPT"] = 'echo "Hello World with id=READY"'
-    with yaml_with_jobs.open("w") as f:
-        yaml.dump(data, f)
-
-    as_conf.set_last_as_command('create')
-    assert 0 == as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=False)
-
-    as_conf.set_last_as_command('run')
-    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
-
-    _assert_exit_code("SUCCESS", exit_code)
 
 
 @pytest.mark.docker

@@ -135,6 +135,7 @@ JobDataTable = Table(
     Column("workflow_commit", Text, nullable=True),
     Column("split", Text, nullable=True),
     Column("splits", Text, nullable=True),
+    Column("fail_count", Integer, nullable=False, default=0),
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 

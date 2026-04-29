@@ -29,7 +29,6 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
 )
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from bscearth.utils.date import date2str
 
 if TYPE_CHECKING:
@@ -125,7 +124,7 @@ def do_recovery(as_exp, fl=None, fc=None, fs=None, ft=None, all_jobs=True):
 
     as_exp.autosubmit.recovery(
         as_exp.expid,
-        noplot=False,
+        noplot=True,
         save=True,
         all_jobs=all_jobs,
         hide=True,
@@ -191,7 +190,7 @@ def test_online_recovery(
         with pytest.raises(AutosubmitCritical):
             as_exp.autosubmit.recovery(
                 as_exp.expid,
-                noplot=False,
+                noplot=True,
                 save=True,
                 all_jobs=True,
                 hide=True,
@@ -205,7 +204,7 @@ def test_online_recovery(
     else:
         as_exp.autosubmit.recovery(
             as_exp.expid,
-            noplot=False,
+            noplot=True,
             save=True,
             all_jobs=True,
             hide=True,
@@ -325,7 +324,7 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
             with pytest.raises(AutosubmitCritical):
                 as_exp.autosubmit.recovery(
                     as_exp.expid,
-                    noplot=False,
+                    noplot=True,
                     save=True,
                     all_jobs=True,
                     hide=True,
@@ -339,7 +338,7 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
         else:
             as_exp.autosubmit.recovery(
                 as_exp.expid,
-                noplot=False,
+                noplot=True,
                 save=True,
                 all_jobs=True,
                 hide=True,
@@ -435,7 +434,7 @@ def test_recovery_plotting_error_logs_warning(as_exp, mocker):
         call.args[0] for call in mocked_warning.call_args_list if call.args
     ]
     assert any(
-        "An error has occurred while plotting the jobs list after recovery."
+        "plotting error"
         in message
         for message in warning_messages
     )

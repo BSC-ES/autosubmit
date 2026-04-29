@@ -21,7 +21,6 @@ from datetime import datetime
 import pytest
 
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.template import Language
 from autosubmit.platforms.psplatform import PsPlatform
 
@@ -48,7 +47,7 @@ def _generate_and_get_split_job(autosubmit_config, experiment_data):
     as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
 
     parameters = as_conf.load_parameters()
-    job_list_obj = JobList('t000', as_conf, as_conf.parser_factory, JobListPersistencePkl())
+    job_list_obj = JobList('t000', as_conf, as_conf.parser_factory)
     job_list_obj.generate(
         as_conf=as_conf,
         date_list=[datetime(2020, 1, 1)],
@@ -59,11 +58,8 @@ def _generate_and_get_split_job(autosubmit_config, experiment_data):
         date_format=None,
         default_retrials=as_conf.get_retrials(),
         default_job_type=Language.BASH,
-        wrapper_jobs={},
         new=True,
-        run_only_members=[],
         show_log=False,
-        create=True,
     )
 
     split_jobs = [

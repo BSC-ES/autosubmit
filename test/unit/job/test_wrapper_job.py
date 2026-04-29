@@ -20,7 +20,7 @@ class DummyWrapperJob(WrapperJob):
     def _check_time(self, *args, **kwargs):
         return self._test_check_time_return
 
-    def _check_inner_job_wallclock(self, job):
+    def _check_inner_job_wallclock(self, job, vertical_wrapper=False):
         return self._test_check_inner_job_wallclock_return
 
 
