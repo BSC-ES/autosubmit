@@ -97,6 +97,7 @@ PERSISTENT_ATTRIBUTES = (
     "local_logs",
     "remote_logs",
     "updated_log",
+    "fail_count",
     "packed",
 )
 
@@ -282,7 +283,6 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
-        self.first_wrapped_level = False
         self._wrapper_queue = None
         self._platform: 'ParamikoPlatform' = None
         self._queue = None
@@ -366,6 +366,7 @@ class Job(object):
         self._cpmip_thresholds = {}
         self._chunk_size = None
         self._chunk_size_unit = None
+        self._validate_template = False
         self._processors_per_node = None
         self.ec_queue = None
         self.platform_name = None
@@ -401,7 +402,8 @@ class Job(object):
         self.validate_template = False
         self.finished_time = None
 
-    def init_runtime_parameters(self, as_conf: AutosubmitConfig, reset_logs: bool, called_from_log_recovery: bool) -> None:
+    def init_runtime_parameters(self, as_conf: AutosubmitConfig, reset_logs: bool,
+                                called_from_log_recovery: bool) -> None:
         """Initialize runtime parameters for the job.
 
         Sets default values for job execution parameters including tasks, nodes,
@@ -442,6 +444,8 @@ class Job(object):
         self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
         if reset_logs:
             self.reset_logs()
+        if self.status not in [Status.COMPLETED, Status.FAILED]:
+            self.finished_time = None
 
     @property  # type: ignore
     def wallclock_in_seconds(self):
@@ -1309,12 +1313,14 @@ class Job(object):
         :rtype: bool
         """
         try:
-            out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1, show_logs=show_logs)
+            out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1,
+                                                        show_logs=show_logs)
         except IOError:
             Log.debug(f'Output log {self.remote_logs[0]} still does not exist')
             out_exist = False
         try:
-            err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1, show_logs=show_logs)
+            err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1,
+                                                        show_logs=show_logs)
         except IOError:
             Log.debug(f'Error log {self.remote_logs[1]} still does not exist')
             err_exist = False
@@ -1780,7 +1786,8 @@ class Job(object):
                     self.het['RESERVATION'].append(str(x))
             self.reservation = str(self.het['RESERVATION'][0])
         else:
-            self.reservation = self.reservation if isinstance(self.reservation, str) and self.reservation.strip() else ""
+            self.reservation = self.reservation if isinstance(self.reservation,
+                                                              str) and self.reservation.strip() else ""
         if type(self.exclusive) is list:
             # Get the exclusive, each element can be only be bool
             self.het['EXCLUSIVE'] = list()
@@ -3128,6 +3135,7 @@ class WrapperJob(Job):
         self.type = wr_type
         self.method = method
         self.num_processors = num_processors
+        self._safe_wait = 60  # seconds to wait before considering a wrapper stuck in RUNNING when all the inner jobs are finished
 
     def _queuing_reason_cancel(self, reason: str) -> bool:
         """Function return True if a job was cancelled for a listed reason.
@@ -3303,6 +3311,7 @@ class WrapperJob(Job):
         :return: True if the status of the wrapper job has changed, otherwise False.
         :rtype: bool
         """
+
         save = False
         self.platform.check_all_jobs([self], as_conf)
         self._handle_vertical_retries()
@@ -3333,6 +3342,9 @@ class WrapperJob(Job):
             Log.debug(f"Wrapper job {self.name} and id {self.id} status updated to {self.status_str}.")
             save = True
 
+        elif self.status != self.prev_status:
+            Log.debug(f"Wrapper job {self.name} and id {self.id} status updated to {self.status_str}.")
+            save = True
         return save
 
     def _check_inner_job_wallclock(self, job: Job, vertical_wrapper) -> bool:

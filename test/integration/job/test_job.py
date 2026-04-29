@@ -54,17 +54,25 @@ def test_retrieve_logfiles(autosubmit_exp, tmp_path, slurm_server, mocker, remot
         slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/some_COMPLETED")
         slurm_server.exec_run(f"printf '%s\n' 19704923 19704924 19704925 > {job.platform.remote_log_dir}/some_STAT_0")
 
-        assert job.retrieve_logfiles()
+        report = job.retrieve_logfiles()
+        assert report.all_succeeded
+        assert len(report.attempts) == 1
+        assert report.attempts[0].success
+        assert report.final_updated_log == 1
     else:
-        assert not job.retrieve_logfiles()
+        report = job.retrieve_logfiles()
+        assert not report.all_succeeded
+        assert report.final_updated_log == 0
         slurm_server.exec_run(f"mkdir -p {job.platform.remote_log_dir}")
-        assert not job.retrieve_logfiles()
+        report = job.retrieve_logfiles()
+        assert not report.all_succeeded
+        assert report.final_updated_log == 0
 
 
 @pytest.mark.docker
 @pytest.mark.ssh
 @pytest.mark.parametrize("remote_logs", [True, False])
-def test_retrieve_internal_logfiles(autosubmit_exp, tmp_path, slurm_server, mocker, remote_logs):
+def test_retrieve_logfiles_with_retrials(autosubmit_exp, tmp_path, slurm_server, mocker, remote_logs):
     as_exp = autosubmit_exp(experiment_data=slurm_conf, include_jobs=False, create=True)
     as_exp.as_conf.experiment_data['ROOTDIR'] = str(tmp_path)
     as_exp.as_conf.experiment_data['DEFAULT']['HPCARCH'] = 'TEST_SLURM'
@@ -72,7 +80,7 @@ def test_retrieve_internal_logfiles(autosubmit_exp, tmp_path, slurm_server, mock
     submitter = ParamikoSubmitter(as_conf=as_exp.as_conf)
     submitter.load_platforms(as_exp.as_conf)
     slurm_platform = submitter.platforms['TEST_SLURM']
-    jobs = [Job('some', 'job_id', status=Status.WAITING, priority=0, loaded_data=None), Job('some', 'job_id2', status=Status.WAITING, priority=0, loaded_data=None)]
+    jobs = [Job('some0', 'job_id', status=Status.WAITING, priority=0, loaded_data=None), Job('some1', 'job_id2', status=Status.WAITING, priority=0, loaded_data=None)]
 
     for i, job in enumerate(jobs):
         job.retrials = len(jobs)
@@ -81,25 +89,31 @@ def test_retrieve_internal_logfiles(autosubmit_exp, tmp_path, slurm_server, mock
         job._tmp_path = tmp_path / as_exp.expid / 'tmp'
         job.platform = slurm_platform
         job.platform.connect(None)
-        Path(f'{tmp_path}/{as_exp.expid}/tmp/some_TOTAL_STATS').touch()
-        slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/some_COMPLETED")
+        Path(f'{tmp_path}/{as_exp.expid}/tmp/{job.name}_TOTAL_STATS').touch()
+        slurm_server.exec_run(f"mkdir -p {job.platform.remote_log_dir}")
+        slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/{job.name}_COMPLETED")
         if remote_logs:
-            slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/some.cmd.out.{i}")
-            slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/some.cmd.err.{i}")
-            slurm_server.exec_run(f"printf '%s\n' 19704923 19704924 19704925 > {job.platform.remote_log_dir}/some_STAT_{job.fail_count}")
+            # Create remote log files for all attempts up to fail_count
+            for attempt in range(job.fail_count + 1):
+                slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/{job.name}.cmd.out.{attempt}")
+                slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/{job.name}.cmd.err.{attempt}")
+                slurm_server.exec_run(f"printf '%s\n' 19704923 19704924 19704925 > {job.platform.remote_log_dir}/{job.name}_STAT_{attempt}")
 
     for job in jobs:
         if remote_logs:
             slurm_server.exec_run(f"mkdir -p {job.platform.remote_log_dir}")
-            job.remote_logs = (f"some.cmd.out.{job.fail_count}", f"some.cmd.err.{job.fail_count}")
-            job.local_logs = (f"some.cmd.out.{job.fail_count}", f"some.cmd.err.{job.fail_count}")
-            _, log_recovered = job.retrieve_internal_retrials_logfiles()
-            # TODO: file in the remote is not found but it is generated in the test... skipping the assert for now
-            #assert log_recovered
+            job.remote_logs = (f"{job.name}.cmd.out.{job.fail_count}", f"{job.name}.cmd.err.{job.fail_count}")
+            job.local_logs = (f"{job.name}.cmd.out.{job.fail_count}", f"{job.name}.cmd.err.{job.fail_count}")
+            report = job.retrieve_logfiles()
+            assert report.all_succeeded
+            assert len(report.attempts) == job.fail_count + 1
+            assert report.final_updated_log == job.fail_count + 1
         else:
-            _, log_recovered = job.retrieve_internal_retrials_logfiles()
-            assert not log_recovered
+            report = job.retrieve_logfiles()
+            assert not report.all_succeeded
+            assert report.final_updated_log == 0
             slurm_server.exec_run(f"mkdir -p {job.platform.remote_log_dir}")
-            _, log_recovered = job.retrieve_internal_retrials_logfiles()
-            assert not log_recovered
+            report = job.retrieve_logfiles()
+            assert not report.all_succeeded
+            assert report.final_updated_log == 0
             slurm_server.exec_run(f"rm -rf {job.platform.remote_log_dir}")

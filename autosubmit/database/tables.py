@@ -181,6 +181,7 @@ JobsTable = Table(
     Column("remote_logs_out", String),
     Column("remote_logs_err", String),
     Column("updated_log", Integer),
+    Column("fail_count", Integer, nullable=False, default=0),
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
     Column("platform_name", String),
