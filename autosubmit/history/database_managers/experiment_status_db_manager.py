@@ -154,9 +154,12 @@ class ExperimentStatusDbManager(DatabaseManager):
         self.create_exp_status(exp_row.id, expid, status)
 
     def update_heartbeat(self, expid: str) -> None:
-        # dummy function
-        pass
-
+        now = HUtils.get_current_datetime()
+        statement = ''' UPDATE experiment_status SET last_heartbeat = ?, modified = ?
+        WHERE name = ?'''
+        arguments = (now, now, expid)
+        self.execute_statement_with_arguments_on_dbfile(
+            self._as_times_file_path, statement, arguments)
 
 class ExperimentStatusDatabaseManager(Protocol):
 
