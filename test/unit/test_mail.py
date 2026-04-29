@@ -220,3 +220,63 @@ def test_notify_status_change(
         assert 'Traceback' not in log_calls
     else:
         mock_printlog.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "sendmail_error, expected_log_message",
+    [
+        (None, None),
+        (Exception("SMTP server error"),
+         'Trace:SMTP server error\nAn error has occurred while sending a warning mail about remote_platform')
+    ],
+    ids=[
+        "Normal case: No errors",
+        "Log connection error (SMTP server error)"
+    ]
+)
+def test_notify_cpmip_threshold_violations(
+        mock_basic_config,
+        mocker,
+        mail_notifier,
+        sendmail_error: Optional[Exception],
+        expected_log_message):
+    exp_id = 'a123'
+    job_name = 'Job1'
+    mail_to = ['recipient@example.com']
+    violations = {
+        "SYPD": {
+            "threshold": 5.0,
+            "accepted_error": 10,
+            "comparison": "greater_than",
+            "bound": 4.5,
+            "real_value": 3.9,
+        }
+    }
+
+    mock_smtp = mocker.patch(
+        'autosubmit.notifications.mail_notifier.smtplib.SMTP')
+    if sendmail_error:
+        mock_smtp.side_effect = sendmail_error
+    mock_printlog = mocker.patch.object(Log, 'printlog')
+
+    mail_notifier.notify_cpmip_threshold_violations(
+        exp_id, job_name, violations, mail_to)
+
+    if expected_log_message:
+        mock_printlog.assert_called_once_with(
+            expected_log_message, 6011)
+        log_calls = [call[0][0]
+                     for call in mock_printlog.call_args_list]
+        assert 'Traceback' not in log_calls
+    else:
+        mock_printlog.assert_not_called()
+        message_arg = mock_smtp.return_value.sendmail.call_args[0][2]
+        assert 'Subject: [Autosubmit] CPMIP Threshold Violation detected for Job1' in message_arg
+        assert 'Autosubmit notification: CPMIP threshold violations' in message_arg
+        assert '----------------------------------------' in message_arg
+        assert 'Metric: SYPD' in message_arg
+        assert 'Comparison: must be >= effective bound (greater_than)' in message_arg
+        assert 'Configured threshold: 5.0' in message_arg
+        assert 'Accepted error (%): 10' in message_arg
+        assert 'Effective bound: 4.5' in message_arg
+        assert 'Observed value: 3.9' in message_arg

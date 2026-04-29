@@ -24,7 +24,10 @@ from testcontainers.core.container import DockerContainer
 from testcontainers.core.waiting_utils import wait_for_logs
 
 from autosubmit.job.job_common import Status
-from autosubmit.notifications.mail_notifier import MailNotifier
+from autosubmit.notifications.mail_notifier import (
+    MailNotifier,
+    _generate_message_cpmip_threshold_violations,
+)
 from autosubmit.platforms.platform import Platform
 from test.integration.test_utils.networking import get_free_port
 
@@ -87,6 +90,16 @@ def _check_metadata(
             assert recipient in email["Raw"]["To"]
 
 
+def _normalize_mail_text(text: str) -> str:
+    """Normalize e-mail text for stable equality assertions."""
+    return text.replace("\r\n", "\n").strip()
+
+
+def _expected_cpmip_mail_body(exp_id: str, job_name: str, violations: dict) -> str:
+    """Return expected body for CPMIP threshold violation notification."""
+    return _generate_message_cpmip_threshold_violations(exp_id, job_name, violations)
+
+
 @pytest.mark.docker
 def test_notify_status_change(mail_notifier, fake_smtp_server):
     _, api_base = fake_smtp_server
@@ -107,7 +120,6 @@ def test_notify_status_change(mail_notifier, fake_smtp_server):
     emails = resp.json()["items"]
     _check_metadata(emails, "status has changed to FAILED",
                    expid, 'notifier@localhost', to_email)
-
 
 @pytest.mark.docker
 def test_experiment_status(mail_notifier, fake_smtp_server, mock_platform):
@@ -139,6 +151,52 @@ def test_experiment_status(mail_notifier, fake_smtp_server, mock_platform):
     ]
     assert ('Name="dummy_run.log.zip"' in b for b in bodies)
     # TODO: test content of compressed file?
+
+
+@pytest.mark.docker
+def test_notify_cpmip_threshold_violations(mail_notifier, fake_smtp_server):
+    _, api_base = fake_smtp_server
+    expid = 'a000'
+    job_name = 'SIM'
+    to_email = ['test@example.com']
+    violations = {
+        "SYPD": {
+            "threshold": 5.0,
+            "accepted_error": 10,
+            "comparison": "greater_than",
+            "bound": 4.5,
+            "real_value": 3.9,
+        },
+        "LATENCY": {
+            "threshold": 10.0,
+            "accepted_error": 5,
+            "comparison": "less_than",
+            "bound": 10.5,
+            "real_value": 10.6,
+        },
+    }
+
+    requests.delete(f"{api_base}/api/v1/messages")
+
+    mail_notifier.notify_cpmip_threshold_violations(
+        expid,
+        job_name,
+        violations,
+        to_email,
+    )
+
+    resp = requests.get(f"{api_base}/api/v2/messages")
+    assert resp.json()["count"] == 1
+    emails = resp.json()["items"]
+    _check_metadata(
+        emails,
+        "CPMIP Threshold Violation detected",
+        expid,
+        'notifier@localhost',
+        to_email)
+
+    expected_body = _expected_cpmip_mail_body(expid, job_name, violations)
+    assert _normalize_mail_text(emails[0]["Content"]["Body"]) == _normalize_mail_text(expected_body)
 
 
 @pytest.mark.parametrize(
