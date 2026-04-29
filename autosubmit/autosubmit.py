@@ -2253,9 +2253,8 @@ class Autosubmit:
                             # TODO: in 4.2 this is faster but not here adapt the change if the perfomance is bad
                             for job in [job for job in job_list.get_active() if job.prev_status is not None and job.prev_status != job.status]:
                                 job_changes_tracker[job.name] = (Status.VALUE_TO_KEY[job.prev_status], Status.VALUE_TO_KEY[job.status])
-                            for job in [job for job in job_list.get_job_list() if job.prev_status not in [Status.COMPLETED, Status.FAILED] and job.status in [Status.COMPLETED, Status.FAILED]]:
-                                job.platform.add_job_to_log_recover(job)
                             if job_changes_tracker:
+                                job_list.recover_logs()
                                 job_list.update_list(as_conf, submitter=submitter)
                                 job_list.save()
                             exp_history = Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker,
@@ -2357,6 +2356,8 @@ class Autosubmit:
                     except BaseException:
                         raise  # If this happens, there is a bug in the code or an exception not-well caught
                 Log.result("No more jobs to run.")
+                job_list.recover_logs()
+
                 # search hint - finished run
                 job_list.save()
                 if not did_run and len(

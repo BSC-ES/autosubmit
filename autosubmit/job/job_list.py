@@ -85,6 +85,8 @@ class JobList(object):
         self.depends_on_previous_split = dict()
         self.path_to_logs = Path(BasicConfig.LOCAL_ROOT_DIR,
                                  self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
+        self._FINAL_STATUSES = [Status.COMPLETED, Status.FAILED, Status.SKIPPED]
+
 
     @property
     def expid(self):
@@ -1870,6 +1872,7 @@ class JobList(object):
 
         return completed_failed_jobs
 
+
     def get_uncompleted(self, platform=None, wrapper=False):
         """Returns a list of completed jobs.
 
@@ -2567,17 +2570,17 @@ class JobList(object):
         # hasattr for backward compatibility (job.updated_logs is only for newer jobs,
         # as the loaded ones may not have this set yet)
         if not hasattr(job, "updated_log"):
-            job.updated_log = False
+            job.updated_log = 0
         elif job.updated_log:
             return
         # X11 has it log written in the run.out file.
         # No need to check for log files as there are none
         if hasattr(job, "x11") and job.x11:
-            job.updated_log = True
+            job.updated_log += 1
             return
         log_recovered = self.check_if_log_is_recovered(job)
         if log_recovered:
-            job.updated_log = True
+            job.updated_log += 1
             # TODO in pickle -> db/yaml migration(I):
             #  Do the save of the job here then clean attributes from mem ( or even the full job )
             job.clean_attributes()
@@ -2586,7 +2589,7 @@ class JobList(object):
             # we only want the last one
             err_filename = log_recovered.name.replace(".out", ".err")
             job.local_logs = (log_recovered.name, err_filename)
-            job.updated_log = True
+            job.updated_log += 1
         elif new_run and not job.updated_log and str(
                 as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS',
                                                                       "false")).lower() == "false":
@@ -2623,6 +2626,32 @@ class JobList(object):
                     if job.ready_date and file_timestamp >= int(job.ready_date):
                         return log_recovered  # TODO: Change to return the tuple of (.out,.err) files
         return None
+
+    def _recover_log(self, job: Job) -> None:
+        """Recover the log for a given job.
+        :param job: The job object to recover the log for.
+        :type job: Job
+        """
+        if str(self._config.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
+            job.retrieve_logfiles()
+        else:
+            # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
+            job.write_submit_time()
+            job.platform.add_job_to_log_recover(job)
+
+        job.log_recovery_call_count += 1
+
+    def recover_logs(self):
+        """Update jobs' log recovered status.
+
+        Iterate over the current job list and mark jobs whose stdout/stderr logs
+        have been recovered.
+
+        """
+        jobs_to_recover = [job for job in self.get_job_list() if
+                           not getattr(job, "x11", False) and job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
+        for job in jobs_to_recover:
+            self._recover_log(job)
 
     def check_completed_jobs_after_recovery(self):
         for job in (job for job in self.get_job_list() if job.status == Status.COMPLETED):
@@ -3423,7 +3452,7 @@ class JobList(object):
                 job.local_logs = jobs_data[job.name]["out"]
                 job.remote_logs = jobs_data[job.name]["err"]
                 job.log_recovered = True
-                job.updated_log = True
+                job.updated_log += 1
 
         for job in finished_jobs:
             # TODO: Another fix will come in 4.2. Currently, if the job has no id, the log will not be recovered properly.
@@ -3432,7 +3461,7 @@ class JobList(object):
             # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
             if not jobs_ran_atleast_once:
                 job.log_recovered = True
-                job.updated_log = True
+                job.updated_log += 1
 
     def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None,
                           return_only_names=False) -> Union[List[str], List["Job"]]:

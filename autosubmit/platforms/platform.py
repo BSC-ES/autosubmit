@@ -469,7 +469,7 @@ class Platform:
             for innerJob in package._jobs:
                 # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
                 innerJob.status = Status.COMPLETED
-                innerJob.updated_log = False
+                innerJob.updated_log = 0
 
     @property
     def serial_platform(self):
@@ -754,16 +754,9 @@ class Platform:
             path = Path(self.remote_log_dir)
         return str(path)
 
-    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):
-        """Checks jobs running status.
-
-        :param job_list: list of jobs
-        :type job_list: list
-        :param as_conf: config
-        :type as_conf: AutosubmitConfig
-        :param retries: retries
-        :type retries: int
-        """
+    def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig'):
+        for job in job_list:
+            self.check_job(job)
 
     def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries: int = 5,
                   submit_hold_check: bool = False, is_wrapper: bool = False):
@@ -799,7 +792,7 @@ class Platform:
         else:
             Log.warning(
                 f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry.")
-            job.updated_log = True
+            job.updated_log += 1
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
@@ -992,91 +985,34 @@ class Platform:
             self.work_event = None
             self.cleanup_event = None
 
-    def wait_mandatory_time(self, sleep_time: int = 60) -> bool:
-        """Waits for the work_event to be set or the cleanup_event to be set for a mandatory time.
+    def wait_for_work(self) -> bool:
+        """Waits until there is work, or the keep alive timeout is reached.
 
-        :param sleep_time: Minimum time to wait in seconds. Defaults to 60.
-        :type sleep_time: int
         :return: True if there is work to process, False otherwise.
-        :rtype: bool
         """
         process_log = False
-        for _ in range(0, sleep_time, 5):
-            time.sleep(5)
-            try:
-                if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
-                    process_log = True
-                    break
-            except OSError:
-                Log.warning(f"Queue is empty and process log is {sleep_time} seconds.")
-        if not process_log:
-            Log.warning(f"No work found within {sleep_time} seconds.")
-        return process_log
+        for _ in range(self.keep_alive_timeout, 0, -1):
+            if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
+                process_log = True
+                break
+            else:
+                time.sleep(1)
 
-    def wait_for_work(self, sleep_time: int = 60) -> bool:
-        """Waits a mandatory time and then waits until there is work, no work to more process or the cleanup event is set.
-
-        :param sleep_time: Maximum time to wait in seconds. Defaults to 60.
-        :type sleep_time: int
-        :return: True if there is work to process, False otherwise.
-        :rtype: bool
-        """
-        process_log = self.wait_mandatory_time(sleep_time)
-        if not process_log:
-            process_log = self.wait_mandatory_time(self.keep_alive_timeout - sleep_time)
         self.work_event.clear()
         return process_log
 
-    def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any],
-                        as_conf: 'AutosubmitConfig') -> set[Any]:
+    def recover_job_log(self) -> set[Any]:
         """Recovers log files for jobs from the recovery queue and retries failed jobs.
 
-        :param identifier: Identifier for logging purposes.
-        :param jobs_pending_to_process: Set of jobs that had issues during log retrieval.
-        :param as_conf: The Autosubmit configuration object containing experiment data.
         :return: Updated set of jobs pending to process.
         """
+        from autosubmit.job.job import Job
+
         while not self.recovery_queue.empty():
-            try:
-                from autosubmit.job.job import Job
-                job = Job(loaded_data=self.recovery_queue.get(timeout=1))
-                job.platform_name = self.name  # Change the original platform to this process platform.
-                job.platform = self
-                job._log_recovery_retries = 0  # Reset the log recovery retries.
-                try:
-                    job.retrieve_logfiles(raise_error=True)
-                except Exception:
-                    jobs_pending_to_process.add(job)
-                    job._log_recovery_retries += 1
-                    Log.warning(
-                        f"{identifier} (Retry) Failed to recover log for job '{job.name}' and retry:'{job.fail_count}'.")
-            except queue.Empty:
-                pass
-
-        if len(jobs_pending_to_process) > 0:  # Restore the connection if there was an issue with one or more jobs.
-            self.restore_connection(as_conf, log_recovery_process=True)
-
-        # This second while is to keep retring the failed jobs.
-        # With the unique queue, the main process won't send the job again, so we have to store it here.
-        while len(jobs_pending_to_process) > 0:  # jobs that had any issue during the log retrieval
-            job = jobs_pending_to_process.pop()
-            job._log_recovery_retries += 1
-            try:
-                job.retrieve_logfiles(raise_error=True)
-                job._log_recovery_retries += 1
-            except Exception as e:
-                if job._log_recovery_retries < 5:
-                    jobs_pending_to_process.add(job)
-                Log.warning(
-                    f"{identifier} (Retry) Failed to recover log for job '{job.name}' "
-                    f"and retry '{job.fail_count}': {str(e)}")
-            Log.result(
-                f"{identifier} (Retry) Successfully recovered log for job '{job.name}' and retry '{job.fail_count}'.")
-        if len(jobs_pending_to_process) > 0:
-            self.restore_connection(as_conf,
-                                    log_recovery_process=True)  # Restore the connection if there was an issue with one or more jobs.
-
-        return jobs_pending_to_process
+            job = Job(loaded_data=self.recovery_queue.get(timeout=1))
+            job.platform_name = self.name  # Change the original platform to this process platform.
+            job.platform = self
+            job.retrieve_logfiles(raise_error=True)
 
     def recover_platform_job_logs(self, as_conf: 'AutosubmitConfig') -> None:
         """Recovers the logs of the jobs that have been submitted.
@@ -1086,18 +1022,17 @@ class Platform:
         identifier = f"{self.name.lower()}(log_recovery):"
         try:
             Log.info(f"{identifier} Starting...")
-            jobs_pending_to_process: set = set()
             self.connected = False
             self.restore_connection(as_conf, log_recovery_process=True)
             Log.result(f"{identifier} successfully connected.")
-            log_recovery_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60)
-            # Keep alive signal timeout is 5 minutes, but the sleeptime is 60 seconds.
-            self.keep_alive_timeout = max(log_recovery_timeout * 5, 60 * 5)
-            while self.wait_for_work(sleep_time=max(log_recovery_timeout, 60)):
-                jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
-                if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
-                    self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
-                    break
+            self.keep_alive_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60 * 5)
+            while not self.cleanup_event.is_set() and self.wait_for_work():
+                try:
+                    self.recover_job_log()
+                except Exception as e:
+                    Log.debug(f'{identifier} Error during log recovery: {e}')
+                    Log.debug(traceback.format_exc())
+                    self.restore_connection(as_conf, log_recovery_process=True)
         except Exception as e:
             Log.error(f"{identifier} {e}")
             Log.debug(traceback.format_exc())

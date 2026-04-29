@@ -152,7 +152,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit', '_validate_template', 'first_wrapped_level'
+        '_log_recovered', 'packed_during_building', 'workflow_commit', '_validate_template', 'first_wrapped_level', 'log_recovery_call_count'
     )
 
     def __setstate__(self, state):
@@ -309,6 +309,7 @@ class Job(object):
                                                             Status.READY] else \
                 self.status
         self.validate_template = False
+        self.log_recovery_call_count = 0
 
     def clean_attributes(self):
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
@@ -1422,7 +1423,8 @@ class Job(object):
             else:
                 Log.result(
                     f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
-        self.log_recovered = log_recovered
+        self.updated_log = self.updated_log + 1 if log_recovered else self.updated_log
+        return log_recovered
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
