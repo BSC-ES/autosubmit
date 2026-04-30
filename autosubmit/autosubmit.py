@@ -4435,6 +4435,7 @@ class Autosubmit:
                                 "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                     if detail:
                         output = 'txt'
+                    if output == 'txt':
                         noplot = False
                     if not noplot:
                         from .monitor.monitor import Monitor
