@@ -1362,22 +1362,6 @@ class Autosubmit:
                     _add_comments_to_yaml(yaml_data, parameter_comments)
                     yaml.dump(yaml_data, output)
 
-    @staticmethod
-    def replace_parameter_inside_section(content, parameter, new_value, section):
-        # same but for any section any parameter, not only EXPID case insensitive
-        # Find the any section
-        if section:
-            section_match = re.search(rf'({section}:[\s\S]*?{parameter}:.*?)(?=\n|$)', content, re.IGNORECASE)
-            if section_match:
-                section = section_match.group(1)
-                # Replace parameter in the section
-                new_section = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', section)
-                # Replace the old section
-                content = content.replace(section, new_section)
-        else:
-            # replace only the parameter
-            content = re.sub(rf'({parameter}:).*', rf'\1 "{new_value}"', content)
-        return content
 
     @staticmethod
     def expid(description, hpc="", copy_id='', dummy=False, minimal_configuration=False,
