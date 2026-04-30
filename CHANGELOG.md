@@ -25,6 +25,7 @@
 
 **Enhancements:**
 
+- Normalized the flags across create / monitor to have the txt option #2264
 - Fix characters escaped in regexes #2526
 - Fixed RO-Crate validation issues with the latest `rocrate-validator`,
   now Autosubmit crates conform to RO-Crate 1.1, process 0.5, workflow run
