@@ -1632,7 +1632,7 @@ class AutosubmitConfig(object):
         :return: dict with updated parameters
         """
         # Variables that should be fixed regardless of the configuration file
-        PINNED_VARIABLES = ["EXPID", "HPCARCH"]
+        PINNED_VARIABLES = ["EXPID"]
 
         starter_default = self.starter_conf.get("DEFAULT", {})
 
