@@ -320,7 +320,7 @@ class JobList(object):
 
     def _add_all_jobs_edge_info(self, dic_jobs, option="DEPENDENCIES"):
         jobs_data = dic_jobs.experiment_data.get("JOBS", {})
-        sections_gen = (section for section in jobs_data.keys())
+        sections_gen = (section for section in jobs_data)
         for job_section in sections_gen:
             jobs_gen = (job for job in dic_jobs.get_jobs(job_section))
             dependencies_keys = jobs_data.get(job_section, {}).get(option, None)
@@ -388,7 +388,7 @@ class JobList(object):
         self.dependency_map = dict()
         self.dependency_map_with_distances = dict()
 
-        for section in jobs_data.keys():
+        for section in jobs_data:
             self.dependency_map[section] = self._deep_map_dependencies(section,
                                                                        jobs_data, option, set(), strip_keys=True)
             self.dependency_map_with_distances[section] = self._deep_map_dependencies(section,
@@ -401,7 +401,7 @@ class JobList(object):
                 self.dependency_map_with_distances[section].remove(section)
 
         # Generate all graph before adding dependencies.
-        for job_section in (section for section in jobs_data.keys()):
+        for job_section in (section for section in jobs_data):
             for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
                 if job.name not in self.graph.nodes:
                     self.graph.add_node(job.name, job=job)
@@ -410,7 +410,7 @@ class JobList(object):
                       self.graph.nodes.get(job.name).get("job", None) is None):
                     self.graph.nodes.get(job.name)["job"] = job
 
-        for job_section in (section for section in jobs_data.keys()):
+        for job_section in (section for section in jobs_data):
             # Changes when all jobs of a section are added
             self.depends_on_previous_chunk = dict()
             self.depends_on_previous_split = dict()
@@ -436,7 +436,7 @@ class JobList(object):
                                                                              dependencies_keys, dependencies,
                                                                              self.graph)
                     if len(problematic_dependencies) > 1:
-                        if job_section not in problematic_jobs.keys():
+                        if job_section not in problematic_jobs:
                             problematic_jobs[job_section] = {}
                         problematic_jobs[job_section].update({job.name: problematic_dependencies})
 
@@ -980,7 +980,7 @@ class JobList(object):
         # divide edge per section name
         parents_by_section: dict = {}
         for parent, _ in self.graph.in_edges(job.name):
-            if self.graph.nodes[parent]['job'].section in filters_to_apply_by_section.keys():
+            if self.graph.nodes[parent]['job'].section in filters_to_apply_by_section:
                 if self.graph.nodes[parent]['job'].section not in parents_by_section:
                     parents_by_section[self.graph.nodes[parent]['job'].section] = set()
                 (parents_by_section[self.graph.nodes[parent]['job'].section].
@@ -998,7 +998,7 @@ class JobList(object):
                                             filters_to_apply_by_section[key], parent)
 
     def find_current_section(self, job_section, section, dic_jobs, distance, visited_section):
-        sections = dic_jobs.as_conf.jobs_data[section].get("DEPENDENCIES", {}).keys()
+        sections = dic_jobs.as_conf.jobs_data[section].get("DEPENDENCIES", {})
         if len(sections) == 0:
             return distance
         sections_str = str("," + ",".join(sections) + ",").upper()
@@ -1075,7 +1075,7 @@ class JobList(object):
             if parent.name in special_dependencies:
                 continue
             if dependency.relationships:  # If this section has filter, selects..
-                found = [aux for aux in dic_jobs.as_conf.jobs_data[parent.section].get("DEPENDENCIES", {}).keys() if
+                found = [aux for aux in dic_jobs.as_conf.jobs_data[parent.section].get("DEPENDENCIES", {}) if
                          job.section == aux]
                 if found:
                     continue
@@ -1132,7 +1132,7 @@ class JobList(object):
         if len(self.graph.pred[job.name]) == 0:
             for parent in natural_parents:
                 if dependency.relationships:  # If this section has filter, selects..
-                    found = [aux for aux in dic_jobs.as_conf.jobs_data[parent.section].get("DEPENDENCIES", {}).keys() if
+                    found = [aux for aux in dic_jobs.as_conf.jobs_data[parent.section].get("DEPENDENCIES", {}) if
                              job.section == aux]
                     if found:
                         continue
@@ -1222,7 +1222,7 @@ class JobList(object):
                     self.depends_on_previous_special_section[job.name] = set()
                 if job.section not in self.depends_on_previous_special_section:
                     self.depends_on_previous_special_section[job.section] = set()
-                if parent.name in self.depends_on_previous_special_section.keys():
+                if parent.name in self.depends_on_previous_special_section:
                     special_dependencies.update(
                         self.depends_on_previous_special_section[parent.name])
                 self.depends_on_previous_special_section[job.name].add(parent.name)
@@ -1340,7 +1340,7 @@ class JobList(object):
         dependencies_keys_without_special_chars = []
 
         # Strip special characters from dependency keys
-        for key_aux_stripped in dependencies_keys.keys():
+        for key_aux_stripped in dependencies_keys:
             if "-" in key_aux_stripped:
                 key_aux_stripped = key_aux_stripped.split("-")[0]
             elif "+" in key_aux_stripped:
@@ -1348,10 +1348,10 @@ class JobList(object):
             dependencies_keys_without_special_chars.append(key_aux_stripped)
 
         # Update dependency map for the current job section
-        self.dependency_map[job.section] = self.dependency_map[job.section].difference(set(dependencies_keys.keys()))
+        self.dependency_map[job.section] = self.dependency_map[job.section].difference(set(dependencies_keys))
 
         # Calculate distances for dependencies (e.g., SIM-1, CLEAN-2)
-        for dependency_key in dependencies_keys.keys():
+        for dependency_key in dependencies_keys:
             if "-" in dependency_key:
                 aux_key = dependency_key.split("-")[0]
                 distance = int(dependency_key.split("-")[1])
@@ -1421,7 +1421,7 @@ class JobList(object):
                     distances_of_current_section_member[aux_key] = distance
 
         # Process sections with special filters
-        sections_to_calculate = [key for key in dependencies_keys.keys() if key not in dependencies_to_del]
+        sections_to_calculate = [key for key in dependencies_keys if key not in dependencies_to_del]
         natural_sections = []
 
         # Parse first sections with special filters if any
@@ -1465,7 +1465,7 @@ class JobList(object):
             aux = dic_jobs.as_conf.jobs_data[dependency.section].get("DEPENDENCIES", {})
             dependencies_of_that_section = [key_aux_stripped.split("-")[0] if "-" in key_aux_stripped else
                                             key_aux_stripped.split("+")[0] if "+" in key_aux_stripped else
-                                            key_aux_stripped for key_aux_stripped in aux.keys()]
+                                            key_aux_stripped for key_aux_stripped in aux]
 
             problematic_dependencies = self._calculate_natural_dependencies(
                 dic_jobs, job, dependency, date, member, chunk, graph,
@@ -1598,7 +1598,7 @@ class JobList(object):
 
     @staticmethod
     def _create_jobs(dic_jobs, priority, default_job_type):
-        for section in (job for job in dic_jobs.experiment_data.get("JOBS", {}).keys()):
+        for section in (job for job in dic_jobs.experiment_data.get("JOBS", {})):
             Log.debug(f"Creating {section} jobs")
             dic_jobs.read_section(section, priority, default_job_type)
             priority += 1
@@ -3019,7 +3019,7 @@ class JobList(object):
                  "## String representation of Job List [" + str(len(all_jobs)) + "] "
         if status_change is not None and len(str(status_change)) > 0:
             result += ("with " + (bcolors.OKGREEN if nocolor is False else '') +
-                       str(len(list(status_change.keys()))) + " Change(s) ##" +
+                       str(len(status_change)) + " Change(s) ##" +
                        (bcolors.ENDC + bcolors.ENDC if nocolor is False else ''))
         else:
             result += " ## "
@@ -3137,7 +3137,7 @@ class JobList(object):
         try:
             packages = JobPackagePersistence(expid).load(wrapper=False)
         except Exception:
-            print("Wrapper table not found, trying packages.")
+            Log.warning("Wrapper table not found, trying packages.")
             packages = None
             try:
                 packages = JobPackagePersistence(expid).load(wrapper=True)
@@ -3175,7 +3175,7 @@ class JobList(object):
                     else:
                         package_to_symbol[list_packages[i]] = 'hexagon'
             except Exception:
-                print((traceback.format_exc()))
+                Log.warning(traceback.format_exc())
 
         return job_to_package, package_to_jobs, package_to_package_id, package_to_symbol
 
@@ -3278,7 +3278,7 @@ class JobList(object):
                 status = Status.VALUE_TO_KEY[status_code]
                 if job_times and status_code not in [Status.READY,
                                                      Status.WAITING, Status.SUSPENDED]:
-                    if name in list(job_times.keys()):
+                    if name in job_times:
                         submit_time, start_time, finish_time, status, detail_id = job_times[
                             name]
                         seconds_running = finish_time - start_time
@@ -3292,7 +3292,7 @@ class JobList(object):
                     finish_time = 0
 
         except Exception:
-            print((traceback.format_exc()))
+            Log.warning(traceback.format_exc())
             return None
 
         seconds_queued = seconds_queued * (-1) if seconds_queued < 0 else seconds_queued
