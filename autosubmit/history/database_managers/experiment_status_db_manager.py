@@ -260,7 +260,6 @@ class SqlAlchemyExperimentStatusDbManager:
                 status=status,
                 seconds_diff=0,
                 modified=now,
-                # Update last_heartbeat only if status is RUNNING, otherwise keep the previous value
                 last_heartbeat=now if status == Models.RunningStatus.RUNNING else ExperimentStatusTable.c.last_heartbeat  # type: ignore
             )
         )
