@@ -667,7 +667,7 @@ class AutosubmitConfig(object):
         #       load the miscellaneous file/key. But in reality, I believe this means if ``load_misc``, and
         #       we still don't have ``AS_MISC``, then we will add the given YAML file to the list of
         #       ``misc_files``. It might be simpler to have a separate function for this, or append directly.
-        new_file.data = self._pin_inmutable_variables(new_file.data)
+        new_file.data = self._pin_immutable_variables(new_file.data)
         if new_file.data.get("AS_MISC", False) and not load_misc:
             self.misc_files.append(yaml_file)
             new_file.data = {}
