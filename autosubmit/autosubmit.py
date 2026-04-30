@@ -48,6 +48,7 @@ from pyparsing import nestedExpr
 from ruamel.yaml import YAML
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
+from autosubmit.helpers.processes import process_id
 import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -1487,6 +1488,8 @@ class Autosubmit:
         except Exception:
             Log.warning(f"Could not update experiment details for {exp_id}. Omitting this step.")
 
+        # ExperimentStatus(exp_id).set_as_not_running()
+
         Log.result(f"Experiment {exp_id} created")
         return exp_id
 
@@ -1918,13 +1921,6 @@ class Autosubmit:
                 # This error is important
             except Exception:
                 pass
-        try:
-            ExperimentStatus(expid).set_as_running()
-        except Exception as e:
-            # Connection to status database ec_earth.db can fail.
-            # API worker will fix the status.
-            Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
-                      f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
         return exp_history
 
     @staticmethod
@@ -2183,6 +2179,8 @@ class Autosubmit:
 
         """
         Autosubmit.exit = False
+        status_tracker = ExperimentStatus(expid)
+        experiment_status: Optional[str] = None
         # Start profiling if the flag has been used
         if profile is not None:
             from .profiler.profiler import Profiler
@@ -2216,6 +2214,15 @@ class Autosubmit:
 
                 as_conf_config = as_conf.experiment_data.get('CONFIG', {})
                 git_operational_check_enabled = as_conf_config.get('GIT_OPERATIONAL_CHECK_ENABLED', True)
+
+                # set experiment as running in the experiment_status database
+                try:
+                    status_tracker.set_as_running()
+                except Exception as e:
+                    # Connection to status database ec_earth.db can fail.
+                    # API worker will fix the status.
+                    Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
+                            f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
 
                 if git_operational_check_enabled:
                     Log.debug('Checking for dirty local Git repository')
@@ -2256,13 +2263,16 @@ class Autosubmit:
 
                 while job_list.get_active():
                     try:
+                        status_tracker.update_heartbeat()
                         if profile is not None:
                             Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
 
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             if job_list.get_failed():
+                                experiment_status = "FAILED"
                                 return 1
+                            experiment_status = "PAUSED"
                             return 0
                         Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
                         for job in job_list.get_ready():
@@ -2456,8 +2466,10 @@ class Autosubmit:
                     p.close_connection()
                 if len(job_list.get_failed()) > 0:
                     Log.info("Some jobs have failed and reached maximum retrials")
+                    experiment_status = "FAILED"
                 else:
                     Log.result("Run successful")
+                    experiment_status = "COMPLETED"
                     if profile is not None:
                         profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
                     # Updating finish time for job data header
@@ -2473,12 +2485,26 @@ class Autosubmit:
                 else:
                     Log.info("ROCRATE not present in experiment YAML configuration. No RO-Crate archive created.")
         except BaseLockException:
+            # Multiple instances of autosubmit running the same experiment or previous instance didn't release the lock file
+            # In both cases, we don't want to overwrite the status of the experiment to avoid errors with the API and GUI
             raise
         except AutosubmitCritical:
+            experiment_status = "FAILED"
             raise
         except BaseException:
+            experiment_status = "FAILED"
             raise
         finally:
+            try:
+                if experiment_status == "COMPLETED":
+                    status_tracker.set_as_not_running()
+                elif experiment_status == "PAUSED":
+                    status_tracker.set_as_not_running()
+                elif experiment_status == "FAILED":
+                    status_tracker.set_as_not_running()
+            except Exception as e:
+                Log.warning(f"Autosubmit couldn't update the final experiment status for {expid}: {str(e)}", 7003)
+            
             if profile is not None:
                 profiler.stop()
 
@@ -4112,6 +4138,9 @@ class Autosubmit:
         :return: ``True`` if the experiment has been successfully archived. ``False`` otherwise.
         :rtype: bool
         """
+        if process_id(expid) is not None:
+            raise AutosubmitCritical("Ensure no processes are running in the experiment directory", 7076)
+        
         exp_folder = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
 
         if not noclean:
@@ -4182,6 +4211,7 @@ class Autosubmit:
                         "Can not remove or rename experiments folder", 7012, str(e))
 
         Log.result("Experiment archived successfully")
+        ExperimentStatus(expid).set_as_archived()
         return True
 
     @staticmethod
@@ -4238,6 +4268,7 @@ class Autosubmit:
             return False
 
         Log.info("Unpacking finished")
+        ExperimentStatus(experiment_id).set_as_not_running()
 
         try:
             archive_path.unlink()
@@ -4468,6 +4499,8 @@ class Autosubmit:
                     Log.result("\nJob list created successfully")
                     Log.warning(
                         "Remember to MODIFY the MODEL config files!")
+                    
+                    # ExperimentStatus(expid).set_as_not_running()
                     fh.flush()
                     os.fsync(fh.fileno())
                     if detail:

@@ -800,12 +800,12 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosub
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/structures").iterdir())
-    # Consult if the expid is not in the database
+    # Consult if the expid is still in the database (tombstone)
     db_path = Path(f"{run_dir}/tests.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")
-    assert cursor.fetchone() is None
+    assert cursor.fetchone() is not None
     cursor.close()
     # Test doesn't exist
 
@@ -846,12 +846,12 @@ def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmi
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/structures").iterdir())
-    # Consult if the expid is not in the database
+    # Consult if the expid is still in the database (tombstone)
     db_path = Path(f"{run_dir}/tests.db")
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")
-        assert cursor.fetchone() is None
+        assert cursor.fetchone() is not None
         cursor.close()
 
 
@@ -890,6 +890,5 @@ def test_perform_deletion(mocker, tmp_path, autosubmit_exp, autosubmit):
     job_data_db_path = Path(basic_config.JOBDATA_DIR, f'job_data_{as_exp.expid}')
     if all("tmp" not in path for path in [str(experiment_path), str(structure_db_path), str(job_data_db_path)]):
         raise AutosubmitCritical("tmp not in path")
-    mocker.patch("autosubmit.database.db_common.delete_experiment", side_effect=FileNotFoundError)
     err_message = _perform_deletion(experiment_path, structure_db_path, job_data_db_path, as_exp.expid)
-    assert all(x in err_message for x in ["Cannot delete experiment entry", "Cannot delete directory"])
+    assert "Cannot delete directory" in err_message
