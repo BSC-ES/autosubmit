@@ -907,13 +907,24 @@ class Autosubmit:
 
     @staticmethod
     def run_command(args: argparse.Namespace):
-        expid = "None"
-
         if hasattr(args, 'notransitive') and args.notransitive:
             warnings.warn('notransitive is deprecated and will be removed in a future major release!')
 
         if hasattr(args, 'expid'):
+            missing_expid = ""
             expid = args.expid
+            if expid :
+                expids = expid.replace(',', ' ').split(' ')
+                expids = [expid.lower() for expid in filter(lambda x: x, expids)]
+                expids = [x.strip() for x in expids]
+
+            for expid in expids:
+                exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
+                if not exp_path.exists():
+                    missing_expid +=  " "+expid
+            if missing_expid != "":
+                Log.error(f"Experiment{missing_expid} does not exist")
+                return 1
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
         if args.command == 'run':
@@ -921,12 +932,8 @@ class Autosubmit:
                 raise AutosubmitCritical('Tracing is only available with profiling. Please add -p/--profile flag to run with tracing.', 7012)
             return Autosubmit.run_experiment(args.expid, args.start_time, args.start_after, args.run_only_members,
                                              args.profile, args.trace)
-        elif args.command == 'expid':
-            return Autosubmit.expid(args.description, args.HPC, args.copy, args.dummy, args.minimal_configuration,
-                                    args.git_repo, args.git_branch, args.git_as_conf, args.operational, args.testcase,
-                                    args.evaluation, args.use_local_minimal) != ''
         elif args.command == 'delete':
-            return delete_experiment(args.expid, args.force)
+            return delete_experiment(expids, args.force)
         elif args.command == 'monitor':
             return Autosubmit.monitor(args.expid, args.output, args.list, args.filter_chunks, args.filter_status,
                                       args.filter_type, args.hide, args.text, args.group_by, args.expand,
@@ -1111,7 +1118,14 @@ class Autosubmit:
                 expids = expid.split(" ")
             expids = [x.strip() for x in expids]
             for expid in expids:
-                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+                exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
+                as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+                as_conf.reload(force_load=True)
+
+                if len(as_conf.experiment_data) == 0:
+                    if args.command not in ["expid", "upgrade"]:
+                        raise AutosubmitCritical(f"Experiment {expid} has no yml data. Please, if you really wish to use "
+                                                 f"AS 4 prompt:\nautosubmit upgrade {expid}",7012)
                 tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
                 aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
                 if not os.path.exists(exp_path):
@@ -3120,9 +3134,9 @@ class Autosubmit:
             jobs_to_recover = job_list.get_job_list()
         else:
             jobs_to_recover = job_list.get_active()
-        
+
         selected_job_names = {job.name for job in jobs_to_recover}
-        
+
         # filters will be applied to all_jobs or only active_jobs, depending on the all_jobs flag
         if filter_section or filter_chunks or filter_status or filter_list:
             # Validate filters. Raises AutosubmitCritical if any filter is invalid, with a message specifying the issue.
@@ -5334,9 +5348,9 @@ class Autosubmit:
                 jobs_to_set_status = job_list.get_job_list()
                 selected_job_names = {job.name for job in jobs_to_set_status}
                 final_status = Autosubmit._get_status(final)
-                
+
                 Log.info("Filtering jobs...")
-                
+
                 selected_job_names = apply_job_filters(
                     job_list=job_list,
                     base_job_names=selected_job_names,
@@ -5348,7 +5362,7 @@ class Autosubmit:
                     filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
                     status_from_str_fn=Autosubmit._get_status,
                 )
-                
+
                 # preserve job list ordering
                 final_list = [job for job in jobs_to_set_status if job.name in selected_job_names]
                 # Time to change status
