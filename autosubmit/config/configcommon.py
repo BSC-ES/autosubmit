@@ -1625,7 +1625,7 @@ class AutosubmitConfig(object):
         keys_to_delete = ["HPCROOTDIR", "HPCLOGDIR", "HPCARCH"]
         for key in keys_to_delete:
             yaml_data.pop(key, None)
-    
+
     def _pin_immutable_variables(self, parameters: dict) -> dict:
         """Keep default variables regardless of the experiment configuration files
         :param parameters: dict with current parameters
@@ -1633,15 +1633,19 @@ class AutosubmitConfig(object):
         """
         # Variables that should be fixed regardless of the configuration file
         PINNED_VARIABLES = ["EXPID", "HPCARCH"]
-        
+
         starter_default = self.starter_conf.get("DEFAULT", {})
-        
-        default_section = parameters.setdefault("DEFAULT", {})
-        for key in PINNED_VARIABLES:
-            if key not in starter_default:
-                continue
-            # For each key, get the original value and the one in the configuration file
-            default_section[key] = starter_default[key]
+
+        # add default section only if it exists in starter_conf
+        if starter_default:
+            default_section = parameters.setdefault("DEFAULT", {})
+
+            for key in PINNED_VARIABLES:
+                if key not in starter_default:
+                    continue
+                # For each key, get the original value and the one in the configuration file
+                default_section[key] = starter_default[key]
+
         return parameters
 
     def load_custom_config(self, current_data, filenames_to_load):
