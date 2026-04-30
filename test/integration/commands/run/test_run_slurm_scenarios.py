@@ -50,13 +50,13 @@ if TYPE_CHECKING:
     EXPERIMENT:
         NUMCHUNKS: '3'
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 echo "Hello World with id=Success"
                 sleep 1
             PLATFORM: TEST_SLURM
             RUNNING: chunk
-            wallclock: 00:01
+            WALLCLOCK: 00:01
     """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
 
     # Success wrapper
@@ -64,32 +64,32 @@ if TYPE_CHECKING:
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
-            DEPENDENCIES: job-1
+            DEPENDENCIES: JOB-1
             PLATFORM: TEST_SLURM
             RUNNING: chunk
-            wallclock: 00:01
+            WALLCLOCK: 00:01
 
-        job2:
+        JOB2:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
-            DEPENDENCIES: job2-1
+            DEPENDENCIES: JOB2-1
             PLATFORM: TEST_SLURM
             RUNNING: chunk
-            wallclock: 00:01
+            WALLCLOCK: 00:01
 
-    wrappers:
-        wrapper:
-            JOBS_IN_WRAPPER: job
+    WRAPPERS:
+        WRAPPER:
+            JOBS_IN_WRAPPER: JOB
             TYPE: vertical
             policy: flexible
 
-        wrapper2:
-            JOBS_IN_WRAPPER: job2
+        WRAPPER2:
+            JOBS_IN_WRAPPER: JOB2
             TYPE: vertical
             policy: flexible
 
@@ -100,69 +100,96 @@ if TYPE_CHECKING:
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
-            wallclock: 00:01
-            retrials: 2  
+            WALLCLOCK: 00:01
+            RETRIALS: 2
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+
+    # Success with het jobs
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '5'
+    JOBS:
+        JOB:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+                sleep 1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            WALLCLOCK: 00:01
+            HETSIZE: 2
+            CURRENT_QUEUE:
+                - gp_debug
+            MEMORY: '1M'
+            MEMORY_PER_TASK:
+                - 1
+            NUMTHREADS:
+                - 1
+                - 1
+            TASKS: 1
+            CUSTOM_DIRECTIVES:
+                - 1
+                - 1
+    """), 5, "COMPLETED", "simple"),  # No wrappers, simple type
 
     # Failure wrappers
     (dedent("""\
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 sleep 2
-                d_echo "Hello World with id=FAILED + wrappers"
+                d_echo "Hello World with id=FAILED + WRAPPERS"
             PLATFORM: TEST_SLURM
-            DEPENDENCIES: job-1
+            DEPENDENCIES: JOB-1
             RUNNING: chunk
-            wallclock: 00:10
-            retrials: 2
-    wrappers:
-        wrapper:
-            JOBS_IN_WRAPPER: job
+            WALLCLOCK: 00:10
+            RETRIALS: 2
+    WRAPPERS:
+        WRAPPER:
+            JOBS_IN_WRAPPER: JOB
             TYPE: vertical
             policy: flexible
 
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 
+    # Success horizontal wrapper
     (dedent("""\
-EXPERIMENT:
-    NUMCHUNKS: '2'
-JOBS:
-    job:
-        SCRIPT: |
-            echo "Hello World with id=Success + wrappers"
-            sleep 1
-        PLATFORM: TEST_SLURM
-        RUNNING: chunk
-        wallclock: 00:01
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        JOB:
+            SCRIPT: |
+                echo "Hello World with id=Success + WRAPPERS"
+                sleep 1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            WALLCLOCK: 00:01
 
-wrappers:
-    wrapper:
-        JOBS_IN_WRAPPER: job
-        TYPE: horizontal
-PLATFORMS:
-    TEST_SLURM:
-        ADD_PROJECT_TO_HOST: 'False'
-        HOST: '127.0.0.1'
-        PROJECT: 'group'
-        QUEUE: 'gp_debug'
-        SCRATCH_DIR: '/tmp/scratch/'
-        TEMP_DIR: ''
-        TYPE: 'slurm'
-        USER: 'root'
-        MAX_WALLCLOCK: '02:00'
-        MAX_PROCESSORS: '4'
-        PROCESSORS_PER_NODE: '4'
-"""), 2, "COMPLETED", "horizontal")
-
-], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper", "Success with horizontal wrapper"])
+    WRAPPERS:
+        WRAPPER:
+            JOBS_IN_WRAPPER: JOB
+            TYPE: horizontal
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
+            MAX_WALLCLOCK: '02:00'
+            MAX_PROCESSORS: '4'
+            PROCESSORS_PER_NODE: '4'
+"""), 2, "COMPLETED", "horizontal"),  # Wrappers present, horizontal type
+], ids=["Success", "Success with wrapper", "Failure", "Success with hetjobs", "Failure with wrapper", "Success with horizontal wrapper"])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
@@ -224,46 +251,46 @@ def test_run_uninterrupted(
     EXPERIMENT:
         NUMCHUNKS: '3'
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 echo "Hello World with id=Success"
                 sleep 1
             PLATFORM: TEST_SLURM
             RUNNING: chunk
-            wallclock: 00:01
+            WALLCLOCK: 00:01
     """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
 
-    # Success wrapper
+    # Success WRAPPER
     (dedent("""\
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
-            DEPENDENCIES: job-1
+            DEPENDENCIES: JOB-1
             PLATFORM: TEST_SLURM
             RUNNING: chunk
-            wallclock: 00:01
+            WALLCLOCK: 00:01
 
-        job2:
+        JOB2:
             SCRIPT: |
                 echo "Hello World with id=Success + wrappers"
                 sleep 1
-            DEPENDENCIES: job2-1
+            DEPENDENCIES: JOB2-1
             PLATFORM: TEST_SLURM
             RUNNING: chunk
-            wallclock: 00:01
+            WALLCLOCK: 00:01
 
-    wrappers:
-        wrapper:
-            JOBS_IN_WRAPPER: job
+    WRAPPERS:
+        WRAPPER:
+            JOBS_IN_WRAPPER: JOB
             TYPE: vertical
             policy: flexible
 
-        wrapper2:
-            JOBS_IN_WRAPPER: job2
+        WRAPPER2:
+            JOBS_IN_WRAPPER: JOB2
             TYPE: vertical
             policy: flexible
 
@@ -274,72 +301,100 @@ def test_run_uninterrupted(
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
-            wallclock: 00:01
-            retrials: 2  # In local, it started to fail at 18 retrials.
+            WALLCLOCK: 00:01
+            RETRIALS: 2  # In local, it started to fail at 18 retrials.
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+
+    # Success with het jobs
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '5'
+    JOBS:
+        JOB:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+                sleep 1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            WALLCLOCK: 00:01
+            HETSIZE: 2
+            CURRENT_QUEUE:
+                - gp_debug
+            MEMORY: '1M'
+            MEMORY_PER_TASK:
+                - 1
+            NUMTHREADS:
+                - 1
+                - 1
+            TASKS: 1
+            CUSTOM_DIRECTIVES:
+                - 1
+                - 1
+    """), 5, "COMPLETED", "simple"),  # No wrappers, simple type
 
     # Failure wrappers
     (dedent("""\
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 sleep 2
                 d_echo "Hello World with id=FAILED + wrappers"
             PLATFORM: TEST_SLURM
-            DEPENDENCIES: job-1
+            DEPENDENCIES: JOB-1
             RUNNING: chunk
-            wallclock: 00:10
-            retrials: 2
-    wrappers:
-        wrapper:
-            JOBS_IN_WRAPPER: job
+            WALLCLOCK: 00:10
+            RETRIALS: 2
+    WRAPPERS:
+        WRAPPER:
+            JOBS_IN_WRAPPER: JOB
             TYPE: vertical
             policy: flexible
 
     """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
 
     (dedent("""\
-EXPERIMENT:
-    NUMCHUNKS: '2'
-JOBS:
-    job:
-        SCRIPT: |
-            echo "Hello World with id=Success + wrappers"
-            sleep 1
-        PLATFORM: TEST_SLURM
-        RUNNING: chunk
-        wallclock: 00:01
-
-wrappers:
-    wrapper:
-        JOBS_IN_WRAPPER: job
-        TYPE: horizontal
-PLATFORMS:
-    TEST_SLURM:
-        ADD_PROJECT_TO_HOST: 'False'
-        HOST: '127.0.0.1'
-        PROJECT: 'group'
-        QUEUE: 'gp_debug'
-        SCRATCH_DIR: '/tmp/scratch/'
-        TEMP_DIR: ''
-        TYPE: 'slurm'
-        USER: 'root'
-        MAX_WALLCLOCK: '02:00'
-        MAX_PROCESSORS: '4'
-        PROCESSORS_PER_NODE: '4'
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        JOB:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+                sleep 1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            WALLCLOCK: 00:01
+    
+    WRAPPERS:
+        WRAPPER:
+            JOBS_IN_WRAPPER: JOB
+            TYPE: horizontal
+    PLATFORMS:
+        TEST_SLURM:
+            ADD_PROJECT_TO_HOST: 'False'
+            HOST: '127.0.0.1'
+            PROJECT: 'group'
+            QUEUE: 'gp_debug'
+            SCRATCH_DIR: '/tmp/scratch/'
+            TEMP_DIR: ''
+            TYPE: 'slurm'
+            USER: 'root'
+            MAX_WALLCLOCK: '02:00'
+            MAX_PROCESSORS: '4'
+            PROCESSORS_PER_NODE: '4'
 """), 2, "COMPLETED", "horizontal")
 
 ], ids=[
     "Success",
     "Success with wrapper",
     "Failure",
+    "Success with het jobs",
     "Failure with wrapper",
     "Success with horizontal wrapper"
 ])
@@ -408,13 +463,13 @@ def test_run_interrupted(
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
-        job:
+        JOB:
             SCRIPT: |
                 d_echo "Hello World with id=FAILED"
             PLATFORM: local
             RUNNING: chunk
-            wallclock: 00:01
-            retrials: 1  
+            WALLCLOCK: 00:01
+            RETRIALS: 1
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
 ], ids=["Force Failure -> Correct it -> Completed"])
 def test_run_failed_set_to_ready_on_new_run(
@@ -441,7 +496,7 @@ def test_run_failed_set_to_ready_on_new_run(
     yaml_with_jobs = Path(as_exp.exp_path, 'conf/additional_data.yml')
     with open(yaml_with_jobs, 'r') as f:
         data = yaml.load(f)
-    data["JOBS"]["job"]["SCRIPT"] = 'echo "Hello World with id=READY"'
+    data["JOBS"]["JOB"]["SCRIPT"] = 'echo "Hello World with id=READY"'
     with yaml_with_jobs.open("w") as f:
         yaml.dump(data, f)
 
@@ -468,14 +523,14 @@ PROJECT:
 LOCAL:
     PROJECT_PATH: "tofill"
 JOBS:
-    job:
+    JOB:
         FILE: 
             - "test.sh"
             - "additional1.sh"
             - "additional2.sh"
         PLATFORM: TEST_SLURM
         RUNNING: chunk
-        wallclock: 00:01
+        WALLCLOCK: 00:01
 PLATFORMS:
     TEST_SLURM:
         ADD_PROJECT_TO_HOST: 'False'
@@ -495,16 +550,16 @@ PROJECT:
 LOCAL:
     PROJECT_PATH: "tofill"
 JOBS:
-    job:
+    JOB:
         FILE: 
             - "test.sh"
             - "additional1.sh"
             - "thisdoesntexists.sh"
         PLATFORM: TEST_SLURM
         DEPENDENCIES:
-          job-1:
+          JOB-1:
         RUNNING: chunk
-        wallclock: 00:01
+        WALLCLOCK: 00:01
 PLATFORMS:
     TEST_SLURM:
         ADD_PROJECT_TO_HOST: 'False'
@@ -575,8 +630,8 @@ def test_run_with_additional_files(
             {
                 "WRAPPERS": {
                     "MAX_WRAPPED": 2,
-                    "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
-                    "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
+                    "WRAPPER": {"JOBS_IN_WRAPPER": "JOB_SOME", "TYPE": "horizontal"},
+                    "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "OTHER_SOME", "TYPE": "horizontal"},
                 }
             },
             "run",
@@ -585,12 +640,12 @@ def test_run_with_additional_files(
             {
                 "WRAPPERS": {
                     "WRAPPER": {
-                        "JOBS_IN_WRAPPER": "job_some",
+                        "JOBS_IN_WRAPPER": "JOB_SOME",
                         "TYPE": "horizontal",
                         "MAX_WRAPPED": 2,
                     },
                     "SECOND_WRAPPER": {
-                        "JOBS_IN_WRAPPER": "other_some",
+                        "JOBS_IN_WRAPPER": "OTHER_SOME",
                         "TYPE": "horizontal",
                         "MAX_WRAPPED": 2,
                     },
@@ -602,8 +657,8 @@ def test_run_with_additional_files(
             {
                 "WRAPPERS": {
                     "MAX_WRAPPED": 2,
-                    "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
-                    "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
+                    "WRAPPER": {"JOBS_IN_WRAPPER": "JOB_SOME", "TYPE": "horizontal"},
+                    "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "OTHER_SOME", "TYPE": "horizontal"},
                 }
             },
             "inspect",
@@ -612,12 +667,12 @@ def test_run_with_additional_files(
             {
                 "WRAPPERS": {
                     "WRAPPER": {
-                        "JOBS_IN_WRAPPER": "job_some",
+                        "JOBS_IN_WRAPPER": "JOB_SOME",
                         "TYPE": "horizontal",
                         "MAX_WRAPPED": 2,
                     },
                     "SECOND_WRAPPER": {
-                        "JOBS_IN_WRAPPER": "other_some",
+                        "JOBS_IN_WRAPPER": "OTHER_SOME",
                         "TYPE": "horizontal",
                         "MAX_WRAPPED": 2,
                     },
@@ -629,7 +684,7 @@ def test_run_with_additional_files(
             {
                 "WRAPPERS": {
                     "WRAPPER": {
-                        "JOBS_IN_WRAPPER": "job_some&other_some",
+                        "JOBS_IN_WRAPPER": "JOB_SOME&OTHER_SOME",
                         "TYPE": "horizontal-vertical",
                         "MAX_WRAPPED": 2,
                         "MIN_WRAPPED": 1
@@ -642,7 +697,7 @@ def test_run_with_additional_files(
             {
                 "WRAPPERS": {
                     "WRAPPER": {
-                        "JOBS_IN_WRAPPER": "job_some&other_some",
+                        "JOBS_IN_WRAPPER": "JOB_SOME&OTHER_SOME",
                         "TYPE": "horizontal-vertical",
                         "MAX_WRAPPED": 2,
                         "MIN_WRAPPED": 1
@@ -767,17 +822,17 @@ def test_wrapper_config(
         "EXPERIMENT": {"MEMBERS": "fc0 fc1 fc2 fc3"},
         "PROJECT": {"PROJECT_TYPE": "None", "PROJECT_DIRECTORY": "local_project"},
         "JOBS": {
-            "job_some": {
+            "JOB_SOME": {
                 "SCRIPT": "echo 'Hello World'",
                 "PLATFORM": "TEST_SLURM",
                 "RUNNING": "member",
-                "wallclock": "00:01",
+                "WALLCLOCK": "00:01",
             },
-            "other_some": {
+            "OTHER_SOME": {
                 "SCRIPT": "echo 'Hello World'",
                 "PLATFORM": "TEST_SLURM",
                 "RUNNING": "member",
-                "wallclock": "00:01",
+                "WALLCLOCK": "00:01",
             },
         },
         "PLATFORMS": {
