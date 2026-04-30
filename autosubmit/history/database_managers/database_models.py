@@ -27,7 +27,7 @@ ExperimentRunRow = collections.namedtuple('ExperimentRunRow', [
                                            'run_id', 'created', 'modified', 'start', 'finish', 'chunk_unit', 'chunk_size', 'completed', 'total', 'failed', 'queuing', 'running', 'submitted', 'suspended', 'metadata'])
 
 ExperimentStatusRow = collections.namedtuple(
-    'ExperimentStatusRow', ['exp_id', 'name', 'status', 'seconds_diff', 'modified'])
+  'ExperimentStatusRow', ['exp_id', 'name', 'status', 'seconds_diff', 'modified', 'last_heartbeat'])
 
 ExperimentRow = collections.namedtuple('ExperimentRow', ["id", "name", "autosubmit_version", "description"])
 
