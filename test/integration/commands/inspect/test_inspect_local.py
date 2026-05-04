@@ -179,7 +179,6 @@ def test_inspect(
         general_data['PLATFORMS'][hpcarch]['CUSTOM_DIR_POINTS_TO_OTHER_DIR'] = '%TEST_REFERENCE%'
         as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(additional_data), include_jobs=False, create=True)
 
-        print(general_data)
         # TODO: This shouldn't be needed but we can't customize LOCAL platform yet
         if hpcarch == 'LOCAL':
             general_data['PLATFORMS'][hpcarch]['PROJECT'] = as_exp.expid
