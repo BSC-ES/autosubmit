@@ -24,6 +24,7 @@ from shutil import copy
 from typing import TYPE_CHECKING
 
 import pytest
+import time
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
@@ -432,3 +433,24 @@ def test_check_wrappers_and_as_exit(
     jobs_to_check, _ = t
 
     assert len(jobs_to_check) == expected_jobs_to_check
+
+
+def test_create_txt_output_writes_status_file(autosubmit_exp):
+    """Test that -o txt and -d both write a txt file to the status folder."""
+    exp = autosubmit_exp(include_jobs=True)
+
+    # status/ should be empty before test
+    assert not list(exp.status_dir.glob('*.txt')), "status/ should be empty before test"
+
+    # test -o txt creates a file in status/
+    exp.autosubmit.create(exp.expid, noplot=False, hide=True, output='txt', force=True)
+    txt_files_after_txt = list(exp.status_dir.glob('*.txt'))
+    assert len(txt_files_after_txt) == 1, "Expected exactly one txt file in status/ for -o txt"
+
+    # wait to ensure a different timestamp for the second file
+    time.sleep(1)
+
+    # test -d creates another file in status/
+    exp.autosubmit.create(exp.expid, noplot=True, hide=True, output=None, detail=True, force=True)
+    txt_files_after_detail = list(exp.status_dir.glob('*.txt'))
+    assert len(txt_files_after_detail) == 2, "Expected a second txt file in status/ for -d"
