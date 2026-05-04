@@ -320,8 +320,7 @@ class JobList(object):
 
     def _add_all_jobs_edge_info(self, dic_jobs, option="DEPENDENCIES"):
         jobs_data = dic_jobs.experiment_data.get("JOBS", {})
-        sections_gen = (section for section in jobs_data)
-        for job_section in sections_gen:
+        for job_section in jobs_data:
             jobs_gen = (job for job in dic_jobs.get_jobs(job_section))
             dependencies_keys = jobs_data.get(job_section, {}).get(option, None)
             dependencies = JobList._manage_dependencies(dependencies_keys, dic_jobs) \
@@ -401,7 +400,7 @@ class JobList(object):
                 self.dependency_map_with_distances[section].remove(section)
 
         # Generate all graph before adding dependencies.
-        for job_section in (section for section in jobs_data):
+        for job_section in jobs_data:
             for job in (job for job in dic_jobs.get_jobs(job_section, sort_string=True)):
                 if job.name not in self.graph.nodes:
                     self.graph.add_node(job.name, job=job)
@@ -410,7 +409,7 @@ class JobList(object):
                       self.graph.nodes.get(job.name).get("job", None) is None):
                     self.graph.nodes.get(job.name)["job"] = job
 
-        for job_section in (section for section in jobs_data):
+        for job_section in jobs_data:
             # Changes when all jobs of a section are added
             self.depends_on_previous_chunk = dict()
             self.depends_on_previous_split = dict()
@@ -998,7 +997,7 @@ class JobList(object):
                                             filters_to_apply_by_section[key], parent)
 
     def find_current_section(self, job_section, section, dic_jobs, distance, visited_section):
-        sections = dic_jobs.as_conf.jobs_data[section].get("DEPENDENCIES", {})
+        sections = dic_jobs.as_conf.jobs_data[section].get("DEPENDENCIES", {}).keys()
         if len(sections) == 0:
             return distance
         sections_str = str("," + ",".join(sections) + ",").upper()
