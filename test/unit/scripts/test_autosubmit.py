@@ -35,7 +35,7 @@ def test_autosubmit_script_main(mocker, autosubmit_config):
     assert exit_code == 0
 
 
-def test_autosubmit_script_readme(mocker, capsys, autosubmit_config):
+def test_autosubmit_script_readme(mocker, autosubmit_config):
     """Test that the readme command is executed and returns 0.
 
     At the moment readme is still returning a boolean. Hopefully, that
@@ -45,9 +45,10 @@ def test_autosubmit_script_readme(mocker, capsys, autosubmit_config):
     as_conf = autosubmit_config('a000', {})
     mocker.patch('sys.argv', ['autosubmit', 'readme'])
     mocker.patch('autosubmit.autosubmit.BasicConfig', as_conf.basic_config)
+    mock_log_info = mocker.patch("autosubmit.autosubmit.Log.info")
     exit_code = main()
-    stdout, _ = capsys.readouterr()
-    assert 'lightweight' in stdout
+    logged_text = " ".join(str(call) for call in mock_log_info.call_args_list)
+    assert "lightweight" in logged_text
     assert exit_code == 0
 
 
