@@ -26,6 +26,7 @@
 **Enhancements:**
 
 - Added txt report generation using autosubmit create -o txt, similar to autosubmit monitor -o txt #2264"
+- Replaced `print` statements with `Log.warning` calls in `job_list.py` and `diagram.py` #2372
 - Fix characters escaped in regexes #2526
 - Fixed RO-Crate validation issues with the latest `rocrate-validator`,
   now Autosubmit crates conform to RO-Crate 1.1, process 0.5, workflow run
