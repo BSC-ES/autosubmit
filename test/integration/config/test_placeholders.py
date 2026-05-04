@@ -43,7 +43,7 @@ def test_job_platform_is_a_placeholder(create_wrappers: bool, autosubmit_exp):
         'JOBS': {
             'DN': {
                 'SCRIPT': 'echo "%DEFAULT.HPCARCH% %DEFAULT.DESCRIPTION%"',
-                'PLATFORM': '%PLATFORMS.MARENOSTRUM5.OFFLINE_DN_PLATFORM%',
+                'PLATFORM': '%HPCOFFLINE_DN_PLATFORM%',
                 'EXPERIMENT_DESCRIPTION': '%default.description%'
             }
         }
