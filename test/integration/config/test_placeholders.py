@@ -49,7 +49,6 @@ def test_job_platform_is_a_placeholder(create_wrappers: bool, autosubmit_exp):
         }
     }, wrapper=create_wrappers)
 
-    print(exp.as_conf.jobs_data['DN'])
     assert exp.as_conf.jobs_data['DN']['SCRIPT'].startswith('echo "MARENOSTRUM5')
     assert 'Pytest' in exp.as_conf.jobs_data['DN']['SCRIPT']
     assert exp.as_conf.jobs_data['DN']['PLATFORM'].lower() == 'marenostrum5-transfer'
