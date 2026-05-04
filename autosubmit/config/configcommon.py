@@ -1629,7 +1629,7 @@ class AutosubmitConfig(object):
     def _pin_immutable_variables(self, parameters: dict) -> dict:
         """Keep default variables regardless of the experiment configuration files
         :param parameters: dict with current parameters
-        :dtype parameters: dict
+        :type parameters: dict
         :return: dict with updated parameters
         :rtype: dict
         """
