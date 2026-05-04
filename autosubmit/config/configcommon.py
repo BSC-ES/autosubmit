@@ -2576,7 +2576,7 @@ class AutosubmitConfig(object):
         matches = re.finditer(regex, content, flags=re.IGNORECASE)
 
         for matchNum, match in enumerate(matches, start=1):
-            Log.info(match.group())
+            print(match.group())
             subs_string = "= " + "\"" + match.group()[2:] + "\""
             regex_sub = match.group()
             content = re.sub(re.escape(regex_sub), subs_string, content)
