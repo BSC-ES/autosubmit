@@ -775,7 +775,7 @@ class AutosubmitConfig(object):
             for name_index in range(len(for_sections["NAME"])):
                 section_ending_name = section_basename + "_" + str(for_sections["NAME"][name_index].upper())
                 if "%" in section_ending_name:
-                    print("Warning: % in a FOR section name, index skipped")
+                    Log.warning("Warning: % in a FOR section name, index skipped")
                     continue
                 current_data_aux = copy.deepcopy(current_data)
                 current_data_aux["NAME"] = for_sections["NAME"][name_index]
@@ -2576,7 +2576,7 @@ class AutosubmitConfig(object):
         matches = re.finditer(regex, content, flags=re.IGNORECASE)
 
         for matchNum, match in enumerate(matches, start=1):
-            print(match.group())
+            Log.info(match.group())
             subs_string = "= " + "\"" + match.group()[2:] + "\""
             regex_sub = match.group()
             content = re.sub(re.escape(regex_sub), subs_string, content)
