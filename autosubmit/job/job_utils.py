@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import date
 import math
 from typing import Dict, Optional, TYPE_CHECKING
 
@@ -70,24 +71,80 @@ def calendar_unitsize_getlowersize(unitsize) -> str:
         return list(CALENDAR_UNITSIZE_ENUM.keys())[unit_value - 1]
 
 
-def calendar_get_month_days(date_str) -> int:
+def calendar_get_month_days(date_str, cal: str = "standard") -> int:
     """
-    Get the number of days in a month
+    Get the number of days in a month for a given date, taking into
+    account the calendar (leap year, noleap)
     :param date_str: Date in string format (YYYYMMDD)
+    :param cal: Calendar to consider (standard, noleap)
     :return: int
     """
     year = int(date_str[0:4])
     month = int(date_str[4:6])
     if month == 2:
-        if is_leap_year(year):
-            return 29
-        else:
+        if cal == "noleap":
             return 28
+        else:
+            return 29 if is_leap_year(year) else 28
     elif month in [4, 6, 9, 11]:
         return 30
     else:
         return 31
+    
 
+def calendar_num_units_between(start_date: date, end_date: date, unit: str, cal: str = "standard") -> float:
+    """
+    Compute the number of units (hours, days, months, years) between
+    start_date (included) and end_date (excluded) taking into account
+    calendar (leap year, noleap)
+    
+    :param start_date: Starting date (included)
+    :param end_date: Ending date (excluded)
+    :param unit: Unit to compute the number of (hour, day, month, year)
+    :param cal: Calendar to consider (standard, noleap)
+    :return: Number of units between start_date and end_date
+    """
+    if unit == "hour":
+        return (end_date - start_date).days * 24
+    
+    if unit == "day":
+        return float((end_date - start_date).days)
+    
+    if unit == "month":
+        total = 0.0
+        current = start_date.replace(day=1)
+        while current < end_date:
+            month_start = max(start_date, current)
+            if current.month == 12:
+                next_month = current.replace(year=current.year + 1, month=1, day=1)
+            else:
+                next_month = current.replace(month=current.month + 1, day=1)
+            month_end = min(end_date, next_month)
+            # check if this is correct
+            days_in_month = calendar_get_month_days(date2str(current), cal)
+            days_covered = (month_end - month_start).days
+            if days_covered > 0:
+                total += days_covered / days_in_month
+            current = next_month
+        return total
+
+    if unit == "year":
+        total = 0.0
+        current = start_date.replace(month=1, day=1)
+        while current < end_date:
+            year_start = max(start_date, current)
+            next_year = current.replace(year=current.year + 1, month=1, day=1)
+            year_end = min(end_date, next_year)
+            days_in_year = 366 if is_leap_year(current.year) and cal != "noleap" else 365
+            days_covered = (year_end - year_start).days
+            if days_covered > 0:
+                total += days_covered / days_in_year
+            current = next_year
+        return total
+
+    # Fallback: treat as days
+    return float((end_date - start_date).days)
+    
 
 def get_chunksize_in_hours(date_str, chunk_unit, chunk_length) -> int:
     if is_leap_year(int(date_str[0:4])):
@@ -168,6 +225,7 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
         if calendar_unitsize_isgreater(split_unit, chunk_unit):
             raise AutosubmitCritical(
                 "Split unit is greater than chunk unit. Autosubmit doesn't support this configuration. Please change the split unit to day or lower. Or don't use calendar splits.")
+        """
         if split_unit == "hour":
             num_max_splits = run_days * 24
         elif split_unit == "month":
@@ -179,6 +237,8 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
                 num_max_splits = run_days / 366
         else:
             num_max_splits = run_days
+        """
+        num_max_splits = calendar_num_units_between(chunk_start, chunk_end, split_unit, cal)
         split_size = get_split_size(exp_data, section)
         chunk_size_in_hours = get_chunksize_in_hours(date2str(chunk_start), chunk_unit, chunk_length)
         if not calendar_split_size_isvalid(date2str(chunk_start), split_size, split_unit, chunk_size_in_hours):
