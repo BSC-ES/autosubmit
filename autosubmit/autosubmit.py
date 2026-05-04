@@ -1020,13 +1020,13 @@ class Autosubmit:
         elif args.command == 'readme':
             if os.path.isfile(Autosubmit.readme_path):
                 with open(Autosubmit.readme_path) as f:
-                    print(f.read())
+                    Log.info(f.read())
                     return True
             return False
         elif args.command == 'changelog':
             if os.path.isfile(Autosubmit.changes_path):
                 with open(Autosubmit.changes_path) as f:
-                    print(f.read())
+                    Log.info(f.read())
                     return True
             return False
         elif args.command == 'dbfix':

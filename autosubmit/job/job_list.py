@@ -3137,7 +3137,7 @@ class JobList(object):
         try:
             packages = JobPackagePersistence(expid).load(wrapper=False)
         except Exception:
-            print("Wrapper table not found, trying packages.")
+            Log.warning("Wrapper table not found, trying packages.")
             packages = None
             try:
                 packages = JobPackagePersistence(expid).load(wrapper=True)
@@ -3175,7 +3175,7 @@ class JobList(object):
                     else:
                         package_to_symbol[list_packages[i]] = 'hexagon'
             except Exception:
-                print((traceback.format_exc()))
+                Log.debug((traceback.format_exc()))
 
         return job_to_package, package_to_jobs, package_to_package_id, package_to_symbol
 
@@ -3292,7 +3292,7 @@ class JobList(object):
                     finish_time = 0
 
         except Exception:
-            print((traceback.format_exc()))
+            Log.debug((traceback.format_exc()))
             return None
 
         seconds_queued = seconds_queued * (-1) if seconds_queued < 0 else seconds_queued

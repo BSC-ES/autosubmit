@@ -286,8 +286,8 @@ def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job]) 
             # Building legend
             i_plot = plot
         except Exception as exp:
-            print((traceback.format_exc()))
-            print(exp)
+            Log.debug((traceback.format_exc()))
+            Log.critical(str(exp))
 
     job_names_in_failed = [name for name in exp_stats.failed_jobs_dict]
     failed_jobs_rects = [None]
@@ -311,8 +311,8 @@ def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job]) 
             failed_jobs_rects[0] = ax[plot - 1].bar(ind_width_2, [exp_stats.failed_jobs_dict[name] for name in
                                                                   job_names_in_failed[l1:l2]], width, color='red')
         except Exception as exp:
-            print((traceback.format_exc()))
-            print(exp)
+            Log.debug((traceback.format_exc()))
+            Log.critical(str(exp))
 
     # Building legends subplot
     legends_plot = fig.add_subplot(grid_spec[0, 0])
@@ -324,8 +324,8 @@ def create_bar_diagram(expid: str, exp_stats: Statistics, jobs_list: List[Job]) 
         # Building legends
         build_legends(legends_plot, rects, exp_stats)
     except Exception as exp:
-        print(exp)
-        print((traceback.format_exc()))
+        Log.critical(str(exp))
+        Log.debug((traceback.format_exc()))
     return True
 
 
