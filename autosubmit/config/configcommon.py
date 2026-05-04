@@ -1629,14 +1629,16 @@ class AutosubmitConfig(object):
     def _pin_immutable_variables(self, parameters: dict) -> dict:
         """Keep default variables regardless of the experiment configuration files
         :param parameters: dict with current parameters
+        :dtype parameters: dict
         :return: dict with updated parameters
+        :rtype: dict
         """
         # Variables that should be fixed regardless of the configuration file
         PINNED_VARIABLES = ["EXPID"]
 
         starter_default = self.starter_conf.get("DEFAULT", {})
 
-        # add default section only if it exists in starter_conf
+        # Add default section only if it exists in starter_conf
         if starter_default:
             default_section = parameters.setdefault("DEFAULT", {})
 
