@@ -1514,7 +1514,8 @@ class Autosubmit:
             Log.warning(f"Could not update experiment details for {exp_id}. Omitting this step.")
             Log.debug(f"Error calling save_update_details: {str(e)}")
 
-        ExperimentStatus(exp_id).set_as_not_running()
+        # TODO: First check that threads are running correctly
+        # ExperimentStatus(exp_id).set_as_not_running()
 
         Log.result(f"Experiment {exp_id} created")
         return exp_id
@@ -2105,6 +2106,7 @@ class Autosubmit:
         Autosubmit.exit = False
         status_tracker = ExperimentStatus(expid)
         experiment_status: Optional[str] = None
+        heartbeat_monitor = status_tracker.heartbeat_monitor(interval_seconds=120) # TODO: decide the interval to update the heartbeat
         # Start profiling if the flag has been used
         if profile:
             from .profiler.profiler import Profiler
@@ -2145,6 +2147,9 @@ class Autosubmit:
                     Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
                             f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
 
+                # create a heartbeat monitor thread to update the experiment status in the database every 2 minutes
+                heartbeat_monitor.start()
+                
                 if git_operational_check_enabled:
                     Log.debug('Checking for dirty local Git repository')
                     check_unpushed_changes(expid, as_conf)
@@ -2190,7 +2195,8 @@ class Autosubmit:
                 while job_list.continue_run():
                     try:
 
-                        # ping the heartbeat
+                        # force the heatbeat update at the beginning of each iteration
+                        heartbeat_monitor.ping()
                         if profiler is not None:
                             Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
 
@@ -2361,6 +2367,8 @@ class Autosubmit:
             experiment_status = "FAILED"
             raise
         finally:
+            # TODO: decide the timeout for the thread to stop
+            heartbeat_monitor.stop(timeout=10)
             try:
                 if experiment_status == "COMPLETED":
                     status_tracker.set_as_not_running()
@@ -4104,7 +4112,8 @@ class Autosubmit:
                     Log.warning(
                         "Remember to MODIFY the MODEL config files!")
                     
-                    ExperimentStatus(expid).set_as_not_running()
+                    # TODO: first check that threads are working
+                    # ExperimentStatus(expid).set_as_not_running()
                     fh.flush()
                     os.fsync(fh.fileno())
                     if detail:
