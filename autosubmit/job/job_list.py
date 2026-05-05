@@ -3174,7 +3174,7 @@ class JobList(object):
                     else:
                         package_to_symbol[list_packages[i]] = 'hexagon'
             except Exception:
-                Log.warning(traceback.format_exc())
+                Log.debug((traceback.format_exc()))
 
         return job_to_package, package_to_jobs, package_to_package_id, package_to_symbol
 
@@ -3291,7 +3291,7 @@ class JobList(object):
                     finish_time = 0
 
         except Exception:
-            Log.warning(traceback.format_exc())
+            Log.debug((traceback.format_exc()))
             return None
 
         seconds_queued = seconds_queued * (-1) if seconds_queued < 0 else seconds_queued
