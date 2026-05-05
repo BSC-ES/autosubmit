@@ -454,3 +454,13 @@ def test_create_txt_output_writes_status_file(autosubmit_exp):
     exp.autosubmit.create(exp.expid, noplot=True, hide=True, output=None, detail=True, force=True)
     txt_files_after_detail = list(exp.status_dir.glob('*.txt'))
     assert len(txt_files_after_detail) == 2, "Expected a second txt file in status/ for -d"
+
+
+def test_infinite_loop_dynamic_variable(autosubmit_exp):
+    with pytest.raises(AutosubmitCritical) as ac:
+        autosubmit_exp(experiment_data={
+            'JOB': {
+                'FDB_COPY_BIN': "%CURRENT_FDB_COPY_BIN%/fdb-copy",
+            }
+        })
+    assert "Dynamic variables FDB_COPY_BIN causing infinite recursion during evaluation" == str(ac.value.message)
