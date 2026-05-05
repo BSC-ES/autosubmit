@@ -1148,12 +1148,11 @@ class AutosubmitConfig(object):
             # Pattern to search a string starting with %^ and ending with %
             special_dynamic_var_pattern = '%\\^[a-zA-Z0-9_.-]*%'
 
-            if not isinstance(val, collections.abc.Mapping) and re.search(dynamic_var_pattern, str(val),
-                                                                          flags=re.IGNORECASE) is not None:
-                self.dynamic_variables[long_key + key] = val
-            elif not isinstance(val, collections.abc.Mapping) and re.search(special_dynamic_var_pattern, str(val),
-                                                                            flags=re.IGNORECASE) is not None:
-                self.special_dynamic_variables[long_key + key] = val
+            if not isinstance(val, collections.abc.Mapping):
+                if re.search(dynamic_var_pattern, str(val), flags=re.IGNORECASE) is not None:
+                    self.dynamic_variables[long_key + key] = val
+                elif re.search(special_dynamic_var_pattern, str(val), flags=re.IGNORECASE) is not None:
+                    self.special_dynamic_variables[long_key + key] = val
             if key == "FOR":
                 # special case: check dynamic variables in the for loop
                 for for_section, for_values in data[key].items():
@@ -2075,6 +2074,15 @@ class AutosubmitConfig(object):
                 experiment_data[key] = starter_conf[key]
             elif isinstance(starter_conf[key], collections.abc.Mapping):
                 experiment_data[key] = self.deep_add_missing_starter_conf(experiment_data[key], starter_conf[key])
+            # This validation checks whether a `Dynamic Variable ` references itself, which would create an infinite loop.
+            # During validation, all variable names are prefixed with `current_` hence the [8:].
+            # However, special variables start with `^` that can break this logic since
+            # becomes part of the generated reference name.
+            if isinstance(experiment_data[key], str) and "%" in experiment_data[key]:
+                check_value = experiment_data[key].split("%")[1]
+                special_var = check_value[0] == "^"
+                if key == check_value[8:] or (special_var and key == check_value[9:]):
+                    raise AutosubmitCritical(f"Dynamic variables {key} causing infinite recursion during evaluation")
         return experiment_data
 
     @staticmethod
