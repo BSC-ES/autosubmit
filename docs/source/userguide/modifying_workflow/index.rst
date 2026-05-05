@@ -149,6 +149,8 @@ Additionally, you can have re-run only jobs that won't be included in the defaul
 
 By default, ``create`` does **not** generate plots. To generate plots of the new job list, use the ``-plt`` or ``--plot`` option.
 
+The only exception is ``-txt`` flag that does not require ``-plt`` or ``--plot`` option.
+
 ::
 
     autosubmit create <EXPID>
