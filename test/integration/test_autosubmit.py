@@ -39,7 +39,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList, load_job_list
 from autosubmit.job.job_utils import check_wrappers
 from autosubmit.job.manage import set_status
-from autosubmit.log.log import Log
+from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.platform import Platform
 from autosubmit.scheduler import Scheduler
 
@@ -680,3 +680,16 @@ def test_set_status_with_detail(autosubmit_exp):
     )
 
     assert result is True
+
+
+
+def test_infinite_loop_dynamic_variable(autosubmit_exp):
+    with pytest.raises(AutosubmitCritical) as ac:
+        autosubmit_exp(experiment_data={
+            'JOBS': {
+                'JOB': {
+                    'FDB_COPY_BIN': "%CURRENT_FDB_COPY_BIN%/fdb-copy",
+                }
+            }
+        })
+    assert "Dynamic variables FDB_COPY_BIN causing infinite recursion during evaluation of the element %CURRENT_FDB_COPY_BIN%/fdb-copy" == str(ac.value.message)
