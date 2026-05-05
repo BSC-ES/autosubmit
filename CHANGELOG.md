@@ -25,6 +25,7 @@
 
 **Enhancements:**
 
+- Replaced redundant `list(dict.keys())` and `.keys()` patterns with direct dictionary iteration and membership checks #2477
 - Replaced `print` statements with `Log.warning` calls in `job_list.py` and `diagram.py` #2372
 - Fix characters escaped in regexes #2526
 - Fixed RO-Crate validation issues with the latest `rocrate-validator`,
