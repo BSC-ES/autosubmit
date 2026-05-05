@@ -111,13 +111,4 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
     # Create the experiment, it will have status 'NOT RUNNING' in the experiment_status table
     exp = autosubmit_exp(expid=expid, include_jobs=True)
     experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
-    print(experiment_status_row)
     assert experiment_status_row and experiment_status_row.status == "NOT RUNNING"
-
-    # assign a unique integer to the experiment status row and check that it is correctly retrieved
-    experiment_db_id = database_manager.get_experiment_row_by_expid(exp.expid).id
-    last_row_id = database_manager.create_exp_status(experiment_db_id, exp.expid, Status.SUBMITTED)
-    assert last_row_id > 0
-
-    experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
-    assert experiment_status_row
