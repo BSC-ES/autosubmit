@@ -24,13 +24,15 @@ import pytest
 from sqlalchemy import inspect
 
 from autosubmit.database.tables import ExperimentStatusTable
-from autosubmit.history.database_managers.database_models import ExperimentRow, ExperimentStatusRow
+from autosubmit.history.database_managers.database_models import (
+    ExperimentRow,
+    ExperimentStatusRow,
+)
 from autosubmit.history.database_managers.experiment_status_db_manager import (
     ExperimentStatusDbManager,
     SqlAlchemyExperimentStatusDbManager,
     create_experiment_status_db_manager,
 )
-from autosubmit.job.job_common import Status
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
@@ -92,7 +94,9 @@ def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, get_nex
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, autosubmit_exp, get_next_expid):
+def test_get_experiment_status_row_by_expid(
+    tmp_path: "LocalPath", as_db: str, autosubmit_exp, get_next_expid
+):
     expid = get_next_expid()
     options = {"expid": expid}
 
@@ -110,5 +114,10 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
 
     # Create the experiment, it will have status 'NOT RUNNING' in the experiment_status table
     exp = autosubmit_exp(expid=expid, include_jobs=True)
-    experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
-    assert experiment_status_row and experiment_status_row.status == "NOT RUNNING"
+    experiment_status_row = database_manager.get_experiment_status_row_by_expid(
+        exp.expid
+    )
+    assert (
+        experiment_status_row
+        and experiment_status_row.status == "NOT RUNNING"
+    )
