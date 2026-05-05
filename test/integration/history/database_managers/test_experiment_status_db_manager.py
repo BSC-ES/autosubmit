@@ -108,10 +108,11 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
     with pytest.raises(ValueError):
         database_manager.get_experiment_status_row_by_expid(expid)
 
-    # Create the experiment, but it still will not have any experiment status
+    # Create the experiment, it will have status 'NOT RUNNING' in the experiment_status table
     exp = autosubmit_exp(expid=expid, include_jobs=True)
     experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
-    assert experiment_status_row is None
+    print(experiment_status_row)
+    assert experiment_status_row and experiment_status_row.status == "NOT RUNNING"
 
     experiment_db_id = 1
     last_row_id = database_manager.create_exp_status(experiment_db_id, exp.expid, Status.SUBMITTED)
