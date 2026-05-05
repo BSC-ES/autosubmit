@@ -25,6 +25,7 @@
 
 **Enhancements:**
 
+- Replaced redundant `list(dict.keys())` and `.keys()` patterns with direct dictionary iteration and membership checks #2477
 - Added txt report generation using autosubmit create -o txt, similar to autosubmit monitor -o txt #2264"
 - Replaced `print` statements with `Log.warning` calls in `job_list.py` and `diagram.py` #2372
 - Fix characters escaped in regexes #2526
