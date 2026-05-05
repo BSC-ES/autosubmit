@@ -215,7 +215,7 @@ def test_install_sqlite_already_exists(monkeypatch, tmp_path, autosubmit):
     with pytest.raises(AutosubmitCritical) as cm:
         autosubmit.install()
 
-    assert 'Database already exists.' == str(cm.value.message)
+    assert 'Database autosubmit.db already exists.' == str(cm.value.message)
 
 
 def test_install_sqlite_create_db_fails(monkeypatch, tmp_path, autosubmit, mocker):
