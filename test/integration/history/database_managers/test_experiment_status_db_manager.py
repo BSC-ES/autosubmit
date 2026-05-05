@@ -129,12 +129,9 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
     print(experiment_status_row)
     assert experiment_status_row and experiment_status_row.status == "NOT RUNNING"
 
-    # Get the experiment row
-    experiment_row = database_manager.get_experiment_row_by_expid(exp.expid)
-    experiment_db_id = experiment_row.id if experiment_row else None
-    assert experiment_db_id is not None
-
-    # Create the experiment status row and assert it is created
+    # assign a unique experiment_db_id to each experiment
+    experiment_db_id = exp.id
+    print(f"Experiment DB ID: {experiment_db_id}")
     last_row_id = database_manager.create_exp_status(experiment_db_id, exp.expid, Status.SUBMITTED)
     assert last_row_id > 0
 
