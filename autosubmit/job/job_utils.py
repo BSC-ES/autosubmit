@@ -39,15 +39,82 @@ CALENDAR_UNITSIZE_ENUM = {
 
 
 def is_leap_year(year) -> bool:
-    """Determine whether a year is a leap year."""
+    """
+    Determine whether a year is a leap year.
+    :param year: The year to check
+    :type year: int
+    :return: True if the year is a leap year, False otherwise
+    :rtype: bool
+    """
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
+def _parse_date_str(date_str: str) -> date:
+    """
+    Parse a date string in YYYYMMDD format.
+
+    :param date_str: Date string (YYYYMMDD)
+    :type date_str: str
+    :return: Parsed date object
+    :rtype: date
+
+    :raises AutosubmitCritical: If date string is invalid
+    """
+    try:
+        if not date_str or len(date_str) < 8:
+            raise ValueError(f"Date string too short: {date_str}")
+        return date(int(date_str[0:4]), int(date_str[4:6]), int(date_str[6:8]))
+    except (ValueError, TypeError) as e:
+        raise AutosubmitCritical(f"Invalid date format '{date_str}'. Expected YYYYMMDD: {str(e)}")
+
+
+def validate_calendar(cal: str) -> None:
+    """
+    Validate that the calendar type is supported.
+
+    :param cal: Calendar type to validate (standard, noleap)
+    :type cal: str
+    :return: None
+
+    :raises AutosubmitCritical: If calendar is not 'standard' or 'noleap'
+    """
+    cal_lower = cal.lower()
+    if cal_lower not in ("standard", "noleap"):
+        raise AutosubmitCritical(
+            f"Invalid calendar type '{cal}'. Must be 'standard' or 'noleap'.")
+
+
+def _validate_unit(unit: str, valid_units: tuple = ("hour", "day", "month", "year")) -> str:
+    """
+    Validate and normalize a calendar unit.
+
+    :param unit: Unit to validate
+    :type unit: str
+    :param valid_units: Tuple of valid units
+    :type valid_units: tuple
+    :return: Normalized (lowercase) unit
+    :rtype: str
+
+    :raises AutosubmitCritical: If unit is invalid
+    """
+    unit_lower = unit.lower()
+    if unit_lower not in valid_units:
+        raise AutosubmitCritical(
+            f"Invalid calendar unit '{unit}'. Must be one of {valid_units}.")
+    return unit_lower
+
+
 def calendar_unitsize_isgreater(split_unit, chunk_unit) -> bool:
-    """ Check if the split unit is greater than the chunk unit
+    """Check if the split unit is greater than the chunk unit
+
     :param split_unit: The split unit (hour, day, month, year)
+    :type split_unit: str
     :param chunk_unit: The chunk unit (day, month, year)
-    :return: bool
+    :type chunk_unit: str
+    :return: True if split unit is greater than chunk unit, False otherwise
+    :rtype: bool
+
+    :raises AutosubmitCritical: If split_unit or chunk_unit is invalid
     """
     split_unit = split_unit.lower()
     chunk_unit = chunk_unit.lower()
@@ -58,10 +125,14 @@ def calendar_unitsize_isgreater(split_unit, chunk_unit) -> bool:
 
 
 def calendar_unitsize_getlowersize(unitsize) -> str:
-    """ Return the next lower calendar unit
+    """Return the next lower calendar unit
+
     :param unitsize: The calendar unit (hour, day, month, year)
     :type unitsize: str
-    :return: str
+    :return: The next lower calendar unit (hour < day < month < year)
+    :rtype: str
+
+    :raises AutosubmitCritical: If unitsize is invalid
     """
     unit_size = unitsize.lower()
     unit_value = CALENDAR_UNITSIZE_ENUM[unit_size]
@@ -74,11 +145,15 @@ def calendar_unitsize_getlowersize(unitsize) -> str:
 def calendar_get_month_days(date_str, cal: str = "standard") -> int:
     """
     Return the number of days in a month represented by date_str
+
     :param date_str: Date in string format (YYYYMMDD)
     :type date_str: str
     :param cal: Calendar to consider (standard, noleap)
     :type cal: str
-    :return: int
+    :return: Number of days in the month of date_str
+    :rtype: int
+
+    :raises AutosubmitCritical: If date_str format is invalid or calendar type is invalid
     """
     year = int(date_str[0:4])
     month = int(date_str[4:6])
@@ -91,10 +166,12 @@ def calendar_get_month_days(date_str, cal: str = "standard") -> int:
         return 30
     else:
         return 31
-    
+
 
 def _days_in_month(year, month, cal: str = "standard") -> int:
-    """ Return the number of days in a month
+    """
+    Return the number of days in a month
+    
     :param year: Year of the month
     :type year: int
     :param month: Month for which to return days
@@ -116,7 +193,7 @@ def _as_date(value: date | datetime) -> date:
 
 
 def _days_between(start_date: date, end_date: date, cal: str = "standard") -> int:
-    """ Return the number of days between two dates, taking into account calendar type (leap year, noleap)
+    """Return the number of days between two dates, taking into account calendar type (leap year, noleap)
     :param start_date: Starting date
     :type start_date: date
     :param end_date: Ending date
@@ -138,8 +215,7 @@ def _days_between(start_date: date, end_date: date, cal: str = "standard") -> in
 
 
 def add_months(start_date: date, months: int, cal: str = "standard") -> date:
-    """
-    Add a number of months to a date, taking into account calendar type (leap year, noleap)
+    """Add a number of months to a date, taking into account calendar type (leap year, noleap)
     :param start_date: Date object to which months will be added
     :param months: Number of months to add
     :param cal: Calendar to consider (standard, noleap)
@@ -153,8 +229,7 @@ def add_months(start_date: date, months: int, cal: str = "standard") -> date:
 
 
 def add_years(start_date: date, years: int, cal: str = "standard") -> date:
-    """
-    Add a number of years to a date, taking into account calendar type (leap year, noleap)
+    """Add a number of years to a date, taking into account calendar type (leap year, noleap)
     :param start_date: Date object to which years will be added
     :param years: Number of years to add
     :param cal: Calendar to consider (standard, noleap)
@@ -169,9 +244,10 @@ def add_years(start_date: date, years: int, cal: str = "standard") -> date:
     return date(year, month, day)
 
 
-def calendar_interval_end(start_date: date, size: int, unit: str, cal: str = "standard") -> date:
-    """
-    Compute the end date of an interval starting at start_date with a size and unit, taking into account calendar type (leap year, noleap)
+def calendar_interval_end(
+    start_date: date, size: int, unit: str, cal: str = "standard"
+) -> date:
+    """Compute the end date of an interval starting at start_date with a size and unit, taking into account calendar type (leap year, noleap)
     :param start_date: Starting date
     :param size: Size of the interval
     :param unit: Unit of the interval (hour, day, month, year)
@@ -201,7 +277,9 @@ def calendar_units_between(start_date: date, end_date: date, unit: str, cal: str
     :param unit: Unit to compute the number of (hour, day, month, year)
     :param cal: Calendar to consider (standard, noleap)
     :return: Number of units between start_date and end_date
+    :raises AutosubmitCritical: If calendar type is invalid
     """
+    validate_calendar(cal)
     start_date = _as_date(start_date)
     end_date = _as_date(end_date)
     if unit == "hour":
@@ -242,20 +320,19 @@ def calendar_units_between(start_date: date, end_date: date, unit: str, cal: str
     return float((end_date - start_date).days)
     
 
-def get_chunksize_in_hours(date_str, chunk_unit, chunk_length) -> int:
-    if is_leap_year(int(date_str[0:4])):
-        num_days_in_a_year = 366
-    else:
-        num_days_in_a_year = 365
-    if chunk_unit == "year":
-        chunk_size_in_hours = num_days_in_a_year * 24 * chunk_length
-    elif chunk_unit == "month":
-        chunk_size_in_hours = calendar_get_month_days(date_str) * 24 * chunk_length
-    elif chunk_unit == "day":
-        chunk_size_in_hours = 24 * chunk_length
-    else:
-        chunk_size_in_hours = chunk_length
-    return chunk_size_in_hours
+def get_chunksize_in_hours(start_date_str: str, chunk_unit: str, chunk_length: int, cal: str = "standard") -> int:
+    """
+    Compute the chunk size in hours using actual calendar semantics.
+    :param start_date_str: Start date (YYYYMMDD format)
+    :param chunk_unit: Unit of chunk (hour, day, month, year)
+    :param chunk_length: Length of chunk
+    :param cal: Calendar type (standard, noleap)
+    :return: Chunk size in hours
+    :raises AutosubmitCritical: If date format or units are invalid
+    """
+    start_date = _parse_date_str(start_date_str)
+    chunk_unit = _validate_unit(chunk_unit)
+    return calendar_unit_interval_hours(start_date, chunk_length, chunk_unit, cal)
 
 
 def calendar_unit_interval_hours(start_date: date, size: int, unit: str, cal: str = "standard") -> int:
@@ -268,8 +345,12 @@ def calendar_unit_interval_hours(start_date: date, size: int, unit: str, cal: st
     :param unit: Unit to advance (hour, day, month, year)
     :param cal: Calendar to consider (standard, noleap)
     :return: Number of hours covered by advancing size units from start_date
+    :raises AutosubmitCritical: If calendar type or unit is invalid
     """
-    unit = unit.lower()
+    if size <= 0:
+        raise AutosubmitCritical(f"Size must be positive, got {size}")
+    validate_calendar(cal)
+    unit = _validate_unit(unit)
     if unit == "hour":
         return size
     if unit == "day":
@@ -279,43 +360,30 @@ def calendar_unit_interval_hours(start_date: date, size: int, unit: str, cal: st
     return _days_between(start_date, end_date, cal) * 24
 
 
-def calendar_split_size_isvalid(date_str, split_size, split_unit,
-                                chunk_size_in_hours, cal) -> bool:
+def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
+                                chunk_size_in_hours: int, cal: str) -> bool:
     """
-    Check if the split size is valid for the calendar
+    Check if the split size is valid for the calendar.
     :param date_str: Date in string format (YYYYMMDD)
-    :param split_size: Size of the split
-    :param split_unit: Unit of the split
-    :param chunk_size_in_hours: chunk size in hours
-    :param cal: Calendar to consider
-    :return: bool
+    :param split_size: Size of the split (must be > 0)
+    :param split_unit: Unit of the split (hour, day, month, year)
+    :param chunk_size_in_hours: Chunk size in hours
+    :param cal: Calendar type (standard, noleap)
+    :return: True if split_size_in_hours <= chunk_size_in_hours, False otherwise
+    :raises AutosubmitCritical: If calendar type, unit, or date format is invalid, or split_size <= 0
     """
-    """
-    if is_leap_year(int(date_str[0:4])):
-        num_days_in_a_year = 366
-    else:
-        num_days_in_a_year = 365
-
-    if split_unit == "year":
-        split_size_in_hours = num_days_in_a_year * 24 * split_size
-    elif split_unit == "month":
-        split_size_in_hours = calendar_get_month_days(date_str) * 24 * split_size
-    elif split_unit == "day":
-        split_size_in_hours = 24 * split_size
-    else:
-        split_size_in_hours = split_size
-
-    if split_size_in_hours != chunk_size_in_hours:
-        Log.warning(
-            f"After calculations, the total sizes are: SplitSize*SplitUnitSize:{split_size_in_hours} hours, ChunkSize*ChunkUnitsize:{chunk_size_in_hours} hours.")
-    else:
-        Log.debug(f"Split size in hours: {split_size_in_hours}, Chunk size in hours: {chunk_size_in_hours}")
-    return split_size_in_hours <= chunk_size_in_hours
-    """
+    if split_size <= 0:
+        raise AutosubmitCritical(f"Split size must be positive, got {split_size}")
+    validate_calendar(cal)
+    split_unit = _validate_unit(split_unit)
+    start_date = _parse_date_str(date_str)
     chunk_size_in_hours = int(chunk_size_in_hours)
-    start_date = date(int(date_str[0:4]), int(date_str[4:6]), int(date_str[6:8]))
     split_size_in_hours = calendar_unit_interval_hours(start_date, split_size, split_unit, cal)
 
+    if split_size_in_hours != chunk_size_in_hours:
+        Log.debug(
+            f"Split size ({split_size_in_hours}h) differs from chunk size ({chunk_size_in_hours}h). "
+            f"This is valid if split_size <= chunk_size.")
     return split_size_in_hours <= chunk_size_in_hours
 
 def calendar_chunk_section(exp_data, section, date, chunk) -> int:
@@ -339,35 +407,42 @@ def calendar_chunk_section(exp_data, section, date, chunk) -> int:
     if jobs_data.get(section, {}).get("RUNNING", "once") == "chunk":
         chunk_length = int(exp_data.get("EXPERIMENT", {}).get('CHUNKSIZE', 1))
         cal = str(exp_data.get('CALENDAR', "standard")).lower()
+        split_size = get_split_size(exp_data, section)
+        
+        # Validate all inputs early to fail fast
+        validate_calendar(cal)
+        chunk_unit = _validate_unit(chunk_unit)
+        if split_size <= 0:
+            raise AutosubmitCritical(f"Split size must be positive, got {split_size}")
+        
         chunk_start = chunk_start_date(
             date, chunk, chunk_length, chunk_unit, cal)
         chunk_end = chunk_end_date(
             chunk_start, chunk_length, chunk_unit, cal)
-        # run_days = subs_dates(chunk_start, chunk_end, cal)
+        
+        # Resolve and validate split unit
         if split_unit == "none":
             split_unit = calendar_unitsize_getlowersize(chunk_unit)
+        split_unit = _validate_unit(split_unit)
+        
         if calendar_unitsize_isgreater(split_unit, chunk_unit):
             raise AutosubmitCritical(
-                "Split unit is greater than chunk unit. Autosubmit doesn't support this configuration. Please change the split unit to day or lower. Or don't use calendar splits.")
-        """
-        if split_unit == "hour":
-            num_max_splits = run_days * 24
-        elif split_unit == "month":
-            num_max_splits = run_days / 30
-        elif split_unit == "year":
-            if not is_leap_year(chunk_start.year) or cal == "noleap":
-                num_max_splits = run_days / 365
-            else:
-                num_max_splits = run_days / 366
-        else:
-            num_max_splits = run_days
-        """
+                f"Split unit '{split_unit}' is greater than chunk unit '{chunk_unit}'. "
+                f"Please use a split unit that is equal to or smaller than the chunk unit.")
+        
+        # Compute max splits and chunk size
         num_max_splits = calendar_units_between(chunk_start, chunk_end, split_unit, cal)
-        split_size = get_split_size(exp_data, section)
-        chunk_size_in_hours = get_chunksize_in_hours(date2str(chunk_start), chunk_unit, chunk_length)
+        chunk_size_in_hours = get_chunksize_in_hours(date2str(chunk_start), chunk_unit, chunk_length, cal)
+        
+        # Validate split size fits in chunk
         if not calendar_split_size_isvalid(date2str(chunk_start), split_size, split_unit, chunk_size_in_hours, cal):
+            split_hours = calendar_unit_interval_hours(
+                _parse_date_str(date2str(chunk_start)), split_size, split_unit, cal)
             raise AutosubmitCritical(
-                f"Invalid split size for the calendar. The split size is {split_size} and the unit is {split_unit}.")
+                f"Split size {split_size} {split_unit}(s) = {split_hours} hours exceeds "
+                f"chunk size {chunk_size_in_hours} hours. Please reduce SPLITSIZE or increase CHUNKSIZE.")
+        
+        # Compute final split count
         splits = num_max_splits / split_size
         if not splits.is_integer() and split_policy == "flexible":
             Log.warning(
