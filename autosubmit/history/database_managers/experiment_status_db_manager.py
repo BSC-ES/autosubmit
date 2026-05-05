@@ -33,6 +33,7 @@ from autosubmit.history.database_managers.database_manager import (
     DEFAULT_LOCAL_ROOT_DIR,
     DatabaseManager,
 )
+from autosubmit.log.log import Log
 
 
 class ExperimentStatusDbManager(DatabaseManager):
@@ -150,13 +151,21 @@ class ExperimentStatusDbManager(DatabaseManager):
             self._as_times_file_path, statement, arguments)
     
     def set_exp_status(self, expid:str, status:str) -> None:
-        exp_status_now = self.get_experiment_status_row_by_expid(expid)
+        try:
+            exp_status_now = self.get_experiment_status_row_by_expid(expid)
+        except ValueError as e:
+            Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
+            return
         # if it already exists, update
         if exp_status_now:
             self.update_exp_status(expid, status)
             return
         # if it does not exist, create
-        exp_row = self.get_experiment_row_by_expid(expid)
+        try:
+            exp_row = self.get_experiment_row_by_expid(expid)
+        except ValueError as e:
+            Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
+            return
         self.create_exp_status(exp_row.id, expid, status)
 
     def update_heartbeat(self, expid: str) -> None:
@@ -287,13 +296,21 @@ class SqlAlchemyExperimentStatusDbManager:
             conn.execute(query)
 
     def set_exp_status(self, expid:str, status:str) -> None:
-        exp_status_now = self.get_experiment_status_row_by_expid(expid)
+        try:
+            exp_status_now = self.get_experiment_status_row_by_expid(expid)
+        except ValueError as e:
+            Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
+            return
         # if it already exists, update
         if exp_status_now:
             self.update_exp_status(expid, status)
             return
         # if it does not exist, create
-        exp_row = self.get_experiment_row_by_expid(expid)
+        try:
+            exp_row = self.get_experiment_row_by_expid(expid)
+        except ValueError as e:
+            Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
+            return
         self.create_exp_status(exp_row.id, expid, status)
     
     def update_heartbeat(self, expid: str) -> None:
