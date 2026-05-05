@@ -2263,7 +2263,7 @@ class Autosubmit:
 
                 while job_list.get_active():
                     try:
-                        status_tracker.update_heartbeat()
+                        # ping the heartbeat
                         if profile is not None:
                             Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
 
