@@ -22,6 +22,7 @@
 - Fix queuing time for the first vertical job
 - Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
 - Fixed `autosubmit stats` command that was not considering parameters defined in the platform, like NODES, TASKS, etc. #2978
+- Fixed `num_max_spits` unit conversion to months when `split_unit` is "month" #2944
 
 **Enhancements:**
 
