@@ -35,6 +35,28 @@ def test_heartbeat_monitor_starts_and_stops_correctly(mocker):
     stop_mock.assert_called_once_with()
 
 
+def test_heartbeat_monitor_run_calls_ping_at_intervals(mocker):
+    """Test that _run() calls ping() at the specified intervals."""
+    status_tracker = mocker.Mock(expid="a000")
+    monitor = ExperimentHeartBeatMonitor(status_tracker, interval_seconds=0.1)
+    ping_mock = mocker.patch.object(monitor, "ping", return_value=True)
+
+    wait_mock = mocker.patch.object(
+        monitor._stop_event,
+        "wait",
+        side_effect=[False, False, False, True],
+    )
+
+    # Act
+    monitor._run()
+
+    # Assert
+    assert (
+        ping_mock.call_count == 3
+    )  # Last call should not happen because wait returns True
+    assert wait_mock.call_count == 4
+
+
 def test_heartbeat_monitor_ping_returns_false_when_update_fails(mocker):
     """Test ping() returns False and logs warning when update_heartbeat fails."""
     status_tracker = mocker.Mock(expid="a000")
