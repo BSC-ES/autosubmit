@@ -3665,6 +3665,7 @@ class Autosubmit:
     @staticmethod
     def install():
         """Creates a new database instance for autosubmit at the configured path."""
+        # SQLite database creation
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             autosubmit_db_path = Path(BasicConfig.DB_PATH)
             as_times_path = Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB
@@ -3678,7 +3679,11 @@ class Autosubmit:
                 query = query_file.read_text()
                 if not create_db(query, BasicConfig.DB_PATH):
                     raise AutosubmitCritical("Can not write database file", 7004)
-                Log.result("Autosubmit database created successfully") 
+                Log.result("Autosubmit database created successfully")
+                try:
+                    os.chmod(str(autosubmit_db_path), 0o664)
+                except (OSError, PermissionError):
+                    Log.warning(f"Could not set permissions on {autosubmit_db_path}")
 
             # as_times database
             if as_times_path.exists():
@@ -3690,6 +3695,12 @@ class Autosubmit:
                 if not create_db(query, str(as_times_path)):
                     raise AutosubmitCritical("Can not write as_times database file", 7004)
                 Log.result("as_times database created successfully")
+                try:
+                    os.chmod(str(as_times_path), 0o664)
+                except (OSError, PermissionError):
+                    Log.warning(f"Could not set permissions on {as_times_path}")
+        
+        # PostgreSQL database creation
         else:
             Log.info("Creating autosubmit Postgres database...")
             if not create_db(''):
