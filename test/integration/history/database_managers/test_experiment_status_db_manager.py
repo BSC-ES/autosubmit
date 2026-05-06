@@ -18,6 +18,7 @@
 """Integration tests for the experiment status DB managers."""
 
 from pathlib import Path
+import sqlite3
 from typing import cast, TYPE_CHECKING
 
 import pytest
@@ -121,3 +122,45 @@ def test_get_experiment_status_row_by_expid(
         experiment_status_row
         and experiment_status_row.status == "NOT RUNNING"
     )
+
+
+def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
+    tmp_path: "LocalPath",
+):
+    """Test that the manager adds last_heartbeat column into experiment_status table if it is missing."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    as_times_path = db_dir / "as_times.db"
+    with sqlite3.connect(as_times_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE experiment_status (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created TIMESTAMP NOT NULL,
+                modified TIMESTAMP NOT NULL
+            )
+            """
+        )
+        conn.commit()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    with sqlite3.connect(as_times_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(experiment_status)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+    assert "last_heartbeat" in columns
+    assert isinstance(database_manager, ExperimentStatusDbManager)
+
