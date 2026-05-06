@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -31,11 +31,13 @@ from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.experiment_common import check_ownership
 # noinspection PyProtectedMember
 from autosubmit.experiment.experiment_common import (
-    check_ownership, copy_experiment, delete_experiment,
-    _delete_expid, new_experiment, _perform_deletion
+    delete_experiment,
+    _delete_expid, _perform_deletion
 )
+from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.utils import as_conf_default_values
 
@@ -364,7 +366,7 @@ def test_copy_experiment(type_flag: str, autosubmit_exp: Callable, autosubmit: A
     :return: None
     """
     autosubmit.install()
-    base_experiment = autosubmit_exp('t000', experiment_data={}, include_jobs=True)
+    base_experiment = autosubmit_exp(experiment_data={}, include_jobs=True)
 
     is_operational = type_flag == 'op'
     is_evaluation = type_flag == 'ev'
@@ -509,7 +511,7 @@ def test_create_expid_flag_hpc(fake_hpc: str, expected_hpc: str, autosubmit: Aut
 @pytest.mark.parametrize("experiment_hpc,expected_hpc", [
     ("local", "mn5"),
     ("mn5", "marenostrum"), ])
-def test_copy_expid_with_flag_hpc(tmp_path: Path, autosubmit: Autosubmit, experiment_hpc, expected_hpc):
+def test_copy_expid_with_flag_hpc(experiment_hpc: str, expected_hpc: str, tmp_path: Path, autosubmit: Autosubmit):
     """Create expid using the flag -H. Defining a value for the flag and not defining any value for that flag.
 
     code-block:: console
@@ -772,8 +774,15 @@ def test_expid_generated_correctly(tmp_path, autosubmit_exp, autosubmit):
     autosubmit.install()
     as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
-    autosubmit.inspect(expid=f'{as_exp.expid}', check_wrapper=True, force=True, lst=None,  # type: ignore
-                       filter_chunks=None, filter_status=None, filter_section=None)  # type: ignore
+    autosubmit.inspect(
+        expid=f'{as_exp.expid}',
+        check_wrapper=True,
+        force=True,
+        lst=None,  # type: ignore[arg-type]
+        filter_chunks=None,  # type: ignore[arg-type]
+        filter_status=None,  # type: ignore[arg-type]
+        filter_section=None  # type: ignore[arg-type]
+    )
     assert f"{as_exp.expid}_DEBUG.cmd" in [
         Path(f).name for f in Path(f"{run_dir}/{as_exp.expid}/tmp").iterdir()
     ]
