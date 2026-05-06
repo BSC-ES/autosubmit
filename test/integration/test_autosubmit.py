@@ -250,6 +250,18 @@ def test_install_postgres_create_db_fails(monkeypatch, autosubmit, mocker):
     assert 'Failed to create Postgres database' == str(cm.value.message)
 
 
+def test_install_postgres_initializes_as_times(monkeypatch, autosubmit, mocker):
+    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
+    mocker.patch('autosubmit.autosubmit.create_db', return_value=True)
+    mock_status_manager = mocker.patch(
+        'autosubmit.history.database_managers.experiment_status_db_manager.create_experiment_status_db_manager'
+    )
+
+    autosubmit.install()
+
+    mock_status_manager.assert_called_once_with('postgres')
+
+
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_update_version(as_db: str, autosubmit, autosubmit_exp, mocker):

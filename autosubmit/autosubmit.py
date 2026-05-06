@@ -2226,7 +2226,10 @@ class Autosubmit:
                             f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
 
                 # create a heartbeat monitor thread to update the experiment status in the database every 2 minutes
-                heartbeat_monitor.start()
+                if not heartbeat_monitor.start():
+                    Log.warning(
+                        f"Heartbeat monitor could not start for experiment {expid}. Experiment status updates may not work."
+                    )
                 
                 if git_operational_check_enabled:
                     Log.debug('Checking for dirty local Git repository')
@@ -3663,32 +3666,42 @@ class Autosubmit:
     def install():
         """Creates a new database instance for autosubmit at the configured path."""
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
-            if not Path(BasicConfig.DB_PATH).exists():
-                # Autosubmit database
+            autosubmit_db_path = Path(BasicConfig.DB_PATH)
+            as_times_path = Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB
+
+            # Autosubmit database
+            if autosubmit_db_path.exists():
+                Log.info(f"Database {autosubmit_db_path} already exists.")
+            else:
                 Log.info("Creating autosubmit database...")
                 query_file = read_files('autosubmit.database') / 'data/autosubmit.sql'
                 query = query_file.read_text()
                 if not create_db(query, BasicConfig.DB_PATH):
                     raise AutosubmitCritical("Can not write database file", 7004)
                 Log.result("Autosubmit database created successfully") 
-            else:
-                raise AutosubmitCritical("Database autosubmit.db already exists.", 7004)
+
             # as_times database
-            as_times_path = Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB
-            if not as_times_path.exists():
+            if as_times_path.exists():
+                Log.info(f"Database {as_times_path} already exists.")
+            else:
                 Log.info("Creating as_times database...")
                 query_file = read_files('autosubmit.database') / 'data/as_times.sql'
                 query = query_file.read_text()
                 if not create_db(query, str(as_times_path)):
                     raise AutosubmitCritical("Can not write as_times database file", 7004)
                 Log.result("as_times database created successfully")
-            else:
-                raise AutosubmitCritical("Database as_times.db already exists.", 7004)
         else:
-            # TODO: create database as_times also for postgres
             Log.info("Creating autosubmit Postgres database...")
             if not create_db(''):
                 raise AutosubmitCritical("Failed to create Postgres database", 7004)
+            Log.info("Creating as_times Postgres table...")
+            try:
+                from autosubmit.history.database_managers.experiment_status_db_manager import (
+                    create_experiment_status_db_manager,
+                )
+                create_experiment_status_db_manager(BasicConfig.DATABASE_BACKEND)
+            except Exception as e:
+                raise AutosubmitCritical(f"Failed to create Postgres as_times table: {str(e)}", 7004)
         return True
 
     @staticmethod

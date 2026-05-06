@@ -55,17 +55,19 @@ class ExperimentHeartBeatMonitor:
         while not self._stop_event.wait(self._interval_seconds):
             self.ping()
 
-    def ping(self) -> None:
+    def ping(self) -> bool:
         """Ping the heartbeat to update the last_heartbeat timestamp in the database."""
         # TODO: Not sure about locking here. Needs testing
         # Use lock to prevent concurrent updates of the heartbeat, prevent race conditions
         with self._ping_lock:
             try:
                 self._status_tracker.update_heartbeat()
+                return True
             except Exception as exc:
                 Log.warning(
                     f"Failed to update heartbeat for experiment {self._status_tracker.expid}: {exc}"
                 )
+                return False
 
     def start(self) -> bool:
         """Start the background thread that updates the heartbeat.
@@ -79,7 +81,9 @@ class ExperimentHeartBeatMonitor:
 
         # clear the stop event in case it was previously set
         self._stop_event.clear()
-        self.ping()
+        if not self.ping():
+            self._stop_event.set()
+            return False
         try:
             # Start the background thread
             self._thread = threading.Thread(
@@ -145,7 +149,7 @@ class ExperimentStatus:
             Logging(self.expid, BasicConfig.HISTORICAL_LOG_DIR).log(
                 message, traceback.format_exc()
             )
-            self.manager = None
+            raise
 
     def set_status(self, status: str) -> None:
         """
@@ -156,8 +160,7 @@ class ExperimentStatus:
         :dtype status: str
         :return: None
         """
-        if self.manager:
-            self.manager.set_exp_status(self.expid, status)
+        self.manager.set_exp_status(self.expid, status)
 
     def set_as_running(self) -> None:
         """
@@ -168,8 +171,7 @@ class ExperimentStatus:
         :dtype status: str
         :return: None
         """
-        if self.manager:
-            self.manager.set_exp_status(self.expid, Models.RunningStatus.RUNNING)
+        self.manager.set_exp_status(self.expid, Models.RunningStatus.RUNNING)
 
     def set_as_not_running(self) -> None:
         """
@@ -180,8 +182,7 @@ class ExperimentStatus:
         :dtype status: str
         :return: None
         """
-        if self.manager:
-            self.manager.set_exp_status(self.expid, Models.RunningStatus.NOT_RUNNING)
+        self.manager.set_exp_status(self.expid, Models.RunningStatus.NOT_RUNNING)
 
     def set_as_deleted(self) -> None:
         """
@@ -192,8 +193,7 @@ class ExperimentStatus:
         :dtype status: str
         :return: None
         """
-        if self.manager:
-            self.manager.set_exp_status(self.expid, Models.RunningStatus.DELETED)
+        self.manager.set_exp_status(self.expid, Models.RunningStatus.DELETED)
 
     def set_as_archived(self) -> None:
         """
@@ -204,8 +204,7 @@ class ExperimentStatus:
         :dtype status: str
         :return: None
         """
-        if self.manager:
-            self.manager.set_exp_status(self.expid, Models.RunningStatus.ARCHIVED)
+        self.manager.set_exp_status(self.expid, Models.RunningStatus.ARCHIVED)
     
     def update_heartbeat(self) -> None:
         """
@@ -214,8 +213,7 @@ class ExperimentStatus:
         
         :return: None
         """
-        if self.manager:
-            self.manager.update_heartbeat(self.expid)
+        self.manager.update_heartbeat(self.expid)
     
     def heartbeat_monitor(self, interval_seconds: int = 120) -> ExperimentHeartBeatMonitor:
         """ Creates an ExperimentHeartBeatMonitor for the experiment with the specified interval for updating the heartbeat.
