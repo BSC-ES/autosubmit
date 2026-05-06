@@ -19,17 +19,18 @@
 
 from autosubmit.history.experiment_status import ExperimentHeartBeatMonitor
 
+
 def test_heartbeat_monitor_starts_and_stops_correctly(mocker):
     """Test __enter__ and __exit__ methods call start() and stop()."""
     status_tracker = mocker.Mock(expid="a000")
     monitor = ExperimentHeartBeatMonitor(status_tracker, interval_seconds=1)
 
-    start_mock = mocker.patch.object(monitor, 'start', return_value=True)
-    stop_mock = mocker.patch.object(monitor, 'stop')
+    start_mock = mocker.patch.object(monitor, "start", return_value=True)
+    stop_mock = mocker.patch.object(monitor, "stop")
 
     with monitor as returned_monitor:
         assert returned_monitor is monitor
-        
+
     start_mock.assert_called_once_with()
     stop_mock.assert_called_once_with()
 
@@ -37,11 +38,100 @@ def test_heartbeat_monitor_starts_and_stops_correctly(mocker):
 def test_heartbeat_monitor_ping_returns_false_when_update_fails(mocker):
     """Test ping() returns False and logs warning when update_heartbeat fails."""
     status_tracker = mocker.Mock(expid="a000")
-    status_tracker.update_heartbeat.side_effect = RuntimeError("DB error")
     monitor = ExperimentHeartBeatMonitor(status_tracker, interval_seconds=1)
 
-    warning_error = mocker.patch('autosubmit.history.experiment_status.Log.warning')
+    status_tracker.update_heartbeat.side_effect = RuntimeError("DB error")
+    warning_error = mocker.patch("autosubmit.history.experiment_status.Log.warning")
 
     assert monitor.ping() is False
     warning_error.assert_called_once()
 
+
+def test_heartbeat_monitor_start_when_thread_already_running(mocker):
+    """Test that start() does not start a new thread if one is already running."""
+    status_tracker = mocker.Mock(expid="a000")
+    monitor = ExperimentHeartBeatMonitor(status_tracker, interval_seconds=1)
+
+    # Mock the thread to simulate it being alive
+    thread = mocker.Mock()
+    thread.is_alive.return_value = True
+    monitor._thread = thread
+
+    # Act
+    result = monitor.start()
+
+    # Assert
+    assert result is True
+    thread.is_alive.assert_called_once_with()
+
+
+def test_heartbeat_monitor_start_fails_when_first_ping_fails(mocker):
+    """Tets that start() fails if the initial ping() fails."""
+    status_tracker = mocker.Mock(expid="a000")
+    monitor = ExperimentHeartBeatMonitor(status_tracker, interval_seconds=1)
+
+    # Simulate ping() failure on first call
+    ping_mock = mocker.patch.object(monitor, "ping", return_value=False)
+
+    # Assert
+    assert monitor.start() is False
+    ping_mock.assert_called_once_with()
+    assert monitor._thread is None
+    assert monitor._stop_event.is_set()
+
+
+def test_heartbeat_monitor_start_fails_when_thread_creation_fails(mocker):
+    """Test that start() fails if thread creation raises an exception."""
+    status_tracker = mocker.Mock(expid="a000")
+    monitor = ExperimentHeartBeatMonitor(status_tracker, interval_seconds=1)
+
+    # Simulate successful ping() but thread creation failure
+    mocker.patch.object(monitor, "ping", return_value=True)
+    thread_mock = mocker.patch(
+        "threading.Thread", side_effect=RuntimeError("Thread error")
+    )
+
+    # Assert
+    assert monitor.start() is False
+    thread_mock.assert_called_once()
+    assert monitor._thread is None
+    assert monitor._stop_event.is_set()
+
+
+def test_heartbeat_monitor_stop_clears_thread(mocker):
+    """Test that stop() clears the thread reference."""
+    status_tracker = mocker.Mock(expid="a000")
+    monitor = ExperimentHeartBeatMonitor(status_tracker, interval_seconds=1)
+
+    # Mock the thread to simulate being dead
+    thread = mocker.Mock()
+    thread.is_alive.return_value = False
+    monitor._thread = thread
+
+    # Act
+    monitor.stop()
+
+    # Assert
+    thread.join.assert_called_once_with(timeout=10.0)  # default timeout
+    assert monitor._thread is None
+
+
+def test_heartbeat_monitor_stop_logs_warning_if_thread_does_not_stop(mocker):
+    """Test that stop() logs a warning if the thread does not stop within the timeout."""
+    status_tracker = mocker.Mock(expid="a000")
+    monitor = ExperimentHeartBeatMonitor(status_tracker, interval_seconds=1)
+
+    # Mock the thread to simulate it being alive after join
+    thread = mocker.Mock()
+    thread.is_alive.return_value = True
+    monitor._thread = thread
+
+    warning_mock = mocker.patch("autosubmit.history.experiment_status.Log.warning")
+
+    # Act
+    monitor.stop(timeout=0.1)  # Use a short timeout for the test
+
+    # Assert
+    thread.join.assert_called_once_with(timeout=0.1)
+    warning_mock.assert_called_once()
+    assert monitor._thread is None
