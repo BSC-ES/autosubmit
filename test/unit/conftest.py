@@ -18,6 +18,7 @@
 """Fixtures for unit tests."""
 
 from datetime import datetime
+from getpass import getuser
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from random import seed, randint, choice
@@ -378,3 +379,81 @@ def pbs_platform(autosubmit_config, tmp_path):
     aslogs.mkdir(parents=True, exist_ok=True)
     (aslogs / "submit_local.sh").touch()
     return PBSPlatform(expid="a000", name="pytest-pbs", config=as_conf.experiment_data)
+
+
+@pytest.fixture(scope="function")
+def general_data(tmp_path: Path) -> dict[str, Any]:
+    """
+    Provides part of the `experiment_data` dictionary used by the
+    integration tests in `commands`.
+
+    :param tmp_path: Temporary directory fixture from pytest.
+    :type tmp_path: Path
+    :return: A dictionary compatible with AutosubmitConfig.experiment_data
+    :rtype: Dict[str, object]
+    """
+    return {
+        'PROJECT': {
+            'PROJECT_TYPE': 'none',
+            'PROJECT_DESTINATION': 'dummy_project'
+        },
+        'AUTOSUBMIT': {
+            'WORKFLOW_COMMIT': 'dummy_commit',
+            'LOCAL_ROOT_DIR': str(tmp_path)  # Override root dir to tmp_path
+        },
+        'CONFIG': {
+            "SAFETYSLEEPTIME": 0,
+            "TOTALJOBS": 20,
+            "MAXWAITINGJOBS": 20
+        },
+        'DEFAULT': {
+            'HPCARCH': "local",
+        },
+        'PLATFORMS': {
+            'TEST_SLURM': {
+                'TYPE': 'slurm',
+                'ADD_PROJECT_TO_HOST': 'False',
+                'HOST': '127.0.0.1',
+                'MAX_WALLCLOCK': '48:00',
+                'PROJECT': 'group',
+                'QUEUE': 'gp_debug',
+                'SCRATCH_DIR': '/tmp/scratch',
+                'TEMP_DIR': '',
+                'USER': getuser(),
+                'PROCESSORS': '1',
+                'MAX_PROCESSORS': '128',
+                'PROCESSORS_PER_NODE': '128',
+            },
+            'TEST_PS': {
+                'TYPE': 'PS',
+                'ADD_PROJECT_TO_HOST': 'False',
+                'HOST': '127.0.0.1',
+                'MAX_WALLCLOCK': '48:00',
+                'PROJECT': 'group',
+                'QUEUE': 'gp_debug',
+                'SCRATCH_DIR': '/tmp/scratch',
+                'TEMP_DIR': '',
+                'USER': getuser(),
+                'PROCESSORS': '1',
+                'MAX_PROCESSORS': '128',
+                'PROCESSORS_PER_NODE': '128',
+            },
+            # TODO: Containerize ecaccess to be able to run these tests in CI/CD.
+            'TEST_EC': {
+                'TYPE': 'ecaccess',  # enables the usage of ecaccess commands, requires a valid .eccert in ~/.eccert
+                'VERSION': 'slurm',  # HPC scheduler accessed via ecaccess commands
+                'ADD_PROJECT_TO_HOST': 'False',
+                'HOST': 'hpc-login',
+                # Can only run locally with a valid .eccert, see https://gitlab.earth.bsc.es/es/auto-ecearth3/-/wikis/Running-on-ECMWF-HPC2020
+                'MAX_WALLCLOCK': '48:00',
+                'PROJECT': 'spesiccf',
+                'QUEUE': 'nf',
+                'EC_QUEUE': 'hpc',
+                'SCRATCH_DIR': '/ec/res4/scratch/c3d',
+                'USER': 'c3d',  # Requires a valid user, contact ecmwf for one.
+                'PROCESSORS_PER_NODE': '4',
+                'MAX_PROCESSORS': '4',
+                'CUSTOM_DIRECTIVES': ['#SBATCH --hint=nomultithread'],
+            },
+        }
+    }
