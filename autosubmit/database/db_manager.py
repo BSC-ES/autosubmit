@@ -17,7 +17,7 @@
 
 """Contains code to manage a database via SQLAlchemy."""
 from pathlib import Path
-from typing import Any, Optional, cast, List, Dict, Union
+from typing import Any, cast, List, Dict, Union
 
 from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc, inspect, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -36,7 +36,7 @@ class DbManager:
     as Postgres, Mongo, MySQL, etc.
     """
 
-    def __init__(self, connection_url: str, schema: Optional[str] = None, historical: Optional[bool] = False) -> None:
+    def __init__(self, connection_url: str, schema: str | None = None, historical: bool | None = False) -> None:
         self.engine = None
         self.engine_historical = None
         if BasicConfig.DATABASE_BACKEND == "sqlite":
@@ -60,7 +60,7 @@ class DbManager:
         self.restore_path = Path(BasicConfig.DB_PATH) / "autosubmit_db.sql"
         self.table_registry = TableRegistry(self.schema)
 
-    def _get_engine(self, table_name: Optional[str] = None) -> Engine:
+    def _get_engine(self, table_name: str | None = None) -> Engine:
         """Return the appropriate engine based on context.
 
         :param table_name: If True, return the historical engine.
@@ -106,7 +106,7 @@ class DbManager:
             result = conn.execute(insert(table), data)
             return cast(int, result.rowcount)
 
-    def select_first_where(self, table_name: str, where: Optional[dict[str, str]]) -> Optional[Any]:
+    def select_first_where(self, table_name: str, where: dict[str, str] | None) -> Any | None:
         table = self.table_registry.get(table_name)
         query = select(table)
         if where:
@@ -127,7 +127,7 @@ class DbManager:
     def select_where_with_columns(
             self,
             table: "Table",
-            where: Optional[Union[dict[str, Any], ClauseElement]] = None
+            where: Union[dict[str, Any], ClauseElement] | None = None
     ) -> List[tuple[tuple[str, Any]]]:
         """Select rows from a table with specific columns. Return a list of hashable tuples.
 
@@ -171,7 +171,7 @@ class DbManager:
             result = conn.execute(delete(table))
             return result.rowcount
 
-    def delete_where(self, table_name: str, where: Optional[Union[dict[str, Any], ClauseElement]]) -> int:
+    def delete_where(self, table_name: str, where: Union[dict[str, Any], ClauseElement] | None) -> int:
         """Delete rows from a table where the specified conditions are met.
         Supports both equality and 'IN' queries for list values.
 
@@ -202,7 +202,7 @@ class DbManager:
         return result.rowcount
 
     def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str],
-                     exclude_cols: Optional[List[str]] = None, batch_size: int = 1000) -> int:
+                     exclude_cols: List[str] | None = None, batch_size: int = 1000) -> int:
         """Perform an upsert (update or insert) operation.
         First delete the affected rows
         then insert the new data.
@@ -285,18 +285,15 @@ class DbManager:
     def select_latest_inner_jobs(
             self,
             innerjobs_table: Table,
-            job_names: Optional[List[str]] = None
+            job_names: List[str] | None = None
     ) -> List[Dict[str, object]]:
         """
         Select the row with the latest timestamp for each job_name from the inner jobs table.
         If job_names is provided, filter only those job_names.
 
         :param innerjobs_table: SQLAlchemy Table object for the inner jobs.
-        :type innerjobs_table: Table
         :param job_names: Optional list of job_name values to filter by.
-        :type job_names: Optional[List[str]]
         :return: List of dictionaries with the latest row per job_name.
-        :rtype: List[Dict[str, object]]
         """
         row_number = func.row_number().over(
             partition_by=innerjobs_table.c.job_name,
@@ -312,7 +309,7 @@ class DbManager:
             result = conn.execute(query)
             return [dict(row) for row in result.mappings().all()]
 
-    def select_last_with_columns(self, table_name: str, columns: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+    def select_last_with_columns(self, table_name: str, columns: List[str] | None = None) -> Dict[str, Any] | None:
         """Return the latest row from a table ordered by descending update time.
 
         :param table_name: Name of the table to select from.

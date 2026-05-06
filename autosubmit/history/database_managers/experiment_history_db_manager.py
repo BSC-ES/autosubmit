@@ -21,7 +21,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Generator, Optional, Protocol, cast
+from typing import Any, Generator, Protocol, cast
 
 from sqlalchemy import and_, func, inspect, desc, insert, select, text, update
 from sqlalchemy.schema import CreateTable, CreateSchema
@@ -210,7 +210,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
         """ Get Current (latest) ExperimentRun data class. """
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
-    def get_experiment_run_dc_with_max_id_or_none(self) -> Optional[ExperimentRun]:
+    def get_experiment_run_dc_with_max_id_or_none(self) -> ExperimentRun | None:
         """Get Current (latest) ExperimentRun data class, or None if not available."""
         try:
             return self.get_experiment_run_dc_with_max_id()
@@ -476,7 +476,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
             raise Exception(f"No job_data found for job_name='{job_name}'.")
         return JobData.from_model(Models.JobDataRow(*job_data_rows[0]))
 
-    def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int:
+    def get_job_data_max_counter(self, job_name: str | None = None) -> int:
         """
         Get the maximum counter value from the `job_data` table. If a `job_name` is provided,
         the query will filter by that specific job name.
@@ -489,11 +489,11 @@ class ExperimentHistoryDbManager(DatabaseManager):
         if job_name:
             statement = "SELECT MAX(counter) as maxcounter FROM job_data WHERE job_name = ?"
             arguments = (job_name,)
-            counter_result: list[tuple[Optional[int]]] = self.get_from_statement_with_arguments(
+            counter_result: list[tuple[int | None]] = self.get_from_statement_with_arguments(
                 self.historicaldb_file_path, statement, arguments)
         else:
             statement = "SELECT MAX(counter) as maxcounter FROM job_data"
-            counter_result: list[tuple[Optional[int]]] = self.get_from_statement(self.historicaldb_file_path, statement)
+            counter_result: list[tuple[int | None]] = self.get_from_statement(self.historicaldb_file_path, statement)
 
         if not counter_result[0][0]:
             return DEFAULT_MAX_COUNTER
@@ -539,7 +539,7 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_experiment_run_dc_with_max_id(self) -> ExperimentRun: ...
 
-    def get_experiment_run_dc_with_max_id_or_none(self) -> Optional[ExperimentRun]: ...
+    def get_experiment_run_dc_with_max_id_or_none(self) -> ExperimentRun | None: ...
 
     def register_experiment_run_dc(self, experiment_run_dc): ...
 
@@ -565,11 +565,11 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str): ...
 
-    def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int: ...
+    def get_job_data_max_counter(self, job_name: str | None = None) -> int: ...
 
     def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData: ...
 
-    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> Optional[JobData]: ...
+    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> JobData | None: ...
 
     def get_stale_rows(self) -> list: ...
 
@@ -589,7 +589,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             self,
             schema: str,
             jobdata_path: str,
-            jobdata_file: Optional[str] = None,
+            jobdata_file: str | None = None,
     ) -> None:
         """Initialize the SQLAlchemy experiment-history manager.
 
@@ -693,7 +693,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         run = self._get_experiment_run_with_max_id()
         return ExperimentRun.from_model(run)
 
-    def get_experiment_run_dc_with_max_id_or_none(self) -> Optional[ExperimentRun]:
+    def get_experiment_run_dc_with_max_id_or_none(self) -> ExperimentRun | None:
         """Get Current (latest) ExperimentRun data class, or None if not available."""
         try:
             return self.get_experiment_run_dc_with_max_id()
@@ -821,7 +821,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             self._update_job_data_by_id(job_data_dc)
         return len(job_data_dcs)
 
-    def get_job_data_dc_unique_latest_by_job_name(self, job_name: Optional[str]):
+    def get_job_data_dc_unique_latest_by_job_name(self, job_name: str | None):
         """ Returns JobData data class for the latest job_data_row with last=1 by job_name. """
         job_data_row_last = self._get_job_data_last_by_name(job_name)
         if len(job_data_row_last) > 0:
@@ -1028,7 +1028,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             raise Exception(f"No job_data found for job_name='{job_name}' and fail_count={fail_count}.")
         return JobData.from_model(result)
 
-    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> Optional[JobData]:
+    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> JobData | None:
         job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table)
@@ -1203,7 +1203,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             return result.rowcount
 
 
-def get_last_run_id(expid: str) -> Optional[int]:
+def get_last_run_id(expid: str) -> int | None:
     """Get the last experiment run ID, or None if not available.
     Bypasses ExperimentHistory.__init__ to avoid silent failure on manager creation.
     """

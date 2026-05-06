@@ -25,7 +25,7 @@ from contextlib import suppress
 from pathlib import Path
 import time
 from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Optional, Set, Union
+from typing import List, Dict, Tuple, Any, Set, Union
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
@@ -86,7 +86,7 @@ class JobList(object):
         self.disable_save = disable_save
         self.submitter = submitter
         self.check_wrapper_fake_ids = set()
-        self.run_id: Optional[int] = None
+        self.run_id: int | None = None
         self._set_status_path = Path(BasicConfig.LOCAL_ROOT_DIR / Path(self.expid) / "status")
         self._update_file_path = self._set_status_path / self._update_file
 
@@ -179,7 +179,7 @@ class JobList(object):
         return self._run_members
 
     @run_members.setter
-    def run_members(self, members: Optional[Union[str, list[str]]]) -> None:
+    def run_members(self, members: Union[str, list[str]] | None) -> None:
         """Normalize and store members supplied as a string or list.
 
         :param members: Members to run, provided as a list or a comma/space separated string.
@@ -1926,36 +1926,28 @@ class JobList(object):
 
     @staticmethod
     def _calculate_dependency_metadata(
-            chunk: Optional[int],
+            chunk: int | None,
             chunk_list: List[int],
-            member: Optional[str],
+            member: str | None,
             member_list: List[str],
-            date: Optional[str],
+            date: str | None,
             date_list: List[str],
             dependency: Any
-    ) -> Tuple[bool, Tuple[Optional[int], Optional[str], Optional[str]]]:
+    ) -> Tuple[bool, Tuple[int | None, str | None, str | None]]:
         """Compute the target chunk, member, and date for a dependency with a +/- distance.
 
         Compute the target chunk, member, and date for a dependency that specifies a
         positive or negative distance.
 
         :param chunk: Current chunk index or ``None``.
-        :type chunk: Optional[int]
         :param chunk_list: Ordered list of available chunk indices.
-        :type chunk_list: List[int]
         :param member: Current member identifier or ``None``.
-        :type member: Optional[str]
         :param member_list: Ordered list of available members.
-        :type member_list: List[str]
         :param date: Current date string or ``None``.
-        :type date: Optional[str]
         :param date_list: Ordered list of available dates.
-        :type date_list: List[str]
         :param dependency: Dependency object.
-        :type dependency: Any
         :returns: Tuple where the first element is a boolean ``skip`` flag and the second is
             a tuple ``(chunk, member, date)`` with the computed targets.
-        :rtype: Tuple[bool, Tuple[Optional[int], Optional[str], Optional[str]]].
         """
         skip = False
         if dependency.sign == '-':
@@ -2797,7 +2789,7 @@ class JobList(object):
             active = []
         return active
 
-    def get_job_by_name(self, name: str) -> Optional[Job]:
+    def get_job_by_name(self, name: str) -> Job | None:
         """Returns the job that its name matches parameter name.
 
         :parameter name: name to look for
@@ -2810,7 +2802,7 @@ class JobList(object):
                 return job
         return None
 
-    def get_jobs_by_section(self, section_list: list, banned_jobs: Optional[list] = None,
+    def get_jobs_by_section(self, section_list: list, banned_jobs: list | None = None,
                             get_only_non_completed: bool = False) -> list:
         """Get jobs by section.
 
@@ -2846,9 +2838,9 @@ class JobList(object):
     def get_jobs_by_section_db(
             self,
             section_list: list,
-            banned_jobs: Optional[list] = None,
+            banned_jobs: list | None = None,
             get_only_non_completed: bool = False,
-            status_filter: Optional[str] = None,
+            status_filter: str | None = None,
     ) -> set[str]:
         """Get job names by section from the database.
 
@@ -2911,14 +2903,11 @@ class JobList(object):
         """
         return sorted(self.job_list, key=lambda k: k.status)
 
-    def save_jobs(self, jobs_to_save: Optional[List[Job]] = None, reset_log_counters: bool = False):
+    def save_jobs(self, jobs_to_save: List[Job] | None = None, reset_log_counters: bool = False):
         """Persists the job list
         :param jobs_to_save: Optional list of jobs to save. If None, saves all jobs in the job list.
-        :type jobs_to_save: Optional[List[Job]]
         :param reset_log_counters: If True, resets the log counters for the jobs being saved. Defaults to False.
-        :type reset_log_counters: bool
         :return: None
-        :rtype: None
         :raises Exception: If a database access error occurs while saving jobs.
         """
 
@@ -2948,7 +2937,7 @@ class JobList(object):
         self.total_size, self.completed_size, self.failed_size = self.dbmanager.get_job_list_size()
         return nodes
 
-    def load_job_by_name(self, job_name: str) -> Optional[Job]:
+    def load_job_by_name(self, job_name: str) -> Job | None:
         """
         Loads a job by its name from the database.
 
@@ -3856,7 +3845,7 @@ class JobList(object):
 
         del self._dic_jobs
 
-    def print_with_status(self, status_change: Optional[dict[Any, Any]] = None, nocolor=False,
+    def print_with_status(self, status_change: dict[Any, Any] | None = None, nocolor=False,
                           existing_list=None) -> str:
         """Returns the string representation of the dependency tree of the Job List
 
@@ -3996,7 +3985,7 @@ class JobList(object):
 
     @staticmethod
     def retrieve_times(status_code, name, tmp_path, make_exception=False, job_times=None,
-                       seconds=False, job_data_collection: Optional['JobData'] = None) -> Union[None, JobRow]:
+                       seconds=False, job_data_collection: 'JobData | None' = None) -> Union[None, JobRow]:
 
         """Retrieve job timestamps from database.
 
@@ -4220,7 +4209,7 @@ class JobList(object):
     def add_job(self, job: Job):
         self.graph.add_node(job.name, job=job)
 
-    def recover_last_data(self, finished_jobs: Optional[list["Job"]] = None) -> None:
+    def recover_last_data(self, finished_jobs: list["Job"] | None = None) -> None:
         """Recover job IDs and log names for completed, failed, and skipped jobs from experiment history.
 
         :param finished_jobs: Optional list of finished Job objects to recover data for.
@@ -4253,7 +4242,7 @@ class JobList(object):
                 # TODO: rebase is fixed
                 job.updated_log = job.fail_count
 
-    def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None,
+    def _get_jobs_by_name(self, status: list[int] | None = None, platform: Platform = None,
                           return_only_names=False) -> Union[List[str], List["Job"]]:
         """Return jobs filtered by status and/or platform as names or Job objects.
 

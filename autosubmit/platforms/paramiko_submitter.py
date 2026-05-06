@@ -20,7 +20,7 @@
 import os
 from collections import defaultdict
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable
 
 from autosubmit.config.basicconfig import BasicConfig
 from .platform import Platform
@@ -72,7 +72,7 @@ def _get_serial_platforms(platforms_used: set[str], platforms_data: dict) -> dic
     """Traverse used platforms and then look for serial platforms."""
     serial_platforms = defaultdict(list)
     for platform in list(platforms_used):
-        hpc: Optional[str] = platforms_data.get(platform, {}).get("SERIAL_PLATFORM", None)
+        hpc: str | None = platforms_data.get(platform, {}).get("SERIAL_PLATFORM", None)
         if hpc:
             serial_platforms[hpc].append(platform)
             if hpc not in platforms_used:
@@ -132,7 +132,7 @@ def _validate_platform_config(platform_name: str, platform: 'ParamikoPlatform') 
 
 
 def get_platform_by_type(platform_type: str, expid: str, platform_name: str, experiment_data: dict,
-                          platform_version: str, auth_password: Optional[str]) -> 'ParamikoPlatform':
+                          platform_version: str, auth_password: str | None) -> 'ParamikoPlatform':
     """Get the platform by its type.
 
     Raise an error if the platform type is not supported.
@@ -175,7 +175,7 @@ def get_platform_by_type(platform_type: str, expid: str, platform_name: str, exp
 class ParamikoSubmitter:
     """Class to manage the experiments Paramiko platforms."""
 
-    def __init__(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
+    def __init__(self, as_conf: 'AutosubmitConfig', auth_password: str | None = None,
                  local_auth_password=None):
         self.platforms: dict[str, 'ParamikoPlatform'] = {}
         self.load_platforms(as_conf=as_conf, auth_password=auth_password, local_auth_password=local_auth_password)
@@ -189,8 +189,8 @@ class ParamikoSubmitter:
         """
         return list(self.platforms.values())
 
-    def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: Optional[dict] = None,
-                            auth_password: Optional[str] = None) -> None:
+    def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: dict | None = None,
+                            auth_password: str | None = None) -> None:
         """Create the local platform.
 
         :param as_conf: Autosubmit configuration.
@@ -216,7 +216,7 @@ class ParamikoSubmitter:
             LocalPlatform.TYPE.upper(): local_platform
         }
 
-    def load_platforms(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
+    def load_platforms(self, as_conf: 'AutosubmitConfig', auth_password: str | None = None,
                        local_auth_password=None) -> None:
         """Create all the platform's object that will be used by the experiment."""
         exp_data = as_conf.experiment_data

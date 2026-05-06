@@ -19,7 +19,6 @@
 
 from pathlib import Path
 from subprocess import CalledProcessError, SubprocessError
-from typing import Optional
 
 import time
 import pytest
@@ -47,8 +46,8 @@ from autosubmit.monitor.monitor import (
 def test_generate_output(
         output_format: str,
         show: bool,
-        display_error: Optional[SubprocessError],
-        error_raised: Optional[BaseException],
+        display_error: SubprocessError | None,
+        error_raised: BaseException | None,
         autosubmit_exp,
         mocker
 ):

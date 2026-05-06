@@ -23,7 +23,7 @@ from contextlib import suppress
 from os import _exit  #noqa
 # noinspection PyProtectedMember
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 from portalocker.exceptions import BaseLockException
 
@@ -96,7 +96,7 @@ def exit_from_error(e: BaseException) -> int:
 
 # noinspection PyProtectedMember
 def main():
-    args: Optional[argparse.Namespace] = None
+    args: argparse.Namespace | None = None
     try:
         return_value, args = Autosubmit.parse_args()
         if args:

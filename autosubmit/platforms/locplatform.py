@@ -20,7 +20,7 @@ import os
 import subprocess
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import autosubmit.log.utils as log_utils
 from autosubmit.config.basicconfig import BasicConfig
@@ -40,7 +40,7 @@ class LocalPlatform(ParamikoPlatform):
     EXECUTION_MODE = ExecutionMode.DIRECT
     TYPE = PlatformType.LOCAL
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: Union[str, list[str]] | None = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.cancel_cmd = None
         self.mkdir_cmd = None
@@ -140,7 +140,7 @@ class LocalPlatform(ParamikoPlatform):
         except Exception as exc:
             Log.error("Writing Job Id Failed : " + str(exc))
 
-    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+    def read_jobid_from_remote_log(self, remote_path: str) -> int | None:
         try:
             if os.path.exists(remote_path):
                 with open(remote_path) as f:

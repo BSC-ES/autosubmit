@@ -22,7 +22,7 @@
 import datetime
 import subprocess
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 import pytest
 from _pytest._py.path import LocalPath
@@ -308,8 +308,8 @@ def test_snapshot_resets_and_captures_pre_existing_ids(
 ])
 def test_check_for_unrecoverable_errors_no_exception_for_valid_output(
     ec_platform: EcPlatform,
-    ssh_output: Optional[str],
-    ssh_output_err: Optional[str],
+    ssh_output: str | None,
+    ssh_output_err: str | None,
 ) -> None:
     """Verify that no exception is raised for known-valid ecaccess output.
 
@@ -327,8 +327,8 @@ def test_check_for_unrecoverable_errors_no_exception_for_valid_output(
 ])
 def test_check_for_unrecoverable_errors_none_exception_expected(
     ec_platform: EcPlatform,
-    ssh_output: Optional[str],
-    ssh_output_err: Optional[str],
+    ssh_output: str | None,
+    ssh_output_err: str | None,
 ) -> None:
     """Verify that no exception is raised for known-valid ecaccess output.
 

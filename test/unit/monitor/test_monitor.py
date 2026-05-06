@@ -22,7 +22,7 @@ from os import utime
 from pathlib import Path
 from shutil import rmtree
 from subprocess import CalledProcessError
-from typing import Any, Optional, Tuple
+from typing import Any, Tuple
 
 import pytest
 # noinspection PyProtectedMember
@@ -151,7 +151,7 @@ def test_check_node_exists(
         'within group, not hiding, single element, quotes will be replaced'
     ]
 )
-def test_create_node(job_name: str, groups: dict[str, Any], hide_groups: bool, expected_group: Optional[str], mocker):
+def test_create_node(job_name: str, groups: dict[str, Any], hide_groups: bool, expected_group: str | None, mocker):
     job = mocker.MagicMock()
     job.name = job_name
 

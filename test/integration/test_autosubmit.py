@@ -329,7 +329,7 @@ def test_update_description(as_db: str, autosubmit, autosubmit_exp, mocker):
 def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict,
                           context_mgr: 'AbstractContextManager'):
     with context_mgr:
-        autosubmit_exp('t000', experiment_data, create=False, include_jobs=False)
+        autosubmit_exp(experiment_data=experiment_data, create=False, include_jobs=False)
 
 
 

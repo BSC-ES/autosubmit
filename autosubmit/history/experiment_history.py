@@ -14,7 +14,6 @@
 
 import traceback
 from time import time
-from typing import Optional
 
 import autosubmit.history.database_managers.database_models as Models
 import autosubmit.history.utils as HUtils
@@ -43,7 +42,7 @@ class ExperimentHistory:
         self._job_data_file = f"job_data_{expid}.db" if BasicConfig.DATABASE_BACKEND == "sqlite" else ""
         self._historiclog_dir_path = BasicConfig.HISTORICAL_LOG_DIR
         self.force_sql_alchemy = force_sql_alchemy
-        self.manager: Optional[ExperimentHistoryDatabaseManager] = None
+        self.manager: ExperimentHistoryDatabaseManager | None = None
         try:
             options = {
                 'expid': self.expid,
@@ -108,37 +107,31 @@ class ExperimentHistory:
 
             return None
 
-    def get_submit_data_dc(self, job_name: str, fail_count: int = 0) -> Optional[JobData]:
+    def get_submit_data_dc(self, job_name: str, fail_count: int = 0) -> JobData | None:
         """Retrieve the full JobData for a job's submission by job name and fail count.
 
         :param job_name: The name of the job.
-        :type job_name: str
         :param fail_count: The number of times the job has failed. Defaults to 0.
-        :type fail_count: int
         :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
-        :rtype: Optional[JobData]
         """
         try:
             return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
         except Exception:
             return None
 
-    def get_finish_data_dc(self, job_name: str, fail_count: int = 0) -> Optional[JobData]:
+    def get_finish_data_dc(self, job_name: str, fail_count: int = 0) -> JobData | None:
         """Retrieve the full JobData for a job's finish record by job name and fail count.
 
         :param job_name: The name of the job.
-        :type job_name: str
         :param fail_count: The number of times the job has failed. Defaults to 0.
-        :type fail_count: int
         :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
-        :rtype: Optional[JobData]
         """
         try:
             return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
         except Exception:
             return None
 
-    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> Optional[JobData]:
+    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> JobData | None:
         """Retrieve JobData by job_id and fail_count.
 
         :param job_id: The scheduler job ID.
@@ -153,51 +146,31 @@ class ExperimentHistory:
     def update_submit_time(self, job_name: str, submit: int = 0, status: str = "UNKNOWN", ncpus: int = 0,
                            wallclock: str = "00:00", qos: str = "debug", date: str = "", member: str = "",
                            section: str = "", chunk: int = 0, platform: str = "NA", job_id: int = 0,
-                           wrapper_queue: Optional[str] = None, wrapper_code: Optional[str] = None,
+                           wrapper_queue: str | None = None, wrapper_code: str | None = None,
                            children: str = "", workflow_commit: str = "", split=None, splits=None,
-                           fail_count: int = 0) -> Optional[JobData]:
+                           fail_count: int = 0) -> JobData | None:
         """Updates an existing job submission entry in the database, identified by job name and fail count.
 
         :param job_name: The name of the job.
-        :type job_name: str
         :param submit: The submission time of the job. Defaults to 0.
-        :type submit: int
         :param status: The status of the job. Defaults to "UNKNOWN".
-        :type status: str
         :param ncpus: The number of CPUs allocated for the job. Defaults to 0.
-        :type ncpus: int
         :param wallclock: The wallclock time allocated for the job. Defaults to "00:00".
-        :type wallclock: str
         :param qos: The quality of service. Defaults to "debug".
-        :type qos: str
         :param date: The date associated with the job. Defaults to an empty string.
-        :type date: str
         :param member: The member associated with the job. Defaults to an empty string.
-        :type member: str
         :param section: The section associated with the job. Defaults to an empty string.
-        :type section: str
         :param chunk: The chunk number associated with the job. Defaults to 0.
-        :type chunk: int
         :param platform: The platform on which the job is run. Defaults to "NA".
-        :type platform: str
         :param job_id: The job ID. Defaults to 0.
-        :type job_id: int
         :param wrapper_queue: The wrapper queue. Defaults to None.
-        :type wrapper_queue: Optional[str]
         :param wrapper_code: The wrapper code. Defaults to None.
-        :type wrapper_code: Optional[str]
         :param children: The children. Defaults to an empty string.
-        :type children: str
         :param workflow_commit: The workflow commit identifier. Defaults to an empty string.
-        :type workflow_commit: str
         :param split: The split identifier. Defaults to None.
-        :type split: Optional[str]
         :param splits: The splits information. Defaults to None.
-        :type splits: Optional[str]
         :param fail_count: The number of times the job has failed. Defaults to 0.
-        :type fail_count: int
         :return: The updated JobData instance, or None if the record is not found or an exception occurs.
-        :rtype: Optional[JobData]
         """
 
         try:
@@ -228,31 +201,21 @@ class ExperimentHistory:
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
-                         job_id: int = 0, wrapper_queue: Optional[str] = None, wrapper_code: Optional[str] = None,
+                         job_id: int = 0, wrapper_queue: str | None = None, wrapper_code: str | None = None,
                          children: str = "", fail_count: int = 0) -> JobData:
         """
         Updates the start time and other details of a job in the database.
 
         :param job_name: The name of the job.
-        :type job_name: str
         :param start: The start time of the job. Default to 0.
-        :type start: int
         :param status: The status of the job. Defaults to "UNKNOWN".
-        :type status: str
         :param qos: The quality of service. Default to "debug".
-        :type qos: str
         :param job_id: The job ID. Default to 0.
-        :type job_id: int
         :param wrapper_queue: The wrapper queue. Defaults to None.
-        :type wrapper_queue: Optional[str]
         :param wrapper_code: The wrapper code. Defaults to None.
-        :type wrapper_code: Optional[str]
         :param children: The children. Default to an empty string.
-        :type children: str
         :param fail_count: The fail count for the attempt. Default to 0.
-        :type fail_count: int
         :return: The result of updating the job data, or None if an exception occurs.
-        :rtype: JobData
         """
         try:
             job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
@@ -270,26 +233,18 @@ class ExperimentHistory:
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def write_finish_time(self, job_name: str, finish: int = 0, status: str = "UNKNOWN", job_id: int = 0,
-                          out_file: Optional[str] = None, err_file: Optional[str] = None,
+                          out_file: str | None = None, err_file: str | None = None,
                           fail_count: int = 0) -> JobData:
         """Updates the finish time and other details of a job in the database.
 
         :param job_name: The name of the job.
-        :type job_name: str
         :param finish: The finish time of the job. Default to 0.
-        :type finish: int
         :param status: The status of the job. Defaults to "UNKNOWN".
-        :type status: str
         :param job_id: The job ID. Default to 0.
-        :type job_id: int
         :param out_file: The output file path. Defaults to None.
-        :type out_file: Optional[str]
         :param err_file: The error file path. Defaults to None.
-        :type err_file: Optional[str]
         :param fail_count: The fail count for the attempt. Default to 0.
-        :type fail_count: int
         :return: The result of updating the job data, or None if an exception occurs.
-        :rtype: JobData
         """
         try:
             job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)

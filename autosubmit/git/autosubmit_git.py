@@ -23,7 +23,7 @@ import subprocess
 from pathlib import Path
 from shutil import rmtree
 from time import time
-from typing import Optional, Union
+from typing import Union
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -61,7 +61,7 @@ _HOOKS_PATH_GIT_VERSION = 2136
 """Minimum Git version that supports the core.hooksPath configuration option."""
 
 
-def _get_uncommitted_code(git_repo: Path) -> Optional[str]:
+def _get_uncommitted_code(git_repo: Path) -> str | None:
     """Return any uncommitted changes in the given Git repository or submodules.
 
     If there are no uncommitted changes, return None.
@@ -81,7 +81,7 @@ def _get_uncommitted_code(git_repo: Path) -> Optional[str]:
     return None
 
 
-def _get_code_not_pushed(git_repo: Path) -> Optional[str]:
+def _get_code_not_pushed(git_repo: Path) -> str | None:
     """Return any code not pushed to remotes in the given Git repository or submodules.
 
     If there are no code not pushed changes, return None.

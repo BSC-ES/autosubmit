@@ -17,7 +17,7 @@
 
 
 import datetime
-from typing import List, Optional, cast
+from typing import List, cast
 from functools import cache, cached_property
 
 from sqlalchemy import (
@@ -312,7 +312,7 @@ JOBLISTTABLES = {
 JobListTable = JobsTable
 
 
-def get_table_with_schema(schema: Optional[str], table: Optional[Table]) -> Table:
+def get_table_with_schema(schema: str | None, table: Table | None) -> Table:
     """Get the ``Table`` instance with the metadata modified.
 
     The metadata will use the given container. This means you can
@@ -336,7 +336,7 @@ def get_table_with_schema(schema: Optional[str], table: Optional[Table]) -> Tabl
     return dest_table
 
 
-def get_table_from_name(*, schema: Optional[str], table_name: str) -> Table:
+def get_table_from_name(*, schema: str | None, table_name: str) -> Table:
     """Get a new Table instance with the given schema and table name from the registry.
 
     :param schema: Optional schema name.
@@ -366,7 +366,7 @@ class TableRegistry:
     subsequent lookups, avoiding redundant MetaData and Table construction.
     """
 
-    def __init__(self, schema: Optional[str]) -> None:
+    def __init__(self, schema: str | None) -> None:
         """Initialize the registry with the target schema."""
         self._schema = schema
 

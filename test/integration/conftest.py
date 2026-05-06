@@ -28,13 +28,13 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import time_ns
-from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
 import pytest
 from ruamel.yaml import YAML
 from sqlalchemy import create_engine
 from testcontainers.core.container import DockerContainer  # type: ignore
-from testcontainers.postgres import PostgresContainer  # type: ignore
+from testcontainers.community.postgres import PostgresContainer  # type: ignore
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
@@ -97,8 +97,6 @@ class AutosubmitExperimentFixture(Protocol):
             wrapper: bool | None = False,
             create: bool | None = True,
             include_jobs: bool | None = False,
-            reload: bool | None = True,
-            mock_last_name_used: bool | None = True,
             *args: Any,
             **kwargs: Any
     ) -> AutosubmitExperiment:
@@ -164,8 +162,6 @@ def autosubmit_exp(
             wrapper: bool | None = False,
             create: bool | None = True,
             include_jobs: bool | None = False,
-            reload: bool | None = True,
-            mock_last_name_used: bool | None = True,
             *_,
             **kwargs
     ) -> AutosubmitExperiment:
@@ -206,20 +202,23 @@ def autosubmit_exp(
         if Path(tmp_path / expid).exists():
             pytest.xfail(f'The test is trying to use {expid} as expid but its directory exists: {tmp_path!s}!')
 
-        expid = autosubmit.expid(
-            description="Pytest experiment (delete me)",
-            hpc="local",
-            copy_id="",
-            dummy=True,
-            minimal_configuration=False,
-            git_repo="",
-            git_branch="",
-            git_as_conf="",
-            operational=operational,
-            testcase=testcase,
-            evaluation=evaluation,
-            use_local_minimal=False
-        )
+        # setdefault will set the default if the user did not specify it.
+        # This way, we can control via kwargs the arguments to expid. In the past, this fixture
+        # used kwargs to add more things to ``as_conf``, but over the time we stopped using it.
+        kwargs.setdefault("description", "Pytest experiment (delete me)")
+        kwargs.setdefault("hpc", "local")
+        kwargs.setdefault("copy_id", "")
+        kwargs.setdefault("dummy", True)
+        kwargs.setdefault("minimal_configuration", False)
+        kwargs.setdefault("git_repo", "")
+        kwargs.setdefault("git_branch", "")
+        kwargs.setdefault("git_as_conf", "")
+        kwargs.setdefault("operational", operational)
+        kwargs.setdefault("testcase", testcase)
+        kwargs.setdefault("evaluation", evaluation)
+        kwargs.setdefault("use_local_minimal", False)
+
+        expid = autosubmit.expid(**kwargs)
         exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
 
         conf_dir = exp_path / "conf"
@@ -251,7 +250,7 @@ def autosubmit_exp(
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
 
-        if not config.experiment_data.get('CONFIG').get('AUTOSUBMIT_VERSION', ''):
+        if not config.experiment_data.get('CONFIG', {}).get('AUTOSUBMIT_VERSION', ''):
             try:
                 config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
             except PackageNotFoundError:
@@ -275,9 +274,6 @@ def autosubmit_exp(
                 YAML().dump(other_yaml, fh)
 
         config.reload(force_load=True)
-
-        for arg, value in kwargs.items():
-            setattr(config, arg, value)
 
         platform_config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
@@ -504,7 +500,7 @@ def as_db(request: "FixtureRequest", autosubmit: Autosubmit, tmp_path: "LocalPat
         # Replace the backend with postgres (default is sqlite)
         user = postgres_server.env['POSTGRES_USER']
         password = postgres_server.env['POSTGRES_PASSWORD']
-        port = postgres_server.ports['5432']
+        port: int = cast(int, postgres_server.ports['5432'])
         db = request.node.name
         if '[' in db:
             db = db.split('[')[0]

@@ -21,7 +21,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from math import ceil
-from typing import List, Dict, Union, Any, Optional
+from typing import List, Dict, Union, Any
 
 import matplotlib as mtp
 import matplotlib.pyplot as plt
@@ -128,7 +128,7 @@ def populate_statistics(
         period_ini: datetime,
         period_fi: datetime,
         queue_time_fixes: dict[str, int]
-) -> Optional[Statistics]:
+) -> Statistics | None:
     try:
         return (
             Statistics(jobs_list, period_ini, period_fi, queue_time_fixes).
@@ -354,7 +354,7 @@ def create_csv_stats(exp_stats: Statistics, jobs_list: List[Job],
                 job_names[i], start_times[i], end_times[i], queuing_times[i], running_times[i]))
 
 
-def build_legends(plot: Any, rects: list[list[Optional[Rectangle]]], experiment_stats: Statistics) -> int:
+def build_legends(plot: Any, rects: list[list["Rectangle | None"]], experiment_stats: Statistics) -> int:
     """build_legends Function
 
     :param plot: Subplot arrangement part of a figure
@@ -367,13 +367,13 @@ def build_legends(plot: Any, rects: list[list[Optional[Rectangle]]], experiment_
     :rtype: int
     """
     # Main legend with colourful rectangles
-    legend_rects: list[list[Optional[Rectangle]]] = [[rect[0] for rect in rects]]
+    legend_rects: list[list["Rectangle | None"]] = [[rect[0] for rect in rects]]
 
     legend_titles = [
         ['Queued (h)', 'Run (h)', 'Fail Queued (h)', 'Fail Run (h)', 'Max wallclock (h)']
     ]
     legend_locs = ["upper right"]
-    legend_handlelengths: list[Optional[int]] = [None]
+    legend_handlelengths: list[int | None] = [None]
 
     # Total stats legend
     stats_summary_as_list = experiment_stats.summary_list
@@ -437,7 +437,7 @@ def _filter_by_status(jobs_list: List[Job]) -> List[Job]:
     return ret
 
 
-def _get_status(jobs_list: List[Job], job_name: str) -> Optional[str]:
+def _get_status(jobs_list: List[Job], job_name: str) -> str | None:
     """Return the status of the job."""
     for job in jobs_list:
         if job.name == job_name:

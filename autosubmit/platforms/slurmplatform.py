@@ -25,7 +25,7 @@ import re
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
@@ -70,7 +70,7 @@ class SlurmPlatform(ParamikoPlatform):
     TYPE = PlatformType.SLURM
 
     def __init__(self, expid: str, name: str, config: dict,
-                 auth_password: Optional[Union[str, list[str]]] = None) -> None:
+                 auth_password: Union[str, list[str]] | None = None) -> None:
         """Initialization of the Class SlurmPlatform.
 
         :param expid: ID of the experiment which will instantiate the SlurmPlatform.

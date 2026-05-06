@@ -57,7 +57,7 @@ class AutosubmitFigureDirective(SphinxDirective):
     def run(self) -> list[Node]:
         caption = self.options.get('caption')
 
-        configuration_name: Optional[str] = self.options.get('name', None)
+        configuration_name: str | None = self.options.get('name', None)
         if configuration_name is None:
             logger.warning('No configuration name specified in the figure directive, skipping copying YAML files.')
             raise ValueError('No configuration name specified in the figure directive.')

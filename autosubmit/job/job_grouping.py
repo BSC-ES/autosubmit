@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from bscearth.utils.date import date2str
 
@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 
 class JobGrouping(object):
 
-    def __init__(self, group_by: str, jobs: list["Job"], job_list: "JobList", expand_list: Optional[list] = None,
-                 expanded_status: Optional[list] = None):
+    def __init__(self, group_by: str, jobs: list["Job"], job_list: "JobList", expand_list: list | None = None,
+                 expanded_status: list | None = None):
         if not expand_list:
             expand_list = []
         if not expanded_status:

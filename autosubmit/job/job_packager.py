@@ -20,7 +20,7 @@ import operator
 from contextlib import suppress
 from math import ceil
 from operator import attrgetter
-from typing import List, TYPE_CHECKING, Set, Union
+from typing import List, TYPE_CHECKING, Set, Union, Any
 
 from bscearth.utils.date import sum_str_hours
 
@@ -1068,9 +1068,7 @@ class JobPackagerVertical(object):
         """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
         :param job: Job to be evaluated.
-        :type job: Job
         :return: Job that is wrappable, or None if no such job is found.
-        :rtype: Optional[Any]
         """
         sorted_jobs = self.sorted_jobs
         child = None
@@ -1146,13 +1144,12 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         # sort by chunk number
         self.index = 0
 
-    def get_wrappable_child(self, job: Job, level: int) -> Job:
+    def get_wrappable_child(self, job: Job, level: int) -> tuple[Job | None, int]:
         """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
         :param job: Job to be evaluated.
-        :type job: Job
-        :return: Job that is wrappable, or None if no such job is found.
-        :rtype: Optional[Any]
+        :param level: Job level.
+        :return: A tuple with a job that is wrappable (or ``None`` if no such job is found) and its level.
         """
         sorted_jobs = self.sorted_jobs
         child = None
@@ -1169,7 +1166,7 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         """Check if a job can be added to the current mixed wrapper chain.
 
         Unlike the parent class version, this does not enforce chunk boundaries
-        since mixed wrappers intentionally cross section and chunk scopes.
+        since mixed wrappers intentionally cross-section and chunk scopes.
 
         :param job: The job to check.
         :return: True if the job is wrappable.
