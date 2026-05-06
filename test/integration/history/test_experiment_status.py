@@ -17,8 +17,11 @@
 
 """Integration tests for ExperimentStatus and ExperimentHeartBeatMonitor."""
 
-from autosubmit.history.experiment_status import ExperimentHeartBeatMonitor
+import pytest
 
+from autosubmit.history.experiment_status import (ExperimentHeartBeatMonitor, ExperimentStatus)
+
+# HEARTBEAT MONITOR TESTS
 
 def test_heartbeat_monitor_starts_and_stops_correctly(mocker):
     """Test __enter__ and __exit__ methods call start() and stop()."""
@@ -157,3 +160,32 @@ def test_heartbeat_monitor_stop_logs_warning_if_thread_does_not_stop(mocker):
     thread.join.assert_called_once_with(timeout=0.1)
     warning_mock.assert_called_once()
     assert monitor._thread is None
+
+
+# EXPERIMENT STATUS TESTS
+
+def test_experiment_status_set_status_delegates_manager(mocker):
+    """Test that set_status() delegates to the status manager."""
+    manager = mocker.Mock()
+    mocker.patch("autosubmit.history.experiment_status.create_experiment_status_db_manager", return_value=manager)
+    experiment_status = ExperimentStatus("a000")
+    
+    # Act
+    experiment_status.set_status("RUNNING")
+
+    # Assert
+    manager.set_exp_status.assert_called_once_with("a000", "RUNNING")
+
+
+def test_experiment_status_init_raises_error_when_manager_creation_fails(mocker):
+    """Test that ExperimentStatus __init__ raises an error if the manager creation fails."""
+    logging_mock = mocker.patch("autosubmit.history.experiment_status.Logging")
+    mocker.patch(
+        "autosubmit.history.experiment_status.create_experiment_status_db_manager",
+        side_effect=RuntimeError("Error creating manager"),
+    )
+
+    with pytest.raises(RuntimeError, match="Error creating manager"):
+        ExperimentStatus("a000")
+
+    logging_mock.return_value.log.assert_called_once()
