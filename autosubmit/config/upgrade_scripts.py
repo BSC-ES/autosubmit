@@ -20,8 +20,9 @@
 import locale
 import re
 import shutil
+from io import StringIO
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from configobj import ConfigObj
 from ruamel.yaml import YAML
@@ -42,66 +43,133 @@ __all__ = [
 ]
 
 
+_LISTS_REGEX = re.compile(r"""
+    =\s*                 # equals sign + optional spaces
+    \[                   # opening bracket
+    (?P<content>         # capture group "content"
+        [^]]*            # anything except closing bracket
+    )
+    ]                    # closing bracket
+""", re.VERBOSE | re.IGNORECASE)
+"""Regex to match patterns like '= [bla]', '= [a, b, c]'."""
+
+
+def _replace_list(match):
+    """Convert '= [a, b]' by ='= "a, b"'."""
+    content = match.group("content").strip()
+    return f"= \"{content}\""
+
+
+def _config_obj_to_nested_dict(config_obj: ConfigObj) -> dict[str, Any]:
+    """Convert a ConfigObj to a nested dictionary.
+
+    e.g., "a.b.c" turns into {"a": {"b": {"c": ...}}}.
+
+    :param config_obj: The ConfigObj to convert.
+    :return: The nested dictionary.
+    """
+    yaml_dict: dict[str, Any] = {}
+
+    for key, value in config_obj.items():
+        keys = key.split(".")
+        current = yaml_dict
+
+        # Traverse down the nested keys
+        for k in keys[:-1]:
+            current = current.setdefault(k, {})
+
+        last_key = keys[-1]
+
+        if isinstance(value, dict):
+            # Merge dicts recursively
+            current.setdefault(last_key, {})
+            _update_dict(current[last_key], value)
+        else:
+            # Only set scalar if it doesn't exist yet
+            current.setdefault(last_key, value)
+
+    return yaml_dict
+
+
 def ini_to_yaml(ini_file: Path) -> Path:
-    root_dir = ini_file.parent
+    """Convert an Autosubmit INI file to YAML.
+
+    Creates a backup of the INI file before conversion.
+
+    INI lists such as "a = [b, c]" are converted to YAML lists ["b", "c"].
+    An intermediary step is required to convert from "a = [b, c]" to "a = b, c".
+
+    Configuration keys such as "a.b.c" are converted to nested dictionaries
+    {"a": {"b": {"c": ...}}}.
+
+    After the conversion, for each INI file we should have the backup INI file
+    and the new YAML file.
+
+    If the file name contains "jobs" or "platform" in ANY part of its name,
+    then the generated YAML data will become {"JOBS": yaml_data} or
+    {"PLATFORMS": yaml_data}.
+
+    :param ini_file: Path to the INI file to convert.
+    :return: The YAML file.
+    """
+    encoding = locale.getlocale()[1]
     # Read the file name from the command line argument
-    input_file = str(ini_file)
-    backup_path = root_dir / Path(ini_file.name + "_AS_v3_backup")
+    backup_path = ini_file.parent / f"{ini_file.name}_as_v3_backup"
     if not backup_path.exists():
-        Log.info(f"Backup stored at {backup_path}")
+        Log.info(f"Backup created at {backup_path}")
         shutil.copyfile(ini_file, backup_path)
-    # Read key=value property configs in python dictionary
 
-    content = open(input_file, 'r', encoding=locale.getlocale()[1]).read()
-    regex = r"\=( )*\[[\[\]\'_0-9.\"#A-Za-z \-,]*\]"
+    content = ini_file.read_text(encoding=encoding)
+    content = _LISTS_REGEX.sub(_replace_list, content)
 
-    matches = re.finditer(regex, content, flags=re.IGNORECASE)
+    config_dict = ConfigObj(
+        StringIO(content),
+        stringify=True,
+        list_values=False,
+        interpolation=False,
+        unrepr=False
+    )
 
-    for matchNum, match in enumerate(matches, start=1):
-        print(match.group())
-        subs_string = "= " + "\"" + match.group()[2:] + "\""
-        regex_sub = match.group()
-        content = re.sub(re.escape(regex_sub), subs_string, content)
+    yaml_dict = _config_obj_to_nested_dict(config_dict)
 
-    open(input_file, 'w', encoding=locale.getlocale()[1]).write(content)
-    config_dict = ConfigObj(input_file, stringify=True, list_values=False, interpolation=False, unrepr=False)
+    if "platform" in ini_file.name.lower():
+        yaml_dict = {"PLATFORMS": yaml_dict}
+    elif "jobs" in ini_file.name.lower():
+        yaml_dict = {"JOBS": yaml_dict}
 
-    # Store the result in yaml_dict
-    yaml_dict: dict = {}
-
-    for key, value in config_dict.items():
-        config_keys = key.split(".")
-
-        for config_key in reversed(config_keys):
-            value = {config_key: value}
-
-        yaml_dict = _update_dict(yaml_dict, value)
-
-    final_dict = {}
-    if input_file.find("platform") != -1:
-        final_dict["PLATFORMS"] = yaml_dict
-    elif input_file.find("job") != -1:
-        final_dict["JOBS"] = yaml_dict
-    else:
-        final_dict = yaml_dict
-    # Write the resultant dictionary to the YAML file
-    yaml_file_path = Path(root_dir, f'{ini_file.stem}.yml')
-    with open(input_file, 'w', encoding=locale.getlocale()[1]) as yaml_file:
-        yaml = YAML()
-        yaml.dump(final_dict, yaml_file)
-        ini_file.rename(yaml_file_path)
-
+    yaml_file_path = ini_file.with_suffix(".yml")
+    with open(yaml_file_path, 'w', encoding=encoding) as yaml_file:
+        YAML().dump(yaml_dict, yaml_file)
     return yaml_file_path
 
 
-# Based on http://stackoverflow.com/a/3233356
-def _update_dict(original_dict: dict, updated_dict: dict) -> dict:
-    for k, v in updated_dict.items():
-        if isinstance(v, dict):
-            r = _update_dict(original_dict.get(k, {}), v)
-            original_dict[k] = r
-        else:
-            original_dict[k] = updated_dict[k]
+def _update_dict(original_dict: dict[str, Any], updated_dict: dict[str, Any]) -> dict[str, Any]:
+    """Update a dictionary recursively, merging both, returning the resulting dictionary.
+
+    It is not recursive, so no risk of YAML-bomb files causing stack issues.
+    Performs an iterative deep-merge.
+
+    :param original_dict: The original dictionary.
+    :param updated_dict: The dictionary to update.
+    :return: The resulting dictionary.
+    """
+    stack: list[tuple[dict[str, Any], dict[str, Any]]] = [(original_dict, updated_dict)]
+
+    while stack:
+        target, source = stack.pop()
+
+        for k, v in source.items():
+            if isinstance(v, dict):
+                existing = target.get(k)
+
+                if not isinstance(existing, dict):
+                    existing = {}
+                    target[k] = existing
+
+                stack.append((existing, v))
+            else:
+                target[k] = v
+
     return original_dict
 
 

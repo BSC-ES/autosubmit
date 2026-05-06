@@ -135,7 +135,7 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
         f.flush()
     ini_to_yaml(ini_file=ini_file)
 
-    backup_file = Path(f'{ini_file}_AS_v3_backup')
+    backup_file = Path(f'{ini_file}_as_v3_backup')
     assert backup_file.exists()
     assert backup_file.stat().st_size > 0
 

@@ -60,7 +60,7 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     assert new_yaml_file.exists()
     assert new_yaml_file.stat().st_size > 0
 
-    new_yaml_file = Path(new_file.parent, new_file.stem).with_suffix('.conf_AS_v3_backup')
+    new_yaml_file = Path(new_file.parent, new_file.stem).with_suffix('.conf_as_v3_backup')
 
     assert new_yaml_file.exists()
     assert new_yaml_file.stat().st_size > 0

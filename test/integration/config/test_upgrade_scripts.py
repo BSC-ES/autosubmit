@@ -21,8 +21,10 @@ from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING
 
+from configobj import ConfigObj
 from ruamel.yaml import YAML
 
+from autosubmit.config.upgrade_scripts import _config_obj_to_nested_dict
 from autosubmit.config.upgrade_scripts import upgrade_scripts, ini_to_yaml
 
 if TYPE_CHECKING:
@@ -118,6 +120,7 @@ def test_ini_to_yaml_backup_exists(tmp_path: 'LocalPath'):
 
 
 def test_ini_to_yaml_lists(tmp_path: 'LocalPath'):
+    """Test that lists are converted from '= [a, b]' to '= "a, b"'."""
     ini_file = tmp_path / 'any_config.ini'
     ini_file.touch()
     ini_file.write_text(dedent('''\
@@ -127,7 +130,7 @@ def test_ini_to_yaml_lists(tmp_path: 'LocalPath'):
 
     yaml_file = ini_to_yaml(ini_file)
     yaml = YAML().load(yaml_file)
-    assert yaml['marenostrum4']['HOST'] == '"[mn1.bsc.es, mn2.bsc.s]"'
+    assert yaml['marenostrum4']['HOST'] == '"mn1.bsc.es, mn2.bsc.s"'
 
 
 def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath'):
@@ -191,3 +194,56 @@ def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath'):
     assert inspect_generated_script.exists(), f"inspect executed but {inspect_generated_script} does not exist"
 
     assert f'The job name is {as_exp.expid}_LOCAL_SETUP' in inspect_generated_script.read_text()
+
+
+def test_single_level_keys():
+    """Test if the function correctly processes single-level keys."""
+    config_obj = ConfigObj({"key1": "value1", "key2": "value2"})
+    result = _config_obj_to_nested_dict(config_obj)
+    expected = {"key1": "value1", "key2": "value2"}
+    assert expected == result
+
+
+def test_multi_level_keys():
+    """Test if the function correctly processes multi-level keys."""
+    config_obj = ConfigObj({"a.b.c": "value1", "a.b.d": "value2"})
+    result = _config_obj_to_nested_dict(config_obj)
+    expected = {"a": {"b": {"c": "value1", "d": "value2"}}}
+    assert expected == result
+
+
+def test_mix_of_single_and_multi_level_keys():
+    """Test if the function handles a mix of single and multi-level keys."""
+    config_obj = ConfigObj({"x": "value1", "a.b.c": "value2", "a.b.d": "value3"})
+    result = _config_obj_to_nested_dict(config_obj)
+    expected = {"x": "value1", "a": {"b": {"c": "value2", "d": "value3"}}}
+    assert expected == result
+
+
+def test_nested_dictionaries():
+    """Test if the function processes nested dictionaries as values."""
+    config_obj = ConfigObj({
+        "top.level": {
+            "nested": "value1",
+            "another": "value2"
+        }
+    })
+    result = _config_obj_to_nested_dict(config_obj)
+    expected = {"top": {"level": {"nested": "value1", "another": "value2"}}}
+    assert expected == result
+
+
+def test_empty_config_obj():
+    """Test if the function handles an empty ConfigObj."""
+    config_obj = ConfigObj({})
+    result = _config_obj_to_nested_dict(config_obj)
+    expected = {}
+    assert expected == result
+
+
+def test_overwrite_existing_key():
+    """Test if the function overwrites values correctly in case of conflict."""
+    config_obj = ConfigObj({"a.b": {"c": "old_value"}, "a.b.c": "new_value"})
+    result = _config_obj_to_nested_dict(config_obj)
+    expected = {"a": {"b": {"c": "old_value"}}}  # old value stays
+    assert result == expected
