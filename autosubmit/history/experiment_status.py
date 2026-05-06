@@ -85,7 +85,7 @@ class ExperimentHeartBeatMonitor:
             self._stop_event.set()
             return False
         try:
-            # Start the background thread
+            # Initialize the background thread
             self._thread = threading.Thread(
                 target=self._run,
                 name=f"autosubmit-heartbeat-{self._status_tracker.expid}",
