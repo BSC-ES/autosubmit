@@ -22,10 +22,9 @@ import re
 import sys
 from contextlib import suppress
 from itertools import zip_longest
-from typing import Iterable, Optional, Union, TYPE_CHECKING
+from typing import Iterable, Union, TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
@@ -38,7 +37,7 @@ if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
 
 
-def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: Optional[str] = None):
+def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: str | None = None):
     """Raise an error if the jobs file does not exist.
 
     By default, it will search all jobs sections. Alternatively, callers can pass
@@ -80,7 +79,7 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: Op
 
 
 def check_experiment_ownership(
-        expid: str, basic_config: BasicConfig, raise_error=False, logger: Optional[Log] = None
+        expid: str, basic_config: BasicConfig, raise_error=False, logger: Log | None = None
 ) -> tuple[bool, bool, str]:
     # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available
     my_user_id = os.getuid()

@@ -22,7 +22,7 @@ from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from random import seed, randint, choice
 from time import time
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Protocol
 
 import pytest
 
@@ -48,7 +48,7 @@ class AutosubmitConfigFactory(Protocol):
     def __call__(
             self,
             expid: str,
-            experiment_data: Optional[dict] = None,
+            experiment_data: dict | None = None,
             include_basic_config: bool = True,
             *args: Any,
             **kwargs: Any

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.schema import CreateTable, CreateSchema
 from sqlalchemy import insert, delete
@@ -49,10 +49,10 @@ class MetricSpecSelectorType(Enum):
 @dataclass
 class MetricSpecSelector:
     type: MetricSpecSelectorType
-    key: Optional[list[str]]
+    key: list[str] | None
 
     @staticmethod
-    def load(data: Optional[dict[str, Any]]) -> "MetricSpecSelector":
+    def load(data: dict[str, Any] | None) -> "MetricSpecSelector":
         if data is None:
             _type = MetricSpecSelectorType.TEXT
             return MetricSpecSelector(type=_type, key=None)
@@ -175,7 +175,7 @@ class UserMetricRepository:
 
 class UserMetricProcessor:
     def __init__(
-        self, as_conf: AutosubmitConfig, job: "Job", run_id: Optional[int] = None
+        self, as_conf: AutosubmitConfig, job: "Job", run_id: int | None = None
     ):
         self.as_conf = as_conf
         self.job = job

@@ -17,7 +17,7 @@
 
 import math
 from datetime import datetime
-from typing import Optional, Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date
 
@@ -543,7 +543,7 @@ class SubJobManager(object):
         return self.subjobfixes
 
 
-def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status=Optional[str]) -> None:
+def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status= str | None) -> None:
     """Cancel jobs on platforms.
 
     It receives a list ``active_jobs_filter`` of statuses to filter jobs for their statuses,

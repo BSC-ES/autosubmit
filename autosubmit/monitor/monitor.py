@@ -24,7 +24,7 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from sys import platform
-from typing import Any, Callable, Optional, Tuple, Union, List, Dict
+from typing import Any, Callable, Tuple, Union, List, Dict
 
 import py3dotplus as pydotplus
 
@@ -77,7 +77,7 @@ def _display_file_xdg(a_file: str) -> None:
     """Displays the PDF for the user.
 
     Tries to use the X Desktop Group tool ``xdg-open``. If that fails,
-    it fallbacks to ``mimeopen``. If this latter fails too, then it
+    it falls back to ``mimeopen``. If this latter fails too, then it
     propagates the possible ``subprocess.CalledProcessError`` exception,
     or another exception or error raised.
 
@@ -105,7 +105,7 @@ def _display_file(a_file: Union[str, Path]) -> None:
     Linux (maybe it is not macOS nor windows?).
 
     But if the user is already on Linux, then we simply call
-    ``xdg-open``, and if ``xdg-open`` fails, we still fallback
+    ``xdg-open``, and if ``xdg-open`` fails, we still fall back
     to ``mimeopen``.
     """
     if platform != "linux":
@@ -183,11 +183,11 @@ def _check_node_exists(
     return node, False
 
 
-def _create_node(job, groups, hide_groups) -> Optional[pydotplus.Node]:
+def _create_node(job, groups, hide_groups) -> "pydotplus.Node | None":
     """Create a node object for a graph.
 
-    If the list of ``groups`` is provided, and contains only the ``job`` and no other elements,
-    then unless ``hide_groups`` is ``True``, a new ``Node`` object will be created for the job
+    If the list of ``groups`` is provided and contains only the ``job`` and no other elements,
+    then, unless ``hide_groups`` is ``True``, a new ``Node`` object will be created for the job
     and returned.
 
     But if there are no ``groups`` or if the ``job`` name does not exist in the list of
@@ -223,17 +223,14 @@ def _create_node(job, groups, hide_groups) -> Optional[pydotplus.Node]:
 
 
 def _check_final_status(
-        job_edges_info: Optional[List[Dict[str, Any]]],
+        job_edges_info: List[Dict[str, Any]] | None,
         child: Job,
-) -> Tuple[Optional[str], Optional[int], Optional[bool]]:
+) -> Tuple[str | None, int | None, bool | None]:
     """Check the final status between a job and its child using edge information.
 
     :param job_edges_info: List of edge information dictionaries.
-    :type job_edges_info: Optional[List[Dict[str, Any]]]
     :param child: The child job.
-    :type child: Job
     :return: Tuple of color and label, or (None, None) if not found.
-    :rtype: Tuple[Optional[str], Optional[int]], Optional[bool
     """
     if not job_edges_info:
         return None, None, None
@@ -316,7 +313,7 @@ def clean_stats(expid: str) -> None:
 class Monitor:
     """Class to handle monitoring of Jobs at HPC."""
 
-    def __init__(self, edge_info: Optional[dict[str, Any]] = None) -> None:
+    def __init__(self, edge_info: dict[str, Any] | None = None) -> None:
         """Initialize the Monitor class."""
         if not edge_info:
             self.edge_info = {}
@@ -624,8 +621,8 @@ class Monitor:
                 self._write_output_txt_recursive(child, output_file, "_" + level, path)
 
     def generate_output_stats(self, expid: str, joblist: list[Job], output_format="pdf", hide=False,
-                              section_summary=False, jobs_summary=False, period_ini: Optional[datetime] = None,
-                              period_fi: Optional[datetime] = None, queue_time_fixes: dict[str, int] = None) -> bool:
+                              section_summary=False, jobs_summary=False, period_ini: datetime | None = None,
+                              period_fi: datetime | None = None, queue_time_fixes: dict[str, int] = None) -> bool:
         """Plots stats for joblist and stores it in a file.
 
         :param queue_time_fixes:

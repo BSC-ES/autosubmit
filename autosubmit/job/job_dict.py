@@ -17,7 +17,7 @@
 
 import datetime
 import re
-from typing import Union, Optional
+from typing import Union
 
 from bscearth.utils.date import date2str
 
@@ -167,7 +167,7 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
         """
         self._dic[section] = dict()
         # Temporally creation for unified jobs in case of synchronize
-        tmp_dic = dict()
+        tmp_dic: dict[str, Union[list, dict]] = dict()
         if synchronize is not None and len(str(synchronize)) > 0:
             count = 0
             for chunk in self._chunk_list:
@@ -210,9 +210,9 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
         self,
         splits: Union[int, dict[str, list[int]]],
         section: str,
-        date: Optional[datetime.datetime],
-        member: Optional[str],
-        chunk: Optional[int],
+        date: datetime.datetime | None,
+        member: str | None,
+        chunk: int | None,
         priority: int,
         default_job_type: str,
         section_data: list[Job],

@@ -20,7 +20,6 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from smtplib import SMTPException
 from tempfile import TemporaryDirectory
-from typing import Optional
 
 import pytest
 
@@ -109,9 +108,9 @@ def test_compress_file(
         mocker,
         mail_notifier,
         number_of_files: int,
-        sendmail_error: Optional[Exception],
-        compress_error: Optional[Exception],
-        attach_error: Optional[Exception]
+        sendmail_error: Exception | None,
+        compress_error: Exception | None,
+        attach_error: Exception | None
 ):
     with TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -193,7 +192,7 @@ def test_notify_status_change(
         mock_smtp,
         mocker,
         mail_notifier,
-        sendmail_error: Optional[Exception],
+        sendmail_error: Exception | None,
         expected_log_message):
     exp_id = 'a123'
     job_name = 'Job1'
@@ -233,7 +232,7 @@ def test_notify_status_change(
     ]
 )
 def test_notify_cpmip_threshold_violations_errors(
-        mock_basic_config, mocker, mail_notifier,sendmail_error: Optional[Exception], expected_log_message):
+        mock_basic_config, mocker, mail_notifier,sendmail_error: Exception | None, expected_log_message):
     """Test the possible errors in ``notify_cpmip_threshold_violations``.
 
     The success path is tested in integration tests.

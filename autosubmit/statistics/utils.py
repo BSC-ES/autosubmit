@@ -19,13 +19,12 @@
 
 from datetime import datetime, timedelta
 from math import ceil
-from typing import Optional
 
 from autosubmit.job.job import Job
 from autosubmit.log.log import AutosubmitCritical
 
 
-def filter_by_section(jobs: list[Job], section: Optional[str]) -> list[Job]:
+def filter_by_section(jobs: list[Job], section: str | None) -> list[Job]:
     """Filter the list of jobs using the optional section.
 
     If a section is not provided, or if the section is ``"Any"``, then the
@@ -43,7 +42,7 @@ def filter_by_section(jobs: list[Job], section: Optional[str]) -> list[Job]:
     return jobs
 
 
-def filter_by_time_period(jobs: list[Job], hours_span: Optional[int]) -> tuple[list[Job], Optional[datetime], datetime]:
+def filter_by_time_period(jobs: list[Job], hours_span: int | None) -> tuple[list[Job], datetime | None, datetime]:
     """Filter the list of jobs using the specified time period.
 
     The time period is used to compute the start time. It subtracts the given

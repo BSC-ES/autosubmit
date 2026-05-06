@@ -23,7 +23,7 @@ import subprocess
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from bscearth.utils.date import date2str
 
@@ -545,7 +545,7 @@ class EcPlatform(ParamikoPlatform):
             Log.printlog("Log file don't recovered {0}".format(filename), 6004)
         return process_ok
 
-    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+    def read_jobid_from_remote_log(self, remote_path: str) -> int | None:
         """Read the JOBID from the first line of the remote output file.
 
         Overrides ``ParamikoPlatform.read_jobid_from_remote_log`` because
@@ -611,7 +611,7 @@ class EcPlatform(ParamikoPlatform):
         """.format(filename, queue, project, wallclock, num_procs, expid, dependency, rootdir,
                    '\n'.ljust(13).join(str(s) for s in directives))
 
-    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+    def get_completed_job_names(self, job_names: list[str] | None = None) -> list[str]:
         """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
 
         Uses ``ecaccess-file-dir`` to inspect the remote directory and filters

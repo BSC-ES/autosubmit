@@ -17,7 +17,7 @@
 
 """Contains code to manage a database via SQLAlchemy."""
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
@@ -33,7 +33,7 @@ class HistoricalDbManager(DbManager):
     via an injected ``JobsDbManager`` instance.
     """
 
-    def __init__(self, schema: Optional[str] = None, job_manager: Optional["JobsDbManager"] = None) -> None:
+    def __init__(self, schema: str | None = None, job_manager: "JobsDbManager | None" = None) -> None:
         """Initialize with an optional JobsDbManager for job-list delegation.
 
         :param schema: Optional schema name for the historical database.

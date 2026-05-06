@@ -21,7 +21,7 @@ import os
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
@@ -40,7 +40,7 @@ class PBSPlatform(ParamikoPlatform):
     EXECUTION_MODE = ExecutionMode.BATCH
     TYPE = PlatformType.PBS
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[str] = None) -> None:
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str | None = None) -> None:
         """Initialization of the Class PBSPlatform.
 
         :param expid: ID of the experiment which will instantiate the PBSPlatform.

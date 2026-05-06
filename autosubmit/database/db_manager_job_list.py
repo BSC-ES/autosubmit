@@ -18,7 +18,7 @@
 """Contains code to manage a database via SQLAlchemy."""
 import datetime
 from pathlib import Path
-from typing import Any, Optional, List, Dict, TYPE_CHECKING, Union, Tuple, Set
+from typing import Any, List, Dict, TYPE_CHECKING, Union, Tuple, Set
 
 from sqlalchemy import and_, or_, not_, func, select, exists, update
 from sqlalchemy.exc import IntegrityError
@@ -34,9 +34,9 @@ from autosubmit.log.log import Log
 
 def _edge_satisfied(
     parent_status: str,
-    min_trigger_status: Optional[str],
+    min_trigger_status: str | None,
     fail_ok: bool,
-    from_step: Optional[int],
+    from_step: int | None,
     child_checkpoint_step: int,
 ) -> bool:
     """Check if a parent edge status satisfies the trigger requirements.
@@ -90,7 +90,7 @@ class JobsDbManager(DbManager):
     as Postgres, Mongo, MySQL, etc.
     """
 
-    def __init__(self, schema: Optional[str] = None) -> None:
+    def __init__(self, schema: str | None = None) -> None:
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             persistence_full_path = Path(Path(BasicConfig.LOCAL_ROOT_DIR, schema, "db"), Path("job_list.db"))
         else:
@@ -150,7 +150,7 @@ class JobsDbManager(DbManager):
             self,
             full_load: bool = False,
             load_failed_jobs: bool = False,
-            members: Optional[List[Any]] = None
+            members: List[Any] | None = None
     ) -> List[Dict[str, Any]]:
         """Return a  list of jobs loaded from the database.
 
@@ -199,9 +199,9 @@ class JobsDbManager(DbManager):
     def select_job_names_by_sections(
             self,
             sections: List[str],
-            exclude_names: Optional[Set[str]] = None,
+            exclude_names: Set[str] | None = None,
             exclude_completed: bool = False,
-            status_filter: Optional[str] = None,
+            status_filter: str | None = None,
     ) -> Set[str]:
         """Return job names from DB filtered by section, status and exclusion.
 
@@ -376,7 +376,7 @@ class JobsDbManager(DbManager):
     def select_active_jobs(
             self,
             include_failed: bool = False,
-            members: Optional[List[Any]] = None
+            members: List[Any] | None = None
     ) -> List[Union[str, Any]]:
         table: Table = self.table_registry.get(JobsTable.name)
         structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
@@ -421,17 +421,14 @@ class JobsDbManager(DbManager):
     def select_children_jobs(
             self,
             job_list: List[Union[str, Any]],
-            members: Optional[List[Any]] = None
+            members: List[Any] | None = None
     ) -> List[Union[str, Any]]:
         """
         Select child jobs from the database, optionally filtered by members.
 
         :param job_list: List of jobs to find children for.
-        :type job_list: List[Union[str, Any]]
         :param members: Optional list of member identifiers to filter child jobs.
-        :type members: Optional[List[Any]]
         :return: List of child jobs.
-        :rtype: List[Union[str, Any]]
         """
         jobs_table: Table = self.table_registry.get(JobsTable.name)
         experiment_structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
@@ -596,7 +593,7 @@ class JobsDbManager(DbManager):
             graph = self.select_edges(job_list)
         return graph
 
-    def select_edges(self, job_list: Optional[List[dict[str, Any]]] = None, only_parents: bool = False) -> List[dict[str, Any]]:
+    def select_edges(self, job_list: List[dict[str, Any]] | None = None, only_parents: bool = False) -> List[dict[str, Any]]:
         """Return edges from the database, optionally filtered by job list.
 
         :param job_list: Optional list of jobs to filter edges by. If None, all edges are returned.
@@ -647,17 +644,14 @@ class JobsDbManager(DbManager):
             self,
             wrappers: Tuple[List[Dict[str, Any]], List[Dict[str, Any]]],
             preview: bool = False,
-            run_id: Optional[int] = None
+            run_id: int | None = None
     ) -> None:
         """
         Save the wrapper jobs and their associated information to the database.
 
         :param wrappers: List of dictionaries containing wrapper job data and package info.
-        :type wrappers: Tuple[Dict[str, Any], List[Dict[str, Any]]]
         :param preview: If True, use preview tables; otherwise, use production tables.
-        :type preview: bool
         :param run_id: Current experiment run ID to associate with these wrappers.
-        :type run_id: Optional[int]
         """
         if preview:
             innerjobs_table: Table = self.table_registry.get(PreviewWrapperJobsTable.name)
@@ -684,17 +678,13 @@ class JobsDbManager(DbManager):
             except IntegrityError as e:
                 Log.warning(f"Unique constraint failed when inserting inner jobs: {e}")
 
-    def load_wrappers(self, preview: bool = False, job_list: Any = None, run_id: Optional[int] = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def load_wrappers(self, preview: bool = False, job_list: Any = None, run_id: int | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Load the wrapper jobs and their associated information from the database.
 
         :param preview: If True, use preview tables; otherwise, use production tables.
-        :type preview: bool
         :param job_list: Optional list of jobs to filter the loaded wrappers.
-        :type job_list: Optional[list]
         :param run_id: Optional run ID to filter wrappers by experiment run.
-        :type run_id: Optional[int]
         :return: Tuple containing a list of dictionaries with wrapper job info and inner jobs.
-        :rtype: Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]
 
         """
         full_load = preview

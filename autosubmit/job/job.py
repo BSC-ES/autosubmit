@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from functools import reduce
 from pathlib import Path
 from threading import Thread
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, TYPE_CHECKING
 
 from bscearth.utils.date import (
     chunk_end_date,
@@ -70,7 +70,7 @@ class RecoveryAttempt:
     success: bool
     local_logs: tuple[str, str]
     remote_logs: tuple[str, str]
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -311,8 +311,8 @@ class Job(object):
         self._partition = None
         self.retry_delay = None
         #: (str): Type of the job, as given on job configuration file. (job: TASKTYPE)
-        self._section: Optional[str] = None
-        self._wallclock: Optional[str] = None
+        self._section: str | None = None
+        self._wallclock: str | None = None
         self.wchunkinc = None
         self._tasks = None
         self._nodes = None
@@ -1535,7 +1535,7 @@ class Job(object):
         success = False
         result_local = backup_log_local
         result_remote = backup_log_remote
-        error: Optional[str] = None
+        error: str | None = None
 
         try:
             self.update_local_logs(attempt)
@@ -1581,7 +1581,7 @@ class Job(object):
         :param attempt: The attempt number to write stats for.
         :return: Result of the stat-writing attempt.
         """
-        error: Optional[str] = None
+        error: str | None = None
         success = False
 
         try:

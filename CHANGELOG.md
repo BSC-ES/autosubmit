@@ -34,6 +34,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 - **Database Method Enhancements**: Support for both PostgreSQL and SQLite with optimized save/load mechanisms. Improved wrapper data storage and load.
 - **Testing Efforts**: Tests have been added for every rework to enhance reliability, with a particular effort on integration tests.
 - Auto-detect git default branch when `-b` flag not specified #3101
+- Removed `files` arguments from autosubmit sub-commands, and moved code to upgrade scripts out of `autosubmit.py` #2711
 
 ### 4.1.17: Bug fixes and enhancements
 

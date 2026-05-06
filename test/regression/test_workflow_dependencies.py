@@ -3,7 +3,7 @@ import os
 import pstats
 import shutil
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Tuple
 
 import pytest
 
@@ -151,20 +151,17 @@ def parse_job_list(lines: List[str]) -> List[SimpleJoblist]:
     return sorted(roots, key=lambda x: x.name)
 
 
-def compare_and_print_differences(node1: Optional[SimpleJoblist], node2: Optional[SimpleJoblist]) -> List[str]:
+def compare_and_print_differences(node1: SimpleJoblist | None, node2: SimpleJoblist | None) -> List[str]:
     """
     Compare two job list nodes and return a list of differences.
 
     :param node1: The first job list node to compare.
-    :type node1: Optional[SimpleJoblist]
     :param node2: The second job list node to compare.
-    :type node2: Optional[SimpleJoblist]
     :return: A list of differences between the two nodes.
-    :rtype: List[str]
     """
     differences = []
     path = ""
-    stack: List[Tuple[Optional[SimpleJoblist], Optional[SimpleJoblist], str]] = [(node1, node2, path)]
+    stack: List[Tuple[SimpleJoblist | None, SimpleJoblist | None, str]] = [(node1, node2, path)]
 
     while stack:
         n1, n2, current_path = stack.pop()

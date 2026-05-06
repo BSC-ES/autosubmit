@@ -24,7 +24,6 @@ from contextlib import suppress
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from textwrap import dedent
-from typing import Optional
 
 import pytest
 from bscearth.utils.date import date2str
@@ -1540,7 +1539,7 @@ def test_checkpoint(job_language: Language):
         ['03:15', 'primeval', '03:15'],
     ]
 )
-def test_process_scheduler_parameters_wallclock(wallclock: Optional[str], platform_name: str, expected_wallclock: str,
+def test_process_scheduler_parameters_wallclock(wallclock: str | None, platform_name: str, expected_wallclock: str,
                                                 autosubmit_config):
     """Test that if the ``process_scheduler_parameters`` call sets wallclocks by default."""
     as_conf = autosubmit_config(_EXPID, {})
@@ -1577,7 +1576,7 @@ def test_process_scheduler_parameters_wallclock(wallclock: Optional[str], platfo
         'local'
     ]
 )
-def test_update_dict_parameters_invalid_script_language(platform_name: Optional[str], autosubmit_config):
+def test_update_dict_parameters_invalid_script_language(platform_name: str | None, autosubmit_config):
     """Test that the ``update_dict_parameters`` function falls back to Bash."""
     as_conf = autosubmit_config(_EXPID, {
         'JOBS': {

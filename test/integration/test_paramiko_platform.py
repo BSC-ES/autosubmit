@@ -24,7 +24,7 @@ import socket
 from dataclasses import dataclass
 from getpass import getuser
 from pathlib import Path
-from typing import cast, Any, Callable, Optional, Protocol, Union, TYPE_CHECKING
+from typing import cast, Any, Callable, Protocol, Union, TYPE_CHECKING
 
 import paramiko
 import pytest
@@ -121,7 +121,7 @@ class CreateJobParametersPlatformFixture(Protocol):
 
     def __call__(
             self,
-            experiment_data: Optional[dict] = None,
+            experiment_data: dict | None = None,
             /,
             *args: Any,
             **kwargs: Any
@@ -133,7 +133,7 @@ class CreateJobParametersPlatformFixture(Protocol):
 def create_job_parameters_platform(
         autosubmit_exp, get_next_expid: Callable[[], str]) -> CreateJobParametersPlatformFixture:
     def job_parameters_platform(
-            experiment_data: Optional[dict] = None,
+            experiment_data: dict | None = None,
             /,
             *args: Any,
             **kwargs: Any
@@ -276,7 +276,7 @@ def test_send_file_errors(
 @pytest.mark.ssh
 @pytest.mark.docker
 def test_send_command(
-        cmd: str, error: Optional[Exception],
+        cmd: str, error: Exception | None,
         ssh_fixture: 'DockerContainer',
         mfa_enabled: bool,
         x11_enabled: bool,
@@ -330,7 +330,7 @@ def test_send_command(
 @pytest.mark.docker
 def test_send_command_timeout_error_exec_command(
         cmd: str,
-        timeout: Optional[int],
+        timeout: int | None,
         mocker,
         request: 'FixtureRequest',
         get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],

@@ -28,7 +28,7 @@ from multiprocessing.synchronize import Event
 # noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import setproctitle
 
@@ -107,7 +107,7 @@ class CopyQueue(Queue):
     A queue that copies the object gathered.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: Optional[float] = None, ctx: Any = None) -> None:
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float | None = None, ctx: Any = None) -> None:
         """Initializes the Queue.
 
         :param maxsize: Maximum size of the queue. Defaults to -1 (infinite size).
@@ -123,7 +123,7 @@ class CopyQueue(Queue):
         self.timeout = timeout
         super().__init__(maxsize, ctx=ctx)
 
-    def put(self, job: Any, block: bool = True, timeout: Optional[float] = None) -> None:
+    def put(self, job: Any, block: bool = True, timeout: float | None = None) -> None:
         """Puts a job into the queue if it is not a duplicate.
 
         :param job: The job to be added to the queue.
@@ -166,18 +166,14 @@ class Platform(ABC):
     TYPE: PlatformType
     EXECUTION_MODE: ExecutionMode
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: Union[str, list[str]] | None = None):
         """Initializes the Platform object with the given experiment ID, platform name, configuration,
         and optional authentication password for two-factor authentication.
 
         :param expid: The experiment ID associated with the platform.
-        :type expid: str
         :param name: The name of the platform.
-        :type name: str
         :param config: Configuration dictionary containing platform-specific settings.
-        :type config: dict
         :param auth_password: Optional password for two-factor authentication.
-        :type auth_password: str or list, optional
         """
         self._atexit_registered = False
         self.processed_wrapper_logs = None
@@ -195,8 +191,8 @@ class Platform(ABC):
         self._partition = None
         self.ec_queue = "hpc"
         self.processors_per_node = None
-        self.scratch_free_space: Optional[str] = None
-        self.custom_directives: Optional[dict] = None
+        self.scratch_free_space: str | None = None
+        self.custom_directives: dict | None = None
         self._host = ''
         self._user = ''
         self._project = ''
@@ -232,17 +228,17 @@ class Platform(ABC):
         self.two_factor_method = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
         if auth_password is not None and self.two_factor_auth:
             if isinstance(auth_password, list):
-                self.pw: Optional[str] = auth_password[0]
+                self.pw: str | None = auth_password[0]
             else:
                 self.pw = auth_password
         else:
             self.pw = None
         self.max_waiting_jobs = 20
-        self.recovery_queue: Optional[Queue] = None
-        self.work_event: Optional[Event] = None
-        self.cleanup_event: Optional[Event] = None
+        self.recovery_queue: Queue | None = None
+        self.work_event: Event | None = None
+        self.cleanup_event: Event | None = None
         self.log_retrieval_process_active: bool = False
-        self.log_recovery_process: Optional['BaseProcess'] = None
+        self.log_recovery_process: 'BaseProcess | None' = None
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
         self.compress_remote_logs = False
         self.remote_logs_compress_type = "gzip"
@@ -780,7 +776,7 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+    def read_jobid_from_remote_log(self, remote_path: str) -> int | None:
         """Reads the JOBID from the first line of a remote log file.
 
         :param remote_path: full remote path to the log file
@@ -971,7 +967,7 @@ class Platform(ABC):
         else:
             Log.result("Log recovery process is not running (will not wait/join the process)")
 
-    def spawn_log_retrieval_process(self, as_conf: Optional['AutosubmitConfig']) -> None:
+    def spawn_log_retrieval_process(self, as_conf: 'AutosubmitConfig | None') -> None:
         """Spawns a process to recover the logs of the jobs that have been completed on this platform.
 
         :param as_conf: Configuration object for the platform.
@@ -1106,7 +1102,7 @@ class Platform(ABC):
     def create_a_new_copy(self):
         raise NotImplementedError  # pragma: no cover
 
-    def read_file(self, src: str, max_size: Optional[int] = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: int | None = None) -> Union[bytes, None]:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path
@@ -1129,7 +1125,7 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+    def get_completed_job_names(self, job_names: list[str] | None = None) -> list[str]:
         """Get the names of the completed jobs on this platform.
 
         :param job_names: List of job names to check. If None, all jobs will be checked.

@@ -1,6 +1,5 @@
 from datetime import datetime
 
-import mock
 import pytest
 from networkx import DiGraph  # type: ignore
 from typing_extensions import Tuple
@@ -122,9 +121,9 @@ def test_job(mocker) -> Job:
 
 
 @pytest.fixture
-def joblist(tmp_path):
+def joblist(tmp_path, mocker):
     experiment_id = 'random-id'
-    as_conf = mock.Mock()
+    as_conf = mocker.Mock()
     as_conf.experiment_data = dict()
     as_conf.experiment_data["JOBS"] = dict()
     as_conf.jobs_data = as_conf.experiment_data["JOBS"]
@@ -614,7 +613,7 @@ def _init_special_conditions(joblist: JobList) -> Tuple[Job, Job, Job, dict, Job
     return job, parent, parent2, special_conditions, joblist
 
 
-def test_add_special_conditions(mocker, _init_special_conditions):
+def test_add_special_conditions(_init_special_conditions):
     job, parent, parent2, special_conditions, joblist = _init_special_conditions
 
     edge = joblist.graph.edges[parent.name, job.name]
