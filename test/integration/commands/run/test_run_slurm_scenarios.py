@@ -582,11 +582,11 @@ def test_wrapper_config(
     if run_type.startswith("invalid"):
         with pytest.raises(AutosubmitCritical):
             autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True,
-                           check_wrappers=True)
+                           wrapper=True)
     elif run_type == "warn-missing-jobs-in-wrapper":
         mocker.patch.object(Log, "warning")
         autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True,
-                       check_wrappers=True)
+                       wrapper=True)
         Log.warning.assert_any_call(
             "JOBS_IN_WRAPPER in WRAPPERS.WRAPPER contains job: 1 that is not defined in JOBS section"
         )
@@ -922,10 +922,10 @@ def test_monitor_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture
     exp.autosubmit.monitor(
         expid=exp.expid,
         file_format="txt",
-        lst=None,
-        filter_chunks=None,
-        filter_status=None,
-        filter_section=None,
+        lst=None,  # type: ignore
+        filter_chunks=None,  # type: ignore
+        filter_status=None,  # type: ignore
+        filter_section=None,  # type: ignore
         hide=False,
         txt_only=True,
         check_wrapper=True
@@ -1318,12 +1318,12 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
         as_conf.set_last_as_command('inspect')
         as_exp.autosubmit.inspect(
             expid=as_exp.expid,
-            lst=None,
+            lst=None,  # type: ignore
             check_wrapper=True,
             force=True,
-            filter_chunks=None,
-            filter_section=None,
-            filter_status=None,
+            filter_chunks=None,  # type: ignore
+            filter_section=None,  # type: ignore
+            filter_status=None,  # type: ignore
             quick=False
         )
 
@@ -1339,10 +1339,10 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
         as_exp.autosubmit.monitor(
             expid=as_exp.expid,
             file_format="txt",
-            lst=None,
-            filter_chunks=None,
-            filter_status=None,
-            filter_section=None,
+            lst=None,  # type: ignore
+            filter_chunks=None,  # type: ignore
+            filter_status=None,  # type: ignore
+            filter_section=None,  # type: ignore
             hide=False,
             txt_only=True,
             check_wrapper=True

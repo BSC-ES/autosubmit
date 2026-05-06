@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.upgrade_scripts import ini_to_yaml
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.platform_type import PlatformType
 
@@ -144,7 +145,7 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
     verifies that the YAML files exist and are not empty, and a backup file was
     created. All without warnings being raised (i.e., they were suppressed).
     """
-    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={})
+    autosubmit_config(expid='a000', experiment_data={})
     ini_file = tmp_path / 'a000_jobs.ini'
     with open(ini_file, 'w+') as f:
         f.write(dedent('''\
@@ -153,9 +154,9 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
             PLATFORM = LOCAL
             '''))
         f.flush()
-    as_conf.ini_to_yaml(root_dir=tmp_path, ini_file=ini_file)
+    ini_to_yaml(ini_file=ini_file)
 
-    backup_file = Path(f'{ini_file}_AS_v3_backup')
+    backup_file = Path(f'{ini_file}_as_v3_backup')
     assert backup_file.exists()
     assert backup_file.stat().st_size > 0
 
@@ -1076,111 +1077,3 @@ def test_check_wrapper_conf_local_platform_not_supported(autosubmit_config):
         as_conf.check_wrapper_conf(wrappers)
 
     assert "LOCAL platform does not support wrappers" in str(exc.value)
-
-
-def test_load_section_parameters_uses_default_platform(autosubmit_config, submitter, mocker):
-    """Test that jobs without a platform use the default platform."""
-    as_conf = autosubmit_config("a000")
-
-    as_conf.hpcarch = "HPC"
-    as_conf.check_conf_files = mocker.Mock()
-
-    job = mocker.Mock()
-    job.platform_name = None
-    job.section = "SIM"
-    job.parameters = {}
-
-    job_list = mocker.Mock()
-    job_list.get_job_list.return_value = [job]
-    job_list.parameters = {}
-
-    job.update_parameters.side_effect = (lambda *_: job.parameters.update({"FOO": "BAR"}))
-
-    result = as_conf.load_section_parameters(job_list, as_conf, submitter)
-
-    as_conf.check_conf_files.assert_called_once_with(False)  # type: ignore
-    assert job.platform is submitter.platforms["HPC"]
-    assert result == {"SIM_FOO": "BAR"}
-
-
-def test_load_section_parameters_falls_back_to_local_platform(autosubmit_config, submitter, mocker):
-    """Test that an unknown platform falls back to LOCAL."""
-    as_conf = autosubmit_config("a000")
-    as_conf.check_conf_files = mocker.Mock()
-
-    job = mocker.Mock()
-    job.platform_name = "DOES_NOT_EXIST"
-    job.section = "SIM"
-    job.parameters = {}
-
-    job_list = mocker.Mock()
-    job_list.get_job_list.return_value = [job]
-    job_list.parameters = {}
-
-    job.update_parameters.side_effect = lambda *_: None
-
-    as_conf.load_section_parameters(job_list, as_conf, submitter)
-
-    assert job.platform is submitter.platforms[PlatformType.LOCAL.upper()]
-
-
-def test_load_section_parameters_updates_each_section_once(autosubmit_config, submitter, mocker):
-    """Test that parameters are updated once per section."""
-    as_conf = autosubmit_config("a000")
-    as_conf.check_conf_files = mocker.Mock()
-
-    job1 = mocker.Mock(section="SIM", platform_name="HPC", parameters={})
-    job2 = mocker.Mock(section="SIM", platform_name="HPC", parameters={})
-    job3 = mocker.Mock(section="POST", platform_name="HPC", parameters={})
-
-    job_list = mocker.Mock()
-    job_list.get_job_list.return_value = [job1, job2, job3]
-    job_list.parameters = {}
-
-    job1.update_parameters.side_effect = lambda *_: None
-    job2.update_parameters.side_effect = lambda *_: None
-    job3.update_parameters.side_effect = lambda *_: None
-
-    as_conf.load_section_parameters(job_list, as_conf, submitter)
-
-    job1.update_parameters.assert_called_once()
-    job2.update_parameters.assert_not_called()
-    job3.update_parameters.assert_called_once()
-
-
-@pytest.mark.parametrize(
-    "existing,expected",
-    [
-        ({}, {"SIM_A": 1, "SIM_B": 2}),
-        ({"A": 0}, {"SIM_B": 2}),
-        ({"A": 0, "B": 0}, {}),
-    ],
-)
-def test_load_section_parameters_filters_existing_parameters(
-    autosubmit_config,
-    submitter,
-    mocker,
-    existing: dict[str, int],
-    expected: dict[str, int],
-):
-    """Test that existing parameters are not returned."""
-    as_conf = autosubmit_config("a000")
-    as_conf.check_conf_files = mocker.Mock()
-
-    job = mocker.Mock()
-    job.platform_name = "HPC"
-    job.section = "SIM"
-    job.parameters = {}
-
-    def update_parameters(*_):
-        job.parameters = { "A": 1,"B": 2 }
-
-    job.update_parameters.side_effect = update_parameters
-
-    job_list = mocker.Mock()
-    job_list.get_job_list.return_value = [job]
-    job_list.parameters = existing
-
-    result = as_conf.load_section_parameters(job_list, as_conf, submitter)
-
-    assert result == expected

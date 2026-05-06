@@ -17,6 +17,7 @@
 
 import datetime
 import re
+from typing import Union
 
 from bscearth.utils.date import date2str
 
@@ -172,7 +173,7 @@ class DicJobs:
         """
         self._dic[section] = dict()
         # Temporally creation for unified jobs in case of synchronize
-        tmp_dic = dict()
+        tmp_dic: dict[str, Union[list, dict]] = dict()
         if synchronize is not None and len(str(synchronize)) > 0:
             count = 0
             for chunk in self._chunk_list:

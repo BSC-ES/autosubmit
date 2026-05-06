@@ -20,9 +20,9 @@ timid = False
 sigterm = True
 
 [report]
-exclude_lines =
-    pragma: no cover
-
+# Preferred over exclude_lines, already excludes pragma no cover and ... (ellipsis);
+# ref: https://coverage.readthedocs.io/en/7.12.0/config.html#report-exclude-also
+exclude_also =
     # Don't complain if tests don't hit defensive assertion code:
     raise NotImplementedError
     raise NotImplemented
@@ -32,14 +32,20 @@ exclude_lines =
     if (typing\.)?TYPE_CHECKING:
     @overload( |$)
 
-    # Don't complain about ellipsis (exception classes, typing overloads etc):
-    \.\.\.
-
     # Ignore abstract methods
     @(abc\.)?abstractmethod
 
     # Ignore pass statements
     ^\s*pass\s*$
+
+    # Main function
+    if __name__ == .__main__.:
+
+    # Protocol classes
+    class .*\bProtocol\):
+
+    # Ignore logging statements
+    ^\s*Log\.
 
 fail_under=0
 ignore_errors = False
