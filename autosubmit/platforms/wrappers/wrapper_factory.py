@@ -114,7 +114,7 @@ class WrapperFactory(object):
         return '#' if not partition else self.partition_directive(partition)
 
     def threads(self, threads):
-        return '#' if not threads or threads in ["0", "1"] else self.threads_directive(threads)
+        return '#' if not threads or threads in ["", "-1", "0", "1"] else self.threads_directive(threads)
 
     def exclusive(self, exclusive):
         return '#' if not exclusive or str(exclusive).lower() == "false" else self.exclusive_directive(exclusive)

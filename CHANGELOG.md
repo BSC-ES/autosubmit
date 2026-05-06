@@ -22,6 +22,8 @@
 - Fix queuing time for the first vertical job
 - Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
 - Fixed `autosubmit stats` command that was not considering parameters defined in the platform, like NODES, TASKS, etc. #2978
+- Fixed `HETSIZE` whenever it had values bigger than 0 without a `CURRENT_QUEUE` or skipping the order of info #2660
+- Fixed `CPU per task` for new version of autosubmit #2897
 
 **Enhancements:**
 
