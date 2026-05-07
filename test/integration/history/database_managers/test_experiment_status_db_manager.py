@@ -207,7 +207,7 @@ def test_set_exp_status_logs_warning_when_get_experiment_status_row_by_expid_fai
 
 
 def test_set_exp_status_logs_warning_when_get_experiment_row_by_expid_fails(
-        tmp_path: "LocalPath", mocker
+    tmp_path: "LocalPath", mocker
 ):
     """Test that set_exp_status() logs a warning when get_experiment_row_by_expid() fails."""
     db_dir = tmp_path / "db"
@@ -226,7 +226,9 @@ def test_set_exp_status_logs_warning_when_get_experiment_row_by_expid_fails(
     warning_mock = mocker.patch(
         "autosubmit.history.database_managers.experiment_status_db_manager.Log.warning"
     )
-    mocker.patch.object(database_manager, "get_experiment_status_row_by_expid", return_value=None)
+    mocker.patch.object(
+        database_manager, "get_experiment_status_row_by_expid", return_value=None
+    )
     mocker.patch.object(
         database_manager,
         "get_experiment_row_by_expid",
@@ -241,3 +243,50 @@ def test_set_exp_status_logs_warning_when_get_experiment_row_by_expid_fails(
     # Assert
     warning_mock.assert_called_once()
     create_status_mock.assert_not_called()
+
+
+def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath"):
+    """Test that update_heartbeat() stores the last heartbeat timestamp in the database."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    # SQLite database initialization
+    autosubmit_db_path = db_dir / "test.db"
+    with sqlite3.connect(autosubmit_db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE experiment (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                autosubmit_version TEXT
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (1, 'a000', 'No description', '3.14.0')",
+        )
+        conn.commit()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    experiment = ExperimentRow(
+        id=1, name="a000", description="No description", autosubmit_version="3.14.0"
+    )
+    database_manager.create_experiment_status_as_running(experiment)
+
+    before = database_manager.get_experiment_status_row_by_exp_id(1)
+    assert before is not None
+    assert before.last_heartbeat is None
+
+    after = database_manager.update_heartbeat("a000")
+    assert after is not None
+    assert after.last_heartbeat is not None
