@@ -18,12 +18,10 @@
 import email.utils
 import re
 import smtplib
-import zipfile
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from textwrap import dedent
 from typing import TYPE_CHECKING
 
@@ -35,27 +33,24 @@ if TYPE_CHECKING:
 
 
 def _compress_file(
-        temporary_directory: TemporaryDirectory,
-        file_path: Path) -> Path:
+        temporary_directory: str,
+        file_path: list[Path]) -> Path:
     """Compress a file.
 
     The file is created inside the given temporary directory.
 
     The function returns a ``Path`` of the archive file.
 
-    :param temporary_directory: The temporary directory.
-    :type temporary_directory: TemporaryDirectory
     :param file_path: The path of the file to be compressed.
-    :type file_path: Path
+    :type file_path: list[Path]
     :return: The Path object of the compressed file.
-    :rtype: str
+    :rtype: Path
     :raises AutosubmitError: The file cannot be compressed.
     """
     try:
-        zip_file_name = Path(temporary_directory.name, f'{file_path.name}.zip')
-        with zipfile.ZipFile(zip_file_name, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            zip_file.write(file_path, Path(file_path).name)
-            return Path(zip_file.filename)
+        log_dir = Path(temporary_directory)
+        file, _, _ = [file for f in [log_dir.glob(e) for e in ('*.gz', '*.xz')] for file in f]
+        return Path(temporary_directory, file.name) if file is not None else Path()
     except ValueError as e:
         raise AutosubmitError(
             code=6011,
@@ -155,6 +150,24 @@ class MailNotifier:
     def __init__(self, basic_config):
         self.config = basic_config
 
+    def _collect_logfiles(self, message: 'MIMEMultipart', exp_id: str):
+        """Generate a compressed file with all the logs from the LOG_<EXPID> folder"""
+        logs_exist = False
+        run_log_compressed_files = [f for f in [self.config.expid_log_dir(exp_id).glob(e) for e in ('*.gz', '*.xz')] for f in f]
+
+        try:
+            if self.config.ATTACHMENT:
+                if len(run_log_compressed_files) > 0:
+                    logs_exist = True
+                    _attach_file(max(run_log_compressed_files), message)
+            else:
+                return
+        except AutosubmitError as e:
+            Log.printlog(code=e.code, message=e.message)
+        if not logs_exist:
+            raise AutosubmitError(message=f'No Log files for the experiment {exp_id} where found to send via email')
+
+
     def notify_experiment_status(
             self,
             exp_id: str,
@@ -180,20 +193,7 @@ class MailNotifier:
         message['Subject'] = '[Autosubmit] Warning: a remote platform is malfunctioning'
         message['Date'] = email.utils.formatdate(localtime=True)
         message.attach(MIMEText(message_text))
-
-        run_log_files = [f for f in self.config.expid_aslog_dir(
-            exp_id).glob('*_run.log') if Path(f).is_file()]
-        if run_log_files:
-            latest_run_log: Path = max(run_log_files)
-            temp_dir = TemporaryDirectory()
-            try:
-                compressed_run_log = _compress_file(temp_dir, latest_run_log)
-                _attach_file(compressed_run_log, message)
-            except AutosubmitError as e:
-                Log.printlog(code=e.code, message=e.message)
-            finally:
-                if temp_dir:
-                    temp_dir.cleanup()
+        self._collect_logfiles(message, exp_id)
 
         self._send_message(mail_to, self.config.MAIL_FROM, message)
 
@@ -208,13 +208,23 @@ class MailNotifier:
         _check_mail_address(mail_to)
         message_text = _generate_message_text(
             exp_id, job_name, prev_status, status)
-        message = MIMEText(message_text)
+        message = MIMEMultipart()
         message['From'] = email.utils.formataddr(
             ('Autosubmit', self.config.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {status}'
         message['Date'] = email.utils.formatdate(localtime=True)
+        if status == "FAILED":
+            message.attach(MIMEText(message_text))
+            self._collect_logfiles(message, exp_id)
 
-        self._send_message(mail_to, self.config.MAIL_FROM, message)
+        for mail in mail_to:  # expects a list
+            message['To'] = email.utils.formataddr((mail, mail))
+            try:
+                self._send_mail(self.config.MAIL_FROM, mail, message)
+            except BaseException as e:
+                Log.printlog(
+                    f'Trace:{str(e)}\nAn error has occurred while sending a mail '
+                    f'for the job {job_name}', 6011)
 
     def _send_message(self, mail_to: list[str], mail_from: str, message) -> None:
         formatted_addresses = [
