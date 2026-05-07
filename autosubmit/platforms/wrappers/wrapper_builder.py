@@ -1057,3 +1057,295 @@ class SrunVerticalHorizontalWrapperBuilder(SrunWrapperBuilder):
         nodelist = self.build_nodes_list()
         srun_launcher = self.build_srun_launcher("scripts_list")
         return nodelist, srun_launcher
+
+
+# QSUB CLASSES
+class QsubWrapperBuilder(WrapperBuilder):
+
+    def build_imports(self):
+        pass
+
+    # hybrids
+    def build_job_list_thread(self):
+        pass
+
+    def build_job_thread(self):
+        return textwrap.dedent(""" """)
+
+    # horizontal and hybrids
+    def build_nodes_list(self):
+        return self.get_nodes() + self.build_cores_list()
+
+    def get_nodes(self):
+        return textwrap.dedent(f"""
+        # Getting the list of allocated nodes
+        {self.allocated_nodes}
+        os.system("mkdir -p machinefiles")
+
+        with open(f"node_list_{{node_id}}", 'r') as file:
+             all_nodes = file.read()
+        os.remove(f"node_list_{{node_id}}")
+
+        all_nodes = all_nodes.split("_NEWLINE_")
+        if all_nodes[-1] == "":
+            all_nodes = all_nodes[:-1]
+        print(all_nodes)""").ljust(13)
+
+    def build_cores_list(self):
+        return textwrap.dedent(f"""
+total_cores = {self.num_procs_value}
+jobs_resources = {str(self.jobs_resources)}
+processors_per_node = int(jobs_resources['PROCESSORS_PER_NODE'])
+idx = 0
+all_cores = []
+while total_cores > 0:
+    if processors_per_node > 0:
+        processors_per_node -= 1
+        total_cores -= 1
+        all_cores.append(all_nodes[idx])
+    else:
+        if idx < len(all_nodes)-1:
+            idx += 1
+        processors_per_node = int(jobs_resources['PROCESSORS_PER_NODE'])
+
+processors_per_node = int(jobs_resources['PROCESSORS_PER_NODE'])""").ljust(13)
+
+    def build_machinefiles(self):
+        machinefile_function = self.get_machinefile_function()
+        if machinefile_function:
+            return self.get_machinefile_function() + self._indent(self.write_machinefiles(), self.machinefiles_indent)
+        return ""
+
+    def build_machinefiles_standard(self):
+        return textwrap.dedent("""
+            machines = str()
+            cores = int(jobs_resources[section]['PROCESSORS'])
+            tasks = int(jobs_resources[section]['TASKS'])
+            nodes = int(ceil(int(cores)/float(tasks)))
+            if tasks < processors_per_node:
+                cores = tasks
+            job_cores = cores
+            while nodes > 0:
+                while cores > 0:
+                    if len(all_cores) > 0:
+                        node = all_cores.pop(0)
+                        if node:
+                            machines += node +"_NEWLINE_"
+                            cores -= 1
+                for rest in range(processors_per_node-tasks):
+                    if len(all_cores) > 0:
+                        all_cores.pop(0)
+                nodes -= 1
+                if tasks < processors_per_node:
+                    cores = job_cores""").ljust(13)
+
+    def _create_components_dict(self):
+        return textwrap.dedent("""
+        xio_procs = int(jobs_resources[section]['COMPONENTS']['XIO_NUMPROC'])
+        rnf_procs = int(jobs_resources[section]['COMPONENTS']['RNF_NUMPROC'])
+        ifs_procs = int(jobs_resources[section]['COMPONENTS']['IFS_NUMPROC'])
+        nem_procs = int(jobs_resources[section]['COMPONENTS']['NEM_NUMPROC'])
+
+        components = OrderedDict([
+            ('XIO', xio_procs),
+            ('RNF', rnf_procs),
+            ('IFS', ifs_procs),
+            ('NEM', nem_procs)
+        ])
+
+        jobs_resources[section]['COMPONENTS'] = components""").ljust(13)
+
+    def build_machinefiles_components(self):
+        return textwrap.dedent(f"""
+        {self._create_components_dict()}
+
+        machines = str()
+        for component, cores in jobs_resources[section]['COMPONENTS'].items():        
+            while cores > 0:
+                if len(all_cores) > 0:
+                    node = all_cores.pop(0)
+                    if node:
+                        machines += node +"_NEWLINE_"
+                        cores -= 1""").ljust(13)
+
+    def write_machinefiles(self):
+        return textwrap.dedent(f"""
+        machines = "_NEWLINE_".join([s for s in machines.split("_NEWLINE_") if s])
+        with open("machinefiles/machinefile_"+{self.machinefiles_name}, "w") as machinefile:
+            machinefile.write(machines)""").ljust(13)
+
+    def build_qsub_launcher(self, jobs_list, footer=True):
+        pass
+
+    # all should override -> abstract!
+    def build_main(self):
+        pass
+
+    def dependency_directive(self):
+        pass
+
+    def queue_directive(self):
+        pass
+
+    def _indent(self, text, amount, ch=' '):
+        padding = amount * ch
+        return ''.join(padding + line for line in text.splitlines(True))
+
+
+class QsubHorizontalWrapperBuilder(QsubWrapperBuilder):
+    def build_imports(self):
+        scripts_bash = "("
+        for script in self.job_scripts:
+            scripts_bash += str("\"" + script + "\"") + " "
+        scripts_bash += ")"
+        return textwrap.dedent(f"""
+        # Defining scripts to be run
+        declare -a scripts={str(scripts_bash)}""").ljust(13)
+
+    def build_qsub_launcher(self, jobs_list, footer=True):
+        qsub_launcher = textwrap.dedent(f"""
+        i=0
+        suffix=".cmd"
+        for template in "${{{jobs_list}[@]}}"; do
+            jobname=${{template%"$suffix"}}
+            out="${{template}}.out" 
+            err="${{template}}.err"
+            qsub -C nodes=1:ppn={self.threads} $template > $out 2> $err &
+            sleep "0.2"
+            ((i=i+1))
+        done
+        wait""").ljust(13)
+        if footer:
+            qsub_launcher += self._indent(textwrap.dedent(f"""
+        for template in "${{{jobs_list}[@]}}"; do
+            suffix_completed=".COMPLETED"
+            completed_filename=${{template%"$suffix"}}
+            completed_filename="$completed_filename"_COMPLETED
+            completed_path=${{PWD}}/$completed_filename
+            if [ -f "$completed_path" ];
+            then
+                echo "`date '+%d/%m/%Y_%H:%M:%S'` $template has been COMPLETED"
+            else
+                echo "`date '+%d/%m/%Y_%H:%M:%S'` $template has FAILED" 
+            fi
+        done"""), 0).ljust(13)
+        return qsub_launcher
+
+    def build_main(self):
+        nodelist = self.build_nodes_list()
+        qsub_launcher = self.build_qsub_launcher("scripts")
+        return nodelist, qsub_launcher
+
+
+class QsubVerticalHorizontalWrapperBuilder(QsubWrapperBuilder):
+    def build_imports(self):
+        scripts_bash = textwrap.dedent("""
+        # Defining scripts to be run""")
+        list_index = 0
+        scripts_array_vars = "( "
+        scripts_array_index = "( "
+        for scripts in self.job_scripts:
+            built_array = "("
+            for script in scripts:
+                built_array += str("\"" + script + "\"") + " "
+            built_array += ")"
+            scripts_bash += textwrap.dedent(f"""
+            declare -a scripts_{str(list_index)}={str(built_array)}""").ljust(13)
+            scripts_array_vars += f"\"scripts_{list_index}\" "
+            scripts_array_index += f"\"{list_index}\" "
+            list_index += 1
+        scripts_array_vars += ")"
+        scripts_array_index += ")"
+        scripts_bash += textwrap.dedent(f"""
+                   declare -a scripts_list={str(scripts_array_vars)}
+                   declare -a scripts_index={str(scripts_array_index)}""").ljust(13)
+
+        total_threads = float(len(self.job_scripts))
+        n_threads = float(self.threads)
+        core = []
+        for thread in range(int(n_threads)):
+            core.append(0x0)
+
+        core[0] = 0x1
+        horizontal_wrapper_size = int(total_threads)
+        qsub_mask_values = []
+        for job_id in range(horizontal_wrapper_size):
+            for thread in range(1, int(n_threads)):
+                core[thread] = core[thread - 1] * 2
+            job_mask = 0x0
+            for thr_mask in core:
+                job_mask = job_mask + thr_mask
+            qsub_mask_values.append(str(hex(job_mask)))
+            if job_id > 0:
+                core[0] = core[0] << int(n_threads)
+            else:
+                core[0] = job_mask + 0x1
+
+        mask_array = "( "
+        for mask in qsub_mask_values:
+            mask_array += str("\"" + mask + "\"") + " "
+        mask_array += ")"
+        scripts_bash += textwrap.dedent(f"""
+                declare -a job_mask_array={mask_array}""").ljust(13)
+
+        return scripts_bash
+
+    def build_qsub_launcher(self, jobs_list, footer=True):
+        return textwrap.dedent(f"""
+        suffix=".cmd"
+        suffix_completed=".COMPLETED"
+        aux_scripts=("${{{jobs_list}[@]}}")
+        prev_script="empty"
+        as_index=0
+        horizontal_size=${{#scripts_index[@]}}
+        scripts_size=${{#scripts_0[@]}}
+        while [ "${{#aux_scripts[@]}}" -gt 0 ]; do
+            i_list=0
+            for script_list in "${{{jobs_list}[@]}}"; do
+                declare -i job_index=${{scripts_index[$i_list]}}
+                declare -n scripts=$script_list
+
+                declare -n prev_horizontal_scripts=$prev_script
+                if [ $job_index -ne -1 ]; then
+                    for horizontal_job in "${{scripts[@]:$job_index}}"; do
+                        template=$horizontal_job
+                        jobname=${{template%"$suffix"}}
+                        as_index=0
+                        multiplication_result=$(($i_list*$scripts_size))
+                        as_index=$((multiplication_result+$job_index))
+                        out="${{template}}.out"
+                        err="${{template}}.err"
+                        if [ $job_index -eq 0 ]; then
+                            prev_template=$template
+                        else
+                            #prev_template=${{prev_horizontal_scripts[$job_index]}}
+                            prev_template=${{scripts[((job_index-1))]}}
+                        fi
+                        completed_filename=${{prev_template%"$suffix"}}
+                        completed_filename="$completed_filename"_COMPLETED
+                        completed_path=${{PWD}}/$completed_filename
+                        if [ $job_index -eq 0 ] || [ -f "$completed_path" ]; then #If first horizontal wrapper or last wrapper is completed
+                                qsub pbsnodes -l 1 nodes=1:ppn={self.threads} $template > $out 2> $err &
+                            job_index=$(($job_index+1))
+
+                        else
+                            break
+                        fi
+                    done
+                    if [ $job_index -ge "${{#scripts[@]}}" ];  then
+                        unset aux_scripts[$i_list]
+                        job_index=-1
+                    fi
+                fi
+                prev_script=("${{script_list[@]}}")
+                scripts_index[$i_list]=$job_index
+                i_list=$((i_list+1)) # check next list ( needed for save list index )
+            done
+        done
+        wait""").ljust(13)
+
+
+    def build_main(self):
+        nodelist = self.build_nodes_list()
+        qsub_launcher = self.build_qsub_launcher("scripts_list")
+        return nodelist, qsub_launcher

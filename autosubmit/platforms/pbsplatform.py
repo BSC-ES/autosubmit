@@ -21,7 +21,7 @@ import os
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job_common import Status
@@ -83,7 +83,9 @@ class PBSPlatform(ParamikoPlatform):
         """Gets the header to be used by the job.
 
         :param job: The job.
-        :param parameters: Parameters dictionary.
+        :type job: Job
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
         :return: Job header.
         """
         header = self.header.HEADER
@@ -305,7 +307,7 @@ class PBSPlatform(ParamikoPlatform):
         """
         return output.strip().split(' ')[0].strip()
 
-    def parse_all_jobs_output(self, output: str, job_id: str) -> str:  # noqa
+    def parse_all_jobs_output(self, output: str, job_id: str) -> Union[list[str], str]:
         """Filter one or more status of a specific Job ID.
 
         :param output: Output of the status of the jobs.
@@ -313,7 +315,7 @@ class PBSPlatform(ParamikoPlatform):
         :param job_id: job ID.
         :type job_id: int
         :return: All status related to a Job.
-        :rtype: str
+        :rtype: Union[list[str], str]
         """
         with suppress(Exception):
             output_lines = output.lower().split('\n')
@@ -352,9 +354,8 @@ class PBSPlatform(ParamikoPlatform):
         """Generate qstat command for the selected job.
 
         :param job_id: ID of a job.
-        :param job_id: str
-
-        :return: Generates the qstat command to be executed.
+        :type job_id: str
+        :return: Generates the qstat command to be executes.
         :rtype: str
         """
         job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
@@ -364,8 +365,7 @@ class PBSPlatform(ParamikoPlatform):
         """Generate qstat command for all the jobs passed down.
 
         :param jobs_id: ID of one or more jobs.
-        :param jobs_id: str
-
+        :type jobs_id: str
         :return: qstat command to all jobs.
         :rtype: str
         """
@@ -376,7 +376,7 @@ class PBSPlatform(ParamikoPlatform):
         """Get an estimated queue time to the job selected.
 
         :param job_id: ID of a job.
-        :param job_id: str
+        :type job_id: str
         :return: Gets estimated queue time.
         :rtype: str
         """
@@ -387,7 +387,7 @@ class PBSPlatform(ParamikoPlatform):
         """Get queue generating qstat command to the job selected.
 
         :param job_id: ID of a job.
-        :param job_id: str
+        :type job_id: str
         :return: Gets estimated queue time.
         :rtype: str
         """
@@ -419,7 +419,7 @@ class PBSPlatform(ParamikoPlatform):
         :param list_queue_jobs_id: List of Job IDs concatenated.
         :type list_queue_jobs_id: str
         :param as_conf: experiment configuration.
-        :type as_conf: autosubmit.config.AutosubmitConfig
+        :type as_conf: AutosubmitConfig
         :rtype: None
         """
         if not in_queue_jobs:
@@ -448,7 +448,7 @@ class PBSPlatform(ParamikoPlatform):
         """Generate the header of the wrapper configuring it to execute the Experiment.
 
         :param kwargs: Key arguments associated to the Job/Experiment to configure the wrapper.
-        :type kwargs: Any
+        :type kwargs: dict
         :return: a sequence of PBS commands.
         :rtype: str
         """
