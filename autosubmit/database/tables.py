@@ -68,6 +68,7 @@ ExperimentStatusTable = Table(
     Column("status", Text, nullable=False),
     Column("seconds_diff", Integer, nullable=False),
     Column("modified", Text, nullable=False),
+    Column("last_heartbeat", Text, nullable=True),
 )
 """Stores the status of the experiments."""
 

@@ -18,19 +18,22 @@
 """Integration tests for the experiment status DB managers."""
 
 from pathlib import Path
+import sqlite3
 from typing import cast, TYPE_CHECKING
 
 import pytest
 from sqlalchemy import inspect
 
 from autosubmit.database.tables import ExperimentStatusTable
-from autosubmit.history.database_managers.database_models import ExperimentRow, ExperimentStatusRow
+from autosubmit.history.database_managers.database_models import (
+    ExperimentRow,
+    ExperimentStatusRow,
+)
 from autosubmit.history.database_managers.experiment_status_db_manager import (
     ExperimentStatusDbManager,
     SqlAlchemyExperimentStatusDbManager,
     create_experiment_status_db_manager,
 )
-from autosubmit.job.job_common import Status
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
@@ -80,9 +83,9 @@ def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, get_nex
     assert exp_status.status == "RUNNING"
 
     # Update status
-    database_manager.update_exp_status(experiment.name, "READY")
+    database_manager.update_exp_status(experiment.name, "NOT RUNNING")
     exp_status: ExperimentStatusRow = (database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id))
-    assert exp_status.status == "READY"
+    assert exp_status.status == "NOT RUNNING"
 
     # Set back to RUNNING
     database_manager.set_existing_experiment_status_as_running(exp_status.name)
@@ -92,7 +95,9 @@ def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, get_nex
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, autosubmit_exp, get_next_expid):
+def test_get_experiment_status_row_by_expid(
+    tmp_path: "LocalPath", as_db: str, autosubmit_exp, get_next_expid
+):
     expid = get_next_expid()
     options = {"expid": expid}
 
@@ -108,14 +113,334 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
     with pytest.raises(ValueError):
         database_manager.get_experiment_status_row_by_expid(expid)
 
-    # Create the experiment, but it still will not have any experiment status
+    # Create the experiment, it will have status 'NOT RUNNING' in the experiment_status table
     exp = autosubmit_exp(expid=expid, include_jobs=True)
-    experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
-    assert experiment_status_row is None
+    experiment_status_row = database_manager.get_experiment_status_row_by_expid(
+        exp.expid
+    )
+    assert (
+        experiment_status_row
+        and experiment_status_row.status == "NOT RUNNING"
+    )
 
-    experiment_db_id = 1
-    last_row_id = database_manager.create_exp_status(experiment_db_id, exp.expid, Status.SUBMITTED)
-    assert last_row_id > 0
 
-    experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
-    assert experiment_status_row
+def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
+    tmp_path: "LocalPath",
+):
+    """Test that the manager adds last_heartbeat column into experiment_status table if it is missing."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    as_times_path = db_dir / "as_times.db"
+    with sqlite3.connect(as_times_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE experiment_status (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created TIMESTAMP NOT NULL,
+                modified TIMESTAMP NOT NULL
+            )
+            """
+        )
+        conn.commit()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    with sqlite3.connect(as_times_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(experiment_status)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+    assert "last_heartbeat" in columns
+    assert isinstance(database_manager, ExperimentStatusDbManager)
+
+
+def test_set_exp_status_logs_warning_when_get_experiment_status_row_by_expid_fails(
+    tmp_path: "LocalPath", mocker
+):
+    """Test that set_exp_status() logs a warning when get_experiment_status_row_by_expid() fails."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    # Mock
+    warning_mock = mocker.patch(
+        "autosubmit.history.database_managers.experiment_status_db_manager.Log.warning"
+    )
+    mocker.patch.object(
+        database_manager,
+        "get_experiment_status_row_by_expid",
+        side_effect=ValueError("missing experiment status row"),
+    )
+
+    get_experiment_status_row_mock = mocker.patch.object(
+        database_manager, "get_experiment_row_by_expid"
+    )
+    create_status_mock = mocker.patch.object(database_manager, "create_exp_status")
+
+    # Act
+    database_manager.set_exp_status("a000", "RUNNING")
+
+    # Assert
+    warning_mock.assert_called_once()
+    assert "Experiment a000 not found when trying to set status" in warning_mock.call_args[0][0]
+    # If warning is logged, it returns early
+    get_experiment_status_row_mock.assert_not_called()
+    create_status_mock.assert_not_called()
+
+
+def test_set_exp_status_logs_warning_when_get_experiment_row_by_expid_fails(
+    tmp_path: "LocalPath", mocker
+):
+    """Test that set_exp_status() logs a warning when get_experiment_row_by_expid() fails."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    # Mock
+    warning_mock = mocker.patch(
+        "autosubmit.history.database_managers.experiment_status_db_manager.Log.warning"
+    )
+    mocker.patch.object(
+        database_manager, "get_experiment_status_row_by_expid", return_value=None
+    )
+    mocker.patch.object(
+        database_manager,
+        "get_experiment_row_by_expid",
+        side_effect=ValueError("missing experiment row"),
+    )
+
+    create_status_mock = mocker.patch.object(database_manager, "create_exp_status")
+
+    # Act
+    database_manager.set_exp_status("a000", "RUNNING")
+
+    # Assert
+    warning_mock.assert_called_once()
+    assert "Experiment a000 not found when trying to set status" in warning_mock.call_args[0][0]
+    create_status_mock.assert_not_called()
+
+
+def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath"):
+    """Test that update_heartbeat() stores the last heartbeat timestamp in the database."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    # SQLite database initialization
+    autosubmit_db_path = db_dir / "test.db"
+    with sqlite3.connect(autosubmit_db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE experiment (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                autosubmit_version TEXT
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (1, 'a000', 'No description', '3.14.0')",
+        )
+        conn.commit()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    experiment = ExperimentRow(
+        id=1, name="a000", description="No description", autosubmit_version="3.14.0"
+    )
+    database_manager.create_experiment_status_as_running(experiment)
+
+    before = database_manager.get_experiment_status_row_by_exp_id(1)
+    assert before is not None
+    assert before.last_heartbeat is None
+
+    database_manager.update_heartbeat("a000")
+    after = database_manager.get_experiment_status_row_by_exp_id(1)
+    assert after is not None
+    assert after.last_heartbeat is not None
+
+
+def test_update_multiple_experiment_last_heartbeats_at_same_time(
+    tmp_path: "LocalPath", mocker
+):
+    """Test that concurrent updates of different experiment heartbeats do not cause race conditions."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    # Initialize SQLite database with two experiments
+    autosubmit_db_path = db_dir / "test.db"
+    with sqlite3.connect(autosubmit_db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE experiment (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                autosubmit_version TEXT
+            )
+            """)
+        cursor.executemany(
+            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (?, ?, ?, ?)",
+            [
+                (1, "a000", "No description", "3.14.0"),
+                (2, "a001", "No description", "3.14.0"),
+            ],
+        )
+        conn.commit()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    experiment1 = ExperimentRow(
+        id=1, name="a000", description="No description", autosubmit_version="3.14.0"
+    )
+    experiment2 = ExperimentRow(
+        id=2, name="a001", description="No description", autosubmit_version="3.14.0"
+    )
+    database_manager.create_experiment_status_as_running(experiment1)
+    database_manager.create_experiment_status_as_running(experiment2)
+
+    # Mock update_heartbeat to start at the same time in both threads
+    original_update_heartbeat = database_manager.update_heartbeat
+
+    import threading
+
+    start_barrier = threading.Barrier(2)
+
+    def delayed_update_heartbeat(expid: str):
+        # Wait for both threads to be ready, then perform the update together
+        start_barrier.wait()
+        original_update_heartbeat(expid)
+
+    mocker.patch.object(
+        database_manager, "update_heartbeat", side_effect=delayed_update_heartbeat
+    )
+
+    # Start two threads that update the heartbeat of the two experiments at the same time
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        thread1 = executor.submit(database_manager.update_heartbeat, "a000")
+        thread2 = executor.submit(database_manager.update_heartbeat, "a001")
+
+        thread1.result()
+        thread2.result()
+
+    # Assert
+    exp_status1 = database_manager.get_experiment_status_row_by_exp_id(1)
+    exp_status2 = database_manager.get_experiment_status_row_by_exp_id(2)
+    assert exp_status1 is not None
+    assert exp_status2 is not None
+    assert exp_status1.last_heartbeat is not None
+    assert exp_status2.last_heartbeat is not None
+
+
+def test_update_same_experiment_last_heartbeats_at_same_time(
+    tmp_path: "LocalPath", mocker
+):
+    """Test that concurrent updates of the same experiment heartbeat do not cause race conditions."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    # Initialize SQLite database with one experiment
+    autosubmit_db_path = db_dir / "test.db"
+    with sqlite3.connect(autosubmit_db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE experiment (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                autosubmit_version TEXT
+            )
+            """)
+        cursor.execute(
+            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (1, 'a000', 'No description', '3.14.0')",
+        )
+        conn.commit()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    experiment = ExperimentRow(
+        id=1, name="a000", description="No description", autosubmit_version="3.14.0"
+    )
+    database_manager.create_experiment_status_as_running(experiment)
+
+    # Mock update_heartbeat to start both updates concurrently
+    original_update_heartbeat = database_manager.update_heartbeat
+
+    import threading
+
+    start_barrier = threading.Barrier(2)
+
+    def delayed_update_heartbeat(expid: str):
+        # Synchronize the two threads so they enter the DB update concurrently
+        start_barrier.wait()
+        original_update_heartbeat(expid)
+
+    mocker.patch.object(
+        database_manager, "update_heartbeat", side_effect=delayed_update_heartbeat
+    )
+
+    # Start two threads that update the heartbeat of the same experiment at the same time
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        thread1 = executor.submit(database_manager.update_heartbeat, "a000")
+        thread2 = executor.submit(database_manager.update_heartbeat, "a000")
+
+        thread1.result()
+        thread2.result()
+
+    # Assert
+    exp_status = database_manager.get_experiment_status_row_by_exp_id(1)
+    assert exp_status is not None
+    assert exp_status.last_heartbeat is not None

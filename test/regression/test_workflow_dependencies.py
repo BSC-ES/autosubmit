@@ -42,8 +42,7 @@ def prepare_custom_config_tests(default_yaml_file: Dict[str, Any], project_yaml_
 @pytest.fixture()
 def prepare_basic_config(current_tmpdir):
     basic_conf = BasicConfig()
-    BasicConfig.DB_DIR = (current_tmpdir / "workflows")
-    BasicConfig.DB_FILE = "as_times.db"
+    BasicConfig.DB_DIR = current_tmpdir
     BasicConfig.LOCAL_ROOT_DIR = (current_tmpdir / "workflows")
     BasicConfig.LOCAL_TMP_DIR = "tmp"
     BasicConfig.LOCAL_ASLOG_DIR = "ASLOGS"

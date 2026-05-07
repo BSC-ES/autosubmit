@@ -22,7 +22,7 @@ import os
 import sqlite3
 from contextlib import suppress
 from pathlib import Path
-from typing import List, Optional, cast
+from typing import List, Optional
 
 from autosubmit.config.basicconfig import BasicConfig
 from sqlalchemy import delete, select, Connection, insert, text, update, func
@@ -286,11 +286,11 @@ def last_name_used(test=False, operational=False, evaluation=False):
 
 def delete_experiment(experiment_id):
     """
-    Removes experiment from database. Anti-lock version.
+    Marks experiment as deleted in metadata tables. Anti-lock version.
 
     :param experiment_id: experiment identifier
     :type experiment_id: str
-    :return: True if delete is successful
+    :return: True if operation is successful
     :rtype: bool
     """
     fn = _delete_experiment
@@ -554,11 +554,12 @@ def _last_name_used(test=False, operational=False, evaluation=False):
 
 def _delete_experiment(experiment_id):
     """
-    Removes experiment from database
+    Marks an experiment as deleted in status metadata while preserving
+    the experiment row to avoid reusing assigned experiment IDs.
 
     :param experiment_id: experiment identifier
     :type experiment_id: str
-    :return: True if delete is successful
+    :return: True if operation is successful
     :rtype: bool
     """
     check_db()
@@ -569,11 +570,20 @@ def _delete_experiment(experiment_id):
         (conn, cursor) = open_conn()
     except DbException as e:
         raise AutosubmitCritical("Could not establish a connection to database", 7001, str(e))
-    cursor.execute('DELETE FROM experiment '
-                   'WHERE name=:name', {'name': experiment_id})
-    row = cursor.fetchone()
-    if row is None:
-        Log.debug(f'The experiment {experiment_id} has been deleted!!!')
+    # Keep experiment rows as tombstones to avoid reusing experiment IDs.
+    # keep the experiment trace in experiment_status for deleted experiments
+    try:
+        cursor.execute('UPDATE experiment_status SET status=:status, seconds_diff=:seconds_diff, modified=CURRENT_TIMESTAMP '
+                       'WHERE name=:name',
+                       {
+                           'status': 'DELETED',
+                           'seconds_diff': 0,
+                           'name': experiment_id
+                       })
+    except Exception:
+        pass
+
+    Log.debug(f'The experiment {experiment_id} has been marked as deleted.')
     close_conn(conn, cursor)
     return True
 
@@ -821,29 +831,25 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
         return True
 
     with _get_sqlalchemy_conn() as conn:
-        # Delete from experiment table
-        query = delete(tables.ExperimentTable).where(
-            tables.ExperimentTable.c.name == experiment_id  # type: ignore
-        )
-        result = conn.execute(query)
-        conn.commit()
-
         # Drop schema
         conn.execute(text(f'DROP SCHEMA IF EXISTS "{experiment_id}" CASCADE'))
         conn.commit()
 
-        # Delete from experiment_status table
+        # Keep the experiment trace in experiment_status for deleted experiments
         try:
-            query = delete(tables.ExperimentStatusTable).where(
+            query = update(tables.ExperimentStatusTable).where(
                 tables.ExperimentStatusTable.c.name == experiment_id  # type: ignore
+            ).values(
+                status="DELETED",
+                seconds_diff=0,
+                modified=func.current_timestamp()
             )
             conn.execute(query)
             conn.commit()
         except Exception as e:
             Log.debug(f"The experiment {experiment_id} has no status: {str(e)}")
 
-        if cast(int, result.rowcount) > 0:
-            Log.debug(f"The experiment {experiment_id} has been deleted!!!")
+        Log.debug(f"The experiment {experiment_id} has been marked as deleted.")
         return True
 
 
