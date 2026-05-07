@@ -287,6 +287,7 @@ def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath"):
     assert before is not None
     assert before.last_heartbeat is None
 
-    after = database_manager.update_heartbeat("a000")
+    database_manager.update_heartbeat("a000")
+    after = database_manager.get_experiment_status_row_by_exp_id(1)
     assert after is not None
     assert after.last_heartbeat is not None
