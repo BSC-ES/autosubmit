@@ -151,6 +151,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, ru
             for job_name in {row["job_name"] for row in rows_as_dicts}
         }
         excluded_keys = ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]
+        _TERMINAL_STATUSES = {"COMPLETED", "FAILED"}
 
         for job_name, grouped_rows in group_by_job_name.items():
             # Check that all fields contain data, except extra_data, children, and platform_output
@@ -167,7 +168,11 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, ru
                 check_job_start_submit = row_dict["start"] >= row_dict["submit"]
                 check_job_finish_start = int(row_dict["finish"]) >= int(row_dict["start"])
                 check_job_finish_submit = int(row_dict["finish"]) >= int(row_dict["submit"])
-                check_job_status = row_dict["status"] == final_status
+                # Each DB row must carry a terminal status. In mixed-result experiments
+                # (some jobs COMPLETED, others FAILED) we cannot require all rows to
+                # match the overall experiment final_status; the overall outcome is
+                # already asserted independently via _assert_exit_code.
+                check_job_status = row_dict["status"] in _TERMINAL_STATUSES
                 # TODO: Now that we run the real workflow with less mocking, we cannot get the
                 #       debug mock workflow commit, as in reality the temporary project will
                 #       simply return an empty commit. We could modify the test to actually create
@@ -242,15 +247,21 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, ru
                 previous_retry_row = row_dict
 
     if run_type == "vertical":
-        # Compare JOB1_2 with JOB1_1
-        # Hardcode test
+        # For every chunk-2 job that has a corresponding chunk-1 job with the same
+        # base name, verify the vertical ordering constraint: chunk-2 must start
+        # only after chunk-1 has finished.  The pattern "_fc0_2_<JOBNAME>" →
+        # "_fc0_1_<JOBNAME>" works for both single-job and multi-job wrapper configs.
         for job_name, run_data in db_check_list["JOB_DATA_FIELDS"].items():
-            if job_name.endswith("fc0_2_JOB"):
-                previous_job_name = job_name.replace("fc0_2_JOB", "fc0_1_JOB")
-                check_start_chunk2_finish_chunk1 = run_data[0]["start"] >= \
-                                                   db_check_list["JOB_DATA_FIELDS"][previous_job_name][0]["finish"]
-                db_check_list["JOB_DATA_FIELDS"][job_name][0][
-                    "start>=finish_previous_chunk"] = check_start_chunk2_finish_chunk1
+            if "_fc0_2_" in job_name:
+                previous_job_name = job_name.replace("_fc0_2_", "_fc0_1_", 1)
+                if previous_job_name in db_check_list["JOB_DATA_FIELDS"]:
+                    check_start_chunk2_finish_chunk1 = (
+                        run_data[0]["start"]
+                        >= db_check_list["JOB_DATA_FIELDS"][previous_job_name][0]["finish"]
+                    )
+                    db_check_list["JOB_DATA_FIELDS"][job_name][0][
+                        "start>=finish_previous_chunk"
+                    ] = check_start_chunk2_finish_chunk1
 
     _print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
     return db_check_list
@@ -287,7 +298,11 @@ def _assert_exit_code(final_status: str, exit_code: int) -> None:
 
 def _check_files_recovered(as_conf, log_dir, expected_files) -> dict:
     """Check that all files are recovered after a run."""
-    retrials = as_conf.experiment_data['JOBS']['JOB'].get('RETRIALS', 0)
+    jobs = as_conf.experiment_data.get('JOBS', {})
+    retrials = max(
+        (job_cfg.get('RETRIALS', job_cfg.get('retrials', 0)) for job_cfg in jobs.values() if isinstance(job_cfg, dict)),
+        default=0,
+    )
     files_check_list = {}
     for f in log_dir.glob('*'):
         files_check_list[f.name] = not any(
@@ -339,3 +354,95 @@ def _assert_files_recovered(files_check_list):
     """Assert that the files are recovered correctly."""
     for check_name in files_check_list:
         assert files_check_list[check_name]
+
+
+def _build_failure_message(
+        db_check_list: dict[str, Any],
+        files_check_list: dict[str, Any],
+        run_tmpdir: Path,
+        expid: str,
+) -> str:
+    """
+    Build a human-readable failure message from DB and file check results.
+
+    :param db_check_list: Result dict returned by :func:`_check_db_fields`.
+    :type db_check_list: dict
+    :param files_check_list: Result dict returned by :func:`_check_files_recovered`.
+    :type files_check_list: dict
+    :param run_tmpdir: Root directory of the experiment run.
+    :type run_tmpdir: Path
+    :param expid: Experiment identifier.
+    :type expid: str
+    :return: Multi-line string describing every failing check.
+    :rtype: str
+    """
+    from autosubmit.config.basicconfig import BasicConfig  # local import to avoid circular deps
+
+    lines: list[str] = [
+        f"Experiment folder : {run_tmpdir}",
+        f"job_data DB       : {Path(BasicConfig.JOBDATA_DIR)}/job_data_{expid}.db",
+        "",
+    ]
+
+    # --- DB checks ---
+    for check, value in db_check_list.items():
+        if check == "JOB_DATA_FIELDS":
+            for job_name, retries in value.items():
+                for retry_idx, fields in retries.items():
+                    for field_name, result in fields.items():
+                        if field_name == "empty_fields":
+                            if result:  # non-empty string means there are empty fields
+                                lines.append(
+                                    f"  [DB] {job_name} retry={retry_idx}: "
+                                    f"fields unexpectedly empty: {result}"
+                                )
+                        elif not result:
+                            lines.append(
+                                f"  [DB] {job_name} retry={retry_idx}: "
+                                f"field '{field_name}' FAILED"
+                            )
+        elif isinstance(value, tuple):
+            ok, msg = value
+            if not ok:
+                lines.append(f"  [DB] {check}: {msg}")
+        elif not value:
+            lines.append(f"  [DB] {check}: {value}")
+
+    # --- File checks ---
+    for check, result in files_check_list.items():
+        if not result:
+            lines.append(f"  [FILES] {check}: FAILED")
+
+    return "\n".join(lines)
+
+
+def assert_run_results(
+        db_check_list: dict[str, Any],
+        files_check_list: dict[str, Any],
+        run_tmpdir: Path,
+        expid: str,
+) -> None:
+    """
+    Assert DB and file-recovery checks and raise a descriptive ``pytest.fail``
+    message on the first failure.
+
+    Combines :func:`_assert_db_fields`, :func:`_assert_files_recovered`, and
+    :func:`_build_failure_message` into a single call so test bodies stay concise.
+
+    :param db_check_list: Result dict returned by :func:`_check_db_fields`.
+    :type db_check_list: dict
+    :param files_check_list: Result dict returned by :func:`_check_files_recovered`.
+    :type files_check_list: dict
+    :param run_tmpdir: Root directory of the experiment run.
+    :type run_tmpdir: Path
+    :param expid: Experiment identifier.
+    :type expid: str
+    :raises pytest.fail: If any check fails, with a full diagnostic message.
+    """
+    import pytest as _pytest  # local import so conftest stays importable outside pytest
+
+    try:
+        _assert_db_fields(db_check_list)
+        _assert_files_recovered(files_check_list)
+    except AssertionError:
+        _pytest.fail(_build_failure_message(db_check_list, files_check_list, run_tmpdir, expid))
