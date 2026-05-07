@@ -303,8 +303,7 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
 def test_override_immutable_variables_in_custom_config(
     temp_folder: Path, mocker, custom_section: str
 ) -> None:
-    """
-    Test that immutable variables (DEFAULT.EXPID, DEFAULT.HPCARCH) cannot be overridden
+    """Test that immutable variables (DEFAULT.EXPID, DEFAULT.HPCARCH) cannot be overridden
     by custom configuration files.
     """
     custom_config = {"PRE": [], "POST": []}
@@ -344,3 +343,4 @@ def test_override_immutable_variables_in_custom_config(
 
     # Immutable variables not overridden
     assert as_conf.experiment_data["DEFAULT"]["EXPID"] == "a000"
+    assert as_conf.experiment_data["DEFAULT"]["HPCARCH"] == "LOCAL"
