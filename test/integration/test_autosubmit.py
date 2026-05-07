@@ -205,42 +205,18 @@ def test__init_logs_sqlite_mismatch_as_version(autosubmit, autosubmit_exp, mocke
 
     assert 'update the experiment version' in str(cm.value.message)
 
-@pytest.mark.parametrize('autosubmit_missing,as_times_missing', [(True, False), (False, True), (True, True)])
-def test_install_sqlite_already_exists(monkeypatch, tmp_path, autosubmit, mocker, autosubmit_missing, as_times_missing):
+
+def test_install_sqlite_already_exists(monkeypatch, tmp_path, autosubmit):
     """Test that a log message is displayed when autosubmit.db or as_times.db already exist when installing with SQLite."""
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
     db_file = tmp_path / 'test.db'
+    db_file.touch()
     monkeypatch.setattr(BasicConfig, 'DB_PATH', str(db_file))
-    monkeypatch.setattr(BasicConfig, 'DB_DIR', str(tmp_path))
 
-    # Create the files if they are not supposed to be missing
-    if not autosubmit_missing:
-        db_file.touch()
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit.install()
     
-    if not as_times_missing:
-        as_times_file = tmp_path / BasicConfig.AS_TIMES_DB
-        as_times_file.touch()
-
-    autosubmit_db_path = Path(BasicConfig.DB_PATH)
-    as_times_path = Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB
-
-    # Mock the log to check the messages
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-
-    # Call
-    autosubmit.install()
-
-    # Assert
-    if autosubmit_missing:
-        mocked_log.info.assert_any_call("Creating autosubmit database...")
-    else:        
-        mocked_log.info.assert_any_call(f"Database {autosubmit_db_path} already exists.")
-    
-    if as_times_missing:
-        mocked_log.info.assert_any_call("Creating as_times database...")
-    else:
-        mocked_log.info.assert_any_call(f"Database {as_times_path} already exists.")
-
+    assert 'Database already exists.' == str(cm.value.message)
 
 def test_install_sqlite_create_db_fails(monkeypatch, tmp_path, autosubmit, mocker):
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
@@ -272,18 +248,6 @@ def test_install_postgres_create_db_fails(monkeypatch, autosubmit, mocker):
         autosubmit.install()
 
     assert 'Failed to create Postgres database' == str(cm.value.message)
-
-
-def test_install_postgres_initializes_as_times(monkeypatch, autosubmit, mocker):
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
-    mocker.patch('autosubmit.autosubmit.create_db', return_value=True)
-    mock_status_manager = mocker.patch(
-        'autosubmit.history.database_managers.experiment_status_db_manager.create_experiment_status_db_manager'
-    )
-
-    autosubmit.install()
-
-    mock_status_manager.assert_called_once_with('postgres')
 
 
 @pytest.mark.docker

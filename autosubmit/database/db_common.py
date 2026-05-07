@@ -38,7 +38,7 @@ CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 15
 
 
-def create_db(qry, db_path: Optional[str] = None):
+def create_db(qry):
     """
     Creates a new database for autosubmit
 
@@ -47,27 +47,19 @@ def create_db(qry, db_path: Optional[str] = None):
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         return _create_db_pg()
 
-    # For sqlite allow creating a database file other than the main DB_PATH
-    target_path = db_path if db_path else BasicConfig.DB_PATH
-
     try:
-        # Ensure parent directory exists
-        Path(target_path).parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(target_path)
-        cursor = conn.cursor()
-    except Exception as e:
+        (conn, cursor) = open_conn(False)
+    except DbException as e:
         raise AutosubmitCritical("Could not establish a connection to database", 7001, str(e))
 
     try:
         cursor.executescript(qry)
     except sqlite3.Error as e:
-        cursor.close()
-        conn.close()
+        close_conn(conn, cursor)
         raise AutosubmitCritical('Database can not be created', 7004, str(e))
 
     conn.commit()
-    cursor.close()
-    conn.close()
+    close_conn(conn, cursor)
     return True
 
 

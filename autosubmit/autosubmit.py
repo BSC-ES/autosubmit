@@ -3665,54 +3665,20 @@ class Autosubmit:
     @staticmethod
     def install():
         """Creates a new database instance for autosubmit at the configured path."""
-        # SQLite database creation
-        if BasicConfig.DATABASE_BACKEND == 'sqlite':
-            autosubmit_db_path = Path(BasicConfig.DB_PATH)
-            as_times_path = Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB
-
-            # Autosubmit database
-            if autosubmit_db_path.exists():
-                Log.info(f"Database {autosubmit_db_path} already exists.")
-            else:
+        if BasicConfig.DATABASE_BACKEND == "sqlite":
+            if not os.path.exists(BasicConfig.DB_PATH):
                 Log.info("Creating autosubmit database...")
-                query_file = read_files('autosubmit.database') / 'data/autosubmit.sql'
+                query_file = read_files("autosubmit.database") / "data/autosubmit.sql"
                 query = query_file.read_text()
-                if not create_db(query, BasicConfig.DB_PATH):
+                if not create_db(query):
                     raise AutosubmitCritical("Can not write database file", 7004)
                 Log.result("Autosubmit database created successfully")
-                try:
-                    os.chmod(str(autosubmit_db_path), 0o664)
-                except (OSError, PermissionError):
-                    Log.warning(f"Could not set permissions on {autosubmit_db_path}")
-
-            # as_times database
-            if as_times_path.exists():
-                Log.info(f"Database {as_times_path} already exists.")
             else:
-                Log.info("Creating as_times database...")
-                query_file = read_files('autosubmit.database') / 'data/as_times.sql'
-                query = query_file.read_text()
-                if not create_db(query, str(as_times_path)):
-                    raise AutosubmitCritical("Can not write as_times database file", 7004)
-                Log.result("as_times database created successfully")
-                try:
-                    os.chmod(str(as_times_path), 0o664)
-                except (OSError, PermissionError):
-                    Log.warning(f"Could not set permissions on {as_times_path}")
-        
-        # PostgreSQL database creation
+                raise AutosubmitCritical("Database already exists.", 7004)
         else:
             Log.info("Creating autosubmit Postgres database...")
-            if not create_db(''):
+            if not create_db(""):
                 raise AutosubmitCritical("Failed to create Postgres database", 7004)
-            Log.info("Creating as_times Postgres table...")
-            try:
-                from autosubmit.history.database_managers.experiment_status_db_manager import (
-                    create_experiment_status_db_manager,
-                )
-                create_experiment_status_db_manager(BasicConfig.DATABASE_BACKEND)
-            except Exception as e:
-                raise AutosubmitCritical(f"Failed to create Postgres as_times table: {str(e)}", 7004)
         return True
 
     @staticmethod
