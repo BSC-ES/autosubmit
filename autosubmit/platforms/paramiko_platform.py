@@ -147,7 +147,7 @@ class ParamikoPlatform(Platform):
         self.job_status: Optional[dict[str, list]] = None
         self._ssh: Optional[paramiko.SSHClient] = None
         self._ssh_config = None
-        self._ssh_output = None
+        self._ssh_output: str = None
         self._host_config: Optional[dict] = None
         self._host_config_id = None
         self.submit_cmd = ""

@@ -682,7 +682,7 @@ class JobList(object):
             filters = [{}]
         return filters
 
-    def _check_dates(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_dates(self, relationships: Dict, current_job: Job) -> dict:
         """Check if the current_job_value is included in the filter_from and retrieve filter_to value
 
         :param relationships: Remaining filters to apply.
@@ -741,7 +741,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
-    def _check_chunks(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_chunks(self, relationships: Dict, current_job: Job) -> dict:
         """Check if the current_job_value is included in the filter_from and retrieve filter_to value
 
         :param relationships: Remaining filters to apply.
@@ -774,7 +774,7 @@ class JobList(object):
         filters_to_apply = self._unify_to_filters(filters_to_apply, current_job.splits)
         return filters_to_apply
 
-    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> {}:
+    def _unify_to_filter(self, unified_filter, filter_to, filter_type, splits=None) -> dict:
         """Unify filter_to filters into a single dictionary
 
         :param unified_filter: Single dictionary with all filters_to
@@ -2592,7 +2592,7 @@ class JobList(object):
             job.platform.add_job_to_log_recover(job)
         return log_recovered
 
-    def check_if_log_is_recovered(self, job: Job) -> Path:
+    def check_if_log_is_recovered(self, job: Job) -> Optional[Path]:
         """Check if the log is recovered.
 
         Conditions:
