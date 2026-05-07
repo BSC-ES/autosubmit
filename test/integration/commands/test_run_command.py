@@ -78,7 +78,6 @@ def set_up_test(
         ['autosubmit', 'describe', '{expid}'],
         # ['autosubmit', 'migrate', '-fs', 'Any', '{expid}'],
         ['autosubmit', 'create', '{expid}', '--hide'],
-        ['autosubmit', 'install'],
         ['autosubmit', 'setstatus', '{expid}', '-t', 'READY', '-fs', 'WAITING', '--hide'],  # TODO
         ['autosubmit', 'testcase', '-dm', '-H', 'local', '-d', 'Tutorial', '-c', '1', '-m', 'fc0', '-s', '19651101'],
         # TODO
@@ -106,7 +105,6 @@ def set_up_test(
         'describe',
         # 'migrate',
         'create',
-        'install',
         'setstatus',
         'testcase',
         'refresh',
@@ -286,11 +284,12 @@ def test_run_command_plot_behavior(
 @pytest.mark.parametrize(
     'command',
     [
+        ['autosubmit', 'install'],
         ['autosubmit', '-lc', 'ERROR', '-lf', 'WARNING', 'run', '{expid}'],
         ['autosubmit', 'recovery', '{expid}', '--hide'],
         ['autosubmit', 'provenance', '{expid}', '--rocrate'],
     ],
-    ids=['run', 'recovery', 'provenance']
+    ids=['install', 'run', 'recovery', 'provenance']
 )
 def test_run_command_raises_autosubmit(
         command: list[str],
@@ -306,6 +305,10 @@ def test_run_command_raises_autosubmit(
         with pytest.raises(AutosubmitCritical) as error:
             exp.autosubmit.run_command(args=args)
             assert str(error.value.code) == '7010' or str(error.code) == '7014'
+    elif 'install' in command:
+        with pytest.raises(AutosubmitCritical) as error:
+            exp.autosubmit.run_command(args=args)
+        assert str(error.value.code) == '7004'
     elif 'recovery' in command:
         with pytest.raises(AutosubmitCritical) as error:
             exp.autosubmit.run_command(args=args)
