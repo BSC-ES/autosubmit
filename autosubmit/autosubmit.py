@@ -39,7 +39,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import cast, Generator, Optional, Union, TYPE_CHECKING
+from typing import Generator, Optional, Union, TYPE_CHECKING
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -907,15 +907,12 @@ class Autosubmit:
 
     @staticmethod
     def run_command(args: argparse.Namespace):
-        expid = "None"
-
         if hasattr(args, 'notransitive') and args.notransitive:
             warnings.warn('notransitive is deprecated and will be removed in a future major release!')
 
-        if hasattr(args, 'expid'):
-            expid = args.expid
         if args.command != "configure" and args.command != "install":
-            Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
+            if Autosubmit._init_logs(args, args.logconsole, args.logfile) == 1:
+                return False
         if args.command == 'run':
             if args.trace and args.profile is None:
                 raise AutosubmitCritical('Tracing is only available with profiling. Please add -p/--profile flag to run with tracing.', 7012)
@@ -1042,7 +1039,7 @@ class Autosubmit:
                                    args.target, args.yes)
 
     @staticmethod
-    def _init_logs(args, console_level='INFO', log_level='DEBUG', expid='None'):
+    def _init_logs(args, console_level='INFO', log_level='DEBUG') -> int:
         Log.set_console_level(console_level)
         if args.command != "configure":
             if not BasicConfig.CONFIG_FILE_FOUND:
@@ -1102,19 +1099,26 @@ class Autosubmit:
                     host in BasicConfig.ALLOWED_HOSTS[args.command] or fullhost in BasicConfig.ALLOWED_HOSTS[
                 args.command]):
                 raise AutosubmitCritical(message, 7071)
+        missing_expid = ""
+        expid = args.expid if hasattr(args, 'expid') else "None"
         if (expid != 'None' and expid) and args.command not in expid_less and args.command not in global_log_command:
-            if isinstance(expid, list):
-                expids = cast(list[str], expid)
-            elif "," in expid:
-                expids = expid.split(",")
-            else:
-                expids = expid.split(" ")
-            expids = [x.strip() for x in expids]
+            if expid:
+                expids = expid.replace(',', ' ').split(' ')
+                expids = [expid.lower() for expid in filter(lambda x: x, expids)]
+                expids = [x.strip() for x in expids]
+
             for expid in expids:
-                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-                tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-                aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
-                if not os.path.exists(exp_path):
+                exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
+                if not exp_path.exists():
+                    missing_expid += f' {expid}'
+            if missing_expid != "":
+                Log.error(f"Experiment{missing_expid} does not exist")
+                return 1
+            tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+            aslogs_path = Path(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
+            for expid in expids:
+                exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
+                if not exp_path.exists():
                     if BasicConfig.DATABASE_BACKEND == 'sqlite':
                         raise AutosubmitCritical("Experiment does not exist", 7012)
                     else:
@@ -1136,46 +1140,42 @@ class Autosubmit:
                 # delete is treated differently
                 owner, eadmin, current_owner = Autosubmit._check_ownership_and_set_last_command(as_conf, expid,
                                                                                                 args.command)
-            if not os.path.exists(tmp_path):
-                os.mkdir(tmp_path)
-            if not os.path.exists(aslogs_path):
-                os.mkdir(aslogs_path)
+            tmp_path.mkdir(exist_ok=True, parents=True)
+            aslogs_path.mkdir(exist_ok=True, parents=True)
             if args.command in ['stop', 'delete']:
                 exp_id = "_".join(expids)
-                Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                          args.command + '_' + exp_id + '.log'), "out", log_level)
-                Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                          args.command + '_' + exp_id + '_err.log'), "err")
+                Log.set_file(str(Path(BasicConfig.GLOBAL_LOG_DIR).joinpath(
+                                          args.command + '_' + exp_id + '.log')), "out", log_level)
+                Log.set_file(str(Path(BasicConfig.GLOBAL_LOG_DIR).joinpath(
+                                          args.command + '_' + exp_id + '_err.log')), "err")
             else:
                 if owner:
-                    os.chmod(tmp_path, 0o775)
-                    with suppress(PermissionError, FileNotFoundError, Exception):  # for -txt option
-                        os.chmod(f'{exp_path}/status', 0o775)
+                    tmp_path.mkdir(mode=0o775,parents=True,exist_ok=True)
+                    (exp_path / 'status').touch(mode=0o775, exist_ok=True)
 
-                    Log.set_file(os.path.join(aslogs_path, args.command + '.log'), "out", log_level)
-                    Log.set_file(os.path.join(aslogs_path, args.command + '_err.log'), "err")
+                    Log.set_file(str(aslogs_path.joinpath(args.command + '.log')), "out", log_level)
+                    Log.set_file(str(aslogs_path.joinpath(args.command + '_err.log')), "err")
                     if args.command in ["run"]:
-                        if os.path.exists(os.path.join(aslogs_path, 'jobs_active_status.log')):
-                            os.remove(os.path.join(aslogs_path, 'jobs_active_status.log'))
-                        if os.path.exists(os.path.join(aslogs_path, 'jobs_failed_status.log')):
-                            os.remove(os.path.join(aslogs_path, 'jobs_failed_status.log'))
-                            Log.set_file(os.path.join(aslogs_path, 'jobs_active_status.log'), "status")
-                            Log.set_file(os.path.join(aslogs_path, 'jobs_failed_status.log'), "status_failed")
+                        aslogs_path.joinpath('jobs_active_status.log').unlink(missing_ok=True)
+                        if aslogs_path.joinpath('jobs_failed_status.log').exists():
+                            aslogs_path.joinpath('jobs_failed_status.log').unlink()
+                            Log.set_file(str(aslogs_path.joinpath('jobs_active_status.log')), "status")
+                            Log.set_file(str(aslogs_path.joinpath('jobs_failed_status.log')), "status_failed")
                 else:
-                    st = os.stat(tmp_path)
+                    st = tmp_path.stat()
                     oct_perm = str(oct(st.st_mode))[-3:]
                     if int(oct_perm[1]) in [6, 7] or int(oct_perm[2]) in [6, 7]:
-                        Log.set_file(os.path.join(tmp_path, args.command + '.log'), "out", log_level)
-                        Log.set_file(os.path.join(tmp_path, args.command + '_err.log'), "err")
+                        Log.set_file(str(tmp_path.joinpath(args.command + '.log')), "out", log_level)
+                        Log.set_file(str(tmp_path.joinpath(args.command + '_err.log')), "err")
                     else:
-                        Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                                  args.command + expid + '.log'), "out", log_level)
-                        Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                                  args.command + expid + '_err.log'), "err")
+                        Log.set_file(str(Path(BasicConfig.GLOBAL_LOG_DIR).joinpath(
+                            args.command + expid + '.log')), "out", log_level)
+                        Log.set_file(str(Path(BasicConfig.GLOBAL_LOG_DIR).joinpath(
+                            args.command + expid + '_err.log')), "err")
                         Log.printlog(f"Permissions of {tmp_path} are {oct_perm}. The log is being written in the "
                                      f"{BasicConfig.GLOBAL_LOG_DIR} path instead of {oct_perm}. "
                                      f"Please tell to the owner to fix the permissions")
-            Log.file_path = tmp_path
+            Log.file_path = str(tmp_path)
             if owner:
                 if "update_version" in args:
                     force_update_version = args.update_version
@@ -1207,16 +1207,16 @@ class Autosubmit:
             else:
                 exp_id = "_" + expid
             if args.command not in expid_less:
-                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-                if not os.path.exists(exp_path):
+                exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
+                if not exp_path.exists():
                     if BasicConfig.DATABASE_BACKEND == 'sqlite':
                         raise AutosubmitCritical("Experiment does not exist", 7012)
                     else:
-                        os.mkdir(exp_path)
-            Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                      args.command + exp_id + '.log'), "out", log_level)
-            Log.set_file(os.path.join(BasicConfig.GLOBAL_LOG_DIR,
-                                      args.command + exp_id + '_err.log'), "err")
+                        exp_path.mkdir()
+            Log.set_file(str(Path(BasicConfig.GLOBAL_LOG_DIR).joinpath(
+                args.command + exp_id + '.log')), "out", log_level)
+            Log.set_file(str(Path(BasicConfig.GLOBAL_LOG_DIR).joinpath(
+                args.command + exp_id + '_err.log')), "err")
         # Enforce LANG=UTF-8
         try:
             try:
@@ -1234,6 +1234,7 @@ class Autosubmit:
             locale.setlocale(locale.LC_ALL, 'C')
 
         Log.info(f"Autosubmit is running with {Autosubmit.autosubmit_version}")
+        return 0
 
     @staticmethod
     def _check_ownership_and_set_last_command(as_conf, expid, command):
