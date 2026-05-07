@@ -173,7 +173,7 @@ def test_inspect(
     # TODO: This should be 'local' but we can't customize LOCAL platform yet,
     #       also scratch_dir, user, host, project shouldn't be allowed to be modified.
     general_data['PLATFORMS']['LOCAL'] = {'TYPE': 'ps', 'HOST': "127.0.0.1", 'SCRATCH_DIR': str(tmp_path), 'USER': ""}
-
+    
     for hpcarch in ['TEST_PS', 'TEST_SLURM', 'LOCAL']:
         general_data['DEFAULT']['HPCARCH'] = hpcarch
         general_data['PLATFORMS'][hpcarch]['CUSTOM_DIR'] = 'test'

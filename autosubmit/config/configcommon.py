@@ -667,6 +667,7 @@ class AutosubmitConfig(object):
         #       load the miscellaneous file/key. But in reality, I believe this means if ``load_misc``, and
         #       we still don't have ``AS_MISC``, then we will add the given YAML file to the list of
         #       ``misc_files``. It might be simpler to have a separate function for this, or append directly.
+        new_file.data = self._pin_immutable_variables(new_file.data)
         if new_file.data.get("AS_MISC", False) and not load_misc:
             self.misc_files.append(yaml_file)
             new_file.data = {}
@@ -1625,6 +1626,30 @@ class AutosubmitConfig(object):
         for key in keys_to_delete:
             yaml_data.pop(key, None)
 
+    def _pin_immutable_variables(self, parameters: dict) -> dict:
+        """Keep default variables regardless of the experiment configuration files
+        :param parameters: dict with current parameters
+        :type parameters: dict
+        :return: dict with updated parameters
+        :rtype: dict
+        """
+        # Variables that should be fixed regardless of the configuration file
+        pinned_variables = ["EXPID", "HPCARCH"]
+
+        starter_default = self.starter_conf.get("DEFAULT", {})
+
+        # Add default section only if it exists in starter_conf
+        if starter_default:
+            default_section = parameters.setdefault("DEFAULT", {})
+
+            for key in pinned_variables:
+                if key not in starter_default:
+                    continue
+                # For each key, get the original value and the one in the configuration file
+                default_section[key] = starter_default[key]
+
+        return parameters
+
     def load_custom_config(self, current_data, filenames_to_load):
         """Loads custom config files
         :param current_data: dict with current data
@@ -1639,8 +1664,8 @@ class AutosubmitConfig(object):
         for filename in filenames_to_load:
             filename = filename.strip(", ")  # Remove commas and spaces if any
             if filename.startswith("~"):
-                filename = os.path.expanduser(filename)
-            current_data_aux = self.unify_conf(self.starter_conf, current_data)
+                filename = str(Path(filename).expanduser())
+            current_data_aux = self.unify_conf(copy.deepcopy(self.starter_conf), current_data)
             current_data_aux["AS_TEMP"] = {}
             current_data_aux["AS_TEMP"]["FILENAME_TO_LOAD"] = filename
             self.dynamic_variables["AS_TEMP.FILENAME_TO_LOAD"] = filename
@@ -1676,17 +1701,21 @@ class AutosubmitConfig(object):
                                                                                            filenames_to_load_level[
                                                                                                "PRE"]))
                     else:
-                        current_data_pre = current_data
+                        current_data_pre = copy.deepcopy(current_data)
                     current_data = self.unify_conf(current_data_pre, current_data)
 
                     if len(filenames_to_load_level["POST"]) > 0:
-                        current_data_post = self.unify_conf(current_data_post, self.unify_conf(current_data,
-                                                                                               self.load_custom_config_section(
-                                                                                                   current_data,
-                                                                                                   filenames_to_load_level[
-                                                                                                       "POST"])))
+                        current_data_post = self.unify_conf(
+                            current_data_post,
+                            self.unify_conf(
+                                copy.deepcopy(current_data),
+                                self.load_custom_config_section(
+                                    copy.deepcopy(current_data), filenames_to_load_level["POST"]
+                                ),
+                            ),
+                        )
                     else:
-                        current_data_post = current_data
+                        current_data_post = copy.deepcopy(current_data)
 
         if current_data_aux:
             del current_data_aux
@@ -1801,9 +1830,11 @@ class AutosubmitConfig(object):
             if not only_experiment_data:
                 # Loads all configuration associated with the project data "pre"
                 custom_conf_pre = self.load_custom_config_section({}, filenames_to_load["PRE"])
+                custom_conf_pre = self._pin_immutable_variables(custom_conf_pre)
                 # Loads all configuration associated with the user data "post"
                 self.experiment_data = self.load_custom_config_section(
                     self.unify_conf(custom_conf_pre, non_minimal_conf), filenames_to_load["POST"])
+                self.experiment_data = self._pin_immutable_variables(self.experiment_data)
             else:
                 self.experiment_data = starter_conf
             ###

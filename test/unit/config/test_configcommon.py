@@ -17,6 +17,7 @@
 
 """Basic tests for ``AutosubmitConfig``."""
 
+import copy
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING
@@ -544,3 +545,152 @@ def test_load_config_file_misc(new_config_data: str, load_misc: bool, expected_m
     as_conf.load_config_file(current_config, tmp_path / 'a000.yml', load_misc=load_misc)
 
     assert len(as_conf.misc_files) == expected_misc_files_length
+
+
+def test_immutable_variables_overwrites_default_values(
+    autosubmit_config: "AutosubmitConfigFactory",
+) -> None:
+    """Test that the _pin_immutable_variables method correctly pins immutable variables."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.starter_conf = {"DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"}}
+    parameters = {
+        "DEFAULT": {"EXPID": "a001", "HPCARCH": "MARENOSTRUM5", "OTHER": "value"}
+    }
+    pinned = as_conf._pin_immutable_variables(parameters)
+
+    # Check immutable variables keep original values, other variables not affected
+    assert pinned["DEFAULT"]["EXPID"] == "a000"
+    assert pinned["DEFAULT"]["HPCARCH"] == "LOCAL"
+    assert pinned["DEFAULT"]["OTHER"] == "value"
+
+
+def test_immutable_variables_adds_missing_sections(
+    autosubmit_config: "AutosubmitConfigFactory",
+) -> None:
+    """Test that the _pin_immutable_variables method adds missing sections and keys."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.starter_conf = {"DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"}}
+
+    parameters = {}
+    pinned = as_conf._pin_immutable_variables(parameters)
+
+    # Check that missing DEFAULT section is added with original values
+    assert pinned["DEFAULT"]["EXPID"] == "a000"
+    assert pinned["DEFAULT"]["HPCARCH"] == "LOCAL"
+
+
+def test_load_custom_config(autosubmit_config, tmp_path) -> None:
+    """Test that the load_custom_config method correctly loads and merges custom configuration files."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+
+    git_project_dir = tmp_path / "proj" / "git_project"
+    conf_dir = git_project_dir / "conf"
+    common_dir = git_project_dir / "as_conf" / "common"
+    real_dir = git_project_dir / "as_conf" / "real_from_ideal"
+    post_dir = git_project_dir / "as_conf" / "post"
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    # PRE
+    common_dir.mkdir(parents=True, exist_ok=True)
+    real_dir.mkdir(parents=True, exist_ok=True)
+    # POST
+    post_dir.mkdir(parents=True, exist_ok=True)
+
+    as_conf.starter_conf = {
+        "DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"},
+        "JOBS": {"DO_NOTHING": {"SCRIPT": "sleep 20", "PLATFORM": "LOCAL", "RUNNING": "once"}},
+        "CONFIG": {},
+        "PROJDIR": str(git_project_dir),
+    }
+
+    current_data = {
+        "DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"},
+        "JOBS": {"DO_NOTHING": {"SCRIPT": "sleep 20", "PLATFORM": "LOCAL", "RUNNING": "once"}},
+        "CONFIG": {},
+        "PROJDIR": str(git_project_dir),
+    }
+
+    current_data_before = copy.deepcopy(current_data)
+
+    root_file = conf_dir / "root_config.yml"
+    root_file.write_text(
+        dedent(
+            """\
+            DEFAULT:
+              CUSTOM_CONFIG:
+                PRE: "%PROJDIR%/as_conf/common,%PROJDIR%/as_conf/real_from_ideal"
+                POST: "%PROJDIR%/as_conf/post"
+            """
+        )
+    )
+
+    (common_dir / "common_config.yml").write_text(
+        dedent("""\
+        DEFAULT:
+          EXPID: "a001"
+          HPCARCH: "MARENOSTRUM5"
+          COMMON_CONFIG_VALUE: "common_value"
+        JOBS:
+          DO_NOTHING:
+            SCRIPT: "pre a.yml!"
+
+    """)
+    )
+
+    (real_dir / "real_from_ideal_config.yml").write_text(
+        dedent("""\
+        DEFAULT:
+          EXPID: "a002"
+          HPCARCH: "MARENOSTRUM5"
+          REAL_CONFIG_VALUE: "real_from_ideal_value_1"
+        REAL_FROM_IDEAL_VALUE: "real_from_ideal_value_2"
+    """)
+    )
+
+    (post_dir / "post_config.yml").write_text(
+        dedent("""\
+        DEFAULT:
+          EXPID: "a003"
+          HPCARCH: "MARENOSTRUM6"
+          POST_CONFIG_VALUE: "post_value"
+        JOBS:
+          DO_NOTHING:
+            SCRIPT: "post b.yml!"
+    """)
+    )
+
+    data_pre, data_post = as_conf.load_custom_config(current_data, [str(root_file)])
+
+    # check nested configurations are merged in PRE
+    assert data_pre["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
+    assert data_pre["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
+    assert data_pre["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
+
+    # check that custom_config does not appear in data_pre
+    assert "CUSTOM_CONFIG" not in data_pre.get("DEFAULT", {})
+    assert "CUSTOM_CONFIG" not in data_post.get("DEFAULT", {})
+    assert "CUSTOM_CONFIG" not in data_post.get("DEFAULT", {})
+
+    # check that pinned variables are not overwritten in data_pre
+    assert data_pre["DEFAULT"]["EXPID"] == "a000"
+    assert data_pre["DEFAULT"]["HPCARCH"] == "LOCAL"
+
+    # check that POST config is merged in data_post
+    assert "POST_CONFIG_VALUE" not in data_pre.get("DEFAULT", {})
+    assert data_post["DEFAULT"]["POST_CONFIG_VALUE"] == "post_value"
+    assert data_post["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
+    assert data_post["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
+    assert data_post["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
+
+    # check there is no aliasing between data_pre and data_post
+    assert data_pre is not data_post
+    data_post["DEFAULT"]["POST_ONLY_TMP"] = "tmp"
+    assert "POST_ONLY_TMP" not in data_pre["DEFAULT"]
+
+    # check input current_data is not mutated by load_custom_config
+    assert current_data == current_data_before
+
+    # check that JOBS section has DO_NOTHING script with post b.yml!
+    assert data_post["JOBS"]["DO_NOTHING"]["SCRIPT"] == "post b.yml!"
+    assert data_pre["JOBS"]["DO_NOTHING"]["SCRIPT"] == "sleep 20"
+
+    assert data_pre is not data_post
