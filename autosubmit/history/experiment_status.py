@@ -57,7 +57,6 @@ class ExperimentHeartBeatMonitor:
 
     def ping(self) -> bool:
         """Ping the heartbeat to update the last_heartbeat timestamp in the database."""
-        # TODO: Not sure about locking here. Needs testing
         # Use lock to prevent concurrent updates of the heartbeat, prevent race conditions
         with self._ping_lock:
             try:

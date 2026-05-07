@@ -201,6 +201,7 @@ def test_set_exp_status_logs_warning_when_get_experiment_status_row_by_expid_fai
 
     # Assert
     warning_mock.assert_called_once()
+    assert "Experiment a000 not found when trying to set status" in warning_mock.call_args[0][0]
     # If warning is logged, it returns early
     get_experiment_status_row_mock.assert_not_called()
     create_status_mock.assert_not_called()
@@ -242,6 +243,7 @@ def test_set_exp_status_logs_warning_when_get_experiment_row_by_expid_fails(
 
     # Assert
     warning_mock.assert_called_once()
+    assert "Experiment a000 not found when trying to set status" in warning_mock.call_args[0][0]
     create_status_mock.assert_not_called()
 
 
@@ -291,3 +293,148 @@ def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath"):
     after = database_manager.get_experiment_status_row_by_exp_id(1)
     assert after is not None
     assert after.last_heartbeat is not None
+
+
+def test_update_multiple_experiment_last_heartbeats_at_same_time(
+    tmp_path: "LocalPath", mocker
+):
+    """Test that concurrent updates of different experiment heartbeats do not cause race conditions."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    # Initialize SQLite database with two experiments
+    autosubmit_db_path = db_dir / "test.db"
+    with sqlite3.connect(autosubmit_db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE experiment (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                autosubmit_version TEXT
+            )
+            """)
+        cursor.executemany(
+            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (?, ?, ?, ?)",
+            [
+                (1, "a000", "No description", "3.14.0"),
+                (2, "a001", "No description", "3.14.0"),
+            ],
+        )
+        conn.commit()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    experiment1 = ExperimentRow(
+        id=1, name="a000", description="No description", autosubmit_version="3.14.0"
+    )
+    experiment2 = ExperimentRow(
+        id=2, name="a001", description="No description", autosubmit_version="3.14.0"
+    )
+    database_manager.create_experiment_status_as_running(experiment1)
+    database_manager.create_experiment_status_as_running(experiment2)
+
+    # Mock update_heartbeat to simulate a delay in the update
+    original_update_heartbeat = database_manager.update_heartbeat
+
+    def delayed_update_heartbeat(expid: str):
+        import time
+
+        time.sleep(0.1)  # Simulate delay
+        original_update_heartbeat(expid)
+
+    mocker.patch.object(
+        database_manager, "update_heartbeat", side_effect=delayed_update_heartbeat
+    )
+
+    # Start two threads that update the heartbeat of the two experiments at the same time
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        thread1 = executor.submit(database_manager.update_heartbeat, "a000")
+        thread2 = executor.submit(database_manager.update_heartbeat, "a001")
+
+        thread1.result()
+        thread2.result()
+
+    # Assert
+    exp_status1 = database_manager.get_experiment_status_row_by_exp_id(1)
+    exp_status2 = database_manager.get_experiment_status_row_by_exp_id(2)
+    assert exp_status1 is not None
+    assert exp_status2 is not None
+    assert exp_status1.last_heartbeat is not None
+    assert exp_status2.last_heartbeat is not None
+
+
+def test_update_same_experiment_last_heartbeats_at_same_time(
+    tmp_path: "LocalPath", mocker
+):
+    """Test that concurrent updates of the same experiment heartbeat do not cause race conditions."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    # Initialize SQLite database with one experiment
+    autosubmit_db_path = db_dir / "test.db"
+    with sqlite3.connect(autosubmit_db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE experiment (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                autosubmit_version TEXT
+            )
+            """)
+        cursor.execute(
+            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (1, 'a000', 'No description', '3.14.0')",
+        )
+        conn.commit()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    experiment = ExperimentRow(
+        id=1, name="a000", description="No description", autosubmit_version="3.14.0"
+    )
+    database_manager.create_experiment_status_as_running(experiment)
+
+    # Mock update_heartbeat to simulate a delay in the update
+    original_update_heartbeat = database_manager.update_heartbeat
+
+    def delayed_update_heartbeat(expid: str):
+        import time
+
+        time.sleep(0.1)  # Simulate delay
+        original_update_heartbeat(expid)
+
+    mocker.patch.object(
+        database_manager, "update_heartbeat", side_effect=delayed_update_heartbeat
+    )
+
+    # Start two threads that update the heartbeat of the same experiment at the same time
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        thread1 = executor.submit(database_manager.update_heartbeat, "a000")
+        thread2 = executor.submit(database_manager.update_heartbeat, "a000")
+
+        thread1.result()
+        thread2.result()
+
+    # Assert
+    exp_status = database_manager.get_experiment_status_row_by_exp_id(1)
+    assert exp_status is not None
+    assert exp_status.last_heartbeat is not None
