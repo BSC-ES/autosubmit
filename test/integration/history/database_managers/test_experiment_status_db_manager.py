@@ -164,3 +164,80 @@ def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
     assert "last_heartbeat" in columns
     assert isinstance(database_manager, ExperimentStatusDbManager)
 
+
+def test_set_exp_status_logs_warning_when_get_experiment_status_row_by_expid_fails(
+    tmp_path: "LocalPath", mocker
+):
+    """Test that set_exp_status() logs a warning when get_experiment_status_row_by_expid() fails."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    # Mock
+    warning_mock = mocker.patch(
+        "autosubmit.history.database_managers.experiment_status_db_manager.Log.warning"
+    )
+    mocker.patch.object(
+        database_manager,
+        "get_experiment_status_row_by_expid",
+        side_effect=ValueError("missing experiment status row"),
+    )
+
+    get_experiment_status_row_mock = mocker.patch.object(
+        database_manager, "get_experiment_row_by_expid"
+    )
+    create_status_mock = mocker.patch.object(database_manager, "create_exp_status")
+
+    # Act
+    database_manager.set_exp_status("a000", "RUNNING")
+
+    # Assert
+    warning_mock.assert_called_once()
+    # If warning is logged, it returns early
+    get_experiment_status_row_mock.assert_not_called()
+    create_status_mock.assert_not_called()
+
+
+def test_set_exp_status_logs_warning_when_get_experiment_row_by_expid_fails(
+        tmp_path: "LocalPath", mocker
+):
+    """Test that set_exp_status() logs a warning when get_experiment_row_by_expid() fails."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    # Mock
+    warning_mock = mocker.patch(
+        "autosubmit.history.database_managers.experiment_status_db_manager.Log.warning"
+    )
+    mocker.patch.object(database_manager, "get_experiment_status_row_by_expid", return_value=None)
+    mocker.patch.object(
+        database_manager,
+        "get_experiment_row_by_expid",
+        side_effect=ValueError("missing experiment row"),
+    )
+
+    create_status_mock = mocker.patch.object(database_manager, "create_exp_status")
+
+    # Act
+    database_manager.set_exp_status("a000", "RUNNING")
+
+    # Assert
+    warning_mock.assert_called_once()
+    create_status_mock.assert_not_called()
