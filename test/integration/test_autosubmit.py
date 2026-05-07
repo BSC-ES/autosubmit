@@ -207,7 +207,6 @@ def test__init_logs_sqlite_mismatch_as_version(autosubmit, autosubmit_exp, mocke
 
 
 def test_install_sqlite_already_exists(monkeypatch, tmp_path, autosubmit):
-    """Test that a log message is displayed when autosubmit.db or as_times.db already exist when installing with SQLite."""
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
     db_file = tmp_path / 'test.db'
     db_file.touch()
@@ -215,7 +214,6 @@ def test_install_sqlite_already_exists(monkeypatch, tmp_path, autosubmit):
 
     with pytest.raises(AutosubmitCritical) as cm:
         autosubmit.install()
-    
     assert 'Database already exists.' == str(cm.value.message)
 
 def test_install_sqlite_create_db_fails(monkeypatch, tmp_path, autosubmit, mocker):
