@@ -3691,7 +3691,7 @@ class Autosubmit:
                 Log.info(f"Database {autosubmit_db_path} already exists.")
             else:
                 Log.info("Creating autosubmit database...")
-                query_file = read_files("autosubmit.database") / "data/autosubmit.sql"
+                query_file = read_files('autosubmit.database') / 'data/autosubmit.sql'
                 query = query_file.read_text()
                 if not create_db(query):
                     raise AutosubmitCritical("Can not write database file", 7004)
@@ -3700,7 +3700,7 @@ class Autosubmit:
                 raise AutosubmitCritical("Database already exists.", 7004)
         else:
             Log.info("Creating autosubmit Postgres database...")
-            if not create_db(""):
+            if not create_db(''):
                 raise AutosubmitCritical("Failed to create Postgres database", 7004)
         return True
 
