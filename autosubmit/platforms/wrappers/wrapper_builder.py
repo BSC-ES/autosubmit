@@ -19,8 +19,6 @@ import random
 import string
 import textwrap
 
-from typing import List
-
 
 class WrapperDirector:
     """
@@ -63,15 +61,24 @@ class WrapperBuilder(object):
         self.machinefiles_name = ''
         self.machinefiles_indent = 0
         self.exit_thread = ''
+        self.fail_count = kwargs.get('fail_count', 0)
+
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
         self.working_dir = kwargs.get('working_dir', '')
 
+        self.name = kwargs['name']
+
     def build_header(self):
-        return textwrap.dedent(self.header_directive) + self.build_imports()
+        return textwrap.dedent(self.header_directive) + self.build_imports() + self.build_wrapper_stat()
 
     def build_imports(self) -> str:
-        pass  # pragma: no cover
+        """Return an empty string by default; subclasses may override."""
+        return ""  # pragma: no cover
+
+    def build_wrapper_stat(self) -> str:
+        """Return an empty string by default; subclasses may override."""
+        return ""  # pragma: no cover
 
     def build_job_thread(self):
         pass  # pragma: no cover
@@ -166,18 +173,38 @@ class PythonWrapperBuilder(WrapperBuilder):
         scripts= {str(self.job_scripts)}
         {os.linesep.ljust(13)}""")
 
+    def build_wrapper_stat(self) -> str:
+        """Return a code snippet that records wrapper start time and registers an atexit handler."""
+        return textwrap.dedent(f"""
+        import atexit
+        stat_file = os.path.join(os.getcwd(), f"{self.name}_STAT_{self.fail_count}")
+        with open(stat_file, 'w') as stat:
+            stat.write(f"{{int(time.time())}}\\n")
+
+        def _write_end_stat() -> None:
+            wrapper_failed_file = os.path.join(os.getcwd(), "{self.name}_WRAPPER_FAILED")
+            status = "FAILED" if os.path.exists(wrapper_failed_file) else "COMPLETED"
+            stat_file = os.path.join(os.getcwd(), f"{self.name}_STAT_{self.fail_count}")
+            with open(stat_file, 'a') as stat:
+                stat.write(f"{{int(time.time())}}\\n")
+                stat.write(f"{{status}}\\n")
+
+        atexit.register(_write_end_stat)
+        """)
+
     def build_job_thread(self):
         return textwrap.dedent(f"""
         class JobThread(Thread):
-            def __init__ (self, template, id_run):
+            def __init__(self, template, id_run):
                 Thread.__init__(self)
-                self.template = template
+                self.template = str(template)
                 self.id_run = id_run
-
+                self.fail_count = {self.fail_count}
+                
             def run(self):
                 jobname = self.template.replace('.cmd', '')
-                out = f"{self.working_dir}/{{str(self.template)}}.out.0"
-                err = f"{self.working_dir}/{{str(self.template)}}.err.0"
+                out = f"{self.working_dir}/{{self.template}}.out.{{self.fail_count}}"
+                err = f"{self.working_dir}/{{self.template}}.err.{{self.fail_count}}"
                 template_path = f"{self.working_dir}/{{self.template}}"
                 print(out+"\\n")
                 print(err+"\\n")
@@ -327,18 +354,18 @@ processors_per_node = int(jobs_resources['PROCESSORS_PER_NODE'])
             sequential_threads_launcher += self._indent(textwrap.dedent(f"""
                 if os.path.exists(failed_wrapper):
                     os.remove(os.path.join(os.getcwd(),wrapper_id))
-                    wrapper_failed = os.path.join(os.getcwd(),"WRAPPER_FAILED")
+                    wrapper_failed = os.path.join(os.getcwd(),"{self.name}_WRAPPER_FAILED")
                     open(wrapper_failed, 'w').close()
-                    os._exit(1)
+                    sys.exit(1)
 
             {os.linesep.ljust(13)}"""), 4)
         else:
             sequential_threads_launcher += self._indent(textwrap.dedent(f"""
                 if os.path.exists(failed_wrapper):
                     os.remove(os.path.join(os.getcwd(),wrapper_id))
-                    wrapper_failed = os.path.join(os.getcwd(),"WRAPPER_FAILED")
+                    wrapper_failed = os.path.join(os.getcwd(),"{self.name}_WRAPPER_FAILED")
                     open(wrapper_failed, 'wb').close()
-                    os._exit(1)
+                    sys.exit(1)
 
             {os.linesep.ljust(13)}"""), 4)
         return sequential_threads_launcher
@@ -405,14 +432,16 @@ for i in range(len(pid_list)):
         failed_filename = {jobs_list}[i].replace('.cmd', '_FAILED')
         failed_path = os.path.join(os.getcwd(),failed_filename)
         failed_wrapper = os.path.join(os.getcwd(),wrapper_id)
-        Failed = False
+        exit_code = 0
         if os.path.exists(completed_path):
             print((datetime.now(), "The job ", pid.template," has been COMPLETED"))
         else:
             open(failed_wrapper, 'w').close()
             open(failed_path, 'w').close()
             print((datetime.now(), "The job ", pid.template," has FAILED"))
+            exit_code = 1
                     {os.linesep.ljust(13)}"""), 4)
+        parallel_threads_launcher += self._indent(textwrap.dedent("""exit(exit_code)\n"""), 0)
 
         return parallel_threads_launcher
 
@@ -472,7 +501,7 @@ for i in range(len(pid_list)):
 
 class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
 
-    def build_sequential_threads_launcher(self, jobs_list: List[str], thread: str, footer: bool = True) -> str:
+    def build_sequential_threads_launcher(self, jobs_list: list[str], thread: str, footer: bool = True) -> str:
         """
         Builds a part of the vertical wrapper cmd launcher script.
         This script writes the start and finish time of each inner_job.
@@ -514,14 +543,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 failed_path = os.path.join(os.getcwd(), failed_filename)
                 failed_wrapper = os.path.join(os.getcwd(), wrapper_id)
                 finish = int(time.time())
-                stat_filename = {jobs_list}[i].replace(".cmd", f"_STAT_{{fail_count}}")
-                stat_path_tmp = os.path.join(os.getcwd(),f"{{stat_filename}}.tmp")
                 print(f"Completed_file:{{completed_path}}")
-                print(f"Writting:{{stat_path_tmp}}")
-                print(f"[Start:{{start}}, Finish:{{finish}}, Fail_count:{{fail_count}}]")
-                with open(f"{{stat_path_tmp}}", "w") as file:
-                    file.write(f"{{start}}\\n")
-                    file.write(f"{{finish}}\\n")
                 if os.path.exists(completed_path):
                     completed = True
                     print(datetime.now(), "The job ", current.template," has been COMPLETED")
@@ -535,12 +557,6 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
             from pathlib import Path
             fail_count = 0 
             while fail_count <= job_retrials:
-                try:
-                    stat_filename = {jobs_list}[i].replace(".cmd", f"_STAT_{{fail_count}}")
-                    stat_path_tmp = os.path.join(os.getcwd(),f"{{stat_filename}}.tmp")
-                    Path(stat_path_tmp).replace(stat_path_tmp.replace(".tmp",""))
-                except:
-                    print(f"Couldn't write the stat file:{{stat_path_tmp}}")
                 fail_count = fail_count + 1
             if not os.path.exists(completed_path):
                 open(failed_wrapper,'wb').close()
@@ -548,17 +564,17 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
 
             if os.path.exists(failed_wrapper):
                 os.remove(os.path.join(os.getcwd(),wrapper_id))
-                print("WRAPPER_FAILED")
-                wrapper_failed = os.path.join(os.getcwd(),"WRAPPER_FAILED")
+                print("{self.name}_WRAPPER_FAILED")
+                wrapper_failed = os.path.join(os.getcwd(),"{self.name}_WRAPPER_FAILED")
                 open(wrapper_failed, 'wb').close()
-                os._exit(1)
+                sys.exit(1)
         {os.linesep.ljust(13)}"""), 4)
         return sequential_threads_launcher
 
     def build_job_thread(self):  # fastlook
         return textwrap.dedent(f"""
         class JobThread(Thread):
-            def __init__ (self, template, id_run, retrials, fail_count):
+            def __init__(self, template, id_run, retrials, fail_count):
                 Thread.__init__(self)
                 self.template = template
                 self.id_run = id_run
@@ -566,6 +582,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 self.fail_count = fail_count
 
             def run(self):
+                import subprocess
                 print("\\n")
                 jobname = self.template.replace('.cmd', '')
                 out = str(self.template) + ".out." + str(self.fail_count)
@@ -573,16 +590,28 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 out_path = os.path.join(os.getcwd(), out)
                 err_path = os.path.join(os.getcwd(), err)
                 template_path = os.path.join(os.getcwd(), self.template)
-                command = f"chmod +x {{template_path}}; timeout {str(self.wallclock_by_level)} {{template_path}} > {{out_path}} 2> {{err_path}}"
-                print(command)
-                getstatusoutput(command)
+                with open(template_path, 'r') as file:
+                    filedata = file.read()
+                print(f"Running job {{self.template}} with fail count {{self.fail_count}}")
+                if self.fail_count > 0:
+                    filedata = filedata.replace('_STAT_0', f'_STAT_{{self.fail_count}}')
+                print(f"timeout {str(self.wallclock_by_level)} bash -s < <filedata> > {{out_path}} 2> {{err_path}}")
+                with open(out_path, 'w') as out_f, open(err_path, 'w') as err_f:
+                    proc = subprocess.run(
+                        ['timeout', '{str(self.wallclock_by_level)}', 'bash', '-s'],
+                        input=filedata,
+                        stdout=out_f,
+                        stderr=err_f,
+                        text=True,
+                    )
+                (self.status) = (proc.returncode, '')
 
 
 
         {os.linesep.ljust(13)}""")
 
     def build_main(self):
-        self.exit_thread = "os._exit(1)"
+        self.exit_thread = "sys.exit(1)"
         return self.build_sequential_threads_launcher("scripts", "JobThread(scripts[i], i, retrials, fail_count)")
 
 
@@ -600,7 +629,7 @@ class PythonVerticalHorizontalWrapperBuilder(PythonWrapperBuilder):
     def build_joblist_thread(self):
         return textwrap.dedent(f"""
         class JobListThread(Thread):
-            def __init__ (self, jobs_list, id_run):
+            def __init__(self, jobs_list, id_run):
                 Thread.__init__(self)
                 self.jobs_list = jobs_list
                 self.id_run = id_run
@@ -661,7 +690,7 @@ for i in range(len(pid_list)):
     def build_joblist_thread(self):
         return textwrap.dedent(f"""
         class JobListThread(Thread):
-            def __init__ (self, jobs_list, id_run, all_cores):
+            def __init__(self, jobs_list, id_run, all_cores):
                 Thread.__init__(self)
                 self.jobs_list = jobs_list
                 self.id_run = id_run
@@ -674,7 +703,7 @@ for i in range(len(pid_list)):
 
     def build_main(self):
         nodes_list = self.build_nodes_list()
-        self.exit_thread = "os._exit(1)"
+        self.exit_thread = "sys.exit(1)"
         joblist_thread = self.build_joblist_thread()
         threads_launcher = self.build_sequential_threads_launcher("scripts",
                                                                   "JobListThread(scripts[i], i*(len(scripts[i])), "
@@ -686,6 +715,23 @@ class BashWrapperBuilder(WrapperBuilder):
 
     def build_imports(self):
         return ""
+
+    def build_wrapper_stat(self) -> str:
+        """Return bash code that records wrapper start/end time and exit status."""
+        return textwrap.dedent(f"""
+        _wrapper_stat_file="$(pwd)/{self.name}_STAT_{self.fail_count}"
+        date +%s > "$_wrapper_stat_file"
+        _write_wrapper_stat() {{
+            if [ $? -eq 0 ]; then
+                _wrapper_exit_status="COMPLETED"
+            else
+                _wrapper_exit_status="FAILED"
+            fi
+            date +%s >> "$_wrapper_stat_file"
+            echo "$_wrapper_exit_status" >> "$_wrapper_stat_file"
+        }}
+        trap _write_wrapper_stat EXIT
+        """)
 
     def build_main(self):
         return textwrap.dedent(f"""
@@ -756,8 +802,9 @@ class BashHorizontalWrapperBuilder(BashWrapperBuilder):
 # SRUN CLASSES
 class SrunWrapperBuilder(WrapperBuilder):
 
-    def build_imports(self):
-        pass
+    def build_imports(self) -> str:
+        """Return an empty string; srun wrappers have no Python imports."""
+        return ""
 
     # hybrids
     def build_joblist_thread(self):

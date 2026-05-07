@@ -24,7 +24,6 @@ import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import AutosubmitCritical
 from test.unit.conftest import AutosubmitConfigFactory
 
 
@@ -65,14 +64,6 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     assert new_yaml_file.stat().st_size > 0
 
 
-def test_pkl_fix_postgres(monkeypatch, autosubmit):
-    """Test that trying to fix the pkl when using Postgres results in an error."""
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
-
-    with pytest.raises(AutosubmitCritical):
-        autosubmit.pkl_fix('a000')
-
-
 def test_database_backup_postgres(monkeypatch, autosubmit, mocker):
     """Test that trying to back up a Postgres DB results in just a log message of WIP."""
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
@@ -99,9 +90,9 @@ def test_iteration_info(completed, failed, mocker):
     """
     total_jobs = completed + failed
     job_list = mocker.MagicMock()
-    job_list.get_job_list.return_value = list(range(total_jobs))
-    job_list.get_completed.return_value = list(range(completed))
-    job_list.get_failed.return_value = list(range(failed))
+    job_list.total_size = total_jobs
+    job_list.completed_size = completed
+    job_list.failed_size = failed
 
     expected_safety_time = 42
     expected_default_retries = 22
@@ -116,15 +107,15 @@ def test_iteration_info(completed, failed, mocker):
 
     total, safety_time, default_retries, check_wrapper_time = Autosubmit.get_iteration_info(as_conf, job_list)
 
+    assert total == total_jobs
     assert expected_default_retries == default_retries
     assert expected_check_wrapper_time == check_wrapper_time
     assert expected_safety_time == safety_time
 
-    log_info_called = mocked_log.info.call_count
-    expected_info_called = 2 if failed > 0 else 1
-    assert log_info_called == expected_info_called
+    assert mocked_log.info.call_count == 1
 
     if failed > 0:
-        failed_text = "job has" if failed == 1 else "jobs have"
-        assert failed_text in mocked_log.info.call_args_list[1][0][0]
-
+        assert mocked_log.warning.call_count == 1
+        assert "jobs have failed" in mocked_log.warning.call_args_list[0][0][0]
+    else:
+        assert mocked_log.warning.call_count == 0

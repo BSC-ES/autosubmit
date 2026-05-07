@@ -14,8 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
-
 import datetime
 import json
 import locale
@@ -30,7 +28,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Optional, TYPE_CHECKING
 
-from bscearth.utils.date import sum_str_hours
+from bscearth.utils.date import sum_str_hours, date2str
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -76,7 +74,8 @@ class JobPackageBase(object):
         self.x11_options = jobs[0].x11_options
         # Scheduler manages the timeout, this is for platforms without scheduler
         # Wrappers are only allowed within a scheduler and timeout is calculated differently there
-        self.timeout = max(job.wallclock_in_seconds for job in jobs) if jobs[0].platform.type in ["PS", "LOCAL"] else None
+        self.timeout = max(job.wallclock_in_seconds for job in jobs) if jobs[0].platform.type in ["PS",
+                                                                                                  "LOCAL"] else None
         self.x11 = jobs[0].x11
         self.het = dict()
         self._num_processors = '0'
@@ -137,7 +136,8 @@ class JobPackageBase(object):
         :return: None.
         """
 
-        if not configuration.get_project_type() or (configuration.get_project_type() and str(configuration.get_project_type()).lower() == "none"):
+        if not configuration.get_project_type() or (
+                configuration.get_project_type() and str(configuration.get_project_type()).lower() == "none"):
             return
 
         Log.debug("Checking job files existence")
@@ -153,8 +153,10 @@ class JobPackageBase(object):
             for additional_file in job.additional_files:
                 if not additional_file or not (project_dir / additional_file).exists():
                     if not only_generate:
-                        raise AutosubmitCritical(f"[section:{job.section}]: Additional file:{additional_file} does not exists", 7014)
-                    Log.warning(f"[section:{job.section}]: Additional file:{additional_file} does not exists, skipping check")
+                        raise AutosubmitCritical(
+                            f"[section:{job.section}]: Additional file:{additional_file} does not exists", 7014)
+                    Log.warning(
+                        f"[section:{job.section}]: Additional file:{additional_file} does not exists, skipping check")
 
     def build_scripts(self, configuration: 'AutosubmitConfig') -> None:
         """Submit jobs one by one without using threads.
@@ -183,18 +185,13 @@ class JobPackageBase(object):
 
     def _clean_previous_run(self):
         """ Clean previous run logs on local and platform. """
+        self._delete_previous_run_files()
         for job in self.jobs:
-            # This sets the log names but also the submission time for non-vertical wrapped jobs.
             job.update_local_logs()
-            # Clean previous run logs on local
-            log_completed = Path(f"{self._tmp_path}/{job.name}_COMPLETED'")
-            log_stat = Path(f"{self._tmp_path}/{job.name}_STAT'")
-            if log_completed.exists():
-                log_completed.unlink(missing_ok=True)
-            if log_stat.exists():
-                log_stat.unlink(missing_ok=True)
-            self.platform.remove_stat_file(job)
-            self.platform.remove_completed_file(job.name)
+
+    def _delete_previous_run_files(self):
+        self.platform.delete_previous_run_files_by_job_names([job.name for job in self.jobs if job.fail_count == 0])
+        self.platform.delete_previous_stat_files_by_job_names([job.name for job in self.jobs if job.fail_count == 0])
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
         raise Exception('Not implemented')
@@ -204,10 +201,12 @@ class JobPackageBase(object):
 
     def process_jobs_to_submit(self, job_id: str) -> None:
         for job in self.jobs:
-            job.id = str(job_id)
-            job.status = Status.SUBMITTED
-            Log.result(
-                f"Job: {job.name} submitted with job_id: {job.id.strip()} and workflow commit: {job.workflow_commit}")
+            job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
+            job.id = job_id
+            if job.status == Status.READY:
+                job.status = Status.SUBMITTED
+                Log.result(
+                    f"Job: {job.name} submitted with job_id: {str(job.id)} and workflow commit: {job.workflow_commit}")
 
 
 class JobPackageSimple(JobPackageBase):
@@ -453,7 +452,8 @@ class JobPackageThread(JobPackageBase):
                 lang = 'UTF-8'
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content.encode(lang))
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content.encode(lang))
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 
@@ -537,7 +537,8 @@ class JobPackageThreadWrapped(JobPackageThread):
     def _create_common_script(self, filename: str = ""):
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content)
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content)
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 
@@ -648,7 +649,8 @@ class JobPackageHorizontal(JobPackageThread):
     """
 
     def __init__(self, jobs: list[Job], dependency: Optional[str] = None, jobs_resources: Optional[dict] = None,
-                 method: str = 'ASThread', configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS"):
+                 method: str = 'ASThread', configuration: Optional['AutosubmitConfig'] = None,
+                 wrapper_section="WRAPPERS"):
         super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources, configuration=configuration,
                                                    wrapper_section=wrapper_section)
         self.method = method

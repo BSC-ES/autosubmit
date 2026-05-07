@@ -44,11 +44,34 @@ class PsPlatform(ParamikoPlatform):
         self.update_cmds()
         self.has_scheduler = False
 
-    def get_check_all_jobs_cmd(self, jobs_id):
-        pass  # pragma: no cover
+    def get_check_all_jobs_cmd(self, jobs_id: str) -> str:
+        """Return a shell command that checks the status of all given process IDs.
 
-    def parse_all_jobs_output(self, output, job_id):
-        pass  # pragma: no cover
+        For each PID, the command outputs a line ``<pid> <status>`` where status
+        is ``0`` if the process is running (non-zombie) and ``1`` otherwise.
+
+        :param jobs_id: Comma-separated list of process IDs to check.
+        :return: Shell command outputting ``<pid> <status>`` per line.
+        """
+        pids = jobs_id.replace(',', ' ')
+        return (
+            f"for pid in {pids}; do "
+            f"echo \"$pid $(ps -o stat= -p $pid 2>/dev/null | grep -qv '^Z' && echo 0 || echo 1)\"; "
+            f"done"
+        )
+
+    def parse_all_jobs_output(self, output: str, job_id: int) -> str:
+        """Parse process-status output for the given job ID.
+
+        :param output: Output of :meth:`get_check_all_jobs_cmd`.
+        :param job_id: Process ID to look up.
+        :return: ``'0'`` if running, ``'1'`` if not running or not found.
+        """
+        for line in output.splitlines():
+            parts = line.split()
+            if parts and parts[0] == str(job_id):
+                return parts[1] if len(parts) > 1 else '1'
+        return '1'
 
     def parse_queue_reason(self, output, job_id):
         pass  # pragma: no cover
@@ -68,7 +91,7 @@ class PsPlatform(ParamikoPlatform):
         self.remove_checker = "rm -rf " + os.path.join(self.scratch, self.project_dir, self.user,
                                                        "ps_permission_checker_azxbyc")
         self.mkdir_checker = "mkdir -p " + os.path.join(self.scratch, self.project_dir, self.user,
-                                                        "ps_permission_checker_azxbyc")
+                                                         "ps_permission_checker_azxbyc")
 
 
     def get_remote_log_dir(self):
@@ -91,10 +114,6 @@ class PsPlatform(ParamikoPlatform):
 
     def get_check_job_cmd(self, job_id):
         return self.get_pscall(job_id)
-
-    def check_all_jobs(self, job_list, as_conf, retries=5):
-        for job, prev_status in job_list:
-            self.check_job(job)
 
     def check_remote_permissions(self) -> bool:
         try:

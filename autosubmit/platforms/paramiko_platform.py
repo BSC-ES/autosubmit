@@ -26,16 +26,16 @@ import select
 import socket
 import sys
 import threading
-import time
 from contextlib import suppress
 from io import BufferedReader
 from pathlib import Path
 from threading import Thread
-from time import sleep
+from time import sleep, time
 from typing import Optional, Union, TYPE_CHECKING, Any
 
 import Xlib.support.connect as xlib_connect
 import paramiko
+from bscearth.utils.date import date2str
 from paramiko import ProxyCommand
 from paramiko.agent import Agent
 from paramiko.ssh_exception import (SSHException)
@@ -315,7 +315,6 @@ class ParamikoPlatform(Platform):
             return False
         return True
 
-
     def write_jobid(self, jobid: str, complete_path: str) -> None:
         try:
             lang = locale.getlocale()[1]
@@ -417,7 +416,8 @@ class ParamikoPlatform(Platform):
                 self.transport.start_client()
 
                 try:
-                    self.transport.auth_publickey(self.user, paramiko.Ed25519Key.from_private_key_file(self._host_config_id[0]))
+                    self.transport.auth_publickey(self.user,
+                                                  paramiko.Ed25519Key.from_private_key_file(self._host_config_id[0]))
                     self.transport.auth_interactive_dumb(self.user)
                     self.transport.open_session()
                 except Exception as e:
@@ -493,6 +493,14 @@ class ParamikoPlatform(Platform):
         return ""
 
     def send_file(self, filename, check=True) -> bool:
+        """
+        Sends a local file to the platform
+        :param check:
+        :param filename: name of the file to send
+        :type filename: str
+        """
+        local_path = None
+        remote_path = None
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
@@ -827,7 +835,8 @@ class ParamikoPlatform(Platform):
     def job_is_over_wallclock(self, job, job_status, cancel=False):
         if job.is_over_wallclock():
             try:
-                job_status = job.check_completion(over_wallclock=True)
+                job.check_completion()
+                job_status = job.new_status
             except Exception as e:
                 job_status = Status.FAILED
                 Log.debug(f"Unexpected error checking completed files for a job over wallclock: {str(e)}")
@@ -858,15 +867,38 @@ class ParamikoPlatform(Platform):
             cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {pattern} \\) -type f"
             self.send_command(cmd)
             output = self.get_ssh_output()
+            Log.debug(f"Command to get completed job names: {cmd}\nOutput: {output}")
             completed_files = [f for f in output.strip().split("\n") if f]
             final_job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
         return final_job_names
 
-    def delete_failed_and_completed_names(self, job_names: list[str]) -> None:
-        """Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+    def get_failed_job_names(self, job_names_provided: Optional[list[str]] = None) -> list[str]:
+        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
 
-        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
-        :type job_names: List[str]
+        :param job_names_provided: If provided, filters the results to include only these job names.
+        :type job_names_provided: Optional[List[str]]
+        :return: List of job names with COMPLETED files.
+        :rtype: List[str]
+        """
+        job_names = []
+        # TODO: from the rebase make it the same as completed but with failed, maybe merge into one
+        if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
+            if not job_names_provided:
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_FAILED' -type f"
+            else:
+                patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names_provided])
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+            self.send_command(cmd)
+            output = self.get_ssh_output()
+            completed_files = output.strip().split('\n') if output else []
+            job_names = [Path(file).name.replace('_FAILED', '') for file in completed_files]
+        return job_names
+
+    def delete_previous_run_files_by_job_names(self, job_names: list[str]) -> None:
+        """Deletes the COMPLETED, FAILED for the given job names.
+
+        :param job_names: List of job names whose COMPLETED, FAILED, and STAT files should be deleted.
+        :type job_names: list[str]
         """
         if job_names:
             if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
@@ -874,114 +906,79 @@ class ParamikoPlatform(Platform):
                 cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( -name {job_name_str} \\) -type f -delete"
                 self.send_command(cmd)
 
-    def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
-        """Checks job running status
+    def delete_previous_stat_files_by_job_names(self, job_names: list[str]) -> None:
+        """Deletes all previous STAT files for the given job names.
 
-        :param is_wrapper:
-        :param submit_hold_check:
-        :param retries: retries
-        :param job: job
-        :type job: autosubmit.job.job.Job
-        :param default_status: default status if job is not found
-        :type job: class(job)
-        :param default_status: status to assign if it can be retrieved from the platform
-        :type default_status: autosubmit.job.job_common.Status
-        :return: current job status
-        :rtype: autosubmit.job.job_common.Status
+        Removes ``{name}_STAT_*`` files from the remote log directory for each job name provided.
 
+        :param job_names: List of job names whose STAT files should be deleted.
+        :type job_names: list[str]
         """
-        for event in job.platform.worker_events:  # keep alive log retrieval workers.
-            if not event.is_set():
-                event.set()
-        job_id = job.id
-        job_status = Status.UNKNOWN
-        if type(job_id) is not int and type(job_id) is not str:
-            Log.error(
-                f'check_job() The job id ({job_id}) is not an integer neither a string.')
-            job.new_status = job_status
-        sleep_time = 5
-        self.send_command(self.get_check_job_cmd(job_id))
-        while self.get_ssh_output().strip(" ") == "" and retries > 0:
-            retries = retries - 1
-            Log.debug(f'Retrying check job command: {self.get_check_job_cmd(job_id)}')
-            Log.debug(f'retries left {retries}')
-            Log.debug(f'Will be retrying in {sleep_time} seconds')
-            sleep(sleep_time)
-            sleep_time = sleep_time + 5
-            self.send_command(self.get_check_job_cmd(job_id))
-        if retries >= 0:
-            Log.debug(f'Successful check job command: {self.get_check_job_cmd(job_id)}')
-            job_status = self.parse_job_output(
-                self.get_ssh_output()).strip("\n")
-            # URi: define status list in HPC Queue Class
-            if job_status in self.job_status['COMPLETED'] or retries == 0:
-                # The Local platform has only 0 or 1, so it necessary to look for the completed file.
-                if self.type == "local":
-                    if not job.is_wrapper:
-                        # Not sure why it is called over_wallclock but is the only way to return a value
-                        job_status = job.check_completion(over_wallclock=True)
-                    else:
-                        # wrapper has a different file name
-                        if Path(f"{self.remote_log_dir}/WRAPPER_FAILED").exists():
-                            job_status = Status.FAILED
-                        else:
-                            job_status = Status.COMPLETED
-                else:
-                    job_status = Status.COMPLETED
+        if job_names:
+            if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
+                stat_name_str = ' -o '.join([f"-name '{name}_STAT_*'" for name in job_names])
+                stat_cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {stat_name_str} \\) -type f -delete"
+                self.send_command(stat_cmd)
 
-            elif job_status in self.job_status['RUNNING']:
-                job_status = Status.RUNNING
-                if not is_wrapper:
-                    if job.status != Status.RUNNING:
-                        job.start_time = datetime.datetime.now()  # URi: start time
-                    if job.start_time is not None and str(job.wrapper_type).lower() == "none":
-                        wallclock = job.wallclock
-                        if job.wallclock == "00:00" or job.wallclock is None:
-                            wallclock = job.platform.max_wallclock
-                        if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
-                            job_status = self.job_is_over_wallclock(job, job_status, cancel=False)
-            elif job_status in self.job_status['QUEUING'] and (not job.hold or job.hold.lower() != "true"):
-                job_status = Status.QUEUING
-            elif job_status in self.job_status['QUEUING'] and (job.hold or job.hold.lower() == "true"):
-                job_status = Status.HELD
-            elif job_status in self.job_status['FAILED']:
-                job_status = Status.FAILED
-            else:
-                job_status = Status.UNKNOWN
+    @staticmethod
+    def _resolve_status(last_line: str) -> "Status":
+        """Resolves the job status based on the last line of the STAT file.
+        :param last_line: The last line read from the STAT file.
+        :return: The resolved job status as a Status enum member.
+        """
+
+        if last_line.isdigit():
+            return Status.RUNNING
+        elif last_line == "COMPLETED":
+            return Status.COMPLETED
+        elif last_line == "FAILED":
+            return Status.FAILED
         else:
-            Log.error(
-                f" check_job(), job is not on the queue system. Output was: {self.get_check_job_cmd(job_id)}")
-            job_status = Status.UNKNOWN
-            Log.error(
-                f'check_job() The job id ({job_id}) status is {job_status}.')
+            return Status.QUEUING
 
-        if job_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
-            job.updated_log = False
-            if not job.start_time_timestamp:  # QUEUING -> COMPLETED ( under safetytime )
-                job.start_time_timestamp = int(time.time())
-            # Estimate Time for failed jobs, as they won't have the timestamp in the stat file
-            job.finish_time_timestamp = int(time.time())
-        if job_status in [Status.RUNNING, Status.COMPLETED] and job.new_status in [Status.QUEUING, Status.SUBMITTED]:
-            # backup for start time in case that the stat file is not found
-            job.start_time_timestamp = int(time.time())
-
-        if submit_hold_check:
-            return job_status
-        else:
-            job.new_status = job_status
-
-    def _check_jobid_in_queue(self, ssh_output, job_list_cmd):
+    def confirm_done_jobs_via_stat(self, job_list: list) -> dict[str, "Status"]:
+        """Checks the STAT files for the given jobs to confirm their completion status.
+            This method retrieves the last line of each STAT file corresponding to the jobs in the job_list and resolves their status using the _resolve_status method.
+        :param job_list: A list of Job objects for which to check the STAT files.
+        :return: A dictionary mapping job names to their resolved Status.
         """
+        if not job_list:
+            return {}
 
-        :param ssh_output: ssh output
-        :type ssh_output: str
+        file_to_job: dict[str, str] = {
+            str(Path(self.remote_log_dir) / f"{job.name}_STAT_{job.fail_count}"): job.name
+            for job in job_list
+        }
+        result: dict[str, str] = {job.name: "" for job in job_list}
+
+        paths_str = " ".join(f'"{p}"' for p in file_to_job)
+        cmd = f'for f in {paths_str}; do res=$(awk \'NF{{last=$0}} END{{print last}}\' "$f" 2>/dev/null); printf "%s: \\"%s\\"\\n" "$f" "${{res:-None}}"; done'
+        self.send_command(cmd, ignore_log=True)
+
+        output = self._ssh_output
+        for line in output.splitlines():
+            current_path = line.split(":")[0].strip()
+            job: "Job" = file_to_job.get(current_path)
+            status = line.split(":")[1].strip().strip('"')
+            result[job] = self._resolve_status(status)
+
+        return result
+
+    def _check_jobid_in_queue(self, ssh_output: str, job_list_cmd: str) -> bool:
+        """Return True if all job IDs in job_list_cmd appear in ssh_output.
+
+        :param ssh_output: Output from the remote queue command; may be None.
+        :param job_list_cmd: Comma-separated string of job IDs with a trailing comma.
+        :return: True if every job ID is found in ssh_output, False otherwise.
         """
+        if not ssh_output:
+            return False
         for job in job_list_cmd[:-1].split(','):
             if job not in ssh_output:
                 return False
         return True
 
-    def parse_job_list(self, job_list: list[list['Job']]) -> str:
+    def parse_job_list(self, job_list: list) -> str:
         """Convert a list of job_list to job_list_cmd
 
         If a job in the provided list is missing its ID, this function will initialize
@@ -990,47 +987,41 @@ class ParamikoPlatform(Platform):
         :param job_list: A list of jobs.
         :return: A comma-separated string containing the job IDs.
         """
-        job_list_cmd: list[str] = []
-        # TODO: second item in tuple, _, is a ``job_prev_status``? What for?
-        for job, _ in job_list:
-            if job.id is None:
-                job_str = "0"
-            else:
-                job_str = str(job.id)
-            job_list_cmd.append(job_str)
+        job_list_cmd = ""
+        if job_list:
+            for job in job_list:
+                job_list_cmd += str(job.id) + ","
+            if job_list_cmd[-1] == ",":
+                job_list_cmd = job_list_cmd[:-1]
+        return job_list_cmd
 
-        return ','.join(job_list_cmd)
-
-    def check_all_jobs(self, job_list: list[list['Job']], as_conf, retries=5):
-        """Checks jobs running status
-
+    def check_all_jobs(self, job_list: list["Job"], as_conf, retries=5):
+        """Checks jobs running status and updates job.new_status.
         :param job_list: list of jobs
         :type job_list: list
         :param as_conf: config
         :type as_conf: as_conf
         :param retries: retries
         :type retries: int
-        :return: current job status
-        :rtype: autosubmit.job.job_common.Status
         """
-        as_conf.get_copy_remote_logs()
         job_list_cmd = self.parse_job_list(job_list)
         cmd = self.get_check_all_jobs_cmd(job_list_cmd)
         sleep_time = 5
-        slurm_error = False
+        remote_error = False
         e_msg = ""
+
         try:
             self.send_command(cmd)
         except AutosubmitError as e:
             e_msg = e.error_message
-            slurm_error = True
-        if not slurm_error:
+            remote_error = True
+        if not remote_error:
             while not self._check_jobid_in_queue(self.get_ssh_output(), job_list_cmd) and retries > 0:
                 try:
                     self.send_command(cmd)
                 except AutosubmitError as e:
                     e_msg = e.error_message
-                    slurm_error = True
+                    remote_error = True
                     break
                 Log.debug(f'Retrying check job command: {cmd}')
                 Log.debug(f'retries left {retries}')
@@ -1039,68 +1030,139 @@ class ParamikoPlatform(Platform):
                 sleep(sleep_time)
                 sleep_time = sleep_time + 5
 
-        job_list_status = self.get_ssh_output()
-        if retries >= 0:
-            Log.debug('Successful check job command')
-            in_queue_jobs = []
-            list_queue_jobid = ""
-            for job, job_prev_status in job_list:
-                if not slurm_error:
-                    job_id = job.id
-                    job_status = self.parse_all_jobs_output(job_list_status, job_id)
-                    while len(job_status) <= 0 <= retries:
+            # Abort early: a retry inside the while loop raised an SSH error.
+            if remote_error:
+                raise AutosubmitError(e_msg, 6000)
+
+            # This only indicates that the scheduler has released the job resources.
+            job_list_status = self.get_ssh_output()
+            # Ideally, we should rely in stat files, as it indicates that every IO file has been flushed, the data is on the login node and the job is really finished.
+            stat_statuses = self.confirm_done_jobs_via_stat(job_list)
+
+            if retries >= 0:
+                Log.debug('Successful check job command')
+                for job in job_list:
+                    try:
+                        job_id = int(job.id)
+                    except (TypeError, ValueError) as ve:
+                        raise AutosubmitCritical(
+                            f"Job ID {job.id} for job {job.name} is not an integer, cannot check job status", 7050,
+                            str(ve))
+                    scheduler_job_status = self.parse_all_jobs_output(job_list_status, job_id)
+                    while len(scheduler_job_status) <= 0 <= retries:
                         retries -= 1
                         self.send_command(cmd)
                         job_list_status = self.get_ssh_output()
-                        job_status = self.parse_all_jobs_output(job_list_status, job_id)
-                        if len(job_status) <= 0:
+                        scheduler_job_status = self.parse_all_jobs_output(job_list_status, job_id)
+                        if len(scheduler_job_status) <= 0:
                             Log.debug(f'Retrying check job command: {cmd}')
                             Log.debug(f'retries left {retries}')
                             Log.debug(f'Will be retrying in {sleep_time} seconds')
                             sleep(sleep_time)
                             sleep_time = sleep_time + 5
-                    # URi: define status list in HPC Queue Class
-                else:
-                    job_status = job.status
-                if job.status != Status.RUNNING:
-                    job.start_time = datetime.datetime.now()  # URi: start time
-                if job.start_time is not None and str(job.wrapper_type).lower() == "none":
-                    wallclock = job.wallclock
-                    if job.wallclock == "00:00":
-                        wallclock = job.platform.max_wallclock
-                    if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
-                        job_status = self.job_is_over_wallclock(job, job_status, cancel=True)
-                if job_status in self.job_status['COMPLETED']:
-                    job_status = Status.COMPLETED
-                elif job_status in self.job_status['RUNNING']:
-                    job_status = Status.RUNNING
-                elif job_status in self.job_status['QUEUING']:
-                    if job.hold:
-                        job_status = Status.HELD  # release?
+
+                    # check real_status of scheduler
+                    if scheduler_job_status in self.job_status['RUNNING']:
+                        scheduler_job_status = Status.RUNNING
+                    elif scheduler_job_status in self.job_status['QUEUING']:
+                        scheduler_job_status = Status.QUEUING
+                    elif scheduler_job_status in self.job_status['COMPLETED']:
+                        scheduler_job_status = Status.COMPLETED
+                    elif scheduler_job_status in self.job_status['FAILED']:
+                        scheduler_job_status = Status.FAILED
                     else:
-                        job_status = Status.QUEUING
-                    list_queue_jobid += str(job.id) + ','
-                    in_queue_jobs.append(job)
-                elif job_status in self.job_status['FAILED']:
-                    job_status = Status.FAILED
-                elif retries == 0:
-                    job_status = Status.COMPLETED
-                    job.update_status(as_conf)
-                else:
-                    job_status = Status.UNKNOWN
-                    Log.error(
-                        f'check_job() The job id ({job.id}) status is {job_status}.')
+                        scheduler_job_status = Status.UNKNOWN
+
+                    stat_status = stat_statuses.get(job.name, Status.UNKNOWN)
+
+                    if stat_status in [Status.COMPLETED, Status.FAILED, Status.RUNNING]:
+                        job_status = stat_status
+                    # Safeguard 1 to avoid infinite loops when there is no STAT file for unknown reasons and the scheduler says that the job is finished.
+                    elif scheduler_job_status in [Status.COMPLETED, Status.FAILED]:
+                        if not job.finished_time:
+                            job.finished_time = time()
+                        elapsed = time() - job.finished_time
+                        if elapsed >= self._io_safe_wait:
+                            job.finished_time = None
+                            job_status = scheduler_job_status
+                            Log.warning(
+                                f"Couldn't fetch status from STAT file for job {job.name} after waiting {elapsed} seconds since job finished. "
+                                f"Falling back to scheduler status {scheduler_job_status} for final job status.")
+                        else:
+                            # safe_wait for IO operations (flushing logs, STAT file creation...)
+                            job_status = Status.RUNNING
+                    else:
+                        job_status = scheduler_job_status
+
+                    job.new_status = job_status
+
+            # check and set if there is any_job without timestamp
+            self.set_start_time_from_remote_stat_file([job for job in job_list if
+                                                       not job.start_time_timestamp and job.new_status in [
+                                                           Status.RUNNING, Status.COMPLETED, Status.FAILED]])
+            # Safeguard 3: Is over_wallclock?
+            for job in [job for job in job_list if
+                        job.new_status == Status.RUNNING and str(job.wrapper_type).lower() == "none"]:
+                job_status = job.new_status
+                wallclock = job.wallclock
+                if wallclock == "00:00":
+                    wallclock = job.platform.max_wallclock
+                if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
+                    job_status = self.job_is_over_wallclock(job, job_status, cancel=True)
                 job.new_status = job_status
-            self.get_queue_status(in_queue_jobs, list_queue_jobid, as_conf)
-        else:
-            for job, job_prev_status in job_list:
-                job_status = Status.UNKNOWN
-                Log.warning(f'check_job() The job id ({job.id}) from platform {self.name} has '
-                            f'an status of {job_status}.')
-            raise AutosubmitError("Some Jobs are in Unknown status", 6008)
-            # job.new_status=job_status
-        if slurm_error:
+        elif remote_error:
             raise AutosubmitError(e_msg, 6000)
+        else:
+            raise AutosubmitError("Failed to check job status after multiple retries", 6000)
+
+    def set_start_time_from_remote_stat_file(self, job_list: list["Job"]) -> None:
+        """Set the start_time_timestamp for each job from the first line of its remote STAT file.
+
+        For each job, reads the first line of ``{job.name}_STAT_{job.fail_count}`` in the
+        remote log directory. That line contains the job start time as a Unix epoch float.
+        If the file does not exist or the value cannot be parsed, a warning is logged and
+        the current datetime is used as a fallback.
+
+        :param job_list: Jobs whose start times should be filled from remote STAT files.
+        :type job_list: list[Job]
+        """
+        if not job_list:
+            return
+
+        file_to_job: dict[str, "Job"] = {
+            str(Path(self.remote_log_dir) / f"{job.name}_STAT_{job.fail_count}"): job
+            for job in job_list
+        }
+
+        paths_str = " ".join(f'"{p}"' for p in file_to_job)
+        cmd = (
+            f'for f in {paths_str}; do '
+            f'res=$(head -1 "$f" 2>/dev/null); '
+            f'printf "%s: \\"%s\\"\\n" "$f" "${{res:-None}}"; '
+            f'done'
+        )
+        self.send_command(cmd, ignore_log=True)
+        output = self._ssh_output
+
+        for line in output.splitlines():
+            parts = line.split(":", 1)
+            if len(parts) != 2:
+                continue
+            current_path = parts[0].strip()
+            raw_value = parts[1].strip().strip('"')
+            job = file_to_job.get(current_path)
+            if not job:
+                continue
+            try:
+                start_epoch = float(raw_value)
+                job.start_time_timestamp = datetime.datetime.fromtimestamp(start_epoch).strftime("%Y%m%d%H%M%S")
+            except (ValueError, OSError):
+                Log.warning(
+                    f"Could not parse start time from STAT file for job {job.name}. "
+                    f"Using current datetime."
+                )
+                job.start_time_timestamp = date2str(datetime.datetime.now(), 'S')
+
 
     def get_job_id_by_job_name(self, job_name, retries=2):
         """Get job id by job name
@@ -1126,17 +1188,6 @@ class ParamikoPlatform(Platform):
             job_ids = [job_id.split(',')[0] for job_id in job_ids_names]
         return job_ids
 
-    def get_queue_status(self, in_queue_jobs, list_queue_jobid, as_conf):
-        """Get queue status for a list of jobs.
-
-        The job statuses are normally found via a command sent to the remote platform.
-
-        Each ``job`` in ``in_queue_jobs`` must be updated. Implementations may check
-        for the reason for queueing cancellation, or if the job is held, and update
-        the ``job`` status appropriately.
-        """
-        raise NotImplementedError  # pragma: no cover
-
     def get_check_job_cmd(self, job_id: str) -> str:
         """Returns command to check job status on remote platforms.
 
@@ -1159,13 +1210,6 @@ class ParamikoPlatform(Platform):
         """Returns command to get job id by job name on remote platforms
 
         :param job_name:
-        :return: str
-        """
-        return NotImplementedError  # pragma: no cover
-
-    def get_queue_status_cmd(self, job_name):
-        """Returns command to get queue status on remote platforms
-
         :return: str
         """
         return NotImplementedError  # pragma: no cover
@@ -1391,9 +1435,10 @@ class ParamikoPlatform(Platform):
                 # close all the pseudo files
                 stdout.close()
                 stderr.close()
-
             self._ssh_output = ''.join([s.decode(lang) for s in stdout_chunks if s.decode(lang) != ''])
             self._ssh_output_err = ''.join([s.decode(lang) for s in stderr_readlines if s.decode(lang) != ''])
+            Log.debug(f"send_command() output: {self._ssh_output}")
+            Log.debug(f"send_command() error output: {self._ssh_output_err}")
             self._check_for_unrecoverable_errors()
 
             if not ignore_log and self._ssh_output_err:
@@ -1488,7 +1533,8 @@ class ParamikoPlatform(Platform):
         """
         return f"{pre} {x11_options} {script_name} {post}" if x11_options else f"nohup {pre} {script_name} {post} & echo $!"
 
-    def get_call(self, script_name, timeout: float, export: str, executable: str, x11_options: str, fail_count: int, sub_queue: str, redirect_out_err: bool = False) -> str:
+    def get_call(self, script_name, timeout: float, export: str, executable: str, x11_options: str, fail_count: int,
+                 sub_queue: str, redirect_out_err: bool = False) -> str:
         """Gets execution command for given job. it builds the command to execute the script on the remote platform.
 
         :param script_name: script to run
@@ -1519,7 +1565,8 @@ class ParamikoPlatform(Platform):
         :return: command to check job status script
         :rtype: str
         """
-        return f'nohup kill -0 {job_id} > /dev/null 2>&1; echo $?'
+        # Now it checks if it is a zombie process too
+        return f"ps -o stat= -p {job_id} 2>/dev/null | grep -qv '^Z' && echo 0 || echo 1"
 
     def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
@@ -1821,7 +1868,7 @@ class ParamikoPlatform(Platform):
         """
         jobs_id: list[str] = self.submit_multiple_jobs(scripts_to_submit)
         for jobid_index, package in enumerate(scripts_to_submit.values()):
-            current_package_id = str(jobs_id[jobid_index]).strip()
+            current_package_id = jobs_id[jobid_index]
             package.process_jobs_to_submit(current_package_id)
         self._check_and_cancel_duplicated_job_names(scripts_to_submit)
 

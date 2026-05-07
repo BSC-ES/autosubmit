@@ -108,8 +108,8 @@ class Profiler:
 
     @property
     def stopped(self):
-        """
-        Check if the profiler is in the stopped state.
+        """Check if the profiler is in the stopped state.
+
         :return: True if profiler is stopped, False otherwise.
         :rtype: bool
         """
@@ -139,6 +139,7 @@ class Profiler:
         :rtype: bool
         """
         gc.collect()
+
         self._mem_iteration.append(_get_current_memory())
         self._obj_iteration.append(_get_current_object_count())
 
@@ -154,7 +155,8 @@ class Profiler:
         self._jobs_iteration.append(loaded_jobs)
         self._edges_iteration.append(loaded_edges)
 
-        self._mem_iteration[-1] -= sys.getsizeof(self._mem_iteration) + sys.getsizeof(self._obj_iteration) + sys.getsizeof(self._fd_iteration) + sys.getsizeof(
+        self._mem_iteration[-1] -= sys.getsizeof(self._mem_iteration) + sys.getsizeof(
+            self._obj_iteration) + sys.getsizeof(self._fd_iteration) + sys.getsizeof(
             self._jobs_iteration) + sys.getsizeof(self._edges_iteration) + sys.getsizeof(self._fd_names_iteration)
         if self.max_checkpoints != 0:
             self.checkpoints += 1
@@ -237,7 +239,6 @@ class Profiler:
                     if names not in fd_names:
                         report += f"{current_iter} Closed file descriptor: {names}\n"
 
-
             if i < len(self._trace_stats_by_iter):
                 report += self._format_top_allocations(self._trace_stats_by_iter[i])
         return report
@@ -257,13 +258,15 @@ class Profiler:
             self._obj_by_iter.append(gc.get_objects())
             if len(self._obj_by_iter) >= 2:
                 prev_objs = set(id(obj) for obj in self._obj_by_iter[-2])
-                diff = [tracemalloc.get_object_traceback(obj) for obj in self._obj_by_iter[-1] if id(obj) not in prev_objs]
+                diff = [tracemalloc.get_object_traceback(obj) for obj in self._obj_by_iter[-1] if
+                        id(obj) not in prev_objs]
                 # only unique tracebacks
                 unique_diff = []
                 seen_tracebacks = set()
                 for obj in diff:
                     # get only traces for /home/dbeltran/Autosubmit
-                    if obj and any("Autosubmit" in frame.filename and "profiler.py" not in frame.filename for frame in obj) and obj not in seen_tracebacks:
+                    if obj and any("Autosubmit" in frame.filename and "profiler.py" not in frame.filename for frame in
+                                   obj) and obj not in seen_tracebacks:
                         unique_diff.append(obj)
                         seen_tracebacks.add(obj)
                 self._obj_by_iter.pop(0)
@@ -385,8 +388,7 @@ def _generate_title(title="") -> str:
 
 
 def _get_current_memory() -> int:
-    """
-    Return the current memory consumption of the process in Bytes.
+    """Return the current memory consumption of the process in Bytes.
 
     :return: The current memory used by the process in Bytes.
     :rtype: int
@@ -416,6 +418,7 @@ def _get_current_open_fds() -> int:
     if hasattr(proc, "num_handles"):
         return proc.num_handles()
 
+
 def _get_fd_connection_map(proc: Process) -> dict:
     """Build a map of fd number to a human-readable connection string using psutil.
 
@@ -439,6 +442,7 @@ def _get_fd_connection_map(proc: Process) -> dict:
             else:
                 def _fmt(addr) -> str:
                     return f"{addr.ip}:{addr.port}" if addr else ""
+
                 laddr, raddr = _fmt(conn.laddr), _fmt(conn.raddr)
                 direction = f"{laddr} -> {raddr}" if raddr else laddr
                 status = f" [{conn.status}]" if conn.status else ""

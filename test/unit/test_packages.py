@@ -43,7 +43,7 @@ def create_packages(mocker, autosubmit_config):
         job._platform = platform
         job.processors = 2
         job.section = "dummysection"
-        job._init_runtime_parameters()
+        job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
         job.wallclock = "00:01"
     packages = [
         JobPackageSimple([jobs[0]]),
@@ -63,5 +63,5 @@ def test_process_jobs_to_submit(create_packages):
             packages):  # Equivalent to valid_packages_to_submit but without the ghost jobs check etc.
         package.process_jobs_to_submit(jobs_id[i])
         for job in package.jobs:  # All jobs inside a package must have the same id.
-            assert job.id == str(jobs_id[i])
+            assert job.id == jobs_id[i]
             assert job.status == Status.SUBMITTED

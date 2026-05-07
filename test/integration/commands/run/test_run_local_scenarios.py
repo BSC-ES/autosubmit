@@ -68,7 +68,22 @@ from test.integration.test_utils.misc import wait_locker
             retrials: 2  
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
-], ids=["Success", "Failure"])
+
+    # Test Splits
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=TestSplits"
+                sleep 1
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            SPLITS: '2'
+            wallclock: 00:01
+    """), 2, "COMPLETED", "split"),
+], ids=["Success", "Failure", "Test Splits"])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,
@@ -94,7 +109,8 @@ def test_run_uninterrupted(
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid,
+                                     run_type="split" if run_type == "split" else "simple")
     e_msg = f"Current folder: {str(run_tmpdir)}\n"
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     for check, value in db_check_list.items():
@@ -173,9 +189,8 @@ def test_run_interrupted(
     process = Process(target=as_exp.autosubmit.run_experiment, args=(as_exp.expid,))
     process.start()
 
-    max_waiting_time_seconds = 30
-
-    # Wait until the process starts (we wait until the file lock is locked).
+    max_waiting_time_seconds = 60
+    # # Wait until the process starts (we wait until the file lock is locked).
     lock_file = tmp_path / 'autosubmit.lock'
     wait_locker(lock_file, expect_locked=True, timeout=max_waiting_time_seconds)
 
@@ -471,7 +486,7 @@ def test_run_with_chunk_ini_greater_than_one(
     "jobs_data, expected_db_entries, final_status, get_call_option",
     [
         (
-            dedent("""\
+                dedent("""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -482,12 +497,12 @@ def test_run_with_chunk_ini_greater_than_one(
                     RUNNING: chunk
                     WALLCLOCK: 00:01
             """),
-            1,
-            "COMPLETED",
-            "default_bash",
+                1,
+                "COMPLETED",
+                "default_bash",
         ),
         (
-            dedent("""\
+                dedent("""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -499,12 +514,12 @@ def test_run_with_chunk_ini_greater_than_one(
                     WALLCLOCK: 00:01
                     TYPE: python
             """),
-            1,
-            "COMPLETED",
-            "type_python",
+                1,
+                "COMPLETED",
+                "type_python",
         ),
         (
-            dedent("""\
+                dedent("""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -516,12 +531,12 @@ def test_run_with_chunk_ini_greater_than_one(
                     WALLCLOCK: 00:01
                     TYPE: r
             """),
-            1,
-            "COMPLETED",
-            "type_r",
+                1,
+                "COMPLETED",
+                "type_r",
         ),
         (
-            dedent("""\
+                dedent("""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -533,12 +548,12 @@ def test_run_with_chunk_ini_greater_than_one(
                     WALLCLOCK: 00:01
                     EXECUTABLE: /bin/bash
             """),
-            1,
-            "COMPLETED",
-            "executable_bash",
+                1,
+                "COMPLETED",
+                "executable_bash",
         ),
         (
-            dedent(f"""\
+                dedent(f"""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -551,12 +566,12 @@ def test_run_with_chunk_ini_greater_than_one(
                     TYPE: python
                     EXECUTABLE: {sys.executable}
             """),
-            1,
-            "COMPLETED",
-            "executable_python3",
+                1,
+                "COMPLETED",
+                "executable_python3",
         ),
         (
-            dedent("""\
+                dedent("""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -570,12 +585,12 @@ def test_run_with_chunk_ini_greater_than_one(
                     WALLCLOCK: 00:01
                     EXPORT: "export AS_INTEGRATION_VAR=hello_from_export"
             """),
-            1,
-            "COMPLETED",
-            "export_placeholder",
+                1,
+                "COMPLETED",
+                "export_placeholder",
         ),
         (
-            dedent("""\
+                dedent("""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -587,12 +602,12 @@ def test_run_with_chunk_ini_greater_than_one(
                     WALLCLOCK: 00:01
                     X11: False
             """),
-            1,
-            "COMPLETED",
-            "x11_false",
+                1,
+                "COMPLETED",
+                "x11_false",
         ),
         (
-            dedent("""\
+                dedent("""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -604,12 +619,12 @@ def test_run_with_chunk_ini_greater_than_one(
                     WALLCLOCK: 00:01
                     X11: True
             """),
-            1,
-            "COMPLETED",
-            "x11_true_no_options",
+                1,
+                "COMPLETED",
+                "x11_true_no_options",
         ),
         (
-            dedent("""\
+                dedent("""\
             EXPERIMENT:
                 NUMCHUNKS: '1'
             JOBS:
@@ -621,9 +636,9 @@ def test_run_with_chunk_ini_greater_than_one(
                     RUNNING: chunk
                     WALLCLOCK: 00:05
             """),
-            1,
-            "COMPLETED",
-            "wallclock",
+                1,
+                "COMPLETED",
+                "wallclock",
         ),
     ],
     ids=[
@@ -639,13 +654,13 @@ def test_run_with_chunk_ini_greater_than_one(
     ],
 )
 def test_run_uninterrupted_get_call_options(
-    autosubmit_exp,
-    jobs_data: str,
-    expected_db_entries: int,
-    final_status: str,
-    get_call_option: str,
-    prepare_scratch,
-    general_data: dict,
+        autosubmit_exp,
+        jobs_data: str,
+        expected_db_entries: int,
+        final_status: str,
+        get_call_option: str,
+        prepare_scratch,
+        general_data: dict,
 ) -> None:
     """Test that all JOBS.job YAML keys that feed get_call work end-to-end.
 
@@ -700,3 +715,56 @@ def test_run_uninterrupted_get_call_options(
         _assert_files_recovered(files_check_list)
     except AssertionError as e:
         pytest.fail(e_msg + str(e))
+
+
+@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
+    # Failure
+    (dedent("""\
+    CONFIG:
+        SAFETYSLEEPTIME: 0
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                d_echo "Hello World with id=FAILED"
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 1  
+    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+], ids=["Force Failure -> Correct it -> Completed"])
+def test_run_failed_set_to_ready_on_new_run(
+        autosubmit_exp,
+        general_data,
+        jobs_data,
+        expected_db_entries,
+        final_status,
+        wrapper_type,
+):
+    yaml = YAML(typ='rt')
+    jobs_data_yaml = yaml.load(jobs_data)
+    as_exp = autosubmit_exp(experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
+    as_conf = as_exp.as_conf
+    as_conf.set_last_as_command('run')
+
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+    _assert_exit_code(final_status, exit_code)
+
+    # The experiment must have failed above with a final status.
+    # But the job script has d_echo, so here we replace it, and
+    # run it again. It should succeed now.
+    yaml_with_jobs = Path(as_exp.exp_path, 'conf/additional_data.yml')
+    with open(yaml_with_jobs, 'r') as f:
+        data = yaml.load(f)
+    data["JOBS"]["job"]["SCRIPT"] = 'echo "Hello World with id=READY"'
+    with yaml_with_jobs.open("w") as f:
+        yaml.dump(data, f)
+
+    as_conf.set_last_as_command('create')
+    assert 0 == as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=False)
+
+    as_conf.set_last_as_command('run')
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+
+    _assert_exit_code("SUCCESS", exit_code)

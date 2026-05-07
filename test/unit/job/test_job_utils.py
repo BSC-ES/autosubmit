@@ -56,7 +56,7 @@ def create_job_list(mocker) -> Callable[[List[Dict[str, Any]]], JobList]:
         job_list.jobs = [
             _create_job_mock(data, mocker) for data in jobs_data
         ]
-        job_list._job_list = job_list.jobs
+        job_list.job_list = job_list.jobs
         job_list.get_job_list.return_value = job_list.jobs
         return job_list
 

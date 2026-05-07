@@ -31,9 +31,8 @@ class JobData(object):
                  status="UNKNOWN", rowtype=0, ncpus=0, wallclock="00:00", qos="debug", energy=0, date="", section="",
                  member="", chunk=0, last=1, platform="NA", job_id=0, extra_data="", nnodes=0, run_id=None, MaxRSS=0.0,
                  AveRSS=0.0, out="", err="", rowstatus=Models.RowStatus.INITIAL, children="", platform_output="",
-                 workflow_commit=""):
-        """
-        """
+                 workflow_commit="", split=None, splits=None, fail_count=0):
+        """Initialize JobData with all job tracking fields."""
         self._id = _id
         self.counter = counter
         self.job_name = job_name
@@ -76,6 +75,9 @@ class JobData(object):
         self.children = children  # DB 17
         self.platform_output = platform_output  # DB 17
         self.workflow_commit = workflow_commit
+        self.split = split
+        self.splits = splits
+        self.fail_count = fail_count
 
     @classmethod
     def from_model(cls, row):
@@ -111,7 +113,10 @@ class JobData(object):
                        row.rowstatus,
                        row.children,
                        row.platform_output,
-                       row.workflow_commit)
+                       row.workflow_commit,
+                       row.split,
+                       row.splits,
+                       row.fail_count)
         return job_data
 
     @property

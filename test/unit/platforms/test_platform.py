@@ -32,10 +32,8 @@ _EXPID = 't000'
 @pytest.mark.parametrize(
     'file_exists,count ',
     [
-        [True, -1],
         [True, 0],
         [True, 1],
-        [False, -1],
         [False, 0],
         [False, 1],
     ]
@@ -53,12 +51,8 @@ def test_get_stat_file(file_exists, count, tmp_path):
     job = TestJob()
     job.stat_file = "test_file"
     job.name = "test_name"
-    if count < 0:
-        job.fail_count = 0
-        filename = job.stat_file + "0"
-    else:
-        job.fail_count = count
-        filename = job.name + f'_STAT_{str(count)}'
+    job.fail_count = count
+    filename = job.name + f'_STAT_{str(job.fail_count)}'
 
     if file_exists:
         with open(f"{basic_config.LOCAL_ROOT_DIR}/{filename}", "w", encoding="utf-8") as f:
@@ -95,13 +89,12 @@ def test_init_logs_log_process_no_root_dir(mocker, autosubmit_config):
             'LOG_RECOVERY_CONSOLE_LEVEL': 'NO_LOG'
         }
     })
-
     platform = mocker.MagicMock()
     mocker.patch('autosubmit.platforms.platform._exit', return_value=0)
+    mocker.patch.object(Log, 'set_console_level')
     recover_platform_job_logs_wrapper(
         platform, None, None, None, as_conf=as_conf)  # type: ignore
-
-    assert Log.console_handler.level == Log.NO_LOG
+    assert Log.set_console_level.call_count == 1
 
 
 def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):

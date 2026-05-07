@@ -34,7 +34,7 @@ SECONDS_WAIT_PLATFORM = 60
 
 
 class ExperimentHistory:
-    def __init__(self, expid, force_sql_alchemy:bool=False):
+    def __init__(self, expid, force_sql_alchemy: bool = False):
         # Unused arguments, but I didn't want to change every call to this class in this PR
         self.expid = expid
         BasicConfig.read()
@@ -72,7 +72,51 @@ class ExperimentHistory:
 
     def write_submit_time(self, job_name, submit=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
                           member="", section="", chunk=0, platform="NA", job_id=0, wrapper_queue=None,
-                          wrapper_code=None, children="", workflow_commit=""):
+                          wrapper_code=None, children="", workflow_commit="", split=None, splits=None,
+                          fail_count=0) -> Optional[JobData]:
+        """Writes a new job submission entry to the database.
+
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param submit: The submission time of the job. Default to 0.
+        :type submit: int
+        :param status: The status of the job. Defaults to "UNKNOWN".
+        :type status: str
+        :param ncpus: The number of CPUs allocated for the job. Default to 0.
+        :type ncpus: int
+        :param wallclock: The wallclock time allocated for the job. Default to "00:00".
+        :type wallclock: str
+        :param qos: The quality of service. Default to "debug".
+        :type qos: str
+        :param date: The date associated with the job. Default to an empty string.
+        :type date: str
+        :param member: The member associated with the job. Default to an empty string.
+        :type member: str
+        :param section: The section associated with the job. Default to an empty string.
+        :type section: str
+        :param chunk: The chunk number associated with the job. Default to 0.
+        :type chunk: int
+        :param platform: The platform on which the job is run. Default to "NA".
+        :type platform: str
+        :param job_id: The job ID. Default to 0.
+        :type job_id: int
+        :param wrapper_queue: The wrapper queue. Defaults to None.
+        :type wrapper_queue: Optional[str]
+        :param wrapper_code: The wrapper code. Defaults to None.
+        :type wrapper_code: Optional[str]
+        :param children: The children. Default to an empty string.
+        :type children: str
+        :param workflow_commit: The workflow commit identifier. Default to an empty string.
+        :type workflow_commit: str
+        :param split: The split identifier. Default to None.
+        :type split: Optional[str]
+        :param splits: The splits information. Default to None.
+        :type splits: Optional[str]
+        :param fail_count: The number of times the job has failed. Default to 0.
+        :type fail_count: int
+        :return: The result of registering the job data, or None if an exception occurs.
+        :rtype: Optional[JobData]
+        """
 
         try:
             next_counter = self._get_next_counter_by_job_name(job_name)
@@ -94,12 +138,127 @@ class ExperimentHistory:
                                   job_id=job_id,
                                   children=children,
                                   run_id=current_experiment_run.run_id,
-                                  workflow_commit=workflow_commit)
+                                  workflow_commit=workflow_commit,
+                                  split=split,
+                                  splits=splits,
+                                  fail_count=fail_count)
             return self.manager.register_submitted_job_data_dc(job_data_dc)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
+            return None
+
+    def get_submit_data_dc(self, job_name: str, fail_count: int = 0) -> Optional[JobData]:
+        """Retrieve the full JobData for a job's submission by job name and fail count.
+
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param fail_count: The number of times the job has failed. Defaults to 0.
+        :type fail_count: int
+        :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
+        :rtype: Optional[JobData]
+        """
+        try:
+            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+        except Exception as exp:
+            self._log.log(str(exp), traceback.format_exc())
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
+            return None
+
+    def get_finish_data_dc(self, job_name: str, fail_count: int = 0) -> Optional[JobData]:
+        """Retrieve the full JobData for a job's finish record by job name and fail count.
+
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param fail_count: The number of times the job has failed. Defaults to 0.
+        :type fail_count: int
+        :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
+        :rtype: Optional[JobData]
+        """
+        try:
+            job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+            if job_data_dc and job_data_dc.finish > 0:
+                return job_data_dc
+            return None
+        except Exception as exp:
+            self._log.log(str(exp), traceback.format_exc())
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
+            return None
+
+    def update_submit_time(self, job_name: str, submit: int = 0, status: str = "UNKNOWN", ncpus: int = 0,
+                           wallclock: str = "00:00", qos: str = "debug", date: str = "", member: str = "",
+                           section: str = "", chunk: int = 0, platform: str = "NA", job_id: int = 0,
+                           wrapper_queue: Optional[str] = None, wrapper_code: Optional[str] = None,
+                           children: str = "", workflow_commit: str = "", split=None, splits=None,
+                           fail_count: int = 0) -> Optional[JobData]:
+        """Updates an existing job submission entry in the database, identified by job name and fail count.
+
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param submit: The submission time of the job. Defaults to 0.
+        :type submit: int
+        :param status: The status of the job. Defaults to "UNKNOWN".
+        :type status: str
+        :param ncpus: The number of CPUs allocated for the job. Defaults to 0.
+        :type ncpus: int
+        :param wallclock: The wallclock time allocated for the job. Defaults to "00:00".
+        :type wallclock: str
+        :param qos: The quality of service. Defaults to "debug".
+        :type qos: str
+        :param date: The date associated with the job. Defaults to an empty string.
+        :type date: str
+        :param member: The member associated with the job. Defaults to an empty string.
+        :type member: str
+        :param section: The section associated with the job. Defaults to an empty string.
+        :type section: str
+        :param chunk: The chunk number associated with the job. Defaults to 0.
+        :type chunk: int
+        :param platform: The platform on which the job is run. Defaults to "NA".
+        :type platform: str
+        :param job_id: The job ID. Defaults to 0.
+        :type job_id: int
+        :param wrapper_queue: The wrapper queue. Defaults to None.
+        :type wrapper_queue: Optional[str]
+        :param wrapper_code: The wrapper code. Defaults to None.
+        :type wrapper_code: Optional[str]
+        :param children: The children. Defaults to an empty string.
+        :type children: str
+        :param workflow_commit: The workflow commit identifier. Defaults to an empty string.
+        :type workflow_commit: str
+        :param split: The split identifier. Defaults to None.
+        :type split: Optional[str]
+        :param splits: The splits information. Defaults to None.
+        :type splits: Optional[str]
+        :param fail_count: The number of times the job has failed. Defaults to 0.
+        :type fail_count: int
+        :return: The updated JobData instance, or None if the record is not found or an exception occurs.
+        :rtype: Optional[JobData]
+        """
+        try:
+            job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+            if not job_data_dc:
+                raise Exception(f"Job {job_name} with fail_count={fail_count} has not been found in the database.")
+            job_data_dc.submit = submit
+            job_data_dc.status = status
+            job_data_dc.ncpus = ncpus
+            job_data_dc.wallclock = wallclock
+            job_data_dc.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
+            job_data_dc.date = date
+            job_data_dc.member = member
+            job_data_dc.section = section
+            job_data_dc.chunk = chunk
+            job_data_dc.platform = platform
+            job_data_dc.job_id = job_id
+            job_data_dc.rowtype = self._get_defined_rowtype(wrapper_code)
+            job_data_dc.children = children
+            job_data_dc.workflow_commit = workflow_commit
+            job_data_dc.split = split
+            job_data_dc.splits = splits
+            return self.manager.update_job_data_dc_by_job_id_name(job_data_dc)
+        except Exception as exp:
+            self._log.log(str(exp), traceback.format_exc())
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
             return None
 
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
@@ -212,15 +371,12 @@ class ExperimentHistory:
 
     def _verify_slurm_monitor(self, slurm_monitor, job_data_dc):
         try:
-            if slurm_monitor.header.status not in ["COMPLETED", "FAILED"]:
-                self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
-                              f"Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.\n")
-                Log.debug(
-                    f'Historical Database error: Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.')
+            # Removed, if that happens it is because the job is an inner_job
             if not slurm_monitor.steps_plus_extern_approximate_header_energy():
-                self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
-                              f"Steps + extern != total energy for ID {slurm_monitor.header.name}."
-                              f"Number of steps {slurm_monitor.step_count}.\n")
+                self._log.log(
+                    f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
+                    f"Steps + extern != total energy for ID {slurm_monitor.header.name}."
+                    f"Number of steps {slurm_monitor.step_count}.\n")
                 Log.debug(
                     f'Historical Database error: Steps + extern != total energy for ID {slurm_monitor.header.name}.'
                     f'Number of steps {slurm_monitor.step_count}.')
