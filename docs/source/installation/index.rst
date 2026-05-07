@@ -72,7 +72,7 @@ For a very quick test, you can follow the next instructions to configure and run
     # Quick-configure ( user-level database)
     autosubmit configure
 
-    # Install
+    # Create Autosubmit directories and database
     autosubmit install
 
     # Quick-start
@@ -143,7 +143,7 @@ For a very quick test, you can follow the next instructions to configure and run
     # Quick-configure ( user-level database)
     autosubmit configure
 
-    # Install
+    # Create Autosubmit directories and database
     autosubmit install
 
     # Quick-start
@@ -194,15 +194,21 @@ Manually generate an ``autosubmitrc`` file in one of these locations, which is t
 Quick Installation - Non-shared database (user level)
 ------------------------------------------------------
 
-After the package installation, you have to configure at least the database and path for Autosubmit.
-
-To use the default settings, create a directory called ``autosubmit`` (``mkdir $HOME/autosubmit``) in your home directory before running the ``configure`` command.
+After the package installation, set up Autosubmit with the following sequence of commands:
 
 ::
 
     autosubmit configure
+    autosubmit install
 
 ``autosubmit configure`` will always generate a file called ``.autosubmitrc`` in your ``$HOME``.
+``autosubmit install`` creates the directories defined in that file (experiments path, logs, metadata) and initialises the database.
+
+.. important::
+    In Autosubmit ``<= 4.1.16``, ``autosubmit configure`` created the directories itself.
+    From the next release onwards, directory creation is the responsibility of ``autosubmit install``.
+    If you are upgrading, make sure to run ``autosubmit install`` after ``autosubmit configure``.
+
 
 You can add ``--advanced`` to the configure command for advanced options.
 
@@ -349,8 +355,8 @@ Example - BSC - /etc/autosubmitrc skeleton
         authorized =  [run bscearth000,bscesautosubmit01,bscesautosubmit02] [stats, clean, describe, check, report,dbfix,pklfix, upgrade,updateversion all]
         forbidden =  [expìd, create, recovery, delete, inspect, monitor, recovery, configure,setstatus,testcase, test, refresh, archive, unarchive bscearth000,bscesautosubmit01,bscesautosubmit02]
 
-Experiments database installation
-=================================
+Experiments database and directories installation
+===================================================
 
 As the last step, ensure to install the Autosubmit database. To do so, execute  ``autosubmit install``.
 
@@ -358,7 +364,10 @@ As the last step, ensure to install the Autosubmit database. To do so, execute  
 
     autosubmit install
 
-This command will generate a blank database in the specified configuration path.
+This creates the Autosubmit directories and generates a blank database at the configured path.
+
+.. note::
+    In versions ``<= 4.1.16``, directory creation was done by ``autosubmit configure``.
 
 Dependencies and licenses
 =========================

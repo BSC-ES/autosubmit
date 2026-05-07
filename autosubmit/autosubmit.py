@@ -3607,15 +3607,6 @@ class Autosubmit:
                     parser.write(config_file)
                     Log.result(f"Configuration file written successfully: \n\t{rc_path}")
 
-                    dirs = [local_root_path, global_logs_path, structures_path, historicdb_path, historiclog_path]
-
-                    for dir in dirs:
-                        create_me = Path(dir)
-                        create_me.mkdir(parents=True, exist_ok=True)
-                        create_me.chmod(0o775)
-
-                    sep = '\n\t'
-                    Log.result(sep.join(['Directories configured successfully:'] + [str(d) for d in dirs]))
                 except (IOError) as e:
                     raise AutosubmitCritical(f"Can not write config file: {e.message}", 7012)
                 except (OSError) as e:
@@ -3629,6 +3620,21 @@ class Autosubmit:
     @staticmethod
     def install():
         """Creates a new database instance for autosubmit at the configured path."""
+        dirs = [
+            BasicConfig.LOCAL_ROOT_DIR,
+            BasicConfig.GLOBAL_LOG_DIR,
+            BasicConfig.STRUCTURES_DIR,
+            BasicConfig.JOBDATA_DIR,
+            BasicConfig.HISTORICAL_LOG_DIR,
+        ]
+        for dir in dirs:
+            create_me = Path(dir)
+            create_me.mkdir(parents=True, exist_ok=True)
+            create_me.chmod(0o775)
+
+        sep = '\n\t'
+        Log.result(sep.join(['Directories configured successfully:'] + [str(d) for d in dirs]))
+        
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             if not os.path.exists(BasicConfig.DB_PATH):
                 Log.info("Creating autosubmit database...")

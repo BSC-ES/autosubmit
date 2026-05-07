@@ -145,3 +145,33 @@ def test_configure_advanced(mocker, tmp_path, suffix: str, autosubmit) -> None:
 
     with open(tmp_path / ".autosubmitrc", "r") as file:
         assert file.read() == expected
+
+
+def test_configure_does_not_create_directories(mocker, tmp_path, autosubmit) -> None:
+    """configure must not create directories. Moved to install"""
+    mocker.patch("autosubmit.autosubmit.get_rc_path").return_value = (
+        tmp_path / ".autosubmitrc"
+    )
+
+    db_path = tmp_path / "database"
+    lr_path = tmp_path / "experiments"
+
+    autosubmit.configure(
+        advanced=False,
+        database_path=str(db_path),
+        database_filename="autosubmit.db",
+        local_root_path=str(lr_path),
+        platforms_conf_path=None,
+        jobs_conf_path=None,
+        smtp_hostname=None,
+        mail_from=None,
+        machine=False,
+        local=False,
+    )
+
+    assert (tmp_path / ".autosubmitrc").exists()
+    assert not (lr_path / "logs").exists()
+    assert not (lr_path / "metadata").exists()
+    assert not (lr_path / "metadata" / "structures").exists()
+    assert not (lr_path / "metadata" / "data").exists()
+    assert not (lr_path / "metadata" / "logs").exists()
