@@ -19,9 +19,11 @@
 
 import pytest
 
-from autosubmit.history.experiment_status import (ExperimentHeartBeatMonitor, ExperimentStatus)
+from autosubmit.history.experiment_status import (
+    ExperimentHeartBeatMonitor,
+    ExperimentStatus,
+)
 
-# HEARTBEAT MONITOR TESTS
 
 def test_heartbeat_monitor_starts_and_stops_correctly(mocker):
     """Test __enter__ and __exit__ methods call start() and stop()."""
@@ -70,6 +72,35 @@ def test_heartbeat_monitor_ping_returns_false_when_update_fails(mocker):
 
     assert monitor.ping() is False
     warning_error.assert_called_once()
+
+
+def test_heartbeat_monitor_ping_blocks_concurrent_pings(mocker):
+    """Test that ping() correctly uses the lock to prevent concurrent updates."""
+    status_tracker = mocker.Mock(expid="a000")
+    monitor = ExperimentHeartBeatMonitor(status_tracker, interval_seconds=1)
+
+    # Simulate update_heartbeat taking some time to complete
+    def slow_update():
+        import time
+
+        time.sleep(0.1)
+
+    status_tracker.update_heartbeat.side_effect = slow_update
+
+    # Start two threads that call ping() at the same time
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        thread_a = executor.submit(monitor.ping)
+        thread_b = executor.submit(monitor.ping)
+
+        result_a = thread_a.result()
+        result_b = thread_b.result()
+
+    # Assert
+    assert result_a is True
+    assert result_b is True
+    assert status_tracker.update_heartbeat.call_count == 2
 
 
 def test_heartbeat_monitor_start_when_thread_already_running(mocker):
@@ -162,14 +193,15 @@ def test_heartbeat_monitor_stop_logs_warning_if_thread_does_not_stop(mocker):
     assert monitor._thread is None
 
 
-# EXPERIMENT STATUS TESTS
-
 def test_experiment_status_set_status_delegates_manager(mocker):
     """Test that set_status() delegates to the status manager."""
     manager = mocker.Mock()
-    mocker.patch("autosubmit.history.experiment_status.create_experiment_status_db_manager", return_value=manager)
+    mocker.patch(
+        "autosubmit.history.experiment_status.create_experiment_status_db_manager",
+        return_value=manager,
+    )
     experiment_status = ExperimentStatus("a000")
-    
+
     # Act
     experiment_status.set_status("RUNNING")
 
