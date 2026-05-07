@@ -216,7 +216,7 @@ class SqlAlchemyExperimentStatusDbManager:
     def create_experiment_status_as_running(self, experiment):
         self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
 
-    def get_experiment_status_row_by_expid(self, expid: str) -> Optional[Models.ExperimentRow]:
+    def get_experiment_status_row_by_expid(self, expid: str) -> Optional[Models.ExperimentStatusRow]:
         experiment_row = self.get_experiment_row_by_expid(expid)
         return self.get_experiment_status_row_by_exp_id(experiment_row.id)
 
