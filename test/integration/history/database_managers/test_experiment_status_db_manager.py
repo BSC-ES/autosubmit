@@ -341,13 +341,16 @@ def test_update_multiple_experiment_last_heartbeats_at_same_time(
     database_manager.create_experiment_status_as_running(experiment1)
     database_manager.create_experiment_status_as_running(experiment2)
 
-    # Mock update_heartbeat to simulate a delay in the update
+    # Mock update_heartbeat to start at the same time in both threads
     original_update_heartbeat = database_manager.update_heartbeat
 
-    def delayed_update_heartbeat(expid: str):
-        import time
+    import threading
 
-        time.sleep(0.1)  # Simulate delay
+    start_barrier = threading.Barrier(2)
+
+    def delayed_update_heartbeat(expid: str):
+        # Wait for both threads to be ready, then perform the update together
+        start_barrier.wait()
         original_update_heartbeat(expid)
 
     mocker.patch.object(
@@ -411,13 +414,16 @@ def test_update_same_experiment_last_heartbeats_at_same_time(
     )
     database_manager.create_experiment_status_as_running(experiment)
 
-    # Mock update_heartbeat to simulate a delay in the update
+    # Mock update_heartbeat to start both updates concurrently
     original_update_heartbeat = database_manager.update_heartbeat
 
-    def delayed_update_heartbeat(expid: str):
-        import time
+    import threading
 
-        time.sleep(0.1)  # Simulate delay
+    start_barrier = threading.Barrier(2)
+
+    def delayed_update_heartbeat(expid: str):
+        # Synchronize the two threads so they enter the DB update concurrently
+        start_barrier.wait()
         original_update_heartbeat(expid)
 
     mocker.patch.object(
