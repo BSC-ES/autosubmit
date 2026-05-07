@@ -128,3 +128,24 @@ def test_iteration_info(completed, failed, mocker):
         failed_text = "job has" if failed == 1 else "jobs have"
         assert failed_text in mocked_log.info.call_args_list[1][0][0]
 
+
+def test_install_creates_directories(monkeypatch, tmp_path, autosubmit, mocker):
+    """install must create the Autosubmit directories (issue #2640)."""
+    local_root = tmp_path / "experiments"
+
+    monkeypatch.setattr(BasicConfig, "LOCAL_ROOT_DIR", str(local_root))
+    monkeypatch.setattr(BasicConfig, "GLOBAL_LOG_DIR", str(local_root / "logs"))
+    monkeypatch.setattr(BasicConfig, "STRUCTURES_DIR", str(local_root / "metadata/structures"))
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(local_root / "metadata/data"))
+    monkeypatch.setattr(BasicConfig, "HISTORICAL_LOG_DIR", str(local_root / "metadata/logs"))
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(tmp_path / "autosubmit.db"))
+    mocker.patch("autosubmit.autosubmit.create_db", return_value=True)
+
+    autosubmit.install()
+
+    assert local_root.exists()
+    assert (local_root / "logs").exists()
+    assert (local_root / "metadata/structures").exists()
+    assert (local_root / "metadata/data").exists()
+    assert (local_root / "metadata/logs").exists()
