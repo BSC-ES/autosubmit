@@ -37,6 +37,7 @@ def test_delete_experiment_cancelled(autosubmit_exp, mocker):
 
 
 def test_delete_experiment_failed(autosubmit_exp, mocker):
+    """Test that if the experiment deletion fails, the experiment is not deleted."""
     exp = autosubmit_exp(experiment_data={})
     mocker.patch('autosubmit.experiment.experiment_common._delete_experiment', side_effect=ValueError)
 
@@ -44,6 +45,7 @@ def test_delete_experiment_failed(autosubmit_exp, mocker):
 
 
 def test_delete_experiment_that_is_running(autosubmit_exp, mocker):
+    """Test that if the experiment is running, the experiment is not deleted."""
     exp = autosubmit_exp(experiment_data={})
     mocker.patch('autosubmit.experiment.experiment_common.process_id', return_value=True)
 
