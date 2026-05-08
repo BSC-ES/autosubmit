@@ -14,6 +14,7 @@ docs/build/
 dist/
 build/
 .cache
+.benchmarks/artifacts/
 
 # Benchmark files
 .benchmarks/artifacts
