@@ -90,7 +90,6 @@ class ExperimentHeartBeatMonitor:
                 name=f"autosubmit-heartbeat-{self._status_tracker.expid}",
                 daemon=True,
             )  # set thread as daemon to automatically stop when the parent process exits
-            # start the watchdog thread
             self._thread.start()
             return True
         except Exception:
