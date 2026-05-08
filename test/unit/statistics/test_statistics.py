@@ -26,7 +26,6 @@ from autosubmit.statistics.statistics import Statistics
 from autosubmit.statistics.stats_summary import StatsSummary
 from autosubmit.statistics.utils import timedelta2hours
 
-LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
 NUM_JOBS = 5  # modify this value to test with different job number
 
 
@@ -46,41 +45,41 @@ def job_with_different_retrials(mocker):
 
     retrials = [
         [
-            datetime(2024, 3, 2, 15, 24, 16, tzinfo=LOCAL_TZ),
-            datetime(2024, 3, 2, 15, 26, 14, tzinfo=LOCAL_TZ),
-            datetime(2024, 3, 3, 00, 10, 7, tzinfo=LOCAL_TZ),
+            datetime(2024, 3, 2, 15, 24, 16),
+            datetime(2024, 3, 2, 15, 26, 14),
+            datetime(2024, 3, 3, 00, 10, 7),
             "COMPLETED"
         ],
         [
-            datetime(2024, 3, 2, 15, 17, 31, tzinfo=LOCAL_TZ),
-            datetime(2024, 3, 2, 15, 23, 45, tzinfo=LOCAL_TZ),
-            datetime(2024, 3, 2, 15, 24, 45, tzinfo=LOCAL_TZ),
+            datetime(2024, 3, 2, 15, 17, 31),
+            datetime(2024, 3, 2, 15, 23, 45),
+            datetime(2024, 3, 2, 15, 24, 45),
             "FAILED"
         ],
         [
-            datetime(2024, 3, 2, 15, 17, 31, tzinfo=LOCAL_TZ),
-            datetime(1970, 1, 1, 2, 00, 00, tzinfo=LOCAL_TZ),
-            datetime(2024, 3, 2, 15, 23, 45, tzinfo=LOCAL_TZ),
+            datetime(2024, 3, 2, 15, 17, 31),
+            datetime(1970, 1, 1, 2, 00, 00),
+            datetime(2024, 3, 2, 15, 23, 45),
             "FAILED"
         ],
         [
-            datetime(2024, 3, 2, 15, 17, 31, tzinfo=LOCAL_TZ),
-            datetime(2024, 3, 2, 15, 23, 45, tzinfo=LOCAL_TZ),
-            datetime(1970, 1, 1, 2, 00, 00, tzinfo=LOCAL_TZ),
+            datetime(2024, 3, 2, 15, 17, 31),
+            datetime(2024, 3, 2, 15, 23, 45),
+            datetime(1970, 1, 1, 2, 00, 00),
             "FAILED"
         ],
         [
-            datetime(2024, 3, 2, 15, 17, 31, tzinfo=LOCAL_TZ),
-            datetime(2024, 3, 2, 15, 23, 45, tzinfo=LOCAL_TZ),
+            datetime(2024, 3, 2, 15, 17, 31),
+            datetime(2024, 3, 2, 15, 23, 45),
             "FAILED"
         ],
         [
-            datetime(2024, 3, 2, 15, 17, 31, tzinfo=LOCAL_TZ),
-            datetime(1970, 1, 1, 2, 00, 00, tzinfo=LOCAL_TZ),
+            datetime(2024, 3, 2, 15, 17, 31),
+            datetime(1970, 1, 1, 2, 00, 00),
             "FAILED"
         ],
         [
-            datetime(2024, 3, 2, 15, 17, 31, tzinfo=LOCAL_TZ),
+            datetime(2024, 3, 2, 15, 17, 31),
             "FAILED"
         ]
     ]
@@ -123,9 +122,9 @@ def job_stats() -> list[JobStat]:
             tasks="",
             nodes="",
             exclusive="")
-        job_stat.submit_time = datetime(2023, 1, 1, 10, 0, 0, tzinfo=LOCAL_TZ)
-        job_stat.start_time = datetime(2023, 1, 1, 10, 30, 0, tzinfo=LOCAL_TZ)
-        job_stat.finish_time = datetime(2023, 1, 1, 11, 0, 0, tzinfo=LOCAL_TZ)
+        job_stat.submit_time = datetime(2023, 1, 1, 10, 0, 0)
+        job_stat.start_time = datetime(2023, 1, 1, 10, 30, 0)
+        job_stat.finish_time = datetime(2023, 1, 1, 11, 0, 0)
         job_stat.completed_queue_time = job_stat_timedelta
         job_stat.completed_run_time = job_stat_timedelta
         job_stat.failed_queue_time = job_stat_timedelta
@@ -141,8 +140,8 @@ def job_stats() -> list[JobStat]:
 def statistics(create_jobs: list[Job], job_stats) -> Statistics:
     return Statistics(
         jobs=create_jobs,
-        start=datetime(2023, 1, 1, 10, 0, 0, tzinfo=LOCAL_TZ),
-        end=datetime(2023, 1, 1, 11, 0, 0, tzinfo=LOCAL_TZ),
+        start=datetime(2023, 1, 1, 10, 0, 0),
+        end=datetime(2023, 1, 1, 11, 0, 0),
         queue_time_fix={},
         jobs_stat=job_stats)
 
@@ -190,8 +189,8 @@ def summary_as_list(summary: StatsSummary) -> list[str]:
 @pytest.fixture()
 def statistics_old_format() -> dict[str, Any]:
     """Create an instance of ``Statistics`` but with the old format."""
-    start_times = [datetime(2023, 1, 1, 10, 30, 0, tzinfo=LOCAL_TZ) for _ in range(NUM_JOBS)]
-    end_times = [datetime(2023, 1, 1, 11, 0, 0, tzinfo=LOCAL_TZ) for _ in range(NUM_JOBS)]
+    start_times = [datetime(2023, 1, 1, 10, 30, 0) for _ in range(NUM_JOBS)]
+    end_times = [datetime(2023, 1, 1, 11, 0, 0) for _ in range(NUM_JOBS)]
     queued = [timedelta2hours(timedelta()) for _ in range(NUM_JOBS)]
     run = [timedelta2hours(timedelta()) for _ in range(NUM_JOBS)]
     failed_jobs = [i for i in range(NUM_JOBS)]
@@ -244,8 +243,8 @@ def test_build_statistics_object(create_jobs: list[Job]) -> None:
     exp_stats = (
         Statistics(
             jobs=create_jobs,
-            start=datetime(2023, 1, 1, 10, 0, 0, tzinfo=LOCAL_TZ),
-            end=datetime(2023, 1, 1, 11, 0, 0, tzinfo=LOCAL_TZ),
+            start=datetime(2023, 1, 1, 10, 0, 0),
+            end=datetime(2023, 1, 1, 11, 0, 0),
             queue_time_fix={}).
         calculate_statistics().
         calculate_summary().

@@ -15,6 +15,8 @@
 import traceback
 from time import time
 
+from sqlalchemy.exc import SQLAlchemyError
+
 import autosubmit.history.database_managers.database_models as models
 import autosubmit.history.utils as hutils
 from autosubmit.config.basicconfig import BasicConfig
@@ -64,20 +66,23 @@ class ExperimentHistory:
             self.initialize_database()
         except (ValueError, OSError) as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f"Historical Database error: {exp!s} {traceback.format_exc()}")
+            Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
             self.manager = None
 
     def initialize_database(self):
         """Initialize the database manager, creating tables and running schema migrations."""
         try:
             self.manager.initialize()
-        except (
-            OSError,
-            AttributeError, #Attribute missing
-        ) as exp:
-            self._log.log(str(exp), traceback.format_exc())
+        except (OSError, AttributeError, KeyError) as exp:
+            Log.debug(f"Historical Database initialization error : {str(exp)} {traceback.format_exc()}")
+            self.manager = None
+        except SQLAlchemyError as exp:
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
             self.manager = None
+        except Exception as exp:
+            Log.debug(f"{str(exp)} {traceback.format_exc()}")
+            self.manager = None
+
 
     def is_header_ready(self):
         if self.manager:
@@ -137,10 +142,13 @@ class ExperimentHistory:
             )
             return self.manager.register_submitted_job_data_dc(job_data_dc)
         except (ValueError, OSError, AutosubmitError, AttributeError) as error:
-            self._log.log(str(error), traceback.format_exc())
-        except (ValueError, OSError) as exp:
-            self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
+            Log.debug(f"Historical Database initialization error : {str(error)} {traceback.format_exc()}")
+            self.manager = None
+        except SQLAlchemyError as error:
+            Log.debug(f"Historical Database error: {str(error)} {traceback.format_exc()}")
+        except Exception as error:
+            Log.debug(f"{str(error)} {traceback.format_exc()}")
+            self.manager = None
 
         return None
 
@@ -488,14 +496,21 @@ class ExperimentHistory:
         new_chunk_size,
         create=False
     ):
-        if create:
-            return True
-        elif not create and self.expid[0].lower() != "t":
-            if len(job_list) != current_experiment_run_dc.total:
+        try:
+            if create:
                 return True
-            if changes_count > int(self._get_date_member_completed_count(job_list)):
-                return True
-        return self._chunk_config_has_changed(current_experiment_run_dc, new_chunk_unit, new_chunk_size)
+            elif not create and self.expid[0].lower() != "t":
+                if len(job_list) != current_experiment_run_dc.total:
+                    return True
+                if changes_count > int(self._get_date_member_completed_count(job_list)):
+                    return True
+            return self._chunk_config_has_changed(current_experiment_run_dc, new_chunk_unit, new_chunk_size)
+        except (ValueError, AttributeError) as error:
+            Log.debug(f"Experiment History wasn't properly initialized : {str(error)} {traceback.format_exc()}")
+            self.manager = None
+        except Exception as error:
+            Log.debug(f"{str(error)} {traceback.format_exc()}")
+            self.manager = None
 
     def _chunk_config_has_changed(self, current_exp_run_dc, new_chunk_unit, new_chunk_size):
         if not current_exp_run_dc:
