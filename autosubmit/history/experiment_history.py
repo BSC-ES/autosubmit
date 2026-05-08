@@ -15,6 +15,7 @@
 import os
 import traceback
 from time import time
+from typing import TYPE_CHECKING
 
 import autosubmit.history.database_managers.database_models as models
 import autosubmit.history.utils as hutils
@@ -35,7 +36,11 @@ from autosubmit.history.strategies import (
     StraightWrapperAssociationStrategy,
     TwoDimWrapperDistributionStrategy,
 )
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.log.log import AutosubmitCritical, Log
+
+if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job import Job
 
 SECONDS_WAIT_PLATFORM = 60
 
@@ -64,19 +69,16 @@ class ExperimentHistory:
                 BasicConfig.DATABASE_BACKEND, **options
             )
             self.initialize_database()
-        except (ValueError, OSError) as exp:
+        except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f"Historical Database error: {exp!s} {traceback.format_exc()}")
+            Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
             self.manager = None
 
     def initialize_database(self):
         """Initialize the database manager, creating tables and running schema migrations."""
         try:
             self.manager.initialize()
-        except (
-            OSError,
-            AttributeError, #Attribute missing
-        ) as exp:
+        except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
             self.manager = None
@@ -138,12 +140,10 @@ class ExperimentHistory:
                 fail_count=fail_count,
             )
             return self.manager.register_submitted_job_data_dc(job_data_dc)
-        except (ValueError, OSError, AutosubmitError, AttributeError) as error:
-            self._log.log(str(error), traceback.format_exc())
-        except (ValueError, OSError) as exp:
+        except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
-
+            self.manager = None
         return None
 
     def get_submit_data_dc(self, job_name: str, fail_count: int = 0) -> JobData | None:
@@ -154,9 +154,9 @@ class ExperimentHistory:
         :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
         """
         try:
-            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(
+                job_name, fail_count
+            )
         except Exception:
             return None
 
@@ -168,13 +168,15 @@ class ExperimentHistory:
         :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
         """
         try:
-            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(
+                job_name, fail_count
+            )
         except Exception:
             return None
 
-    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> JobData | None:
+    def get_job_data_by_job_id_and_fail_count(
+        self, job_id: int, fail_count: int
+    ) -> JobData | None:
         """Retrieve JobData by job_id and fail_count.
 
         :param job_id: The scheduler job ID.
@@ -182,9 +184,9 @@ class ExperimentHistory:
         :return: The JobData instance, or None if not found.
         """
         try:
-            return self.manager.get_job_data_by_job_id_and_fail_count(job_id, fail_count)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+            return self.manager.get_job_data_by_job_id_and_fail_count(
+                job_id, fail_count
+            )
         except Exception:
             return None
 
@@ -208,7 +210,7 @@ class ExperimentHistory:
         workflow_commit: str = "",
         split=None,
         splits=None,
-        fail_count: int = 0
+        fail_count: int = 0,
     ) -> JobData | None:
         """Updates an existing job submission entry in the database, identified by job name and fail count.
 
@@ -235,9 +237,11 @@ class ExperimentHistory:
         """
 
         try:
-            job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+            job_data_dc = (
+                self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(
+                    job_name, fail_count
+                )
+            )
         except Exception:
             return None
         try:
@@ -245,7 +249,9 @@ class ExperimentHistory:
             job_data_dc.status = status
             job_data_dc.ncpus = ncpus
             job_data_dc.wallclock = wallclock
-            job_data_dc.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
+            job_data_dc.qos = self._get_defined_queue_name(
+                wrapper_queue, wrapper_code, qos
+            )
             job_data_dc.date = date
             job_data_dc.member = member
             job_data_dc.section = section
@@ -259,8 +265,6 @@ class ExperimentHistory:
             job_data_dc.splits = splits
             job_data_dc.fail_count = fail_count
             return self.manager.update_job_data_dc_by_job_id_name(job_data_dc)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
@@ -275,7 +279,7 @@ class ExperimentHistory:
         wrapper_queue: str | None = None,
         wrapper_code: str | None = None,
         children: str = "",
-        fail_count: int = 0
+        fail_count: int = 0,
     ) -> JobData | None:
         """
         Updates the start time and other details of a job in the database.
@@ -292,18 +296,22 @@ class ExperimentHistory:
         :return: The result of updating the job data, or None if an exception occurs.
         """
         try:
-            job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+            job_data_dc_last = (
+                self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(
+                    job_name, fail_count
+                )
+            )
             if not job_data_dc_last:
                 raise Exception(f"Job {job_name} has not been found in the database.")
             job_data_dc_last.start = start
-            job_data_dc_last.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
+            job_data_dc_last.qos = self._get_defined_queue_name(
+                wrapper_queue, wrapper_code, qos
+            )
             job_data_dc_last.status = status
             job_data_dc_last.rowtype = self._get_defined_rowtype(wrapper_code)
             job_data_dc_last.job_id = job_id
             job_data_dc_last.children = children
             return self.manager.update_job_data_dc_by_job_id_name(job_data_dc_last)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
@@ -316,7 +324,7 @@ class ExperimentHistory:
         job_id: int = 0,
         out_file: str | None = None,
         err_file: str | None = None,
-        fail_count: int = 0
+        fail_count: int = 0,
     ) -> JobData | None:
         """Updates the finish time and other details of a job in the database.
 
@@ -330,7 +338,11 @@ class ExperimentHistory:
         :return: The result of updating the job data, or None if an exception occurs.
         """
         try:
-            job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+            job_data_dc_last = (
+                self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(
+                    job_name, fail_count
+                )
+            )
             if not job_data_dc_last:
                 raise Exception(f"Job {job_name} has not been found in the database.")
             job_data_dc_last.finish = finish if finish > 0 else int(time())
@@ -340,8 +352,6 @@ class ExperimentHistory:
             job_data_dc_last.out = out_file if out_file else ""
             job_data_dc_last.err = err_file if err_file else ""
             return self.manager.update_job_data_dc_by_job_id_name(job_data_dc_last)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
@@ -392,8 +402,6 @@ class ExperimentHistory:
             return self.manager.update_list_job_data_dc_by_each_id(
                 job_data_dcs_to_update
             )
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
@@ -411,26 +419,24 @@ class ExperimentHistory:
                     f"Historical Database error: Steps + extern != total energy for ID {slurm_monitor.header.name}."
                     f"Number of steps {slurm_monitor.step_count}."
                 )
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
+            Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
 
     def process_status_changes(
         self,
-        job_list=None,
-        chunk_unit="NA",
-        chunk_size=0,
-        current_config="",
-        create=False,
+        job_list: list['Job'],
+        chunk_unit: str = "NA",
+        chunk_size: int = 0,
+        current_config: str = "",
+        create: bool = False,
     ) -> ExperimentRun | None:
-        """ Detect status differences between job_list and current job_data rows, and update. Creates a new run if necessary. """
+        """Detect status differences between job_list and current job_data rows, and update. Creates a new run if necessary."""
+        current_experiment_run_dc: ExperimentRun | int
         try:
             current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
             update_these_changes = self._get_built_list_of_changes(job_list)
-        except (ValueError, OSError, AutosubmitError, AttributeError, Exception) as exp:
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+        except Exception as exp:
             Log.debug(str(exp), traceback.format_exc())
             current_experiment_run_dc = 0
             update_these_changes = []
@@ -447,13 +453,15 @@ class ExperimentHistory:
             if len(update_these_changes) > 0 and not should_create_new_run:
                 self.manager.update_many_job_data_change_status(update_these_changes)
             if should_create_new_run:
-                return self.create_new_experiment_run(chunk_unit, chunk_size, current_config, job_list)
-            return self.update_counts_on_experiment_run_dc(current_experiment_run_dc, job_list)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+                return self.create_new_experiment_run(
+                    chunk_unit, chunk_size, current_config, job_list
+                )
+            return self.update_counts_on_experiment_run_dc(
+                current_experiment_run_dc, job_list
+            )
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
+            Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
 
     def _get_built_list_of_changes(self, job_list: list | None = None):
         """Return: List of (current timestamp, current datetime str, status, rowstatus, id in job_data). One tuple per change."""
@@ -474,39 +482,51 @@ class ExperimentHistory:
         """Updates current experiment_run row with totals calculated from job_list."""
         try:
             current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
-            return self.update_counts_on_experiment_run_dc(current_experiment_run_dc, job_list)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+            return self.update_counts_on_experiment_run_dc(
+                current_experiment_run_dc, job_list
+            )
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
 
     def should_we_create_a_new_run(
         self,
-        job_list,
-        changes_count,
-        current_experiment_run_dc,
-        new_chunk_unit,
-        new_chunk_size,
-        create=False
+        job_list: list['Job'],
+        changes_count: int,
+        current_experiment_run_dc: ExperimentRun | int,
+        new_chunk_unit: str,
+        new_chunk_size: int,
+        create: bool = False,
     ):
         if create:
             return True
-        elif not create and self.expid[0].lower() != "t":
+        elif (
+            not create
+            and self.expid[0].lower() != "t"
+            and not isinstance(current_experiment_run_dc, int)
+        ):
             if len(job_list) != current_experiment_run_dc.total:
                 return True
             if changes_count > int(self._get_date_member_completed_count(job_list)):
                 return True
-        return self._chunk_config_has_changed(current_experiment_run_dc, new_chunk_unit, new_chunk_size)
+        return self._chunk_config_has_changed(
+            current_experiment_run_dc, new_chunk_unit, new_chunk_size
+        )
 
-    def _chunk_config_has_changed(self, current_exp_run_dc, new_chunk_unit, new_chunk_size):
+    def _chunk_config_has_changed(
+        self, current_exp_run_dc, new_chunk_unit, new_chunk_size
+    ):
         if not current_exp_run_dc:
             return True
-        return current_exp_run_dc.chunk_unit != new_chunk_unit or current_exp_run_dc.chunk_size != new_chunk_size
-
+        return (
+            current_exp_run_dc.chunk_unit != new_chunk_unit
+            or current_exp_run_dc.chunk_size != new_chunk_size
+        )
 
     def update_counts_on_experiment_run_dc(
-        self, experiment_run_dc, job_list=None
+        self,
+        experiment_run_dc: ExperimentRun,
+        job_list: list['Job']
     ) -> ExperimentRun:
         """Return updated row as models.ExperimentRun."""
         if self.manager is None:
@@ -522,17 +542,20 @@ class ExperimentHistory:
         return self.manager.update_experiment_run_dc_by_id(experiment_run_dc)
 
     def finish_current_experiment_run(self):
-        try:
-            if self.manager.is_there_a_last_experiment_run():
-                current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
-                current_experiment_run_dc.finish = int(time())
-                return self.manager.update_experiment_run_dc_by_id(current_experiment_run_dc)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+        if self.manager.is_there_a_last_experiment_run():
+            current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
+            current_experiment_run_dc.finish = int(time())
+            return self.manager.update_experiment_run_dc_by_id(
+                current_experiment_run_dc
+            )
         return None
 
     def create_new_experiment_run(
-        self, chunk_unit="NA", chunk_size=0, current_config="", job_list=None
+            self,
+            chunk_unit: str="NA",
+            chunk_size: int=0,
+            current_config: str="",
+            job_list: list['Job'] | None = None,
     ):
         """Also writes the finish timestamp of the previous run."""
         self.finish_current_experiment_run()
@@ -544,7 +567,11 @@ class ExperimentHistory:
         )
 
     def _create_new_experiment_run_dc_with_counts(
-        self, chunk_unit, chunk_size, current_config="", job_list=None
+            self,
+            chunk_unit: str,
+            chunk_size: int,
+            current_config: str="",
+            job_list: list['Job'] | None = None,
     ):
         """Create new experiment_run row and return the new models.ExperimentRun data class from database."""
         status_counts = self.get_status_counts_from_job_list(job_list)
@@ -564,16 +591,22 @@ class ExperimentHistory:
         )
         return self.manager.register_experiment_run_dc(experiment_run_dc)
 
-    def detect_changes_in_job_list(self, job_list):
-        """ Detect changes in job_list compared to the current contents of job_data table. Returns a list of JobData data classes where the status of each item is the new status."""
+    def detect_changes_in_job_list(self, job_list: list['Job']):
+        """Detect changes in job_list compared to the current contents of job_data table. Returns a list of JobData data classes where the status of each item is the new status."""
         job_name_to_job = {str(job.name): job for job in job_list}
         current_job_data_dcs = self.manager.get_all_last_job_data_dcs()
         differences = []
         for job_dc in current_job_data_dcs:
-            if job_dc.job_name in job_name_to_job and job_dc.status != job_name_to_job[job_dc.job_name].status_str:
+            if (
+                job_dc.job_name in job_name_to_job
+                and job_dc.status != job_name_to_job[job_dc.job_name].status_str
+            ):
                 _TERMINAL_STATUSES = {"COMPLETED", "FAILED"}
-                if not (job_dc.status in _TERMINAL_STATUSES and job_name_to_job[
-                    job_dc.job_name].status_str not in _TERMINAL_STATUSES):
+                if not (
+                    job_dc.status in _TERMINAL_STATUSES
+                    and job_name_to_job[job_dc.job_name].status_str
+                    not in _TERMINAL_STATUSES
+                ):
                     # If the job is not changing from a finalized status to a starting status
                     job_dc.status = job_name_to_job[job_dc.job_name].status_str
                     differences.append(job_dc)
@@ -595,19 +628,16 @@ class ExperimentHistory:
             return wrapper_queue
         return qos
 
-    def _get_next_counter_by_job_name(self, job_name) -> int | None:
+    def _get_next_counter_by_job_name(self, job_name: str) -> int | None:
         """Return the counter attribute from the latest job data row by job_name."""
-        try:
-            job_data_dc = self.manager.get_job_data_dc_unique_latest_by_job_name(job_name)
-            max_counter = self.manager.get_job_data_max_counter(job_name)
-            if job_data_dc:
-                return max(max_counter, job_data_dc.counter + 1)
-            else:
-                return max_counter
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+        job_data_dc = self.manager.get_job_data_dc_unique_latest_by_job_name(job_name)
+        max_counter = self.manager.get_job_data_max_counter(job_name)
+        if job_data_dc:
+            return max(max_counter, job_data_dc.counter + 1)
+        else:
+            return max_counter
 
-    def _get_date_member_completed_count(self, job_list) -> int:
+    def _get_date_member_completed_count(self, job_list: list['Job']) -> int:
         """Each item in the job_list must have attributes: date, member, status_str."""
         job_list = job_list if job_list else []
         return sum(
@@ -618,10 +648,8 @@ class ExperimentHistory:
             and job.status_str == hutils.SupportedStatus.COMPLETED
         )
 
-    def get_status_counts_from_job_list(self, job_list):
-        """
-        Return dict with keys COMPLETED, FAILED, QUEUING, SUBMITTED, RUNNING, SUSPENDED, TOTAL.
-        """
+    def get_status_counts_from_job_list(self, job_list: list['Job']):
+        """Return dict with keys COMPLETED, FAILED, QUEUING, SUBMITTED, RUNNING, SUSPENDED, TOTAL."""
         result = {
             hutils.SupportedStatus.COMPLETED: 0,
             hutils.SupportedStatus.FAILED: 0,
@@ -645,15 +673,15 @@ class ExperimentHistory:
         """Return all job_data rows with submit>0 and (start=0 or finish=0).
 
         :return: List of Row objects with job_name, fail_count, platform.
-        :rtype: list
         """
-        try:
-            return self.manager.get_stale_rows()
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+        return self.manager.get_stale_rows()
 
     def update_job_data_values(
-        self, job_name: str, fail_count: int, start: int, finish: int
+            self,
+            job_name: str,
+            fail_count: int,
+            start: int,
+            finish: int
     ) -> int | None:
         """Update start and finish for a specific job_data row.
 
@@ -662,15 +690,15 @@ class ExperimentHistory:
         :param start: Start epoch timestamp.
         :param finish: Finish epoch timestamp.
         :return: Number of rows updated.
-        :rtype: int
         """
-        try:
-            return self.manager.update_job_data_values(job_name, fail_count, start, finish)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+        return self.manager.update_job_data_values(job_name, fail_count, start, finish)
 
 
-def get_historical_database(expid, job_list, as_conf):
+def get_historical_database(
+        expid: str,
+        job_list: list['Job'],
+        as_conf: 'AutosubmitConfig'
+):
     """Get the historical database for the experiment.
 
     :param expid: a string with the experiment id
@@ -683,9 +711,12 @@ def get_historical_database(expid, job_list, as_conf):
         # Historical Database: Can create a new run if there is a difference in the number of jobs or if the current run does not exist.
         exp_history = ExperimentHistory(expid)
         exp_history.initialize_database()
-        run_dc = exp_history.process_status_changes(job_list.get_job_list(), as_conf.get_chunk_size_unit(),
-                                                    as_conf.get_chunk_size(),
-                                                    current_config=as_conf.get_full_config_as_json())
+        run_dc = exp_history.process_status_changes(
+            job_list.get_job_list(),
+            as_conf.get_chunk_size_unit(),
+            as_conf.get_chunk_size(),
+            current_config=as_conf.get_full_config_as_json(),
+        )
         job_list.run_id = run_dc.run_id if run_dc else None
         # TODO: Restore database backup after 4.2.0 joblist? https://github.com/BSC-ES/autosubmit/issues/3179
         # Autosubmit.database_backup(expid)
@@ -697,6 +728,9 @@ def get_historical_database(expid, job_list, as_conf):
     except Exception as e:
         # Connection to status database ec_earth.db can fail.
         # API worker will fix the status.
-        Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
-                  f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
+        Log.debug(
+            f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
+            f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}",
+            7003,
+        )
     return exp_history

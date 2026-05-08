@@ -41,8 +41,7 @@ from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
 )
-from autosubmit.log.log import Log
-from autosubmit.log.log import AutosubmitError
+from autosubmit.log.log import AutosubmitError, Log
 
 CURRENT_DB_VERSION = 21  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
@@ -458,7 +457,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
             self.historicaldb_file_path, statement, changes
         )
 
-    def _update_job_data_by_id(self, job_data_dc: Any):
+    def _update_job_data_by_id(self, job_data_dc: Any) -> None:
         """
         Update job_data table with data class JobData.
         Update last, submit, start, finish, modified, job_id, status, energy, extra_data, nnodes, ncpus, rowstatus, out, err by id.
@@ -673,8 +672,6 @@ class ExperimentHistoryDatabaseManager(Protocol):
     def get_experiment_run_dc_with_max_id(self) -> ExperimentRun: ...
 
     def get_experiment_run_dc_with_max_id_or_none(self) -> ExperimentRun | None: ...
-
-    def register_experiment_run_dc(self, experiment_run_dc): ...
 
     def update_experiment_run_dc_by_id(self, experiment_run_dc) -> ExperimentRun: ...
 
@@ -1160,7 +1157,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             return JobData.from_model(result)
 
     def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
-        """SQLALCHEMY Get the last job data by job name and fail_count.
+        """SQLAlchemy Get the last job data by job name and fail_count.
 
         :param job_name: The job name.
         :type job_name: str
@@ -1196,7 +1193,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         return JobData.from_model(result) if result else None
 
     def get_last_job_data_dc_by_job_name_and_counter(self, job_name: str, counter: int) -> JobData:
-        """SQLALCHEMY Get the last JobData for a given job_name and counter.
+        """SQLAlchemy Get the last JobData for a given job_name and counter.
 
         :param job_name: The job name.
         :type job_name: str
@@ -1220,7 +1217,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         return JobData.from_model(result)
 
     def get_last_job_data_dc_by_job_name(self, job_name: str) -> JobData:
-        """SQLALCHEMY Get the most recent JobData for a given job_name regardless of counter.
+        """SQLAlchemy Get the most recent JobData for a given job_name regardless of counter.
 
         :param job_name: The job name.
         :type job_name: str

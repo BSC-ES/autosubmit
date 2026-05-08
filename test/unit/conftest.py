@@ -21,7 +21,7 @@ from collections.abc import Callable
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from random import choice, randint, seed, randrange
+from random import choice, randint, randrange, seed
 from time import time
 from typing import Any, Protocol
 
@@ -189,9 +189,9 @@ def create_jobs(mocker, request) -> list[Job]:
     def _create_jobs(mock, num_jobs, max_num_retrials_per_job) -> list[Job]:
         jobs = []
         seed(time())
-        submit_time = datetime.datetime(2023, 1, 1, 10, 0, 0, tzinfo=LOCAL_TZ)
-        start_time = datetime.datetime(2023, 1, 1, 10, 30, 0, tzinfo=LOCAL_TZ)
-        end_time = datetime.datetime(2023, 1, 1, 11, 0, 0, tzinfo=LOCAL_TZ)
+        submit_time = datetime(2023, 1, 1, 10, 0, 0)
+        start_time = datetime(2023, 1, 1, 10, 30, 0)
+        end_time = datetime(2023, 1, 1, 11, 0, 0)
         completed_retrial = [submit_time, start_time, end_time, "COMPLETED"]
         partial_retrials = [
             [submit_time, start_time, end_time, ""],
