@@ -260,10 +260,9 @@ def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(m
     dic_mock.read_section.assert_any_call('fake-section-2', 1, Language.BASH)
 
 
-def test_run_only_selected_members(setup_job_list, as_conf):
-    """
-    Test that only jobs with members in the run_members list are loaded. ( autosubmit run $expid -rom --run_only_members)
-    """
+def test_run_only_selected_members(setup_job_list, as_conf, autosubmit):
+    """Test that only jobs with members in the run_members list are loaded.
+    ( autosubmit run $expid -rom --run_only_members)"""
     _, _, job_list = setup_job_list
 
     for job in job_list.get_job_list():

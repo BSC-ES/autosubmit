@@ -200,7 +200,7 @@ def autosubmit_exp(
         # - https://wiki.c2.com/?UnitTestIsolation
         # - https://www.thoughtworks.com/en-es/insights/blog/testing/ephemeral-testing-environments-kill-darlings
         if Path(tmp_path / expid).exists():
-            pytest.xfail(f'The test is trying to use {expid} as expid but its directory exists: {tmp_path!s}!')
+            pytest.xfail(f'The test is trying to use {expid} as expid but its directory exists: {str(tmp_path)}!')
 
         # setdefault will set the default if the user did not specify it.
         # This way, we can control via kwargs the arguments to expid. In the past, this fixture
