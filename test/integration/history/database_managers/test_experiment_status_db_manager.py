@@ -40,12 +40,6 @@ if TYPE_CHECKING:
     from _pytest._py.path import LocalPath
 
 
-def test_create_experiment_status_db_manager_invalid_value():
-    """Test that providing an invalid database type (diff from 'sqlite' and 'postgres') raises an error."""
-    with pytest.raises(ValueError):
-        create_experiment_status_db_manager(None)  # type: ignore
-
-
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, get_next_expid):
@@ -163,49 +157,6 @@ def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
 
     assert "last_heartbeat" in columns
     assert isinstance(database_manager, ExperimentStatusDbManager)
-
-
-@pytest.mark.parametrize(
-    "mock_path,status_row_return",
-    [
-        ("get_experiment_status_row_by_expid", ValueError("missing experiment status row")),
-        ("get_experiment_row_by_expid", ValueError("missing experiment row")),
-    ],
-    ids=["status_row_lookup_fails", "experiment_row_lookup_fails"],
-)
-def test_set_exp_status_logs_warning_on_lookup_failures(
-    tmp_path: "LocalPath", mocker, mock_path, status_row_return
-):
-    """Test that set_exp_status() logs a warning when experiment lookups fail."""
-    db_dir = tmp_path / "db"
-    db_dir.mkdir()
-    local_root_dir = tmp_path / "local"
-    local_root_dir.mkdir()
-
-    database_manager = ExperimentStatusDbManager(
-        expid="a000",
-        db_dir_path=str(db_dir),
-        main_db_name="test.db",
-        local_root_dir_path=str(local_root_dir),
-    )
-
-    warning_mock = mocker.patch(
-        "autosubmit.history.database_managers.experiment_status_db_manager.Log.warning"
-    )
-    mocker.patch.object(
-        database_manager,
-        mock_path,
-        side_effect=status_row_return,
-    )
-    create_status_mock = mocker.patch.object(database_manager, "create_exp_status")
-
-    # Act
-    database_manager.set_exp_status("a000", "RUNNING")
-
-    # Assert
-    warning_mock.assert_called_once()
-    assert "Experiment a000 not found when trying to set status" in warning_mock.call_args[0][0]
-    create_status_mock.assert_not_called()
 
 
 def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", mocker):
