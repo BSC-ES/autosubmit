@@ -17,7 +17,7 @@
 
 """Unit tests for for the experiment status DB managers."""
 
-from typing import cast, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import pytest
 
