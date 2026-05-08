@@ -368,3 +368,60 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(tmp_path: "L
     assert after_running is not None
     assert after_running.status == "RUNNING"
     assert after_running.last_heartbeat == timestamps[3]
+
+
+def test_set_exp_status_creates_running_with_heartbeat(tmp_path: "LocalPath", mocker):
+    """Test that set_exp_status creates a new RUNNING status with heartbeat when status doesn't exist."""
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    local_root_dir = tmp_path / "local"
+    local_root_dir.mkdir()
+    
+    # Make it deterministic, ensure ordering is stable across diff runs
+    timestamps = [
+        "2026-05-08T10:00:00+00:00",  # create_exp_status (modified)
+        "2026-05-08T10:00:01+00:00",  # update_heartbeat (called by set_exp_status)
+    ]
+    mocker.patch(
+        "autosubmit.history.database_managers.experiment_status_db_manager.HUtils.get_current_datetime",
+        side_effect=timestamps,
+    )
+
+    # SQLite database initialization
+    autosubmit_db_path = db_dir / "test.db"
+    with sqlite3.connect(autosubmit_db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE experiment (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                autosubmit_version TEXT
+            )
+            """
+        )
+        cursor.execute(
+            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (1, 'a000', 'No description', '3.14.0')",
+        )
+        conn.commit()
+
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name="test.db",
+        local_root_dir_path=str(local_root_dir),
+    )
+
+    # Verify no status row exists
+    initial_status = database_manager.get_experiment_status_row_by_exp_id(1)
+    assert initial_status is None
+
+    # Act
+    database_manager.set_exp_status("a000", "RUNNING")
+
+    # Assert
+    final_status = database_manager.get_experiment_status_row_by_exp_id(1)
+    assert final_status is not None
+    assert final_status.status == "RUNNING"
+    assert final_status.last_heartbeat == timestamps[1]
