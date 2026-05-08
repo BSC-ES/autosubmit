@@ -155,7 +155,7 @@ def _delete_experiment(expid: str, force: bool) -> None:
 
 
 def _delete_expid(expid_delete: str, force: bool = False) -> None:
-    """Removes an experiment from disk and marks it as deleted in status metadata.
+    """Removes an experiment from the path and marks it as deleted in the database.
     If the current user is eadmin and the -f flag has been sent, it deletes regardless of experiment owner.
 
     :param expid_delete: Identifier of the experiment to delete.
@@ -201,7 +201,7 @@ def _delete_expid(expid_delete: str, force: bool = False) -> None:
                 f"Current user is not the owner of the experiment. {expid_delete} cannot be deleted!", 7012)
 
     message_parts = [
-        f"The {expid_delete} experiment was removed from local disk and marked as deleted in metadata.",
+        f"The {expid_delete} experiment was removed from local disk and marked as deleted in the database.",
         "Note that this action does not delete any data written by the experiment.",
         "Complete list of files/directories deleted:",
         ""

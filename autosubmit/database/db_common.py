@@ -554,7 +554,7 @@ def _last_name_used(test=False, operational=False, evaluation=False):
 
 def _delete_experiment(experiment_id):
     """
-    Marks an experiment as deleted in status metadata while preserving
+    Marks an experiment as deleted in database while preserving
     the experiment row to avoid reusing assigned experiment IDs.
 
     :param experiment_id: experiment identifier
@@ -570,8 +570,7 @@ def _delete_experiment(experiment_id):
         (conn, cursor) = open_conn()
     except DbException as e:
         raise AutosubmitCritical("Could not establish a connection to database", 7001, str(e))
-    # Keep experiment rows as tombstones to avoid reusing experiment IDs.
-    # keep the experiment trace in experiment_status for deleted experiments
+    # Keep the experiment trace in experiment_status for deleted experiments
     try:
         cursor.execute('UPDATE experiment_status SET status=:status, seconds_diff=:seconds_diff, modified=CURRENT_TIMESTAMP '
                        'WHERE name=:name',

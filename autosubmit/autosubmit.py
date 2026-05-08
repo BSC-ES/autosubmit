@@ -2181,7 +2181,7 @@ class Autosubmit:
         Autosubmit.exit = False
         status_tracker = ExperimentStatus(expid)
         experiment_status: Optional[str] = None
-        heartbeat_monitor = status_tracker.heartbeat_monitor(interval_seconds=120) # TODO: decide the interval to update the heartbeat
+        heartbeat_monitor = status_tracker.heartbeat_monitor(interval_seconds=120)
         # Start profiling if the flag has been used
         if profile is not None:
             from .profiler.profiler import Profiler
@@ -2503,7 +2503,6 @@ class Autosubmit:
             experiment_status = "FAILED"
             raise
         finally:
-            # TODO: decide the timeout for the thread to stop
             heartbeat_monitor.stop(timeout=10)
             try:
                 if experiment_status == "COMPLETED":
