@@ -260,9 +260,8 @@ def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(m
 
 
 def test_run_only_selected_members(setup_job_list, as_conf, autosubmit):
-    """
-    Test that only jobs with members in the run_members list are loaded. ( autosubmit run $expid -rom --run_only_members)
-    """
+    """Test that only jobs with members in the run_members list are loaded.
+    ( autosubmit run $expid -rom --run_only_members)"""
     _, _, job_list = setup_job_list
 
     for job in job_list.get_job_list():
@@ -684,5 +683,3 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     job_list.add_job(Job("test_job", "1", Status.COMPLETED, 0))
 
     job_list.recover_last_data()
-
-
