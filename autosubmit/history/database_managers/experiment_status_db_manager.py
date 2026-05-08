@@ -100,6 +100,7 @@ class ExperimentStatusDbManager(DatabaseManager):
     def create_experiment_status_as_running(self, experiment: Models.ExperimentRow) -> None:
         """ Create a new experiment_status row for the Models.Experiment item."""
         self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
+        self.update_heartbeat(experiment.name)
 
     def get_experiment_status_row_by_expid(self, expid: str) -> Optional[Models.ExperimentStatusRow]:
         """Get Models.ExperimentRow by expid."""
@@ -161,6 +162,8 @@ class ExperimentStatusDbManager(DatabaseManager):
             Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
             return
         self.create_exp_status(exp_row.id, expid, status)
+        if status == Models.RunningStatus.RUNNING:
+            self.update_heartbeat(expid)
 
     def update_heartbeat(self, expid: str) -> None:
         now = HUtils.get_current_datetime()
@@ -215,6 +218,7 @@ class SqlAlchemyExperimentStatusDbManager:
 
     def create_experiment_status_as_running(self, experiment):
         self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
+        self.update_heartbeat(experiment.name)
 
     def get_experiment_status_row_by_expid(self, expid: str) -> Optional[Models.ExperimentStatusRow]:
         experiment_row = self.get_experiment_row_by_expid(expid)
@@ -293,6 +297,8 @@ class SqlAlchemyExperimentStatusDbManager:
             Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
             return
         self.create_exp_status(exp_row.id, expid, status)
+        if status == Models.RunningStatus.RUNNING:
+            self.update_heartbeat(expid)
     
     def update_heartbeat(self, expid: str) -> None:
         now = HUtils.get_current_datetime()
