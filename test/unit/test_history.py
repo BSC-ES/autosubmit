@@ -20,12 +20,13 @@ from pathlib import Path
 
 import os
 import re
-from autosubmit.history.utils import get_current_datetime
-import pytest
 import time
 import traceback
+from collections import namedtuple
 from shutil import copy2
 from sqlalchemy import create_engine
+
+import pytest
 
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.internal_logging import Logging
@@ -34,10 +35,11 @@ from autosubmit.history.strategies import StraightWrapperAssociationStrategy, Ge
     PlatformInformationHandler
 from autosubmit.config.basicconfig import BasicConfig
 from test._oldschema import old_job_data_table, old_experiment_run_table
+from autosubmit.history.utils import get_current_datetime
 
 EXPID_TT00_SOURCE = "test_database.db~"
 EXPID_TT01_SOURCE = "test_database_no_run.db~"
-EXPID = "tt00"
+EXPID = "a000"
 EXPID_NONE = "tt01"
 BasicConfig.read()
 JOBDATA_DIR = BasicConfig.JOBDATA_DIR
@@ -465,3 +467,29 @@ def test_update_submit_time(tmp_path, monkeypatch):
     finish_data_dc = exp_history.get_finish_data_dc(JOB_NAME, fail_count=FAIL_COUNT)
     assert finish_data_dc is not None, "get_finish_data_dc returned None; record not found."
     assert finish_data_dc.submit == new_submit_time, f"Expected submit time {new_submit_time}, got {finish_data_dc.submit}"
+
+
+@pytest.mark.parametrize("manager", [
+        False,
+        True,
+    ], ids=["With Manager", "Without Manager"])
+def test_process_status_changes_exception(mocker, job_list, manager):
+    mocked_log = mocker.patch('autosubmit.history.experiment_history.Log')
+    mocked_exp_history = mocker.Mock()
+
+    exp_history = ExperimentHistory(EXPID)
+    exp_history.initialize_database()
+    if manager:
+        exp_history.manager = None
+
+    CHUNK_UNIT = "month"
+    CHUNK_SIZE = 20
+    CURRENT_CONFIG = "CURRENT CONFIG"
+
+    mocked_exp_history.manager.get_experiment_run_dc_with_max_id.side_effect = None
+    exp_history.process_status_changes(job_list=job_list, chunk_unit=CHUNK_UNIT,
+                                                 chunk_size=CHUNK_SIZE,
+                                                 current_config=CURRENT_CONFIG)  # Generates new run
+
+    assert mocked_log.debug.call_count > 0
+    assert "Historical Database error:" in mocked_log.debug.call_args.args[0]

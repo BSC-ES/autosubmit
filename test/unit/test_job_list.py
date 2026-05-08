@@ -20,7 +20,6 @@
 import shutil
 from copy import copy
 from pathlib import Path
-from random import randrange
 from typing import Callable
 
 import networkx
@@ -40,14 +39,6 @@ from test.unit.conftest import FakePlatform
 from test._oldschema import old_job_data_table, old_experiment_run_table
 
 _EXPID = 'a000'
-
-
-@pytest.fixture
-def as_conf(autosubmit_config):
-    return autosubmit_config(_EXPID, experiment_data={
-        'JOBS': {},
-        'PLATFORMS': {}
-    })
 
 
 # TODO: this file has ``setup_job_list`` and ``job_list`` that create job lists.
@@ -88,48 +79,6 @@ def job_list_with_repeated_ids(as_conf, tmpdir, mocker):
 
 
 @pytest.fixture
-def jobs_as_dict(next_job_id):
-    return {
-        Status.COMPLETED: [
-            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
-            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
-            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
-            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED)
-        ],
-        Status.SUBMITTED: [
-            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
-            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
-            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED)
-        ],
-        Status.RUNNING: [
-            _create_dummy_job_with_status(next_job_id(), Status.RUNNING),
-            _create_dummy_job_with_status(next_job_id(), Status.RUNNING)
-        ],
-        Status.QUEUING: [
-            _create_dummy_job_with_status(next_job_id(), Status.QUEUING)
-        ],
-        Status.FAILED: [
-            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
-            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
-            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
-            _create_dummy_job_with_status(next_job_id(), Status.FAILED)
-        ],
-        Status.READY: [
-            _create_dummy_job_with_status(next_job_id(), Status.READY),
-            _create_dummy_job_with_status(next_job_id(), Status.READY),
-            _create_dummy_job_with_status(next_job_id(), Status.READY)
-        ],
-        Status.WAITING: [
-            _create_dummy_job_with_status(next_job_id(), Status.WAITING),
-            _create_dummy_job_with_status(next_job_id(), Status.WAITING)
-        ],
-        Status.UNKNOWN: [
-            _create_dummy_job_with_status(next_job_id(), Status.UNKNOWN)
-        ]
-    }
-
-
-@pytest.fixture
 def job_list_no_repeated_ids(as_conf, mocker, jobs_as_dict):
     parameters = {'fake-key': 'fake-value',
                   'fake-key2': 'fake-value2'}
@@ -142,13 +91,6 @@ def job_list_no_repeated_ids(as_conf, mocker, jobs_as_dict):
         # noinspection PyProtectedMember
         job_list._job_list.extend(jobs)
     return job_list
-
-
-def _create_dummy_job_with_status(job_id: int, status: int) -> Job:
-    job_name = f'job_{job_id}'
-    job = Job(job_name, job_id, status, 0)
-    job.type = randrange(0, 2)
-    return job
 
 
 @pytest.fixture

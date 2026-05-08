@@ -28,13 +28,13 @@ from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
 from autosubmit.history.strategies import PlatformInformationHandler, SingleAssociationStrategy, \
     StraightWrapperAssociationStrategy, \
     TwoDimWrapperDistributionStrategy, GeneralizedWrapperDistributionStrategy
-from autosubmit.log.log import Log
+from autosubmit.log.log import AutosubmitCritical, Log
 
 SECONDS_WAIT_PLATFORM = 60
 
 
 class ExperimentHistory:
-    def __init__(self, expid, force_sql_alchemy:bool=False):
+    def __init__(self, expid, force_sql_alchemy: bool = False):
         # Unused arguments, but I didn't want to change every call to this class in this PR
         self.expid = expid
         BasicConfig.read()
@@ -311,14 +311,16 @@ class ExperimentHistory:
     def _verify_slurm_monitor(self, slurm_monitor, job_data_dc):
         try:
             if slurm_monitor.header.status not in ["COMPLETED", "FAILED"]:
-                self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
-                              f"Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.\n")
+                self._log.log(
+                    f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
+                    f"Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.\n")
                 Log.debug(
                     f'Historical Database error: Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.')
             if not slurm_monitor.steps_plus_extern_approximate_header_energy():
-                self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
-                              f"Steps + extern != total energy for ID {slurm_monitor.header.name}."
-                              f"Number of steps {slurm_monitor.step_count}.\n")
+                self._log.log(
+                    f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
+                    f"Steps + extern != total energy for ID {slurm_monitor.header.name}."
+                    f"Number of steps {slurm_monitor.step_count}.\n")
                 Log.debug(
                     f'Historical Database error: Steps + extern != total energy for ID {slurm_monitor.header.name}.'
                     f'Number of steps {slurm_monitor.step_count}.')
@@ -328,13 +330,16 @@ class ExperimentHistory:
 
     def process_status_changes(self, job_list=None, chunk_unit="NA", chunk_size=0, current_config="", create=False):
         """ Detect status differences between job_list and current job_data rows, and update. Creates a new run if necessary. """
+        current_experiment_run_dc: Optional['ExperimentRun']
         try:
+            if self.manager is None:
+                raise AutosubmitCritical("The DB Manager couldn't be properly initialized")
             try:
                 current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
                 update_these_changes = self._get_built_list_of_changes(job_list)
             except Exception as exp:
                 Log.debug(str(exp), traceback.format_exc())
-                current_experiment_run_dc = 0
+                current_experiment_run_dc = None
                 update_these_changes = []
                 # ("no runs")
             should_create_new_run = self.should_we_create_a_new_run(job_list, len(update_these_changes),
@@ -346,8 +351,8 @@ class ExperimentHistory:
                 return self.create_new_experiment_run(chunk_unit, chunk_size, current_config, job_list)
             return self.update_counts_on_experiment_run_dc(current_experiment_run_dc, job_list)
         except Exception as exp:
-            self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
+            self._log.log(str(exp), traceback.format_exc())
 
     def _get_built_list_of_changes(self, job_list):
         """ Return: List of (current timestamp, current datetime str, status, rowstatus, id in job_data). One tuple per change. """
@@ -367,7 +372,7 @@ class ExperimentHistory:
                                    new_chunk_size, create=False):
         if create:
             return True
-        elif not create and self.expid[0].lower() != "t":
+        elif not create and self.expid[0].lower() != "t" and current_experiment_run_dc:
             if len(job_list) != current_experiment_run_dc.total:
                 return True
             if changes_count > int(self._get_date_member_completed_count(job_list)):
