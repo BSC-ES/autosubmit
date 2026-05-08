@@ -21,7 +21,7 @@ import datetime
 from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from random import choice, randint, seed, randrange
+from random import choice, randint, randrange, seed
 from time import time
 from typing import Any, Protocol
 
