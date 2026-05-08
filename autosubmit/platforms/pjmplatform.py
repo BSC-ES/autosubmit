@@ -407,8 +407,8 @@ class PJMPlatform(ParamikoPlatform):
 
     def _check_for_unrecoverable_errors(self) -> None:
         """Check PJM command output for recoverable and unrecoverable errors."""
-        out = self._ssh_output or ""
-        err = self._ssh_output_err or ""
+        out = self._ssh_output
+        err = self._ssh_output_err
 
         # Fast-exit: any match in stdout confirms valid PJM command output.
         if any(pat.search(out) for pat in _PJM_EXPECTED_OUTPUT):

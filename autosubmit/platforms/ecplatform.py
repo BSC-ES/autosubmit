@@ -458,8 +458,8 @@ class EcPlatform(ParamikoPlatform):
         :raises AutosubmitError: For transient errors.
         :raises AutosubmitCritical: For permanent errors.
         """
-        out = self._ssh_output or ""
-        err = self._ssh_output_err or ""
+        out = self._ssh_output
+        err = self._ssh_output_err
 
         # Fast-exit: stdout matches a known ecaccess success pattern.
         if any(pat.search(out) for pat in _EC_EXPECTED_OUTPUT):

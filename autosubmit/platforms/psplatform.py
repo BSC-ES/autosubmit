@@ -148,8 +148,8 @@ class PsPlatform(ParamikoPlatform):
 
     def _check_for_unrecoverable_errors(self) -> None:
         """Check process-platform output for recoverable and unrecoverable errors."""
-        out = self._ssh_output or ""
-        err = self._ssh_output_err or ""
+        out = self._ssh_output
+        err = self._ssh_output_err
 
         # Fast-exit: stdout is a single digit (process status from get_pscall)
         # or contains lines starting with numeric PIDs (ps output).

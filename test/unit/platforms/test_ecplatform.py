@@ -241,7 +241,6 @@ def test_snapshot_resets_and_captures_pre_existing_ids(
 @pytest.mark.parametrize("ssh_output,ssh_output_err", [
     # Empty or whitespace output – no error possible.
     ("", ""),
-    (None, None),
     ("   \n  ", ""),
     # Bare numeric job ID – ecaccess-job-submit success.
     ("12345", ""),
@@ -273,6 +272,27 @@ def test_check_for_unrecoverable_errors_no_exception_for_valid_output(
     ec_platform._ssh_output = ssh_output
     ec_platform._ssh_output_err = ssh_output_err
     ec_platform._check_for_unrecoverable_errors()  # must not raise
+
+
+@pytest.mark.parametrize("ssh_output,ssh_output_err", [
+    (None, None),
+])
+def test_check_for_unrecoverable_errors_none_exception_expected(
+    ec_platform: EcPlatform,
+    ssh_output: Optional[str],
+    ssh_output_err: Optional[str],
+) -> None:
+    """Verify that no exception is raised for known-valid ecaccess output.
+
+    :param ec_platform: EcPlatform under test.
+    :param ssh_output: Value to assign to ``_ssh_output``.
+    :param ssh_output_err: Value to assign to ``_ssh_output_err``.
+    """
+    ec_platform._ssh_output = ssh_output
+    ec_platform._ssh_output_err = ssh_output_err
+    with pytest.raises(TypeError) as te:
+        ec_platform._check_for_unrecoverable_errors()
+    assert "expected string or bytes-like object" in te.value.args[0]
 
 
 @pytest.mark.parametrize("output", [

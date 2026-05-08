@@ -147,7 +147,7 @@ class ParamikoPlatform(Platform):
         self.job_status: Optional[dict[str, list]] = None
         self._ssh: Optional[paramiko.SSHClient] = None
         self._ssh_config = None
-        self._ssh_output = None
+        self._ssh_output = ""
         self._host_config: Optional[dict] = None
         self._host_config_id = None
         self.submit_cmd = ""
@@ -166,13 +166,13 @@ class ParamikoPlatform(Platform):
 
         self.remove_log_files_on_transfer = False
         if self.config:
-            platform_config: dict = self.config.get("PLATFORMS", {}).get(
+            platform_config = self.config.get("PLATFORMS", {}).get(
                 self.name.upper(), {}
             )
             self.remove_log_files_on_transfer = platform_config.get(
                 "REMOVE_LOG_FILES_ON_TRANSFER", False
             )
-        self._uses_local_api: bool = False
+        self._uses_local_api = False
         # Pre-submission snapshot used by get_submitted_jobs_by_name to exclude
         # stale processes from previous runs on process-based platforms.
         self._pre_submission_pids: dict[str, set[int]] = {}
@@ -200,7 +200,7 @@ class ParamikoPlatform(Platform):
         self.connected = False
         self._ssh = None
         self._ssh_config = None
-        self._ssh_output = None
+        self._ssh_output = ""
         self._host_config = None
         self._host_config_id = None
         self._ftpChannel = None
@@ -1465,8 +1465,6 @@ class ParamikoPlatform(Platform):
         :return: output from last command
         :rtype: str
         """
-        if self._ssh_output is None or not self._ssh_output:
-            self._ssh_output = ""
         return self._ssh_output
 
     def get_ssh_output_err(self):

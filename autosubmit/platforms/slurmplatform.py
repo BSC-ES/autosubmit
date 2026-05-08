@@ -440,8 +440,8 @@ class SlurmPlatform(ParamikoPlatform):
 
     def _check_for_unrecoverable_errors(self) -> None:
         """Check Slurm command output for recoverable and unrecoverable errors."""
-        out = self._ssh_output or ""
-        err = self._ssh_output_err or ""
+        out = self._ssh_output
+        err = self._ssh_output_err
 
         # Fast-exit: any match in stdout (single or multi-line) confirms the
         if any(pat.search(out) for pat in _SLURM_EXPECTED_OUTPUT):
