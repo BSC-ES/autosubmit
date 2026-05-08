@@ -457,7 +457,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
             self.historicaldb_file_path, statement, changes
         )
 
-    def _update_job_data_by_id(self, job_data_dc: Any):
+    def _update_job_data_by_id(self, job_data_dc: Any) -> None:
         """
         Update job_data table with data class JobData.
         Update last, submit, start, finish, modified, job_id, status, energy, extra_data, nnodes, ncpus, rowstatus, out, err by id.
@@ -672,8 +672,6 @@ class ExperimentHistoryDatabaseManager(Protocol):
     def get_experiment_run_dc_with_max_id(self) -> ExperimentRun: ...
 
     def get_experiment_run_dc_with_max_id_or_none(self) -> ExperimentRun | None: ...
-
-    def register_experiment_run_dc(self, experiment_run_dc): ...
 
     def update_experiment_run_dc_by_id(self, experiment_run_dc) -> ExperimentRun: ...
 
