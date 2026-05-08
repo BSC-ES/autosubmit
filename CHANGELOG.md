@@ -53,6 +53,7 @@
 - Improving the handling of leakages that were happening when dealing with queues and processes #2900
 - verbosity adjusted #2976
 - Implement filters for `recovery` command #2923
+- Extended possible experiment statuses in `experiment_status` table, added `last_heartbeat` column as a keep-alive signal for running experiments #2947
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
