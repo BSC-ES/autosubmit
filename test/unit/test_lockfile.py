@@ -56,6 +56,11 @@ def test_log_critical_raises_error(mocker):
 _TEST_EXCEPTION = AutosubmitCritical()
 _TEST_EXCEPTION.trace = 'a trace'
 
+# (ValueError, 1, 1, True),
+# (BaseLockException, 1, 0, False),
+# (AutosubmitCritical, 1, 1, True),
+# (_TEST_EXCEPTION, 2, 1, True),
+# (AutosubmitError, 1, 1, True)
 
 @pytest.mark.parametrize(
     'exception,debug_calls,critical_calls,delete_called',

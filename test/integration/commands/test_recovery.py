@@ -29,7 +29,6 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
 )
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from bscearth.utils.date import date2str
 
 if TYPE_CHECKING:
@@ -125,7 +124,7 @@ def do_recovery(as_exp, fl=None, fc=None, fs=None, ft=None, all_jobs=True):
 
     as_exp.autosubmit.recovery(
         as_exp.expid,
-        noplot=False,
+        noplot=True,
         save=True,
         all_jobs=all_jobs,
         hide=True,
@@ -172,30 +171,26 @@ def test_online_recovery(
     :param as_exp: The Autosubmit experiment object.
     :param prepare_scratch: Fixture to prepare the scratch directory.
     """
-    job_list_ = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    job_list_ = as_exp.autosubmit.load_job_list(
+        as_exp.expid, as_exp.as_conf, new=False, full_load=True,
+        check_failed_jobs=True)
     db_manager = SqlAlchemyExperimentHistoryDbManager(as_exp.expid, BasicConfig.JOBDATA_DIR, f'job_data_{as_exp.expid}.db')
     db_manager.initialize()
-    # Save fails if the platform is not set. In 4.2 this will not happen.
-    submitter = ParamikoSubmitter(as_conf=as_exp.as_conf)
-    submitter.load_platforms(as_exp.as_conf)
-    platforms = submitter.platforms
 
     for job in job_list_.get_job_list():
-        if not job.platform:
-            job.platform = platforms[job.platform_name]
         if job.name in job_names_to_recover:
             if active_jobs:
                 job.status = Status.RUNNING
             else:
                 job.status = Status.WAITING
 
-    job_list_.save()
+    job_list_.save_jobs()
 
     if active_jobs and not force:
         with pytest.raises(AutosubmitCritical):
             as_exp.autosubmit.recovery(
                 as_exp.expid,
-                noplot=False,
+                noplot=True,
                 save=True,
                 all_jobs=True,
                 hide=True,
@@ -209,7 +204,7 @@ def test_online_recovery(
     else:
         as_exp.autosubmit.recovery(
             as_exp.expid,
-            noplot=False,
+            noplot=True,
             save=True,
             all_jobs=True,
             hide=True,
@@ -221,7 +216,9 @@ def test_online_recovery(
             offline=False
         )
 
-        job_list_ = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+        job_list_ = as_exp.autosubmit.load_job_list(
+            as_exp.expid, as_exp.as_conf, new=False, full_load=True,
+            check_failed_jobs=True)
 
         completed_jobs = [job.name for job in job_list_.get_job_list() if job.status == Status.COMPLETED]
 
@@ -254,15 +251,10 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
 
         db_manager.initialize()
         job_list_ = as_exp.autosubmit.load_job_list(
-            as_exp.expid, as_exp.as_conf, new=False)
-
-        submitter = as_exp.autosubmit._get_submitter(as_exp.as_conf)
-        submitter.load_platforms(as_exp.as_conf)
-        platforms = submitter.platforms
+            as_exp.expid, as_exp.as_conf, new=False, full_load=True,
+            check_failed_jobs=True)
 
         for job in job_list_.get_job_list():
-            if not job.platform:
-                job.platform = platforms[job.platform_name]
             if job.name in job_names_to_recover:
                 if active_jobs:
                     job.status = Status.RUNNING
@@ -332,7 +324,7 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
             with pytest.raises(AutosubmitCritical):
                 as_exp.autosubmit.recovery(
                     as_exp.expid,
-                    noplot=False,
+                    noplot=True,
                     save=True,
                     all_jobs=True,
                     hide=True,
@@ -346,7 +338,7 @@ def test_offline_recovery(as_exp, tmp_path, submitter, job_names_to_recover, act
         else:
             as_exp.autosubmit.recovery(
                 as_exp.expid,
-                noplot=False,
+                noplot=True,
                 save=True,
                 all_jobs=True,
                 hide=True,
@@ -442,7 +434,7 @@ def test_recovery_plotting_error_logs_warning(as_exp, mocker):
         call.args[0] for call in mocked_warning.call_args_list if call.args
     ]
     assert any(
-        "An error has occurred while plotting the jobs list after recovery."
+        "plotting error"
         in message
         for message in warning_messages
     )

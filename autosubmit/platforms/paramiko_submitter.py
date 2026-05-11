@@ -22,6 +22,7 @@ import os
 from collections import defaultdict
 from typing import Optional, Union, TYPE_CHECKING
 
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.ecplatform import EcPlatform
@@ -31,6 +32,7 @@ from autosubmit.platforms.pbsplatform import PBSPlatform
 from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
+from .platform import Platform
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -115,6 +117,15 @@ class ParamikoSubmitter:
                        local_auth_password=None):
         self.platforms: Optional[dict[str, 'ParamikoPlatform']] = None
         self.load_platforms(as_conf=as_conf, auth_password=auth_password, local_auth_password=local_auth_password)
+
+    @property
+    def platforms_object(self) -> list[Platform]:
+        """Returns a list of all the platforms objects used by the experiment.
+
+        :return: List of platform objects
+        :rtype: list[Platform]
+        """
+        return list(self.platforms.values())
 
     def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: Optional[dict] = None,
                             auth_password: Optional[str] = None) -> None:
@@ -218,8 +229,6 @@ class ParamikoSubmitter:
 
             remote_platform.processors_per_node = section_platform.get('PROCESSORS_PER_NODE', "1")
             remote_platform.custom_directives = section_platform.get('CUSTOM_DIRECTIVES', "")
-            if len(remote_platform.custom_directives) > 0:
-                Log.debug(f'Custom directives for {platform_used}: {remote_platform.custom_directives}')
             remote_platform.scratch_free_space = str(section_platform.get('SCRATCH_FREE_SPACE', False)).lower()
             try:
                 remote_platform.root_dir = os.path.join(remote_platform.scratch, remote_platform.project,

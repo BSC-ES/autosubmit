@@ -19,30 +19,25 @@
 
 import pytest
 
-from autosubmit.database.tables import get_table_with_schema, get_table_from_name, ExperimentTable
+from autosubmit.database.tables import ExperimentTable, TableRegistry
 
 
-def test_get_table_with_schema_invalid_table():
-    with pytest.raises(ValueError, match='Invalid source type on table schema change'):
-        get_table_with_schema(schema=None, table=None)  # type: ignore
-
-
-def test_get_table_with_schema():
+def test_get_table():
     table = ExperimentTable
+    table_registry = TableRegistry("testing")
     assert table.schema is None
-    table = get_table_with_schema(schema='testing', table=table)
+    table = table_registry.get(table.name)
     assert table.schema == 'testing'
 
 
-def test_get_table_from_name_invalid_name():
-    with pytest.raises(ValueError, match='Missing table name: None'):
-        get_table_from_name(schema=None, table_name=None)  # type: ignore
+def test_get_table_from_name_invalid_table_name() -> None:
+    """Raise ``KeyError`` for an unknown table name."""
+    table_registry = TableRegistry("testing")
 
+    with pytest.raises(KeyError) as exc_info:
+        table_registry.get(table_name="catch-me-if-you-can")
 
-def test_get_table_from_name_invalid_table_name():
-    """An invalid table name will result in the same scenario as ``test_get_table_with_schema_invalid_table``."""
-    with pytest.raises(ValueError, match='Invalid source type on table schema change'):
-        get_table_from_name(schema=None, table_name='catch-me-if-you-can')
+    assert exc_info.value.args[0] == "No table definition found for 'catch-me-if-you-can'."
 
 
 @pytest.mark.parametrize(
@@ -53,7 +48,8 @@ def test_get_table_from_name_invalid_table_name():
     ]
 )
 def test_get_table_from_name(schema):
-    table = get_table_from_name(schema=schema, table_name=ExperimentTable.name)
+    table_registry = TableRegistry(schema)
+    table = table_registry.get(table_name=ExperimentTable.name)
     assert table.name == ExperimentTable.name
     assert len(table.columns) == len(ExperimentTable.columns)  # type: ignore
     assert all([left.name == right.name for left, right in zip(table.columns, ExperimentTable.columns)])  # type: ignore

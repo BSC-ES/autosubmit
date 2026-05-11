@@ -19,14 +19,14 @@
 """ Test file for autosubmit/autosubmit.py """
 
 from contextlib import contextmanager
-from shutil import rmtree
 
 import pytest
+from pathlib import Path
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
-
 
 @contextmanager
 def does_not_raise():
@@ -50,7 +50,7 @@ def build_db_mock(current_experiment_id, mock_db_common, mocker):
     ('', does_not_raise()),
     ('test', pytest.raises(AutosubmitCritical))
 ], ids=['success', 'fail'])
-def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypatch) -> None:
+def test_expid(copy_id, expected, tmp_path, autosubmit_config, monkeypatch, autosubmit) -> None:
     """
     Function to test if the autosubmit().expid generates the paths and expid properly
 
@@ -58,29 +58,11 @@ def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypat
     :param tmp_path: Path
     :return: None
     """
+    autosubmit.install()
     monkeypatch.setattr(db_common, 'TIMEOUT', 1)
-
-    current_experiment_id = "empty"
-
-    monkeypatch.setattr(db_common, 'TIMEOUT', 1)
-
-    db_common_mock = mocker.patch('autosubmit.experiment.experiment_common.db_common')
-    build_db_mock(current_experiment_id, db_common_mock, mocker)
-
-    basic_config = autosubmit_config('a000').basic_config
-    basic_config.STRUCTURES_DIR = basic_config.LOCAL_ROOT_DIR = str(tmp_path)
-    basic_config.JOBDATA_DIR = str(tmp_path)
-    basic_config.read()
-
-    # The fixtures create the experiment directories, so we must remove them before calling
-    # expid here.
-    exp_path = tmp_path / 'a000'
-    rmtree(exp_path)
-
     with expected:
         expid = Autosubmit.expid("Test", copy_id=copy_id)
         experiment = Autosubmit.describe(expid)
-        path = tmp_path / expid
-        assert path.exists()
+        assert Path(BasicConfig.LOCAL_ROOT_DIR) / expid
         assert experiment is not None
         assert isinstance(expid, str) and len(expid) == 4

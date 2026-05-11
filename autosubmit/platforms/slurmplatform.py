@@ -27,8 +27,6 @@ from pathlib import Path
 from time import sleep
 from typing import Any, Optional, Union, TYPE_CHECKING
 
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
@@ -36,7 +34,7 @@ from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
 
 if TYPE_CHECKING:
     # Avoid circular imports
-    from autosubmit.job.job import Job
+    pass
 
 
 # Compiled patterns that identify valid stdout from any Slurm command.
@@ -273,15 +271,7 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return f"scontrol -o show JobId {job_id} | grep -Po '(?<=EligibleTime=)[0-9-:T]*'"
 
-    def get_queue_status_cmd(self, job_id: str) -> str:
-        """Get queue generating squeue command to the job selected.
 
-        :param job_id: ID of a job.
-        :param job_id: str
-        :return: Gets estimated queue time.
-        :rtype: str
-        """
-        return f'squeue -j {job_id} -o %A,%R'
 
     def get_job_id_by_job_name_cmd(self, job_name: str) -> str:
         """Looks for a job based on its name.
@@ -318,37 +308,7 @@ class SlurmPlatform(ParamikoPlatform):
             if x.split(',')[0] == str(job_id)
         ])
 
-    def get_queue_status(self, in_queue_jobs: list['Job'], list_queue_jobid: str, as_conf: AutosubmitConfig) -> None:
-        """get_queue_status.
 
-        :param in_queue_jobs: List of Job.
-        :type in_queue_jobs: list[Job]
-        :param list_queue_jobid: List of Job IDs concatenated.
-        :type list_queue_jobid: str
-        :param as_conf: experiment configuration.
-        :type as_conf: autosubmit.config.AutosubmitConfig
-        """
-        if not in_queue_jobs:
-            return
-        cmd = self.get_queue_status_cmd(list_queue_jobid)
-        self.send_command(cmd)
-        queue_status = self._ssh_output
-        for job in in_queue_jobs:
-            reason = self.parse_queue_reason(queue_status, job.id)
-            if job.queuing_reason_cancel(reason):  # this should be a platform method to be implemented
-                Log.error(
-                    f"Job {job.name} will be cancelled and set to FAILED as it was queuing due to {reason}")
-                self.send_command(
-                    self.cancel_cmd + f" {job.id}")
-                job.new_status = Status.FAILED
-                job.update_status(as_conf)
-            elif reason == '(JobHeldUser)':
-                if not job.hold:
-                    # should be self.release_cmd or something like that, but it is not implemented
-                    self.send_command(f"scontrol release {job.id}")
-                    job.new_status = Status.QUEUING  # If it was HELD and was released, it should be QUEUING next.
-                else:
-                    job.new_status = Status.HELD
 
     def wrapper_header(self, **kwargs: Any) -> str:
         """It generates the header of the wrapper configuring it to execute the Experiment.
@@ -370,9 +330,9 @@ class SlurmPlatform(ParamikoPlatform):
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5,
-                          max_retries: int = 3) -> bool:
-        """Checks if a file exists on the FTP server.
-
+                          max_retries: int = 3, show_logs: bool = True) -> bool:
+        """
+        Checks if a file exists on the FTP server.
         :param src: The name of the file to check.
         :type src: str
         :param wrapper_failed: Whether the wrapper has failed. Defaults to False.
@@ -381,6 +341,9 @@ class SlurmPlatform(ParamikoPlatform):
         :type sleeptime: int
         :param max_retries: Maximum number of retries. Defaults to 3.
         :type max_retries: int
+        :param show_logs: Whether to show logs if the file does not exist. Defaults to True.
+        :type show_logs: bool
+
         :return: True if the file exists, False otherwise
         :rtype: bool
         """
@@ -407,7 +370,7 @@ class SlurmPlatform(ParamikoPlatform):
                 else:
                     file_exist = False  # won't exist
                     retries = 999  # no more retries
-        if not file_exist:
+        if not file_exist and show_logs:
             Log.warning(f"File {src} couldn't be found")
         return file_exist
 

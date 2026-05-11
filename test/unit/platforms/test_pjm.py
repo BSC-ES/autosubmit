@@ -95,7 +95,7 @@ def create_packages(as_conf, pjm_platform):
         job.platform_name = pjm_platform.name
         job.processors = 2
         job.section = "dummysection"
-        job._init_runtime_parameters()
+        job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
         job.wallclock = "00:01"
     packages = [
         JobPackageSimple(simple_jobs),
@@ -186,7 +186,7 @@ def test_process_ready_jobs_valid_packages_to_submit(mocker, pjm_platform, creat
 
     for i, package in enumerate(create_packages):
         for job in package.jobs:
-            assert job.id == str(jobs_id[i])
+            assert job.id == jobs_id[i]
             assert job.status == Status.SUBMITTED
 
 

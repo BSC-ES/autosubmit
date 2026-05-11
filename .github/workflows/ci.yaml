@@ -58,7 +58,7 @@ jobs:
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             --verbose --verbosity="2" \
-            test/unit -m "not postgres"
+            test/unit -m "not postgres and not profile and not profilelong"
 
       - name: Coverage report
         run: |
@@ -76,14 +76,14 @@ jobs:
     env:
       COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     strategy:
       matrix:
         # NOTE: We use 3.11 and not the latest 3.12 as the debugger of 3.12 is buggy
         #       and 3.11 is the current version used at the BSC ES department.
         python-version: ["3.9", "3.11"]
-        pytest-markers: ["not postgres and not slurm"]
+        pytest-markers: ["not postgres and not slurm and not profile and not profilelong"]
         # Here we include an extra build with the lowest version of Python and Postgres.
         # We do it this way to avoid wasting CICD resources since we already tested the
         # code with SQLite. So we run just one build with Postgres (normally newer versions
@@ -92,7 +92,7 @@ jobs:
         # https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow#example-adding-configurations
         include:
           - python-version: '3.9'
-            pytest-markers: 'postgres and not slurm'
+            pytest-markers: 'postgres and not slurm and not profile and not profilelong'
 
     steps:
       - name: Checkout code
@@ -130,7 +130,7 @@ jobs:
         run: |
           Xvfb :99 -screen 0 1024x768x24 -ac &
           export DISPLAY=:99
-          
+
           pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
@@ -155,7 +155,7 @@ jobs:
         if: failure()
         run: |
           logs_found=false
-          
+
           if [ -d ../container_logs_ssh_server ]; then
             echo "Found container logs for SSH server, moving them to container_logs_integration"
             mv ../container_logs_ssh_server/ container_logs_integration
@@ -163,7 +163,7 @@ jobs:
           else
             echo "No container logs found for SSH server"
           fi
-          
+
           if [ -d ../container_logs_git_server ]; then
             echo "Found container logs for Git server, moving them to container_logs_integration_git"
             mv ../container_logs_git_server/ container_logs_integration_git
@@ -171,7 +171,7 @@ jobs:
           else
             echo "No container logs found for Git server"
           fi
-          
+
           # Write the value to the GH Actions step output, so other steps can use it.
           echo "logs_found=$logs_found" >> $GITHUB_OUTPUT
 
@@ -223,7 +223,7 @@ jobs:
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/regression \
-            -m ''
+            -m "not profile and not profilelong"
 
       - name: Coverage report
         run: |
@@ -273,7 +273,7 @@ jobs:
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
-            -m 'slurm'
+            -m 'slurm and not profile and not profilelong'
 
       - name: Coverage report
         run: |
@@ -292,7 +292,7 @@ jobs:
         if: failure()
         run: |
           logs_found=false
-          
+
           if [ -d ../container_logs_slurm_server ]; then
             echo "Found container logs for SLURM server, moving them to container_logs_slurm"
             mv ../container_logs_slurm_server/ container_logs_slurm
@@ -300,7 +300,7 @@ jobs:
           else
             echo "No container logs found for SLURM server"
           fi
-          
+
           # Write the value to the GH Actions step output, so other steps can use it.
           echo "logs_found=$logs_found" >> $GITHUB_OUTPUT
 

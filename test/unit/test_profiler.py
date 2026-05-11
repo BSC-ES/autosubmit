@@ -14,8 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-from typing import Optional
-
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
@@ -79,18 +77,19 @@ def test_memory_profiling_loop(profiler):
 
 
 @pytest.mark.parametrize(
-    "argv, expected_profile, expected_trace",
+    "argv, expected_profile, expected_trace, expected_max_iter",
     [
-        (["autosubmit", "run", "a000"], None, False),
-        (["autosubmit", "run", "a000", "--profile"], 0, False),
-        (["autosubmit", "run", "a000", "--profile", "3"], 3, False),
-        (["autosubmit", "run", "a000", "--profile", "--trace"], 0, True),
+        (["autosubmit", "run", "a000"], False, False, 0),
+        (["autosubmit", "run", "a000", "--profile"], True, False, 0),
+        (["autosubmit", "run", "a000", "--profile", "--profile_max_iterations", "3"], True, False, 3),
+        (["autosubmit", "run", "a000", "--profile", "--trace"], True, True, 0),
     ],
 )
 def test_run_command_forwards_profile_arguments(
         argv: list[str],
-        expected_profile: Optional[int],
+        expected_profile: bool,
         expected_trace: bool,
+        expected_max_iter: int,
         mocker,
 ) -> None:
     mocker.patch("sys.argv", argv)
@@ -114,6 +113,7 @@ def test_run_command_forwards_profile_arguments(
         None,
         expected_profile,
         expected_trace,
+        expected_max_iter,
     )
 
 

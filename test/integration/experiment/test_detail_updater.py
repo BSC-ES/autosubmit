@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for detail updater."""
+from pathlib import Path
 
 import pytest
 from sqlalchemy.schema import CreateTable
@@ -60,10 +61,10 @@ def test_details_properties(autosubmit_exp, mocker):
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_details_repository(tmpdir, as_db: str):
-    connection_url = get_connection_url(tmpdir / 'details.db')
+    connection_url = get_connection_url(Path(tmpdir / 'details.db'))
     with session.create_engine(connection_url=connection_url).connect() as conn:
-        conn.execute(CreateTable(DetailsTable, if_not_exists=True))
-        conn.commit()
+        with conn.begin():
+            conn.execute(CreateTable(DetailsTable, if_not_exists=True))
 
     details_repo = create_experiment_details_repository(as_db)
 

@@ -12,5 +12,5 @@ MAIL:
   NOTIFICATIONS: False
   TO:
 STORAGE:
-  TYPE: "pkl"
+  TYPE: "db"
   COPY_REMOTE_LOGS: True

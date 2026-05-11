@@ -27,7 +27,7 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.platforms.platform import CopyQueue
+from autosubmit.platforms.platform import CopyQueue, Platform
 
 
 def _get_script_files_path() -> Path:
@@ -45,8 +45,9 @@ def as_conf(prepare_test, mocker):
 
 
 def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
-    mocker.patch('autosubmit.platforms.platform.max', return_value=1)
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    local.config['LOG_RECOVERY_TIMEOUT'] = 1
+
     local.spawn_log_retrieval_process(as_conf)
     is_alive = local.log_recovery_process.is_alive()
     assert is_alive, 'Log recovery process is not alive'
@@ -60,43 +61,34 @@ def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
 
 
 def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
-    mocker.patch('autosubmit.platforms.platform.max', return_value=1)
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
-    local.keep_alive_timeout = 0
+    local.config['LOG_RECOVERY_TIMEOUT'] = 1
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
-    time.sleep(0.9)
+    time.sleep(0.5)
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
-    time.sleep(0.9)
-    assert local.log_recovery_process.is_alive()
-    time.sleep(1.1)  # added .1 because the code could take a bit more time to exit
+    time.sleep(1.1)
     assert local.log_recovery_process.is_alive() is False
     local.cleanup_event.set()
 
 
 def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
-    mocker.patch('autosubmit.platforms.platform.max', return_value=1)
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
-    local.keep_alive_timeout = 0
+    local.config['LOG_RECOVERY_TIMEOUT'] = 0
     local.spawn_log_retrieval_process(as_conf)
-    assert local.log_recovery_process.is_alive()
-    local.work_event.set()
-    time.sleep(0.9)
-    assert local.log_recovery_process.is_alive()
-    local.work_event.set()
     local.cleanup_event.set()
-    time.sleep(1.1)  # added .1 because the code could take a bit more time to exit
-    assert local.log_recovery_process.is_alive() is False
-    local.cleanup_event.set()
+    # Some grace time to the process to detect the cleanup event
+    time.sleep(1)
+    assert not local.log_recovery_process.is_alive()
 
 
 def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
     print(prepare_test.strpath)
     mocker.patch('autosubmit.platforms.platform.max', return_value=0)
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
-    local.keep_alive_timeout = 20
+    local.config['LOG_RECOVERY_TIMEOUT'] = 1
     mocker.patch('autosubmit.job.job.Job.write_stats')
     local.spawn_log_retrieval_process(as_conf)
     local.work_event.set()
@@ -105,7 +97,7 @@ def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
     job.platform = local
     job.platform_name = 'local'
     job.local_logs = ("t000.cmd.out.moved", "t000.cmd.err.moved")
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     local.work_event.set()
     local.add_job_to_log_recover(job)
     local.cleanup_event.set()
@@ -118,7 +110,7 @@ def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
 def test_refresh_log_retry_process(prepare_test, local, as_conf, mocker):
     mocker.patch('autosubmit.platforms.platform.max', return_value=0)
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
-    local.keep_alive_timeout = 20
+    local.config['LOG_RECOVERY_TIMEOUT'] = 1
     platforms = [local]
     local.spawn_log_retrieval_process(as_conf)
     Autosubmit.refresh_log_recovery_process(platforms, as_conf)
@@ -142,39 +134,20 @@ def test_refresh_log_retry_process(prepare_test, local, as_conf, mocker):
     (False, False, True, True),
     (False, False, False, False),
     (True, True, True, True),
-], ids=["w(T)|c(F)|rq(T)", "w(T)|c(F)|rq(F)", "w(F)|c(T)|rq(T)", "w(F)|c(T)|rq(F)", "w(F)|c(F)|rq(T)",
-        "w(F)|c(F)|rq(F)", "w(T)|c(T)|rq(T)"])
-def test_wait_until_timeout(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
-                            result):
-    mocker.patch('autosubmit.platforms.platform.max', return_value=2)
-    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
-    local.keep_alive_timeout = 2
-    max_items = 1
-    local.prepare_process()
-    local.recovery_queue = CopyQueue(ctx=local.ctx)
-    local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
-    local.work_event.set() if work_event else local.work_event.clear()
-    if recovery_queue_full:
-        for i in range(max_items):
-            local.recovery_queue.put(Job('t000', f'000{i}', Status.COMPLETED, 0))
-    process_log = local.wait_mandatory_time(2)
-    assert process_log == result
-
-
-@pytest.mark.parametrize("work_event, cleanup_event, recovery_queue_full, result", [
-    (True, False, True, True),
-    (True, False, False, True),
-    (False, True, True, True),
-    (False, True, False, True),
-    (False, False, True, True),
-    (False, False, False, False),
-    (True, True, True, True),
-], ids=["w(T)|c(F)|rq(T)", "w(T)|c(F)|rq(F)", "w(F)|c(T)|rq(T)", "w(F)|c(T)|rq(F)", "w(F)|c(F)|rq(T)",
-        "w(F)|c(F)|rq(F)", "w(T)|c(T)|rq(T)"])
+], ids=[
+    "w(T)|c(F)|rq(T)",
+    "w(T)|c(F)|rq(F)",
+    "w(F)|c(T)|rq(T)",
+    "w(F)|c(T)|rq(F)",
+    "w(F)|c(F)|rq(T)",
+    "w(F)|c(F)|rq(F)",
+    "w(T)|c(T)|rq(T)"
+])
 def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
                        result):
-    mocker.patch('autosubmit.platforms.platform.max', return_value=2)
     mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    local.config['LOG_RECOVERY_TIMEOUT'] = 2
+    # This is needed, because in this occasion we are testing the function from the main process
     local.keep_alive_timeout = 2
     max_items = 1
     local.prepare_process()
@@ -184,34 +157,7 @@ def test_wait_for_work(prepare_test, local, as_conf, mocker, cleanup_event, work
     if recovery_queue_full:
         for i in range(max_items):
             local.recovery_queue.put(Job('t000', f'000{i}', Status.COMPLETED, 0))
-    process_log = local.wait_for_work(2)
-    assert process_log == result
-
-
-@pytest.mark.parametrize("work_event, cleanup_event, recovery_queue_full, result", [
-    (True, False, True, True),
-    (True, False, False, True),
-    (False, True, True, True),
-    (False, True, False, True),
-    (False, False, True, True),
-    (False, False, False, False),
-    (True, True, True, True),
-], ids=["w(T)|c(F)|rq(T)", "w(T)|c(F)|rq(F)", "w(F)|c(T)|rq(T)", "w(F)|c(T)|rq(F)", "w(F)|c(F)|rq(T)",
-        "w(F)|c(F)|rq(F)", "w(T)|c(T)|rq(T)"])
-def test_wait_mandatory_time(prepare_test, local, as_conf, mocker, cleanup_event, work_event, recovery_queue_full,
-                             result):
-    mocker.patch('autosubmit.platforms.platform.max', return_value=2)
-    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
-    local.keep_alive_timeout = 2
-    max_items = 1
-    local.prepare_process()
-    local.recovery_queue = CopyQueue(ctx=local.ctx)
-    local.cleanup_event.set() if cleanup_event else local.cleanup_event.clear()
-    local.work_event.set() if work_event else local.work_event.clear()
-    if recovery_queue_full:
-        for i in range(max_items):
-            local.recovery_queue.put(Job('rng', f'000{i}', Status.COMPLETED, 0))
-    process_log = local.wait_mandatory_time(2)
+    process_log = local.wait_for_work()
     assert process_log == result
 
 
@@ -331,3 +277,62 @@ def test_refresh_log_recovery_process(local, autosubmit, as_conf, mocker):
         autosubmit.refresh_log_recovery_process(platforms=[local], as_conf=as_conf)
         assert p != local.work_event
         assert local.work_event.is_set()
+
+
+def test_worker_events_no_duplicates(local, mocker):
+    """Verify that update_workers() does not add the same event twice."""
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    Platform.worker_events.clear()
+    local.prepare_process()
+    # prepare_process adds one event; verify adding the same one again doesn't duplicate
+    count_after_prepare = len(Platform.worker_events)
+    assert count_after_prepare >= 1
+    Platform.update_workers(local.work_event)
+    assert len(Platform.worker_events) == count_after_prepare
+    Platform.worker_events.clear()
+
+
+def test_add_job_to_log_recover_failure_does_not_increment_updated_log(local, mocker):
+    """Verify that when recovery_queue.put fails, updated_log is NOT incremented."""
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    local.prepare_process()
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    job = Job('t000', '0000', Status.COMPLETED, 0)
+    job.name = 'test_job'
+    job.id = 123
+    job.updated_log = 0
+    local.log_recovery_process = mocker.MagicMock()
+    local.log_recovery_process.is_alive.return_value = True
+
+    # Patch put to simulate a failure
+    mocker.patch.object(local.recovery_queue, 'put', side_effect=Exception('Queue full'))
+    local.add_job_to_log_recover(job)
+    assert job.updated_log == 0
+
+
+def test_add_job_to_log_recover_no_queue(local):
+    """Verify graceful skip when recovery_queue is None."""
+    local.recovery_queue = None
+    job = Job('t000', '0000', Status.COMPLETED, 0)
+    job.name = 'test_job'
+    job.id = 123
+    job.updated_log = 0
+    # Should not raise and should not increment updated_log
+    local.add_job_to_log_recover(job)
+    assert job.updated_log == 0
+
+
+def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
+    """Verify cleanup does not hang when child has crashed."""
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    local.config['LOG_RECOVERY_TIMEOUT'] = 1
+    local.spawn_log_retrieval_process(as_conf)
+    assert local.log_recovery_process.is_alive()
+    # Abruptly kill the child to simulate a crash
+    local.log_recovery_process.kill()
+    local.log_recovery_process.join(timeout=5)
+    assert not local.log_recovery_process.is_alive()
+    # Cleanup should return promptly without hanging
+    local.clean_log_recovery_process()
+    assert local.recovery_queue is None
+    assert local.log_recovery_process is None

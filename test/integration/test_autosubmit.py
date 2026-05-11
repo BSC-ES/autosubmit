@@ -19,8 +19,6 @@
 
 from contextlib import nullcontext as does_not_raise
 from os import R_OK, W_OK
-from pathlib import Path
-from shutil import copy
 from typing import TYPE_CHECKING
 
 import pytest
@@ -30,13 +28,13 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
+
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.platform import Platform
-from autosubmit.scripts.autosubmit import main
 
 if TYPE_CHECKING:
     from test.integration.conftest import AutosubmitExperimentFixture
@@ -297,39 +295,6 @@ def test_update_description(as_db: str, autosubmit, autosubmit_exp, mocker):
     assert new_description == get_experiment_description(exp.expid)[0][0]
 
 
-def test_autosubmit_pklfix_no_backup(autosubmit_exp, mocker, tmp_path):
-    exp = autosubmit_exp()
-    mocker.patch('sys.argv', ['autosubmit', 'pklfix', exp.expid])
-
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-
-    assert 0 == main()
-
-    assert mocked_log.info.called
-    assert mocked_log.info.call_args[0][0].startswith('Backup file not found')
-
-
-def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
-    exp = autosubmit_exp(include_jobs=True)
-
-    pkl_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, 'pkl')
-    current = pkl_path / f'job_list_{exp.expid}.pkl'
-    backup = pkl_path / f'job_list_{exp.expid}_backup.pkl'
-
-    copy(current, backup)
-
-    mocker.patch('sys.argv', ['autosubmit', 'pklfix', exp.expid])
-
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-
-    mocker.patch('autosubmit.autosubmit.user_yes_no_query', return_value=True)
-
-    assert 0 == main()
-
-    assert mocked_log.result.called
-    assert mocked_log.result.call_args[0][0].startswith('Pkl restored')
-
-
 @pytest.mark.parametrize('experiment_data,context_mgr', [
     ({
          'JOBS': {
@@ -364,6 +329,7 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
 def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
     with context_mgr:
         autosubmit_exp('t000', experiment_data, create=False, include_jobs=False)
+
 
 
 @pytest.mark.parametrize(
@@ -414,22 +380,18 @@ def test_check_wrappers_and_as_exit(
     exp = autosubmit_exp(experiment_data={})
     as_conf: AutosubmitConfig = exp.as_conf
 
+    job = Job('1', '1', job_previous_status)
     job_list: JobList = mocker.MagicMock(spec=JobList)
-    job_list.get_in_queue_grouped_id.return_value = {
-        '1': [
-            Job('1', '1', job_previous_status)
-        ]
-    }
+    job_list.get_job_list.return_value = [job]
     job_list.job_package_map = {}
 
     platform = mocker.MagicMock(spec=Platform)
     platform.name = 'test_platform'
-    platforms_to_test: set[Platform] = {platform}
 
     Autosubmit.exit = _exit
 
     t: tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]] = \
-        autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, exp.expid)
+        autosubmit.check_wrappers(as_conf, job_list, exp.expid)
     jobs_to_check, _ = t
 
     assert len(jobs_to_check) == expected_jobs_to_check

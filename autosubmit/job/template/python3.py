@@ -92,15 +92,15 @@ def as_body(body: str) -> str:
         # Autosubmit job
         ###################
 
+        _as_job_status = 'FAILED'
         try:
         __BODY__
+            _as_job_status = 'COMPLETED'
         finally:
             stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'a')
             stat_file.write(f'{int(time.time())}\\n')
+            stat_file.write(f'{_as_job_status}\\n')
             stat_file.close()
-
-        # Now, we let the execution of the tailer happen, where the _COMPLETED
-        # file will be created.
         """)
     return template.replace('__BODY__', indented_body)
 
