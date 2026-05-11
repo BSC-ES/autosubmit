@@ -24,7 +24,6 @@ import os
 import platform
 import pwd
 import re
-import stat
 import shutil
 import signal
 import subprocess
