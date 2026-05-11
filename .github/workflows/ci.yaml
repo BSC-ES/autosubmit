@@ -37,7 +37,9 @@ jobs:
           cache: 'pip' # caching pip dependencies
 
       - name: Install system dependencies
-        run: sudo apt-get install -y curl graphviz rsync r-base
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl graphviz rsync r-base
 
       - name: Install dependencies
         run: |
@@ -104,7 +106,9 @@ jobs:
           cache: 'pip' # caching pip dependencies
 
       - name: Install system dependencies
-        run: sudo apt-get install -y curl git subversion graphviz rsync xvfb r-base
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl git subversion graphviz rsync xvfb r-base
 
       - name: Install dependencies
         run: |
@@ -202,7 +206,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install system dependencies
-        run: sudo apt-get install -y curl graphviz rsync
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl graphviz rsync
 
       - name: Install dependencies
         run: |
@@ -329,7 +335,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install system dependencies
-        run: sudo apt-get install -y curl graphviz rsync
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl graphviz rsync
 
       - name: Install dependencies
         run: |
