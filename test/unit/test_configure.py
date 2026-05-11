@@ -170,8 +170,6 @@ def test_configure_does_not_create_directories(mocker, tmp_path, autosubmit) -> 
     )
 
     assert (tmp_path / ".autosubmitrc").exists()
+    assert not db_path.exists()
+    assert not lr_path.exists()
     assert not (lr_path / "logs").exists()
-    assert not (lr_path / "metadata").exists()
-    assert not (lr_path / "metadata" / "structures").exists()
-    assert not (lr_path / "metadata" / "data").exists()
-    assert not (lr_path / "metadata" / "logs").exists()

@@ -3533,7 +3533,6 @@ class Autosubmit:
                         Log.error("Not a valid path. You must include '~/' at the beginning.")
                 database_path = Path(database_path).expanduser().resolve()
                 # if not os.path.exists(database_path):
-                Path(database_path).mkdir(parents=True, exist_ok=True)
                 # Log.error("Database path does not exist.")
                 # return False
                 while database_filename is None:
@@ -3546,7 +3545,6 @@ class Autosubmit:
                     Log.error("Not a valid path. You must include '~/' at the beginning.")
             local_root_path = Path(local_root_path).expanduser().resolve()
 
-            Path(local_root_path).mkdir(parents=True, exist_ok=True)
             global_logs_path = local_root_path / 'logs'
             structures_path = local_root_path / 'metadata/structures'
             historicdb_path = local_root_path / 'metadata/data'
@@ -3607,6 +3605,16 @@ class Autosubmit:
                     parser.write(config_file)
                     Log.result(f"Configuration file written successfully: \n\t{rc_path}")
 
+                    paths_info = [
+                        f"Local root path: {local_root_path}",
+                        f"Global logs path: {global_logs_path}",
+                        f"Structures path: {structures_path}",
+                        f"Historic DB path: {historicdb_path}",
+                        f"Historic logs path: {historiclog_path}",
+                    ]
+                    sep = '\n\t- '
+                    Log.result(sep.join(['Directories added to the configuration file:'] + paths_info))
+
                 except (IOError) as e:
                     raise AutosubmitCritical(f"Can not write config file: {e.message}", 7012)
                 except (OSError) as e:
@@ -3633,7 +3641,7 @@ class Autosubmit:
             create_me.chmod(0o775)
 
         sep = '\n\t'
-        Log.result(sep.join(['Directories configured successfully:'] + [str(d) for d in dirs]))
+        Log.result(sep.join(['Directories have been created and configured successfully:'] + [str(d) for d in dirs]))
         
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             if not os.path.exists(BasicConfig.DB_PATH):

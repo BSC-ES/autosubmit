@@ -201,6 +201,8 @@ After the package installation, set up Autosubmit with the following sequence of
     autosubmit configure
     autosubmit install
 
+When running ``autosubmit configure``, you have to configure at least the database and path for Autosubmit.
+
 ``autosubmit configure`` will always generate a file called ``.autosubmitrc`` in your ``$HOME``.
 ``autosubmit install`` creates the directories defined in that file (experiments path, logs, metadata) and initialises the database.
 
