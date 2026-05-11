@@ -3634,6 +3634,7 @@ class Autosubmit:
             BasicConfig.STRUCTURES_DIR,
             BasicConfig.JOBDATA_DIR,
             BasicConfig.HISTORICAL_LOG_DIR,
+            BasicConfig.DB_DIR,
         ]
         for dir in dirs:
             create_me = Path(dir)
