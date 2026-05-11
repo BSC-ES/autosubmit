@@ -24,6 +24,7 @@ import os
 import platform
 import pwd
 import re
+import stat
 import shutil
 import signal
 import subprocess
@@ -3120,9 +3121,9 @@ class Autosubmit:
             jobs_to_recover = job_list.get_job_list()
         else:
             jobs_to_recover = job_list.get_active()
-        
+
         selected_job_names = {job.name for job in jobs_to_recover}
-        
+
         # filters will be applied to all_jobs or only active_jobs, depending on the all_jobs flag
         if filter_section or filter_chunks or filter_status or filter_list:
             # Validate filters. Raises AutosubmitCritical if any filter is invalid, with a message specifying the issue.
@@ -3629,20 +3630,54 @@ class Autosubmit:
     @staticmethod
     def install():
         """Creates a new database instance for autosubmit at the configured path."""
-        if BasicConfig.DATABASE_BACKEND == 'sqlite':
-            if not os.path.exists(BasicConfig.DB_PATH):
-                Log.info("Creating autosubmit database...")
-                query_file = read_files('autosubmit.database') / 'data/autosubmit.sql'
-                query = query_file.read_text()
-                if not create_db(query):
-                    raise AutosubmitCritical("Can not write database file", 7004)
-                Log.result("Autosubmit database created successfully")
+
+        if BasicConfig.DATABASE_BACKEND == "sqlite":
+            autosubmit_db_path = Path(BasicConfig.DB_PATH)
+            as_times_db_path = Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB
+
+            # autosubmit.db
+            if autosubmit_db_path.exists():
+                Log.info(f"Database {autosubmit_db_path} already exists.")
             else:
-                raise AutosubmitCritical("Database already exists.", 7004)
+                Log.info("Creating autosubmit database...")
+                query_file = read_files("autosubmit.database") / "data/autosubmit.sql"
+                query = query_file.read_text()
+                if not create_db(query, autosubmit_db_path):
+                    raise AutosubmitCritical("Can not write database file", 7004)
+                # set read + write permission for owner and group
+                autosubmit_db_path.chmod(0o660)
+                Log.result("Autosubmit database created successfully")
+
+            # as_times.db
+            if as_times_db_path.exists():
+                Log.info(f"Database {as_times_db_path} already exists.")
+            else:
+                Log.info("Creating as_times database...")
+                query_file = read_files("autosubmit.database") / "data/as_times.sql"
+                query = query_file.read_text()
+                if not create_db(query, as_times_db_path):
+                    raise AutosubmitCritical(
+                        "Can not write as_times database file", 7004
+                    )
+                # set read + write permission for owner and group
+                as_times_db_path.chmod(0o660)
+                Log.result("as_times database created successfully")
+
         else:
             Log.info("Creating autosubmit Postgres database...")
-            if not create_db(''):
+            if not create_db(""):
                 raise AutosubmitCritical("Failed to create Postgres database", 7004)
+            Log.info("Creating as_times Postgres database...")
+            try:
+                from autosubmit.history.database_managers.experiment_status_db_manager import (
+                    create_experiment_status_db_manager,
+                )
+
+                create_experiment_status_db_manager(BasicConfig.DATABASE_BACKEND)
+            except Exception as e:
+                raise AutosubmitCritical(
+                    f"Failed to create as_times Postgres database: {str(e)}", 7004
+                )
         return True
 
     @staticmethod
@@ -5338,9 +5373,9 @@ class Autosubmit:
                 jobs_to_set_status = job_list.get_job_list()
                 selected_job_names = {job.name for job in jobs_to_set_status}
                 final_status = Autosubmit._get_status(final)
-                
+
                 Log.info("Filtering jobs...")
-                
+
                 selected_job_names = apply_job_filters(
                     job_list=job_list,
                     base_job_names=selected_job_names,
@@ -5352,7 +5387,7 @@ class Autosubmit:
                     filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
                     status_from_str_fn=Autosubmit._get_status,
                 )
-                
+
                 # preserve job list ordering
                 final_list = [job for job in jobs_to_set_status if job.name in selected_job_names]
                 # Time to change status
