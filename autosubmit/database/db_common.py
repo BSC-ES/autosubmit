@@ -38,17 +38,27 @@ CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 15
 
 
-def create_db(qry):
+def create_db(qry, db_path: Optional[str] = None) -> bool:
     """
     Creates a new database for autosubmit
 
     :param qry: query to create the new database
-    :type qry: str    """
+    :type qry: str
+    :param db_path: path to the database file
+    :type db_path: Optional[str]
+    :return: True if database is created successfully, False otherwise
+    :rtype: bool
+    """
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         return _create_db_pg()
 
+    # If db_path is empty, use the default from BasicConfig
+    target_path = db_path if db_path else BasicConfig.DB_PATH
+
     try:
-        (conn, cursor) = open_conn(False)
+        # Ensure parent directory exists
+        Path(target_path).parent.mkdir(parents=True, exist_ok=True)
+        (conn, cursor) = open_conn(False, target_path)
     except DbException as e:
         raise AutosubmitCritical("Could not establish a connection to database", 7001, str(e))
 
@@ -72,7 +82,7 @@ def check_db() -> None:
         raise AutosubmitCritical(f'DB path does not exist: {BasicConfig.DB_PATH}', 7003)
 
 
-def open_conn(check_version=True):
+def open_conn(check_version=True, db_path: Optional[str] = None):
     """
     Opens a connection to database
 
@@ -84,7 +94,8 @@ def open_conn(check_version=True):
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         raise AutosubmitCritical('For Postgres databases, connections must be open and managed with SQLAlchemy!')
 
-    conn = sqlite3.connect(BasicConfig.DB_PATH)
+    target_path = db_path if db_path else BasicConfig.DB_PATH
+    conn = sqlite3.connect(target_path)
     cursor = conn.cursor()
 
     # Getting database version
