@@ -3318,18 +3318,19 @@ class Autosubmit:
                 parameter_output = f'{expid}_parameter_list_{datetime.datetime.today().strftime("%Y%m%d-%H%M%S")}.txt'
                 parameter_file = open(os.path.join(
                     tmp_path, parameter_output), 'w')
-                # Common parameters
+                # parameters
+                parameters = as_conf.load_parameters()
+                global_keys = set(parameters.keys())
                 jobs_parameters = {}
                 try:
                     for job in job_list.get_job_list():
                         job_parameters = job.update_parameters(as_conf, set_attributes=True)
                         for key, value in job_parameters.items():
+                            if key in global_keys or key.startswith("JOBS."):
+                                continue
                             jobs_parameters["JOBS" + "." + job.section + "." + key] = value
                 except Exception:
                     pass
-                if len(jobs_parameters) > 0:
-                    del as_conf.experiment_data["JOBS"]
-                parameters = as_conf.load_parameters()
                 parameters.update(jobs_parameters)
                 for key, value in parameters.items():
                     if value is not None and len(str(value)) > 0:
