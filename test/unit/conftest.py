@@ -29,8 +29,11 @@ import pytest
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
+from autosubmit.job.job_list import JobList
+from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.pbsplatform import PBSPlatform
@@ -354,6 +357,34 @@ def local_platform(tmp_path):
     """Minimal LocalPlatform."""
     config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"}
     return LocalPlatform(expid="a000", name="local", config=config)
+
+
+class FakePlatform:
+    """Minimal platform stub for testing wrapper and job-check logic."""
+
+    def __init__(self):
+        self.name = 'fake_platform'
+        self.log_recovery_process = None
+        self.cleanup_event = None
+        self.check_all_jobs = None
+        self.check_job = None
+
+
+@pytest.fixture
+def fake_platform(mocker):
+    """Return a FakePlatform with mocker-backed method stubs."""
+    fp = FakePlatform()
+    fp.check_all_jobs = mocker.MagicMock()
+    fp.check_job = mocker.MagicMock()
+    return fp
+
+
+@pytest.fixture
+def fake_job_list(mocker):
+    """Return a minimal JobList for wrapper/job-check tests."""
+    as_conf = mocker.MagicMock()
+    as_conf.experiment_data = {}
+    return JobList('a000', as_conf, YAMLParserFactory(), JobListPersistencePkl())
 
 
 @pytest.fixture

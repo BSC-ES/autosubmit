@@ -33,7 +33,9 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.template import Language
+from test.unit.conftest import FakePlatform
 
 _EXPID = 'a000'
 
@@ -891,3 +893,41 @@ def test_get_in_queue_grouped_id(
         jobs_by_id_list = list(jobs_by_id.values())
         section_jobs = jobs_by_id_list[idx]
         assert len(section_jobs) == length
+
+
+@pytest.mark.parametrize(
+    'job_id,job_status,wrapper_status,in_map,expected',
+    [
+        (100, Status.RUNNING, Status.RUNNING, True, True),
+        (100, Status.RUNNING, None, False, False),
+        (100, Status.COMPLETED, Status.COMPLETED, True, False),
+    ],
+    ids=['running-in-map', 'not-in-map', 'wrapper-not-running'],
+)
+def test_is_wrapper_still_running(fake_job_list, mocker, job_id, job_status, wrapper_status, in_map, expected):
+    """is_wrapper_still_running must return True only when the wrapper entry exists and is running."""
+    inner_job = Job('a000_20000101_fc0_1_SIM', job_id, job_status, 0)
+    if in_map:
+        wrapper_job = mocker.MagicMock()
+        wrapper_job.status = wrapper_status
+        fake_job_list.job_package_map[job_id] = wrapper_job
+    assert fake_job_list.is_wrapper_still_running(inner_job) is expected
+
+
+def test_save_wrappers_casts_id_to_int(fake_job_list, mocker):
+    """save_wrappers must store the job id as an int in job_package_map."""
+    as_conf = mocker.MagicMock()
+    packages_persistence = mocker.MagicMock()
+
+    job = Job('a000_20000101_fc0_1_SIM', '999', Status.SUBMITTED, 0)
+    package = mocker.MagicMock(spec=JobPackageThread)
+    package.jobs = [job]
+    package.name = 'wrapper_1'
+    package._wallclock = '00:30'
+    package.platform = FakePlatform()
+
+    submitted_scripts = {'section': {'pkg': package}}
+    fake_job_list.save_wrappers(submitted_scripts, as_conf, packages_persistence)
+
+    assert 999 in fake_job_list.job_package_map
+    assert '999' not in fake_job_list.job_package_map

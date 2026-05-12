@@ -17,6 +17,8 @@
 
 """Tests for ``AutosubmitGit``."""
 
+import datetime
+import signal
 from pathlib import Path
 from textwrap import dedent
 
@@ -24,6 +26,8 @@ import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
 from test.unit.conftest import AutosubmitConfigFactory
 
@@ -128,3 +132,75 @@ def test_iteration_info(completed, failed, mocker):
         failed_text = "job has" if failed == 1 else "jobs have"
         assert failed_text in mocked_log.info.call_args_list[1][0][0]
 
+
+def test_signal_handler_sets_exit_flag():
+    from autosubmit.autosubmit import signal_handler, Autosubmit
+    Autosubmit.exit = False
+    signal_handler(signal.SIGINT, None)
+    assert Autosubmit.exit is True
+
+
+@pytest.mark.parametrize(
+    'inner_statuses,wrapper_status,expect_popped',
+    [
+        ([Status.COMPLETED, Status.COMPLETED], Status.COMPLETED, True),
+        ([Status.FAILED, Status.SKIPPED], Status.FAILED, True),
+        ([Status.RUNNING, Status.COMPLETED], Status.RUNNING, False),
+    ],
+    ids=['all-completed', 'failed-skipped', 'still-running'],
+)
+def test_check_wrappers_pops_when_all_inner_jobs_terminal(
+    fake_job_list, fake_platform, mocker, inner_statuses, wrapper_status, expect_popped
+):
+    """check_wrappers must pop the wrapper from job_package_map only when all inner jobs are terminal."""
+    as_conf = mocker.MagicMock()
+    as_conf.get_wrapper_check_time.return_value = 0
+    as_conf.get_notifications.return_value = 'false'
+
+    inner_jobs = [
+        Job(f'a000_20000101_fc0_{i}_SIM', 100 + i, status, 0)
+        for i, status in enumerate(inner_statuses)
+    ]
+    wrapper_job = mocker.MagicMock()
+    wrapper_job.job_list = inner_jobs
+    wrapper_job.status = wrapper_status
+    wrapper_job.new_status = wrapper_status
+    wrapper_job.name = 'wrapper_1'
+    wrapper_job.checked_time = datetime.datetime.now() - datetime.timedelta(seconds=10)
+
+    fake_job_list.job_package_map[100] = wrapper_job
+    fake_job_list.packages_dict['wrapper_1'] = inner_jobs
+    fake_job_list.get_in_queue_grouped_id = mocker.MagicMock(
+        return_value={100: inner_jobs}
+    )
+
+    Autosubmit.check_wrappers(as_conf, fake_job_list, {fake_platform}, 'a000')
+
+    if expect_popped:
+        assert 100 not in fake_job_list.job_package_map
+    else:
+        assert 100 in fake_job_list.job_package_map
+
+
+def test_check_non_wrapped_jobs_checks_jobs_and_tracks_changes(fake_job_list, fake_platform, mocker):
+    """check_non_wrapped_jobs must call check_all_jobs and return a tracker with status changes."""
+    from autosubmit.job.job import Job as JobClass
+    as_conf = mocker.MagicMock()
+
+    job1 = Job('a000_20000101_fc0_1_SIM', 10, Status.RUNNING, 0)
+    job1.platform = fake_platform
+
+    jobs_to_check = {'fake_platform': [[job1, Status.RUNNING]]}
+
+    def mock_update_status(self, as_conf):
+        self.status = Status.COMPLETED
+        return Status.COMPLETED
+
+    mocker.patch.object(JobClass, 'update_status', mock_update_status)
+    tracker = Autosubmit.check_non_wrapped_jobs(
+        as_conf, fake_job_list, [fake_platform], jobs_to_check, 'a000', {}
+    )
+
+    fake_platform.check_all_jobs.assert_called_once()
+    assert job1.name in tracker
+    assert tracker[job1.name] == (Status.RUNNING, Status.COMPLETED)

@@ -40,7 +40,11 @@ from autosubmit.job.job_packages import JobPackageVertical
 from autosubmit.job.job_utils import Dependency
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.platforms.wrappers.wrapper_builder import SrunVerticalHorizontalWrapperBuilder
+from autosubmit.platforms.wrappers.wrapper_builder import (
+    SrunVerticalHorizontalWrapperBuilder,
+    PythonWrapperBuilder,
+    PythonVerticalWrapperBuilder,
+)
 
 """Tests for wrappers."""
 
@@ -2317,3 +2321,69 @@ def test_build_srun_launcher():
 #                   'MEMORY': '', 'MEMORY_PER_TASK': 2, 'NUMTHREADS': '', 'RESERVATION': '', 'CUSTOM_DIRECTIVES': '', 'TASKS': '',
 #                   }
 #     header.calculate_wrapper_het_header(wr_job=wr_job)
+
+
+@pytest.fixture
+def wrapper_builder():
+    return PythonVerticalWrapperBuilder(
+        retrials=2,
+        header_directive='',
+        jobs_scripts=['job1.cmd', 'job2.cmd'],
+        threads=1,
+        num_processors=1,
+        num_processors_value=1,
+        expid='a000',
+        jobs_resources={'PROCESSORS_PER_NODE': 1},
+        allocated_nodes='',
+        wallclock_by_level='3600',
+        working_dir='/tmp'
+    )
+
+
+def test_build_imports_contains_wrapper_failed_and_completed_ids(wrapper_builder):
+    imports = wrapper_builder.build_imports()
+    assert '_WRAPPER_FAILED' in imports
+    assert '_WRAPPER_COMPLETED' in imports
+
+
+_SEQUENTIAL_LAUNCHER_CALL = (
+    "scripts", "JobThread(scripts[i], i, retrials, fail_count)"
+)
+
+
+@pytest.mark.parametrize(
+    'assertion',
+    [
+        lambda launcher, imports: 'wrapper_completed_id' in launcher and '_WRAPPER_COMPLETED' in imports,
+        lambda launcher, _: ('COMPLETED' in launcher or 'FAILED' in launcher) and '.tmp' in launcher,
+        lambda launcher, _: 'fail_count' in launcher,
+    ],
+    ids=['wrapper-completed-id', 'per-job-stat-status', 'fail-count-propagated'],
+)
+def test_build_sequential_threads_launcher(wrapper_builder, assertion):
+    """build_sequential_threads_launcher must include stat-aware and fail_count-aware code."""
+    launcher = wrapper_builder.build_sequential_threads_launcher(*_SEQUENTIAL_LAUNCHER_CALL, footer=True)
+    imports = wrapper_builder.build_imports()
+    assert assertion(launcher, imports)
+
+
+def test_base_sequential_threads_launcher_has_stat_awareness():
+    """PythonWrapperBuilder launcher must reference STAT files."""
+    builder = PythonWrapperBuilder(
+        header_directive='',
+        jobs_scripts=['job1.cmd'],
+        threads=1,
+        num_processors=1,
+        num_processors_value=1,
+        expid='a000',
+        working_dir='/tmp'
+    )
+    launcher = builder.build_sequential_threads_launcher("scripts", "JobThread(scripts[i], i)", footer=True)
+    assert '_STAT_' in launcher or 'STAT' in launcher
+
+
+def test_vertical_job_thread_uses_fail_count(wrapper_builder):
+    """build_job_thread must generate a thread that tracks fail_count."""
+    thread = wrapper_builder.build_job_thread()
+    assert 'fail_count' in thread
+    assert 'self.fail_count' in thread

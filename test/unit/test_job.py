@@ -948,7 +948,7 @@ def test_reset_logs(autosubmit_config):
     }
     as_conf = autosubmit_config("t000", experiment_data)
     job = Job("job1", "1", Status.READY, 0)
-    job.reset_logs(as_conf)
+    job.reset_logs()
     assert job.workflow_commit == "dummy-commit"
     assert job.updated_log is False
     assert job.packed_during_building is False
@@ -2308,3 +2308,158 @@ def test_case_insensitive_running_parameter(autosubmit_config):
     job.section = "A"
     job.update_dict_parameters(as_conf)
     assert job.running == "once"
+
+
+def test_timestamp_fields_initialized_to_zero():
+    """Timestamp fields must default to 0 on Job construction."""
+    job = Job("test_job", 1, Status.WAITING, 0)
+    assert job.submit_time_timestamp == 0
+    assert job.start_time_timestamp == 0
+    assert job.finish_time_timestamp == 0
+
+
+@pytest.mark.parametrize(
+    'state,expected',
+    [
+        (
+            {'_name': 'test_job', 'id': 1, '_status': Status.WAITING, 'priority': 0},
+            (0, 0, 0),
+        ),
+        (
+            {
+                '_name': 'test_job', 'id': 1, '_status': Status.WAITING, 'priority': 0,
+                'submit_time_timestamp': None,
+                'start_time_timestamp': None,
+                'finish_time_timestamp': None,
+            },
+            (0, 0, 0),
+        ),
+        (
+            {
+                '_name': 'test_job', 'id': 1, '_status': Status.WAITING, 'priority': 0,
+                'submit_time_timestamp': 100,
+                'start_time_timestamp': 200,
+                'finish_time_timestamp': 300,
+            },
+            (100, 200, 300),
+        ),
+    ],
+    ids=['missing', 'none-values', 'existing-values'],
+)
+def test_setstate_timestamp_fields(state, expected):
+    """__setstate__ must initialize missing/None timestamps to 0 and preserve existing values."""
+    job = Job("test_job", 1, Status.WAITING, 0)
+    job.__setstate__(state)
+    submit, start, finish = expected
+    assert job.submit_time_timestamp == submit
+    assert job.start_time_timestamp == start
+    assert job.finish_time_timestamp == finish
+
+
+@pytest.mark.parametrize(
+    'method_name,db_method_name',
+    [
+        ('_get_submit_data_dc_from_db', 'get_submit_data_dc'),
+        ('_get_finish_time_from_db', 'get_finish_data_dc'),
+    ],
+    ids=['submit', 'finish'],
+)
+def test_get_data_dc_from_db(mocker, method_name, db_method_name):
+    """Job DB-fetch helpers must call ExperimentHistory with expid and job name."""
+    job = Job("t000_test_job", 1, Status.WAITING, 0)
+    mock_exp_history_class = mocker.patch('autosubmit.job.job.ExperimentHistory')
+    mock_exp_history = mock_exp_history_class.return_value
+    mock_result = mocker.MagicMock()
+    getattr(mock_exp_history, db_method_name).return_value = mock_result
+
+    result = getattr(job, method_name)(2)
+
+    mock_exp_history_class.assert_called_once_with("t000")
+    getattr(mock_exp_history, db_method_name).assert_called_once_with("t000_test_job", 2)
+    assert result is mock_result
+
+
+def test_update_submit_time_and_job_id(mocker):
+    """update_submit_time_and_job_id must update job.submit_time_timestamp and job.id from db."""
+    job = Job("t000_test_job", 1, Status.WAITING, 0)
+    mock_exp_history_class = mocker.patch('autosubmit.job.job.ExperimentHistory')
+    mock_submit_data = mocker.MagicMock()
+    mock_submit_data.submit = 12345
+    mock_submit_data.job_id = 999
+    mock_exp_history_class.return_value.get_submit_data_dc.return_value = mock_submit_data
+
+    job.update_submit_time_and_job_id(2)
+
+    mock_exp_history_class.return_value.get_submit_data_dc.assert_called_once_with("t000_test_job", 2)
+    assert job.submit_time_timestamp == 12345
+    assert job.id == 999
+
+
+def test_update_submit_time_and_job_id_no_data(mocker):
+    """update_submit_time_and_job_id must not change timestamps when no db data is found."""
+    job = Job("t000_test_job", 1, Status.WAITING, 0)
+    job.id = 1
+    job.submit_time_timestamp = 0
+    mock_exp_history_class = mocker.patch('autosubmit.job.job.ExperimentHistory')
+    mock_exp_history_class.return_value.get_submit_data_dc.return_value = None
+
+    job.update_submit_time_and_job_id(2)
+
+    assert job.submit_time_timestamp == 0
+    assert job.id == 1
+
+
+def test_retrieve_logfiles_uses_fail_count(mocker, tmp_path):
+    """retrieve_logfiles must recover log for current fail_count regardless of wrapper type."""
+    job = Job('job', '1', Status.COMPLETED, 0)
+    job.fail_count = 2
+    job.wrapper_type = 'vertical'
+    job._tmp_path = str(tmp_path)
+    job._log_path = tmp_path / f"LOG_{job.expid}"
+    job._log_path.mkdir(parents=True, exist_ok=True)
+
+    platform = mocker.Mock()
+    platform.compress_remote_logs = False
+    platform.get_files_path.return_value = str(tmp_path)
+    platform.get_logs_files.return_value = None
+    platform.move_file.return_value = True
+    job._platform = platform
+
+    (tmp_path / "job.cmd.out.2").write_text("out")
+    (tmp_path / "job.cmd.err.2").write_text("err")
+
+    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=True)
+    mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
+    mocker.patch('autosubmit.job.job.Job.write_stats')
+
+    job.retrieve_logfiles()
+    assert job.log_recovered is True
+    assert job.remote_logs == ('job.cmd.out.2', 'job.cmd.err.2')
+    Job.write_stats.assert_called_once_with(2)
+
+
+@pytest.mark.parametrize(
+    'method_to_call,history_method,fail_count,extra_kwargs',
+    [
+        ('write_start_time', 'write_start_time', 3, {'count': 3}),
+        ('write_end_time', 'write_finish_time', 4, {'completed': True, 'count': 4}),
+        ('write_submit_time', 'write_submit_time', 5, {}),
+    ],
+    ids=['start', 'end', 'submit'],
+)
+def test_write_time_methods_pass_fail_count_to_db(mocker, tmp_path, method_to_call, history_method, fail_count, extra_kwargs):
+    """write_*_time methods must forward fail_count to the corresponding ExperimentHistory call."""
+    job = Job('job', '1', Status.SUBMITTED, 0)
+    job.fail_count = fail_count
+    job.submit_time_timestamp = '20210101000000'
+    job.local_logs = ('out', 'err')
+    job._tmp_path = str(tmp_path)
+    job._platform = mocker.Mock()
+    (tmp_path / f"{job.name}_TOTAL_STATS").write_text("")
+    mock_exp_history = mocker.patch('autosubmit.job.job.ExperimentHistory').return_value
+    getattr(mock_exp_history, history_method).return_value = mocker.Mock()
+
+    getattr(job, method_to_call)(**extra_kwargs)
+
+    _, kwargs = getattr(mock_exp_history, history_method).call_args
+    assert kwargs.get('fail_count') == fail_count

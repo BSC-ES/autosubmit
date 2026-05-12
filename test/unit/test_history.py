@@ -25,6 +25,9 @@ import time
 import traceback
 from shutil import copy2
 
+from autosubmit.history.data_classes.job_data import JobData
+from autosubmit.history.database_managers import database_models as Models
+from autosubmit.history.database_managers.experiment_history_db_manager import ExperimentHistoryDbManager
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
@@ -356,3 +359,202 @@ class TestLogging:
 
     def test_log(self):
         self.log.log(self.exp_message, self.trace_message)
+
+
+_JOB_DATA_ROW_BASE = (
+    1, 1, "test_job", "2024-01-01T00:00:00+0000", "2024-01-01T00:00:00+0000",
+    0, 0, 0, "COMPLETED", 2, 1, "00:30", "debug", 0, "20200101", "SIM", "fc0",
+    1, 1, "LOCAL", 101, "{}", 0, 1, 0.0, 0.0, "", "", 0, "", "", "",
+)
+
+
+@pytest.mark.parametrize(
+    'kwargs,expected',
+    [
+        ({}, {'split': None, 'splits': None, 'fail_count': 0}),
+        ({'split': '1', 'splits': '1-3', 'fail_count': 2}, {'split': '1', 'splits': '1-3', 'fail_count': 2}),
+    ],
+    ids=['defaults', 'explicit-v21-fields'],
+)
+def test_job_data_row_v21_fields(kwargs, expected):
+    """JobDataRow must include split, splits, fail_count with correct defaults and explicit values."""
+    row = Models.JobDataRow(*_JOB_DATA_ROW_BASE, **kwargs)
+    for attr, value in expected.items():
+        assert getattr(row, attr) == value
+
+
+@pytest.mark.parametrize(
+    'kwargs,expected',
+    [
+        ({}, {'split': None, 'splits': None, 'fail_count': 0}),
+        ({'split': '2', 'splits': '1-4', 'fail_count': 3}, {'split': '2', 'splits': '1-4', 'fail_count': 3}),
+    ],
+    ids=['defaults', 'explicit-v21-fields'],
+)
+def test_job_data_init_v21_fields(kwargs, expected):
+    """JobData __init__ must accept and default split, splits, fail_count correctly."""
+    job = JobData(_id=1, job_name="test_job", **kwargs)
+    for attr, value in expected.items():
+        assert getattr(job, attr) == value
+
+
+@pytest.mark.parametrize(
+    'row_kwargs,expected',
+    [
+        ({}, {'split': None, 'splits': None, 'fail_count': 0}),
+        ({'split': '1', 'splits': '1-3', 'fail_count': 2}, {'split': '1', 'splits': '1-3', 'fail_count': 2}),
+    ],
+    ids=['defaults', 'explicit-v21-fields'],
+)
+def test_job_data_from_model_v21_fields(row_kwargs, expected):
+    """JobData.from_model must correctly parse and default split, splits, fail_count."""
+    row = Models.JobDataRow(*_JOB_DATA_ROW_BASE, **row_kwargs)
+    job = JobData.from_model(row)
+    for attr, value in expected.items():
+        assert getattr(job, attr) == value
+
+
+@pytest.fixture
+def fresh_experiment_history(tmp_path, mocker):
+    """Return an ExperimentHistory backed by a fresh v21 database with one experiment run."""
+    db_file = tmp_path / "job_data_test.db"
+    manager = ExperimentHistoryDbManager(
+        expid="test",
+        jobdata_dir_path=str(tmp_path)
+    )
+    manager.historicaldb_file_path = str(db_file)
+    manager.create_historical_database()
+    manager._insert_experiment_run(
+        mocker.MagicMock(
+            start=0, finish=0, chunk_unit="NA", chunk_size=0,
+            completed=0, total=0, failed=0, queuing=0, running=0,
+            submitted=0, suspended=0, metadata=""
+        )
+    )
+    exp_history = ExperimentHistory("test")
+    exp_history.manager = manager
+    return exp_history
+
+
+def test_write_submit_time_accepts_split_splits_fail_count(fresh_experiment_history):
+    job_dc = fresh_experiment_history.write_submit_time(
+        "test_job", submit=100, status="SUBMITTED", ncpus=4,
+        wallclock="01:00", qos="debug", date="20240101",
+        member="fc0", section="SIM", chunk=1, platform="mn4",
+        job_id=42, wrapper_queue=None, wrapper_code=None,
+        children="", workflow_commit="abc123",
+        split="1", splits="1-3", fail_count=2
+    )
+
+    assert job_dc is not None
+    assert job_dc.split == "1"
+    assert job_dc.splits == "1-3"
+    assert job_dc.fail_count == 2
+
+
+def test_get_submit_data_dc_found(fresh_experiment_history):
+    fresh_experiment_history.write_submit_time(
+        "test_job", submit=100, status="SUBMITTED",
+        fail_count=2, split="1", splits="1-3"
+    )
+
+    result = fresh_experiment_history.get_submit_data_dc("test_job", 2)
+    assert result is not None
+    assert result.job_name == "test_job"
+    assert result.fail_count == 2
+    assert result.submit == 100
+
+
+def test_get_submit_data_dc_not_found(fresh_experiment_history):
+    result = fresh_experiment_history.get_submit_data_dc("missing", 0)
+    assert result is None
+
+
+def test_get_finish_data_dc_found(fresh_experiment_history):
+    fresh_experiment_history.write_submit_time(
+        "test_job", submit=100, status="SUBMITTED",
+        fail_count=2
+    )
+
+    result = fresh_experiment_history.get_finish_data_dc("test_job", 2)
+    assert result is not None
+    assert result.job_name == "test_job"
+    assert result.fail_count == 2
+
+
+def test_get_finish_data_dc_not_found(fresh_experiment_history):
+    result = fresh_experiment_history.get_finish_data_dc("missing", 0)
+    assert result is None
+
+
+def test_update_submit_time(fresh_experiment_history):
+    fresh_experiment_history.write_submit_time(
+        "test_job", submit=100, status="SUBMITTED",
+        fail_count=2, split="1", splits="1-3"
+    )
+
+    updated = fresh_experiment_history.update_submit_time(
+        "test_job", submit=200, status="QUEUING",
+        fail_count=2, split="2", splits="2-4",
+        job_id=99
+    )
+
+    assert updated is not None
+    assert updated.submit == 200
+    assert updated.status == "QUEUING"
+    assert updated.split == "2"
+    assert updated.splits == "2-4"
+    assert updated.fail_count == 2
+    assert updated.job_id == 99
+
+
+def test_write_start_time_uses_fail_count(fresh_experiment_history):
+    fresh_experiment_history.write_submit_time(
+        "test_job", submit=100, status="SUBMITTED",
+        fail_count=2, job_id=10
+    )
+
+    result = fresh_experiment_history.write_start_time(
+        "test_job", start=200, status="RUNNING",
+        fail_count=2, job_id=10
+    )
+
+    assert result is not None
+    assert result.start == 200
+    assert result.status == "RUNNING"
+
+
+def test_write_finish_time_uses_fail_count(fresh_experiment_history):
+    fresh_experiment_history.write_submit_time(
+        "test_job", submit=100, status="SUBMITTED",
+        fail_count=2, job_id=10
+    )
+    fresh_experiment_history.write_start_time(
+        "test_job", start=200, status="RUNNING",
+        fail_count=2, job_id=10
+    )
+
+    result = fresh_experiment_history.write_finish_time(
+        "test_job", finish=300, status="COMPLETED",
+        fail_count=2, job_id=10
+    )
+
+    assert result is not None
+    assert result.finish == 300
+    assert result.status == "COMPLETED"
+
+
+def test_verify_slurm_monitor_warns_on_non_final_status(fresh_experiment_history, mocker):
+    """_verify_slurm_monitor must log a warning when the monitor shows a non-final SLURM status."""
+    exp_history = fresh_experiment_history
+    ssh_output = """                 17857525  RUNNING           10        1 2021-10-13T15:51:16 2021-10-13T15:51:17 2021-10-13T15:52:47         2.41K                                                     
+    """
+    slurm_monitor = SlurmMonitor(ssh_output)
+    job_data_dc = mocker.MagicMock()
+    job_data_dc.job_name = "test_job"
+
+    mock_log = mocker.patch('autosubmit.history.experiment_history.Log')
+    exp_history._verify_slurm_monitor(slurm_monitor, job_data_dc)
+    mock_log.warning.assert_called_once()
+    args, _ = mock_log.warning.call_args
+    assert "RUNNING" in args[0]

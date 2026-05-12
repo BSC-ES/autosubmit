@@ -579,8 +579,7 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def _normalize_dependencies(dependencies: Union[str, dict]) -> dict:
-        """
-        Normalize the dependencies to a consistent format.
+        """Normalize the dependencies to a consistent format.
 
         This function takes a string or dictionary of dependencies and normalizes them to a dictionary format.
         If the input is a string, it splits the string by spaces and converts each dependency to uppercase.

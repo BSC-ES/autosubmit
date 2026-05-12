@@ -743,3 +743,211 @@ def test_ps_get_job_names_cmd_contains_expected_components(
 
     assert "job_a" in cmd
     assert "job_b" in cmd
+
+
+@pytest.fixture
+def paramiko_platform_v21():
+    config = {
+        "LOCAL_ROOT_DIR": "/tmp",
+        "LOCAL_TMP_DIR": "tmp",
+        "PLATFORMS": {
+            "TEST": {
+                "IO_SAFE_WAIT": 0
+            }
+        }
+    }
+    platform = ParamikoPlatform('t000', 'test', config)
+    platform.job_status = {
+        'COMPLETED': ['COMPLETED'],
+        'RUNNING': ['RUNNING'],
+        'QUEUING': ['PENDING'],
+        'FAILED': ['FAILED']
+    }
+    platform.IO_SAFE_WAIT = 0
+    return platform
+
+
+def test_resolve_status_maps_scheduler_to_autosubmit(paramiko_platform_v21):
+    """_resolve_status must map known scheduler strings to Autosubmit Status."""
+    job = Job(name='test_job', job_id='1', status=Status.RUNNING, priority=0)
+    assert paramiko_platform_v21._resolve_status('COMPLETED', job) == Status.COMPLETED
+    assert paramiko_platform_v21._resolve_status('RUNNING', job) == Status.RUNNING
+    assert paramiko_platform_v21._resolve_status('PENDING', job) == Status.QUEUING
+    assert paramiko_platform_v21._resolve_status('FAILED', job) == Status.FAILED
+    job.hold = True
+    assert paramiko_platform_v21._resolve_status('PENDING', job) == Status.HELD
+    assert paramiko_platform_v21._resolve_status('UNKNOWN', job) == Status.UNKNOWN
+
+
+@pytest.mark.parametrize(
+    'file_exists,fail_count,expected',
+    [
+        (True, 2, True),
+        (False, 0, False),
+    ],
+    ids=['file-exists', 'file-missing'],
+)
+def test_confirm_done_jobs_via_stat(paramiko_platform_v21, mocker, file_exists, fail_count, expected):
+    """confirm_done_jobs_via_stat must return True iff the STAT file exists."""
+    mocker.patch.object(paramiko_platform_v21, 'check_file_exists', return_value=file_exists)
+    job = Job(name='test_job', job_id='1', status=Status.RUNNING, priority=0)
+    job.stat_file = 'test_job_STAT_'
+    job.fail_count = fail_count
+    assert paramiko_platform_v21.confirm_done_jobs_via_stat(job) is expected
+    paramiko_platform_v21.check_file_exists.assert_called_once_with(f'test_job_STAT_{fail_count}')
+
+
+@pytest.mark.parametrize(
+    'file_content,initial_ts,expected_ts',
+    [
+        (b'1234567890\n9876543210\n', 0, 1234567890),
+        (None, 555, 555),
+    ],
+    ids=['file-present', 'file-missing'],
+)
+def test_set_start_time_from_remote_stat_file(paramiko_platform_v21, mocker, file_content, initial_ts, expected_ts):
+    """set_start_time_from_remote_stat_file must update start_time_timestamp when the file is readable."""
+    mocker.patch.object(paramiko_platform_v21, 'get_files_path', return_value='/remote/log')
+    mocker.patch.object(paramiko_platform_v21, 'read_file', return_value=file_content)
+    job = Job(name='test_job', job_id='1', status=Status.RUNNING, priority=0)
+    job.stat_file = 'test_job_STAT_'
+    job.fail_count = 0
+    job.start_time_timestamp = initial_ts
+    paramiko_platform_v21.set_start_time_from_remote_stat_file(job)
+    assert job.start_time_timestamp == expected_ts
+
+
+def test_check_all_jobs_verifies_completed_stat_file(paramiko_platform_v21, mocker):
+    """When scheduler reports COMPLETED, check_all_jobs must verify STAT file."""
+    mocker.patch.object(paramiko_platform_v21, 'send_command', return_value=True)
+    mocker.patch.object(paramiko_platform_v21, 'get_ssh_output', return_value='1 COMPLETED')
+    mocker.patch.object(paramiko_platform_v21, 'parse_all_jobs_output', return_value='COMPLETED')
+    mocker.patch.object(paramiko_platform_v21, 'check_file_exists', return_value=True)
+    mocker.patch.object(paramiko_platform_v21, 'get_queue_status')
+    mocker.patch.object(paramiko_platform_v21, 'set_start_time_from_remote_stat_file')
+    mocker.patch.object(paramiko_platform_v21, 'job_is_over_wallclock', return_value=Status.COMPLETED)
+    mocker.patch.object(paramiko_platform_v21, 'get_check_all_jobs_cmd', return_value='squeue -j 1')
+    mocker.patch.object(paramiko_platform_v21, '_check_jobid_in_queue', return_value=True)
+
+    job = Job(name='test_job', job_id='1', status=Status.RUNNING, priority=0)
+    job.wrapper_type = None
+    job.wallclock = '01:00'
+    job.stat_file = 'test_job_STAT_'
+    job.fail_count = 0
+
+    paramiko_platform_v21.check_all_jobs([[job, Status.RUNNING]], mocker.Mock())
+    assert job.new_status == Status.COMPLETED
+    paramiko_platform_v21.check_file_exists.assert_called_once_with('test_job_STAT_0')
+
+
+def test_check_all_jobs_treats_missing_stat_as_failed_when_no_wait(paramiko_platform_v21, mocker):
+    """If STAT is missing and IO_SAFE_WAIT is 0, COMPLETED must become FAILED."""
+    mocker.patch.object(paramiko_platform_v21, 'send_command', return_value=True)
+    mocker.patch.object(paramiko_platform_v21, 'get_ssh_output', return_value='1 COMPLETED')
+    mocker.patch.object(paramiko_platform_v21, 'parse_all_jobs_output', return_value='COMPLETED')
+    mocker.patch.object(paramiko_platform_v21, 'check_file_exists', return_value=False)
+    mocker.patch.object(paramiko_platform_v21, 'get_queue_status')
+    mocker.patch.object(paramiko_platform_v21, 'set_start_time_from_remote_stat_file')
+    mocker.patch.object(paramiko_platform_v21, 'job_is_over_wallclock', return_value=Status.COMPLETED)
+    mocker.patch.object(paramiko_platform_v21, 'get_check_all_jobs_cmd', return_value='squeue -j 1')
+    mocker.patch.object(paramiko_platform_v21, '_check_jobid_in_queue', return_value=True)
+
+    job = Job(name='test_job', job_id='1', status=Status.RUNNING, priority=0)
+    job.wrapper_type = None
+    job.wallclock = '01:00'
+    job.stat_file = 'test_job_STAT_'
+    job.fail_count = 0
+    paramiko_platform_v21.IO_SAFE_WAIT = 0
+
+    paramiko_platform_v21.check_all_jobs([[job, Status.RUNNING]], mocker.Mock())
+    assert job.new_status == Status.FAILED
+
+
+def test_check_all_jobs_waits_and_rechecks_stat(paramiko_platform_v21, mocker):
+    """If STAT missing and IO_SAFE_WAIT > 0, check_all_jobs must wait and recheck."""
+    mocker.patch.object(paramiko_platform_v21, 'send_command', return_value=True)
+    mocker.patch.object(paramiko_platform_v21, 'get_ssh_output', return_value='1 COMPLETED')
+    mocker.patch.object(paramiko_platform_v21, 'parse_all_jobs_output', return_value='COMPLETED')
+    mocker.patch.object(paramiko_platform_v21, 'get_queue_status')
+    mocker.patch.object(paramiko_platform_v21, 'set_start_time_from_remote_stat_file')
+    mocker.patch.object(paramiko_platform_v21, 'job_is_over_wallclock', return_value=Status.COMPLETED)
+    mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
+    mocker.patch.object(paramiko_platform_v21, 'get_check_all_jobs_cmd', return_value='squeue -j 1')
+    mocker.patch.object(paramiko_platform_v21, '_check_jobid_in_queue', return_value=True)
+
+    mocker.patch.object(paramiko_platform_v21, 'check_file_exists', side_effect=[False, True])
+
+    job = Job(name='test_job', job_id='1', status=Status.RUNNING, priority=0)
+    job.wrapper_type = None
+    job.wallclock = '01:00'
+    job.stat_file = 'test_job_STAT_'
+    job.fail_count = 0
+    paramiko_platform_v21.IO_SAFE_WAIT = 2
+
+    paramiko_platform_v21.check_all_jobs([[job, Status.RUNNING]], mocker.Mock())
+    assert job.new_status == Status.COMPLETED
+    assert paramiko_platform_v21.check_file_exists.call_count == 2
+    from autosubmit.platforms.paramiko_platform import sleep
+    sleep.assert_called_once_with(2)
+
+
+def test_check_all_jobs_failed_when_stat_still_missing_after_wait(paramiko_platform_v21, mocker):
+    """If STAT still missing after IO_SAFE_WAIT, status must be FAILED."""
+    mocker.patch.object(paramiko_platform_v21, 'send_command', return_value=True)
+    mocker.patch.object(paramiko_platform_v21, 'get_ssh_output', return_value='1 COMPLETED')
+    mocker.patch.object(paramiko_platform_v21, 'parse_all_jobs_output', return_value='COMPLETED')
+    mocker.patch.object(paramiko_platform_v21, 'check_file_exists', return_value=False)
+    mocker.patch.object(paramiko_platform_v21, 'get_queue_status')
+    mocker.patch.object(paramiko_platform_v21, 'set_start_time_from_remote_stat_file')
+    mocker.patch.object(paramiko_platform_v21, 'job_is_over_wallclock', return_value=Status.COMPLETED)
+    mocker.patch('autosubmit.platforms.paramiko_platform.sleep')
+    mocker.patch.object(paramiko_platform_v21, 'get_check_all_jobs_cmd', return_value='squeue -j 1')
+    mocker.patch.object(paramiko_platform_v21, '_check_jobid_in_queue', return_value=True)
+
+    job = Job(name='test_job', job_id='1', status=Status.RUNNING, priority=0)
+    job.wrapper_type = None
+    job.wallclock = '01:00'
+    job.stat_file = 'test_job_STAT_'
+    job.fail_count = 0
+    paramiko_platform_v21.IO_SAFE_WAIT = 3
+
+    paramiko_platform_v21.check_all_jobs([[job, Status.RUNNING]], mocker.Mock())
+    assert job.new_status == Status.FAILED
+    from autosubmit.platforms.paramiko_platform import sleep
+    sleep.assert_called_once_with(3)
+
+
+def test_delete_previous_stat_files_by_job_names(paramiko_platform_v21, mocker):
+    """Must send a find command deleting STAT files for the given job names."""
+    paramiko_platform_v21.remote_log_dir = "/remote/t000/log"
+    paramiko_platform_v21.expid = 't000'
+    mocker.patch.object(paramiko_platform_v21, 'send_command', return_value=True)
+    paramiko_platform_v21.delete_previous_stat_files_by_job_names(['job_a', 'job_b'])
+    cmd = paramiko_platform_v21.send_command.call_args[0][0]
+    assert 'job_a_STAT_*' in cmd
+    assert 'job_b_STAT_*' in cmd
+    assert '-delete' in cmd
+
+
+def test_delete_previous_run_files_by_job_names(paramiko_platform_v21, mocker):
+    """Must send a find command deleting .out/.err run files for the given job names."""
+    paramiko_platform_v21.remote_log_dir = "/remote/t000/log"
+    paramiko_platform_v21.expid = 't000'
+    mocker.patch.object(paramiko_platform_v21, 'send_command', return_value=True)
+    paramiko_platform_v21.delete_previous_run_files_by_job_names(['job_a', 'job_b'])
+    cmd = paramiko_platform_v21.send_command.call_args[0][0]
+    assert "job_a.cmd.out.*" in cmd
+    assert "job_a.cmd.err.*" in cmd
+    assert "job_b.cmd.out.*" in cmd
+    assert "job_b.cmd.err.*" in cmd
+    assert '-delete' in cmd
+
+
+def test_cleanup_skips_when_expid_not_in_remote_log_dir(paramiko_platform_v21, mocker):
+    """Must not send commands when remote_log_dir does not contain expid."""
+    paramiko_platform_v21.remote_log_dir = "/some/other/path"
+    mocker.patch.object(paramiko_platform_v21, 'send_command')
+    paramiko_platform_v21.delete_previous_stat_files_by_job_names(['job_a'])
+    paramiko_platform_v21.send_command.assert_not_called()
+    paramiko_platform_v21.delete_previous_run_files_by_job_names(['job_a'])
+    paramiko_platform_v21.send_command.assert_not_called()

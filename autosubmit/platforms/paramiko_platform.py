@@ -874,6 +874,30 @@ class ParamikoPlatform(Platform):
                 cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( -name {job_name_str} \\) -type f -delete"
                 self.send_command(cmd)
 
+    def delete_previous_stat_files_by_job_names(self, job_names: list[str]) -> None:
+        """Deletes previous STAT files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose STAT files should be deleted
+        :type job_names: List[str]
+        """
+        if job_names and self.expid in str(self.remote_log_dir):
+            patterns = ' -o -name '.join([f"'{name}_STAT_*'" for name in job_names])
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( -name {patterns} \\) -type f -delete"
+            self.send_command(cmd)
+
+    def delete_previous_run_files_by_job_names(self, job_names: list[str]) -> None:
+        """Deletes previous run log files (.out/.err) for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose run log files should be deleted
+        :type job_names: List[str]
+        """
+        if job_names and self.expid in str(self.remote_log_dir):
+            patterns = ' -o -name '.join(
+                [f"'{name}.cmd.out.*' -o -name '{name}.cmd.err.*'" for name in job_names]
+            )
+            cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( -name {patterns} \\) -type f -delete"
+            self.send_command(cmd)
+
     def check_job(self, job, default_status=Status.COMPLETED, retries=5, submit_hold_check=False, is_wrapper=False):
         """Checks job running status
 
@@ -1001,6 +1025,53 @@ class ParamikoPlatform(Platform):
 
         return ','.join(job_list_cmd)
 
+    def _resolve_status(self, raw_status: str, job: 'Job') -> str:
+        """Map a raw scheduler status string to an Autosubmit Status.
+
+        :param raw_status: Status string returned by the scheduler.
+        :param job: Job being checked.
+        :return: Autosubmit status value.
+        """
+        if raw_status in self.job_status['COMPLETED']:
+            return Status.COMPLETED
+        elif raw_status in self.job_status['RUNNING']:
+            return Status.RUNNING
+        elif raw_status in self.job_status['QUEUING']:
+            return Status.HELD if job.hold else Status.QUEUING
+        elif raw_status in self.job_status['FAILED']:
+            return Status.FAILED
+        else:
+            return Status.UNKNOWN
+
+    def confirm_done_jobs_via_stat(self, job: 'Job', count: int = -1) -> bool:
+        """Check whether the remote STAT file exists for a completed/failed job.
+
+        :param job: Job to verify.
+        :param count: Fail count to check. Defaults to job.fail_count.
+        :return: True if the STAT file exists on the remote host.
+        """
+        if count == -1:
+            count = job.fail_count
+        stat_filename = f"{job.stat_file}{count}"
+        return self.check_file_exists(stat_filename)
+
+    def set_start_time_from_remote_stat_file(self, job: 'Job', count: int = -1) -> None:
+        """Update job.start_time_timestamp from the remote STAT file if available.
+
+        :param job: Job to update.
+        :param count: Fail count to check. Defaults to job.fail_count.
+        """
+        if count == -1:
+            count = job.fail_count
+        stat_filename = f"{job.stat_file}{count}"
+        try:
+            content = self.read_file(os.path.join(self.get_files_path(), stat_filename), max_size=1024)
+            if content:
+                start_time_str = content.decode('utf-8').strip().splitlines()[0]
+                job.start_time_timestamp = int(start_time_str)
+        except Exception:
+            pass
+
     def check_all_jobs(self, job_list: list[list['Job']], as_conf, retries=5):
         """Checks jobs running status
 
@@ -1047,47 +1118,55 @@ class ParamikoPlatform(Platform):
             for job, job_prev_status in job_list:
                 if not slurm_error:
                     job_id = job.id
-                    job_status = self.parse_all_jobs_output(job_list_status, job_id)
-                    while len(job_status) <= 0 <= retries:
+                    raw_status = self.parse_all_jobs_output(job_list_status, job_id)
+                    while len(raw_status) <= 0 <= retries:
                         retries -= 1
                         self.send_command(cmd)
                         job_list_status = self.get_ssh_output()
-                        job_status = self.parse_all_jobs_output(job_list_status, job_id)
-                        if len(job_status) <= 0:
+                        raw_status = self.parse_all_jobs_output(job_list_status, job_id)
+                        if len(raw_status) <= 0:
                             Log.debug(f'Retrying check job command: {cmd}')
                             Log.debug(f'retries left {retries}')
                             Log.debug(f'Will be retrying in {sleep_time} seconds')
                             sleep(sleep_time)
                             sleep_time = sleep_time + 5
-                    # URi: define status list in HPC Queue Class
+                    job_status = self._resolve_status(raw_status, job)
                 else:
                     job_status = job.status
-                if job.status != Status.RUNNING:
-                    job.start_time = datetime.datetime.now()  # URi: start time
+
+                # Set start time from remote STAT file when job is running
+                if job_status == Status.RUNNING:
+                    self.set_start_time_from_remote_stat_file(job)
+
                 if job.start_time is not None and str(job.wrapper_type).lower() == "none":
                     wallclock = job.wallclock
                     if job.wallclock == "00:00":
                         wallclock = job.platform.max_wallclock
                     if wallclock != "00:00" and wallclock != "00:00:00" and wallclock != "":
                         job_status = self.job_is_over_wallclock(job, job_status, cancel=True)
-                if job_status in self.job_status['COMPLETED']:
-                    job_status = Status.COMPLETED
-                elif job_status in self.job_status['RUNNING']:
-                    job_status = Status.RUNNING
-                elif job_status in self.job_status['QUEUING']:
-                    if job.hold:
-                        job_status = Status.HELD  # release?
-                    else:
-                        job_status = Status.QUEUING
+
+                # STAT-file confirmation for jobs reported as COMPLETED or FAILED
+                if job_status in (Status.COMPLETED, Status.FAILED):
+                    if not self.confirm_done_jobs_via_stat(job):
+                        if self.IO_SAFE_WAIT > 0:
+                            Log.info(f"Job {job.name} scheduler status is {Status.VALUE_TO_KEY.get(job_status)} but STAT file is missing. Waiting {self.IO_SAFE_WAIT}s...")
+                            sleep(self.IO_SAFE_WAIT)
+                            if self.confirm_done_jobs_via_stat(job):
+                                Log.info(f"Job {job.name} STAT file found after wait.")
+                            else:
+                                Log.warning(f"Job {job.name} STAT file still missing after {self.IO_SAFE_WAIT}s. Treating as FAILED.")
+                                job_status = Status.FAILED
+                        else:
+                            Log.warning(f"Job {job.name} STAT file missing and IO_SAFE_WAIT is 0. Treating as FAILED.")
+                            job_status = Status.FAILED
+
+                if job_status == Status.QUEUING:
                     list_queue_jobid += str(job.id) + ','
                     in_queue_jobs.append(job)
-                elif job_status in self.job_status['FAILED']:
-                    job_status = Status.FAILED
-                elif retries == 0:
+                elif retries == 0 and job_status == Status.UNKNOWN:
                     job_status = Status.COMPLETED
                     job.update_status(as_conf)
-                else:
-                    job_status = Status.UNKNOWN
+                elif job_status == Status.UNKNOWN:
                     Log.error(
                         f'check_job() The job id ({job.id}) status is {job_status}.')
                 job.new_status = job_status

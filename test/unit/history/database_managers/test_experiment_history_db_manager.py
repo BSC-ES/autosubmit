@@ -23,6 +23,7 @@ from sqlalchemy import and_, insert, select
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import JobDataTable, get_table_with_schema
 from autosubmit.history.utils import get_current_datetime
+from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     create_experiment_history_db_manager,
     SqlAlchemyExperimentHistoryDbManager,
@@ -39,7 +40,6 @@ def test_functions_not_implemented(mocker):
     mocker.patch('autosubmit.history.database_managers.experiment_history_db_manager.get_connection_url')
     mocker.patch('autosubmit.history.database_managers.experiment_history_db_manager.session')
     db_manager = SqlAlchemyExperimentHistoryDbManager(None, BasicConfig.JOBDATA_DIR)
-    # NOTE: These are all parameter-less.
     for fn in [
         'is_header_ready_db_version',
         'is_current_version',
@@ -105,3 +105,65 @@ def test_select_jobs_data_regression_sqlite_variable_limit(tmp_path, monkeypatch
 
     assert len(result) == n_jobs
     assert all(dict(row)["last"] == 1 for row in result)
+
+
+@pytest.fixture
+def db_manager(tmp_path, monkeypatch):
+    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
+    manager = SqlAlchemyExperimentHistoryDbManager(
+        schema="test_sqlalchemy_v21",
+        jobdata_path=str(tmp_path),
+        jobdata_file="job_data_test_sqlalchemy_v21.db",
+    )
+    manager.initialize()
+    return manager
+
+
+def test_sqlalchemy_insert_and_update_with_v21_fields(db_manager):
+    job = JobData(
+        _id=0,
+        job_name="test_job",
+        rowtype=2,
+        split="1",
+        splits="1-3",
+        fail_count=2
+    )
+    db_manager._insert_job_data(job)
+
+    all_jobs = db_manager.get_job_data_all()
+    assert len(all_jobs) == 1
+    assert all_jobs[0].split == "1"
+    assert all_jobs[0].splits == "1-3"
+    assert all_jobs[0].fail_count == 2
+
+    job._id = all_jobs[0].id
+    job.split = "2"
+    job.splits = "2-4"
+    job.fail_count = 3
+    db_manager._update_job_data_by_id(job)
+
+    all_jobs = db_manager.get_job_data_all()
+    assert all_jobs[0].split == "2"
+    assert all_jobs[0].splits == "2-4"
+    assert all_jobs[0].fail_count == 3
+
+
+def test_sqlalchemy_get_last_by_job_name_and_fail_counter(db_manager):
+    for fail_count in [0, 1, 2]:
+        job = JobData(
+            _id=0,
+            job_name="test_job",
+            rowtype=2,
+            counter=fail_count,
+            fail_count=fail_count
+        )
+        db_manager._insert_job_data(job)
+
+    result = db_manager.get_last_job_data_dc_by_job_name_and_fail_counter("test_job", 1)
+    assert result.job_name == "test_job"
+    assert result.fail_count == 1
+
+    result = db_manager.get_last_job_data_dc_by_job_name_and_fail_counter("test_job", 2)
+    assert result.fail_count == 2
+
+    assert db_manager.get_last_job_data_dc_by_job_name_and_fail_counter("test_job", 99) is None

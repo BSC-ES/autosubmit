@@ -41,13 +41,11 @@ def test_local_platform_copy():
 @pytest.mark.parametrize(
     'count,stats_file_exists,job_fail_count,remote_file_exists',
     [
-        (-1, True, 0, True),
         (0, False, 0, False),
         (1, False, 1, True),
         (100, True, 100, True)
     ],
     ids=[
-        'use fail_count, delete stats_file, remote file transferred',
         'use count, no stats_file, failed to transfer',
         'use count, no stats_file, remote file transferred',
         'use count, delete stats_file, remote file transferred',
@@ -66,12 +64,7 @@ def test_get_stat_file(count: int, stats_file_exists: bool, job_fail_count: int,
     job = Job('job', '1', Status.WAITING, None, None)
     job.fail_count = job_fail_count
 
-    # TODO: this is from ``job.py``; we can probably find an easier way to fetch the file name,
-    #       so we can re-use it in tests (e.g. move the logic to a small function/property/etc.).
-    if count == -1:
-        filename = f"{job.stat_file}{job.fail_count}"
-    else:
-        filename = f'{job.name}_STAT_{str(count)}'
+    filename = f"{job.stat_file}{count}"
 
     if remote_file_exists:
         # Create fake remote stat file transferred.

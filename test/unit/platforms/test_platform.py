@@ -23,19 +23,19 @@ import pytest
 
 from autosubmit.log.log import Log
 from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.platform import recover_platform_job_logs_wrapper
+from autosubmit.platforms.platform import recover_platform_job_logs_wrapper, Platform
 from test.unit.test_job import TestJob, FakeBasicConfig
+from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
 
 _EXPID = 't000'
 
 
 @pytest.mark.parametrize(
-    'file_exists,count ',
+    'file_exists,count',
     [
-        [True, -1],
         [True, 0],
         [True, 1],
-        [False, -1],
         [False, 0],
         [False, 1],
     ]
@@ -53,12 +53,8 @@ def test_get_stat_file(file_exists, count, tmp_path):
     job = TestJob()
     job.stat_file = "test_file"
     job.name = "test_name"
-    if count < 0:
-        job.fail_count = 0
-        filename = job.stat_file + "0"
-    else:
-        job.fail_count = count
-        filename = job.name + f'_STAT_{str(count)}'
+    job.fail_count = count
+    filename = job.stat_file + str(count)
 
     if file_exists:
         with open(f"{basic_config.LOCAL_ROOT_DIR}/{filename}", "w", encoding="utf-8") as f:
@@ -126,3 +122,45 @@ def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):
         platform, None, None, None, as_conf=as_conf)  # type: ignore
 
     assert len(Log.log.handlers) == current_number_of_handlers + 2  # + out + err
+
+def test_io_safe_wait_class_constant_default():
+    """Platform class must define IO_SAFE_WAIT defaulting to 0."""
+    assert hasattr(Platform, 'IO_SAFE_WAIT')
+    assert Platform.IO_SAFE_WAIT == 0
+
+
+@pytest.mark.parametrize(
+    'platform_config,expected',
+    [
+        ({"IO_SAFE_WAIT": 5}, 5),
+        ({}, 0),
+    ],
+    ids=['configured', 'default'],
+)
+def test_io_safe_wait_from_platform_config(autosubmit_config, platform_config, expected):
+    """IO_SAFE_WAIT must be read from platform config or default to 0."""
+    as_conf = autosubmit_config(_EXPID, experiment_data={
+        "PLATFORMS": {"TEST": platform_config}
+    })
+    platform = LocalPlatform(_EXPID, 'test', as_conf.experiment_data)
+    assert platform.IO_SAFE_WAIT == expected
+
+
+def test_get_stat_file_requires_explicit_count(local_platform):
+    """get_stat_file must raise TypeError when count is omitted."""
+    job = Job('job', '1', Status.WAITING, 0)
+    with pytest.raises(TypeError):
+        local_platform.get_stat_file(job)
+
+
+def test_get_stat_file_uses_stat_file_plus_count(local_platform, mocker):
+    """get_stat_file must build filename from job.stat_file + count."""
+    mocker.patch.object(local_platform, 'check_file_exists', return_value=True)
+    mocker.patch.object(local_platform, 'get_file', return_value=True)
+
+    job = Job('job', '1', Status.WAITING, 0)
+    job.stat_file = 'my_job_STAT_'
+    job.fail_count = 7
+
+    local_platform.get_stat_file(job, 3)
+    local_platform.check_file_exists.assert_called_once_with('my_job_STAT_3')

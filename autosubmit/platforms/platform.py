@@ -134,6 +134,7 @@ class Platform:
     worker_events: list[Event] = []
     # Shared lock between the main process and a retrieval log process
     lock = multiprocessing.Lock()
+    IO_SAFE_WAIT = 0
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         """Initializes the Platform object with the given experiment ID, platform name, configuration,
@@ -234,6 +235,7 @@ class Platform:
         self.log_queue_size = log_queue_size
         self.remote_log_dir = None
         self.has_scheduler = True
+        self.IO_SAFE_WAIT = int(self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("IO_SAFE_WAIT", self.IO_SAFE_WAIT))
 
     @classmethod
     def update_workers(cls, event_worker):
@@ -722,21 +724,15 @@ class Platform:
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
         return True
 
-    def get_stat_file(self, job, count=-1):
-        if count == -1:  # No internal retrials
-            filename = f"{job.stat_file}{job.fail_count}"
-        else:
-            filename = f'{job.name}_STAT_{str(count)}'
+    def get_stat_file(self, job, count):
+        filename = f"{job.stat_file}{count}"
         stat_local_path = os.path.join(
             self.config.get("LOCAL_ROOT_DIR"), self.expid, self.config.get("LOCAL_TMP_DIR"), filename)
         if os.path.exists(stat_local_path):
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                if count == -1:
-                    Log.debug(f'{job.name}_STAT_{str(job.fail_count)} file have been transferred')
-                else:
-                    Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
+                Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
                 return True
         Log.warning(f'{job.name}_STAT_{str(count)} file not found')
         return False

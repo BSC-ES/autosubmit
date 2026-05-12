@@ -24,10 +24,15 @@ from typing import cast, TYPE_CHECKING
 
 import pytest
 
+import sqlite3
+
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers import experiment_history_db_manager
-from autosubmit.history.database_managers.experiment_history_db_manager import create_experiment_history_db_manager
+from autosubmit.history.database_managers.experiment_history_db_manager import (
+    create_experiment_history_db_manager,
+    CURRENT_DB_VERSION,
+)
 
 if TYPE_CHECKING:
     from autosubmit.history.database_managers.experiment_history_db_manager import (
@@ -522,3 +527,174 @@ def test_sqlite_pragma_version(autosubmit_exp, tmp_path: 'LocalPath'):
         db_manager.is_header_ready_db_version()
 
     assert 'pragma version' in str(cm.value)
+
+
+def test_current_db_version_is_21():
+    assert CURRENT_DB_VERSION == 21
+
+
+def test_schema_v21_migration(tmp_path):
+    """A v19 database migrates to v21 with split, splits, fail_count columns."""
+    db_file = tmp_path / "job_data_test.db"
+    conn = sqlite3.connect(str(db_file))
+    conn.execute('''
+        CREATE TABLE job_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            counter INTEGER NOT NULL,
+            job_name TEXT NOT NULL,
+            created TEXT NOT NULL,
+            modified TEXT NOT NULL,
+            submit INTEGER NOT NULL,
+            start INTEGER NOT NULL,
+            finish INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            rowtype INTEGER NOT NULL,
+            ncpus INTEGER NOT NULL,
+            wallclock TEXT NOT NULL,
+            qos TEXT NOT NULL,
+            energy INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            section TEXT NOT NULL,
+            member TEXT NOT NULL,
+            chunk INTEGER NOT NULL,
+            last INTEGER NOT NULL,
+            platform TEXT NOT NULL,
+            job_id INTEGER NOT NULL,
+            extra_data TEXT NOT NULL,
+            nnodes INTEGER NOT NULL DEFAULT 0,
+            run_id INTEGER,
+            MaxRSS REAL NOT NULL DEFAULT 0.0,
+            AveRSS REAL NOT NULL DEFAULT 0.0,
+            out TEXT NOT NULL DEFAULT '',
+            err TEXT NOT NULL DEFAULT '',
+            rowstatus INTEGER NOT NULL DEFAULT 0,
+            children TEXT,
+            platform_output TEXT,
+            workflow_commit TEXT
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE experiment_run (
+            run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created TEXT NOT NULL,
+            modified TEXT NOT NULL,
+            start INTEGER NOT NULL,
+            finish INTEGER,
+            chunk_unit TEXT NOT NULL,
+            chunk_size INTEGER NOT NULL,
+            completed INTEGER NOT NULL,
+            total INTEGER NOT NULL,
+            failed INTEGER NOT NULL,
+            queuing INTEGER NOT NULL,
+            running INTEGER NOT NULL,
+            submitted INTEGER NOT NULL,
+            suspended INTEGER NOT NULL DEFAULT 0,
+            metadata TEXT
+        )
+    ''')
+    conn.execute("pragma user_version=19;")
+    conn.commit()
+    conn.close()
+
+    from autosubmit.history.database_managers.experiment_history_db_manager import ExperimentHistoryDbManager
+    manager = ExperimentHistoryDbManager(
+        expid="test",
+        jobdata_dir_path=str(tmp_path)
+    )
+    manager.historicaldb_file_path = str(db_file)
+    manager.initialize()
+
+    assert manager.is_current_version()
+
+    conn = sqlite3.connect(str(db_file))
+    cursor = conn.execute("PRAGMA table_info(job_data)")
+    columns = {row[1] for row in cursor.fetchall()}
+    conn.close()
+
+    assert "split" in columns
+    assert "splits" in columns
+    assert "fail_count" in columns
+
+
+def test_insert_and_update_job_data_with_v21_fields(tmp_path):
+    """Insert and update must preserve split, splits, fail_count."""
+    from autosubmit.history.database_managers.experiment_history_db_manager import ExperimentHistoryDbManager
+    db_file = tmp_path / "job_data_test.db"
+    manager = ExperimentHistoryDbManager(
+        expid="test",
+        jobdata_dir_path=str(tmp_path)
+    )
+    manager.historicaldb_file_path = str(db_file)
+    manager.create_historical_database()
+
+    job = JobData(
+        _id=0,
+        job_name="test_job",
+        rowtype=2,
+        split="1",
+        splits="1-3",
+        fail_count=2
+    )
+    job_id = manager._insert_job_data(job)
+
+    conn = sqlite3.connect(str(db_file))
+    cursor = conn.execute(
+        "SELECT split, splits, fail_count FROM job_data WHERE id=?",
+        (job_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    assert row[0] == "1"
+    assert row[1] == "1-3"
+    assert row[2] == 2
+
+    job._id = job_id
+    job.split = "2"
+    job.splits = "2-4"
+    job.fail_count = 3
+    manager._update_job_data_by_id(job)
+
+    conn = sqlite3.connect(str(db_file))
+    cursor = conn.execute(
+        "SELECT split, splits, fail_count FROM job_data WHERE id=?",
+        (job_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    assert row[0] == "2"
+    assert row[1] == "2-4"
+    assert row[2] == 3
+
+
+def test_get_last_job_data_dc_by_job_name_and_fail_counter(tmp_path):
+    """Query by job_name and fail_count must return the correct JobData."""
+    from autosubmit.history.database_managers.experiment_history_db_manager import ExperimentHistoryDbManager
+    db_file = tmp_path / "job_data_test.db"
+    manager = ExperimentHistoryDbManager(
+        expid="test",
+        jobdata_dir_path=str(tmp_path)
+    )
+    manager.historicaldb_file_path = str(db_file)
+    manager.create_historical_database()
+
+    for fail_count in [0, 1, 2]:
+        job = JobData(
+            _id=0,
+            job_name="test_job",
+            rowtype=2,
+            counter=fail_count,
+            fail_count=fail_count
+        )
+        manager._insert_job_data(job)
+
+    result = manager.get_last_job_data_dc_by_job_name_and_fail_counter("test_job", 1)
+    assert result.job_name == "test_job"
+    assert result.fail_count == 1
+
+    result = manager.get_last_job_data_dc_by_job_name_and_fail_counter("test_job", 2)
+    assert result.fail_count == 2
+
+    with pytest.raises(Exception):
+        manager.get_last_job_data_dc_by_job_name_and_fail_counter("test_job", 99)

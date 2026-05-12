@@ -293,7 +293,7 @@ class JobList(object):
         for platform in job_list_per_platform:
             for job in job_list_per_platform[platform]:
                 if create or new:
-                    job.reset_logs(as_conf)
+                    job.reset_logs()
                     # The platform mayn't exist. ( The Autosubmit config parser should check this )
                     if job.platform_name and job.platform_name in submitter.platforms:
                         job.platform = submitter.platforms[job.platform_name]
@@ -2298,6 +2298,17 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
+    def is_wrapper_still_running(self, job: Job) -> bool:
+        """Check if the job's wrapper is still active.
+
+        :param job: Job to check.
+        :return: True if the wrapper is still running, False otherwise.
+        """
+        if job.id in self.job_package_map:
+            wrapper_job = self.job_package_map[job.id]
+            return wrapper_job.status in (Status.RUNNING, Status.SUBMITTED, Status.QUEUING)
+        return False
+
     def get_in_queue_grouped_id(self, platform: Platform) -> dict[int, list[Job]]:
         """Gets the queued jobs, grouped by their IDs.
         Same ID, same dictionary key. Each dictionary value is a list.
@@ -2864,7 +2875,7 @@ class JobList(object):
                     from ..job.job import WrapperJob
                     wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
                                              package.jobs, package._wallclock, package.platform, as_conf, False)
-                    self.job_package_map[package.jobs[0].id] = wrapper_job
+                    self.job_package_map[int(package.jobs[0].id)] = wrapper_job
                     packages_persistence.save(package, inspect)
 
     def check_scripts(self, as_conf) -> bool:
