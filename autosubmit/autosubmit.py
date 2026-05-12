@@ -3607,6 +3607,7 @@ class Autosubmit:
 
                     paths_info = [
                         f"Local root path: {local_root_path}",
+                        f"Database path: {database_path}",
                         f"Global logs path: {global_logs_path}",
                         f"Structures path: {structures_path}",
                         f"Historic DB path: {historicdb_path}",
