@@ -105,7 +105,7 @@ def test_stop_expids_no_cancel(autosubmit, mocker):
 
     mocker.patch(
         'autosubmit.autosubmit.Autosubmit.prepare_run',
-        return_value=[None, None, None, None, None, None, None, None]
+        return_value=[None, None, None, None, None, None, None]
     )
     mocked_cancel_jobs = mocker.patch('autosubmit.job.job_utils.cancel_jobs')
 
@@ -216,7 +216,7 @@ def test_stop_expids(autosubmit, mocker, expids: str, num_expids: int, cancel: b
 
         mocker.patch(
             'autosubmit.autosubmit.Autosubmit.prepare_run',
-            return_value=[None, None, None, None, None, None, None, None]
+            return_value=[None, None, None, None, None, None, None]
         )
         mocked_cancel_jobs = mocker.patch('autosubmit.job.job_utils.cancel_jobs')
 
@@ -240,4 +240,3 @@ def test_stop_expids(autosubmit, mocker, expids: str, num_expids: int, cancel: b
 
         if sleep:
             assert mocked_sleep.call_count > 0
-

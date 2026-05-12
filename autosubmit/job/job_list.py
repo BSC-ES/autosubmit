@@ -36,10 +36,11 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_package_persistence import JobPackagePersistence
+from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency
 from autosubmit.job.job_utils import transitive_reduction
@@ -74,7 +75,6 @@ class JobList(object):
         self._ordered_jobs_by_date_member = dict()
 
         self.dependency_map = None
-        self.packages_id = dict()
         self.job_package_map = dict()
         self.sections_checked = set()
         self._run_members = None
@@ -85,6 +85,26 @@ class JobList(object):
         self.depends_on_previous_split = dict()
         self.path_to_logs = Path(BasicConfig.LOCAL_ROOT_DIR,
                                  self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
+        self._FINAL_STATUSES = [Status.COMPLETED, Status.FAILED, Status.SKIPPED]
+        self._packages_persistence: Optional[JobPackagePersistence] = None
+
+    def __getstate__(self):
+        """Exclude non-picklable SQLAlchemy engine from pickled state."""
+        state = self.__dict__.copy()
+        state.pop('_packages_persistence', None)
+        return state
+
+    def get_packages_persistence(self, reset=False) -> JobPackagePersistence:
+        """Return (lazily creating if needed) the ``JobPackagePersistence`` for this experiment."""
+        if reset:
+            # In 4.2, this will not be neccesary 4.1.17 is not prepared to handle historical wrappers
+            self._packages_persistence = None
+            persistence_packages_path = Path(self._persistence_path, f"job_packages_{self.expid}.db")
+            if persistence_packages_path.exists():
+                persistence_packages_path.unlink()
+        if self._packages_persistence is None:
+            self._packages_persistence = JobPackagePersistence(self.expid)
+        return self._packages_persistence
 
     @property
     def expid(self):
@@ -185,6 +205,9 @@ class JobList(object):
         :param monitor: monitor
         :type monitor: bool
         """
+        if create:
+            # In 4.2.0, this table is an historical but 4.1.17 is not prepared to handle that, so we need to reset it on create
+            self.get_packages_persistence(reset=True)
         if create and self.check_split_set_to_auto(as_conf):
             force = True
         if force:
@@ -293,7 +316,7 @@ class JobList(object):
         for platform in job_list_per_platform:
             for job in job_list_per_platform[platform]:
                 if create or new:
-                    job.reset_logs(as_conf)
+                    job.reset_logs()
                     # The platform mayn't exist. ( The Autosubmit config parser should check this )
                     if job.platform_name and job.platform_name in submitter.platforms:
                         job.platform = submitter.platforms[job.platform_name]
@@ -1864,8 +1887,7 @@ class JobList(object):
         """
 
         completed_failed_jobs = [job for job in self._job_list if
-                                 (job.status == Status.COMPLETED or job.status == Status.FAILED) and
-                                 job.updated_log is False]
+                                 job.status in [Status.COMPLETED, Status.FAILED] and job.updated_log <= job.fail_count]
 
         return completed_failed_jobs
 
@@ -2298,6 +2320,19 @@ class JobList(object):
                     jobs.append(job)
         return jobs
 
+    def is_wrapper_still_running(self, job: Job) -> bool:
+        """Check if the job's wrapper is still active.
+
+        :param job: Job to check.
+        :return: True if the wrapper is still running, False otherwise.
+        """
+        job.packed = False
+        if job.id in self.job_package_map.keys():
+            wrapper_job = self.job_package_map[job.id]
+            job.packed = wrapper_job.status in (Status.RUNNING, Status.SUBMITTED, Status.QUEUING)
+            return job.packed
+        return job.packed
+
     def get_in_queue_grouped_id(self, platform: Platform) -> dict[int, list[Job]]:
         """Gets the queued jobs, grouped by their IDs.
         Same ID, same dictionary key. Each dictionary value is a list.
@@ -2561,67 +2596,36 @@ class JobList(object):
                     non_completed_parents_current.append(parent[0])
         return non_completed_parents_current, completed_parents
 
-    def update_log_status(self, job: 'Job', as_conf, new_run=False):
-        """ Updates the log err and log out."""
-        # hasattr for backward compatibility (job.updated_logs is only for newer jobs,
-        # as the loaded ones may not have this set yet)
-        if not hasattr(job, "updated_log"):
-            job.updated_log = False
-        elif job.updated_log:
-            return
-        # X11 has it log written in the run.out file.
-        # No need to check for log files as there are none
-        if hasattr(job, "x11") and job.x11:
-            job.updated_log = True
-            return
-        log_recovered = self.check_if_log_is_recovered(job)
-        if log_recovered:
-            job.updated_log = True
-            # TODO in pickle -> db/yaml migration(I):
-            #  Do the save of the job here then clean attributes from mem ( or even the full job )
-            job.clean_attributes()
-            # TODO in pickle -> db/yaml migration(II):
-            #  And remove these two lines
-            # we only want the last one
-            err_filename = log_recovered.name.replace(".out", ".err")
-            job.local_logs = (log_recovered.name, err_filename)
-            job.updated_log = True
-        elif new_run and not job.updated_log and str(
-                as_conf.platforms_data.get(job.platform.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                      "false")).lower() == "false":
-            job.platform.add_job_to_log_recover(job)
-        return log_recovered
-
-    def check_if_log_is_recovered(self, job: Job) -> Path:
-        """Check if the log is recovered.
-
-        Conditions:
-        - File must exist.
-        - File timestamp should be greater than the job ready_date,
-        otherwise it is from a previous run.
-
-        :param job: The job object to check the log for.
+    def _recover_log(self, job: Job) -> None:
+        """Recover the log for a given job.
+        :param job: The job object to recover the log for.
         :type job: Job
-        :return: The path to the recovered log file if found, otherwise None.
-        :rtype: Path
         """
+        if str(self._config.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
+                                                                 "false")).lower() == "true":
+            job.retrieve_logfiles()
+        else:
+            # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
+            job.write_submit_time()
+            job.platform.add_job_to_log_recover(job)
 
-        if not hasattr(job, "updated_log") or not job.updated_log:
-            job_log_files = self.path_to_logs.glob(f"{job.name}.*")
-            for log_recovered in job_log_files:
-                match = re.match(
-                    rf"{re.escape(job.name)}" + r"\.(\d{14})\.(out)(.gz|.xz)?$",
-                    log_recovered.name,
-                )
-                if match:
-                    file_timestamp = int(
-                        datetime.datetime.fromtimestamp(
-                            log_recovered.stat().st_mtime
-                        ).strftime("%Y%m%d%H%M%S")
-                    )
-                    if job.ready_date and file_timestamp >= int(job.ready_date):
-                        return log_recovered  # TODO: Change to return the tuple of (.out,.err) files
-        return None
+        job.updated_log += 1
+
+    def recover_logs(self) -> bool:
+        """Update jobs' log recovered status.
+
+        Iterate over the current job list and mark jobs whose stdout/stderr logs
+        have been recovered.
+
+        """
+        jobs_to_recover = [job for job in self._job_list if
+                           job.status in self._FINAL_STATUSES and job.updated_log <= job.fail_count]
+        for job in jobs_to_recover:
+            self._recover_log(job)
+        if len(jobs_to_recover) > 0:
+            return True
+        else:
+            return False
 
     def check_completed_jobs_after_recovery(self):
         for job in (job for job in self.get_job_list() if job.status == Status.COMPLETED):
@@ -2651,15 +2655,11 @@ class JobList(object):
             save = store_change
         Log.debug('Updating FAILED jobs')
         if not first_time:
-            for job in self.get_failed():
+            for job in [job for job in self.get_failed() if not self.is_wrapper_still_running(job)]:
                 if as_conf.jobs_data[job.section].get("RETRIALS", None) is None:
                     retrials = int(as_conf.get_retrials())
                 else:
                     retrials = int(job.retrials)
-
-                # Fixes the issue with the integration test. Failed vertical job was being resubmitted. In 4.2.0 this has a better fix since the check_wrapper was redesigned in general.
-                if job.wrapper_type and job.wrapper_type == "vertical":
-                    job.fail_count = job.retrials
 
                 if job.fail_count < retrials:
                     job.inc_fail_count()
@@ -2714,12 +2714,15 @@ class JobList(object):
                 job.fail_count = 0
         # Check checkpoint jobs, the status can be Any
         for job in self.check_special_status():
-            job.status = Status.READY
-            # Run start time in format (YYYYMMDDHH:MM:SS) from current time
-            job.id = None
-            job.wrapper_type = None
-            save = True
-            Log.debug(f"Special condition fulfilled for job {job.name}")
+            # Wait until all parents are completed to begin the wrapper to avoid run-time issues
+            if not as_conf.is_section_in_any_wrapper(job.section):
+                as_conf.check_wrapper_conf()
+                job.status = Status.READY
+                # Run start time in format (YYYYMMDDHH:MM:SS) from current time
+                job.id = None
+                job.wrapper_type = None
+                save = True
+                Log.debug(f"Special condition fulfilled for job {job.name}")
         # if waiting jobs has all parents completed change its State to READY
         for job in self.get_completed():
             # Log name has this format:
@@ -2848,24 +2851,158 @@ class JobList(object):
         except Exception as exp:
             Log.warning(str(exp))
 
-    def save_wrappers(self, submitted_scripts: dict, as_conf: AutosubmitConfig, packages_persistence: JobPackagePersistence,
-                      inspect: bool = False):
-        """Saves the wrapper jobs in the job list and the packages dict.
+    def save_wrappers(
+            self,
+            submitted_scripts: dict,
+            as_conf: AutosubmitConfig,
+            inspect: bool = False,
+    ) -> None:
+        """Save wrapper jobs in the job list and the packages dict.
 
-        :param submitted_scripts: dict with the submitted scripts to save
-        :param as_conf: experiment configuration
-        :param packages_persistence: persistence for the job packages
-        :param inspect: if True, the wrapper jobs will be stored in a separated db
+        :param submitted_scripts: Nested dict ``{section: {name: package}}`` of
+            packages produced by the wrapper packager.
+        :param as_conf: Experiment configuration object.
+        :param inspect: If True, persist to the preview tables (``-cw`` flag).
         """
-        for section, scripts_to_submit_by_name in submitted_scripts.items():
-            for package in scripts_to_submit_by_name.values():
-                if isinstance(package, JobPackageThread):
-                    self.packages_dict[package.name] = package.jobs
-                    from ..job.job import WrapperJob
-                    wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
-                                             package.jobs, package._wallclock, package.platform, as_conf, False)
-                    self.job_package_map[package.jobs[0].id] = wrapper_job
-                    packages_persistence.save(package, inspect)
+        wrappers = []
+        initial_status = Status.COMPLETED if inspect else Status.SUBMITTED
+        from ..job.job import WrapperJob
+        for scripts_by_name in submitted_scripts.values():
+            for package in scripts_by_name.values():
+                if not package.is_wrapped:
+                    continue
+                if inspect:
+                    self.assign_unique_fake_id(package)
+                wrapper_job = WrapperJob(
+                    name=package.name,
+                    job_id=package.jobs[0].id,
+                    status=initial_status,
+                    priority=0,
+                    job_list=package.jobs,
+                    total_wallclock=package._wallclock,
+                    platform=package.platform,
+                    as_config=as_conf,
+                    num_processors=int(package.num_processors) if package.num_processors else 0,
+                    sections=package.sections,
+                    method=package.method,
+                    wr_type=package.wrapper_type,
+                )
+                self.job_package_map[int(wrapper_job.id)] = wrapper_job
+                self.packages_dict[package.name] = wrapper_job.job_list
+                wrappers.append(self._wrapper_job_dict(wrapper_job))
+        if wrappers:
+            self.get_packages_persistence().save(wrappers, preview=inspect)
+
+    def save_wrapper_info(self, wrapper_job):
+        """Save wrapper job info to the database for all wrapper jobs in the job list."""
+        Log.info("Saving wrapper job info to the database...")
+        self.get_packages_persistence().save([self._wrapper_job_dict(wrapper_job)], preview=False)
+
+    def assign_unique_fake_id(self, package: 'JobPackageThread') -> None:
+        """Assign a unique negative fake ID to a package's first job for preview use.
+
+        Prevents ``job_package_map`` key collisions when jobs have no real
+        platform ID yet (e.g. during ``inspect -cw`` or ``create -cw``).
+
+        :param package: The job package whose first job will receive a fake ID.
+        """
+        package.jobs[0].id = -id(package)
+
+    def load_wrappers(self, preview: bool = False) -> None:
+        """Load wrapper jobs and their inner jobs from the database.
+
+        Populates ``job_package_map`` and ``packages_dict`` with the loaded
+        wrapper and inner-job data.
+
+        :param preview: If True, load from the preview tables.
+        """
+        un_mapped_wrapper_info, un_mapped_inner_jobs = self.get_packages_persistence().load(preview, self._job_list)
+
+        # Build a dictionary of wrapper info indexed by wrapper name.
+        wrappers_info: Dict[str, dict] = {
+            dict(wrapper)['name']: dict(wrapper) for wrapper in un_mapped_wrapper_info
+        }
+        # Group inner jobs by package name.
+        inner_jobs_by_package: Dict[str, list] = {}
+        for job in un_mapped_inner_jobs:
+            inner_jobs_by_package.setdefault(job['package_name'], []).append(job['job_name'])
+
+        # Attach job objects to each wrapper's job list and update packages_dict.
+        for package_name, job_names in inner_jobs_by_package.items():
+            if package_name not in wrappers_info:
+                continue
+            wrappers_info[package_name].setdefault("job_list", [])
+            for job_name in job_names:
+                job = self.get_job_by_name(job_name)
+                if not job:
+                    continue
+                if job.id == wrappers_info[package_name]["id"]:
+                    wrappers_info[package_name]["job_list"].append(job)
+            if wrappers_info[package_name]["job_list"]:
+                self.packages_dict[package_name] = wrappers_info[package_name]["job_list"]
+
+        # Create WrapperJob objects and populate job_package_map.
+        from ..job.job import WrapperJob
+        for wrapper_info in wrappers_info.values():
+            if not wrapper_info.get("job_list"):  # TODO: horizontal-vertical issue
+                continue
+            wrapper_job = WrapperJob(
+                name=wrapper_info["name"],
+                job_id=wrapper_info["id"],
+                status=wrapper_info["status"],
+                priority=wrapper_info.get("priority", 0),
+                total_wallclock=wrapper_info["wallclock"],
+                job_list=wrapper_info["job_list"],
+                platform=wrapper_info["job_list"][0].platform,
+                as_config=self._config,
+            )
+            wrapper_job.platform_name = wrapper_job.job_list[0].platform_name
+            self.job_package_map[int(wrapper_job.id)] = wrapper_job
+
+    def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Tuple[Dict[str, Any], List[str]]:
+        """Return a dictionary representation of a WrapperJob and its inner jobs for database insertion.
+
+        :param wrapper_job: The wrapper job instance to serialize.
+        :type wrapper_job: WrapperJob
+        :return: Tuple containing a dictionary of wrapper job attributes and a list of inner job names.
+        :rtype: Tuple[Dict[str, Any], List[str]]
+        """
+        wrapper_info = {
+            "name": wrapper_job.name,
+            "id": wrapper_job.id,
+            "script_name": getattr(wrapper_job, "script_name", None),
+            "status": wrapper_job.status,
+            "local_logs_out": getattr(wrapper_job, "local_logs_out", None),
+            "local_logs_err": getattr(wrapper_job, "local_logs_err", None),
+            "remote_logs_out": getattr(wrapper_job, "remote_logs_out", None),
+            "remote_logs_err": getattr(wrapper_job, "remote_logs_err", None),
+            "updated_log": getattr(wrapper_job, "updated_log", 0),
+            "platform_name": wrapper_job.platform.name if wrapper_job.platform else None,
+            "wallclock": wrapper_job.wallclock,
+            "num_processors": 0,  # TODO: Num_processors is not saved on 4.1.17
+            "type": getattr(wrapper_job, "type", None),
+            "sections": getattr(wrapper_job, "sections", None),
+            "method": getattr(wrapper_job, "method", None),
+        }
+        wrapper_inner_jobs = [
+            {
+                'package_id': wrapper_job.id,
+                'package_name': wrapper_job.name,
+                'job_name': job.name,
+                'timestamp': datetime.datetime.now().isoformat()
+            }
+            for job in wrapper_job.job_list
+        ]
+        return wrapper_info, wrapper_inner_jobs
+
+    def clear_preview_wrapper(self) -> None:
+        """Clear the wrapper preview table used by the ``-cw`` flag.
+
+        Drops and recreates the ``wrapper_job_package`` table so that stale
+        preview data from a previous ``inspect -cw`` or ``create -cw`` run
+        does not persist between calls.
+        """
+        self.get_packages_persistence().reset_table(preview=True)
 
     def check_scripts(self, as_conf) -> bool:
         """When we have created the scripts, all parameters should have been substituted.
@@ -3134,16 +3271,10 @@ class JobList(object):
         # monitor = Monitor()
         packages = None
         try:
-            packages = JobPackagePersistence(expid).load(wrapper=False)
+            packages = JobPackagePersistence(expid).db_manager.select_all(WrapperJobsTable.name)
         except Exception:
-            Log.warning("Wrapper table not found, trying packages.")
+            Log.warning("Wrapper table not found.")
             packages = None
-            try:
-                packages = JobPackagePersistence(expid).load(wrapper=True)
-            except Exception:
-                packages = None
-                pass
-            pass
 
         job_to_package = dict()
         package_to_jobs = dict()
@@ -3151,7 +3282,7 @@ class JobList(object):
         package_to_symbol = dict()
         if packages:
             try:
-                for exp, package_name, job_name in packages:
+                for _package_id, package_name, job_name, _timestamp in packages:
                     if len(str(package_name).strip()) > 0:
                         if current_jobs:
                             if job_name in current_jobs:
@@ -3418,8 +3549,7 @@ class JobList(object):
                 job.id = int(jobs_data[job.name]["job_id"])
                 job.local_logs = jobs_data[job.name]["out"]
                 job.remote_logs = jobs_data[job.name]["err"]
-                job.log_recovered = True
-                job.updated_log = True
+                job.updated_log += 1
 
         for job in finished_jobs:
             # TODO: Another fix will come in 4.2. Currently, if the job has no id, the log will not be recovered properly.
@@ -3427,8 +3557,7 @@ class JobList(object):
                 job.id = 1
             # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
             if not jobs_ran_atleast_once:
-                job.log_recovered = True
-                job.updated_log = True
+                job.updated_log += 1
 
     def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None,
                           return_only_names=False) -> Union[List[str], List["Job"]]:

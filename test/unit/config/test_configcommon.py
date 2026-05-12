@@ -544,3 +544,81 @@ def test_load_config_file_misc(new_config_data: str, load_misc: bool, expected_m
     as_conf.load_config_file(current_config, tmp_path / 'a000.yml', load_misc=load_misc)
 
     assert len(as_conf.misc_files) == expected_misc_files_length
+
+
+@pytest.mark.parametrize(
+    'experiment_data, section, expected',
+    [
+        (
+            {
+                'WRAPPERS': {
+                    'WRAPPER_A': {
+                        'TYPE': 'horizontal',
+                        'JOBS_IN_WRAPPER': ['SIM', 'POST'],
+                    }
+                }
+            },
+            'SIM',
+            True,
+        ),
+        (
+            {
+                'WRAPPERS': {
+                    'WRAPPER_A': {
+                        'TYPE': 'horizontal',
+                        'JOBS_IN_WRAPPER': ['SIM', 'POST'],
+                    }
+                }
+            },
+            'INI',
+            False,
+        ),
+        (
+            {
+                'WRAPPERS': {
+                    'WRAPPER_A': {
+                        'TYPE': 'horizontal',
+                        'JOBS_IN_WRAPPER': ['SIM'],
+                    },
+                    'WRAPPER_B': {
+                        'TYPE': 'vertical',
+                        'JOBS_IN_WRAPPER': ['POST'],
+                    },
+                }
+            },
+            'POST',
+            True,
+        ),
+        (
+            {},
+            'SIM',
+            False,
+        ),
+        (
+            {
+                'WRAPPERS': {
+                    'WRAPPER_A': 'not_a_dict',
+                }
+            },
+            'SIM',
+            False,
+        ),
+    ],
+    ids=[
+        'section_in_single_wrapper',
+        'section_not_in_wrapper',
+        'section_in_second_wrapper',
+        'no_wrappers_section',
+        'wrapper_value_not_dict',
+    ],
+)
+def test_is_section_in_any_wrapper(
+    autosubmit_config: 'AutosubmitConfigFactory',
+    experiment_data: dict,
+    section: str,
+    expected: bool,
+) -> None:
+    """Test that is_section_in_any_wrapper returns the correct result."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data=experiment_data)
+    as_conf.experiment_data = experiment_data
+    assert as_conf.is_section_in_any_wrapper(section) is expected

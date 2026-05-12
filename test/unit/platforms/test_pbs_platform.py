@@ -345,7 +345,7 @@ def test_process_ready_jobs_valid_packages_to_submit(
 
     for i, package in enumerate(create_packages):
         for job in package.jobs:
-            assert job.id == str(jobs_id[i])
+            assert job.id == jobs_id[i]
             assert job.status == Status.SUBMITTED
 
 
@@ -376,7 +376,7 @@ def test_process_ready_jobs_assigns_string_job_ids(
 
     pbs_platform.process_ready_jobs(scripts_to_submit)
 
-    assert assigned_job_ids == ["1116786", "1116787"]
+    assert assigned_job_ids == [1116786, 1116787]
 
 
 @pytest.mark.parametrize("ssh_output,expected_cancelled", [

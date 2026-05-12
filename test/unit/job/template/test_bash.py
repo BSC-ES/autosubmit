@@ -151,7 +151,7 @@ def test_stat_file_written_on_success(tmp_path: 'Path'):
     stat_file = tmp_path / 't000_test_STAT_0'
     assert stat_file.exists()
     lines = [line for line in stat_file.read_text().strip().splitlines() if line.strip()]
-    assert len(lines) == 2  # start + end timestamps
+    assert len(lines) == 3  # start + end timestamps + status
 
 
 def test_completed_file_not_created_on_failure(tmp_path: 'Path'):

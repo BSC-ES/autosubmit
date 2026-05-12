@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import datetime
 import locale
 import os
 import re
@@ -24,6 +25,9 @@ from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING, Optional
 
+from bscearth.utils.date import date2str
+
+from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
 from autosubmit.platforms.headers.ec_header import EcHeader
@@ -57,13 +61,45 @@ class EcPlatform(ParamikoPlatform):
     """
 
     def parse_all_jobs_output(self, output, job_id):
-        pass  # pragma: no cover
+        """Parse ecaccess-job-list tabular output for a single job ID.
+
+        :param output: Raw output from :meth:`get_check_all_jobs_cmd`.
+        :param job_id: ecaccess job ID to look up.
+        :return: Job status word (e.g. ``EXEC``, ``DONE``, ``STOP``) or
+            an empty string if the job is not found.
+        """
+        if not output:
+            return ''
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 3 and parts[0] == str(job_id):
+                return parts[2]
+        return ''
 
     def parse_queue_reason(self, output, job_id):
         pass  # pragma: no cover
 
     def get_check_all_jobs_cmd(self, jobs_id):
-        pass  # pragma: no cover
+        """Return the batch job-list command for ecaccess.
+
+        ``ecaccess-job-list`` without arguments lists all active jobs for the
+        user, so a single call covers every job in *jobs_id*.
+
+        :param jobs_id: Comma-separated job IDs (ignored by ecaccess).
+        :return: ``ecaccess-job-list`` command.
+        """
+        return "ecaccess-job-list"
+
+    def _check_jobid_in_queue(self, ssh_output: str, job_list_cmd: str) -> bool:
+        """Bypass the retry loop for missing job IDs.
+
+        Completed ecaccess jobs disappear from ``ecaccess-job-list`` output.
+        Retrying would only delay status updates. Transient errors are already
+        handled by :meth:`send_command`.
+
+        :return: Always ``True``.
+        """
+        return True
 
     def __init__(self, expid, name, config, scheduler):
         ParamikoPlatform.__init__(self, expid, name, config)
@@ -136,6 +172,145 @@ class EcPlatform(ParamikoPlatform):
     def get_remote_log_dir(self):
         return self.remote_log_dir
 
+    def check_remote_log_dir(self) -> None:
+        """Create the remote log directory and all required parent directories.
+
+        ``ecaccess-file-mkdir`` has no ``-p`` option, so each intermediate path
+        level must be created in sequence.  Failures for levels that already
+        exist are silenced; only a failure on the final LOG directory is
+        reported.
+
+        :raises AutosubmitError: If the log directory cannot be created.
+        """
+        levels = [
+            f"{self.host}:{self.scratch}",
+            f"{self.host}:{self.scratch}/{self.project}",
+            f"{self.host}:{self.scratch}/{self.project}/{self.user}",
+            f"{self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}",
+            f"{self.host}:{self.remote_log_dir}",
+        ]
+        for path in levels[:-1]:
+            with suppress(Exception):
+                subprocess.check_output(f"ecaccess-file-mkdir {path}", shell=True,
+                                        stderr=subprocess.DEVNULL)
+        try:
+            subprocess.check_output(f"ecaccess-file-mkdir {levels[-1]}", shell=True,
+                                    stderr=subprocess.DEVNULL)
+            Log.debug(f"{self.remote_log_dir} has been created on {self.host}.")
+        except subprocess.CalledProcessError:
+            # Directory may already exist — treat as success.
+            Log.debug(f"{self.remote_log_dir} already exists on {self.host}.")
+        except Exception as e:
+            raise AutosubmitError(
+                f"Couldn't create {self.remote_log_dir} on {self.host}", 6004, str(e)
+            )
+
+    def confirm_done_jobs_via_stat(self, job_list: list) -> dict[str, "Status"]:
+        """Confirm job statuses via STAT files using ecaccess commands.
+
+        Overrides the base ``awk``-based implementation because EcPlatform runs
+        commands locally via subprocess and cannot read remote files directly.
+
+        :param job_list: Jobs to confirm.
+        :return: Mapping of job names to resolved statuses.
+        """
+        if not job_list:
+            return {}
+
+        result: dict[str, Status] = {}
+
+        # List files in the remote log directory
+        try:
+            self.send_command(f"ecaccess-file-dir {self.host}:{self.remote_log_dir}")
+            dir_output = self.get_ssh_output()
+        except Exception:
+            return result
+
+        # Build a set of available STAT file names
+        # ecaccess-file-dir output format: filename|size  NNNN
+        available_stats: set[str] = set()
+        for line in dir_output.splitlines():
+            file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
+            if "_STAT_" in file_name:
+                available_stats.add(file_name)
+
+        # Download and read each STAT file that matches a job
+        for job in job_list:
+            stat_name = f"{job.name}_STAT_{job.fail_count}"
+            if stat_name not in available_stats:
+                continue
+
+            remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
+            local_path = Path(self.tmp_path) / stat_name
+
+            try:
+                subprocess.check_output(
+                    f"{self.get_cmd} {remote_path} {local_path}",
+                    shell=True,
+                    stderr=subprocess.DEVNULL,
+                )
+                content = local_path.read_text().strip()
+                if content:
+                    last_line = content.splitlines()[-1]
+                    result[job.name] = self._resolve_status(last_line)
+            except Exception:
+                pass
+
+        return result
+
+    def set_start_time_from_remote_stat_file(self, job_list: list) -> None:
+        """Set the start_time_timestamp for each job from the first line of its STAT file.
+
+        Overrides the base SSH ``head``-based implementation because EcPlatform
+        runs commands locally via subprocess and cannot read remote files directly.
+        The first line of each STAT file contains the job start time as a Unix
+        epoch float.
+
+        :param job_list: Jobs whose start times should be filled from remote STAT files.
+        """
+        if not job_list:
+            return
+
+        # List files in the remote log directory
+        try:
+            self.send_command(f"ecaccess-file-dir {self.host}:{self.remote_log_dir}")
+            dir_output = self.get_ssh_output()
+        except Exception:
+            return
+
+        # ecaccess-file-dir output format: filename|size  NNNN
+        available_stats: set[str] = set()
+        for line in dir_output.splitlines():
+            file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
+            if "_STAT_" in file_name:
+                available_stats.add(file_name)
+
+        for job in job_list:
+            stat_name = f"{job.name}_STAT_{job.fail_count}"
+            if stat_name not in available_stats:
+                continue
+
+            remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
+            local_path = Path(self.tmp_path) / stat_name
+
+            try:
+                subprocess.check_output(
+                    f"{self.get_cmd} {remote_path} {local_path}",
+                    shell=True,
+                    stderr=subprocess.DEVNULL,
+                )
+                content = local_path.read_text().strip()
+                if content:
+                    first_line = content.splitlines()[0]
+                    start_epoch = float(first_line)
+                    job.start_time_timestamp = datetime.datetime.fromtimestamp(start_epoch).strftime("%Y%m%d%H%M%S")
+            except Exception:
+                Log.warning(
+                    f"Could not parse start time from STAT file for job {job.name}. "
+                    f"Using current datetime."
+                )
+                job.start_time_timestamp = date2str(datetime.datetime.now(), 'S')
+
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
 
@@ -153,7 +328,8 @@ class EcPlatform(ParamikoPlatform):
 
         :param ec_queue: Queue to submit the job to.
         """
-        self._submit_cmd = f"{self._submit_command_name} -retry 30 -distant -queueName {ec_queue} {self.host}:"
+        # even with 30 it false failed.. increasing it
+        self._submit_cmd = f"{self._submit_command_name} -retry 100 -distant -queueName {ec_queue} {self.host}:"
 
     def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
         """Gets the command to submit a job, for the current platform, with the given parameters.
@@ -171,10 +347,6 @@ class EcPlatform(ParamikoPlatform):
                 "X11 options are not supported for ecaccess jobs, as they need to be launched within an iterative node , which is not compatible with the current submission method. Please remove x11 options from your job configuration.")
 
         return f"{pre} {self._submit_cmd}{script_name} {post}"
-
-    def check_all_jobs(self, job_list, as_conf, retries=5):
-        for job, prev_status in job_list:
-            self.check_job(job)
 
     def parse_job_output(self, output):
         job_state = output.split('\n')
@@ -259,13 +431,13 @@ class EcPlatform(ParamikoPlatform):
         with suppress(Exception):
             subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
         with suppress(Exception):
-            subprocess.check_output(f"{self.host}:{self.scratch}", shell=True)
+            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}", shell=True)
         with suppress(Exception):
-            subprocess.check_output(f"{self.host}:{self.scratch}/{self.project}", shell=True)
+            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}", shell=True)
         with suppress(Exception):
-            subprocess.check_output(f"{self.host}:{self.scratch}/{self.project}/{self.user}", shell=True)
+            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}/{self.user}", shell=True)
         with suppress(Exception):
-            subprocess.check_output(f"{self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}", shell=True)
+            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}", shell=True)
         try:
             subprocess.check_output(self.check_remote_permissions_cmd, shell=True)
             subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
@@ -423,14 +595,68 @@ class EcPlatform(ParamikoPlatform):
             self.send_command(cmd)
             output = self.get_ssh_output()
 
+            # ecaccess-file-dir output format: filename|size  NNNN
             for line in output.splitlines():
-                file_name = Path(line.strip().split()[-1].rstrip("/")).name if line.strip() else ""
+                file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
                 if not file_name.endswith("_COMPLETED") or (expected_files and file_name not in expected_files):
                     continue
 
                 completed_job_names.append(file_name.removesuffix("_COMPLETED"))
 
         return completed_job_names
+
+    def delete_previous_run_files_by_job_names(self, job_names: list[str]) -> None:
+        """Delete COMPLETED and FAILED marker files for the given job names using ecaccess.
+
+        Overrides the base SSH ``find``-based implementation because EcPlatform
+        runs commands locally via subprocess, not over SSH.
+
+        :param job_names: Job names whose COMPLETED and FAILED files should be deleted.
+        """
+        if not job_names or self.expid not in str(self.remote_log_dir):
+            return
+        for name in job_names:
+            for suffix in ("_COMPLETED", "_FAILED"):
+                remote_path = f"{self.host}:{self.remote_log_dir}/{name}{suffix}"
+                with suppress(Exception):
+                    subprocess.check_call(
+                        f"{self.del_cmd} {remote_path}",
+                        shell=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+
+    def delete_previous_stat_files_by_job_names(self, job_names: list[str]) -> None:
+        """Delete all STAT marker files for the given job names using ecaccess.
+
+        Lists the remote log directory via ``ecaccess-file-dir`` and removes any
+        matching ``{name}_STAT_*`` files one at a time.  Overrides the base SSH
+        ``find``-based implementation because EcPlatform runs commands locally.
+
+        :param job_names: Job names whose STAT files should be deleted.
+        """
+        if not job_names or self.expid not in str(self.remote_log_dir):
+            return
+        with suppress(Exception):
+            self.send_command(f"ecaccess-file-dir {self.host}:{self.remote_log_dir}")
+            output = self.get_ssh_output()
+            name_set = set(job_names)
+            # ecaccess-file-dir output format: filename|size  NNNN
+            for line in output.splitlines():
+                file_name = Path(line.strip().split("|")[0].rstrip("/")).name if line.strip() else ""
+                if "_STAT_" not in file_name:
+                    continue
+                stem = file_name.rsplit("_STAT_", 1)[0]
+                if stem not in name_set:
+                    continue
+                remote_path = f"{self.host}:{self.remote_log_dir}/{file_name}"
+                with suppress(Exception):
+                    subprocess.check_call(
+                        f"{self.del_cmd} {remote_path}",
+                        shell=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
 
     def cancel_jobs(self, job_ids: list[str]) -> None:
         """Cancel ecaccess jobs by their IDs.

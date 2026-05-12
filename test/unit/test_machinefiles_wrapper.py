@@ -46,7 +46,8 @@ def test_job_less_than_48_cores_standard(job_scripts):
     wrapper_builder = PythonWrapperBuilder(header_directive='', jobs_scripts=job_scripts,
                                            num_processors=num_processors, expid='a000',
                                            jobs_resources=jobs_resources, threads='1', retrials=0,
-                                           wallclock_by_level=None, num_processors_value=num_processors)
+                                           wallclock_by_level=None, num_processors_value=num_processors,
+                                           name='test_wrapper_less')
 
     nodes = _create_nodelist(num_processors)
     cores_list = wrapper_builder.build_cores_list()
@@ -90,7 +91,8 @@ def test_job_more_than_48_cores_standard(job_scripts):
     wrapper_builder = PythonWrapperBuilder(header_directive='', jobs_scripts=job_scripts,
                                            num_processors=num_processors, expid='a000',
                                            jobs_resources=jobs_resources, threads='1', retrials=0,
-                                           wallclock_by_level=None, num_processors_value=num_processors)
+                                           wallclock_by_level=None, num_processors_value=num_processors,
+                                           name='test_wrapper_more')
 
     nodes = _create_nodelist(num_processors)
     cores_list = wrapper_builder.build_cores_list()

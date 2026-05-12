@@ -107,6 +107,15 @@ When using multiple wrappers or 2-dim wrappers is essential to define the `JOBS_
 
 .. important:: Autosubmit will not wrap tasks with external and non-fulfilled dependencies.
 
+.. warning::
+   **Start conditions and wrappers are not compatible.**
+
+   Jobs that use start conditions (``START_CONDITIONS``) cannot be reliably bundled inside a wrapper.
+   When a job with start conditions is part of a wrapper, Autosubmit ignores the start conditions and
+   enforces a stricter rule: the wrapper will only be submitted once **all parent jobs have reached
+   ``COMPLETED`` status**. This avoids downstream issues caused by partially satisfied start conditions
+   inside a wrapper package.
+
 Wrapper parameters description
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

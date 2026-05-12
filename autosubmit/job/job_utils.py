@@ -21,9 +21,7 @@ from typing import Dict, Optional, TYPE_CHECKING
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
 from networkx.classes import DiGraph
 
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.log.log import Log, AutosubmitCritical
 
 if TYPE_CHECKING:
@@ -245,34 +243,6 @@ def transitive_reduction(graph) -> DiGraph:
     for u in graph:
         graph.nodes[u]["job"].add_children([graph.nodes[v]["job"] for v in graph[u]])
     return graph
-
-
-def get_job_package_code(expid: str, job_name: str) -> int:
-    """
-    Finds the package code and retrieves it. None if no package.
-
-    :param job_name: String
-    :param expid: Experiment ID
-    :type expid: String
-
-    :return: package code, None if not found
-    :rtype: int or None
-    """
-    try:
-        basic_conf = BasicConfig()
-        basic_conf.read()
-        packages_wrapper = JobPackagePersistence(expid).load(wrapper=True)
-        packages_wrapper_plus = JobPackagePersistence(expid).load(wrapper=False)
-        if packages_wrapper or packages_wrapper_plus:
-            packages = packages_wrapper if len(packages_wrapper) > len(packages_wrapper_plus) else packages_wrapper_plus
-            for exp, package_name, _job_name in packages:
-                if job_name == _job_name:
-                    code = int(package_name.split("_")[-3])
-                    return code
-    except Exception:
-        pass
-    return 0
-
 
 class Dependency(object):
     """

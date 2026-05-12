@@ -15,13 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import sys
 import subprocess
+from pathlib import Path
 
 from autosubmit.autosubmit import Autosubmit
 
 
 def test_autosubmit_version():
-    exit_code, out = subprocess.getstatusoutput('autosubmit -v')
+    # Use the autosubmit from the same venv as the test runner
+    venv_bin = Path(sys.executable).parent / "autosubmit"
+
+    exit_code, out = subprocess.getstatusoutput(f'{venv_bin} -v')
     assert exit_code == 0
     assert out.strip().endswith(Autosubmit.autosubmit_version)
 

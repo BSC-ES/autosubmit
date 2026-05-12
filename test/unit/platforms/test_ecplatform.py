@@ -19,12 +19,15 @@
 
 """Unit tests for EcPlatform."""
 
+import datetime
+import subprocess
 from pathlib import Path
 from typing import Optional
 
 import pytest
 from _pytest._py.path import LocalPath
 
+from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.ecplatform import EcPlatform
 
@@ -398,6 +401,205 @@ def test_pre_submission_snapshot_clears_and_captures_ids(
     assert snapshot_calls == [["a.cmd", "b.cmd"]]
 
 
+def test_check_remote_log_dir_creates_all_path_levels(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify check_remote_log_dir calls ecaccess-file-mkdir for every path level.
+
+    :param ec_platform: EcPlatform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    ec_platform.host = "hpc"
+    ec_platform.scratch = "/scratch"
+    ec_platform.project = "proj"
+    ec_platform.user = "user1"
+    ec_platform.expid = "t000"
+    ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
+
+    import subprocess as sp
+    called: list[str] = []
+
+    def _check_output(cmd: str, **_) -> bytes:
+        called.append(cmd)
+        return b""
+
+    monkeypatch.setattr(sp, "check_output", _check_output)
+
+    ec_platform.check_remote_log_dir()
+
+    expected_paths = [
+        "hpc:/scratch",
+        "hpc:/scratch/proj",
+        "hpc:/scratch/proj/user1",
+        "hpc:/scratch/proj/user1/t000",
+        "hpc:/scratch/proj/user1/t000/LOG_t000",
+    ]
+    for expected in expected_paths:
+        assert any(expected in c for c in called), (
+            f"Expected ecaccess-file-mkdir for {expected!r} but got: {called}"
+        )
+
+
+def test_check_remote_log_dir_does_not_raise_when_dir_already_exists(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify check_remote_log_dir treats a non-zero exit on the LOG dir as success.
+
+    :param ec_platform: EcPlatform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    ec_platform.host = "hpc"
+    ec_platform.scratch = "/scratch"
+    ec_platform.project = "proj"
+    ec_platform.user = "user1"
+    ec_platform.expid = "t000"
+    ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
+
+    import subprocess as sp
+
+    def _check_output(cmd: str, **_) -> bytes:
+        if "LOG_t000" in cmd:
+            raise sp.CalledProcessError(1, cmd)
+        return b""
+
+    monkeypatch.setattr(sp, "check_output", _check_output)
+
+    # Must not raise even when the final mkdir returns non-zero (already exists).
+    ec_platform.check_remote_log_dir()
+
+
+def test_check_remote_permissions_uses_ecaccess_file_mkdir(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify check_remote_permissions uses ecaccess-file-mkdir for each path level.
+
+    :param ec_platform: EcPlatform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    ec_platform.host = "hpc"
+    ec_platform.scratch = "/scratch"
+    ec_platform.project = "proj"
+    ec_platform.user = "user1"
+    ec_platform.expid = "t000"
+    ec_platform.check_remote_permissions_cmd = "ecaccess-file-mkdir hpc:/scratch/proj/user1/_permission_checker_azxbyc"
+    ec_platform.check_remote_permissions_remove_cmd = "ecaccess-file-rmdir hpc:/scratch/proj/user1/_permission_checker_azxbyc"
+
+    import subprocess as sp
+    called: list[str] = []
+
+    def _check_output(cmd: str, **_) -> bytes:
+        called.append(cmd)
+        return b""
+
+    monkeypatch.setattr(sp, "check_output", _check_output)
+
+    ec_platform.check_remote_permissions()
+
+    mkdir_calls = [c for c in called if not c.startswith("ecaccess-file-rmdir")]
+    for cmd in mkdir_calls:
+        assert cmd.startswith("ecaccess-file-mkdir"), (
+            f"Expected 'ecaccess-file-mkdir' prefix but got: {cmd!r}"
+        )
+        assert "hpc:/" in cmd, f"Host path missing in: {cmd!r}"
+
+
+def test_delete_previous_run_files_by_job_names_calls_del_cmd(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify delete_previous_run_files_by_job_names issues one del_cmd per suffix.
+
+    :param ec_platform: EcPlatform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    ec_platform.expid = "t000"
+    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.host = "hpc"
+    ec_platform.del_cmd = "ecaccess-file-delete"
+
+    called: list[str] = []
+
+    def _check_call(cmd: str, **_) -> int:
+        called.append(cmd)
+        return 0
+
+    import subprocess as sp
+    monkeypatch.setattr(sp, "check_call", _check_call)
+
+    ec_platform.delete_previous_run_files_by_job_names(["t000_INI", "t000_SIM"])
+
+    assert len(called) == 4  # 2 jobs × 2 suffixes (_COMPLETED, _FAILED)
+    assert any("t000_INI_COMPLETED" in c for c in called)
+    assert any("t000_INI_FAILED" in c for c in called)
+    assert any("t000_SIM_COMPLETED" in c for c in called)
+    assert any("t000_SIM_FAILED" in c for c in called)
+
+
+def test_delete_previous_run_files_by_job_names_skips_when_expid_not_in_log_dir(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify no commands are issued when expid is absent from remote_log_dir.
+
+    :param ec_platform: EcPlatform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    ec_platform.expid = "t000"
+    ec_platform.remote_log_dir = "/scratch/other/LOG_other"
+
+    called: list[str] = []
+    import subprocess as sp
+    monkeypatch.setattr(sp, "check_call", lambda cmd, **_: called.append(cmd))
+
+    ec_platform.delete_previous_run_files_by_job_names(["t000_INI"])
+
+    assert called == []
+
+
+def test_delete_previous_stat_files_by_job_names_removes_matching_stat_files(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify delete_previous_stat_files_by_job_names removes matched STAT files.
+
+    :param ec_platform: EcPlatform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    """
+    ec_platform.expid = "t000"
+    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.host = "hpc"
+    ec_platform.del_cmd = "ecaccess-file-delete"
+
+    # ecaccess-file-dir output format: filename|size  NNNN
+    dir_listing = (
+        "t000_INI_STAT_0|size  5550\n"
+        "t000_INI_STAT_1|size  5550\n"
+        "t000_SIM_STAT_0|size  5550\n"
+        "t000_OTHER_COMPLETED|size  5550\n"
+    )
+
+    def _send_command(command: str, **_) -> bool:
+        ec_platform._ssh_output = dir_listing
+        return True
+
+    monkeypatch.setattr(ec_platform, "send_command", _send_command)
+
+    called: list[str] = []
+    import subprocess as sp
+    monkeypatch.setattr(sp, "check_call", lambda cmd, **_: called.append(cmd))
+
+    ec_platform.delete_previous_stat_files_by_job_names(["t000_INI"])
+
+    assert len(called) == 2
+    assert any("t000_INI_STAT_0" in c for c in called)
+    assert any("t000_INI_STAT_1" in c for c in called)
+    assert not any("t000_SIM" in c for c in called)
+    assert not any("t000_OTHER" in c for c in called)
+
+
 def test_pre_submission_snapshot_called_with_empty_list(
     ec_platform: EcPlatform,
     monkeypatch: pytest.MonkeyPatch,
@@ -420,3 +622,159 @@ def test_pre_submission_snapshot_called_with_empty_list(
 
     assert ec_platform._pre_submission_ids == {}
     assert snapshot_calls == [[]]
+
+
+# -- Batch checking (check_all_jobs) tests
+
+_JOB_LIST_TABLE = (
+    "JOB Id  User  Status  Queue  Name\n"
+    "------  ----  ------  -----  ----\n"
+    "10001   user  EXEC    hpc    a000_INI\n"
+    "10002   user  DONE    hpc    a000_SIM\n"
+    "10003   user  STOP    hpc    a000_CLEAN\n"
+)
+
+
+def test_get_check_all_jobs_cmd_returns_ecaccess_job_list(
+    ec_platform: EcPlatform,
+) -> None:
+    """Verify get_check_all_jobs_cmd returns the batch ecaccess list command."""
+    assert ec_platform.get_check_all_jobs_cmd("10001,10002") == "ecaccess-job-list"
+
+
+def test_parse_all_jobs_output_finds_status_by_job_id(
+    ec_platform: EcPlatform,
+) -> None:
+    """Verify parse_all_jobs_output extracts the correct status word from the table."""
+    assert ec_platform.parse_all_jobs_output(_JOB_LIST_TABLE, 10001) == "EXEC"
+    assert ec_platform.parse_all_jobs_output(_JOB_LIST_TABLE, 10002) == "DONE"
+    assert ec_platform.parse_all_jobs_output(_JOB_LIST_TABLE, 10003) == "STOP"
+
+
+def test_parse_all_jobs_output_returns_empty_for_missing_job(
+    ec_platform: EcPlatform,
+) -> None:
+    """Verify parse_all_jobs_output returns '' when the job ID is absent."""
+    assert ec_platform.parse_all_jobs_output(_JOB_LIST_TABLE, 99999) == ""
+    assert ec_platform.parse_all_jobs_output("", 10001) == ""
+
+
+def test_check_jobid_in_queue_always_returns_true(
+    ec_platform: EcPlatform,
+) -> None:
+    """Verify _check_jobid_in_queue bypasses retries for ecaccess."""
+    assert ec_platform._check_jobid_in_queue("any output", "10001,") is True
+    assert ec_platform._check_jobid_in_queue("", "10001,") is True
+
+
+def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Verify confirm_done_jobs_via_stat uses ecaccess-file-dir and ecaccess-file-get."""
+    ec_platform.host = "hpc"
+    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.get_cmd = "ecaccess-file-get"
+
+    # Mock send_command for ecaccess-file-dir
+    # ecaccess-file-dir output format: filename|size  NNNN
+    def _send_command(cmd: str, **_) -> bool:
+        ec_platform._ssh_output = (
+            "t000_INI_STAT_0|size  5550\n"
+            "t000_SIM_STAT_0|size  5550\n"
+            "t000_OTHER_COMPLETED|size  5550\n"
+        )
+        return True
+
+    monkeypatch.setattr(ec_platform, "send_command", _send_command)
+
+    # Mock subprocess.check_output for ecaccess-file-get
+    downloaded: list[str] = []
+
+    def _check_output(cmd: str, **_) -> bytes:
+        downloaded.append(cmd)
+        # Create the local file with STAT content
+        local_file = cmd.split()[-1]
+        Path(local_file).write_text("COMPLETED\n")
+        return b""
+
+    monkeypatch.setattr(subprocess, "check_output", _check_output)
+
+    # Create mock jobs
+    class MockJob:
+        def __init__(self, name: str, fail_count: int):
+            self.name = name
+            self.fail_count = fail_count
+
+    job_list = [MockJob("t000_INI", 0), MockJob("t000_SIM", 0), MockJob("t000_MISSING", 0)]
+    result = ec_platform.confirm_done_jobs_via_stat(job_list)
+
+    # Only the first two jobs have STAT files
+    assert result["t000_INI"] == Status.COMPLETED
+    assert result["t000_SIM"] == Status.COMPLETED
+    assert "t000_MISSING" not in result
+
+    # Verify ecaccess-file-get was called for the existing STAT files
+    assert any("t000_INI_STAT_0" in c for c in downloaded)
+    assert any("t000_SIM_STAT_0" in c for c in downloaded)
+    assert not any("t000_MISSING_STAT_0" in c for c in downloaded)
+
+
+def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Verify set_start_time_from_remote_stat_file uses ecaccess-file-dir and ecaccess-file-get."""
+    ec_platform.host = "hpc"
+    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.get_cmd = "ecaccess-file-get"
+
+    # Mock send_command for ecaccess-file-dir
+    # ecaccess-file-dir output format: filename|size  NNNN
+    def _send_command(cmd: str, **_) -> bool:
+        ec_platform._ssh_output = (
+            "t000_INI_STAT_0|size  5550\n"
+            "t000_SIM_STAT_0|size  5550\n"
+        )
+        return True
+
+    monkeypatch.setattr(ec_platform, "send_command", _send_command)
+
+    # Mock subprocess.check_output for ecaccess-file-get
+    downloaded: list[str] = []
+
+    def _check_output(cmd: str, **_) -> bytes:
+        downloaded.append(cmd)
+        local_file = cmd.split()[-1]
+        # Write an epoch timestamp as the first line
+        Path(local_file).write_text("1715769600\n")
+        return b""
+
+    monkeypatch.setattr(subprocess, "check_output", _check_output)
+
+    # Create mock jobs
+    class MockJob:
+        def __init__(self, name: str, fail_count: int):
+            self.name = name
+            self.fail_count = fail_count
+            self.start_time_timestamp = None
+
+    job_ini = MockJob("t000_INI", 0)
+    job_sim = MockJob("t000_SIM", 0)
+    job_missing = MockJob("t000_MISSING", 0)
+    ec_platform.set_start_time_from_remote_stat_file([job_ini, job_sim, job_missing])
+
+    # start_time_timestamp should be set for jobs that have STAT files
+    expected_timestamp = datetime.datetime.fromtimestamp(1715769600).strftime("%Y%m%d%H%M%S")
+    assert job_ini.start_time_timestamp == expected_timestamp
+    assert job_sim.start_time_timestamp == expected_timestamp
+    assert job_missing.start_time_timestamp is None
+
+    # Verify ecaccess-file-get was called for the existing STAT files
+    assert any("t000_INI_STAT_0" in c for c in downloaded)
+    assert any("t000_SIM_STAT_0" in c for c in downloaded)
+    assert not any("t000_MISSING_STAT_0" in c for c in downloaded)

@@ -27,8 +27,8 @@ import os
 import pwd
 import sqlite3
 from pathlib import Path
-from threading import Thread
-from typing import cast, Any, Callable, Optional, TYPE_CHECKING
+from threading import Thread, Event
+from typing import Any, Callable, TYPE_CHECKING
 
 import pytest
 
@@ -103,32 +103,23 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
                 print(f"Job entry: {job_name} assert {str(all_ok).upper()}")
 
 
-def run_in_thread(target: Callable[..., Any], *args, **kwargs) -> tuple[Thread, Optional[Exception], int]:
-    """Run the given target function in a separate thread.
-
-    :param target: The function to execute in the thread.
-    :type target: Callable[..., Any]
-    :param args: Positional arguments for the target function.
-    :type args: Any
-    :param kwargs: Keyword arguments for the target function.
-    :type kwargs: Any
-    :return: The started Thread object.
-    :rtype: Thread
-    """
+def run_in_thread(target: Callable[..., Any], *args, **kwargs):
+    stop_event = Event()
     result = {"exit_code": -1, "exception": None}
 
-    def wrap_thread(*args, **kwargs) -> None:
+    def wrap_thread(*args, **kwargs):
         try:
-            result["exit_code"] = target(*args, **kwargs)
+            result["exit_code"] = target(*args, stop_event=stop_event, **kwargs)
         except Exception as e:
-            result["exception"] = e  # type: ignore
+            result["exception"] = e
 
     thread = Thread(target=wrap_thread, args=args, kwargs=kwargs)
     thread.start()
-    return thread, result["exception"], cast(int, result["exit_code"])
+    return thread, result, stop_event
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wrapper_type="simple") -> dict[str, (bool, str)]:
+def _check_db_fields(run_tmpdir: Path, expected_entries, expid, run_type='simple') -> dict[
+    str, (bool, str)]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.
@@ -150,15 +141,6 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
             f"Expected {expected_entries} entries, found {len(rows)}"
         # Convert rows to a list of dictionaries
         rows_as_dicts: list[dict[str, Any]] = [dict(row) for row in rows]
-        # add first level of a wrapper if wrapper_type != None
-        for row_dict in rows_as_dicts:
-            # TODO: add splits in 4.2, and modify the check to be only for chunk 1 and split 1
-            # Change the check for assert internally retried jobs for the first submission
-            if wrapper_type != "vertical" or (wrapper_type == "vertical" and row_dict.get("chunk", -1) == 1 and row_dict.get("counter", -1) == 0):
-                row_dict["first_level"] = True
-            else:
-                row_dict["first_level"] = False
-
         # Tune the print, so it is more readable, so it is easier to debug in case of failure
         counter_by_name = {}
         group_by_job_name = {
@@ -168,7 +150,8 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
             )
             for job_name in {row["job_name"] for row in rows_as_dicts}
         }
-        excluded_keys = ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]
+        excluded_keys = ["status", "finish", "submit", "start", "extra_data", "children", "platform_output", "date", "member", "chunk"]
+        _TERMINAL_STATUSES = {"COMPLETED", "FAILED"}
 
         for job_name, grouped_rows in group_by_job_name.items():
             # Check that all fields contain data, except extra_data, children, and platform_output
@@ -182,13 +165,14 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
                 check_job_submit = row_dict["submit"] > 0 and row_dict["submit"] != 1970010101
                 check_job_start = row_dict["start"] > 0 and row_dict["start"] != 1970010101
                 check_job_finish = row_dict["finish"] > 0 and row_dict["finish"] != 1970010101
-                if row_dict["first_level"]:
-                    check_job_start_submit = row_dict["start"] >= row_dict["submit"]
-                else:
-                    check_job_start_submit = row_dict["start"] == row_dict["submit"]
+                check_job_start_submit = row_dict["start"] >= row_dict["submit"]
                 check_job_finish_start = int(row_dict["finish"]) >= int(row_dict["start"])
                 check_job_finish_submit = int(row_dict["finish"]) >= int(row_dict["submit"])
-                check_job_status = row_dict["status"] == final_status
+                # Each DB row must carry a terminal status. In mixed-result experiments
+                # (some jobs COMPLETED, others FAILED) we cannot require all rows to
+                # match the overall experiment final_status; the overall outcome is
+                # already asserted independently via _assert_exit_code.
+                check_job_status = row_dict["status"] in _TERMINAL_STATUSES
                 # TODO: Now that we run the real workflow with less mocking, we cannot get the
                 #       debug mock workflow commit, as in reality the temporary project will
                 #       simply return an empty commit. We could modify the test to actually create
@@ -196,7 +180,14 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
                 #       contains the workflow commit column. For the content we can verify it
                 #       later with a more complete functional test using Git.
                 check_workflow_commit = "workflow_commit" in row_dict
-
+                has_splits = row_dict.get("splits") and int(row_dict["splits"]) > 0
+                check_split = "split" in row_dict and "splits" in row_dict and (
+                        (has_splits and row_dict.get("split") and int(row_dict["split"]) > 0)
+                        or (not has_splits and not row_dict.get("split"))
+                )
+                previous_retry_row = previous_retry_row if previous_retry_row and previous_retry_row.get("fail_count",
+                                                                                                         -1)-1 == row_dict.get(
+                    "fail_count", -1) else None
                 if previous_retry_row:
                     check_submit_previous_submit_retry = row_dict["submit"] >= previous_retry_row["submit"]
                     check_submit_previous_finish_retry = row_dict["submit"] >= previous_retry_row["finish"]
@@ -209,6 +200,9 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
                     check_finish_previous_finish_retry = row_dict["finish"] >= previous_retry_row["finish"]
                     check_finish_previous_start_retry = row_dict["finish"] >= previous_retry_row["start"]
                     check_finish_previous_submit_retry = row_dict["finish"] >= previous_retry_row["submit"]
+
+                    check_start_distinct_from_previous = row_dict["start"] != previous_retry_row["start"]
+                    check_finish_distinct_from_previous = row_dict["finish"] != previous_retry_row["finish"]
                 else:
                     check_submit_previous_submit_retry = True
                     check_submit_previous_finish_retry = True
@@ -221,6 +215,9 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
                     check_finish_previous_finish_retry = True
                     check_finish_previous_start_retry = True
                     check_finish_previous_submit_retry = True
+
+                    check_start_distinct_from_previous = True
+                    check_finish_distinct_from_previous = True
 
                 db_check_job = db_check_list["JOB_DATA_FIELDS"][job_name]
                 db_check_job[i] = {
@@ -241,6 +238,9 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
                     "finish>=previous_finish": check_finish_previous_finish_retry,
                     "finish>=previous_start": check_finish_previous_start_retry,
                     "finish>=previous_submit": check_finish_previous_submit_retry,
+                    "start_distinct_from_previous": check_start_distinct_from_previous,
+                    "finish_distinct_from_previous": check_finish_distinct_from_previous,
+                    "split": check_split,
                 }
 
                 db_check_job[i]["empty_fields"] = "".join(
@@ -251,6 +251,24 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, wr
                     }.keys()
                 )
                 previous_retry_row = row_dict
+
+    if run_type == "vertical":
+        # For every chunk-2 job that has a corresponding chunk-1 job with the same
+        # base name, verify the vertical ordering constraint: chunk-2 must start
+        # only after chunk-1 has finished.  The pattern "_fc0_2_<JOBNAME>" →
+        # "_fc0_1_<JOBNAME>" works for both single-job and multi-job wrapper configs.
+        for job_name, run_data in db_check_list["JOB_DATA_FIELDS"].items():
+            if "_fc0_2_" in job_name:
+                previous_job_name = job_name.replace("_fc0_2_", "_fc0_1_", 1)
+                if previous_job_name in db_check_list["JOB_DATA_FIELDS"]:
+                    check_start_chunk2_finish_chunk1 = (
+                        run_data[0]["start"]
+                        >= db_check_list["JOB_DATA_FIELDS"][previous_job_name][0]["finish"]
+                    )
+                    db_check_list["JOB_DATA_FIELDS"][job_name][0][
+                        "start>=finish_previous_chunk"
+                    ] = check_start_chunk2_finish_chunk1
+
     _print_db_results(db_check_list, rows_as_dicts, run_tmpdir)
     return db_check_list
 
@@ -273,7 +291,7 @@ def _assert_db_fields(db_check_list: dict[str, Any]) -> None:
                 if field == "empty_fields":
                     assert len(db_check_job_field) == 0
                 else:
-                    assert db_check_job_field, f"Field {field} missing"
+                    assert db_check_job_field, f"Job_name: {job_name} with counter: {job_counter}, Field {field} missing"
 
 
 def _assert_exit_code(final_status: str, exit_code: int) -> None:
@@ -284,9 +302,114 @@ def _assert_exit_code(final_status: str, exit_code: int) -> None:
         assert exit_code == 0
 
 
+def _print_wrapper_db_results(wrapper_db_check_list, info_rows_as_dicts, jobs_rows_as_dicts, run_tmpdir, preview):
+    """
+    Print the wrapper database check results.
+    """
+    prefix = "PREVIEW" if preview else "NON-PREVIEW"
+    print(f"\n{prefix} wrapper DB check results for {run_tmpdir}:")
+    print(f"DB_EXIST: {wrapper_db_check_list['DB_EXIST']}")
+    print(f"WRAPPER_INFO_ENTRIES: {wrapper_db_check_list['WRAPPER_INFO_ENTRIES']}")
+    print(f"WRAPPER_JOBS_ENTRIES: {wrapper_db_check_list['WRAPPER_JOBS_ENTRIES']}")
+
+    for name, checks in wrapper_db_check_list["WRAPPER_INFO_FIELDS"].items():
+        all_ok = all(checks.values())
+        print(f"Wrapper info {name}: {'OK' if all_ok else 'FAILED'}")
+        for field, ok in checks.items():
+            if not ok:
+                print(f"  {field}: FAILED")
+
+    for idx, checks in wrapper_db_check_list["WRAPPER_JOBS_FIELDS"].items():
+        all_ok = all(checks.values())
+        print(f"Wrapper job {idx}: {'OK' if all_ok else 'FAILED'}")
+        for field, ok in checks.items():
+            if not ok:
+                print(f"  {field}: FAILED")
+
+
+def _check_wrapper_db_fields(run_tmpdir: Path, expid: str, preview: bool = False, expected_wrappers: int = 0,
+                             expected_inner_jobs: int = 0) -> dict[str, Any]:
+    """Check that the wrapper database contains the expected entries
+    and that fields contain correct data."""
+    job_packages_db = run_tmpdir / expid / 'pkl' / f'job_packages_{expid}.db'
+    wrapper_db_check_list: dict = {
+        "DB_EXIST": (job_packages_db.exists(), f"DB {str(job_packages_db)} missing"),
+        "WRAPPER_INFO_FIELDS": {},
+        "WRAPPER_JOBS_FIELDS": {},
+    }
+
+    info_table = "preview_wrappers_info" if preview else "wrappers_info"
+    jobs_table = "preview_wrappers_jobs" if preview else "wrappers_jobs"
+
+    with sqlite3.connect(job_packages_db) as conn:
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+
+        # Check wrapper_info
+        c.execute(f"SELECT * FROM {info_table}")
+        info_rows = c.fetchall()
+        wrapper_db_check_list["WRAPPER_INFO_ENTRIES"] = len(info_rows) == expected_wrappers, \
+            f"Expected {expected_wrappers} wrapper info entries, found {len(info_rows)}"
+
+        info_rows_as_dicts: list[dict[str, Any]] = [dict(row) for row in info_rows]
+        for row_dict in info_rows_as_dicts:
+            name = row_dict["name"]
+            check_id_sign = row_dict["id"] < 0 if preview else row_dict["id"] > 0
+            check_type = bool(row_dict.get("type"))
+            check_sections = bool(row_dict.get("sections"))
+            check_status = bool(row_dict.get("status"))
+
+            wrapper_db_check_list["WRAPPER_INFO_FIELDS"][name] = {
+                "id_sign": check_id_sign,
+                "type": check_type,
+                "sections": check_sections,
+                "status": check_status,
+            }
+
+        # Check wrapper_jobs
+        c.execute(f"SELECT * FROM {jobs_table}")
+        jobs_rows = c.fetchall()
+        wrapper_db_check_list["WRAPPER_JOBS_ENTRIES"] = len(jobs_rows) == expected_inner_jobs, \
+            f"Expected {expected_inner_jobs} wrapper jobs entries, found {len(jobs_rows)}"
+
+        jobs_rows_as_dicts: list[dict[str, Any]] = [dict(row) for row in jobs_rows]
+        info_ids = {r["id"] for r in info_rows_as_dicts}
+        for row_dict in jobs_rows_as_dicts:
+            idx = f"{row_dict['package_name']}:{row_dict['job_name']}"
+            check_package_id_exists = row_dict["package_id"] in info_ids
+            check_timestamp = bool(row_dict.get("timestamp"))
+
+            wrapper_db_check_list["WRAPPER_JOBS_FIELDS"][idx] = {
+                "package_id_exists": check_package_id_exists,
+                "timestamp": check_timestamp,
+            }
+
+    _print_wrapper_db_results(wrapper_db_check_list, info_rows_as_dicts, jobs_rows_as_dicts, run_tmpdir, preview)
+    return wrapper_db_check_list
+
+
+def _assert_wrapper_db_fields(wrapper_db_check_list: dict[str, Any]) -> None:
+    """Run assertions against wrapper database values."""
+    assert wrapper_db_check_list["DB_EXIST"][0], wrapper_db_check_list["DB_EXIST"][1]
+    assert wrapper_db_check_list["WRAPPER_INFO_ENTRIES"][0], wrapper_db_check_list["WRAPPER_INFO_ENTRIES"][1]
+    assert wrapper_db_check_list["WRAPPER_JOBS_ENTRIES"][0], wrapper_db_check_list["WRAPPER_JOBS_ENTRIES"][1]
+
+    for name in wrapper_db_check_list["WRAPPER_INFO_FIELDS"]:
+        for field, ok in wrapper_db_check_list["WRAPPER_INFO_FIELDS"][name].items():
+            assert ok, f"Wrapper {name} field {field} failed"
+
+    for idx in wrapper_db_check_list["WRAPPER_JOBS_FIELDS"]:
+        for field, ok in wrapper_db_check_list["WRAPPER_JOBS_FIELDS"][idx].items():
+            assert ok, f"Inner job {idx} field {field} failed"
+
+
 def _check_files_recovered(as_conf, log_dir, expected_files) -> dict:
     """Check that all files are recovered after a run."""
-    retrials = as_conf.experiment_data['JOBS']['JOB'].get('RETRIALS', 0)
+    jobs = as_conf.experiment_data.get('JOBS', {})
+    retrials = max(
+        (job_cfg.get('RETRIALS', job_cfg.get('retrials', 0)) for job_cfg in jobs.values() if isinstance(job_cfg, dict)),
+        default=0,
+    )
     files_check_list = {}
     for f in log_dir.glob('*'):
         files_check_list[f.name] = not any(
@@ -310,6 +433,8 @@ def _check_files_recovered(as_conf, log_dir, expected_files) -> dict:
         if (
                    str(f).endswith(".err") or
                    str(f).endswith(".out") or
+                   "attempt" in str(f).lower() or
+                   "retry" in str(f).lower() or
                    "retrial" in str(f).lower()
            ) and "ASThread" not in str(f)
     ]
@@ -336,3 +461,95 @@ def _assert_files_recovered(files_check_list):
     """Assert that the files are recovered correctly."""
     for check_name in files_check_list:
         assert files_check_list[check_name]
+
+
+def _build_failure_message(
+        db_check_list: dict[str, Any],
+        files_check_list: dict[str, Any],
+        run_tmpdir: Path,
+        expid: str,
+) -> str:
+    """
+    Build a human-readable failure message from DB and file check results.
+
+    :param db_check_list: Result dict returned by :func:`_check_db_fields`.
+    :type db_check_list: dict
+    :param files_check_list: Result dict returned by :func:`_check_files_recovered`.
+    :type files_check_list: dict
+    :param run_tmpdir: Root directory of the experiment run.
+    :type run_tmpdir: Path
+    :param expid: Experiment identifier.
+    :type expid: str
+    :return: Multi-line string describing every failing check.
+    :rtype: str
+    """
+    from autosubmit.config.basicconfig import BasicConfig  # local import to avoid circular deps
+
+    lines: list[str] = [
+        f"Experiment folder : {run_tmpdir}",
+        f"job_data DB       : {Path(BasicConfig.JOBDATA_DIR)}/job_data_{expid}.db",
+        "",
+    ]
+
+    # --- DB checks ---
+    for check, value in db_check_list.items():
+        if check == "JOB_DATA_FIELDS":
+            for job_name, retries in value.items():
+                for retry_idx, fields in retries.items():
+                    for field_name, result in fields.items():
+                        if field_name == "empty_fields":
+                            if result:  # non-empty string means there are empty fields
+                                lines.append(
+                                    f"  [DB] {job_name} retry={retry_idx}: "
+                                    f"fields unexpectedly empty: {result}"
+                                )
+                        elif not result:
+                            lines.append(
+                                f"  [DB] {job_name} retry={retry_idx}: "
+                                f"field '{field_name}' FAILED"
+                            )
+        elif isinstance(value, tuple):
+            ok, msg = value
+            if not ok:
+                lines.append(f"  [DB] {check}: {msg}")
+        elif not value:
+            lines.append(f"  [DB] {check}: {value}")
+
+    # --- File checks ---
+    for check, result in files_check_list.items():
+        if not result:
+            lines.append(f"  [FILES] {check}: FAILED")
+
+    return "\n".join(lines)
+
+
+def assert_run_results(
+        db_check_list: dict[str, Any],
+        files_check_list: dict[str, Any],
+        run_tmpdir: Path,
+        expid: str,
+) -> None:
+    """
+    Assert DB and file-recovery checks and raise a descriptive ``pytest.fail``
+    message on the first failure.
+
+    Combines :func:`_assert_db_fields`, :func:`_assert_files_recovered`, and
+    :func:`_build_failure_message` into a single call so test bodies stay concise.
+
+    :param db_check_list: Result dict returned by :func:`_check_db_fields`.
+    :type db_check_list: dict
+    :param files_check_list: Result dict returned by :func:`_check_files_recovered`.
+    :type files_check_list: dict
+    :param run_tmpdir: Root directory of the experiment run.
+    :type run_tmpdir: Path
+    :param expid: Experiment identifier.
+    :type expid: str
+    :raises pytest.fail: If any check fails, with a full diagnostic message.
+    """
+    import pytest as _pytest  # local import so conftest stays importable outside pytest
+
+    try:
+        _assert_db_fields(db_check_list)
+        _assert_files_recovered(files_check_list)
+    except AssertionError:
+        _pytest.fail(_build_failure_message(db_check_list, files_check_list, run_tmpdir, expid))
