@@ -41,7 +41,7 @@ from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
 )
 
-CURRENT_DB_VERSION = 19  # Update this if you change the database schema
+CURRENT_DB_VERSION = 21  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
 DB_VERSION_SCHEMA_CHANGES = 12
 DEFAULT_DB_VERSION = 10
@@ -142,6 +142,9 @@ class ExperimentHistoryDbManager(DatabaseManager):
             children TEXT,
             platform_output TEXT,
             workflow_commit TEXT,
+            split TEXT,
+            splits TEXT,
+            fail_count INTEGER NOT NULL DEFAULT 0,
             UNIQUE(counter,job_name)
             );
             ''')
@@ -178,6 +181,15 @@ class ExperimentHistoryDbManager(DatabaseManager):
         # Version 18
         self.version_schema_changes.extend([
             "ALTER TABLE job_data ADD COLUMN workflow_commit TEXT"
+        ])
+        # Version 19
+        self.version_schema_changes.extend([
+            "ALTER TABLE job_data ADD COLUMN split TEXT",
+            "ALTER TABLE job_data ADD COLUMN splits TEXT"
+        ])
+        # Version 20
+        self.version_schema_changes.extend([
+            "ALTER TABLE job_data ADD COLUMN fail_count INTEGER NOT NULL DEFAULT 0"
         ])
 
     def create_historical_database(self):
@@ -309,12 +321,13 @@ class ExperimentHistoryDbManager(DatabaseManager):
     def _insert_job_data(self, job_data):
         # type : (JobData) -> int
         """ Insert data class JobData into job_data table. """
-        statement = ''' INSERT INTO job_data(counter, job_name, created, modified, 
-                submit, start, finish, status, rowtype, ncpus, 
-                wallclock, qos, energy, date, section, member, chunk, last, 
-                platform, job_id, extra_data, nnodes, run_id, MaxRSS, AveRSS, 
-                out, err, rowstatus, children, platform_output, workflow_commit) 
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
+        statement = ''' INSERT INTO job_data(counter, job_name, created, modified,
+                submit, start, finish, status, rowtype, ncpus,
+                wallclock, qos, energy, date, section, member, chunk, last,
+                platform, job_id, extra_data, nnodes, run_id, MaxRSS, AveRSS,
+                out, err, rowstatus, children, platform_output, workflow_commit,
+                split, splits, fail_count)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
         arguments = (job_data.counter, job_data.job_name, HUtils.get_current_datetime(), HUtils.get_current_datetime(),
                      job_data.submit, job_data.start, job_data.finish, job_data.status, job_data.rowtype,
                      job_data.ncpus,
@@ -323,7 +336,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      job_data.platform, job_data.job_id, job_data.extra_data, job_data.nnodes, job_data.run_id,
                      job_data.MaxRSS, job_data.AveRSS,
                      job_data.out, job_data.err, job_data.rowstatus, job_data.children, job_data.platform_output,
-                     job_data.workflow_commit)
+                     job_data.workflow_commit,
+                     job_data.split, job_data.splits, job_data.fail_count)
         return self.insert_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
 
     def _insert_experiment_run(self, experiment_run):
@@ -356,16 +370,18 @@ class ExperimentHistoryDbManager(DatabaseManager):
         :param job_data_dc: The JobData data class instance containing job data to be updated.
         :type job_data_dc: JobData
         """
-        statement = ''' UPDATE job_data SET last=?, submit=?, start=?, finish=?, modified=?, 
-                    job_id=?, status=?, energy=?, extra_data=?, 
-                    nnodes=?, ncpus=?, rowstatus=?, out=?, err=?, 
-                    children=?, platform_output=?, id=?, workflow_commit=? WHERE id=?'''
+        statement = ''' UPDATE job_data SET last=?, submit=?, start=?, finish=?, modified=?,
+                    job_id=?, status=?, energy=?, extra_data=?,
+                    nnodes=?, ncpus=?, rowstatus=?, out=?, err=?,
+                    children=?, platform_output=?, id=?, workflow_commit=?,
+                    split=?, splits=?, fail_count=? WHERE id=?'''
         # noinspection PyProtectedMember
         arguments = (
             job_data_dc.last, job_data_dc.submit, job_data_dc.start, job_data_dc.finish, HUtils.get_current_datetime(),
             job_data_dc.job_id, job_data_dc.status, job_data_dc.energy, job_data_dc.extra_data,
             job_data_dc.nnodes, job_data_dc.ncpus, job_data_dc.rowstatus, job_data_dc.out, job_data_dc.err,
-            job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc.workflow_commit, job_data_dc._id
+            job_data_dc.children, job_data_dc.platform_output, job_data_dc._id, job_data_dc.workflow_commit,
+            job_data_dc.split, job_data_dc.splits, job_data_dc.fail_count, job_data_dc._id
         )
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
@@ -383,6 +399,23 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      experiment_run_dc.submitted,
                      experiment_run_dc.suspended, HUtils.get_current_datetime(), experiment_run_dc.run_id)
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
+
+    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
+        """Get the latest JobData for a given job_name and fail_count.
+
+        :param job_name: The job name.
+        :type job_name: str
+        :param fail_count: The fail count.
+        :type fail_count: int
+        :return: The latest JobData instance.
+        :rtype: JobData
+        """
+        statement = self.get_built_select_statement("job_data", "job_name=? AND fail_count=? ORDER BY id DESC LIMIT 1")
+        arguments = (str(job_name), int(fail_count),)
+        job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
+        if len(job_data_rows) == 0:
+            return None
+        return JobData.from_model(Models.JobDataRow(*job_data_rows[0]))
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
         """
@@ -482,6 +515,8 @@ class ExperimentHistoryDatabaseManager(Protocol):
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str): ...
 
     def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int: ...
+
+    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData: ...
 
 
 class SqlAlchemyExperimentHistoryDbManager:
@@ -776,7 +811,11 @@ class SqlAlchemyExperimentHistoryDbManager:
                 err=job_data.err,
                 rowstatus=job_data.rowstatus,
                 children=job_data.children,
-                platform_output=job_data.platform_output
+                platform_output=job_data.platform_output,
+                workflow_commit=job_data.workflow_commit,
+                split=job_data.split,
+                splits=job_data.splits,
+                fail_count=job_data.fail_count,
             )
         )
         with self.engine.connect() as conn:
@@ -828,11 +867,38 @@ class SqlAlchemyExperimentHistoryDbManager:
                 err=job_data_dc.err,
                 children=job_data_dc.children,
                 platform_output=job_data_dc.platform_output,
+                workflow_commit=job_data_dc.workflow_commit,
+                split=job_data_dc.split,
+                splits=job_data_dc.splits,
+                fail_count=job_data_dc.fail_count,
             )
         )
         with self.engine.connect() as conn:
             conn.execute(query)
             conn.commit()
+
+    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
+        """Get the latest JobData for a given job_name and fail_count.
+
+        :param job_name: The job name.
+        :type job_name: str
+        :param fail_count: The fail count.
+        :type fail_count: int
+        :return: The latest JobData instance.
+        :rtype: JobData
+        """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = (
+            select(job_data_table)
+            .where(job_data_table.c.job_name == job_name)  # type: ignore
+            .where(job_data_table.c.fail_count == fail_count)
+            .order_by(job_data_table.c.id.desc())
+        )
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+            if not result:
+                return None
+            return JobData.from_model(result)
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
         """Get the job data by job ID and name."""
