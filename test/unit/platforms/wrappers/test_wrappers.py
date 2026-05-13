@@ -2292,15 +2292,15 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
 
 
 def test_build_imports():
-    kwargs:dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
-                   'num_processors_value': True, 'expid': True}
+    kwargs: dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
+                    'num_processors_value': True, 'expid': True, 'name': 'test_wrapper'}
     vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_imports()
     assert type(vh_wrapper) is str and '("t" "e" "s" "t" )' in vh_wrapper
 
 
 def test_build_srun_launcher():
-    kwargs:dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
-                   'num_processors_value': True, 'expid': True}
+    kwargs: dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
+                    'num_processors_value': True, 'expid': True, 'name': 'test_wrapper'}
     vh_wrapper = SrunVerticalHorizontalWrapperBuilder(**kwargs).build_srun_launcher("job1, job2, job3, job4, job5")
     assert type(vh_wrapper) is str and "job1, job2, job3, job4, job5" in vh_wrapper
 

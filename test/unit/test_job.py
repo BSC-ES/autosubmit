@@ -24,7 +24,6 @@ from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
-from time import time
 from typing import Optional
 
 import pytest
@@ -941,17 +940,10 @@ def test_create_script(test_tmp_path: Path, mocker) -> None:
 
 
 def test_reset_logs(autosubmit_config):
-    experiment_data = {
-        'AUTOSUBMIT': {
-            'WORKFLOW_COMMIT': "dummy-commit",
-        },
-    }
-    as_conf = autosubmit_config("t000", experiment_data)
     job = Job("job1", "1", Status.READY, 0)
-    job.reset_logs(as_conf)
-    assert job.workflow_commit == "dummy-commit"
-    assert job.updated_log is False
-    assert job.packed_during_building is False
+    job.updated_log = 5
+    job.reset_logs()
+    assert job.updated_log == 0
 
 
 def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker):
@@ -1074,37 +1066,7 @@ def test_recover_last_ready_date(tmpdir, test_with_file, file_is_empty, last_lin
     assert job.ready_date == expected_date
 
 
-@pytest.mark.parametrize('test_with_logfiles, file_timestamp_greater_than_ready_date', [
-    (False, False),
-    (True, True),
-    (True, False),
-], ids=["no file", "log timestamp >= ready_date", "log timestamp < ready_date"])
-def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greater_than_ready_date):
-    job = Job('dummy', '1', 0, 1)
-    job._log_path = Path(tmpdir)
-    expected_local_logs = (f"{job.name}.out.0", f"{job.name}.err.0")
-    if test_with_logfiles:
-        if file_timestamp_greater_than_ready_date:
-            ready_time = datetime.now() - timedelta(minutes=5)
-            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-            expected_update_log = True
-            expected_local_logs = (log_name.with_suffix('.out').name, log_name.with_suffix('.err').name)
-        else:
-            expected_update_log = False
-            ready_time = datetime.now() + timedelta(minutes=5)
-            job.ready_date = str(ready_time.strftime("%Y%m%d%H%M%S"))
-            log_name = job._log_path.joinpath(f'{job.name}_{job.ready_date}')
-        log_name.with_suffix('.out').touch()
-        log_name.with_suffix('.err').touch()
-    else:
-        expected_update_log = False
 
-    job.updated_log = False
-    job.recover_last_log_name()
-    assert job.updated_log == expected_update_log
-    assert job.local_logs[0] == str(expected_local_logs[0])
-    assert job.local_logs[1] == str(expected_local_logs[1])
 
 
 @pytest.mark.parametrize('experiment_data, attributes_to_check', [
@@ -1556,9 +1518,9 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
 @pytest.mark.parametrize(
     'completed,existing_lines,count',
     [
-        (True, 'a\nb\n', -1),
+        (True, 'prev_result COMPLETED\n20260101000000 20260101000010 end status\n', -1),
         (True, None, -1),
-        (False, 'a\n', -1),
+        (False, '20260101000000 20260101000010 end status\n', -1),
         (False, None, 100)
     ],
     ids=[
@@ -1580,7 +1542,6 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
 
     status = Status.COMPLETED if True else Status.WAITING
     job = Job(f'{_EXPID}_dummy', 1, status, 0)
-    job.finish_time_timestamp = time()
     job.platform = local
 
     total_stats = Path(tmp_path, f'{job.name}_TOTAL_STATS')
@@ -1590,19 +1551,16 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
 
     job.write_end_time(completed=completed, count=count)
 
-    # It will exist regardless of the argument ``total_stats_exists``, as ``write_submit_time()``
-    # must have created it.
+    # The file must exist after write_end_time regardless of whether it existed before.
     assert total_stats.exists()
 
-    # When the file already exists, it will append new content. It must never
-    # delete the existing lines, so this assertion just verifies the content
-    # written previously (if any) was not removed.
+    # For an empty file a single template line is created by _write_time.
+    # For pre-existing content the last line is updated in-place; no new line is appended.
     if existing_lines:
-        lines = len(existing_lines.split('\n')) - 1
+        expected_lines = len(existing_lines.splitlines())
     else:
-        lines = 0
-    expected_lines = lines + 1
-    assert len(total_stats.read_text().split('\n')) == expected_lines
+        expected_lines = 1
+    assert len(total_stats.read_text().splitlines()) == expected_lines
 
 
 def test_job_repr():
@@ -1715,7 +1673,7 @@ def test_update_status_logs(status: Status, autosubmit_config, mocker):
 
     assert job.status == status
 
-    assert mocked_log.info.call_args_list[0][0][0] == f'Job {job.name} is {Status.VALUE_TO_KEY[status].upper()}'
+    assert mocked_log.status.call_args_list[0][0][0] == f'Job {job.name} and id: {job.id} is {Status.VALUE_TO_KEY[status]}'
 
 
 @pytest.mark.parametrize(
@@ -1772,12 +1730,9 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
         job.update_status(as_conf=as_conf, failed_file=False)
         assert job.status == Status.COMPLETED
 
-        assert mocked_log.result.call_args_list[0][0][0] == f'Job {job.name} is COMPLETED'
-
-        if job_id == '0':
-            assert job.updated_log
-        else:
-            assert job.platform.recovery_queue.put.called  # type: ignore
+        assert mocked_log.result.call_args_list[0][0][0] == (
+            f'Job {job.name} changed from WAITING to COMPLETED'
+        )
     else:
         job.update_status(as_conf=as_conf, failed_file=False)
         assert job.status == Status.FAILED

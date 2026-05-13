@@ -950,10 +950,6 @@ class ParamikoPlatform(Platform):
 
     def parse_job_list(self, job_list: list) -> str:
         """Convert a list of job_list to job_list_cmd
-
-        If a job in the provided list is missing its ID, this function will initialize
-        it to a string containing the digit zero,``"0"``.
-
         :param job_list: A list of jobs.
         :return: A comma-separated string containing the job IDs.
         """

@@ -467,14 +467,6 @@ class Platform:
         """
 
         if only_wrappers or inspect:
-            # Now name is used for submit scripts, before it was used to determine if a package had a wrapper or not
-            if package.is_wrapped:
-                job_list.packages_dict[package.name] = package.jobs
-                from ..job.job import WrapperJob
-                wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.READY, 0,
-                                         package.jobs, package._wallclock, package.platform, as_conf, hold=False)
-                job_list.job_package_map[package.jobs[0].id] = wrapper_job
-                packages_persistence.save(package, inspect)
             for innerJob in package._jobs:
                 # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
                 innerJob.status = Status.COMPLETED
@@ -731,7 +723,7 @@ class Platform:
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
         return True
 
-    def get_stat_file(self, job, count=-1):
+    def get_stat_file(self, job, count):
         filename = f'{job.name}_STAT_{str(count)}'
         stat_local_path = os.path.join(
             self.config.get("LOCAL_ROOT_DIR"), self.expid, self.config.get("LOCAL_TMP_DIR"), filename)
@@ -1112,10 +1104,18 @@ class Platform:
         raise NotImplementedError  # pragma: no cover
 
     def delete_previous_run_files_by_job_names(self, job_names: list[str]) -> None:
-        """Deletes the COMPLETED and FAILED files for the given job names from the remote log directory.
+        """Delete the COMPLETED and FAILED files for the given job names from the remote log directory.
 
-        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted
-        :type job_names: List[str]
+        :param job_names: List of job names whose COMPLETED and FAILED files should be deleted.
+        :type job_names: list[str]
+        """
+        raise NotImplementedError  # pragma: no cover
+
+    def delete_previous_stat_files_by_job_names(self, job_names: list[str]) -> None:
+        """Delete all previous STAT files for the given job names from the remote log directory.
+
+        :param job_names: List of job names whose STAT files should be deleted.
+        :type job_names: list[str]
         """
         raise NotImplementedError  # pragma: no cover
 

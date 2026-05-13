@@ -138,7 +138,7 @@ def test_is_over_wallclock(new_platform_mock):
     setup_jobs([job], new_platform_mock)
     job.wallclock = "00:01"
     assert job.is_over_wallclock() is False
-    job.start_time = datetime.now() - timedelta(minutes=2)
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
     assert job.is_over_wallclock() is True
 
 
@@ -154,7 +154,7 @@ def test_platform_job_is_over_wallclock(setup_as_conf, new_platform_mock, platfo
     job.wallclock = "00:01"
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING)
     assert job_status == Status.RUNNING
-    job.start_time = datetime.now() - timedelta(minutes=2)
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
     platform_instance.get_completed_job_names = mocker.MagicMock(return_value=[])
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING)
     assert job_status == Status.FAILED
@@ -179,6 +179,8 @@ def test_platform_job_is_over_wallclock_force_failure(setup_as_conf, new_platfor
     platform_instance = platform_class("dummy", f"{platform_name}-dummy", setup_as_conf.experiment_data)
     job = Job("dummy-1", 1, Status.RUNNING, 0)
     setup_jobs([job], platform_instance)
-    job.start_time = datetime.now() - timedelta(minutes=2)
+    platform_instance.get_completed_job_names = mocker.MagicMock(return_value=[])
+    platform_instance.send_command = mocker.MagicMock()
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
     assert job_status == Status.FAILED

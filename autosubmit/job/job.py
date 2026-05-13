@@ -1529,7 +1529,12 @@ class Job(object):
             effective_wallclock = self.wallclock_in_seconds
         if not self.start_time_timestamp:  # Fallback, this should not happen as start_time_timestamp is set when the job is running
             Log.warning(f"Job {self.name} does not have start time timestamp, trying to set it from remote stat file")
-            self.platform.set_start_time_from_remote_stat_file([self])
+            try:
+                self.platform.set_start_time_from_remote_stat_file([self])
+            except Exception:
+                if not self.start_time_timestamp:
+                    self.start_time_timestamp = int(time.strftime("%Y%m%d%H%M%S"))
+                    Log.warning(f"Job {self.name} still does not have start time timestamp, setting it to current time: {self.start_time_timestamp}")
         elapsed = datetime.datetime.now() - datetime.datetime.strptime(str(self.start_time_timestamp), "%Y%m%d%H%M%S")
         if int(elapsed.total_seconds()) > effective_wallclock:
             Log.warning(f"Job {self.name} is over wallclock time, Autosubmit will check if it is completed")
