@@ -116,8 +116,8 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
             job_list=[job],
             as_conf=as_conf,
             retries=-1)
-    assert cm.value.message == 'Some Jobs are in Unknown status'
-    assert cm.value.code == 6008
+    assert cm.value.message == ae.error_message
+    assert cm.value.code == 6000
     assert cm.value.trace is None
 
 

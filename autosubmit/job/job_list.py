@@ -2843,7 +2843,7 @@ class JobList(object):
                     from ..job.job import WrapperJob
                     wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
                                              package.jobs, package._wallclock, package.platform, as_conf, False)
-                    self.job_package_map[int(package.jobs[0].id)] = wrapper_job
+                    self.job_package_map[package.jobs[0].id] = wrapper_job
                     packages_persistence.save(package, inspect)
 
     def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> list[dict]:

@@ -201,10 +201,10 @@ class JobPackageBase(object):
     def send_files(self):
         """ Send local files to the platform. """
 
-    def process_jobs_to_submit(self, job_id: str) -> None:
+    def process_jobs_to_submit(self, job_id: int) -> None:
         for job in self.jobs:
             job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
-            job.id = job_id
+            job.id = int(job_id)
             if job.status == Status.READY:
                 job.status = Status.SUBMITTED
                 Log.result(

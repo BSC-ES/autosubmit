@@ -429,7 +429,7 @@ def test_check_wrappers_and_as_exit(
     Autosubmit.exit = _exit
 
     t: tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]] = \
-        autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, exp.expid)
+        autosubmit.check_wrappers(as_conf, job_list, exp.expid)
     jobs_to_check, _ = t
 
     assert len(jobs_to_check) == expected_jobs_to_check

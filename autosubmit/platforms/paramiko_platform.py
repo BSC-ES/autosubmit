@@ -1830,9 +1830,9 @@ class ParamikoPlatform(Platform):
         :return: retrieve the ID of the Jobs
         :rtype: tuple[bool, list[Any]]
         """
-        jobs_id: list[str] = self.submit_multiple_jobs(scripts_to_submit)
+        jobs_id: list[int] = self.submit_multiple_jobs(scripts_to_submit)
         for jobid_index, package in enumerate(scripts_to_submit.values()):
-            current_package_id = jobs_id[jobid_index]
+            current_package_id = int(jobs_id[jobid_index])
             package.process_jobs_to_submit(current_package_id)
         self._check_and_cancel_duplicated_job_names(scripts_to_submit)
 

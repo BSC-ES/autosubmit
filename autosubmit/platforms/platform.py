@@ -723,15 +723,21 @@ class Platform:
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
         return True
 
-    def get_stat_file(self, job, count):
-        filename = f'{job.name}_STAT_{str(count)}'
+    def get_stat_file(self, job, count=-1):
+        if count == -1:  # No internal retrials
+            filename = f"{job.stat_file}{job.fail_count}"
+        else:
+            filename = f'{job.name}_STAT_{str(count)}'
         stat_local_path = os.path.join(
             self.config.get("LOCAL_ROOT_DIR"), self.expid, self.config.get("LOCAL_TMP_DIR"), filename)
         if os.path.exists(stat_local_path):
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
+                if count == -1:
+                    Log.debug(f'{job.name}_STAT_{str(job.fail_count)} file have been transferred')
+                else:
+                    Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
                 return True
         Log.warning(f'{job.name}_STAT_{str(count)} file not found')
         return False
