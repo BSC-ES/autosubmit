@@ -326,29 +326,29 @@ def test_poller(platform: str, mocker, paramiko_platform):
 @pytest.mark.parametrize(
     'job_list,expected',
     [
-    (
-            [], ''
-    ),
-    (
-            [
-                Job(job_id='10', name='')
-            ],
-            '10'
-    ),
-    (
-            [
-                Job(job_id='1', name=''),
-                Job(job_id='2', name='')
-            ],
-            '1,2'
-    ),
-    (
-            [
-                Job(job_id=None, name=''),
-                Job(job_id='2', name='')
-            ],
-            '0,2'
-    )
+        (
+                [], ''
+        ),
+        (
+                [
+                    Job(job_id='10', name='')
+                ],
+                '10'
+        ),
+        (
+                [
+                    Job(job_id='1', name=''),
+                    Job(job_id='2', name='')
+                ],
+                '1,2'
+        ),
+        (
+                [
+                    Job(job_id=None, name=''),
+                    Job(job_id='2', name='')
+                ],
+                '0,2'
+        )
     ]
 )
 def test_parse_joblist(job_list: list, expected: str, paramiko_platform: ParamikoPlatform):
@@ -415,7 +415,8 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
         (Exception("garbage"), False, False)
     ]
 )
-def test_move_file_errors(error, must_exist, expected_error_or_return_value, paramiko_platform: ParamikoPlatform, mocker,
+def test_move_file_errors(error, must_exist, expected_error_or_return_value, paramiko_platform: ParamikoPlatform,
+                          mocker,
                           tmp_path):
     """Test the error paths for ``move_file``.
 
@@ -602,6 +603,7 @@ def test__load_ssh_config_missing_ssh_config(
 
     assert mocked_log.warning.called
 
+
 @pytest.mark.parametrize("output,expected", [
     ("", {}),
     ("   \n\n  \n", {}),
@@ -620,8 +622,8 @@ def test_parse_job_names(output: str, expected: dict) -> None:
 
 
 def test_check_and_cancel_duplicated_job_names_no_duplicates(
-    slurm_platform: SlurmPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        slurm_platform: SlurmPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Do not call cancel_jobs when no job name appears more than once.
 
@@ -640,8 +642,8 @@ def test_check_and_cancel_duplicated_job_names_no_duplicates(
 
 
 def test_check_and_cancel_duplicated_job_names_with_duplicates(
-    slurm_platform: SlurmPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        slurm_platform: SlurmPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Cancel the oldest (lowest-sorted) ID when a job name has multiple entries.
 
@@ -660,8 +662,8 @@ def test_check_and_cancel_duplicated_job_names_with_duplicates(
 
 
 def test_check_and_cancel_duplicated_job_names_empty_output(
-    slurm_platform: SlurmPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        slurm_platform: SlurmPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Do not cancel anything when the command returns empty output.
 
@@ -680,7 +682,7 @@ def test_check_and_cancel_duplicated_job_names_empty_output(
 
 
 def test_submit_multiple_jobs_empty_input_returns_empty(
-    paramiko_platform: ParamikoPlatform,
+        paramiko_platform: ParamikoPlatform,
 ) -> None:
     """Return an empty list immediately when no scripts are provided.
 
@@ -690,8 +692,8 @@ def test_submit_multiple_jobs_empty_input_returns_empty(
 
 
 def test_submit_multiple_jobs_uses_fallback_when_count_mismatch(
-    paramiko_platform: ParamikoPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        paramiko_platform: ParamikoPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Use get_submitted_jobs_by_name when direct parse returns the wrong count.
 
@@ -710,8 +712,8 @@ def test_submit_multiple_jobs_uses_fallback_when_count_mismatch(
 
 
 def test_submit_multiple_jobs_raises_when_both_paths_fail(
-    paramiko_platform: ParamikoPlatform,
-    monkeypatch: pytest.MonkeyPatch,
+        paramiko_platform: ParamikoPlatform,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Raise AutosubmitError (6005) when both direct and fallback ID parsing fail.
 
@@ -732,7 +734,7 @@ def test_submit_multiple_jobs_raises_when_both_paths_fail(
 
 
 def test_ps_get_job_names_cmd_contains_expected_components(
-    ps_platform: tuple,
+        ps_platform: tuple,
 ) -> None:
     """The PS command must use ps and grep to filter by job name.
 

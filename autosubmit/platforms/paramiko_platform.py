@@ -956,7 +956,7 @@ class ParamikoPlatform(Platform):
         job_list_cmd = ""
         if job_list:
             for job in job_list:
-                job_list_cmd += str(job.id) + ","
+                job_list_cmd += str(job.id) + "," if job.id else "0,"
             if job_list_cmd[-1] == ",":
                 job_list_cmd = job_list_cmd[:-1]
         return job_list_cmd

@@ -97,7 +97,9 @@ def setup_jobs(dummy_jobs, new_platform_mock):
         job.section = "dummysection"
         job._init_runtime_parameters()
         job.wallclock = "00:01"
-        job.start_time = datetime.now() - timedelta(minutes=1)
+        start_time = datetime.now() - timedelta(minutes=1)
+        job.start_time = start_time
+        job.start_time_timestamp = start_time.strftime('%Y%m%d%H%M%S')
 
 
 @pytest.mark.parametrize(
