@@ -768,21 +768,6 @@ class Platform:
         :type retries: int
         """
 
-    def check_job(self, job: 'Job', default_status: str = Status.COMPLETED, retries: int = 5,
-                  submit_hold_check: bool = False, is_wrapper: bool = False):
-        """Checks job running status.
-
-        :param is_wrapper:
-        :param submit_hold_check:
-        :param job:
-        :param retries: retries
-        :param default_status: status to assign if it can be retrieved from the platform
-        :type default_status: autosubmit.job.job_common.Status
-        :return: current job status
-        :rtype: autosubmit.job.job_common.Status
-        """
-        raise NotImplementedError  # pragma: no cover
-
     def close_connection(self):
         return
 
@@ -891,9 +876,6 @@ class Platform:
         self.log_recovery_process = None
         self.work_event = None
         self.processed_wrapper_logs = set()
-
-    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
-        self.config = as_conf.experiment_data
 
     def load_process_info(self, platform):
 
@@ -1126,16 +1108,6 @@ class Platform:
 
         :param job_names: List of job names to check. If None, all jobs will be checked.
         :return: List of completed job names.
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def get_failed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
-        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
-
-        :param job_names: If provided, filters the results to include only these job names.
-        :type job_names: Optional[List[str]]
-        :return: List of job names with COMPLETED files.
-        :rtype: List[str]
         """
         raise NotImplementedError  # pragma: no cover
 

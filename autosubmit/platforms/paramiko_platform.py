@@ -864,28 +864,6 @@ class ParamikoPlatform(Platform):
             final_job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
         return final_job_names
 
-    def get_failed_job_names(self, job_names_provided: Optional[list[str]] = None) -> list[str]:
-        """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
-
-        :param job_names_provided: If provided, filters the results to include only these job names.
-        :type job_names_provided: Optional[List[str]]
-        :return: List of job names with COMPLETED files.
-        :rtype: List[str]
-        """
-        job_names = []
-        # TODO: from the rebase make it the same as completed but with failed, maybe merge into one
-        if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
-            if not job_names_provided:
-                cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_FAILED' -type f"
-            else:
-                patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names_provided])
-                cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
-            self.send_command(cmd)
-            output = self.get_ssh_output()
-            completed_files = output.strip().split('\n') if output else []
-            job_names = [Path(file).name.replace('_FAILED', '') for file in completed_files]
-        return job_names
-
     def delete_previous_run_files_by_job_names(self, job_names: list[str]) -> None:
         """Deletes the COMPLETED, FAILED for the given job names.
 
@@ -1868,18 +1846,6 @@ class ParamikoPlatform(Platform):
     def _check_for_unrecoverable_errors(self):
         """Check for unrecoverable errors in the command output"""
         raise NotImplementedError
-
-    def is_log_updated(self, job_list: list['Job']) -> bool:
-        """Check if the log file of a job has been updated.
-
-        :param job_list: List of jobs to check.
-        :param job_script: Job script name to check.
-        :param last_log_size: Last known size of the log file.
-        :return: True if the log file has been updated, False otherwise.
-        """
-        local_path = str(Path(self.local_log_dir) / job_list[0].name.strip("") / f"{job_list[0].name}.cmd.out")
-        # quick-look
-        # raise NotImplementedError
 
 
 class ParamikoPlatformException(Exception):

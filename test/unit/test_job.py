@@ -1109,94 +1109,94 @@ def test_recover_last_log_name(tmpdir, test_with_logfiles, file_timestamp_greate
 
 @pytest.mark.parametrize('experiment_data, attributes_to_check', [
     (
-        {
-            'JOBS': {
-                'RANDOM-SECTION': {
-                    'FILE': 'test.sh',
-                    'PLATFORM': 'DUMMY_PLATFORM',
-                    'NOTIFY_ON': 'COMPLETED',
+            {
+                'JOBS': {
+                    'RANDOM-SECTION': {
+                        'FILE': 'test.sh',
+                        'PLATFORM': 'DUMMY_PLATFORM',
+                        'NOTIFY_ON': 'COMPLETED',
+                    },
                 },
-            },
-            'PLATFORMS': {
-                'dummy_platform': {
-                    'type': 'ps',
+                'PLATFORMS': {
+                    'dummy_platform': {
+                        'type': 'ps',
+                    },
                 },
+                'ROOTDIR': 'dummy_rootdir',
+                'LOCAL_TMP_DIR': 'dummy_tmpdir',
+                'LOCAL_ROOT_DIR': 'dummy_rootdir',
             },
-            'ROOTDIR': 'dummy_rootdir',
-            'LOCAL_TMP_DIR': 'dummy_tmpdir',
-            'LOCAL_ROOT_DIR': 'dummy_rootdir',
-        },
-        {'notify_on': ['COMPLETED']}
+            {'notify_on': ['COMPLETED']}
     ),
     (
-        {
-            'JOBS': {
-                'RANDOM-SECTION': {
-                    'FILE': 'test.sh',
-                    'PLATFORM': 'DUMMY_PLATFORM',
-                    'CPMIP_THRESHOLDS': {
-                        'SYPD': {
-                            'THRESHOLD': 5.0,
-                            'COMPARISON': 'greater_than',
-                            '%_ACCEPTED_ERROR': 10,
-                        }
+            {
+                'JOBS': {
+                    'RANDOM-SECTION': {
+                        'FILE': 'test.sh',
+                        'PLATFORM': 'DUMMY_PLATFORM',
+                        'CPMIP_THRESHOLDS': {
+                            'SYPD': {
+                                'THRESHOLD': 5.0,
+                                'COMPARISON': 'greater_than',
+                                '%_ACCEPTED_ERROR': 10,
+                            }
+                        },
                     },
                 },
             },
-        },
-        {
-            'cpmip_thresholds': {
-                'SYPD': {
-                    'THRESHOLD': 5.0,
-                    'COMPARISON': 'greater_than',
-                    '%_ACCEPTED_ERROR': 10,
+            {
+                'cpmip_thresholds': {
+                    'SYPD': {
+                        'THRESHOLD': 5.0,
+                        'COMPARISON': 'greater_than',
+                        '%_ACCEPTED_ERROR': 10,
+                    }
                 }
             }
-        }
     ),
     (
-        {
-            'JOBS': {
-                'RANDOM-SECTION': {
-                    'FILE': 'test.sh',
-                    'PLATFORM': 'DUMMY_PLATFORM',
+            {
+                'JOBS': {
+                    'RANDOM-SECTION': {
+                        'FILE': 'test.sh',
+                        'PLATFORM': 'DUMMY_PLATFORM',
+                    },
                 },
             },
-        },
-        {'cpmip_thresholds': {}}
+            {'cpmip_thresholds': {}}
     ),
     (
-        {
-            'EXPERIMENT': {
-                'CHUNKSIZE': 3,
-                'CHUNKSIZEUNIT': 'MONTH',
-            },
-            'JOBS': {
-                'RANDOM-SECTION': {
-                    'FILE': 'test.sh',
-                    'PLATFORM': 'DUMMY_PLATFORM',
+            {
+                'EXPERIMENT': {
+                    'CHUNKSIZE': 3,
+                    'CHUNKSIZEUNIT': 'MONTH',
+                },
+                'JOBS': {
+                    'RANDOM-SECTION': {
+                        'FILE': 'test.sh',
+                        'PLATFORM': 'DUMMY_PLATFORM',
+                    },
                 },
             },
-        },
-        {'chunk_size': 3, 'chunk_size_unit': 'month'}
+            {'chunk_size': 3, 'chunk_size_unit': 'month'}
     ),
     (
-        {
-            'JOBS': {
-                'RANDOM-SECTION': {
-                    'FILE': 'test.sh',
-                    'PLATFORM': 'DUMMY_PLATFORM',
+            {
+                'JOBS': {
+                    'RANDOM-SECTION': {
+                        'FILE': 'test.sh',
+                        'PLATFORM': 'DUMMY_PLATFORM',
+                    },
                 },
             },
-        },
-        {'chunk_size': 1, 'chunk_size_unit': ''}
+            {'chunk_size': 1, 'chunk_size_unit': ''}
     ),
 ], ids=[
     'notify_on_attribute',
-    'cpmip_thresholds_from_config', # Expected to be loaded when present in the config.
-    'empty_cpmip_thresholds_when_missing', # Expected to be empty when not present in the config.
-    'chunk_metadata_from_experiment_defaults', # Expected to be loaded from experiment config when present.
-    'chunk_metadata_when_missing', # Expected to have default values when chunk metadata is missing in the config
+    'cpmip_thresholds_from_config',  # Expected to be loaded when present in the config.
+    'empty_cpmip_thresholds_when_missing',  # Expected to be empty when not present in the config.
+    'chunk_metadata_from_experiment_defaults',  # Expected to be loaded from experiment config when present.
+    'chunk_metadata_when_missing',  # Expected to have default values when chunk metadata is missing in the config
 ])
 def test_update_parameters_attributes(autosubmit_config, experiment_data, attributes_to_check):
     job, _, _ = create_job_and_update_parameters(autosubmit_config, experiment_data)
@@ -1396,7 +1396,7 @@ def test_update_parameters_reset_logs(autosubmit_config, tmpdir):
     )
     job = Job('DUMMY', '1', 0, 1)
     job.section = 'DUMMY_S'
-    job.log_recovered = True
+    job.updated_log += 1
     job.packed_during_building = True
     job.workflow_commit = "incorrect"
     job.update_parameters(as_conf, set_attributes=True, reset_logs=True)
@@ -1676,10 +1676,6 @@ def test_job_getters_setters():
     del job._long_name
     assert job.long_name == 'name'
 
-    assert job.log_recovered is False
-    job.log_recovered = True
-    assert job.log_recovered
-
     assert job.remote_logs == ('', '')
     job.remote_logs = ('a.err', 'b.err')
     assert job.remote_logs == ('a.err', 'b.err')
@@ -1785,22 +1781,6 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
     else:
         job.update_status(as_conf=as_conf, failed_file=False)
         assert job.status == Status.FAILED
-
-
-def test_wrapper_job_cancel_failed_wrapper_job_error(autosubmit_config, mocker):
-    """Test that an exception raised in ``cancel_failed_wrapper_job`` logs correctly."""
-    as_conf = autosubmit_config(_EXPID, {})
-    platform = mocker.MagicMock()
-    error_message = 'fatal error'
-    platform.send_command.side_effect = Exception(error_message)
-    wrapper_job = WrapperJob(_EXPID, 1, 'WAITING', 0, [], '00:30', platform, as_conf, False)
-
-    mocked_log = mocker.patch('autosubmit.job.job.Log')
-
-    wrapper_job.cancel_failed_wrapper_job()
-
-    assert mocked_log.info.called
-    assert error_message in mocked_log.info.call_args_list[0][0][0]
 
 
 @pytest.mark.parametrize(
@@ -2186,7 +2166,8 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
         elif isinstance(value, list):
             for element in value:
                 if isinstance(element, str):
-                    if element.startswith("%") and element.endswith("%") and key not in as_conf.default_parameters.keys():
+                    if element.startswith("%") and element.endswith(
+                            "%") and key not in as_conf.default_parameters.keys():
                         placeholders_not_resolved.append(key)
     assert not placeholders_not_resolved, f"Placeholders not resolved: {placeholders_not_resolved}"
     assert parameters["CURRENT_NEVER_RESOLVED"] == ""
@@ -2274,7 +2255,8 @@ def test_retrieve_logfiles(local, mocker, output):
     The second input returns a higher absolute energy value, causing the validation to succeed.
     These tests replicate the behavior of getting the data from the SSH output and handle it to make sure that
     """
-    mocker.patch("autosubmit.history.database_managers.experiment_history_db_manager.ExperimentHistoryDbManager", return_value=mocker.MagicMock())
+    mocker.patch("autosubmit.history.database_managers.experiment_history_db_manager.ExperimentHistoryDbManager",
+                 return_value=mocker.MagicMock())
     mocker.patch("autosubmit.history.experiment_history.ExperimentHistory", return_value=mocker.MagicMock())
     mocker.patch("autosubmit.platforms.paramiko_platform.ParamikoPlatform.check_job_energy", return_value=output)
     job = Job(_EXPID, '1', 'WAITING', 0, None)
@@ -2282,12 +2264,13 @@ def test_retrieve_logfiles(local, mocker, output):
     job.platform = local
 
     Path(job._tmp_path + "/" + job.name).mkdir(parents=True)
-    for i in range (2):
+    for i in range(2):
         Path(job.platform.get_files_path() + f'/test.out.{i}').touch()
         Path(job.platform.get_files_path() + f'/test.err.{i}').touch()
         Path(job.platform.get_files_path() + f'/t001_STAT_{i}').touch()
     job.platform.type = 'slurm'
-    job.platform.remote_log_dir = Path(job.platform.root_dir) / job.platform.config.get("LOCAL_TMP_DIR") / f'LOG_{job.platform.expid}'
+    job.platform.remote_log_dir = Path(job.platform.root_dir) / job.platform.config.get(
+        "LOCAL_TMP_DIR") / f'LOG_{job.platform.expid}'
     job.wrapper_type = 'vertical'
     job.retrials = 1
     job.script_name = 'test'
@@ -2295,8 +2278,9 @@ def test_retrieve_logfiles(local, mocker, output):
     job.submit_time_timestamp = '0'
 
     job.platform.check_file_exists = mocker.MagicMock(return_value=True)
-    job.retrieve_logfiles()
-    assert job.log_recovered
+    report = job.retrieve_logfiles()
+    assert report.all_succeeded
+    assert len(report.attempts) == 1
 
 
 def test_case_insensitive_running_parameter(autosubmit_config):

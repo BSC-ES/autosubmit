@@ -148,9 +148,6 @@ class LocalPlatform(ParamikoPlatform):
         """
         self.connected = True
 
-    def check_all_jobs(self, job_list, as_conf, retries=5):
-        for job, prev_job_status in job_list:
-            self.check_job(job)
 
     def send_command(self, command: str, ignore_log=False, x11=False) -> bool:
         try:
