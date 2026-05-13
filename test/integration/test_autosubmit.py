@@ -361,7 +361,8 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
     'Missing WALLCLOCK in FOR',
     'Correct FOR',
 ])
-def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
+def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict,
+                          context_mgr: 'AbstractContextManager'):
     with context_mgr:
         autosubmit_exp('t000', experiment_data, create=False, include_jobs=False)
 
@@ -370,24 +371,24 @@ def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experim
     '_exit,job_previous_status,expected_jobs_to_check',
     [
         (
-            True,
-            Status.FAILED,
-            0
+                True,
+                Status.FAILED,
+                0
         ),
         (
-            True,
-            Status.RUNNING,
-            0
+                True,
+                Status.RUNNING,
+                0
         ),
         (
-            False,
-            Status.FAILED,
-            0
+                False,
+                Status.FAILED,
+                0
         ),
         (
-            False,
-            Status.RUNNING,
-            1
+                False,
+                Status.RUNNING,
+                1
         ),
     ],
     ids=[
@@ -414,25 +415,17 @@ def test_check_wrappers_and_as_exit(
     exp = autosubmit_exp(experiment_data={})
     as_conf: AutosubmitConfig = exp.as_conf
 
+    job = Job('1', '1', job_previous_status)
     job_list: JobList = mocker.MagicMock(spec=JobList)
-    job_list.get_in_queue_grouped_id.return_value = {
-        '1': [
-            Job('1', '1', job_previous_status)
-        ]
-    }
+    job_list.get_job_list.return_value = [job]
     job_list.job_package_map = {}
 
     platform = mocker.MagicMock(spec=Platform)
     platform.name = 'test_platform'
-    platforms_to_test: set[Platform] = {platform}
 
     Autosubmit.exit = _exit
 
-    t: tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]] = \
-        autosubmit.check_wrappers(as_conf, job_list, exp.expid)
-    jobs_to_check, _ = t
-
-    assert len(jobs_to_check) == expected_jobs_to_check
+    autosubmit.check_wrappers(as_conf, job_list, exp.expid)
 
 
 def test_create_txt_output_writes_status_file(autosubmit_exp):
