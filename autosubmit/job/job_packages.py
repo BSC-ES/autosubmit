@@ -30,7 +30,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Optional, TYPE_CHECKING
 
-from bscearth.utils.date import sum_str_hours
+from bscearth.utils.date import sum_str_hours, date2str
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -204,14 +204,18 @@ class JobPackageBase(object):
 
     def process_jobs_to_submit(self, job_id: str) -> None:
         for job in self.jobs:
-            job.id = str(job_id)
-            job.status = Status.SUBMITTED
-            Log.result(
-                f"Job: {job.name} submitted with job_id: {job.id.strip()} and workflow commit: {job.workflow_commit}")
+            job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
+            job.id = job_id
+            if job.status == Status.READY:
+                job.status = Status.SUBMITTED
+                Log.result(
+                    f"Job: {job.name} submitted with job_id: {job.id} and workflow commit: {job.workflow_commit}"
+                )
 
 
 class JobPackageSimple(JobPackageBase):
     """
+
     Class to manage a group of simple jobs, not packaged, to be submitted by autosubmit
     """
 

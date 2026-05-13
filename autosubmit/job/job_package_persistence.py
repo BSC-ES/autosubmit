@@ -92,6 +92,19 @@ class JobPackagePersistence:
             self.db_manager.insert_many(JobPackageTable.name, job_packages_data)
             self.db_manager.insert_many(WrapperJobPackageTable.name, job_packages_data)
 
+    def sync_packages(self, rows: List[dict]) -> None:
+        """Replace all ``job_package`` entries with the given rows.
+
+        Clears the ``job_package`` table and re-inserts the provided rows so
+        that the persisted state mirrors the caller's in-memory state.
+
+        :param rows: List of row dicts with keys ``exp_id``, ``package_name``,
+            ``job_name``, and ``wallclock``.
+        """
+        self.db_manager.delete_all(JobPackageTable.name)
+        if rows:
+            self.db_manager.insert_many(JobPackageTable.name, rows)
+
     def reset_table(self, wrappers=False):
         """Drops and recreates the database."""
         if wrappers:

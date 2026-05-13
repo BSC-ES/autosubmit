@@ -34,6 +34,7 @@ from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
     from networkx import DiGraph
+    from autosubmit.job.job import Job
 
 
 class JobListPersistence(object):
@@ -68,6 +69,16 @@ class JobListPersistence(object):
         :param persistence_path: str
         """
         raise NotImplementedError
+
+    def save_job_log(self, persistence_path: str, persistence_file: str, job: 'Job') -> None:
+        """Save only the log-related fields of a single job to persistence.
+
+        :param persistence_path: Directory where the persistence file lives.
+        :param persistence_file: Base name of the persistence file (without extension).
+        :param job: Job object whose log information is to be saved.
+        :raises NotImplementedError: Must be implemented by subclasses.
+        """
+        raise NotImplementedError  # pragma: no cover
 
 
 class JobListPersistencePkl(JobListPersistence):
@@ -143,6 +154,45 @@ class JobListPersistencePkl(JobListPersistence):
         path = os.path.join(persistence_path, persistence_file + '.pkl')
         return os.path.exists(path)
 
+    def save_job_log(self, persistence_path: str, persistence_file: str, job: 'Job') -> None:
+        """Save only the log-related fields of a single job to the pkl file.
+
+        Load the existing pkl, patch the log keys for the given job, and
+        write it back atomically via a temporary file.
+
+        :param persistence_path: Directory where the pkl file lives.
+        :param persistence_file: Base name of the pkl file (without extension).
+        :param job: Job object whose log information is to be saved.
+        """
+        _LOG_KEYS = frozenset({
+            'name', 'log', 'updated_log',
+            'local_logs_out', 'local_logs_err',
+            'remote_logs_out', 'remote_logs_err',
+        })
+
+        path = os.path.join(persistence_path, persistence_file + '.pkl')
+        try:
+            job_list: dict = self.load(persistence_path, persistence_file) or {}
+        except FileNotFoundError:
+            Log.warning(f'pkl not found at {path}; skipping log save for {job.name}.')
+            return
+
+        job_state: dict = job.__getstate__()
+        log_data = {k: v for k, v in job_state.items() if k in _LOG_KEYS}
+        job_list.setdefault(job.name, {}).update(log_data)
+
+        tmp_path = path + '.tmp'
+        with suppress(FileNotFoundError, PermissionError):
+            os.remove(tmp_path)
+        with open(tmp_path, 'wb') as fd:
+            current_limit = getrecursionlimit()
+            setrecursionlimit(100000)
+            pickle.dump(job_list, fd, pickle.HIGHEST_PROTOCOL)
+            setrecursionlimit(current_limit)
+            gc.collect()
+        os.replace(tmp_path, path)
+        Log.debug(f'Log fields for job {job.name} saved in {path}')
+
 
 class JobListPersistenceDb(JobListPersistence):
     """Class to manage the database persistence of the job lists."""
@@ -216,3 +266,35 @@ class JobListPersistenceDb(JobListPersistence):
         return self.db_manager.select_first_where(
             JobPklTable.name, {'expid': self.expid}
         ) is not None
+
+    def save_job_log(self, persistence_path: str, persistence_file: str, job: 'Job') -> None:
+        """Save only the log-related fields of a single job to the database pkl blob.
+
+        Load the existing pickled job list, patch the log keys for the given
+        job, and write the updated blob back, replacing the previous row.
+
+        :param persistence_path: Unused; kept for interface compatibility.
+        :param persistence_file: Unused; kept for interface compatibility.
+        :param job: Job object whose log information is to be saved.
+        """
+        _LOG_KEYS = frozenset({
+            'name', 'log', 'updated_log',
+            'local_logs_out', 'local_logs_err',
+            'remote_logs_out', 'remote_logs_err',
+        })
+
+        job_list: dict = self.load(persistence_path, persistence_file) or {}
+
+        job_state: dict = job.__getstate__()
+        log_data = {k: v for k, v in job_state.items() if k in _LOG_KEYS}
+        job_list.setdefault(job.name, {}).update(log_data)
+
+        pickled_data = pickle.dumps(job_list, protocol=pickle.HIGHEST_PROTOCOL)
+        gc.collect()
+
+        self.db_manager.delete_where(JobPklTable.name, {'expid': self.expid})
+        self.db_manager.insert_many(
+            JobPklTable.name,
+            [{"expid": self.expid, "pkl": pickled_data, "modified": str(datetime.now())}],
+        )
+        Log.debug(f'Log fields for job {job.name} saved in DB pkl for {self.expid}')
