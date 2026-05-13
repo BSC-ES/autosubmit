@@ -214,7 +214,11 @@ class SlurmPlatform(ParamikoPlatform):
             if x11:
                 return int(output.splitlines()[0])
             for line in output.splitlines():
-                jobs_id.append(int(line.split(' ')[3]))
+                m = re.search(r'Submitted batch job (\d+)', line, re.IGNORECASE)
+                if m:
+                    jobs_id.append(int(m.group(1)))
+            if not jobs_id:
+                raise AutosubmitCritical("Submission failed. No job ID found in sbatch output", 7014)
             return jobs_id
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
@@ -477,7 +481,13 @@ class SlurmPlatform(ParamikoPlatform):
 
         for pattern in critical_patterns:
             if pattern in err_lower:
+                # Filter SSH banner/module-load lines; keep only Slurm-relevant stderr lines
+                slurm_lines = [
+                    line for line in err.splitlines()
+                    if re.search(r'(?:sbatch|salloc|srun|sinfo|slurm)\b', line, re.IGNORECASE)
+                ]
+                clean_err = "\n".join(slurm_lines) if slurm_lines else err
                 raise AutosubmitCritical(
-                    f"Permanent Slurm error: {err}",
+                    f"Permanent Slurm error: {clean_err}",
                     7014,
                 )
