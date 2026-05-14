@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from ast import Add
 import textwrap
 from pathlib import Path
 from typing import Protocol, cast
