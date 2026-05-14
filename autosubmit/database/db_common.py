@@ -562,28 +562,17 @@ def _delete_experiment(experiment_id):
     :return: True if operation is successful
     :rtype: bool
     """
-    check_db()
+    check_db() # check_db called two times
 
     if not _check_experiment_exists(experiment_id, False):  # Reference the no anti-lock version.
         return True
+    from autosubmit.history.experiment_status import ExperimentStatus
     try:
-        (conn, cursor) = open_conn()
-    except DbException as e:
-        raise AutosubmitCritical("Could not establish a connection to database", 7001, str(e))
-    # Keep the experiment trace in experiment_status for deleted experiments
-    try:
-        cursor.execute('UPDATE experiment_status SET status=:status, seconds_diff=:seconds_diff, modified=CURRENT_TIMESTAMP '
-                       'WHERE name=:name',
-                       {
-                           'status': 'DELETED',
-                           'seconds_diff': 0,
-                           'name': experiment_id
-                       })
-    except Exception:
-        pass
+        ExperimentStatus(experiment_id).set_as_deleted()
+    except Exception as e:
+        raise AutosubmitCritical('Could not mark experiment as deleted', 7001, str(e))
 
     Log.debug(f'The experiment {experiment_id} has been marked as deleted.')
-    close_conn(conn, cursor)
     return True
 
 
@@ -828,7 +817,15 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
         experiment_id, False
     ):  # Reference the no anti-lock version.
         return True
-
+    from autosubmit.history.experiment_status import ExperimentStatus
+    try:
+        ExperimentStatus(experiment_id).set_as_deleted()
+    except Exception as e:
+        raise AutosubmitCritical("Could not mark experiment as deleted", 7001, str(e))
+    
+    Log.debug(f"The experiment {experiment_id} has been marked as deleted.")
+    return True
+    """
     with _get_sqlalchemy_conn() as conn:
         # Drop schema
         conn.execute(text(f'DROP SCHEMA IF EXISTS "{experiment_id}" CASCADE'))
@@ -853,7 +850,8 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
             Log.warning(f"Failed to mark experiment {experiment_id} as deleted: {str(e)}")
 
         return True
-
+    
+    """
 
 def _get_experiment_id_sqlalchemy(name: str) -> int:
     query = select(tables.ExperimentTable.c.id).where(

@@ -149,13 +149,13 @@ class ExperimentStatus:
             )
             raise
 
-    def set_status(self, status: str) -> None:
+    def set_status(self, status: Models.RunningStatus) -> None:
         """
         Sets the status of the experiment in experiment_status of as_times.db.
         Creates the database, table and row if necessary.
 
         :param status: The status to set for the experiment.
-        :dtype status: str
+        :dtype status: Models.RunningStatus
         :return: None
         """
         self.manager.set_exp_status(self.expid, status)
