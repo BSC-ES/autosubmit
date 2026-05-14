@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from autosubmit.config.basicconfig import BasicConfig
-from sqlalchemy import delete, select, Connection, insert, text, update, func
+from sqlalchemy import delete, select, Connection, insert, update, func
 from sqlalchemy.schema import CreateTable
 
 from autosubmit.database import tables, session

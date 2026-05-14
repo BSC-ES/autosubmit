@@ -83,7 +83,7 @@ class ExperimentStatusDbManager(DatabaseManager):
             self._as_times_file_path,
             '''CREATE UNIQUE INDEX IF NOT EXISTS uq_experiment_status_name ON experiment_status(name);'''
         )
-    
+
     def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
         """ Add a column to the experiment_status table if it is missing. """
         # check if column exists
@@ -144,8 +144,8 @@ class ExperimentStatusDbManager(DatabaseManager):
         arguments = (status, 0, now, status, Models.RunningStatus.RUNNING, now, expid)
         self.execute_statement_with_arguments_on_dbfile(
             self._as_times_file_path, statement, arguments)
-    
-    def set_exp_status(self, expid:str, status:str) -> None:
+
+    def set_exp_status(self, expid: str, status: str) -> None:
         try:
             exp_status_now = self.get_experiment_status_row_by_expid(expid)
         except ValueError as e:

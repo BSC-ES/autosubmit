@@ -18,8 +18,6 @@
 
 import collections
 
-from enum_tools import Enum
-
 JobDataRow = collections.namedtuple('JobDataRow', ['id', 'counter', 'job_name', 'created', 'modified', 'submit', 'start', 'finish', 
                                                   'status', 'rowtype', 'ncpus', 'wallclock', 'qos', 'energy', 'date', 'section', 'member', 
                                                   'chunk', 'last', 'platform', 'job_id', 'extra_data', 'nnodes', 'run_id', 'MaxRSS', 'AveRSS', 
@@ -37,7 +35,7 @@ PragmaVersion = collections.namedtuple('PragmaVersion', ['version'])
 MaxCounter = collections.namedtuple('MaxCounter', ['maxcounter'])
 
 
-class RunningStatus(str, Enum):
+class RunningStatus:
   RUNNING = "RUNNING"
   NOT_RUNNING = "NOT RUNNING"
   ARCHIVED = "ARCHIVED"
