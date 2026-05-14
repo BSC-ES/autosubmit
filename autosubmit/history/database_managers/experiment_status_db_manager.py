@@ -229,7 +229,7 @@ class SqlAlchemyExperimentStatusDbManager:
     def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
         """ Add a column to the experiment_status table if it is missing. """
         with self.engine.connect() as conn:
-            result = conn.execute(text(f"PRAGMA table_info(experiment_status);"))
+            result = conn.execute(text("PRAGMA table_info(experiment_status);"))
             current_columns = [row[1] for row in result]
             if column_name not in current_columns:
                 conn.execute(text(f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type};"))
