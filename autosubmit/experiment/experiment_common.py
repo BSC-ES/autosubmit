@@ -25,10 +25,8 @@ from shutil import rmtree
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
-from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import user_yes_no_query
-from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 __all__ = [
