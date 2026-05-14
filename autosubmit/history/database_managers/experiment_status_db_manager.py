@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from ast import Add
 import os
 import textwrap
 from pathlib import Path
@@ -229,10 +230,15 @@ class SqlAlchemyExperimentStatusDbManager:
     def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
         """ Add a column to the experiment_status table if it is missing. """
         with self.engine.connect() as conn:
-            result = conn.execute(text("PRAGMA table_info(experiment_status);"))
-            current_columns = [row[1] for row in result]
-            if column_name not in current_columns:
-                conn.execute(text(f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type};"))
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name='experiment_status' AND column_name=:column_name"
+            ), {"column_name": column_name})
+            column_exists = result.first() is not None
+            if not column_exists:
+                conn.execute(text(
+                    f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type};"
+                ))
                 conn.commit()
 
     def set_existing_experiment_status_as_running(self, expid):
