@@ -2572,7 +2572,6 @@ class Autosubmit:
             scripts_to_submit_by_section, x11_scripts_to_submit_by_section = platform_interface.prepare_submission(
                 as_conf,
                 job_list,
-                packages_persistence,
                 packages_to_submit,
                 inspect=inspect,
                 only_wrappers=only_wrappers)

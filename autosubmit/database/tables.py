@@ -27,11 +27,10 @@ from sqlalchemy import (
     Float,
     LargeBinary,
     UniqueConstraint,
-    Column,
+    Column, ForeignKey,
 )
 
 metadata_obj = MetaData()
-
 
 ExperimentTable = Table(
     "experiment",
@@ -70,31 +69,6 @@ ExperimentStatusTable = Table(
     Column("modified", Text, nullable=False),
 )
 """Stores the status of the experiments."""
-
-JobPackageTable = Table(
-    "job_package",
-    metadata_obj,
-    Column("exp_id", Text),
-    Column("package_name", Text),
-    Column("job_name", Text),
-    Column("wallclock", Text)
-)
-"""Stores a mapping between the wrapper name and the actual job in SLURM."""
-
-WrapperJobPackageTable = Table(
-    "wrapper_job_package",
-    metadata_obj,
-    Column("exp_id", Text),
-    Column("package_name", Text),
-    Column("job_name", Text),
-    Column("wallclock", Text)
-)
-"""It is a replication.
-It is only created/used when using inspect and create or monitor
-with flag -cw in Autosubmit.
-This replication is used to not interfere with the current
-autosubmit run of that experiment since wrapper_job_package
-will contain a preview, not the real wrapper packages."""
 
 # NOTE: The column ``metadata`` has a name that is reserved in
 #       SQLAlchemy ORM. It works for SQLAlchemy Core, here, but
@@ -210,16 +184,58 @@ UserMetricsTable = Table(
     Column("modified", Text),
 )
 
+
+def create_wrapper_tables(name, metadata_obj_):
+    """Create a wrapper table for the given name."""
+    table_package_info = Table(
+        f"{name}_info",
+        metadata_obj_,
+        Column("name", String, nullable=False, primary_key=True),
+        Column("id", Integer),
+        Column("script_name", String),
+        Column("status", Text, nullable=False),  # Should be job_status_enum
+        Column("local_logs_out", String),  # TODO: We should recover the log from the remote at some point
+        Column("local_logs_err", String),  # TODO: We should recover the log from the remote at some point
+        Column("remote_logs_out", String),  # TODO: We should recover the log from the remote at some point
+        Column("remote_logs_err", String),  # TODO: We should recover the log from the remote at some point
+        Column("updated_log", Integer),  # TODO: We should recover the log from the remote at some point
+        Column("platform_name", String),
+        Column("wallclock", String),
+        Column("num_processors", Integer),
+        Column("type", Text),
+        Column("sections", Text),
+        Column("method", Text),
+    )
+
+    table_jobs_inside_wrapper = Table(
+        f"{name}_jobs",
+        metadata_obj_,
+        Column("package_id", Integer, nullable=False, primary_key=True),
+        Column("package_name", String, nullable=False, primary_key=True),
+        Column("job_name", String, ForeignKey("jobs.name"), nullable=False, primary_key=True),
+        Column("timestamp", String, nullable=True),
+        UniqueConstraint("package_id", "package_name", "job_name",
+                         name=f"unique_{name}_jobs_package_id_package_name_job_name"),
+
+    )
+    return table_package_info, table_jobs_inside_wrapper
+
+
+WrapperInfoTable, WrapperJobsTable = create_wrapper_tables("wrappers", metadata_obj)
+PreviewWrapperInfoTable, PreviewWrapperJobsTable = create_wrapper_tables("preview_wrappers", metadata_obj)
+
 TABLES = (
     ExperimentTable,
     ExperimentStatusTable,
     ExperimentStructureTable,
     ExperimentRunTable,
     DBVersionTable,
-    JobPackageTable,
+    WrapperInfoTable,
+    WrapperJobsTable,
+    PreviewWrapperInfoTable,
+    PreviewWrapperJobsTable,
     JobDataTable,
     JobListTable,
-    WrapperJobPackageTable,
     JobPklTable,
     DetailsTable,
     UserMetricsTable,

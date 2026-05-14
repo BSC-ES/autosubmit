@@ -2829,7 +2829,7 @@ class JobList(object):
     def save_wrappers(self, submitted_scripts: dict, as_conf: AutosubmitConfig,
                       packages_persistence: JobPackagePersistence,
                       inspect: bool = False):
-        """Saves the wrapper jobs in the job list and the packages dict.
+        """Saves the wrapper jobs in the job list and the packages' dict.
 
         :param submitted_scripts: dict with the submitted scripts to save
         :param as_conf: experiment configuration
@@ -2846,36 +2846,144 @@ class JobList(object):
                     self.job_package_map[int(package.jobs[0].id)] = wrapper_job
                     packages_persistence.save(package, inspect)
 
-    def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> list[dict]:
-        """Return ``job_package`` row dicts for every inner job of a wrapper.
+    def save_wrappers(
+            self,
+            scripts: Any,
+            as_conf: Any,
+            preview: bool = False
+    ) -> None:
+        """Save wrapper jobs for job packages that are not in the failed set.
 
-        :param wrapper_job: The in-memory wrapper whose inner jobs are serialised.
-        :return: A list of dicts, one per inner job, ready for DB insertion.
+        :param scripts: List of job package objects to process.
+        :type scripts: List[Any]
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: Any
+        :param preview: Whether to run in preview mode.
+        :type preview: bool
+        :return: None
+        :rtype: None
         """
-        return [
+
+        wrappers = []
+        initial_status = Status.SUBMITTED if not preview else Status.COMPLETED
+        for package in [package for package in scripts.values() if package.is_wrapped]:
+            # Add a fake id while using inspect -cw, create -cw or monitor -cw
+            if preview:
+                self.assign_unique_fake_id(package)
+            # TODO: For another PR, tried to change this, results in a circular import
+            # This is due the fact that the WRAPPERJOB class is derived from the JOB class, when it shouldn't as it contains JOB'S
+            from ..job.job import WrapperJob
+            wrapper_job = WrapperJob(
+                name=package.name,
+                job_id=package.jobs[0].id,
+                status=initial_status,
+                priority=0,
+                job_list=package.jobs,
+                total_wallclock=package._wallclock,
+                num_processors=package._num_processors,
+                platform=package.platform,
+                as_config=as_conf,
+            )
+            self.job_package_map[int(wrapper_job.id)] = wrapper_job
+            self.packages_dict[package.name] = wrapper_job.job_list
+
+            wrappers.append(self._wrapper_job_dict(wrapper_job))
+        if wrappers:
+            self.dbmanager.save_wrappers(wrappers, preview=preview)
+
+    def load_wrappers(self, preview: bool = False) -> None:
+        """ Load wrapper jobs and their inner jobs from the database, and populate the job package map.
+
+        :param preview: If True, load wrappers in preview mode.
+        :type preview: bool
+
+        :return: None
+        :rtype: None
+        """
+        # db_manager from job_package_persistence
+        db_manager = JobPackagePersistence(self.expid)
+        un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, self.job_list)
+
+        # Build a dictionary of wrapper info indexed by wrapper name
+        wrappers_info: Dict[str, dict] = {
+            dict(wrapper)['name']: dict(wrapper) for wrapper in un_mapped_wrapper_info
+        }
+        # Group inner jobs by package id
+        inner_jobs_by_package: Dict[str, list] = {}
+        for job in un_mapped_inner_jobs:
+            if job['package_name'] not in inner_jobs_by_package:
+                inner_jobs_by_package[job['package_name']] = []
+            inner_jobs_by_package[job['package_name']].append(job['job_name'])
+
+        # Attach job objects to each wrapper's job list and update packages_dict
+        for package_name, job_names in inner_jobs_by_package.items():
+            if package_name in wrappers_info:
+                if not wrappers_info[package_name].get("job_list", None):
+                    wrappers_info[package_name]["job_list"] = []
+                for job_name in job_names:
+                    job = self.get_job_by_name(job_name)
+                    if not job:
+                        job = self.load_job_by_name(job_name)
+                    if job.id == wrappers_info[package_name]["id"]:
+                        wrappers_info[package_name]["job_list"].append(job)
+                if wrappers_info[package_name]["job_list"]:
+                    self.packages_dict[package_name] = wrappers_info[package_name]["job_list"]
+        # Create WrapperJob objects and populate job_package_map
+        from ..job.job import WrapperJob
+        for wrapper_info in wrappers_info.values():
+
+            if not wrapper_info.get("job_list", None):  # to delete TODO (horizontal-vertical issue)
+                continue
+            wrapper_job = WrapperJob(
+                name=wrapper_info["name"],
+                job_id=wrapper_info["id"],
+                status=wrapper_info["status"],
+                priority=wrapper_info.get("priority", 0),
+                total_wallclock=wrapper_info["wallclock"],
+                job_list=wrapper_info["job_list"],
+                num_processors=0,  # TODO: implement wrapper_info["num_processors"],
+                platform=wrapper_info["job_list"][0].platform,
+                as_config=self._as_conf,
+            )
+            wrapper_job.platform_name = wrapper_job.job_list[0].platform_name
+
+            self.job_package_map[int(wrapper_job.id)] = wrapper_job
+
+    def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Tuple[Dict[str, Any], List[str]]:
+        """Return a dictionary representation of a WrapperJob and its inner jobs for database insertion.
+
+        :param wrapper_job: The wrapper job instance to serialize.
+        :type wrapper_job: WrapperJob
+        :return: Tuple containing a dictionary of wrapper job attributes and a list of inner job names.
+        :rtype: Tuple[Dict[str, Any], List[str]]
+        """
+        wrapper_info = {
+            "name": wrapper_job.name,
+            "id": wrapper_job.id,
+            "script_name": getattr(wrapper_job, "script_name", None),
+            "status": wrapper_job.status,
+            "local_logs_out": getattr(wrapper_job, "local_logs_out", None),
+            "local_logs_err": getattr(wrapper_job, "local_logs_err", None),
+            "remote_logs_out": getattr(wrapper_job, "remote_logs_out", None),
+            "remote_logs_err": getattr(wrapper_job, "remote_logs_err", None),
+            "updated_log": getattr(wrapper_job, "updated_log", 0),
+            "platform_name": wrapper_job.platform.name if wrapper_job.platform else None,
+            "wallclock": wrapper_job.wallclock,
+            "num_processors": 0,  # TODO: Num_processors is not saved on 4.1.17
+            "type": getattr(wrapper_job, "type", None),
+            "sections": getattr(wrapper_job, "sections", None),
+            "method": getattr(wrapper_job, "method", None),
+        }
+        wrapper_inner_jobs = [
             {
-                'exp_id': self._expid,
+                'package_id': wrapper_job.id,
                 'package_name': wrapper_job.name,
                 'job_name': job.name,
-                'wallclock': wrapper_job.wallclock,
+                'timestamp': datetime.datetime.now().isoformat()
             }
             for job in wrapper_job.job_list
         ]
-
-    def update_db_wrappers(self) -> None:
-        """Sync the ``job_package`` table with the currently active wrappers.
-
-        Replaces all persisted package entries with the wrappers that are
-        still present in :attr:`job_package_map`, so that a subsequent
-        experiment reload reflects only the active wrapper state.
-        """
-        if not self.job_package_map:
-            return
-        rows: list[dict] = []
-        for wrapper_job in self.job_package_map.values():
-            rows.extend(self._wrapper_job_dict(wrapper_job))
-        JobPackagePersistence(self._expid).sync_packages(rows)
-
+        return wrapper_info, wrapper_inner_jobs
 
     def clear_preview_wrapper(self) -> None:
         """Clear the wrapper preview table used by the ``-cw`` flag.

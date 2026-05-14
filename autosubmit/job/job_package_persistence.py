@@ -23,7 +23,8 @@ from typing import Any, List
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
-from autosubmit.database.tables import JobPackageTable, WrapperJobPackageTable
+from autosubmit.database.tables import WrapperInfoTable, PreviewWrapperInfoTable, WrapperJobsTable, \
+    PreviewWrapperJobsTable
 from autosubmit.log.log import AutosubmitCritical
 
 
@@ -45,30 +46,26 @@ class JobPackagePersistence:
             _schema = None
 
         self.db_manager = DbManager(connection_url=connection_url, schema=_schema)
-        self.db_manager.create_table(JobPackageTable.name)
-        self.db_manager.create_table(WrapperJobPackageTable.name)
+        self.db_manager.create_table(WrapperInfoTable.name)
+        self.db_manager.create_table(PreviewWrapperInfoTable.name)
+        self.db_manager.create_table(WrapperJobsTable.name)
+        self.db_manager.create_table(PreviewWrapperJobsTable.name)
 
-    def load(self, wrapper=False) -> List[Any]:
+    def load(self, preview=False) -> tuple[Any, Any]:
+        """Loads the job packages from the database.
+
+        :param preview: Use an auxiliar table for previewing the wrappers.
+        :rtype: bool
+        :return: list of job packages
         """
-        Loads package of jobs from a database
-        :param: wrapper: boolean
-        :return: list of jobs per package
-        """
-        if not wrapper:
-            results = self.db_manager.select_all(JobPackageTable.name)
+        if not preview:
+            wrapper_info = self.db_manager.select_all(WrapperInfoTable.name)
+            wrapped_jobs = self.db_manager.select_all(WrapperJobsTable.name)
         else:
-            results = self.db_manager.select_all(WrapperJobPackageTable.name)
-        if len(results) > 0:
-            # ['exp_id', 'package_name', 'job_name', 'wallclock']  wallclock is the new addition
-            for wrapper in results:
-                if len(wrapper) != 4:
-                    # New field in the db, so not compatible if the wrapper package is not reset
-                    # (done in the create function)
-                    raise AutosubmitCritical("Error while loading the wrappers. The current wrappers have a different "
-                                             "amount of fields than the expected. Possibly due to using different "
-                                             "versions of Autosubmit in the same experiment. Please, run "
-                                             "'autosubmit create -f <EXPID>' to fix this issue.")
-        return results
+            wrapper_info = self.db_manager.select_all(PreviewWrapperInfoTable.name)
+            wrapped_jobs = self.db_manager.select_all(PreviewWrapperJobsTable.name)
+
+        return wrapper_info, wrapped_jobs
 
     def save(self, package, preview_wrappers=False):
         """Persists a job list in a database.
@@ -79,11 +76,18 @@ class JobPackagePersistence:
         job_packages_data = []
         for job in package.jobs:
             # noinspection PyProtectedMember
+            # job_packages_data += [{
+            #     'exp_id': package._expid,
+            #     'package_name': package.name,
+            #     'job_name': job.name,
+            #     'wallclock': package._wallclock
+            # }]
             job_packages_data += [{
                 'exp_id': package._expid,
                 'package_name': package.name,
                 'job_name': job.name,
                 'wallclock': package._wallclock
+
             }]
 
         if preview_wrappers:
@@ -92,26 +96,11 @@ class JobPackagePersistence:
             self.db_manager.insert_many(JobPackageTable.name, job_packages_data)
             self.db_manager.insert_many(WrapperJobPackageTable.name, job_packages_data)
 
-    def sync_packages(self, rows: List[dict]) -> None:
-        """Replace all ``job_package`` entries with the given rows.
-
-        Clears the ``job_package`` table and re-inserts the provided rows so
-        that the persisted state mirrors the caller's in-memory state.
-
-        :param rows: List of row dicts with keys ``exp_id``, ``package_name``,
-            ``job_name``, and ``wallclock``.
-        """
-        self.db_manager.delete_all(JobPackageTable.name)
-        if rows:
-            self.db_manager.insert_many(JobPackageTable.name, rows)
-
-    def reset_table(self, wrappers=False):
+    def reset_table(self, preview=False):
         """Drops and recreates the database."""
-        if wrappers:
-            self.db_manager.drop_table(WrapperJobPackageTable.name)
-            self.db_manager.create_table(WrapperJobPackageTable.name)
-        else:
-            self.db_manager.drop_table(JobPackageTable.name)
-            self.db_manager.create_table(JobPackageTable.name)
-            self.db_manager.drop_table(WrapperJobPackageTable.name)
-            self.db_manager.create_table(WrapperJobPackageTable.name)
+
+        self.db_manager.drop_table(PreviewWrapperJobsTable.name)
+        self.db_manager.create_table(PreviewWrapperJobsTable.name)
+        if not preview:
+            self.db_manager.drop_table(WrapperInfoTable.name)
+            self.db_manager.drop_table(WrapperJobsTable.name)

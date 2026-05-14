@@ -386,7 +386,7 @@ class Platform:
         self._root_dir = value
 
     def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
-                           packages_persistence: 'JobPackagePersistence', packages_to_submit: list['JobPackageBase'],
+                           packages_to_submit: list['JobPackageBase'],
                            inspect=False, only_wrappers=False) -> tuple[
         dict[str, dict[str, 'JobPackageBase']], dict[str, dict[str, 'JobPackageBase']]]:
         """Prepare job packages for submission on the current platform.
@@ -422,7 +422,7 @@ class Platform:
         scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
         x11_scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
         for package in packages_to_submit:
-            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, packages_persistence, as_conf)
+            self.prepare_dry_run_if_applicable(package, only_wrappers, inspect)
             if not only_wrappers:
                 package.generate_scripts(as_conf, inspect)
                 if not inspect:
@@ -439,15 +439,11 @@ class Platform:
         return scripts_to_submit_by_section, x11_scripts_to_submit_by_section
 
     @staticmethod
-    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool,
+    def prepare_dry_run_if_applicable(package: 'JobPackageBase', only_wrappers: bool,
                                       inspect: bool,
-                                      packages_persistence: 'JobPackagePersistence',
-                                      as_conf: 'AutosubmitConfig') -> None:
+                                      ) -> None:
         """Dry-run preparation of a package to emulate that the package was submitted, without following the normal submission flow.
 
-        :param job_list: Job container used to register wrapper package and job
-            mappings.
-        :type job_list: JobList
         :param package: Package being prepared for inspect or wrapper-only mode.
         :type package: JobPackageBase
         :param only_wrappers: If ``True``, prepare wrapper metadata without
@@ -455,11 +451,6 @@ class Platform:
         :type only_wrappers: bool
         :param inspect: If ``True``, prepare package metadata for inspect mode.
         :type inspect: bool
-        :param packages_persistence: Persistence helper used to store package
-            data for later recovery or visualization.
-        :type packages_persistence: JobPackagePersistence
-        :param as_conf: Autosubmit configuration for the current experiment.
-        :type as_conf: AutosubmitConfig
         :raises Exception: Propagate any exception raised while creating wrapper
             job metadata or saving the package.
         """
@@ -467,6 +458,7 @@ class Platform:
         if only_wrappers or inspect:
             for innerJob in package._jobs:
                 # Setting status to COMPLETED, so it does not get stuck in the loop that calls this function
+                innerJob.id = 1
                 innerJob.status = Status.COMPLETED
                 innerJob.updated_log = innerJob.retrials
 
