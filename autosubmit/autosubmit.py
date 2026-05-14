@@ -67,6 +67,7 @@ from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, user_yes_no_query
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
+from autosubmit.history.database_managers import database_models as Models
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
@@ -2180,7 +2181,7 @@ class Autosubmit:
         """
         Autosubmit.exit = False
         status_tracker = ExperimentStatus(expid)
-        experiment_status: Optional[str] = None
+        experiment_status: Optional[Models.RunningStatus] = None
         heartbeat_monitor = status_tracker.heartbeat_monitor(interval_seconds=120)
         # Start profiling if the flag has been used
         if profile is not None:
@@ -2278,9 +2279,9 @@ class Autosubmit:
                         if Autosubmit.exit:
                             Autosubmit.check_logs_status(job_list, as_conf, new_run=False)
                             if job_list.get_failed():
-                                experiment_status = "FAILED"
+                                experiment_status = Models.RunningStatus.NOT_RUNNING
                                 return 1
-                            experiment_status = "PAUSED"
+                            experiment_status = Models.RunningStatus.NOT_RUNNING
                             return 0
                         Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
                         for job in job_list.get_ready():
@@ -2474,10 +2475,10 @@ class Autosubmit:
                     p.close_connection()
                 if len(job_list.get_failed()) > 0:
                     Log.info("Some jobs have failed and reached maximum retrials")
-                    experiment_status = "FAILED"
+                    experiment_status = Models.RunningStatus.NOT_RUNNING
                 else:
                     Log.result("Run successful")
-                    experiment_status = "COMPLETED"
+                    experiment_status = Models.RunningStatus.NOT_RUNNING
                     if profile is not None:
                         profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
                     # Updating finish time for job data header
@@ -2497,20 +2498,18 @@ class Autosubmit:
             # In both cases, we don't want to overwrite the status of the experiment to avoid errors with the API and GUI
             raise
         except AutosubmitCritical:
-            experiment_status = "FAILED"
+            experiment_status = Models.RunningStatus.NOT_RUNNING
             raise
         except BaseException:
-            experiment_status = "FAILED"
+            experiment_status = Models.RunningStatus.NOT_RUNNING
             raise
         finally:
             heartbeat_monitor.stop(timeout=10)
             try:
-                if experiment_status == "COMPLETED":
-                    status_tracker.set_as_not_running()
-                elif experiment_status == "PAUSED":
-                    status_tracker.set_as_not_running()
-                elif experiment_status == "FAILED":
-                    status_tracker.set_as_not_running()
+                # TODO: Separate NOT_RUNNING into FAILED, COMPLETED and PAUSED statuses.
+                # Currently it's all treated as NOT_RUNNING for simplicity
+                if experiment_status == Models.RunningStatus.NOT_RUNNING:
+                    status_tracker.set_status(Models.RunningStatus.NOT_RUNNING)
             except Exception as e:
                 Log.warning(f"Autosubmit couldn't update the final experiment status for {expid}: {str(e)}", 7003)
             

@@ -843,12 +843,15 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
                 seconds_diff=0,
                 modified=func.current_timestamp()
             )
-            conn.execute(query)
+            result = conn.execute(query)
             conn.commit()
+            if result.rowcount > 0:
+                Log.debug(f"The experiment {experiment_id} has been marked as deleted.")
+            else:
+                Log.debug(f"The experiment {experiment_id} was not found in experiment_status table to be marked as deleted.")
         except Exception as e:
-            Log.debug(f"The experiment {experiment_id} has no status: {str(e)}")
+            Log.warning(f"Failed to mark experiment {experiment_id} as deleted: {str(e)}")
 
-        Log.debug(f"The experiment {experiment_id} has been marked as deleted.")
         return True
 
 
