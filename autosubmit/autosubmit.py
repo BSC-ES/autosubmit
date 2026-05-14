@@ -3681,13 +3681,7 @@ class Autosubmit:
         Log.result(sep.join(['Directories have been created and configured successfully:'] + [str(d) for d in dirs]))
         
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
-            autosubmit_db_path = Path(BasicConfig.DB_PATH)
-            as_times_path = Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB
-
-            # Autosubmit database
-            if autosubmit_db_path.exists():
-                Log.info(f"Database {autosubmit_db_path} already exists.")
-            else:
+            if not os.path.exists(BasicConfig.DB_PATH):
                 Log.info("Creating autosubmit database...")
                 query_file = read_files('autosubmit.database') / 'data/autosubmit.sql'
                 query = query_file.read_text()
