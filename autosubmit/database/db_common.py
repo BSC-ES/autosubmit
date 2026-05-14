@@ -24,7 +24,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
-from sqlalchemy import Connection, delete, func, insert, select, text, update
+from sqlalchemy import Connection, delete, func, insert, select, update
 from sqlalchemy.schema import CreateTable
 
 from autosubmit.config.basicconfig import BasicConfig

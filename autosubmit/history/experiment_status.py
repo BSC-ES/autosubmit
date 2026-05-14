@@ -149,7 +149,7 @@ class ExperimentStatus:
             )
             raise
 
-    def set_status(self, status: Models.RunningStatus) -> None:
+    def set_status(self, status: str) -> None:
         """
         Sets the status of the experiment in experiment_status of as_times.db.
         Creates the database, table and row if necessary.
