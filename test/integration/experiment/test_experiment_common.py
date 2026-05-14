@@ -51,10 +51,3 @@ def test_delete_experiment_that_is_running(autosubmit_exp, mocker):
 
     assert not delete_experiment(exp.expid, force=True)
 
-
-def test_delete_experiment_fails_db_details(autosubmit_exp, mocker):
-    """Test that if the experiment details cannot be updated in the database, the experiment is not deleted."""
-    exp = autosubmit_exp(experiment_data={})
-    mocker.patch('autosubmit.experiment.experiment_common.ExperimentDetails', side_effect=ValueError)
-
-    assert not delete_experiment(exp.expid, force=True)

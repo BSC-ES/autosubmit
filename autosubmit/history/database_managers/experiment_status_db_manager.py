@@ -20,7 +20,7 @@ import textwrap
 from pathlib import Path
 from typing import Optional, Protocol, cast
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import insert, select, text, update
 from sqlalchemy.schema import CreateTable
 
 import autosubmit.history.utils as HUtils
@@ -209,9 +209,31 @@ class SqlAlchemyExperimentStatusDbManager:
     def __init__(self) -> None:
         connection_url = get_connection_url(Path(BasicConfig.DATABASE_CONN_URL))
         self.engine = session.create_engine(connection_url=connection_url)
+        self._validate_status_database()
+    
+    def _validate_status_database(self) -> None:
+        """ Creates experiment_status table if it does not exist """
         with self.engine.connect() as conn:
             conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
             conn.commit()
+
+        self._add_column_if_missing("last_heartbeat", "TEXT")
+
+        with self.engine.connect() as conn:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_experiment_status_name "
+                "ON experiment_status(name)"
+            ))
+            conn.commit()
+    
+    def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
+        """ Add a column to the experiment_status table if it is missing. """
+        with self.engine.connect() as conn:
+            result = conn.execute(text(f"PRAGMA table_info(experiment_status);"))
+            current_columns = [row[1] for row in result]
+            if column_name not in current_columns:
+                conn.execute(text(f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type};"))
+                conn.commit()
 
     def set_existing_experiment_status_as_running(self, expid):
         self.update_exp_status(expid, Models.RunningStatus.RUNNING)
