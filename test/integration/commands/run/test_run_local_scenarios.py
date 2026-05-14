@@ -83,7 +83,25 @@ from test.integration.test_utils.misc import wait_locker
             SPLITS: '2'
             wallclock: 00:01
     """), 2, "COMPLETED", "split"),
-], ids=["Success", "Failure", "Test Splits"])
+    # Test splits: auto
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+        CHUNKSIZE: '1'
+        CHUNKUNIT: 'month'
+        DATELIST: "20000101"
+        
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=TestSplitsAuto"
+                sleep 1
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            SPLITS: auto
+            wallclock: 00:01
+    """), 31, "COMPLETED", "split"),
+], ids=["Success", "Failure", "Test Splits", "Test splits: auto"])
 def test_run_uninterrupted(
         autosubmit_exp,
         jobs_data: str,

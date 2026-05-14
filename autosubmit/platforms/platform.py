@@ -30,10 +30,8 @@ from typing import Any, Optional, Union, TYPE_CHECKING
 
 import setproctitle
 
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_list_persistence import JobListPersistenceDb, JobListPersistencePkl
 from autosubmit.log.log import Log
 
 if TYPE_CHECKING:

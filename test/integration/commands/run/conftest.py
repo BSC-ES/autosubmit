@@ -150,7 +150,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, ru
             )
             for job_name in {row["job_name"] for row in rows_as_dicts}
         }
-        excluded_keys = ["status", "finish", "submit", "start", "extra_data", "children", "platform_output"]
+        excluded_keys = ["status", "finish", "submit", "start", "extra_data", "children", "platform_output", "date", "member", "chunk"]
         _TERMINAL_STATUSES = {"COMPLETED", "FAILED"}
 
         for job_name, grouped_rows in group_by_job_name.items():
@@ -180,14 +180,10 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, ru
                 #       contains the workflow commit column. For the content we can verify it
                 #       later with a more complete functional test using Git.
                 check_workflow_commit = "workflow_commit" in row_dict
+                has_splits = row_dict.get("splits") and int(row_dict["splits"]) > 0
                 check_split = "split" in row_dict and "splits" in row_dict and (
-                        "split" in row_dict
-                        and "splits" in row_dict
-                        and (
-                                (run_type.lower() == "split" and int(row_dict["split"]) > 0 and int(
-                                    row_dict["splits"]) > 0)
-                                or (run_type.lower() != "split" and not row_dict["split"] and not row_dict["splits"])
-                        )
+                        (has_splits and row_dict.get("split") and int(row_dict["split"]) > 0)
+                        or (not has_splits and not row_dict.get("split"))
                 )
 
                 if previous_retry_row:

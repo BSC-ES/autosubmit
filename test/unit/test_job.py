@@ -34,7 +34,7 @@ from mock.mock import patch  # type: ignore
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
-from autosubmit.job.job import Job, WrapperJob
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl

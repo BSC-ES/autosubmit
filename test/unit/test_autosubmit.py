@@ -15,8 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Tests for ``AutosubmitGit``."""
+"""Tests for ``Autosubmit``."""
 
+import signal
 from pathlib import Path
 from textwrap import dedent
 
@@ -24,6 +25,8 @@ import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
 from test.unit.conftest import AutosubmitConfigFactory
 
@@ -149,3 +152,103 @@ def test_install_creates_directories(monkeypatch, tmp_path, autosubmit, mocker):
     assert (local_root / "metadata/structures").exists()
     assert (local_root / "metadata/data").exists()
     assert (local_root / "metadata/logs").exists()
+
+
+def test_signal_handler_sets_exit_flag():
+    """signal_handler must set ``Autosubmit.exit`` to ``True`` on SIGINT.
+
+    :raises AssertionError: If ``Autosubmit.exit`` is not ``True`` after the handler runs.
+    """
+    from autosubmit.autosubmit import signal_handler
+    original = Autosubmit.exit
+    try:
+        Autosubmit.exit = False
+        signal_handler(signal.SIGINT, None)
+        assert Autosubmit.exit is True
+    finally:
+        # Restore class-level flag so other tests are not affected.
+        Autosubmit.exit = original
+
+
+@pytest.mark.parametrize(
+    'wrapper_status,expect_popped',
+    [
+        (Status.COMPLETED, True),
+        (Status.FAILED, True),
+        (Status.RUNNING, False),
+        (Status.QUEUING, False),
+        (Status.SUBMITTED, False),
+    ],
+    ids=['completed-popped', 'failed-popped', 'running-kept', 'queuing-kept', 'submitted-kept'],
+)
+def test_check_wrappers_pops_terminal_wrappers(
+    fake_job_list, fake_platform, mocker, wrapper_status: Status, expect_popped: bool
+) -> None:
+    """check_wrappers must pop the wrapper from job_package_map only when its status is terminal.
+
+    :param fake_job_list: Minimal JobList fixture.
+    :param fake_platform: Minimal platform stub fixture.
+    :param mocker: pytest-mock mocker fixture.
+    :param wrapper_status: Status to assign to the wrapper.
+    :type wrapper_status: Status
+    :param expect_popped: Whether the wrapper should be removed from ``job_package_map``.
+    :type expect_popped: bool
+    """
+    as_conf = mocker.MagicMock()
+
+    inner_job = Job('a000_20000101_fc0_1_SIM', 100, wrapper_status, 0)
+    wrapper_job = mocker.MagicMock()
+    wrapper_job.job_list = [inner_job]
+    wrapper_job.status = wrapper_status
+    wrapper_job.new_status = wrapper_status
+    wrapper_job.name = 'wrapper_1'
+    wrapper_job.id = 100
+
+    fake_job_list.job_package_map[100] = wrapper_job
+    fake_job_list.packages_dict['wrapper_1'] = [inner_job]
+
+    mocker.patch.object(Autosubmit, 'manage_wrapper_job', return_value=wrapper_job)
+    mocker.patch.object(Autosubmit, 'wrapper_notify')
+
+    Autosubmit.check_wrappers(as_conf, fake_job_list, 'a000')
+
+    if expect_popped:
+        assert 100 not in fake_job_list.job_package_map
+    else:
+        assert 100 in fake_job_list.job_package_map
+
+
+def test_check_non_wrapped_jobs_calls_platform_and_updates_status(
+    fake_job_list, fake_platform, mocker
+) -> None:
+    """check_non_wrapped_jobs must call check_all_jobs and update job status.
+
+    Edge case vs. stashed version: the current signature is
+    ``(platforms_to_test, job_list, as_conf, expid)`` — no ``jobs_to_check`` dict
+    and no return value (it fires updates in place).
+
+    :param fake_job_list: Minimal JobList fixture.
+    :param fake_platform: Minimal platform stub.
+    :param mocker: pytest-mock mocker fixture.
+    """
+    from autosubmit.job.job import Job as JobClass
+    as_conf = mocker.MagicMock()
+
+    job1 = Job('a000_20000101_fc0_1_SIM', 10, Status.RUNNING, 0)
+    job1.platform = fake_platform
+    fake_job_list._job_list.append(job1)
+
+    def mock_update_status(self, conf):
+        self.status = Status.COMPLETED
+        return Status.COMPLETED
+
+    mocker.patch.object(JobClass, 'update_status', mock_update_status)
+    # Avoid hitting the filesystem – save() would try to pickle to a tmp path.
+    mocker.patch.object(fake_job_list, 'save')
+    # Simulate new_status differing so update_status is called.
+    job1.new_status = Status.COMPLETED
+
+    Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, 'a000')
+
+    fake_platform.check_all_jobs.assert_called_once()
+    fake_job_list.save.assert_called_once()

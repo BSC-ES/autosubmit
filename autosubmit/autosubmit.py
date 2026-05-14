@@ -32,7 +32,6 @@ import tarfile
 import threading
 import time
 import warnings
-from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import suppress
 from importlib.metadata import version

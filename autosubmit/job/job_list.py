@@ -36,7 +36,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job.job import Job
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_package_persistence import JobPackagePersistence
@@ -2843,7 +2843,7 @@ class JobList(object):
                     from ..job.job import WrapperJob
                     wrapper_job = WrapperJob(package.name, package.jobs[0].id, Status.SUBMITTED, 0,
                                              package.jobs, package._wallclock, package.platform, as_conf, False)
-                    self.job_package_map[package.jobs[0].id] = wrapper_job
+                    self.job_package_map[int(package.jobs[0].id)] = wrapper_job
                     packages_persistence.save(package, inspect)
 
     def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> list[dict]:

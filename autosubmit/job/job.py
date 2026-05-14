@@ -2702,7 +2702,7 @@ class Job(object):
         return out
 
     def update_local_logs(self) -> None:
-        """Updates the local log filenames based on the retry count."""
+        """Updates the local log filenames based on the fail count."""
 
         if self.fail_count > 0:
             self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out_attempt_{self.fail_count}",

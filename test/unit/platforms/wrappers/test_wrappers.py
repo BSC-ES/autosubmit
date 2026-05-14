@@ -40,7 +40,11 @@ from autosubmit.job.job_packages import JobPackageVertical
 from autosubmit.job.job_utils import Dependency
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.platforms.wrappers.wrapper_builder import SrunVerticalHorizontalWrapperBuilder
+from autosubmit.platforms.wrappers.wrapper_builder import (
+    SrunVerticalHorizontalWrapperBuilder,
+    PythonWrapperBuilder,
+    PythonVerticalWrapperBuilder,
+)
 
 """Tests for wrappers."""
 
@@ -2317,3 +2321,82 @@ def test_build_srun_launcher():
 #                   'MEMORY': '', 'MEMORY_PER_TASK': 2, 'NUMTHREADS': '', 'RESERVATION': '', 'CUSTOM_DIRECTIVES': '', 'TASKS': '',
 #                   }
 #     header.calculate_wrapper_het_header(wr_job=wr_job)
+@pytest.fixture
+def wrapper_builder() -> PythonVerticalWrapperBuilder:
+    """Return a :class:`PythonVerticalWrapperBuilder` for unit testing launcher/thread code.
+    :return: Configured builder instance.
+    :rtype: PythonVerticalWrapperBuilder
+    """
+    return PythonVerticalWrapperBuilder(
+        retrials=2,
+        header_directive='',
+        jobs_scripts=['job1.cmd', 'job2.cmd'],
+        threads=1,
+        num_processors=1,
+        num_processors_value=1,
+        expid='a000',
+        name='test_wrapper',
+        jobs_resources={'PROCESSORS_PER_NODE': 1},
+        allocated_nodes='',
+        wallclock_by_level='3600',
+        working_dir='/tmp',
+    )
+def test_build_imports_contains_wrapper_failed_and_completed_ids(
+    wrapper_builder: PythonVerticalWrapperBuilder,
+) -> None:
+    """build_imports must expose the ``_FAILED`` sentinel identifier.
+    The current implementation sets ``wrapper_id = "<rand>_FAILED"`` in the
+    imports block.  Check that ``_FAILED`` is present.
+    :param wrapper_builder: Builder fixture.
+    :type wrapper_builder: PythonVerticalWrapperBuilder
+    """
+    imports = wrapper_builder.build_imports()
+    assert '_FAILED' in imports
+@pytest.mark.parametrize(
+    'assertion',
+    [
+        lambda launcher, _: 'WRAPPER_FAILED' in launcher,
+        lambda launcher, _: ('COMPLETED' in launcher or 'FAILED' in launcher),
+        lambda launcher, _: 'fail_count' in launcher,
+    ],
+    ids=['wrapper-failed-sentinel', 'per-job-completion-status', 'fail-count-propagated'],
+)
+def test_build_sequential_threads_launcher(
+    wrapper_builder: PythonVerticalWrapperBuilder, assertion
+) -> None:
+    """build_sequential_threads_launcher must include completion/fail-count aware code.
+    :param wrapper_builder: Builder fixture.
+    :type wrapper_builder: PythonVerticalWrapperBuilder
+    :param assertion: Callable receiving ``(launcher, imports)`` that must return ``True``.
+    """
+    launcher = wrapper_builder.build_sequential_threads_launcher(
+        'scripts', 'JobThread(scripts[i], i, retrials, fail_count)', footer=True
+    )
+    imports = wrapper_builder.build_imports()
+    assert assertion(launcher, imports)
+def test_base_sequential_threads_launcher_has_completion_awareness() -> None:
+    """PythonWrapperBuilder (base/horizontal) launcher must reference COMPLETED/FAILED markers.
+    :rtype: None
+    """
+    builder = PythonWrapperBuilder(
+        header_directive='',
+        jobs_scripts=['job1.cmd'],
+        threads=1,
+        num_processors=1,
+        num_processors_value=1,
+        expid='a000',
+        name='test_wrapper',
+        working_dir='/tmp',
+    )
+    launcher = builder.build_sequential_threads_launcher(
+        'scripts', 'JobThread(scripts[i], i)', footer=True
+    )
+    assert 'COMPLETED' in launcher or 'FAILED' in launcher
+def test_vertical_job_thread_uses_fail_count(wrapper_builder: PythonVerticalWrapperBuilder) -> None:
+    """build_job_thread must generate a thread that tracks fail_count.
+    :param wrapper_builder: Builder fixture.
+    :type wrapper_builder: PythonVerticalWrapperBuilder
+    """
+    thread = wrapper_builder.build_job_thread()
+    assert 'fail_count' in thread
+    assert 'self.fail_count' in thread
