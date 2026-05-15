@@ -222,13 +222,27 @@ class SqlAlchemyExperimentStatusDbManager:
 
         self._add_column_if_missing("last_heartbeat", "TEXT")
 
+        # keep only latest row by name
+        with self.engine.connect() as conn:
+            conn.execute(text(
+                "DELETE FROM experiment_status es "
+                "USING ("
+                "  SELECT exp_id, "
+                "         ROW_NUMBER() OVER (PARTITION BY name ORDER BY modified DESC, exp_id DESC) AS rn "
+                "  FROM experiment_status"
+                ") ranked "
+                "WHERE es.exp_id = ranked.exp_id AND ranked.rn > 1"
+            ))
+            conn.commit()
+
+        # enforce name as a unique index
         with self.engine.connect() as conn:
             conn.execute(text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_experiment_status_name "
                 "ON experiment_status(name)"
             ))
             conn.commit()
-    
+
     def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
         """ Add a column to the experiment_status table if it is missing. """
         if not self._column_exists(column_name):

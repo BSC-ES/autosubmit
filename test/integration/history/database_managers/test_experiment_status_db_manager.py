@@ -46,7 +46,7 @@ def _create_experiment_status_db_manager_and_rows(
     expids: list[str],
     autosubmit_exp=None,
 ):
-    """Create a status manager and the experiment rows required by a backend-specific test."""
+    """Create a status manager and the experiment rows for sqlite or postgres."""
     options = {"expid": expids[0]}
 
     if as_db == "sqlite":
@@ -175,6 +175,32 @@ def test_get_experiment_status_row_by_expid(
 
 @pytest.mark.docker
 @pytest.mark.postgres
+def test_experiment_status_name_is_unique(tmp_path: "LocalPath", as_db: str, autosubmit_exp, get_next_expid):
+    """Test that the experiment_status table enforces unique experiment names, keeping only the latest row for each name."""
+    database_manager, experiments = _create_experiment_status_db_manager_and_rows(
+        as_db=as_db,
+        tmp_path=tmp_path,
+        expids=["a000"],
+        autosubmit_exp=autosubmit_exp,
+    )
+
+    experiment = experiments[0]
+
+    database_manager.create_exp_status(
+        experiment.id,
+        experiment.name,
+        "RUNNING",
+    )
+
+    with pytest.raises(Exception):
+        database_manager.create_exp_status(
+            experiment.id,
+            experiment.name,
+            "RUNNING",
+        )
+
+@pytest.mark.docker
+@pytest.mark.postgres
 def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
     tmp_path: "LocalPath", as_db: str
 ):
@@ -267,16 +293,17 @@ def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", as_db: st
     )
 
     experiment = experiments[0]
+    exp_id = experiment.id
     # Act
     database_manager.create_experiment_status_as_running(experiment)
-    before = database_manager.get_experiment_status_row_by_exp_id(1)
+    before = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     # Assert
     assert before is not None
     assert before.last_heartbeat == timestamps[1]
 
     # Act
     database_manager.update_heartbeat("a000")
-    after = database_manager.get_experiment_status_row_by_exp_id(1)
+    after = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     # Assert
     assert after is not None
     assert after.last_heartbeat == timestamps[2]
@@ -360,10 +387,12 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(
     )
 
     experiment = experiments[0]
+    exp_id = experiment.id
+    
     database_manager.create_experiment_status_as_running(experiment)
 
     # Get initial status (RUNNING with last_heartbeat set)
-    exp_status = database_manager.get_experiment_status_row_by_exp_id(1)
+    exp_status = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     assert exp_status is not None
     initial_heartbeat = exp_status.last_heartbeat
     assert initial_heartbeat == timestamps[1]
@@ -371,7 +400,7 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(
     # Update status to NOT RUNNING. Should not update last_heartbeat
     database_manager.set_exp_status("a000", "NOT RUNNING")
 
-    after_not_running = database_manager.get_experiment_status_row_by_exp_id(1)
+    after_not_running = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     assert after_not_running is not None
     assert after_not_running.status == "NOT RUNNING"
     assert after_not_running.last_heartbeat == initial_heartbeat
@@ -379,7 +408,7 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(
     # Update again with RUNNING status. Should update last_heartbeat
     database_manager.set_exp_status("a000", "RUNNING")
 
-    after_running = database_manager.get_experiment_status_row_by_exp_id(1)
+    after_running = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     assert after_running is not None
     assert after_running.status == "RUNNING"
     assert after_running.last_heartbeat == timestamps[3]
@@ -408,15 +437,18 @@ def test_set_exp_status_creates_running_with_heartbeat(
         side_effect=timestamps,
     )
 
+    experiment = database_manager.get_experiment_row_by_expid("a000")
+    exp_id = experiment.id
+
     # Verify no status row exists
-    initial_status = database_manager.get_experiment_status_row_by_exp_id(1)
+    initial_status = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     assert initial_status is None
 
     # Act
     database_manager.set_exp_status("a000", "RUNNING")
 
     # Assert
-    final_status = database_manager.get_experiment_status_row_by_exp_id(1)
+    final_status = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     assert final_status is not None
     assert final_status.status == "RUNNING"
     assert final_status.last_heartbeat == timestamps[1]
