@@ -594,12 +594,6 @@ Alternatively it also can be called as follows:
 
     autosubmit report EXPID -all
 
-Or combined as follows:
-
-::
-
-    autosubmit report EXPID -all -t "absolute_file_path"
-
 Options:
 
 .. runcmd:: autosubmit report -h
