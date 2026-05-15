@@ -20,7 +20,7 @@ import textwrap
 from pathlib import Path
 from typing import Optional, Protocol, cast
 
-from sqlalchemy import insert, select, text, update
+from sqlalchemy import inspect, insert, select, text, update
 from sqlalchemy.schema import CreateTable
 
 import autosubmit.history.utils as HUtils
@@ -86,12 +86,15 @@ class ExperimentStatusDbManager(DatabaseManager):
 
     def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
         """ Add a column to the experiment_status table if it is missing. """
-        # check if column exists
-        query = "PRAGMA table_info(experiment_status);"
-        current_columns = [row[1] for row in self.get_from_statement(self._as_times_file_path, query)]
-        if column_name not in current_columns:
+        if not self._column_exists(self._as_times_file_path, column_name):
             alter_query = f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type};"
             self.execute_statement_on_dbfile(self._as_times_file_path, alter_query)
+
+    def _column_exists(self, path: str, column_name: str) -> bool:
+        """Check whether a column exists in the experiment_status table for SQLite."""
+        query = "PRAGMA table_info(experiment_status);"
+        current_columns = [row[1] for row in self.get_from_statement(path, query)]
+        return column_name in current_columns
 
     def set_existing_experiment_status_as_running(self, expid: str) -> None:
         """ Set the experiment_status row as running. """
@@ -228,17 +231,17 @@ class SqlAlchemyExperimentStatusDbManager:
     
     def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
         """ Add a column to the experiment_status table if it is missing. """
-        with self.engine.connect() as conn:
-            result = conn.execute(text(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name='experiment_status' AND column_name=:column_name"
-            ), {"column_name": column_name})
-            column_exists = result.first() is not None
-            if not column_exists:
+        if not self._column_exists(column_name):
+            with self.engine.connect() as conn:
                 conn.execute(text(
                     f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type};"
                 ))
                 conn.commit()
+
+    def _column_exists(self, column_name: str) -> bool:
+        """Check whether a column exists in the experiment_status table for SQLAlchemy backends."""
+        inspector = inspect(self.engine)
+        return any(column["name"] == column_name for column in inspector.get_columns("experiment_status"))
 
     def set_existing_experiment_status_as_running(self, expid):
         self.update_exp_status(expid, Models.RunningStatus.RUNNING)
