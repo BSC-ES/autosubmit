@@ -2149,7 +2149,7 @@ class Autosubmit:
     @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
                        run_only_members: Optional[str] = None, profile: Optional[int] = None,
-                       trace: bool = False) -> int:
+                       trace: bool = False, stop_event=None) -> int:
         """Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
 
         :param expid: the experiment id
@@ -2158,6 +2158,7 @@ class Autosubmit:
         :param run_only_members: the members to run
         :param profile: if >0, profile will stop after N iterations, if 0, profile will not stop until the experiment finishes or is stopped by the user
         :param trace: if True, the function will be traced
+        :param stop_event: optional threading.Event used to signal interruption (e.g. from tests)
         :return: exit status
 
         """
@@ -2240,6 +2241,9 @@ class Autosubmit:
                     try:
                         if profile is not None:
                             Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
+
+                        if stop_event and stop_event.is_set():
+                            Autosubmit.exit = True
 
                         if Autosubmit.exit:
                             Log.info("Interrupt signal received. Breaking main loop to perform cleanup.")
