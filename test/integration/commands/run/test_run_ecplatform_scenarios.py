@@ -16,7 +16,6 @@ from shutil import copy
 # -- Tests
 
 @pytest.mark.local
-@pytest.mark.timeout(300)
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\

@@ -2436,7 +2436,6 @@ class Autosubmit:
         :param expid: a string with the experiment id
         :return: None
         """
-        Autosubmit.save_historical_edges(expid)
         # TODO: Add all methods and functions to the new historical db manager
         old_exp_history = ExperimentHistory(expid)
         old_exp_history.finish_current_experiment_run()
