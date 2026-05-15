@@ -17,13 +17,14 @@
 
 """Integration tests for the experiment status DB managers."""
 
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 from typing import cast, TYPE_CHECKING
 
 import pytest
-from sqlalchemy import inspect
+from sqlalchemy import create_engine, inspect, text
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import ExperimentStatusTable
 from autosubmit.history.database_managers.database_models import (
     ExperimentRow,
@@ -118,45 +119,75 @@ def test_get_experiment_status_row_by_expid(
     assert experiment_status_row and experiment_status_row.status == "NOT RUNNING"
 
 
+@pytest.mark.docker
+@pytest.mark.postgres
 def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
-    tmp_path: "LocalPath",
+    tmp_path: "LocalPath", as_db: str
 ):
     """Test that the manager adds last_heartbeat column into experiment_status table if it is missing."""
-    db_dir = tmp_path / "db"
-    db_dir.mkdir()
-    local_root_dir = tmp_path / "local"
-    local_root_dir.mkdir()
+    # SQLite
+    if as_db == "sqlite":
+        db_dir = tmp_path / "db"
+        db_dir.mkdir()
+        local_root_dir = tmp_path / "local"
+        local_root_dir.mkdir()
 
-    as_times_path = db_dir / "as_times.db"
-    with sqlite3.connect(as_times_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE experiment_status (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                status TEXT NOT NULL,
-                created TIMESTAMP NOT NULL,
-                modified TIMESTAMP NOT NULL
-            )
-            """
+        # Create the database and experiment_status table without last_heartbeat column
+        as_times_db_path = db_dir / "as_times.db"
+        with sqlite3.connect(as_times_db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE experiment_status (
+                    exp_id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    seconds_diff INTEGER NOT NULL,
+                    modified TEXT NOT NULL
+                )
+                """)
+            conn.commit()
+
+        # Initialize the manager
+        database_manager = ExperimentStatusDbManager(
+            expid="a000",
+            db_dir_path=str(db_dir),
+            main_db_name="as_times.db",
+            local_root_dir_path=str(local_root_dir),
         )
-        conn.commit()
 
-    database_manager = ExperimentStatusDbManager(
-        expid="a000",
-        db_dir_path=str(db_dir),
-        main_db_name="test.db",
-        local_root_dir_path=str(local_root_dir),
-    )
+        # Get the columns of the experiment_status table for later verification
+        with sqlite3.connect(as_times_db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(experiment_status)")
+            columns = [row[1] for row in cursor.fetchall()]
 
-    with sqlite3.connect(as_times_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(experiment_status)")
-        columns = [row[1] for row in cursor.fetchall()]
+    # Postgres
+    else:
+        with create_engine(BasicConfig.DATABASE_CONN_URL).begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS experiment_status"))
+            conn.execute(text("""
+                    CREATE TABLE experiment_status (
+                        exp_id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        seconds_diff INTEGER NOT NULL,
+                        modified TEXT NOT NULL
+                    )
+                    """))
+        database_manager = create_experiment_status_db_manager("postgres")
+        inspector = inspect(database_manager.engine)
+        columns = [
+            col["name"]
+            for col in inspector.get_columns(
+                ExperimentStatusTable.name, schema="public"
+            )
+        ]
 
     assert "last_heartbeat" in columns
-    assert isinstance(database_manager, ExperimentStatusDbManager)
+    if as_db == "sqlite":
+        assert isinstance(database_manager, ExperimentStatusDbManager)
+    else:
+        assert isinstance(database_manager, SqlAlchemyExperimentStatusDbManager)
 
 
 def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", mocker):
