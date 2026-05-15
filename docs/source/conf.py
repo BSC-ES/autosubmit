@@ -169,7 +169,7 @@ html_theme_options = {
     "navbar_start": ["navbar-logo"],
     "navbar_center": ["navbar-nav"],
     "navbar_end": ["navbar-icon-links"],
-    "navbar_persistent": ["search-button"],
+    "navbar_persistent": ["search-button", "theme-switcher"],
     'footer_start': ['copyright', 'sphinx-version'],
     'footer_end': ['theme-version', 'footer_notes']
 }
