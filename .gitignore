@@ -28,3 +28,5 @@ dockerfiles/authorized_keys
 
 venv/
 .ipynb_checkpoints
+# Local Pi runtime state
+.atl/

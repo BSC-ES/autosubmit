@@ -281,3 +281,57 @@ def get_table_from_name(*, schema: Optional[str], table_name: str) -> Table:
 
     table = next(filter(predicate, TABLES), None)
     return get_table_with_schema(schema, table)
+
+
+def get_all_tables_by_name() -> dict[str, Table]:
+    """Return a dictionary of all tables, combining general and job-list tables."""
+    return {table.name: table for table in TABLES}
+
+
+# From 4.2.0 , used for wrappers only to keep changes minimal
+class TableRegistry:
+    """Manage SQLAlchemy Table instances keyed by schema and table name.
+
+    Tables are created once per (schema, table_name) pair and reused on
+    subsequent lookups, avoiding redundant MetaData and Table construction.
+    """
+
+    def __init__(self, schema) -> None:
+        """Initialize the registry with an empty cache."""
+        self._cache: dict[tuple[Optional[str], str], Table] = {}
+        self._metadata: dict[Optional[str], MetaData] = {}
+        self._schema = schema
+
+    def get_metadata(self) -> MetaData:
+        """Return the MetaData instance for the given schema, creating it if needed.
+        :return: The MetaData instance for the schema.
+        """
+        if self._schema not in self._metadata:
+            self._metadata[self._schema] = MetaData(schema=self._schema)
+        return self._metadata[self._schema]
+
+    def get(self, table_name: str) -> Table:
+        """Return the Table for the given name and schema, creating it if needed.
+
+        :param table_name: The name of the table.
+        :return: The SQLAlchemy Table instance.
+        :raises KeyError: If no table definition exists for ``table_name``.
+        """
+        key = (self._schema, table_name)
+        if key not in self._cache:
+            self._cache[key] = self._build(table_name)
+        return self._cache[key]
+
+    def _build(self, table_name: str) -> Table:
+        """Build and return a new Table for the given name attached to this schema.
+
+        :param table_name: The name of the table to build.
+        :return: A new SQLAlchemy ``Table`` instance.
+        :raises KeyError: If ``table_name`` is not found in the global table registry.
+        """
+        all_tables_def = get_all_tables_by_name()
+        if table_name not in all_tables_def:
+            raise KeyError(f"No table definition found for '{table_name}'.")
+        definition_table = all_tables_def[table_name]
+        metadata = self.get_metadata()
+        return definition_table.to_metadata(metadata)
