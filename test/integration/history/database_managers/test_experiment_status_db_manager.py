@@ -464,3 +464,33 @@ def test_set_exp_status_creates_running_with_heartbeat(
     assert final_status is not None
     assert final_status.status == "RUNNING"
     assert final_status.last_heartbeat == timestamps[1]
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_set_exp_status_logs_warning(
+    tmp_path: "LocalPath", as_db: str, mocker
+):
+    """Test lookup failure behavior: direct lookup raises, status setter logs warning."""
+    options = {"expid": "a000"}
+
+    if as_db == "sqlite":
+        options["db_dir_path"] = tmp_path
+        options["local_root_dir_path"] = tmp_path
+        options["main_db_name"] = "tests.db"
+
+    database_manager = create_experiment_status_db_manager(as_db, **options)
+
+    warning_mock = mocker.patch(
+        "autosubmit.history.database_managers.experiment_status_db_manager.Log.warning"
+    )
+
+    # Calling directly get_exp_row_by_expid raises a ValueError
+    with pytest.raises(ValueError):
+        database_manager.get_experiment_row_by_expid("a000")
+
+    # set_exp_status catches the ValueError and logs a warning
+    database_manager.set_exp_status("a000", "RUNNING")
+
+    warning_mock.assert_called_once()
+    assert "Experiment a000 not found when trying to set status" in warning_mock.call_args[0][0]
