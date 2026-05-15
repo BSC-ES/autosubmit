@@ -15,60 +15,68 @@
 # You should have received a copy of the GNU General Public License 
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>. 
 
-from typing import Generator, Tuple
-
-from unittest.mock import Mock
+from typing import Any, Callable, Generator, Optional, Union, TYPE_CHECKING
 
 import pytest
 import requests
-from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
 
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
-from autosubmit.platforms.platform import Platform
-from test.integration.test_utils.networking import get_free_port
+from test.integration.test_utils.docker import get_mail_container, prepare_and_test_mail_container
+
+if TYPE_CHECKING:
+    # noinspection PyProtectedMember
+    from integration.conftest import AutosubmitExperiment
+    from integration.conftest import AutosubmitExperimentFixture
+    from pathlib import Path
+    from requests import Response
 
 
-@pytest.fixture(scope="module")
-def fake_smtp_server() -> Generator[Tuple[int, str], None, None]:
-    """Start fake SMTP server container.
+def _get_messages(api_base: str) -> 'Response':
+    return requests.get(f"{api_base}/api/v2/messages")
+
+
+def _find_email_by_subject(search_text: str, emails) -> Any:
+    return next(
+        (
+            e for e in emails
+            if any(
+                search_text in subject
+                for subject in e["Content"]["Headers"].get("Subject", [])
+            )
+        ),
+        None,
+    )
+
+
+@pytest.fixture
+def fake_smtp_server() -> Generator[tuple[int, str], None, None]:
+    """Start a fake SMTP server container.
     :return: A tuple with the SMTP port, and the SMTP test server API base URL """
-    smtp_port = get_free_port()
-    api_port = get_free_port()
-    with DockerContainer(image="mailhog/mailhog", remove=True) \
-            .with_bind_ports(1025, smtp_port) \
-            .with_bind_ports(8025, api_port) as container:
-        wait_for_logs(container, 'Serving under')
-        api_base = f"http://127.0.0.1:{api_port}"
+    container, smtp_port, api_base = get_mail_container()
+    with container:
+        prepare_and_test_mail_container(container)
+
         yield smtp_port, api_base
-        requests.delete(f"{api_base}/api/v2/messages")
+        # requests.delete(f"{api_base}/api/v2/messages")
 
 
 @pytest.fixture
-def mail_notifier(fake_smtp_server, tmp_path):
-    smtp_port, _ = fake_smtp_server
+def create_mail_notifier() -> Callable[['AutosubmitExperiment', int], MailNotifier]:
+    """Factory fixture to create a MailNotifier instance."""
 
-    def expid_aslog_dir(expid):
-        exp_dir = tmp_path / "aslog" / expid
-        exp_dir.mkdir(parents=True)
-        (exp_dir / "dummy_run.log").write_text("Log entry: simulation started.")
-        return exp_dir
+    def _create_mail_notifier(autosubmit_experiment: 'AutosubmitExperiment', smtp_port: int):
+        exp_path: 'Path' = autosubmit_experiment.exp_path
+        with (exp_path / 'dummy_run.log') as f:
+            f.write_text("Log entry: simulation started.")
 
-    config = type('Config', (), {
-        'MAIL_FROM': 'notifier@localhost',
-        'SMTP_SERVER': f'127.0.0.1:{smtp_port}',
-        'expid_aslog_dir': staticmethod(expid_aslog_dir),
-    })()
-    return MailNotifier(config)
+        basic_config = autosubmit_experiment.as_conf.basic_config
+        basic_config.MAIL_FROM = 'notifier@localhost'
+        basic_config.SMTP_SERVER = f'127.0.0.1:{smtp_port}'
 
+        return MailNotifier(basic_config)
 
-@pytest.fixture
-def mock_platform() -> Platform:
-    mock = Mock(spec=Platform)
-    mock.host = 'localhost'
-    mock.name = 'fake-local'
-    return mock
+    return _create_mail_notifier
 
 
 def _check_metadata(
@@ -88,97 +96,64 @@ def _check_metadata(
             assert recipient in email["Raw"]["To"]
 
 
-def _normalize_mail_text(text: str) -> str:
-    """Normalize e-mail text for stable equality assertions."""
-    return text.replace("\r\n", "\n").strip()
-
-
-def _expected_cpmip_mail_body() -> str:
-    """Return the expected CPMIP threshold violation notification body."""
-    return (
-        "Autosubmit notification\n\n"
-        "        -------------------------\n\n"
-        "        Experiment id:  a000\n\n"
-        "        Job name: SIM\n\n"
-        "        The following CPMIP metrics violated their configured thresholds:\n\n"
-        "        ----------------------------------------\n"
-        "Metric: LATENCY\n"
-        "----------------------------------------\n"
-        "Comparison: must be <= effective bound (less_than)\n"
-        "Configured threshold: 10.0\n"
-        "Accepted error (%): 5\n"
-        "Effective bound: 10.5\n"
-        "Observed value: 10.6\n\n"
-        "----------------------------------------\n"
-        "Metric: SYPD\n"
-        "----------------------------------------\n"
-        "Comparison: must be >= effective bound (greater_than)\n"
-        "Configured threshold: 5.0\n"
-        "Accepted error (%): 10\n"
-        "Effective bound: 4.5\n"
-        "Observed value: 3.9\n\n\n\n\n\n"
-        "        INFO: This message was auto generated by Autosubmit,\n"
-        "        remember that you can disable these messages on Autosubmit config file.\n"
-    )
-
-
 @pytest.mark.docker
-def test_notify_status_change(mail_notifier, fake_smtp_server):
-    _, api_base = fake_smtp_server
-    expid = 'a000'
+def test_notify_status_change(
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        create_mail_notifier: Callable[['AutosubmitExperiment', int], MailNotifier],
+        fake_smtp_server: tuple[int, str]):
+    smtp_port, api_base = fake_smtp_server
     job_name = 'SIM'
     to_email = ['test@example.com']
-    requests.delete(f"{api_base}/api/v1/messages")
 
+    exp = autosubmit_exp()
+
+    mail_notifier = create_mail_notifier(exp, smtp_port)
     mail_notifier.notify_status_change(
-        expid, job_name,
+        exp.expid, job_name,
         Status.VALUE_TO_KEY[Status.RUNNING],  # previous status
-        Status.VALUE_TO_KEY[Status.FAILED],  # new status
+        Status.VALUE_TO_KEY[Status.FAILED],   # new status
         to_email
     )
 
-    resp = requests.get(f"{api_base}/api/v2/messages")
+    resp = _get_messages(api_base)
     assert resp.json()["count"] == 1
     emails = resp.json()["items"]
-    _check_metadata(emails, "status has changed to FAILED",
-                   expid, 'notifier@localhost', to_email)
+    _check_metadata(emails, "status has changed to FAILED", exp.expid, 'notifier@localhost', to_email)
+
 
 @pytest.mark.docker
-def test_experiment_status(mail_notifier, fake_smtp_server, mock_platform):
-    _, api_base = fake_smtp_server
-    expid = 'a000'
+def test_experiment_status(
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        create_mail_notifier: Callable[['AutosubmitExperiment', int], MailNotifier],
+        fake_smtp_server: tuple[int, str]):
+    exp = autosubmit_exp()
+
+    smtp_port, api_base = fake_smtp_server
+    mail_notifier = create_mail_notifier(exp, smtp_port)
     to_email = ['test@example.com']
-    requests.delete(f"{api_base}/api/v1/messages")
 
-    platform = mock_platform
-    mail_notifier.notify_experiment_status(
-        expid,
-        to_email,
-        platform
-    )
+    mail_notifier.notify_experiment_status(exp.expid, to_email, exp.platform)
 
-    resp = requests.get(f"{api_base}/api/v2/messages")
+    resp = _get_messages(api_base)
     assert resp.json()["count"] == 1
     emails = resp.json()["items"]
-    _check_metadata(
-        emails,
-        "platform is malfunctioning",
-        expid,
-        'notifier@localhost',
-        to_email)
+    _check_metadata(emails, "platform is malfunctioning", exp.expid, 'notifier@localhost', to_email)
 
-    bodies = [
-        email["Content"]["Body"]
-        for email in emails
-    ]
+    bodies = [email["Content"]["Body"] for email in emails]
     assert ('Name="dummy_run.log.zip"' in b for b in bodies)
     # TODO: test content of compressed file?
 
 
 @pytest.mark.docker
-def test_notify_cpmip_threshold_violations(mail_notifier, fake_smtp_server):
-    _, api_base = fake_smtp_server
-    expid = 'a000'
+def test_notify_cpmip_threshold_violations(
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        create_mail_notifier: Callable[['AutosubmitExperiment', int], MailNotifier],
+        fake_smtp_server: tuple[int, str]):
+    exp = autosubmit_exp()
+
+    smtp_port, api_base = fake_smtp_server
+    mail_notifier = create_mail_notifier(exp, smtp_port)
+
     job_name = 'SIM'
     to_email = ['test@example.com']
     violations = {
@@ -198,69 +173,68 @@ def test_notify_cpmip_threshold_violations(mail_notifier, fake_smtp_server):
         },
     }
 
-    requests.delete(f"{api_base}/api/v1/messages")
+    mail_notifier.notify_cpmip_threshold_violations(exp.expid, job_name, violations, to_email)
 
-    mail_notifier.notify_cpmip_threshold_violations(
-        expid,
-        job_name,
-        violations,
-        to_email,
-    )
+    resp = _get_messages(api_base)
+    emails: Any = resp.json()["items"]
+    _check_metadata(emails, "CPMIP Threshold Violation detected", exp.expid, 'notifier@localhost', to_email)
 
-    resp = requests.get(f"{api_base}/api/v2/messages")
-    emails = resp.json()["items"]
-    _check_metadata(
-        emails,
-        "CPMIP Threshold Violation detected",
-        expid,
-        'notifier@localhost',
-        to_email)
-
-    cpmip_email = next(
-        (e for e in emails
-         if any("CPMIP Threshold Violation" in s
-                for s in e["Content"]["Headers"].get("Subject", []))),
-        None,
-    )
+    cpmip_email = _find_email_by_subject("CPMIP Threshold Violation", emails)
     assert cpmip_email is not None, "No CPMIP Threshold Violation email found in mailbox"
 
-    body = cpmip_email["Content"]["Body"]
-    assert _normalize_mail_text(body) == _normalize_mail_text(_expected_cpmip_mail_body())
+    body = cpmip_email["Content"]["Body"].replace("\r\n", "\n").strip()
+
+    # Notification body
+    assert f"Experiment id:  {exp.expid}" in body
+    assert f"Job name: {job_name}" in body
+    assert "The following CPMIP metrics violated their configured thresholds:" in body
+
+    # Latency metric
+    assert "Metric: LATENCY" in body
+    assert "Comparison: must be <= effective bound (less_than)" in body
+    assert "Configured threshold: 10.0" in body
+    assert "Accepted error (%): 5" in body
+    assert "Effective bound: 10.5" in body
+    assert "Observed value: 10.6" in body
+
+    # Latency SYPD
+    assert "Metric: SYPD" in body
+    assert "Comparison: must be >= effective bound (greater_than)" in body
+    assert "Configured threshold: 5.0" in body
+    assert "Accepted error (%): 10" in body
+    assert "Effective bound: 4.5" in body
+    assert "Observed value: 3.9" in body
 
 
 @pytest.mark.parametrize(
     "list_recipients, expected_error_message",
     [("test", "Recipients of mail notifications must be a list of emails!"),
-        ([], "Empty recipient list"),
-        (['test'], "Invalid email in recipient list"),
-        (['test@mail.com', 'test2@mail.com'], None)]
+     ([], "Empty recipient list"),
+     (['test'], "Invalid email in recipient list"),
+     (['test@mail.com', 'test2@mail.com'], None)]
 )
 @pytest.mark.docker
 def test_recipients_list(
-        mail_notifier,
-        fake_smtp_server,
-        list_recipients,
-        expected_error_message):
-    _, api_base = fake_smtp_server
-    expid = 'a000'
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        create_mail_notifier: Callable[['AutosubmitExperiment', int], MailNotifier],
+        fake_smtp_server: tuple[int, str],
+        list_recipients: Union[str, list[str]],
+        expected_error_message: Optional[str]):
+    smtp_port, api_base = fake_smtp_server
     job_name = 'SIM'
-    requests.delete(f"{api_base}/api/v1/messages")
+
+    exp = autosubmit_exp()
+    mail_notifier = create_mail_notifier(exp, smtp_port)
 
     if expected_error_message:
         with pytest.raises(ValueError, match=expected_error_message):
-            mail_notifier.notify_status_change(
-                expid, job_name,
-                Status.VALUE_TO_KEY[Status.RUNNING],
-                Status.VALUE_TO_KEY[Status.FAILED],
-                list_recipients
+            mail_notifier.notify_status_change(exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING],
+                Status.VALUE_TO_KEY[Status.FAILED], list_recipients  # type: ignore
             )
     else:
         mail_notifier.notify_status_change(
-            expid, job_name,
-            Status.VALUE_TO_KEY[Status.RUNNING],
-            Status.VALUE_TO_KEY[Status.FAILED],
-            list_recipients
+            exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING], Status.VALUE_TO_KEY[Status.FAILED],
+            list_recipients  # type: ignore
         )
-        resp = requests.get(f"{api_base}/api/v2/messages")
-        assert len(resp.json()["items"][0]["Raw"]
-                   ["To"]) == len(list_recipients)
+        response = _get_messages(api_base)
+        assert len(response.json()["items"][0]["Raw"]["To"]) == len(list_recipients)

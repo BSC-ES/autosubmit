@@ -47,7 +47,9 @@ __all__ = [
     'prepare_and_test_ssh_container',
     'stop_test_containers',
     'get_svn_container',
-    'prepare_and_test_svn_container'
+    'prepare_and_test_svn_container',
+    'get_mail_container',
+    'prepare_and_test_mail_container'
 ]
 
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
@@ -138,7 +140,7 @@ def _create_git_container(git_repos_path: Path, http_port: int) -> DockerContain
     return container
 
 
-def prepare_and_test_git_container(container: 'DockerContainer', http_port: int) -> None:
+def prepare_and_test_git_container(container: DockerContainer, http_port: int) -> None:
     wait_for_logs(container, "Command line: 'httpd -D FOREGROUND'")
 
     container.exec('whoami')
@@ -146,7 +148,7 @@ def prepare_and_test_git_container(container: 'DockerContainer', http_port: int)
     wait_for_tcp_port('localhost', http_port)
 
 
-def get_git_container(git_repos_path: Path) -> tuple['DockerContainer', int]:
+def get_git_container(git_repos_path: Path) -> tuple[DockerContainer, int]:
     """Get a running Git container and its HTTP port."""
     http_port = get_free_port()
     # noinspection PyProtectedMember
@@ -182,7 +184,7 @@ def _create_svn_container(svn_repos_path: Path, http_port: int) -> DockerContain
     return container
 
 
-def prepare_and_test_svn_container(container: 'DockerContainer', http_port: int) -> None:
+def prepare_and_test_svn_container(container: DockerContainer, http_port: int) -> None:
     container.exec("htpasswd -b /etc/subversion/passwd svnadmin test")
     container.exec("sed -i 's/= r/= rw/g' /etc/subversion/subversion-access-control")
     container.exec("svnadmin create home/svn/svn-project")
@@ -199,7 +201,7 @@ def prepare_and_test_svn_container(container: 'DockerContainer', http_port: int)
     wait_for_tcp_port('localhost', http_port)
 
 
-def get_svn_container(svn_repos_path: Path) -> tuple['DockerContainer', int]:
+def get_svn_container(svn_repos_path: Path) -> tuple[DockerContainer, int]:
     """Get a running SVN container and its HTTP port."""
     http_port = get_free_port()
     # noinspection PyProtectedMember
@@ -208,7 +210,7 @@ def get_svn_container(svn_repos_path: Path) -> tuple['DockerContainer', int]:
 
 
 def prepare_and_test_slurm_container(
-        container: 'DockerContainer', ssh_port: int, ssh_path: Path, mocker: 'MockerFixture') -> None:
+        container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: 'MockerFixture') -> None:
     # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
     wait_for_logs(container, lambda logs: 'All services started' in logs)
 
@@ -321,7 +323,7 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
     return container
 
 
-def get_slurm_container() -> tuple['DockerContainer', int]:
+def get_slurm_container() -> tuple[DockerContainer, int]:
     """Get a running Slurm container and its SSH port."""
     # ssh_port = int(container.ports['2222/tcp'][0]['HostPort'])  # type: ignore
     ssh_port = get_free_port()
@@ -402,7 +404,7 @@ def _create_ssh_container(ssh_port: int, mfa=False, x11=False) -> DockerContaine
     return docker_container
 
 
-def get_ssh_container(mfa: bool, x11: bool) -> tuple['DockerContainer', int]:
+def get_ssh_container(mfa: bool, x11: bool) -> tuple[DockerContainer, int]:
     """Get a running SSH container, its port, and an SSH config.
 
     NOTE: Different from its sibling functions in this module, this function
@@ -416,10 +418,39 @@ def get_ssh_container(mfa: bool, x11: bool) -> tuple['DockerContainer', int]:
     # NOTE: In the call above, the ``DockerContainer`` returned by the start
     #       function has the correct ports, but the ``Container`` object
     #       wrapped doesn't. Can't tell if by design in TestContainers or a bug,
-    #       which is why the signature of the get_container functions return
+    #       which is why the signature of the get_container functions returns
     #       the port used.
 
     return container_instance, ssh_port
+
+
+def prepare_and_test_mail_container(container: DockerContainer) -> None:
+    wait_for_logs(container, 'Serving under')
+
+
+def _create_mail_container(smtp_port: int, api_port: int) -> DockerContainer:
+    docker_container = DockerContainer(image="mailhog/mailhog", remove=True) \
+        .with_bind_ports(1025, smtp_port) \
+        .with_bind_ports(8025, api_port)
+    return docker_container
+
+
+def get_mail_container() -> tuple[DockerContainer, int, str]:
+    """Get a fake SMTP container.
+
+    To clear the messages in the container, use the API endpoint
+    ``requests.delete(f"{api_base}/api/v2/messages")``.
+
+    :return: A tuple containing the container instance, the SMTP port, and the API base URL.
+    """
+    smtp_port = get_free_port()
+    api_port = get_free_port()
+
+    container_instance = _create_mail_container(smtp_port, api_port)
+
+    api_base = f"http://127.0.0.1:{api_port}"
+
+    return container_instance, smtp_port, api_base
 
 
 def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:

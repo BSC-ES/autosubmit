@@ -55,7 +55,7 @@ def _compress_file(
         zip_file_name = Path(temporary_directory.name, f'{file_path.name}.zip')
         with zipfile.ZipFile(zip_file_name, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             zip_file.write(file_path, Path(file_path).name)
-            return Path(zip_file.filename)
+            return Path(zip_file.filename)  # type: ignore
     except ValueError as e:
         raise AutosubmitError(
             code=6011,
@@ -197,8 +197,7 @@ def _generate_message_cpmip_threshold_violations(
 
 def _check_mail_address(mail_to: list[str]) -> None:
     if not isinstance(mail_to, list):
-        raise ValueError(
-            'Recipients of mail notifications must be a list of emails!')
+        raise ValueError('Recipients of mail notifications must be a list of emails!')
     elif not mail_to:
         raise ValueError('Empty recipient list')
     elif any([not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$', mail) for mail in mail_to]):
@@ -287,19 +286,13 @@ class MailNotifier:
         self._send_message(mail_to, self.config.MAIL_FROM, message)
 
     def _send_message(self, mail_to: list[str], mail_from: str, message) -> None:
-        formatted_addresses = [
-                email.utils.formataddr(
-                    (mail, mail)) for mail in mail_to]
+        formatted_addresses = [email.utils.formataddr((mail, mail)) for mail in mail_to]
         message["To"] = ", ".join(formatted_addresses)
         try:
-            self._send_mail(
-                    mail_from,
-                    formatted_addresses,
-                    message)
-        except Exception as e:
-            Log.printlog(
-                    f'Trace:{str(e)}\nAn error has occurred while sending a warning mail '
-                    f'about remote_platform', 6011)
+            self._send_mail(mail_from, formatted_addresses, message)
+        except smtplib.SMTPException as e:
+            Log.printlog(f'Trace:{str(e)}\nAn error has occurred while sending a warning mail '
+                    'about remote_platform', 6011)
 
     def _send_mail(self, mail_from, mail_to, message):
         server = smtplib.SMTP(self.config.SMTP_SERVER, timeout=60)
