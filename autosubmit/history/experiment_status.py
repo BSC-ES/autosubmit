@@ -162,7 +162,7 @@ class ExperimentStatus:
 
     def set_as_running(self) -> None:
         """
-        Set the status of the experiment in experiment_status of as_times.db as RUNNING.
+        Set the status of the experiment in experiment_status as RUNNING.
         Creates the database, table and row if necessary.
 
         :param status: The status to set for the experiment.
@@ -173,7 +173,7 @@ class ExperimentStatus:
 
     def set_as_not_running(self) -> None:
         """
-        Set the status of the experiment in experiment_status of as_times.db as NOT_RUNNING.
+        Set the status of the experiment in experiment_status as NOT_RUNNING.
         Creates the database, table and row if necessary.
 
         :param status: The status to set for the experiment.
@@ -184,7 +184,7 @@ class ExperimentStatus:
 
     def set_as_deleted(self) -> None:
         """
-        Set the status of the experiment in experiment_status of as_times.db as DELETED.
+        Set the status of the experiment in experiment_status as DELETED.
         Creates the database, table and row if necessary.
 
         :param status: The status to set for the experiment.
