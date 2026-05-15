@@ -18,6 +18,7 @@
 """Integration tests for the experiment status DB managers."""
 
 import sqlite3
+import sqlalchemy.exc
 from pathlib import Path
 from typing import cast, TYPE_CHECKING
 
@@ -176,7 +177,7 @@ def test_get_experiment_status_row_by_expid(
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_experiment_status_name_is_unique(tmp_path: "LocalPath", as_db: str, autosubmit_exp, get_next_expid):
-    """Test that the experiment_status table enforces unique experiment names, keeping only the latest row for each name."""
+    """Test that experiment_status.name is enforced as unique."""
     database_manager, experiments = _create_experiment_status_db_manager_and_rows(
         as_db=as_db,
         tmp_path=tmp_path,
@@ -192,12 +193,23 @@ def test_experiment_status_name_is_unique(tmp_path: "LocalPath", as_db: str, aut
         "RUNNING",
     )
 
-    with pytest.raises(Exception):
-        database_manager.create_exp_status(
-            experiment.id,
-            experiment.name,
-            "RUNNING",
-        )
+    if as_db == "sqlite":
+        with pytest.raises(sqlite3.IntegrityError) as exc_info:
+            database_manager.create_exp_status(
+                experiment.id,
+                experiment.name,
+                "RUNNING",
+            )
+        assert "UNIQUE constraint failed: experiment_status.exp_id" in str(exc_info.value)
+    else:
+        with pytest.raises(sqlalchemy.exc.IntegrityError) as exc_info:
+            database_manager.create_exp_status(
+                experiment.id,
+                experiment.name,
+                "RUNNING",
+            )
+        assert "duplicate key value violates unique constraint" in str(exc_info.value)
+
 
 @pytest.mark.docker
 @pytest.mark.postgres
@@ -398,7 +410,7 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(
     assert initial_heartbeat == timestamps[1]
 
     # Update status to NOT RUNNING. Should not update last_heartbeat
-    database_manager.set_exp_status("a000", "NOT RUNNING")
+    database_manager.update_exp_status("a000", "NOT RUNNING")
 
     after_not_running = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     assert after_not_running is not None
@@ -406,7 +418,7 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(
     assert after_not_running.last_heartbeat == initial_heartbeat
 
     # Update again with RUNNING status. Should update last_heartbeat
-    database_manager.set_exp_status("a000", "RUNNING")
+    database_manager.update_exp_status("a000", "RUNNING")
 
     after_running = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     assert after_running is not None

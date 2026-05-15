@@ -213,9 +213,9 @@ class SqlAlchemyExperimentStatusDbManager:
         connection_url = get_connection_url(Path(BasicConfig.DATABASE_CONN_URL))
         self.engine = session.create_engine(connection_url=connection_url)
         self._validate_status_database()
-    
+
     def _validate_status_database(self) -> None:
-        """ Creates experiment_status table if it does not exist """
+        """Creates experiment_status table if it does not exist"""
         with self.engine.connect() as conn:
             conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
             conn.commit()
@@ -224,38 +224,47 @@ class SqlAlchemyExperimentStatusDbManager:
 
         # keep only latest row by name
         with self.engine.connect() as conn:
-            conn.execute(text(
-                "DELETE FROM experiment_status es "
-                "USING ("
-                "  SELECT exp_id, "
-                "         ROW_NUMBER() OVER (PARTITION BY name ORDER BY modified DESC, exp_id DESC) AS rn "
-                "  FROM experiment_status"
-                ") ranked "
-                "WHERE es.exp_id = ranked.exp_id AND ranked.rn > 1"
-            ))
+            conn.execute(
+                text(
+                    "DELETE FROM experiment_status es "
+                    "USING ("
+                    "  SELECT exp_id, "
+                    "         ROW_NUMBER() OVER (PARTITION BY name ORDER BY modified DESC, exp_id DESC) AS rn "
+                    "  FROM experiment_status"
+                    ") ranked "
+                    "WHERE es.exp_id = ranked.exp_id AND ranked.rn > 1"
+                )
+            )
             conn.commit()
 
         # enforce name as a unique index
         with self.engine.connect() as conn:
-            conn.execute(text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_experiment_status_name "
-                "ON experiment_status(name)"
-            ))
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_experiment_status_name "
+                    "ON experiment_status(name)"
+                )
+            )
             conn.commit()
 
     def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
-        """ Add a column to the experiment_status table if it is missing. """
+        """Add a column to the experiment_status table if it is missing."""
         if not self._column_exists(column_name):
             with self.engine.connect() as conn:
-                conn.execute(text(
-                    f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type};"
-                ))
+                conn.execute(
+                    text(
+                        f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type};"
+                    )
+                )
                 conn.commit()
 
     def _column_exists(self, column_name: str) -> bool:
         """Check whether a column exists in the experiment_status table for SQLAlchemy backends."""
         inspector = inspect(self.engine)
-        return any(column["name"] == column_name for column in inspector.get_columns("experiment_status"))
+        return any(
+            column["name"] == column_name
+            for column in inspector.get_columns("experiment_status")
+        )
 
     def set_existing_experiment_status_as_running(self, expid):
         self.update_exp_status(expid, Models.RunningStatus.RUNNING)
@@ -343,7 +352,7 @@ class SqlAlchemyExperimentStatusDbManager:
         self.create_exp_status(exp_row.id, expid, status)
         if status == Models.RunningStatus.RUNNING:
             self.update_heartbeat(expid)
-    
+
     def update_heartbeat(self, expid: str) -> None:
         now = HUtils.get_current_datetime()
         query = (
