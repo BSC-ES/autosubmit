@@ -17,11 +17,13 @@
 
 """Tests for ``JobPackagePersistence``."""
 
+import datetime
+
 import pytest
 
 from autosubmit.job.job import Job
+from autosubmit.job.job_common import Status
 from autosubmit.job.job_package_persistence import JobPackagePersistence
-from autosubmit.job.job_packages import JobPackageVertical
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 
@@ -86,14 +88,52 @@ def test_load_save_load(as_db: str, autosubmit_exp):
         jobs.append(job)
 
     job_package_persistence = JobPackagePersistence(exp.expid)
-    assert not job_package_persistence.load(exp.expid)
+    # Initially empty
+    wrappers_info, inner_jobs = job_package_persistence.load(preview=False)
+    assert not wrappers_info
+    assert not inner_jobs
 
-    job_package = JobPackageVertical(jobs, configuration=exp.as_conf, wrapper_section="WRAPPER_0")
+    wrapper_name = f"{exp.expid}_wrapper_1"
+    wrapper_info = {
+        "name": wrapper_name,
+        "id": 1000,
+        "script_name": None,
+        "status": Status.SUBMITTED,
+        "local_logs_out": None,
+        "local_logs_err": None,
+        "remote_logs_out": None,
+        "remote_logs_err": None,
+        "updated_log": 0,
+        "platform_name": "TEST_SLURM_PLATFORM",
+        "wallclock": "00:30",
+        "num_processors": 0,
+        "type": None,
+        "sections": None,
+        "method": None,
+    }
+    wrapper_inner_jobs = [
+        {
+            'package_id': 1000,
+            'package_name': wrapper_name,
+            'job_name': job.name,
+            'timestamp': datetime.datetime.now().isoformat()
+        }
+        for job in jobs
+    ]
 
-    job_package_persistence.save(job_package)
+    job_package_persistence.save([(wrapper_info, wrapper_inner_jobs)], preview=False)
 
-    job_packages = job_package_persistence.load(exp.expid)
-    assert len(jobs) == len(job_packages)
+    wrappers_info, inner_jobs = job_package_persistence.load(preview=False)
+    assert len(wrappers_info) == 1
+    assert len(inner_jobs) == len(jobs)
 
-    job_package_persistence.reset_table(True)
-    assert not job_package_persistence.load(exp.expid)
+    job_package_persistence.reset_table(preview=True)
+    # Production data should still be there
+    wrappers_info, inner_jobs = job_package_persistence.load(preview=False)
+    assert len(wrappers_info) == 1
+    assert len(inner_jobs) == len(jobs)
+
+    # Preview should be empty
+    wrappers_info_preview, inner_jobs_preview = job_package_persistence.load(preview=True)
+    assert not wrappers_info_preview
+    assert not inner_jobs_preview

@@ -124,7 +124,14 @@ def test_check_wrapper_stored_status(setup_as_conf, new_job_list, new_platform_m
         new_job_list.packages_dict = {"dummy_wrapper": dummy_jobs}
     new_job_list = Autosubmit.check_wrapper_stored_status(setup_as_conf, new_job_list, "03:30")
     assert new_job_list is not None
-    if dummy_jobs[0].status != Status.UNKNOWN:
+    if dummy_jobs[0].status == Status.UNKNOWN:
+        # No packages were set up
+        pass
+    elif expected_status in (Status.COMPLETED, Status.FAILED):
+        # Completed/failed wrappers are purged from memory
+        assert "dummy_wrapper" not in new_job_list.packages_dict
+        assert dummy_jobs[0].id not in new_job_list.job_package_map
+    else:
         assert new_job_list.job_package_map[dummy_jobs[0].id].status == expected_status
 
 

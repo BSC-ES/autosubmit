@@ -48,8 +48,9 @@ class JobPackagePersistence:
     VERSION = 2
 
     def __init__(self, expid: str):
-        database_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl', f'job_packages_{expid}.db')
-        connection_url = get_connection_url(db_path=database_file)
+        self.database_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl', f'job_packages_{expid}.db')
+        self.database_file.parent.mkdir(parents=True, exist_ok=True, mode=0o775)
+        connection_url = get_connection_url(db_path=self.database_file)
 
         if BasicConfig.DATABASE_BACKEND == "postgres":
             _schema = expid

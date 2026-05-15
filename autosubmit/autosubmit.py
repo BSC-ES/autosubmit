@@ -1667,13 +1667,13 @@ class Autosubmit:
                     file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd | {job.file}\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
-                    as_conf, job_list, jobs, packages_persistence, False)
+                    as_conf, job_list, jobs, False)
             if len(jobs_cw) > 0:
                 for job in jobs_cw:
                     file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
-                    as_conf, job_list, jobs_cw, packages_persistence, False)
+                    as_conf, job_list, jobs_cw, False)
             job_list.clear_preview_wrapper()
 
             # obtain base script
@@ -1690,7 +1690,7 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def generate_scripts_andor_wrappers(as_conf, job_list, jobs_filtered, packages_persistence, only_wrappers=False):
+    def generate_scripts_andor_wrappers(as_conf, job_list, jobs_filtered, only_wrappers=False):
         """
         :param as_conf: Class that handles basic configuration parameters of Autosubmit. \n
         :type as_conf: AutosubmitConfig() Object \n
@@ -1698,8 +1698,6 @@ class Autosubmit:
         :type job_list: JobList() Object \n
         :param jobs_filtered: list of jobs that are relevant to the process. \n
         :type jobs_filtered: List() of Job Objects \n
-        :param packages_persistence: Object that handles local db persistence.  \n
-        :type packages_persistence: JobPackagePersistence() Object \n
         :param only_wrappers: True when coming from Autosubmit.create(). False when coming from Autosubmit.inspect(), \n
         :type only_wrappers: Boolean \n
         :return: Nothing\n
@@ -1756,7 +1754,7 @@ class Autosubmit:
             if job.status != Status.WAITING:
                 job.status = Status.READY
         while job_list.get_active():
-            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence, True,
+            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, True,
                                          only_wrappers)
             job_list.update_list(as_conf, False)
         for job in job_list.get_job_list():
@@ -1790,7 +1788,6 @@ class Autosubmit:
             wrapper_job.checked_time = datetime.datetime.now()
             save |= wrapper_job.check_and_update_status(as_conf)
             if save:
-                job_list.update_db_wrappers()
                 job_list.save()
 
         return wrapper_job
@@ -1846,7 +1843,7 @@ class Autosubmit:
         # if packages_dict attr is in job_list
         if hasattr(job_list, "packages_dict"):
             wrapper_status = Status.SUBMITTED
-            for package_name, jobs in job_list.packages_dict.items():
+            for package_name, jobs in list(job_list.packages_dict.items()):
                 from .job.job import WrapperJob
                 # Ordered by higher priority status
                 if all(job.status == Status.COMPLETED for job in jobs):
@@ -1862,6 +1859,10 @@ class Autosubmit:
                     wrapper_status = Status.HELD
                 elif any(job.status == Status.SUBMITTED for job in jobs):
                     wrapper_status = Status.SUBMITTED
+
+                if wrapper_status in (Status.COMPLETED, Status.FAILED):
+                    job_list.packages_dict.pop(package_name, None)
+                    continue
 
                 wrapper_job = WrapperJob(package_name, jobs[0].id, wrapper_status, 0, jobs,
                                          wrapper_wallclock, jobs[0].platform, as_conf, jobs[0].hold)
@@ -1933,7 +1934,6 @@ class Autosubmit:
         Optional[str],
         AutosubmitConfig,
         set[Platform],
-        JobPackagePersistence,
         bool,
     ]:
         """Prepare the run of the experiment.
@@ -2033,37 +2033,16 @@ class Autosubmit:
                 job_list.check_scripts(as_conf)
         except Exception as e:
             raise AutosubmitCritical("Error while checking job templates", 7014, str(e))
-        Log.debug("Loading job packages")
-        # Packages == wrappers and jobs inside wrappers. Name is also misleading.
-        try:
-            packages_persistence = JobPackagePersistence(expid)
-        except IOError as e:
-            raise AutosubmitError("job_packages not found", 6016, str(e))
+
         # Check if the user wants to continue using wrappers and loads the appropriate info.
         if as_conf.experiment_data.get("WRAPPERS", None) is not None:
             if BasicConfig.DATABASE_BACKEND == 'sqlite':
                 os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
                                       expid, "pkl", "job_packages_" + expid + ".db"), 0o644)
             try:
-                packages = packages_persistence.load()
+                job_list.load_wrappers()
             except IOError as e:
                 raise AutosubmitError("job_packages not found", 6016, str(e))
-            Log.debug("Processing job packages")
-            try:
-                # fallback value, only affects to is_overclock
-                wrapper_wallclock = as_conf.experiment_data.get("CONFIG", {}).get("WRAPPERS_WALLCLOCK", "48:00")
-                for (exp_id, package_name, job_name, wrapper_wallclock) in packages:
-                    if package_name not in job_list.packages_dict:
-                        job_list.packages_dict[package_name] = []
-                    job_list.packages_dict[package_name].append(job_list.get_job_by_name(job_name))
-                # This function, checks the stored STATUS of jobs inside wrappers.
-                # Since "wrapper status" is a memory variable.
-                job_list = Autosubmit.check_wrapper_stored_status(as_conf, job_list, wrapper_wallclock)
-            except Exception as e:
-                raise AutosubmitCritical(
-                    "Autosubmit failed while processing job packages. This might be due to a change in "
-                    "your experiment configuration files after 'autosubmit create' was performed.",
-                    7014, str(e))
         if recover:
             Log.info("Recovering wrappers... Done")
 
@@ -2098,9 +2077,9 @@ class Autosubmit:
             # establish the connection to all platforms
             # Restore is misleading, it is actually a "connect" function when the recover flag is not set.
             Autosubmit.restore_platforms(platforms_to_test, as_conf=as_conf)
-            return job_list, submitter, exp_history, host, as_conf, list(platforms_to_test), packages_persistence, False
-        else:
-            return job_list, submitter, None, None, as_conf, list(platforms_to_test), packages_persistence, True
+            return job_list, submitter, exp_history, host, as_conf, list(platforms_to_test), False
+
+        return job_list, submitter, None, None, as_conf, list(platforms_to_test), True
 
     @staticmethod
     def get_iteration_info(as_conf, job_list) -> tuple[int, int, int, bool]:
@@ -2206,7 +2185,7 @@ class Autosubmit:
                     Log.debug("Preparing run")
                     # This function is called only once, when the experiment is started. It is used to initialize the experiment and to check the correctness of the configuration files.
                     # If there are issues while running, this function will be called again to reinitialize the experiment.
-                    job_list, submitter, exp_history, host, as_conf, platforms_to_test, packages_persistence, _ = Autosubmit.prepare_run(
+                    job_list, submitter, exp_history, host, as_conf, platforms_to_test, _ = Autosubmit.prepare_run(
                         expid, start_time, start_after, run_only_members)
                 except AutosubmitCritical:
                     # e.message += " HINT: check the CUSTOM_DIRECTIVE syntax in your jobs configuration files."
@@ -2283,7 +2262,7 @@ class Autosubmit:
 
                         # Submit ready jobs
                         if len(job_list.get_ready()) > 0:
-                            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test, packages_persistence)
+                            Autosubmit.submit_ready_jobs(as_conf, job_list, platforms_to_test)
                         # Check wrappers status and inner jobs
                         Autosubmit.check_wrappers(as_conf, job_list, expid)
                         # Check non-wrapped jobs
@@ -2339,7 +2318,7 @@ class Autosubmit:
                             consecutive_retrials = consecutive_retrials + 1
                             Log.info(f"Waiting {delay} seconds before continue")
                             try:
-                                job_list, submitter, _, _, as_conf, platforms_to_test, packages_persistence, recovery = Autosubmit.prepare_run(
+                                job_list, submitter, _, _, as_conf, platforms_to_test, recovery = Autosubmit.prepare_run(
                                     expid,
                                     start_time,
                                     start_after,
@@ -2537,7 +2516,7 @@ class Autosubmit:
 
     @staticmethod
     def submit_ready_jobs(as_conf: AutosubmitConfig, job_list: JobList, platforms_to_test: list[ParamikoPlatform],
-                          packages_persistence: JobPackagePersistence, inspect=False,
+                          inspect=False,
                           only_wrappers=False) -> None:
         """Gets READY jobs and send them to the platforms if there is available space on the queues.
 
@@ -2547,8 +2526,6 @@ class Autosubmit:
         :type job_list: JobList object
         :param platforms_to_test: platforms used
         :type platforms_to_test: set of Platform Objects, e.g. SgePlatform(), SlurmPlatform().
-        :param packages_persistence: Handles database per experiment.
-        :type packages_persistence: JobPackagePersistence object
         :param inspect: True if coming from generate_scripts_andor_wrappers().
         :type inspect: Boolean
         :param only_wrappers: True if it comes from create -cw, False if it comes from inspect -cw.
@@ -2605,7 +2582,7 @@ class Autosubmit:
                         job_list.save()
 
             wrapper_errors.update(packager.wrappers_with_error)
-            job_list.save_wrappers(scripts_to_submit_by_section, as_conf, packages_persistence, inspect=inspect)
+            job_list.save_wrappers(scripts_to_submit_by_section, as_conf, inspect=inspect)
 
         Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
 
@@ -2741,9 +2718,9 @@ class Autosubmit:
 
         # WRAPPERS
         try:
+            packages_persistence = JobPackagePersistence(expid)
             if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrapper:
                 # Class constructor creates table if it does not exist
-                packages_persistence = JobPackagePersistence(expid)
                 # Permissions
                 if BasicConfig.DATABASE_BACKEND == 'sqlite':
                     os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "pkl", "job_packages_" + expid + ".db"),
@@ -2753,12 +2730,12 @@ class Autosubmit:
                 # Load another job_list to go through that goes through the jobs, but we want to monitor the other one
                 job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
                 Autosubmit.generate_scripts_andor_wrappers(as_conf, job_list_wr, job_list_wr.get_job_list(),
-                                                           packages_persistence, True)
+                                                           True)
 
-                packages = packages_persistence.load(True)
-                packages += JobPackagePersistence(expid).load()
+                packages = packages_persistence.db_manager.select_all("preview_wrappers_jobs")
+                packages += packages_persistence.db_manager.select_all("wrappers_jobs")
             else:
-                packages = JobPackagePersistence(expid).load()
+                packages = packages_persistence.db_manager.select_all("wrappers_jobs")
         except BaseException as e:
             if profile:
                 profiler.stop()
@@ -3171,7 +3148,7 @@ class Autosubmit:
         # Added TRY EXCEPT for plotting and detail to avoid recovery failure (as the jobs were recovered)
         try:
             if not noplot:
-                packages = JobPackagePersistence(expid).load()
+                packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
                 from .monitor.monitor import Monitor
                 status = list()
                 if group_by:
@@ -4405,12 +4382,6 @@ class Autosubmit:
                     job_list.clear_generate()
                     job_list.save()
                     as_conf.save()
-                    try:
-                        packages_persistence = JobPackagePersistence(expid)
-                        packages_persistence.reset_table()
-                        packages_persistence.reset_table(True)
-                    except Exception:
-                        pass
 
                     groups_dict = dict()
 
@@ -4455,8 +4426,9 @@ class Autosubmit:
                         if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
                             job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
                             Autosubmit.generate_scripts_andor_wrappers(
-                                as_conf, job_list_wr, job_list_wr.get_job_list(), packages_persistence, True)
-                            packages = packages_persistence.load(True)
+                                as_conf, job_list_wr, job_list_wr.get_job_list(), True)
+                            packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
+                            packages += JobPackagePersistence(expid).db_manager.select_all("preview_wrappers_jobs")
                         else:
                             packages = None
 
@@ -5419,11 +5391,12 @@ class Autosubmit:
                         job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
 
                         Autosubmit.generate_scripts_andor_wrappers(as_conf, job_list_wr, job_list_wr.get_job_list(),
-                                                                   packages_persistence, True)
+                                                                   True)
 
-                        packages = packages_persistence.load(True)
+                        packages = packages_persistence.db_manager.select_all("preview_wrappers_jobs")
+                        packages += packages_persistence.db_manager.select_all("wrappers_jobs")
                     else:
-                        packages = JobPackagePersistence(expid).load()
+                        packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
                     groups_dict = dict()
                     if group_by:
                         status = list()
@@ -5885,6 +5858,6 @@ class Autosubmit:
                     Log.info(f"Waiting for the autosubmit run to safety stop: {expid_in_list}")
                     sleep(5)
             if cancel:
-                job_list, _, _, _, _, _, _, _ = Autosubmit.prepare_run(expid_in_list, check_scripts=False)
+                job_list, _, _, _, _, _, _ = Autosubmit.prepare_run(expid_in_list, check_scripts=False)
                 cancel_jobs(job_list, active_jobs_filter=current_status, target_status=status)
         return True

@@ -85,12 +85,12 @@ if TYPE_CHECKING:
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
-            policy: flexible
+            policy: strict
 
         wrapper2:
             JOBS_IN_WRAPPER: job2
             TYPE: vertical
-            policy: flexible
+            policy: strict
 
     """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
 
@@ -1170,19 +1170,29 @@ _DESTINE_LIKE_PARAMS = [
         wrapper_sim:
             JOBS_IN_WRAPPER: sim
             TYPE: vertical
-            policy: flexible
+            policy: strict
+            MIN_WRAPPED: 2
+            MAX_WRAPPED: 4
         wrapper_downstream:
             JOBS_IN_WRAPPER: downstream
             TYPE: vertical
-            policy: flexible
+            policy: strict
+            MIN_WRAPPED: 4
+            MAX_WRAPPED: 4
+
         wrapper_operator:
             JOBS_IN_WRAPPER: operator
             TYPE: vertical
-            policy: flexible
+            policy: strict
+            MIN_WRAPPED: 4
+            MAX_WRAPPED: 4
         wrapper_application:
             JOBS_IN_WRAPPER: application
             TYPE: vertical
-            policy: flexible
+            policy: strict
+            MIN_WRAPPED: 4
+            MAX_WRAPPED: 4
+
     """),
      31,
      "COMPLETED",
@@ -1238,7 +1248,7 @@ def test_run_uninterrupted_destine_like(
     # Verify that 4 ASThread wrapper templates were generated
     templates_dir = run_tmpdir / as_exp.expid / "tmp"
     asthread_files = list(templates_dir.rglob("*ASThread*"))
-    assert len(asthread_files) == 4, f"Expected 4 ASThread files, found {len(asthread_files)}"
+    assert len(asthread_files) == 7, f"Expected 7 ASThread files, found {len(asthread_files)}"
 
 
 @pytest.mark.docker
@@ -1298,4 +1308,5 @@ def test_run_interrupted_destine_like(
     # Verify ASThread wrapper templates
     templates_dir = run_tmpdir / as_exp.expid / "tmp"
     asthread_files = list(templates_dir.rglob("*ASThread*"))
-    assert len(asthread_files) == 4, f"Expected 4 ASThread files, found {len(asthread_files)}"
+    # 1 sim, 2 downstream, 2 operator, 2 application = 7 total ASThread files expected
+    assert len(asthread_files) == 7, f"Expected 7 ASThread files, found {len(asthread_files)}"

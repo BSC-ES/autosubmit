@@ -960,17 +960,18 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
     :param mocker: pytest-mock mocker fixture.
     """
     as_conf = mocker.MagicMock()
-    packages_persistence = mocker.MagicMock()
+
 
     job = Job('a000_20000101_fc0_1_SIM', '999', Status.SUBMITTED, 0)
     package = mocker.MagicMock(spec=JobPackageThread)
+    package.is_wrapped = True
     package.jobs = [job]
     package.name = 'wrapper_1'
     package._wallclock = '00:30'
     package.platform = FakePlatform()
 
     submitted_scripts = {'section': {'pkg': package}}
-    fake_job_list.save_wrappers(submitted_scripts, as_conf, packages_persistence)
+    fake_job_list.save_wrappers(submitted_scripts, as_conf)
 
     # Key must be int (999), not string ('999'), so that subsequent id-based
     # lookups with integer job ids work correctly.

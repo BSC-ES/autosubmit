@@ -39,7 +39,6 @@ if TYPE_CHECKING:
     from autosubmit.job.job_packages import JobPackageBase
     from autosubmit.job.job import Job
     from autosubmit.job.job_list import JobList
-    from autosubmit.job.job_package_persistence import JobPackagePersistence
     from multiprocessing.process import BaseProcess
 
 

@@ -39,7 +39,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import calendar_chunk_section
-from autosubmit.job.job_utils import get_job_package_code, SubJob, SubJobManager
+from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
@@ -1265,20 +1265,6 @@ def test_no_start_time(autosubmit_config, experiment_data):
     as_conf.data_changed = False
     job.update_parameters(as_conf, set_attributes=True)
     assert isinstance(job.start_time, datetime)
-
-
-def test_get_job_package_code(autosubmit_config):
-    autosubmit_config('dummy', {})
-    experiment_id = 'dummy'
-    job = Job(experiment_id, '1', 0, 1)
-
-    with patch("autosubmit.job.job_utils.JobPackagePersistence") as mock_persistence:
-        mock_persistence.return_value.load.return_value = [
-            ['dummy', '0005_job_packages', 'dummy']
-        ]
-        code = get_job_package_code(job.expid, job.name)
-
-        assert code == 5
 
 
 def test_sub_job_instantiation(tmp_path, autosubmit_config):

@@ -3114,7 +3114,7 @@ class WrapperJob(Job):
         A inner_job can run when all of its parents of the current wrapper have COMPLETED status.
         """
         return all(
-            parent.status == Status.COMPLETED
+            parent.status == Status.COMPLETED or parent.new_status == Status.COMPLETED
             for parent in inner_job.parents
             if parent in wrapper_job_set
         )

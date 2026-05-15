@@ -500,6 +500,18 @@ class AutosubmitConfig(object):
 
         wrapper_data["JOBS_IN_WRAPPER"] = sanitized_jobs_in_wrapper
 
+    def is_section_in_any_wrapper(self, section: str) -> bool:
+        """Return True if the section appears in any wrapper's JOBS_IN_WRAPPER.
+
+        :param section: The job section name to look up.
+        :return: True if the section is found in at least one wrapper, False otherwise.
+        """
+        for wrapper_data in self.experiment_data.get("WRAPPERS", {}).values():
+            if isinstance(wrapper_data, dict):
+                if section in wrapper_data.get("JOBS_IN_WRAPPER", []):
+                    return True
+        return False
+
     @staticmethod
     def _normalize_wrappers_section(data_fixed: dict, raise_exception: bool = False) -> None:
         """Normalize the WRAPPERS section to a consistent format so there is no issues during runtime.

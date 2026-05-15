@@ -415,4 +415,6 @@ def fake_job_list(mocker) -> JobList:
     """
     as_conf = mocker.MagicMock()
     as_conf.experiment_data = {}
-    return JobList('a000', as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list = JobList('a000', as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list._packages_persistence = mocker.MagicMock()
+    return job_list

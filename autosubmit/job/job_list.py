@@ -75,7 +75,6 @@ class JobList(object):
         self._ordered_jobs_by_date_member = dict()
 
         self.dependency_map = None
-        self.packages_id = dict()
         self.job_package_map = dict()
         self.sections_checked = set()
         self._run_members = None
@@ -87,6 +86,25 @@ class JobList(object):
         self.path_to_logs = Path(BasicConfig.LOCAL_ROOT_DIR,
                                  self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
         self._FINAL_STATUSES = [Status.COMPLETED, Status.FAILED, Status.SKIPPED]
+        self._packages_persistence: Optional[JobPackagePersistence] = None
+
+    def __getstate__(self):
+        """Exclude non-picklable SQLAlchemy engine from pickled state."""
+        state = self.__dict__.copy()
+        state.pop('_packages_persistence', None)
+        return state
+
+    def _get_packages_persistence(self, reset=False) -> JobPackagePersistence:
+        """Return (lazily creating if needed) the ``JobPackagePersistence`` for this experiment."""
+        if reset:
+            # In 4.2, this will not be neccesary 4.1.17 is not prepared to handle historical wrappers
+            self._packages_persistence = None
+            persistence_packages_path = Path(self._persistence_path, f"job_packages_{self.expid}.db")
+            if persistence_packages_path.exists():
+                persistence_packages_path.unlink()
+        if self._packages_persistence is None:
+            self._packages_persistence = JobPackagePersistence(self.expid)
+        return self._packages_persistence
 
     @property
     def expid(self):
@@ -187,6 +205,9 @@ class JobList(object):
         :param monitor: monitor
         :type monitor: bool
         """
+        # In 4.2.0, this table is an historical but 4.1.17 is not prepared to handle that, so we need to reset it on create
+        if create:
+            self._get_packages_persistence(reset=True)
         if create and self.check_split_set_to_auto(as_conf):
             force = True
         if force:
@@ -197,6 +218,7 @@ class JobList(object):
             persistence_pkl_path = Path(self._persistence_path, self._persistence_file + "_backup.pkl")
             if persistence_pkl_path.exists():
                 persistence_pkl_path.unlink()
+        self._get_packages_persistence().reset_table(True)
         self._parameters = parameters
         self._date_list = date_list
         self._member_list = member_list
@@ -2693,12 +2715,15 @@ class JobList(object):
                 job.fail_count = 0
         # Check checkpoint jobs, the status can be Any
         for job in self.check_special_status():
-            job.status = Status.READY
-            # Run start time in format (YYYYMMDDHH:MM:SS) from current time
-            job.id = None
-            job.wrapper_type = None
-            save = True
-            Log.debug(f"Special condition fulfilled for job {job.name}")
+            # Wait until all parents are completed to begin the wrapper to avoid run-time issues
+            if not as_conf.is_section_in_any_wrapper(job.section):
+                as_conf.check_wrapper_conf()
+                job.status = Status.READY
+                # Run start time in format (YYYYMMDDHH:MM:SS) from current time
+                job.id = None
+                job.wrapper_type = None
+                save = True
+                Log.debug(f"Special condition fulfilled for job {job.name}")
         # if waiting jobs has all parents completed change its State to READY
         for job in self.get_completed():
             # Log name has this format:
@@ -2831,7 +2856,6 @@ class JobList(object):
             self,
             submitted_scripts: dict,
             as_conf: AutosubmitConfig,
-            packages_persistence: JobPackagePersistence,
             inspect: bool = False,
     ) -> None:
         """Save wrapper jobs in the job list and the packages dict.
@@ -2839,7 +2863,6 @@ class JobList(object):
         :param submitted_scripts: Nested dict ``{section: {name: package}}`` of
             packages produced by the wrapper packager.
         :param as_conf: Experiment configuration object.
-        :param packages_persistence: Persistence instance used to write wrapper data.
         :param inspect: If True, persist to the preview tables (``-cw`` flag).
         """
         wrappers = []
@@ -2865,7 +2888,7 @@ class JobList(object):
                 self.packages_dict[package.name] = wrapper_job.job_list
                 wrappers.append(self._wrapper_job_dict(wrapper_job))
         if wrappers:
-            packages_persistence.save(wrappers, preview=inspect)
+            self._get_packages_persistence().save(wrappers, preview=inspect)
 
     def assign_unique_fake_id(self, package: 'JobPackageThread') -> None:
         """Assign a unique negative fake ID to a package's first job for preview use.
@@ -2885,8 +2908,7 @@ class JobList(object):
 
         :param preview: If True, load from the preview tables.
         """
-        persistence = JobPackagePersistence(self.expid)
-        un_mapped_wrapper_info, un_mapped_inner_jobs = persistence.load(preview, self.job_list)
+        un_mapped_wrapper_info, un_mapped_inner_jobs = self._get_packages_persistence().load(preview, self._job_list)
 
         # Build a dictionary of wrapper info indexed by wrapper name.
         wrappers_info: Dict[str, dict] = {
@@ -2924,7 +2946,7 @@ class JobList(object):
                 total_wallclock=wrapper_info["wallclock"],
                 job_list=wrapper_info["job_list"],
                 platform=wrapper_info["job_list"][0].platform,
-                as_config=self._as_conf,
+                as_config=self._config,
             )
             wrapper_job.platform_name = wrapper_job.job_list[0].platform_name
             self.job_package_map[int(wrapper_job.id)] = wrapper_job
@@ -2972,7 +2994,7 @@ class JobList(object):
         preview data from a previous ``inspect -cw`` or ``create -cw`` run
         does not persist between calls.
         """
-        JobPackagePersistence(self._expid).reset_table(preview=True)
+        self._get_packages_persistence().reset_table(preview=True)
 
     def check_scripts(self, as_conf) -> bool:
         """When we have created the scripts, all parameters should have been substituted.
