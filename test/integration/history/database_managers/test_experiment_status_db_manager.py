@@ -39,6 +39,60 @@ from autosubmit.history.database_managers.experiment_status_db_manager import (
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from _pytest._py.path import LocalPath
+    
+def _create_experiment_status_db_manager_and_rows(
+    as_db: str,
+    tmp_path: Path,
+    expids: list[str],
+    autosubmit_exp=None,
+):
+    """Create a status manager and the experiment rows required by a backend-specific test."""
+    options = {"expid": expids[0]}
+
+    if as_db == "sqlite":
+        db_dir = tmp_path / "db"
+        db_dir.mkdir()
+        local_root_dir = tmp_path / "local"
+        local_root_dir.mkdir()
+
+        autosubmit_db_path = db_dir / "test.db"
+        with sqlite3.connect(autosubmit_db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                CREATE TABLE experiment (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    autosubmit_version TEXT
+                )
+                """
+            )
+            cursor.executemany(
+                "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (?, ?, ?, ?)",
+                [(index + 1, expid, "test", "4.1.10") for index, expid in enumerate(expids)],
+            )
+            conn.commit()
+
+        options["db_dir_path"] = str(db_dir)
+        options["local_root_dir_path"] = str(local_root_dir)
+        options["main_db_name"] = "test.db"
+    else:
+        if autosubmit_exp is None:
+            raise ValueError("autosubmit_exp is required when using postgres")
+
+        for expid in expids:
+            autosubmit_exp(expid=expid, include_jobs=True)
+
+    database_manager = create_experiment_status_db_manager(as_db, **options)
+
+    if as_db == "postgres":
+        with database_manager.engine.begin() as conn:
+            for expid in expids:
+                conn.execute(text("DELETE FROM experiment_status WHERE name = :name"), {"name": expid})
+
+    experiment_rows = [database_manager.get_experiment_row_by_expid(expid) for expid in expids]
+    return database_manager, experiment_rows
 
 
 @pytest.mark.docker
@@ -190,12 +244,16 @@ def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
         assert isinstance(database_manager, SqlAlchemyExperimentStatusDbManager)
 
 
-def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", mocker):
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", as_db: str, autosubmit_exp, mocker):
     """Test that update_heartbeat() stores the last heartbeat timestamp in the database."""
-    db_dir = tmp_path / "db"
-    db_dir.mkdir()
-    local_root_dir = tmp_path / "local"
-    local_root_dir.mkdir()
+    database_manager, experiments = _create_experiment_status_db_manager_and_rows(
+        as_db=as_db,
+        tmp_path=tmp_path,
+        expids=["a000"],
+        autosubmit_exp=autosubmit_exp,
+    )
 
     # Ensure heartbeat timestamps are deterministic, ordering stable across diff runs
     timestamps = [
@@ -208,35 +266,7 @@ def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", mocker):
         side_effect=timestamps,
     )
 
-    # SQLite database initialization
-    autosubmit_db_path = db_dir / "test.db"
-    with sqlite3.connect(autosubmit_db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE experiment (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT NOT NULL,
-                autosubmit_version TEXT
-            )
-            """
-        )
-        conn.execute(
-            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (1, 'a000', 'No description', '3.14.0')",
-        )
-        conn.commit()
-
-    database_manager = ExperimentStatusDbManager(
-        expid="a000",
-        db_dir_path=str(db_dir),
-        main_db_name="test.db",
-        local_root_dir_path=str(local_root_dir),
-    )
-
-    experiment = ExperimentRow(
-        id=1, name="a000", description="No description", autosubmit_version="3.14.0"
-    )
+    experiment = experiments[0]
     # Act
     database_manager.create_experiment_status_as_running(experiment)
     before = database_manager.get_experiment_status_row_by_exp_id(1)
@@ -260,43 +290,20 @@ def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", mocker):
     ],
     ids=["same_experiment", "different_experiments"],
 )
-def test_concurrent_heartbeat_updates(tmp_path: "LocalPath", mocker, exp_count, update_expids):
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_concurrent_heartbeat_updates(tmp_path: "LocalPath", as_db: str, autosubmit_exp, mocker, exp_count, update_expids):
     """Test that concurrent heartbeat updates do not cause race conditions."""
-    db_dir = tmp_path / "db"
-    db_dir.mkdir()
-    local_root_dir = tmp_path / "local"
-    local_root_dir.mkdir()
-
-    # Initialize SQLite database
-    autosubmit_db_path = db_dir / "test.db"
-    with sqlite3.connect(autosubmit_db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE experiment (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT NOT NULL,
-                autosubmit_version TEXT
-            )
-            """)
-        cursor.executemany(
-            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (?, ?, ?, ?)",
-            [(i + 1, f"a00{i}", "No description", "3.14.0") for i in range(exp_count)],
-        )
-        conn.commit()
-
-    database_manager = ExperimentStatusDbManager(
-        expid="a000",
-        db_dir_path=str(db_dir),
-        main_db_name="test.db",
-        local_root_dir_path=str(local_root_dir),
+    unique_expids = list(dict.fromkeys(update_expids))
+    database_manager, experiments = _create_experiment_status_db_manager_and_rows(
+        as_db=as_db,
+        tmp_path=tmp_path,
+        expids=unique_expids,
+        autosubmit_exp=autosubmit_exp,
     )
 
     # Create status rows for experiments
-    for i in range(exp_count):
-        experiment = ExperimentRow(
-            id=i + 1, name=f"a00{i}", description="No description", autosubmit_version="3.14.0"
-        )
+    for experiment in experiments:
         database_manager.create_experiment_status_as_running(experiment)
 
     # Mock update_heartbeat to synchronize concurrent calls
@@ -327,13 +334,18 @@ def test_concurrent_heartbeat_updates(tmp_path: "LocalPath", mocker, exp_count, 
         assert exp_status.last_heartbeat is not None
 
 
-def test_update_exp_status_updates_last_heartbeat_only_when_running(tmp_path: "LocalPath", mocker):
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_update_exp_status_updates_last_heartbeat_only_when_running(
+    tmp_path: "LocalPath", as_db: str, autosubmit_exp, mocker
+):
     """Test that RUNNING status creation and updates store a last_heartbeat value."""
-
-    db_dir = tmp_path / "db"
-    db_dir.mkdir()
-    local_root_dir = tmp_path / "local"
-    local_root_dir.mkdir()
+    database_manager, experiments = _create_experiment_status_db_manager_and_rows(
+        as_db=as_db,
+        tmp_path=tmp_path,
+        expids=["a000"],
+        autosubmit_exp=autosubmit_exp,
+    )
 
     # Make it deterministic, ensure ordering is stable across diff runs
     timestamps = [
@@ -347,35 +359,7 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(tmp_path: "L
         side_effect=timestamps,
     )
 
-    # SQLite database initialization
-    autosubmit_db_path = db_dir / "test.db"
-    with sqlite3.connect(autosubmit_db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE experiment (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT NOT NULL,
-                autosubmit_version TEXT
-            )
-            """
-        )
-        cursor.execute(
-            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (1, 'a000', 'No description', '3.14.0')",
-        )
-        conn.commit()
-
-    database_manager = ExperimentStatusDbManager(
-        expid="a000",
-        db_dir_path=str(db_dir),
-        main_db_name="test.db",
-        local_root_dir_path=str(local_root_dir),
-    )
-
-    experiment = ExperimentRow(
-        id=1, name="a000", description="No description", autosubmit_version="3.14.0"
-    )
+    experiment = experiments[0]
     database_manager.create_experiment_status_as_running(experiment)
 
     # Get initial status (RUNNING with last_heartbeat set)
@@ -401,13 +385,19 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(tmp_path: "L
     assert after_running.last_heartbeat == timestamps[3]
 
 
-def test_set_exp_status_creates_running_with_heartbeat(tmp_path: "LocalPath", mocker):
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_set_exp_status_creates_running_with_heartbeat(
+    tmp_path: "LocalPath", as_db: str, autosubmit_exp, mocker
+):
     """Test that set_exp_status creates a new RUNNING status with heartbeat when status doesn't exist."""
-    db_dir = tmp_path / "db"
-    db_dir.mkdir()
-    local_root_dir = tmp_path / "local"
-    local_root_dir.mkdir()
-    
+    database_manager, _ = _create_experiment_status_db_manager_and_rows(
+        as_db=as_db,
+        tmp_path=tmp_path,
+        expids=["a000"],
+        autosubmit_exp=autosubmit_exp,
+    )
+
     # Make it deterministic, ensure ordering is stable across diff runs
     timestamps = [
         "2026-05-08T10:00:00+00:00",  # create_exp_status (modified)
@@ -416,32 +406,6 @@ def test_set_exp_status_creates_running_with_heartbeat(tmp_path: "LocalPath", mo
     mocker.patch(
         "autosubmit.history.database_managers.experiment_status_db_manager.HUtils.get_current_datetime",
         side_effect=timestamps,
-    )
-
-    # SQLite database initialization
-    autosubmit_db_path = db_dir / "test.db"
-    with sqlite3.connect(autosubmit_db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE experiment (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT NOT NULL,
-                autosubmit_version TEXT
-            )
-            """
-        )
-        cursor.execute(
-            "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (1, 'a000', 'No description', '3.14.0')",
-        )
-        conn.commit()
-
-    database_manager = ExperimentStatusDbManager(
-        expid="a000",
-        db_dir_path=str(db_dir),
-        main_db_name="test.db",
-        local_root_dir_path=str(local_root_dir),
     )
 
     # Verify no status row exists
