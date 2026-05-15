@@ -401,4 +401,42 @@ def test_run_report_command(
             assert not duplicated, \
                 f"Global namespace {ns!r} duplicated under JOBS.{section}.* " \
                 f"(issue #1043): {duplicated[:3]}"
-            
+
+ 
+@pytest.mark.parametrize(
+    'template_content,expected_output',
+    [
+        ('%%EXPERIMENT.CHUNKSIZEUNIT%%', '%EXPERIMENT.CHUNKSIZEUNIT%'),
+        ('%^EXPERIMENT.CHUNKSIZE%', '-'),
+        ('% EXPERIMENT.CHUNKSIZE %', '% EXPERIMENT.CHUNKSIZE %'),
+        ('%HPCRACH%', '-'),
+        ('50%% off', '50%% off'),
+    ],
+    ids=[
+        'escape_renders_literal',
+        'invalid_char_in_key_is_unknown',
+        'whitespace_breaks_placeholder',
+        'unknown_key_renders_dash',
+        'stray_double_percent_left_alone',
+    ],
+)
+def test_run_report_template_edge_cases(
+        template_content: str,
+        expected_output: str,
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        mocker: 'MockerFixture',
+        tmp_path: Path,
+        get_next_expid: Callable[[], str]):
+    """Validate template-substitution edge cases for `autosubmit report -t`.
+    """
+    expid = get_next_expid()
+    template_path = tmp_path / "template.txt"
+    template_path.write_text(template_content)
+
+    command = ['autosubmit', 'report', expid, '-t', str(template_path)]
+    exp, args, command = set_up_test(expid, command, autosubmit_exp, mocker)
+    assert exp.autosubmit.run_command(args=args)
+
+    report = next(Path(exp.tmp_dir).glob(f"{expid}_report_*"))
+    rendered = report.read_text().rstrip('\n')
+    assert rendered == expected_output
