@@ -1135,16 +1135,26 @@ def test_rerun_expid(
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
+    # # Check results
+    # run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+    # total_db_entries = expected_db_entries
+    # db_check_list = _check_db_fields(
+    #     run_tmpdir, total_db_entries, final_status, as_exp.expid, wrapper_type
+    # )
+    # files_check_list = _check_files_recovered(
+    #     as_conf, log_dir, expected_files=total_db_entries
+    # )
+    # assert_run_results(db_check_list, files_check_list, run_tmpdir, as_exp.expid)
+
     # Reset workflow with create
     as_exp.autosubmit.create(
-        expid=as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=False
+        expid=as_exp.expid, noplot=True, hide=False, force=False, check_wrappers=False
     )
 
     # Rerun
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
-    # Check results only after rerun
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
     total_db_entries = expected_db_entries * 2
     db_check_list = _check_db_fields(

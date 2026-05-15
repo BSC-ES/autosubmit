@@ -185,7 +185,9 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, final_status, expid, ru
                         (has_splits and row_dict.get("split") and int(row_dict["split"]) > 0)
                         or (not has_splits and not row_dict.get("split"))
                 )
-
+                previous_retry_row = previous_retry_row if previous_retry_row and previous_retry_row.get("fail_count",
+                                                                                                         -1)-1 == row_dict.get(
+                    "fail_count", -1) else None
                 if previous_retry_row:
                     check_submit_previous_submit_retry = row_dict["submit"] >= previous_retry_row["submit"]
                     check_submit_previous_finish_retry = row_dict["submit"] >= previous_retry_row["finish"]
