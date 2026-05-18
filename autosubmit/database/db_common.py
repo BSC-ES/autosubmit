@@ -607,8 +607,6 @@ def _delete_experiment(experiment_id):
     :return: True if operation is successful
     :rtype: bool
     """
-    check_db() # check_db called two times
-
     if not _check_experiment_exists(experiment_id, False):  # Reference the no anti-lock version.
         return True
     from autosubmit.history.experiment_status import ExperimentStatus
