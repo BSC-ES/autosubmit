@@ -562,8 +562,6 @@ def _delete_experiment(experiment_id):
     :return: True if operation is successful
     :rtype: bool
     """
-    check_db() # check_db called two times
-
     if not _check_experiment_exists(experiment_id, False):  # Reference the no anti-lock version.
         return True
     from autosubmit.history.experiment_status import ExperimentStatus
@@ -825,33 +823,7 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
     
     Log.debug(f"The experiment {experiment_id} has been marked as deleted.")
     return True
-    """
-    with _get_sqlalchemy_conn() as conn:
-        # Drop schema
-        conn.execute(text(f'DROP SCHEMA IF EXISTS "{experiment_id}" CASCADE'))
-        conn.commit()
 
-        # Keep the experiment trace in experiment_status for deleted experiments
-        try:
-            query = update(tables.ExperimentStatusTable).where(
-                tables.ExperimentStatusTable.c.name == experiment_id  # type: ignore
-            ).values(
-                status="DELETED",
-                seconds_diff=0,
-                modified=func.current_timestamp()
-            )
-            result = conn.execute(query)
-            conn.commit()
-            if result.rowcount > 0:
-                Log.debug(f"The experiment {experiment_id} has been marked as deleted.")
-            else:
-                Log.debug(f"The experiment {experiment_id} was not found in experiment_status table to be marked as deleted.")
-        except Exception as e:
-            Log.warning(f"Failed to mark experiment {experiment_id} as deleted: {str(e)}")
-
-        return True
-    
-    """
 
 def _get_experiment_id_sqlalchemy(name: str) -> int:
     query = select(tables.ExperimentTable.c.id).where(
