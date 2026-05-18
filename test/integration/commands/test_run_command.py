@@ -343,3 +343,62 @@ def test_run_command_logs_warning(
 
     with pytest.warns(UserWarning, match=warning_log_message):
         exp.autosubmit.run_command(args=args)
+
+
+@pytest.mark.parametrize(
+    'command,expected',
+    [(
+        ['autosubmit', 'report', '{expid}', '-all'],
+        {
+            'required_top_level': ('HPCARCH',),
+            'required_section_keys': ('FILE', 'RUNNING'),
+        },
+    )],
+    ids=['report -all'],
+)
+def test_run_report_command(
+        command: list[str],
+        expected: dict,
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        mocker: 'MockerFixture',
+        get_next_expid: Callable[[], str]):
+    """Validate `autosubmit report -all` output (issue #1043).
+
+    Checks that the parameter list contains the expected content and is free
+    of the two redundancy patterns the issue describes: global keys duplicated
+    under every JOBS.<section>.* prefix, and sibling jobs re-nested under each
+    section (JOBS.<X>.JOBS.<Y>.*).
+
+    """
+    exp, args, command = set_up_test(get_next_expid(), command, autosubmit_exp, mocker)
+    assert exp.autosubmit.run_command(args=args)
+
+    report = next(Path(exp.tmp_dir).glob(f"{exp.expid}_parameter_list_*.txt"))
+    keys = {line.split('=', 1)[0] for line in report.read_text().splitlines() if '=' in line}
+
+    for k in expected['required_top_level']:
+        assert k in keys, f"Top-level key {k!r} missing from report"
+
+    sections = {k.split('.')[1] for k in keys if k.startswith('JOBS.')}
+    assert sections, "Report contains no JOBS.<section>.* entries"
+
+    for section in sections:
+        for suffix in expected['required_section_keys']:
+            assert f'JOBS.{section}.{suffix}' in keys, \
+                f"Static key JOBS.{section}.{suffix} missing from report"
+
+    sibling_nested = [k for k in keys if k.startswith('JOBS.') and '.JOBS.' in k]
+    assert not sibling_nested, \
+        f"Sibling jobs re-nested under sections (issue #1043): {sibling_nested[:3]}"
+
+    top_level_namespaces = {
+        k.split('.', 1)[0] for k in keys
+        if '.' in k and not k.startswith('JOBS.')
+    }
+    for section in sections:
+        for ns in top_level_namespaces:
+            duplicated = [k for k in keys if k.startswith(f'JOBS.{section}.{ns}.')]
+            assert not duplicated, \
+                f"Global namespace {ns!r} duplicated under JOBS.{section}.* " \
+                f"(issue #1043): {duplicated[:3]}"
+            
