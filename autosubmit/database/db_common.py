@@ -22,14 +22,14 @@ import os
 import sqlite3
 from contextlib import suppress
 from pathlib import Path
-from typing import cast, Any, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
-from sqlalchemy import delete, select, Connection, insert, text, update, func
+from sqlalchemy import Connection, delete, func, insert, select, text, update
 from sqlalchemy.schema import CreateTable
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database import tables, session
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.database import session, tables
+from autosubmit.log.log import AutosubmitCritical, Log
 
 if TYPE_CHECKING:
     from sqlalchemy.sql.elements import ColumnElement
@@ -170,7 +170,7 @@ def save_experiment(name: str, description: Optional[str], version: Optional[str
     return result
 
 
-def get_experiment_expids(expids: Optional[List[str]] = None) -> set[str]:
+def get_experiment_expids(expids: Optional[list[str]] = None) -> set[str]:
     """
     Get the expids of all experiments in the database, or only the requested ones.
 
@@ -411,7 +411,7 @@ def _save_experiment(name, description, version):
     return True
 
 
-def _get_experiment_expids_sqlalchemy(expids: Optional[List[str]] = None) -> set[str]:
+def _get_experiment_expids_sqlalchemy(expids: Optional[list[str]] = None) -> set[str]:
     with _get_sqlalchemy_conn() as conn:
         query = select(tables.ExperimentTable.c.name)
         if expids is not None:

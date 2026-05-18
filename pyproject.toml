@@ -143,6 +143,7 @@ explicit_package_bases = false
 [[tool.mypy.overrides]]
 module = [
     "bscearth.*",
+    "configobj.*",
     "integration.*",
     "rocrate.*",
     "rocrate_validator.*",
