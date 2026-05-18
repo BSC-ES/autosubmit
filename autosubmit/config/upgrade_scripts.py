@@ -82,8 +82,7 @@ def _config_obj_to_nested_dict(config_obj: ConfigObj) -> dict[str, Any]:
 
         if isinstance(value, dict):
             # Merge dicts recursively
-            current.setdefault(last_key, {})
-            _update_dict(current[last_key], value)
+            current[last_key] = _config_obj_to_nested_dict(ConfigObj(value))
         else:
             # Only set scalar if it doesn't exist yet
             current.setdefault(last_key, value)
@@ -106,8 +105,8 @@ def ini_to_yaml(ini_file: Path) -> Path:
     and the new YAML file.
 
     If the file name contains "jobs" or "platform" in ANY part of its name,
-    then the generated YAML data will become {"JOBS": yaml_data} or
-    {"PLATFORMS": yaml_data}.
+    then the generated YAML data will become ``{"JOBS": yaml_data}`` or
+    ``{"PLATFORMS": yaml_data}``.
 
     :param ini_file: Path to the INI file to convert.
     :return: The YAML file.
@@ -175,8 +174,7 @@ def _update_dict(original_dict: dict[str, Any], updated_dict: dict[str, Any]) ->
 
 def upgrade_scripts(expid: str, files: Optional[list[str]] = None) -> bool:
     """Upgrade scripts from Autosubmit 3 to 4."""
-    if not files:
-        files = ('*.conf', '*.CONF')
+    list_of_files: tuple[str, ...] = tuple(files) if files else ("*.conf", "*.CONF")
 
     Log.info("Checking if experiment exists...")
     check_ownership(expid, raise_error=True)
@@ -186,7 +184,7 @@ def upgrade_scripts(expid: str, files: Optional[list[str]] = None) -> bool:
     as_conf.load_parameters()
 
     exp_conf_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf"
-    ini_files = {f for pattern in files for f in exp_conf_dir.rglob(pattern)}
+    ini_files = {f for pattern in list_of_files for f in exp_conf_dir.rglob(pattern)}
 
     # TODO: Use tqdm to show the user the progress?
     Log.info(f"Converting {len(ini_files)} INI files (.conf) into YAML files (.yml)")
@@ -220,6 +218,11 @@ def upgrade_scripts(expid: str, files: Optional[list[str]] = None) -> bool:
                 substituted.append(f"Variables changed for: {template_path.name}\n{s}\n")
         except Exception as e:
             Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
+
+    # We now must have new YAML files. Let's reload them.
+    as_conf.reload(force_load=True)
+    as_conf.check_conf_files()
+    as_conf.load_parameters()
 
     # Update files in proj/ folder.
     exp_project_dir = Path(as_conf.get_project_dir())
@@ -278,7 +281,7 @@ def _update_old_script(
         # Look for %_%
         variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content, flags=re.IGNORECASE)
         variables = [variable[1:-1].upper() for variable in variables]
-        results = {}
+        results: dict[str, set] = {}
         # Change format
         for old_format_key in variables:
             for key in as_conf.load_parameters().keys():

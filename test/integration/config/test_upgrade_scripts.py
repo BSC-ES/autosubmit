@@ -19,7 +19,7 @@
 
 from pathlib import Path
 from textwrap import dedent
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from configobj import ConfigObj
 from ruamel.yaml import YAML
@@ -102,8 +102,8 @@ def test_ini_to_yaml(tmp_path: 'LocalPath'):
     assert yaml_dict['marenostrum4']['TYPE'] == 'slurm'
 
 
-def test_ini_to_yaml_backup_exists(tmp_path: 'LocalPath'):
-    backup_file = tmp_path / 'backup.ini_AS_v3_backup'
+def test_ini_to_yaml_backup_exists(tmp_path: 'LocalPath', mocker):
+    backup_file = tmp_path / 'backup.ini_as_v3_backup'
     backup_file.touch()
     backup_file.write_text('autosubmit')
     backup_file_size = backup_file.stat().st_size
@@ -115,8 +115,12 @@ def test_ini_to_yaml_backup_exists(tmp_path: 'LocalPath'):
     TYPE = slurm
     '''))
 
+    mocked_log = mocker.patch('autosubmit.config.upgrade_scripts.Log')
     _ = ini_to_yaml(ini_file)
     assert backup_file_size == backup_file.stat().st_size, 'ini_to_yaml replaced the existing backup file'
+
+    assert mocked_log.info.called
+    assert 'Backup created at' in mocked_log.info.call_args[0][0]
 
 
 def test_ini_to_yaml_lists(tmp_path: 'LocalPath'):
@@ -149,7 +153,6 @@ def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath'):
 
     as3_jobs_file = exp_dir / f'conf/jobs_{as_exp.expid}.conf'
     as3_jobs_file.parent.mkdir(exist_ok=True)
-    as3_jobs_file.touch()
     as3_jobs_file.write_text(dedent('''\
     [LOCAL_SETUP]
     FILE = templates/local_setup.sh
@@ -159,7 +162,6 @@ def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath'):
     '''))
 
     as3_platforms_file = exp_dir / 'conf/platforms.conf'
-    as3_platforms_file.touch()
     as3_platforms_file.write_text(dedent('''\
     [marenostrum4-test]
     TYPE = slurm
@@ -176,7 +178,6 @@ def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath'):
 
     as3_script_template = temp_project / 'templates/local_setup.sh'
     as3_script_template.parent.mkdir(exist_ok=True, parents=True)
-    as3_script_template.touch()
     as3_script_template.write_text(dedent('''\
     #!/bin/bash
     
@@ -222,14 +223,22 @@ def test_mix_of_single_and_multi_level_keys():
 
 def test_nested_dictionaries():
     """Test if the function processes nested dictionaries as values."""
-    config_obj = ConfigObj({
+    config_obj: ConfigObj = ConfigObj({
         "top.level": {
-            "nested": "value1",
-            "another": "value2"
+            "nested.deeply": "value1",
+            "another": "value2",
         }
     })
-    result = _config_obj_to_nested_dict(config_obj)
-    expected = {"top": {"level": {"nested": "value1", "another": "value2"}}}
+    result: dict[str, Any] = _config_obj_to_nested_dict(config_obj)
+
+    expected: dict[str, Any] = {
+        "top": {
+            "level": {
+                "nested": {"deeply": "value1"},
+                "another": "value2",
+            }
+        }
+    }
     assert expected == result
 
 
