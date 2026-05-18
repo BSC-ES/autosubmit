@@ -84,3 +84,25 @@ def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypat
         assert path.exists()
         assert experiment is not None
         assert isinstance(expid, str) and len(expid) == 4
+
+
+@pytest.mark.parametrize(
+    'description',
+    [None]  # TODO: "" is OK?
+)
+def test_expid_missing_description(description):
+    with pytest.raises(AutosubmitCritical) as cm:
+        Autosubmit.expid(description, '', '', False, False)
+
+    assert 'experiment description' in str(cm.value)
+
+
+@pytest.mark.parametrize(
+    'hpc',
+    [None]  # TODO: "" is OK?
+)
+def test_expid_missing_hpc(hpc):
+    with pytest.raises(AutosubmitCritical) as cm:
+        Autosubmit.expid('test', hpc, '', False, False)
+
+    assert 'provide an HPC' in str(cm.value)

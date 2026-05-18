@@ -1,7 +1,5 @@
-import mock
 import pytest
 from datetime import datetime
-from mock.mock import MagicMock
 from networkx import DiGraph
 
 from autosubmit.autosubmit import Autosubmit
@@ -123,9 +121,9 @@ def test_job(mocker) -> Job:
 
 
 @pytest.fixture
-def joblist(tmp_path):
+def joblist(tmp_path, mocker):
     experiment_id = 'random-id'
-    as_conf = mock.Mock()
+    as_conf = mocker.Mock()
     as_conf.experiment_data = dict()
     as_conf.experiment_data["JOBS"] = dict()
     as_conf.jobs_data = as_conf.experiment_data["JOBS"]
@@ -640,7 +638,7 @@ def test_add_special_conditions_chunks_to_once(mocker, joblist):
     job_list = mocker.Mock(wraps=joblist)
     job_list._job_list = [job, job_two, parent]
 
-    dependency = MagicMock()
+    dependency = mocker.MagicMock()
     dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1'}, '2': {'FROM_STEP': '2'}, },
                                 'STATUS': 'RUNNING'}
     filters_to_apply = job_list.get_filters_to_apply(job, dependency)
@@ -652,7 +650,7 @@ def test_add_special_conditions_chunks_to_once(mocker, joblist):
     job_list.add_special_conditions(job, special_conditions, filters_to_apply, parent)
     job_list.add_special_conditions(job_two, special_conditions_two, filters_to_apply_two, parent)
 
-    dependency = MagicMock()
+    dependency = mocker.MagicMock()
     dependency.relationships = {'CHUNKS_FROM': {'1': {'FROM_STEP': '1', 'CHUNKS_TO': 'natural'},
                                                 '2': {'FROM_STEP': '2', 'CHUNKS_TO': 'natural'}, },
                                 'STATUS': 'RUNNING'}
@@ -676,7 +674,7 @@ def test_add_special_conditions_chunks_to_once(mocker, joblist):
     assert (value_two[0].name, value_two[1]) == (parent.name, "2")
     assert len(job_two.edge_info.get("RUNNING", "")) == 1
 
-    dependency = MagicMock()
+    dependency = mocker.MagicMock()
     dependency.relationships = {
         'CHUNKS_FROM': {'1': {'FROM_STEP': '1', 'CHUNKS_TO': 'natural', 'DATES_TO': "dummy"},
                         '2': {'FROM_STEP': '2', 'CHUNKS_TO': 'natural', 'DATES_TO': "dummy"}, },

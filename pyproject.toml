@@ -77,7 +77,7 @@ readme = {file = "README_PIP.md"}
 [project.optional-dependencies]
 postgres = ["psycopg2"]
 tests = [
-    # TODO: remove mock by pytest-mock
+    # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
     "mock",
     "pytest>=8.2,<9.1",
     "pytest-cov",
@@ -87,9 +87,17 @@ tests = [
     "testcontainers",
     "pytest-timeout",
     "roc-validator",
-    "types-requests",
     "typing_extensions==4.*",
     "pytest-timestamper"
+]
+mypy = [
+    "mypy",
+    "types-docker",
+    "types-psutil",
+    "types-mock",
+    "types-networkx",
+    "types-paramiko",
+    "types-requests"
 ]
 docs = [
     "livereload",
@@ -103,6 +111,7 @@ docs = [
 ]
 all = [
     "autosubmit[tests]",
+    "autosubmit[mypy]",
     "autosubmit[docs]",
     "autosubmit[postgres]"
 ]
@@ -126,12 +135,23 @@ package-data = { "autosubmit" = [
 ] }
 include-package-data = true
 
+[tool.mypy]
+mypy_path = ["."]
+namespace_packages = true
+explicit_package_bases = false
+
 [[tool.mypy.overrides]]
 module = [
+    "bscearth.*",
+    "integration.*",
     "rocrate.*",
-    "rocrate_validator.*"
+    "rocrate_validator.*",
+    "unit.*",
+    "test.integration.*",
+    "test.unit.*"
 ]
 ignore_missing_imports = true
+follow_untyped_imports = true
 
 [tool.vulture]
 exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]

@@ -368,7 +368,9 @@ def create_rocrate_archive(
     crate.description = get_experiment_description(expid)[0][0]
     for profile in PROFILES:
         crate.add(ContextEntity(crate, properties=profile))
-    crate.conformsTo = conforming_profiles
+    # conformsTo does not exist in every version of RO-Crate py.
+    if hasattr(crate, 'conformsTo'):  # pragma: no cover
+        crate.conformsTo = conforming_profiles  # pragma: no cover
     crate.root_dataset['conformsTo'] = conforming_profiles
 
     Log.info('Creating RO-Crate archive...')

@@ -363,7 +363,7 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
 ])
 def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
     with context_mgr:
-        autosubmit_exp('t000', experiment_data, create=False, include_jobs=False)
+        autosubmit_exp(experiment_data=experiment_data, create=False, include_jobs=False)
 
 
 @pytest.mark.parametrize(

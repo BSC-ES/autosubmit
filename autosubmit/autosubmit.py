@@ -3345,15 +3345,15 @@ class Autosubmit:
                                      7040, str(e))
 
     @staticmethod
-    def describe(input_experiment_list="*", get_from_user=""):
+    def describe(
+            input_experiment_list="*",
+            get_from_user=""
+    ) -> Union[bool, tuple[str, Union[str, datetime.datetime], str, str, str]]:
         """Show details for specified experiment
 
         :param input_experiment_list: experiments identifier:
-        :type input_experiment_list: str
         :param get_from_user: user to get the experiments from
-        :type get_from_user: str
         :return: tuple with user, created time, model, branch, and HPC
-        :rtype: bool | (str, str, str, str, str)
         """
         experiments_ids = input_experiment_list
         not_described_experiments = []
@@ -3384,12 +3384,11 @@ class Autosubmit:
 
                 as_conf = AutosubmitConfig(experiment_id, BasicConfig, YAMLParserFactory())
                 as_conf.check_conf_files(False, no_log=True)
-                user = int(Path(as_conf.conf_folder_yaml).stat().st_uid)
+                user_id = int(Path(as_conf.conf_folder_yaml).stat().st_uid)
                 try:
-                    user = pwd.getpwuid(user).pw_name
-                except Exception:
-                    Log.warning(
-                        "The user does not exist anymore in the system, using id instead")
+                    user = pwd.getpwuid(user_id).pw_name
+                except Exception as e:
+                    Log.warning(f"The user does not exist anymore in the system, using id instead: {str(e)}")
                     continue
 
                 created = datetime.datetime.fromtimestamp(Path(as_conf.conf_folder_yaml).stat().st_mtime)
@@ -3418,16 +3417,17 @@ class Autosubmit:
                 Log.result("Branch: {0}", branch)
                 Log.result("HPC: {0}", hpc)
                 Log.result("Description: {0}", description[0][0])
-            except Exception:
+            except Exception as e:
+                Log.warning(f'Failed to describe experiment {experiment_id}: {str(e)}')
                 not_described_experiments.append(experiment_id)
         if len(not_described_experiments) > 0:
-            Log.printlog(f"Could not describe the following experiments:\n"
-                         f"{not_described_experiments}", Log.WARNING)
+            Log.printlog(f"Could not describe the following experiments:\n{not_described_experiments}", Log.WARNING)
         if len(experiments_ids) == 1:
             # for backward compatibility or GUI
             return user, created, model, branch, hpc
         elif len(experiments_ids) == 0:
             Log.result(f"No experiments found for expid={input_experiment_list} and user {get_from_user}")
+        return False
 
     @staticmethod
     def configure(

@@ -26,7 +26,7 @@ from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import time_ns
-from typing import Any, Callable, Generator, Iterator, Optional, Protocol, TYPE_CHECKING
+from typing import cast, Any, Callable, Generator, Iterator, Optional, Protocol, TYPE_CHECKING
 
 import pytest
 from ruamel.yaml import YAML
@@ -89,8 +89,6 @@ class AutosubmitExperimentFixture(Protocol):
             wrapper: Optional[bool] = False,
             create: Optional[bool] = True,
             include_jobs: Optional[bool] = False,
-            reload: Optional[bool] = True,
-            mock_last_name_used: Optional[bool] = True,
             *args: Any,
             **kwargs: Any
     ) -> AutosubmitExperiment:
@@ -156,8 +154,6 @@ def autosubmit_exp(
             wrapper: Optional[bool] = False,
             create: Optional[bool] = True,
             include_jobs: Optional[bool] = False,
-            reload: Optional[bool] = True,
-            mock_last_name_used: Optional[bool] = True,
             *_,
             **kwargs
     ) -> AutosubmitExperiment:
@@ -198,19 +194,24 @@ def autosubmit_exp(
         if Path(tmp_path / expid).exists():
             pytest.xfail(f'The test is trying to use {expid} as expid but its directory exists: {str(tmp_path)}!')
 
+        # setdefault will set the default if the user did not specify it.
+        # This way, we can control via kwargs the arguments to expid. In the past, this fixture
+        # used kwargs to add more things to ``as_conf``, but over the time we stopped using it.
+        kwargs.setdefault("description", "Pytest experiment (delete me)")
+        kwargs.setdefault("hpc", "local")
+        kwargs.setdefault("copy_id", "")
+        kwargs.setdefault("dummy", True)
+        kwargs.setdefault("minimal_configuration", False)
+        kwargs.setdefault("git_repo", "")
+        kwargs.setdefault("git_branch", "")
+        kwargs.setdefault("git_as_conf", "")
+        kwargs.setdefault("operational", operational)
+        kwargs.setdefault("testcase", testcase)
+        kwargs.setdefault("evaluation", evaluation)
+        kwargs.setdefault("use_local_minimal", False)
+
         expid = autosubmit.expid(
-            description="Pytest experiment (delete me)",
-            hpc="local",
-            copy_id="",
-            dummy=True,
-            minimal_configuration=False,
-            git_repo="",
-            git_branch="",
-            git_as_conf="",
-            operational=operational,
-            testcase=testcase,
-            evaluation=evaluation,
-            use_local_minimal=False
+            **kwargs
         )
         exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
 
@@ -243,7 +244,7 @@ def autosubmit_exp(
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
 
-        if not config.experiment_data.get('CONFIG').get('AUTOSUBMIT_VERSION', ''):
+        if not config.experiment_data.get('CONFIG', {}).get('AUTOSUBMIT_VERSION', ''):
             try:
                 config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
             except PackageNotFoundError:
@@ -267,9 +268,6 @@ def autosubmit_exp(
                 YAML().dump(other_yaml, fh)
 
         config.reload(force_load=True)
-
-        for arg, value in kwargs.items():
-            setattr(config, arg, value)
 
         platform_config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
@@ -489,7 +487,7 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         # Replace the backend with postgres (default is sqlite)
         user = postgres_server.env['POSTGRES_USER']
         password = postgres_server.env['POSTGRES_PASSWORD']
-        port = postgres_server.ports[5432]
+        port: int = cast(int, postgres_server.ports[5432])
         db = request.node.name
         if '[' in db:
             db = db.split('[')[0]
@@ -565,9 +563,9 @@ def copy_content_from_containers(request, log_name, path_to_docker=""):
     if has_failures and log_name in func_args and func_args[log_name]:
         container_in_use: 'Container'
         if log_name == 'git_server':
-            container_in_use: 'Container' = func_args[log_name][0].get_wrapped_container()
+            container_in_use = func_args[log_name][0].get_wrapped_container()
         else:
-            container_in_use: 'Container' = func_args[log_name]
+            container_in_use = func_args[log_name]
 
         if "No such file" not in str(container_in_use.exec_run(f"ls {path_to_docker}").output):
             stream = (container_in_use.get_archive(path_to_docker))[0]

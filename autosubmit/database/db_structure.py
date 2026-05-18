@@ -71,7 +71,7 @@ def get_structure(expid: str, structures_path: Path) -> Optional[dict[str, list[
 
         current_structure = db_manager.select_all('experiment_structure')
 
-        current_table_structure = {}
+        current_table_structure: dict[str, list] = {}
         for item in current_structure:
             _from, _to = item
             current_table_structure.setdefault(_from, []).append(_to)

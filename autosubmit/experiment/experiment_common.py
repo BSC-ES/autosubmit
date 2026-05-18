@@ -46,7 +46,7 @@ __all__ = [
 Log.get_logger("Autosubmit")
 
 
-def new_experiment(description, version, test=False, operational=False, evaluation=False):
+def new_experiment(description, version, test=False, operational=False, evaluation=False) -> str:
     """
     Stores a new experiment on the database and generates its identifier
 
@@ -269,43 +269,33 @@ def _perform_deletion(experiment_path: Path, structure_db_path: Path, job_data_d
     return "\n".join(error_message)
 
 
-def copy_experiment(experiment_id, description, version, test=False, operational=False, evaluation=False):
+def copy_experiment(experiment_id, description, version, test=False, operational=False, evaluation=False) -> str:
     """
     Creates a new experiment by copying an existing experiment
 
     :param version: experiment's associated autosubmit version
-    :type version: str
     :param experiment_id: identifier of experiment to copy
-    :type experiment_id: str
     :param description: experiment's description
-    :type description: str
     :param test: specifies if it is a test experiment
-    :type test: bool
     :param operational: specifies if it is an operational experiment
-    :type operational: bool
     :param evaluation: specifies if it is an evaluation experiment
-    :type evaluation: bool
-    :return: experiment id for the new experiment
-    :rtype: str
+    :return: new experiment identifier
     """
     try:
         if not db_common.check_experiment_exists(experiment_id):
             return ''
-        new_name = new_experiment(description, version, test, operational, evaluation)
-        return new_name
+        return new_experiment(description, version, test, operational, evaluation)
     except Exception as e:
         raise AutosubmitCritical(f"Error while copying the experiment {experiment_id} "
                                  f"as a new experiment in the db: {e}", 7011) from e
 
 
-def next_experiment_id(current_id):
+def next_experiment_id(current_id: str) -> str:
     """
     Get next experiment identifier
 
     :param current_id: previous experiment identifier
-    :type current_id: str
     :return: new experiment identifier
-    :rtype: str
     """
     if not is_valid_experiment_id(current_id):
         return ''
