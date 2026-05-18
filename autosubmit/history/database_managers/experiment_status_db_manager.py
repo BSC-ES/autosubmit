@@ -19,7 +19,7 @@ import textwrap
 from pathlib import Path
 from typing import Protocol, cast
 
-from sqlalchemy import inspect, select, text, update
+from sqlalchemy import delete, func, inspect, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable
@@ -229,18 +229,28 @@ class SqlAlchemyExperimentStatusDbManager:
         self._add_column_if_missing("last_heartbeat", "TEXT")
 
         # keep only latest row by name
-        with self.engine.connect() as conn:
-            conn.execute(
-                text(
-                    "DELETE FROM experiment_status es "
-                    "USING ("
-                    "  SELECT exp_id, "
-                    "         ROW_NUMBER() OVER (PARTITION BY name ORDER BY modified DESC, exp_id DESC) AS rn "
-                    "  FROM experiment_status"
-                    ") ranked "
-                    "WHERE es.exp_id = ranked.exp_id AND ranked.rn > 1"
-                )
+        ranked = (
+            select(
+                ExperimentStatusTable.c.exp_id,
+                func.row_number().over(
+                    partition_by=ExperimentStatusTable.c.name,
+                    order_by=(
+                        ExperimentStatusTable.c.modified.desc(),
+                        ExperimentStatusTable.c.exp_id.desc(),
+                    ),
+                ).label("rn"),
             )
+            .subquery()
+        )
+
+        dedup_query = delete(ExperimentStatusTable).where(
+            ExperimentStatusTable.c.exp_id.in_(
+                select(ranked.c.exp_id).where(ranked.c.rn > 1)
+            )
+        )
+
+        with self.engine.connect() as conn:
+            conn.execute(dedup_query)
             conn.commit()
 
         # enforce name as a unique index
