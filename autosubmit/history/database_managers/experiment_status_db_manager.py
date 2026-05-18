@@ -150,20 +150,19 @@ class ExperimentStatusDbManager(DatabaseManager):
 
     def set_exp_status(self, expid: str, status: str) -> None:
         try:
-            exp_status_now = self.get_experiment_status_row_by_expid(expid)
-        except ValueError as e:
-            Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
-            return
-        # if it already exists, update
-        if exp_status_now:
-            self.update_exp_status(expid, status)
-            return
-        # if it does not exist, create
-        try:
             exp_row = self.get_experiment_row_by_expid(expid)
         except ValueError as e:
             Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
             return
+
+        exp_status_now = self.get_experiment_status_row_by_exp_id(exp_row.id)
+
+        # if it already exists, update
+        if exp_status_now:
+            self.update_exp_status(expid, status)
+            return
+
+        # if it does not exist, create
         self.create_exp_status(exp_row.id, expid, status)
         if status == Models.RunningStatus.RUNNING:
             self.update_heartbeat(expid)
@@ -335,20 +334,19 @@ class SqlAlchemyExperimentStatusDbManager:
 
     def set_exp_status(self, expid:str, status:str) -> None:
         try:
-            exp_status_now = self.get_experiment_status_row_by_expid(expid)
-        except ValueError as e:
-            Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
-            return
-        # if it already exists, update
-        if exp_status_now:
-            self.update_exp_status(expid, status)
-            return
-        # if it does not exist, create
-        try:
             exp_row = self.get_experiment_row_by_expid(expid)
         except ValueError as e:
             Log.warning(f"Experiment {expid} not found when trying to set status. Exception: {str(e)}")
             return
+
+        exp_status_now = self.get_experiment_status_row_by_exp_id(exp_row.id)
+
+        # if it already exists, update
+        if exp_status_now:
+            self.update_exp_status(expid, status)
+            return
+
+        # if it does not exist, create
         self.create_exp_status(exp_row.id, expid, status)
         if status == Models.RunningStatus.RUNNING:
             self.update_heartbeat(expid)
