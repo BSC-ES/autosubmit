@@ -37,21 +37,8 @@ def test_create_experiment_status_db_manager_invalid_value():
         create_experiment_status_db_manager(None)  # type: ignore
 
 
-@pytest.mark.parametrize(
-    "mock_path,status_row_return",
-    [
-        (
-            "get_experiment_status_row_by_expid",
-            ValueError("missing experiment status row"),
-        ),
-        ("get_experiment_row_by_expid", ValueError("missing experiment row")),
-    ],
-    ids=["status_row_lookup_fails", "experiment_row_lookup_fails"],
-)
-def test_set_exp_status_logs_warning_on_lookup_failures(
-    tmp_path: "LocalPath", mocker, mock_path, status_row_return
-):
-    """Test that set_exp_status() logs a warning when experiment lookups fail."""
+def test_set_exp_status_logs_warning_on_lookup_failures(tmp_path: "LocalPath", mocker):
+    """Test that set_exp_status() logs a warning when experiment lookup fails."""
     db_dir = tmp_path / "db"
     db_dir.mkdir()
     local_root_dir = tmp_path / "local"
@@ -67,10 +54,11 @@ def test_set_exp_status_logs_warning_on_lookup_failures(
     warning_mock = mocker.patch(
         "autosubmit.history.database_managers.experiment_status_db_manager.Log.warning"
     )
+    # Simulate experiment lookup failure (this is the lookup used by set_exp_status)
     mocker.patch.object(
         database_manager,
-        mock_path,
-        side_effect=status_row_return,
+        "get_experiment_row_by_expid",
+        side_effect=ValueError("missing experiment row"),
     )
     create_status_mock = mocker.patch.object(database_manager, "create_exp_status")
 
