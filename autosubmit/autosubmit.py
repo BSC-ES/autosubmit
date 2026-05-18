@@ -573,13 +573,12 @@ class Autosubmit:
                 "-db",
                 "--databasepath",
                 default=None,
-                help="path to SQLite database. If not supplied, "
-                     "it will prompt for it. Required for SQLite backend.",
+                help="path to SQLite database. Defaults to $HOME/autosubmit if not supplied. "
+                     "Required for SQLite backend.",
             )
             subparser.add_argument(
                 '-dbf', '--databasefilename', default=None, help='database filename')
-            subparser.add_argument('-lr', '--localrootpath', default=None, help='path to store experiments. If not '
-                                                                                'supplied, it will prompt for it')
+            subparser.add_argument('-lr', '--localrootpath', default=None, help='path to store experiments. Defaults to $HOME/autosubmit if not supplied')
             subparser.add_argument('-pc', '--platformsconfpath', default=None, help='path to platforms.yml file to '
                                                                                     'use by default. Optional')
             subparser.add_argument('-jc', '--jobsconfpath', default=None, help='path to jobs.yml file to use by '
