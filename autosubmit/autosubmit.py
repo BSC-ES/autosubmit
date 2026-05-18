@@ -81,6 +81,7 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values, apply_job_filters
+from autosubmit.notifications.cpmip_notifier import CPMIPNotifier
 
 
 if TYPE_CHECKING:
@@ -2155,7 +2156,17 @@ class Autosubmit:
             if new_run:
                 job.platform.spawn_log_retrieval_process(as_conf)
 
-            job_list.update_log_status(job, as_conf, new_run)
+            # Capture CPMIP metric inputs before update_log_status clears the
+            # job's runtime attributes on successful log recovery.
+            cpmip_evaluation = CPMIPNotifier.capture(job, as_conf)
+
+            log_recovered = job_list.update_log_status(job, as_conf, new_run)
+
+            if log_recovered and cpmip_evaluation is not None:
+                try:
+                    CPMIPNotifier.notify(as_conf, job_list.expid, job, cpmip_evaluation)
+                except Exception as error:
+                    Log.error(f"Error sending CPMIP notification for {job.name}: {error}")
 
     @staticmethod
     def refresh_log_recovery_process(platforms: list[Platform], as_conf: AutosubmitConfig) -> None:

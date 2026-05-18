@@ -24,6 +24,7 @@ from pwd import getpwnam
 from time import sleep, time
 from typing import TYPE_CHECKING
 
+import requests
 # noinspection PyProtectedMember
 from docker import from_env
 from testcontainers.core.container import DockerContainer  # type: ignore
@@ -35,6 +36,7 @@ from test.integration.test_utils.ssh import create_ssh_keypair_and_config, wait_
 if TYPE_CHECKING:
     from docker.models.containers import Container, ExecResult
     from pytest_mock import MockerFixture
+    from requests import Response
 
 __all__ = [
     'get_container_by_id',
@@ -49,7 +51,8 @@ __all__ = [
     'get_svn_container',
     'prepare_and_test_svn_container',
     'get_mail_container',
-    'prepare_and_test_mail_container'
+    'prepare_and_test_mail_container',
+    'get_mailhog_messages'
 ]
 
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
@@ -451,6 +454,15 @@ def get_mail_container() -> tuple[DockerContainer, int, str]:
     api_base = f"http://127.0.0.1:{api_port}"
 
     return container_instance, smtp_port, api_base
+
+
+def get_mailhog_messages(api_base: str) -> 'Response':
+    """Fetch the current MailHog inbox via its v2 API.
+
+    :param api_base: API base URL returned by :func:`get_mail_container`.
+    :return: Raw ``requests.Response``; callers use ``.json()["items"]`` or ``.json()["count"]``.
+    """
+    return requests.get(f"{api_base}/api/v2/messages")
 
 
 def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
