@@ -1,0 +1,973 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Tests that run diverse scenarios for Autosubmit run with a ``slurm`` platform
+and checks the database for expected results."""
+
+from getpass import getuser
+from pathlib import Path
+from textwrap import dedent
+from test.integration.test_utils.misc import wait_locker
+from typing import TYPE_CHECKING
+
+import pytest
+from ruamel.yaml import YAML
+
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.log.log import AutosubmitCritical
+from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
+    _assert_db_fields, _assert_files_recovered, run_in_thread
+from test.integration.conftest import AutosubmitExperimentFixture
+
+if TYPE_CHECKING:
+    from docker.models.containers import Container
+
+
+# -- Tests
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.timeout(300)
+@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
+    # Success
+    (dedent("""\
+
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+                sleep 1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+
+    # Success wrapper
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+                sleep 1
+            DEPENDENCIES: job-1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+
+        job2:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+                sleep 1
+            DEPENDENCIES: job2-1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: vertical
+            policy: flexible
+
+        wrapper2:
+            JOBS_IN_WRAPPER: job2
+            TYPE: vertical
+            policy: flexible
+
+    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+
+    # Failure
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                sleep 2
+                d_echo "Hello World with id=FAILED"
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 2  
+
+    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+
+    # Failure wrappers
+    (dedent("""\
+    JOBS:
+        job:
+            SCRIPT: |
+                sleep 2
+                d_echo "Hello World with id=FAILED + wrappers"
+            PLATFORM: TEST_SLURM
+            DEPENDENCIES: job-1
+            RUNNING: chunk
+            wallclock: 00:10
+            retrials: 2
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: vertical
+            policy: flexible
+
+    """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '2'
+JOBS:
+    job:
+        SCRIPT: |
+            echo "Hello World with id=Success + wrappers"
+            sleep 1
+        PLATFORM: TEST_SLURM
+        RUNNING: chunk
+        wallclock: 00:01
+
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: horizontal
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+        MAX_WALLCLOCK: '02:00'
+        MAX_PROCESSORS: '4'
+        PROCESSORS_PER_NODE: '4'
+"""), 2, "COMPLETED", "horizontal")
+
+], ids=["Success", "Success with wrapper", "Failure", "Failure with wrapper", "Success with horizontal wrapper"])
+def test_run_uninterrupted(
+        autosubmit_exp,
+        jobs_data: str,
+        expected_db_entries,
+        final_status,
+        wrapper_type,
+        slurm_server: 'Container',
+        prepare_scratch,
+        general_data
+):
+    yaml = YAML(typ='rt')
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
+    as_conf = as_exp.as_conf
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    log_dir = tmp_path / f"LOG_{as_exp.expid}"
+    as_conf.set_last_as_command('run')
+
+    # Run the experiment
+    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    _assert_exit_code(final_status, exit_code)
+
+    # Check and display results
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid, wrapper_type=wrapper_type)
+    e_msg = f"Current folder: {str(run_tmpdir)}\n"
+    e_msg += f"job_data file: {Path(BasicConfig.JOBDATA_DIR)}/job_data_{as_exp.expid}.db\n"
+    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
+    for check, value in db_check_list.items():
+        if not value:
+            e_msg += f"{check}: {value}\n"
+        elif isinstance(value, dict):
+            for job_name in value:
+                for job_counter in value[job_name]:
+                    for check_name, value_ in value[job_name][job_counter].items():
+                        if not value_:
+                            if check_name != "empty_fields":
+                                e_msg += f"{job_name}_run_number_{job_counter} field: {check_name}: {value_}\n"
+
+    for check, value in files_check_list.items():
+        if not value:
+            e_msg += f"{check}: {value}\n"
+    try:
+        _assert_db_fields(db_check_list)
+        _assert_files_recovered(files_check_list)
+    except AssertionError:
+        pytest.fail(e_msg)
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.timeout(300)
+@pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
+    # Success
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+                sleep 1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+
+    # Success wrapper
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+                sleep 1
+            DEPENDENCIES: job-1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+
+        job2:
+            SCRIPT: |
+                echo "Hello World with id=Success + wrappers"
+                sleep 1
+            DEPENDENCIES: job2-1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: vertical
+            policy: flexible
+
+        wrapper2:
+            JOBS_IN_WRAPPER: job2
+            TYPE: vertical
+            policy: flexible
+
+    """), 4, "COMPLETED", "vertical"),  # Wrappers present, vertical type
+
+    # Failure
+    (dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                sleep 2
+                d_echo "Hello World with id=FAILED"
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 2  # In local, it started to fail at 18 retrials.
+
+    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+
+    # Failure wrappers
+    (dedent("""\
+    JOBS:
+        job:
+            SCRIPT: |
+                sleep 2
+                d_echo "Hello World with id=FAILED + wrappers"
+            PLATFORM: TEST_SLURM
+            DEPENDENCIES: job-1
+            RUNNING: chunk
+            wallclock: 00:10
+            retrials: 2
+    wrappers:
+        wrapper:
+            JOBS_IN_WRAPPER: job
+            TYPE: vertical
+            policy: flexible
+
+    """), (2 + 1) * 1, "FAILED", "vertical"),  # Wrappers present, vertical type
+
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: '2'
+JOBS:
+    job:
+        SCRIPT: |
+            echo "Hello World with id=Success + wrappers"
+            sleep 1
+        PLATFORM: TEST_SLURM
+        RUNNING: chunk
+        wallclock: 00:01
+
+wrappers:
+    wrapper:
+        JOBS_IN_WRAPPER: job
+        TYPE: horizontal
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+        MAX_WALLCLOCK: '02:00'
+        MAX_PROCESSORS: '4'
+        PROCESSORS_PER_NODE: '4'
+"""), 2, "COMPLETED", "horizontal")
+
+], ids=[
+    "Success",
+    "Success with wrapper",
+    "Failure",
+    "Failure with wrapper",
+    "Success with horizontal wrapper"
+])
+def test_run_interrupted(
+        autosubmit_exp,
+        jobs_data: str,
+        expected_db_entries,
+        final_status,
+        wrapper_type,
+        slurm_server: 'Container',
+        prepare_scratch,
+        general_data,
+):
+    yaml = YAML(typ='rt')
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
+    as_conf = as_exp.as_conf
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    log_dir = tmp_path / f"LOG_{as_exp.expid}"
+    as_conf.set_last_as_command('run')
+
+    # Run the experiment
+    # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
+    lock_file = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid, BasicConfig.LOCAL_TMP_DIR, "autosubmit.lock")
+    as_thread, exception, _ = run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
+    if exception:
+        pytest.fail(f"Exception raised: {exception}")
+    wait_locker(lock_file, expect_locked=True, timeout=30, interval=0.5)
+    current_statuses = 'SUBMITTED, QUEUING, RUNNING'
+    as_exp.autosubmit.stop(
+        all_expids=False,
+        cancel=False,
+        current_status=current_statuses,
+        expids=as_exp.expid,
+        force=True,
+        force_all=True,
+        status='FAILED')
+
+    as_thread.join(timeout=60)
+    assert not as_thread.is_alive(), "Autosubmit thread did not stop after stop() call"
+    wait_locker(lock_file, expect_locked=False, timeout=30, interval=0.5)
+
+    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+
+    # Check and display results
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
+    _assert_db_fields(db_check_list)
+
+    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
+    _assert_files_recovered(files_check_list)
+
+    _assert_exit_code(final_status, exit_code)
+
+
+@pytest.mark.ssh
+@pytest.mark.slurm
+@pytest.mark.docker
+@pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
+    # Failure
+    (dedent("""\
+    CONFIG:
+        SAFETYSLEEPTIME: 0
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                d_echo "Hello World with id=FAILED"
+            PLATFORM: local
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 1  
+    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+], ids=["Force Failure -> Correct it -> Completed"])
+def test_run_failed_set_to_ready_on_new_run(
+        autosubmit_exp,
+        general_data,
+        jobs_data,
+        expected_db_entries,
+        final_status,
+        wrapper_type,
+        slurm_server
+):
+    yaml = YAML(typ='rt')
+    jobs_data_yaml = yaml.load(jobs_data)
+    as_exp = autosubmit_exp(experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
+    as_conf = as_exp.as_conf
+    as_conf.set_last_as_command('run')
+
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+    _assert_exit_code(final_status, exit_code)
+
+    # The experiment must have failed above with a final status.
+    # But the job script has d_echo, so here we replace it, and
+    # run it again. It should succeed now.
+    yaml_with_jobs = Path(as_exp.exp_path, 'conf/additional_data.yml')
+    with open(yaml_with_jobs, 'r') as f:
+        data = yaml.load(f)
+    data["JOBS"]["job"]["SCRIPT"] = 'echo "Hello World with id=READY"'
+    with yaml_with_jobs.open("w") as f:
+        yaml.dump(data, f)
+
+    as_conf.set_last_as_command('create')
+    assert 0 == as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=False)
+
+    as_conf.set_last_as_command('run')
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+
+    _assert_exit_code("SUCCESS", exit_code)
+
+
+@pytest.mark.docker
+@pytest.mark.timeout(300)
+@pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.parametrize("jobs_data,final_status", [
+    (dedent("""\
+EXPERIMENT:
+    NUMCHUNKS: 2
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "additional2.sh"
+        PLATFORM: TEST_SLURM
+        RUNNING: chunk
+        wallclock: 00:01
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        MAX_WALLCLOCK: '00:03'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+    """), "COMPLETED"),
+    (dedent("""\
+PROJECT:
+    PROJECT_TYPE: local
+    PROJECT_DIRECTORY: local_project
+LOCAL:
+    PROJECT_PATH: "tofill"
+JOBS:
+    job:
+        FILE: 
+            - "test.sh"
+            - "additional1.sh"
+            - "thisdoesntexists.sh"
+        PLATFORM: TEST_SLURM
+        DEPENDENCIES:
+          job-1:
+        RUNNING: chunk
+        wallclock: 00:01
+PLATFORMS:
+    TEST_SLURM:
+        ADD_PROJECT_TO_HOST: 'False'
+        HOST: '127.0.0.1'
+        MAX_WALLCLOCK: '00:03'
+        PROJECT: 'group'
+        QUEUE: 'gp_debug'
+        SCRATCH_DIR: '/tmp/scratch/'
+        TEMP_DIR: ''
+        TYPE: 'slurm'
+        USER: 'root'
+"""), "FAILED"),
+], ids=["All files exist", "One file missing"])
+@pytest.mark.parametrize("include_wrappers", [False, True], ids=["no_wrappers", "wrappers"])
+def test_run_with_additional_files(
+        jobs_data: str,
+        final_status: str,
+        include_wrappers: bool,
+        autosubmit_exp,
+        slurm_server: 'Container',
+        tmp_path,
+):
+    yaml = YAML(typ='rt')
+    project_path = Path(tmp_path) / "org_templates"
+    jobs_data = jobs_data.replace("tofill", str(project_path))
+    project_path.mkdir(parents=True, exist_ok=True)
+
+    (project_path / "test.sh").write_text('echo "main script."\n')
+    (project_path / "additional1.sh").write_text('echo "additional file 1."\n')
+    (project_path / "additional2.sh").write_text('echo "additional file 2."\n')
+
+    experiment_data_yaml = yaml.load(jobs_data)
+    if include_wrappers:
+        wrappers_dict = {
+            "WRAPPERS": {
+                "WRAPPER": {
+                    "JOBS_IN_WRAPPER": "JOB",
+                    "TYPE": "vertical",
+                }
+            },
+        }
+        experiment_data_yaml.update(wrappers_dict)
+
+    as_exp = autosubmit_exp(experiment_data=experiment_data_yaml, include_jobs=False, create=True)
+    as_exp.as_conf.set_last_as_command('run')
+
+    if final_status == "FAILED":
+        with pytest.raises(AutosubmitCritical):
+            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    else:
+        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        _assert_exit_code(final_status, exit_code)
+        project_remote_path = f"/tmp/scratch/group/root/{as_exp.expid}/LOG_{as_exp.expid}"
+        for additional_filename in ["additional1.sh", "additional2.sh"]:
+            for chunk in range(1, 1 + experiment_data_yaml.get("EXPERIMENT", {}).get("NUMCHUNKS", 1)):
+                remote_name = additional_filename.replace(".sh", f'_20000101_fc0_{chunk}_JOB')
+                command = f"cat {project_remote_path}/{remote_name}"
+                exit_code, output = slurm_server.exec_run(["bash", "-c", command])
+                assert exit_code == 0, f"File {additional_filename} not found in remote project path."
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.timeout(300)
+@pytest.mark.parametrize("wrappers, run_type", [
+    (
+            {
+                "WRAPPERS": {
+                    "MAX_WRAPPED": 2,
+                    "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
+                    "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
+                }
+            },
+            "run",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job_some",
+                        "TYPE": "horizontal",
+                        "MAX_WRAPPED": 2,
+                    },
+                    "SECOND_WRAPPER": {
+                        "JOBS_IN_WRAPPER": "other_some",
+                        "TYPE": "horizontal",
+                        "MAX_WRAPPED": 2,
+                    },
+                }
+            },
+            "run",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "MAX_WRAPPED": 2,
+                    "WRAPPER": {"JOBS_IN_WRAPPER": "job_some", "TYPE": "horizontal"},
+                    "SECOND_WRAPPER": {"JOBS_IN_WRAPPER": "other_some", "TYPE": "horizontal"},
+                }
+            },
+            "inspect",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job_some",
+                        "TYPE": "horizontal",
+                        "MAX_WRAPPED": 2,
+                    },
+                    "SECOND_WRAPPER": {
+                        "JOBS_IN_WRAPPER": "other_some",
+                        "TYPE": "horizontal",
+                        "MAX_WRAPPED": 2,
+                    },
+                }
+            },
+            "inspect",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job_some&other_some",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "&inspect",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "job_some&other_some",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "quick-inspect",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "[1,2,3,4]",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect1",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "[&]",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect2",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "&",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect3",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": ",",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect4",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect-empty-string",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "[',']",  # it is empty, because the "," is stripped somewhere
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect6-empty",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": "['&']",
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect8",
+    ),
+    (
+            {
+                "WRAPPERS": {
+                    "WRAPPER": {
+                        "JOBS_IN_WRAPPER": [],
+                        "TYPE": "horizontal-vertical",
+                        "MAX_WRAPPED": 2,
+                        "MIN_WRAPPED": 1
+                    },
+                }
+            },
+            "invalid-inspect-empty-list",
+    ),
+])
+def test_wrapper_config(
+        wrappers: dict,
+        run_type: str,
+        autosubmit_exp,
+        slurm_server: 'Container',
+        tmp_path,
+):
+    experiment_data = {
+        "EXPERIMENT": {"MEMBERS": "fc0 fc1 fc2 fc3"},
+        "PROJECT": {"PROJECT_TYPE": "None", "PROJECT_DIRECTORY": "local_project"},
+        "JOBS": {
+            "job_some": {
+                "SCRIPT": "echo 'Hello World'",
+                "PLATFORM": "TEST_SLURM",
+                "RUNNING": "member",
+                "wallclock": "00:01",
+            },
+            "other_some": {
+                "SCRIPT": "echo 'Hello World'",
+                "PLATFORM": "TEST_SLURM",
+                "RUNNING": "member",
+                "wallclock": "00:01",
+            },
+        },
+        "PLATFORMS": {
+            "TEST_SLURM": {
+                "ADD_PROJECT_TO_HOST": "False",
+                "HOST": "127.0.0.1",
+                "MAX_WALLCLOCK": "00:03",
+                "PROJECT": "group",
+                "QUEUE": "gp_debug",
+                "SCRATCH_DIR": "/tmp/scratch/",
+                "TEMP_DIR": "",
+                "TYPE": "slurm",
+                "USER": "root",
+                "PROCESSORS_PER_NODE": "4",
+                "MAX_PROCESSORS": "4",
+            }
+        },
+    }
+
+    if run_type.startswith("invalid"):
+        with pytest.raises(AutosubmitCritical):
+            autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True, wrapper=True)
+    else:
+        as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
+
+        if run_type == "run":
+            as_exp.as_conf.set_last_as_command('run')
+            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        else:
+            as_exp.as_conf.set_last_as_command('inspect')
+            as_exp.autosubmit.inspect(
+                expid=as_exp.expid,
+                lst=None,  # type: ignore
+                check_wrapper=True,
+                force=True,
+                filter_chunks=None,  # type: ignore
+                filter_section=None,  # type: ignore
+                filter_status=None,  # type: ignore
+                quick=True if run_type == "quick-inspect" else False
+            )
+        templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
+        asthread_files = list(templates_dir.rglob("*ASThread*"))
+        if run_type == "run" or run_type == "inspect":
+            # 8 jobs in total, 2 wrappers with max 2 jobs each -> 4 ASThread files expected
+            assert len(asthread_files) == 2 + 2
+
+
+def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture'):
+    """Test inspect with wrappers."""
+    user = getuser()
+    exp = autosubmit_exp(experiment_data={
+        'DEFAULT': {
+            'HPCARCH': 'TEST_PS'
+        },
+        'PLATFORMS': {
+            'TEST_PS': {
+                'CUSTOM_DIR': 'test',
+                'CUSTOM_DIR_POINTS_TO_OTHER_DIR': '%TEST_REFERENCE%',
+                'TYPE': 'ps',
+                'HOST': 'localhost',
+                'USER': user,
+                'SCRATCH_DIR': str(tmp_path),
+                'MAX_WALLCLOCK': '00:30'
+            }
+        },
+        'JOBS': {
+            'A': {
+                'SCRIPT': 'echo "Hello World"',
+                'RUNNING': 'once',
+                'PLATFORM': 'TEST_PS'
+            }
+        },
+        'WRAPPERS': {
+            'MIN_WRAPPED': 1,
+            'TEST_WRAPPER': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'A'
+            }
+        }
+    }, include_jobs=False, create=True)
+    exp.as_conf.set_last_as_command('inspect')
+
+    # Inspect
+    exp.autosubmit.inspect(
+        expid=exp.expid,
+        lst=None,  # type: ignore
+        check_wrapper=True,
+        force=True,
+        filter_chunks=None,  # type: ignore
+        filter_section=None,  # type: ignore
+        filter_status=None,  # type: ignore
+        quick=True
+    )
+
+    templates_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / exp.expid / BasicConfig.LOCAL_TMP_DIR
+    templates_generated = [t for t in templates_dir.glob(f"{exp.expid}*.cmd")]
+
+    assert len(templates_generated) == 1
+
+
+@pytest.mark.ssh
+@pytest.mark.slurm
+@pytest.mark.docker
+@pytest.mark.parametrize("jobs_data,final_status", [
+    # Failure
+    (dedent("""\
+    CONFIG:
+        SAFETYSLEEPTIME: 0
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World with id=Success"
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 1  
+    """), "Success"),
+], ids=["Create -> Run Completed -> Create -> Run Completed"])
+def test_rerun_expid(
+        autosubmit_exp,
+        general_data,
+        jobs_data,
+        final_status,
+        slurm_server
+):
+    yaml = YAML(typ='rt')
+    jobs_data_yaml = yaml.load(jobs_data)
+    as_exp = autosubmit_exp(experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
+    as_conf = as_exp.as_conf
+    as_conf.set_last_as_command('run')
+
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+    _assert_exit_code(final_status, exit_code)
+    _assert_exit_code("SUCCESS", exit_code)
+
+    as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=False)
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+    _assert_exit_code("SUCCESS", exit_code)
+
+
+@pytest.mark.ssh
+@pytest.mark.slurm
+@pytest.mark.docker
+@pytest.mark.parametrize("jobs_data,final_status", [
+    (dedent("""\
+    CONFIG:
+        SAFETYSLEEPTIME: 0
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                print("Hello World with id=Success")
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 1
+            type: python3
+    """), "COMPLETED"),
+    (dedent("""\
+    CONFIG:
+        SAFETYSLEEPTIME: 0
+    EXPERIMENT:
+        NUMCHUNKS: '2'
+    JOBS:
+        job:
+            SCRIPT: |
+                raise RuntimeError("Intentional failure")
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+            retrials: 1
+            type: python3
+    """), "FAILED"),
+], ids=["Python3 script succeeds", "Python3 script fails"])
+def test_run_python3_job(
+        autosubmit_exp,
+        general_data,
+        jobs_data,
+        final_status,
+        slurm_server
+):
+    """Run a job using python3 script type and assert the expected final status."""
+    yaml = YAML(typ='rt')
+    jobs_data_yaml = yaml.load(jobs_data)
+    as_exp = autosubmit_exp(experiment_data=general_data | jobs_data_yaml, include_jobs=False, create=True)
+    as_conf = as_exp.as_conf
+    as_conf.set_last_as_command('run')
+
+    exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
+    _assert_exit_code(final_status, exit_code)

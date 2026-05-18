@@ -81,6 +81,7 @@ from autosubmit.helpers.utils import (
     recover_stale_job_data,
     user_yes_no_query,
 )
+from autosubmit.helpers.version import get_version
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job import Job, WrapperJob
@@ -3304,15 +3305,15 @@ class Autosubmit:
                                      7040, str(e))
 
     @staticmethod
-    def describe(input_experiment_list="*", get_from_user=""):
-        """Show details for specified experiment
+    def describe(
+            input_experiment_list="*",
+            get_from_user=""
+    ) -> Union[bool, tuple[str, Union[str, datetime.datetime], str, str, str]]:
+        """Show details for the specified experiment.
 
         :param input_experiment_list: experiments identifier:
-        :type input_experiment_list: str
         :param get_from_user: user to get the experiments from
-        :type get_from_user: str
         :return: tuple with user, created time, model, branch, and HPC
-        :rtype: bool | (str, str, str, str, str)
         """
         if get_from_user == "*" or get_from_user == "":
             get_from_user = pwd.getpwuid(os.getuid())[0]
@@ -3342,12 +3343,10 @@ class Autosubmit:
         for experiment_id in experiments_ids:
             exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(experiment_id)
             if exp_path.is_dir():
-                try:
+                with suppress(OSError, KeyError, TypeError):
                     folder_owner = pwd.getpwuid(exp_path.stat().st_uid).pw_name
                     if folder_owner != get_from_user:
                         continue
-                except Exception:
-                    pass
             try:
                 try:
                     # Preferred source of truth: the on-disk config files.
@@ -3357,7 +3356,7 @@ class Autosubmit:
                     uid = int(Path(as_conf.conf_folder_yaml).stat().st_uid)
                     try:
                         user = pwd.getpwuid(uid).pw_name
-                    except Exception:
+                    except (KeyError, TypeError, OverflowError):
                         Log.warning("The user does not exist anymore in the system, using id instead")
                         user = str(uid)
 
@@ -3381,8 +3380,9 @@ class Autosubmit:
 
                     description = get_experiment_description(experiment_id)
                     description = description[0][0] if description else ""
-                except Exception:
-                    # Files not available (e.g. archived): fall back to the
+                except Exception as e:
+                    Log.warning(f"Experiment files are not available: {str(e)}")
+                    # Files are not available (e.g. archived): fall back to the
                     # last snapshot stored in the database.
                     snapshot = ExperimentDetails(experiment_id, init_reload=False).get_details()
                     if not snapshot:
@@ -3405,16 +3405,17 @@ class Autosubmit:
                 Log.result(f"Branch: {branch}")
                 Log.result(f"HPC: {hpc}")
                 Log.result(f"Description: {description}")
-            except Exception:
+            except Exception as e:
+                Log.warning(f'Failed to describe experiment {experiment_id}: {str(e)}')
                 not_described_experiments.append(experiment_id)
         if len(not_described_experiments) > 0:
-            Log.printlog(f"Could not describe the following experiments:\n"
-                         f"{not_described_experiments}", Log.WARNING)
+            Log.printlog(f"Could not describe the following experiments:\n{not_described_experiments}", Log.WARNING)
         if len(experiments_ids) == 1:
             # for backward compatibility or GUI
             return user, created, model, branch, hpc
         elif len(experiments_ids) == 0:
             Log.result(f"No experiments found for expid={input_experiment_list} and user {get_from_user}")
+        return False
 
     @staticmethod
     def configure(
@@ -3454,6 +3455,8 @@ class Autosubmit:
         :type mail_from: str
         :param smtp_hostname:
         :type smtp_hostname: str
+        :param database_backend: The system database backend. Defaults to sqlite.
+        :param database_conn_url: The database connection URL.
         """
         try:
             home_path = Path.home()
