@@ -401,3 +401,4 @@ def test_run_report_command(
             assert not duplicated, \
                 f"Global namespace {ns!r} duplicated under JOBS.{section}.* " \
                 f"(issue #1043): {duplicated[:3]}"
+            
