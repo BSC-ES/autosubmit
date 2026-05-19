@@ -16,15 +16,14 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Tests for ``upgrade_scripts.py`` module."""
-
+import shutil
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, TYPE_CHECKING
 
-from configobj import ConfigObj
+import pytest
 from ruamel.yaml import YAML
 
-from autosubmit.config.upgrade_scripts import _config_obj_to_nested_dict
 from autosubmit.config.upgrade_scripts import upgrade_scripts, ini_to_yaml
 
 if TYPE_CHECKING:
@@ -32,59 +31,97 @@ if TYPE_CHECKING:
     from py._path.local import LocalPath  # type: ignore
 
 
-def test_jobs_ini_to_yaml(tmp_path: 'LocalPath'):
-    ini_file = tmp_path / 'jobs_monarch.ini'
-    ini_file.touch()
-    ini_file.write_text(dedent('''\
-    [LOCAL_SETUP]
-    FILE = templates/local_setup.sh
-    PLATFORM = LOCAL
-    RUNNING = once
-    NOTIFY_ON = FAILED COMPLETED
-    '''))
+@pytest.fixture
+def as3_ini_files(tmp_path: 'LocalPath'):
+    """Create AS3 ini files."""
+    jobs_ini = tmp_path / 'jobs_monarch.conf'
+    jobs_ini.write_text(dedent('''\
+    
+        [LOCAL_SETUP]
+        FILE = templates/local_setup.sh
+        PLATFORM = marenostrum4-test
+        RUNNING = once
+        NOTIFY_ON = FAILED COMPLETED
+        '''))
 
-    yaml_file = ini_to_yaml(ini_file)
-    assert yaml_file
+    platforms_ini = tmp_path / 'platform_monarch.conf'
+    platforms_ini.write_text(dedent('''\
+        [marenostrum4-test]
+        TYPE = slurm
+        HOST = mn1.bsc.es
+        PROJECT = bsc32
+        USER = %user%
+        SCRATCH_DIR = /gpfs/scratch
+        ADD_PROJECT_TO_HOST = False
+        TEST_SUITE = False
+        MAX_WALLCLOCK = 48:00
+        MAX_PROCESSORS = 2400
+        PROCESSORS_PER_NODE = 48
+        '''))
 
-    yaml_dict = YAML().load(yaml_file)
+    autosubmit_ini = tmp_path / 'autosubmit.conf'
+    autosubmit_ini.write_text(dedent('''\
+        [config]
+        EXPID = a000
+        AUTOSUBMIT_VERSION = v3.15.0
+        # a comment
+        MAXWAITINGJOBS = 3
+        TOTALJOBS = 6
+        HPCARCH = CESGA
+        '''))
 
+    return [jobs_ini, platforms_ini, autosubmit_ini]
+
+
+def _get_yaml_dict(tmp_path: 'LocalPath'):
+    yaml_dict = {}
+    y = YAML()
+    for f in tmp_path.glob('*.yml'):
+        yaml_dict.update(y.load(f))
+    return yaml_dict
+
+
+def _convert_all(as3_ini_files: list[Path]):
+    for ini_file in as3_ini_files:
+        ini_to_yaml(ini_file)
+
+
+def test_jobs_ini_to_yaml(tmp_path: 'LocalPath', as3_ini_files: list[Path]):
+    _convert_all(as3_ini_files)
+    yaml_dict = _get_yaml_dict(tmp_path)
     assert yaml_dict['JOBS']['LOCAL_SETUP']['FILE'] == 'templates/local_setup.sh'
 
 
-def test_platforms_ini_to_yaml(tmp_path: 'LocalPath'):
-    ini_file = tmp_path / 'platforms.ini'
-    ini_file.touch()
-    ini_file.write_text(dedent('''\
-    [marenostrum4]
-    TYPE = slurm
-    HOST = mn1.bsc.es
-    PROJECT = bsc32
-    USER = bsc32xxx
-    SCRATCH_DIR = /gpfs/scratch
-    ADD_PROJECT_TO_HOST = False
-    TEST_SUITE = False
-    MAX_WALLCLOCK = 48:00
-    MAX_PROCESSORS = 2400
-    PROCESSORS_PER_NODE = 48
-    '''))
+def test_platforms_ini_to_yaml(tmp_path: 'LocalPath', as3_ini_files: list[Path]):
+    _convert_all(as3_ini_files)
+    yaml_dict = _get_yaml_dict(tmp_path)
+    assert yaml_dict['PLATFORMS']['marenostrum4-test']['TYPE'] == 'slurm'
 
-    yaml_file = ini_to_yaml(ini_file)
-    assert yaml_file
 
-    yaml_dict = YAML().load(yaml_file)
+def test_ini_to_yaml_already_exists(tmp_path: 'LocalPath'):
+    """Test that the conversion is not executed if the file already exists."""
+    ini_file = tmp_path / 'any_config.conf'
+    yaml_file = Path(tmp_path / 'any_config.yml')
+    with yaml_file.open('w') as f:
+        f.write('test')
 
-    assert yaml_dict['PLATFORMS']['marenostrum4']['TYPE'] == 'slurm'
+    ini_to_yaml(ini_file)
+    assert yaml_file.read_text() == 'test'
 
 
 def test_ini_to_yaml(tmp_path: 'LocalPath'):
-    ini_file = tmp_path / 'any_config.ini'
+    """Test that the Autosubmit 3 configuration model is followed.
+
+    In AS3 platforms are only loaded from a ``platform_*.conf`` file.
+    """
+    ini_file = tmp_path / 'any_config.conf'
     ini_file.touch()
     ini_file.write_text(dedent('''\
     [marenostrum4]
     TYPE = slurm
     HOST = mn1.bsc.es
     PROJECT = bsc32
-    USER = bsc32xxx
+    USER = %user%
     SCRATCH_DIR = /gpfs/scratch
     ADD_PROJECT_TO_HOST = False
     TEST_SUITE = False
@@ -103,13 +140,12 @@ def test_ini_to_yaml(tmp_path: 'LocalPath'):
 
 
 def test_ini_to_yaml_backup_exists(tmp_path: 'LocalPath', mocker):
-    backup_file = tmp_path / 'backup.ini_as_v3_backup'
-    backup_file.touch()
+    """Test that a backup file is not overwritten if it already exists."""
+    backup_file = tmp_path / 'any_config.conf_as_v3_backup'
     backup_file.write_text('autosubmit')
     backup_file_size = backup_file.stat().st_size
 
-    ini_file = tmp_path / 'any_config.ini'
-    ini_file.touch()
+    ini_file = tmp_path / 'any_config.conf'
     ini_file.write_text(dedent('''\
     [marenostrum4]
     TYPE = slurm
@@ -120,24 +156,96 @@ def test_ini_to_yaml_backup_exists(tmp_path: 'LocalPath', mocker):
     assert backup_file_size == backup_file.stat().st_size, 'ini_to_yaml replaced the existing backup file'
 
     assert mocked_log.info.called
-    assert 'Backup created at' in mocked_log.info.call_args[0][0]
+    assert 'Backup already exists at' in mocked_log.info.call_args[0][0]
 
 
 def test_ini_to_yaml_lists(tmp_path: 'LocalPath'):
     """Test that lists are converted from '= [a, b]' to '= "a, b"'."""
-    ini_file = tmp_path / 'any_config.ini'
+    ini_file = tmp_path / 'any_config.conf'
     ini_file.touch()
     ini_file.write_text(dedent('''\
     [marenostrum4]
-    HOST = [mn1.bsc.es, mn2.bsc.s]
+    HOST = [mn1.bsc.es, mn2.bsc.es]
     '''))
 
     yaml_file = ini_to_yaml(ini_file)
     yaml = YAML().load(yaml_file)
-    assert yaml['marenostrum4']['HOST'] == '"mn1.bsc.es, mn2.bsc.s"'
+    assert yaml['marenostrum4']['HOST'] == '"mn1.bsc.es, mn2.bsc.es"'
 
 
-def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath'):
+def test_upgrade_scripts_as_3_conf_causes_error(
+        autosubmit_exp,
+        tmp_path: 'LocalPath',
+        as3_ini_files: list[Path],
+        mocker
+):
+    """Test that the upgrade script fails if the AS3 configuration file upgrade fails."""
+    as_exp = autosubmit_exp(experiment_data={}, create=False)
+
+    exp_dir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR, as_exp.expid)
+    # Copy fixture INI files into the experiment path
+    for ini_file in as3_ini_files:
+        shutil.copy(ini_file, exp_dir / 'conf')
+
+    mocker.patch('autosubmit.config.upgrade_scripts.ini_to_yaml', side_effect=ValueError('test'))
+    mocked_log = mocker.patch('autosubmit.config.upgrade_scripts.Log')
+    upgrade_scripts(as_exp.expid, files=[])
+    assert mocked_log.warning.called
+    assert 'Failed to upgrade AS3 conf file' in mocked_log.warning.call_args[0][0]
+
+
+@pytest.mark.parametrize(
+    'side_effect_index,expected_error',
+    [
+        (0, 'Failed to fix placeholders in the new AS4 YAML file'),
+        (3, 'Failed to fix placeholders in template file')
+    ],
+    ids=[
+        'First YAML file fails',
+        'First template file fails'
+    ]
+)
+def test_upgrade_scripts_as_3_yaml_placeholders_cause_error(
+        side_effect_index: int,
+        expected_error: str,
+        autosubmit_exp,
+        tmp_path: 'LocalPath',
+        as3_ini_files: list[Path],
+        mocker
+):
+    """Test that the upgrade script fails if the AS4 YAML or template placeholder fix fails.
+
+    Sorry to any fellow developer who finds this test a bit confusing. That is because the logic
+    is as follows:
+
+    * We have 3 test conf files in a fixture (as_ini_files)
+    * Each file will produce a YAML
+    * Each YAML has a template
+    * The function being tested is called once per YAML or template
+    * We mock, so the first YAML (index 0) raises a value error, with the message that the YAML failed
+    * We mock, so the first template (index 3) raises a value error, with the message that the template failed
+    """
+    as_exp = autosubmit_exp(experiment_data={}, create=False)
+
+    exp_dir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR, as_exp.expid)
+    # Copy fixture INI files into the experiment path
+    for ini_file in as3_ini_files:
+        shutil.copy(ini_file, exp_dir / 'conf')
+
+    # We have one call per conf file converted to YAML; each file should create a new entry for its job.
+    side_effect: list[Any] = [([], []) for _ in as3_ini_files]
+    side_effect.extend([([], []) for _ in as3_ini_files])
+    # The first call results in an error
+    side_effect[side_effect_index] = ValueError('test')
+
+    mocker.patch('autosubmit.config.upgrade_scripts._fix_placeholders', side_effect=side_effect)
+    mocked_log = mocker.patch('autosubmit.config.upgrade_scripts.Log')
+    upgrade_scripts(as_exp.expid, files=[])
+    assert mocked_log.printlog.called
+    assert expected_error in mocked_log.printlog.call_args_list[0][0][0]
+
+
+def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath', as3_ini_files: list[Path]):
     temp_project = tmp_path / 'temp_project'
     as_exp = autosubmit_exp(experiment_data={
         'PROJECT': {
@@ -150,38 +258,16 @@ def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath'):
     }, create=False)
 
     exp_dir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR, as_exp.expid)
-
-    as3_jobs_file = exp_dir / f'conf/jobs_{as_exp.expid}.conf'
-    as3_jobs_file.parent.mkdir(exist_ok=True)
-    as3_jobs_file.write_text(dedent('''\
-    [LOCAL_SETUP]
-    FILE = templates/local_setup.sh
-    PLATFORM = marenostrum4-test
-    RUNNING = once
-    NOTIFY_ON = FAILED COMPLETED
-    '''))
-
-    as3_platforms_file = exp_dir / 'conf/platforms.conf'
-    as3_platforms_file.write_text(dedent('''\
-    [marenostrum4-test]
-    TYPE = slurm
-    HOST = mn1.bsc.es
-    PROJECT = bsc32
-    USER = bsc32xxx
-    SCRATCH_DIR = /gpfs/scratch
-    ADD_PROJECT_TO_HOST = False
-    TEST_SUITE = False
-    MAX_WALLCLOCK = 48:00
-    MAX_PROCESSORS = 2400
-    PROCESSORS_PER_NODE = 48
-    '''))
+    # Copy fixture INI files into the experiment path
+    for ini_file in as3_ini_files:
+        shutil.copy(ini_file, exp_dir / 'conf')
 
     as3_script_template = temp_project / 'templates/local_setup.sh'
     as3_script_template.parent.mkdir(exist_ok=True, parents=True)
     as3_script_template.write_text(dedent('''\
     #!/bin/bash
     
-    echo "The job name is %JOBNAME%"
+    echo "The job name is %JOBNAME% on %HPCARCH%"
     '''))
 
     assert as_exp.autosubmit.create(as_exp.expid, force=True, noplot=True, hide=True) == 0
@@ -196,63 +282,4 @@ def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath'):
 
     assert f'The job name is {as_exp.expid}_LOCAL_SETUP' in inspect_generated_script.read_text()
 
-
-def test_single_level_keys():
-    """Test if the function correctly processes single-level keys."""
-    config_obj = ConfigObj({"key1": "value1", "key2": "value2"})
-    result = _config_obj_to_nested_dict(config_obj)
-    expected = {"key1": "value1", "key2": "value2"}
-    assert expected == result
-
-
-def test_multi_level_keys():
-    """Test if the function correctly processes multi-level keys."""
-    config_obj = ConfigObj({"a.b.c": "value1", "a.b.d": "value2"})
-    result = _config_obj_to_nested_dict(config_obj)
-    expected = {"a": {"b": {"c": "value1", "d": "value2"}}}
-    assert expected == result
-
-
-def test_mix_of_single_and_multi_level_keys():
-    """Test if the function handles a mix of single and multi-level keys."""
-    config_obj = ConfigObj({"x": "value1", "a.b.c": "value2", "a.b.d": "value3"})
-    result = _config_obj_to_nested_dict(config_obj)
-    expected = {"x": "value1", "a": {"b": {"c": "value2", "d": "value3"}}}
-    assert expected == result
-
-
-def test_nested_dictionaries():
-    """Test if the function processes nested dictionaries as values."""
-    config_obj: ConfigObj = ConfigObj({
-        "top.level": {
-            "nested.deeply": "value1",
-            "another": "value2",
-        }
-    })
-    result: dict[str, Any] = _config_obj_to_nested_dict(config_obj)
-
-    expected: dict[str, Any] = {
-        "top": {
-            "level": {
-                "nested": {"deeply": "value1"},
-                "another": "value2",
-            }
-        }
-    }
-    assert expected == result
-
-
-def test_empty_config_obj():
-    """Test if the function handles an empty ConfigObj."""
-    config_obj = ConfigObj({})
-    result = _config_obj_to_nested_dict(config_obj)
-    expected = {}
-    assert expected == result
-
-
-def test_overwrite_existing_key():
-    """Test if the function overwrites values correctly in case of conflict."""
-    config_obj = ConfigObj({"a.b": {"c": "old_value"}, "a.b.c": "new_value"})
-    result = _config_obj_to_nested_dict(config_obj)
-    expected = {"a": {"b": {"c": "old_value"}}}  # old value stays
-    assert result == expected
+    assert as_exp.as_conf.experiment_data['PLATFORMS']['MARENOSTRUM4-TEST']['USER'] == ['%USER%'], "Not uppercase!"
