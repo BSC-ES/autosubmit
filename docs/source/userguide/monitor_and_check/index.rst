@@ -568,7 +568,7 @@ How to extract information about the experiment parameters
 ------------------------------------------------------------
 
 The ``autosubmit report`` command extracts the parameters and resolved values
-of an experiment. It has two modes, and they can be used together:
+of an experiment. It has two modes, each generating their own file, and they can be used together:
 
 * ``-all`` dumps every parameter Autosubmit knows about into a flat
   ``<expid>_parameter_list_<timestamp>.txt`` file. Useful for discovery and
