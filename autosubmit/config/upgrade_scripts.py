@@ -42,7 +42,6 @@ __all__ = [
     'upgrade_scripts'
 ]
 
-
 _LISTS_REGEX = re.compile(r"""
     =\s*                 # equals sign + optional spaces
     \[                   # opening bracket
@@ -60,40 +59,50 @@ def _replace_list(match):
     return f"= \"{content}\""
 
 
-def _config_obj_to_nested_dict(config_obj: ConfigObj) -> dict[str, Any]:
-    """Convert a ConfigObj to a nested dictionary.
+def _update_dict(config_obj: ConfigObj) -> dict[str, Any]:
+    """Convert a ConfigObj dictionary to a nested dictionary.
 
-    e.g., "a.b.c" turns into {"a": {"b": {"c": ...}}}.
+    It is iterative, not recursive, so no risk of YAML-bomb files causing stack issues.
 
-    :param config_obj: The ConfigObj to convert.
-    :return: The nested dictionary.
+    :param config_obj: The original ConfigObj instance (dictionary-compatible).
+    :return: The resulting dictionary.
     """
     yaml_dict: dict[str, Any] = {}
 
-    for key, value in config_obj.items():
-        keys = key.split(".")
-        current = yaml_dict
+    stack: list[tuple[Optional[str], dict[str, Any]]] = [(None, config_obj)]
 
-        # Traverse down the nested keys
-        for k in keys[:-1]:
-            current = current.setdefault(k, {})
+    while stack:
+        current_key, source_dict = stack.pop()
 
-        last_key = keys[-1]
+        for k, v in source_dict.items():
+            keys = k.split(".")
+            current = yaml_dict if not current_key else yaml_dict[current_key]
 
-        if isinstance(value, dict):
-            # Merge dicts recursively
-            current[last_key] = _config_obj_to_nested_dict(ConfigObj(value))
-        else:
-            # Only set scalar if it doesn't exist yet
-            current.setdefault(last_key, value)
+            # Traverse down the nested keys
+            for nested_key in keys[:-1]:
+                current = current.setdefault(nested_key, {})
+
+            last_key = keys[-1]
+
+            if isinstance(v, dict):
+                # Does the YAML data already contain this, and as a dictionary?
+                # If so, we use that.
+                existing = current.get(k)
+                if not isinstance(existing, dict):
+                    current[last_key] = {}
+
+                stack.append((last_key, v))
+            else:
+                current[last_key] = v
+                current.setdefault(last_key, v)
 
     return yaml_dict
 
 
 def ini_to_yaml(ini_file: Path) -> Path:
-    """Convert an Autosubmit INI file to YAML.
+    """Convert an Autosubmit conf file to YAML.
 
-    Creates a backup of the INI file before conversion.
+    Creates a backup of the conf file before conversion.
 
     INI lists such as "a = [b, c]" are converted to YAML lists ["b", "c"].
     An intermediary step is required to convert from "a = [b, c]" to "a = b, c".
@@ -108,16 +117,23 @@ def ini_to_yaml(ini_file: Path) -> Path:
     then the generated YAML data will become ``{"JOBS": yaml_data}`` or
     ``{"PLATFORMS": yaml_data}``.
 
-    :param ini_file: Path to the INI file to convert.
+    :param ini_file: Path to the AS3 conf file to convert.
     :return: The YAML file.
     """
-    encoding = locale.getlocale()[1]
+    yaml_file_path = ini_file.with_suffix(".yml")
+    if yaml_file_path.exists():
+        Log.debug(f'AS3 conf file {ini_file} not upgraded. YAML file already exists: {yaml_file_path}')
+        return yaml_file_path
+
     # Read the file name from the command line argument
     backup_path = ini_file.parent / f"{ini_file.name}_as_v3_backup"
     if not backup_path.exists():
         Log.info(f"Backup created at {backup_path}")
         shutil.copyfile(ini_file, backup_path)
+    else:
+        Log.info(f"Backup already exists at {backup_path}")
 
+    encoding = locale.getlocale()[1]
     content = ini_file.read_text(encoding=encoding)
     content = _LISTS_REGEX.sub(_replace_list, content)
 
@@ -129,7 +145,7 @@ def ini_to_yaml(ini_file: Path) -> Path:
         unrepr=False
     )
 
-    yaml_dict = _config_obj_to_nested_dict(config_dict)
+    yaml_dict = _update_dict(config_dict)
 
     if "platform" in ini_file.name.lower():
         yaml_dict = {"PLATFORMS": yaml_dict}
@@ -142,39 +158,9 @@ def ini_to_yaml(ini_file: Path) -> Path:
     return yaml_file_path
 
 
-def _update_dict(original_dict: dict[str, Any], updated_dict: dict[str, Any]) -> dict[str, Any]:
-    """Update a dictionary recursively, merging both, returning the resulting dictionary.
-
-    It is not recursive, so no risk of YAML-bomb files causing stack issues.
-    Performs an iterative deep-merge.
-
-    :param original_dict: The original dictionary.
-    :param updated_dict: The dictionary to update.
-    :return: The resulting dictionary.
-    """
-    stack: list[tuple[dict[str, Any], dict[str, Any]]] = [(original_dict, updated_dict)]
-
-    while stack:
-        target, source = stack.pop()
-
-        for k, v in source.items():
-            if isinstance(v, dict):
-                existing = target.get(k)
-
-                if not isinstance(existing, dict):
-                    existing = {}
-                    target[k] = existing
-
-                stack.append((existing, v))
-            else:
-                target[k] = v
-
-    return original_dict
-
-
 def upgrade_scripts(expid: str, files: Optional[list[str]] = None) -> bool:
     """Upgrade scripts from Autosubmit 3 to 4."""
-    list_of_files: tuple[str, ...] = tuple(files) if files else ("*.conf", "*.CONF")
+    files_or_extension_patterns: tuple[str, ...] = tuple(files) if files else ("*.conf", "*.CONF")
 
     Log.info("Checking if experiment exists...")
     check_ownership(expid, raise_error=True)
@@ -184,40 +170,37 @@ def upgrade_scripts(expid: str, files: Optional[list[str]] = None) -> bool:
     as_conf.load_parameters()
 
     exp_conf_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf"
-    ini_files = {f for pattern in list_of_files for f in exp_conf_dir.rglob(pattern)}
+    conf_files = {f for pattern in files_or_extension_patterns for f in exp_conf_dir.rglob(pattern)}
 
     # TODO: Use tqdm to show the user the progress?
-    Log.info(f"Converting {len(ini_files)} INI files (.conf) into YAML files (.yml)")
+    # Convert conf files into YAML files.
+    Log.info(f"Upgrading AS3 {len(conf_files)} conf files (.conf) to AS 4 YAML (.yml)...")
     yaml_files = []
-    for ini_file in ini_files:
-        yaml_file = Path(ini_file.stem + ".yml")
-        if yaml_file.exists():
-            Log.debug(f'INI file {ini_file} not upgraded. YAML file already exists: {yaml_file}')
-            continue
-
-        Log.debug(f'Converting INI file {ini_file} into YAML file: {yaml_file}')
+    for conf_file in conf_files:
+        yaml_file = Path(conf_file.stem + ".yml")
+        Log.debug(f'Upgrading AS3 conf file {conf_file} to AS4 YAML: {yaml_file}')
         try:
-            ini_to_yaml(ini_file)
+            ini_to_yaml(conf_file)
             yaml_files.append(yaml_file)
         except Exception as e:
-            Log.warning(f'Failed to convert INI file {ini_file} into {yaml_file}: {e}')
+            Log.warning(f'Failed to upgrade AS3 conf file {conf_file} into {yaml_file}: {e}')
 
     warnings = []
     substituted = []
 
-    # Update files in conf/ folder.
+    # Adjust placeholders.
     exp_project_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / expid / "proj"
     Log.info(f"Fixing placeholder variables (%_%) inside the new {len(yaml_files)} YAML files")
     for yaml_file in yaml_files:
         template_path = exp_project_dir / Path(yaml_file).name
         try:
-            w, s = _update_old_script(exp_project_dir, template_path, as_conf)
+            w, s = _fix_placeholders(template_path, as_conf)
             if w != "":
                 warnings.append(f"Warnings for: {template_path.name}\n{w}\n")
             if s != "":
                 substituted.append(f"Variables changed for: {template_path.name}\n{s}\n")
         except Exception as e:
-            Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
+            Log.printlog(f"Failed to fix placeholders in the new AS4 YAML file {template_path}: {str(e)}")
 
     # We now must have new YAML files. Let's reload them.
     as_conf.reload(force_load=True)
@@ -232,13 +215,13 @@ def upgrade_scripts(expid: str, files: Optional[list[str]] = None) -> bool:
     for section, value in as_conf.jobs_data.items():
         try:
             template_path = exp_project_dir / Path(value.get("FILE", ""))
-            w, s = _update_old_script(template_path.parent, template_path, as_conf)
+            w, s = _fix_placeholders(template_path, as_conf)
             if w != "":
                 warnings.append(f"Warnings for: {template_path.name}\n{w}\n")
             if s != "":
                 substituted.append(f"Variables changed for: {template_path.name}\n{s}\n")
         except Exception as e:
-            Log.printlog(f"Couldn't read {template_path} template.\ntrace:{str(e)}")
+            Log.printlog(f"Failed to fix placeholders in template file {template_path}: {str(e)}")
 
     if substituted:
         Log.printlog("\n".join(substituted), Log.RESULT)
@@ -254,65 +237,63 @@ def upgrade_scripts(expid: str, files: Optional[list[str]] = None) -> bool:
     return True
 
 
-def _update_old_script(
-        root_dir: Path,
-        template_path: Path,
-        as_conf: AutosubmitConfig
-) -> tuple[list[str], list[str]]:
-    """Backs up the configuration and tries to update them.
+def _fix_placeholders(template_or_script_path: Path, as_conf: AutosubmitConfig) -> tuple[list[str], list[str]]:
+    """Adjusts Autosubmit 3 placeholders to the new format in Autosubmit 4.
 
-    Returns a tuple with warnings and substituted values.
+    All variables are made upper case.
 
-    Lower case variables are replaced by upper case variables.
-
+    :param template_or_script_path: Path with all the INI configuration files, or Template files with placeholders.
+    :param as_conf: Autosubmit configuration object.
     :return: A tuple with a list of warnings and substituted values.
     """
     # Do a backup and tries to update
     warnings = []
-    substituted = []
-    Log.info(f"Checking {template_path}")
-    if template_path.exists():
-        backup_path = root_dir / Path(template_path.name + "_AS_v3_backup_placeholders")
-        if not backup_path.exists():
-            Log.info(f"Backup stored at {backup_path}")
-            shutil.copyfile(template_path, backup_path)
-        with open(template_path, 'r', encoding=locale.getlocale()[1]) as f:
-            template_content = f.read()
-        # Look for %_%
-        variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_content, flags=re.IGNORECASE)
-        variables = [variable[1:-1].upper() for variable in variables]
-        results: dict[str, set] = {}
-        # Change format
-        for old_format_key in variables:
-            for key in as_conf.load_parameters().keys():
-                key_affix = key.split(".")[-1]
-                if key_affix == old_format_key:
-                    if old_format_key not in results:
-                        results[old_format_key] = set()
+    success = []
+    Log.info(f"Checking for AS3 conf or templates in: {template_or_script_path}")
 
-                    results[old_format_key].add("%" + key.strip("'") + "%")
-        for key, new_key in results.items():
-            if len(new_key) > 1:
-                if list(new_key)[0].find("JOBS") > -1 or list(new_key)[0].find("PLATFORMS") > -1:
-                    pass
-                else:
-                    warnings.append(f"{key} couldn't translate to {new_key} since it is a duplicate variable. "
-                                    f"Please chose one of the keys value.")
-            else:
-                new_key = new_key.pop().upper()
-                substituted.append(f"{key.upper()} translated to {new_key}")
-                template_content = re.sub('%(?<!%%)' + key + '%(?!%%)', new_key, template_content, flags=re.I)
-        # write_it
-        # Deletes unused keys from confs
-        if template_path.name.lower().find("autosubmit") > -1:
-            template_content = re.sub('(?m)^( )*(EXPID:)( )*[a-zA-Z0-9._-]*(\n)*', "", template_content, flags=re.I)
-        # Write the final result
-        with open(template_path, "w") as f:
-            f.write(template_content)
+    if not template_or_script_path.exists():
+        Log.warning(f"Skipping template not found: {template_or_script_path}")
+        return warnings, success
 
-    if not warnings and not substituted:
-        Log.result(f"Completed check for {template_path}.\nNo %_% variables found.")
+    with open(template_or_script_path, 'r', encoding=locale.getlocale()[1]) as f:
+        template_or_script_content = f.read()
+    # TODO: quite sure this is duplicating work done in the config module, we
+    #       can reuse the same code.
+    # Look for %_%, and make them all uppercase (Autosubmit 4 default format)
+    variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_or_script_content, flags=re.IGNORECASE)
+    variables = [variable[1:-1].upper() for variable in variables]
+    results: dict[str, set] = {}
+    # Change format
+    for old_format_key in variables:
+        for key in as_conf.load_parameters().keys():
+            last_key = key.split(".")[-1]
+            if last_key == old_format_key:
+                if old_format_key not in results:
+                    results[old_format_key] = set()
+                strip_char = "'"
+                results[old_format_key].add(f"%{key.strip(strip_char)}%")
+    for key, new_key in results.items():
+        new_key_list = list(new_key)
+        if len(new_key_list) > 1:
+            if "JOBS" not in new_key_list[0] and "PLATFORMS" not in new_key_list:
+                warnings.append(
+                    f"Duplicate variable found: {key} to {new_key}. Adjust your script to use one of these.")
+        else:
+            new_key = new_key.pop().upper()
+            success.append(f"Translated {key} to {new_key}")
+            template_or_script_content = re.sub('%(?<!%%)' + key + '%(?!%%)', new_key, template_or_script_content,
+                                                flags=re.I)
+    # Deletes unused keys from confs
+    if 'autosubmit' in template_or_script_path.name.lower():
+        template_or_script_content = re.sub('(?m)^( )*(EXPID:)( )*[a-zA-Z0-9._-]*(\n)*', "", template_or_script_content,
+                                            flags=re.I)
+    # Write the final result
+    with open(template_or_script_path, "w") as f:
+        f.write(template_or_script_content)
+
+    if not warnings and not success:
+        Log.result(f"Completed check for {template_or_script_path}.\nNo %_% variables found.")
     else:
-        Log.result(f"Completed check for {template_path}")
+        Log.result(f"Completed check for {template_or_script_path}")
 
-    return warnings, substituted
+    return warnings, success
