@@ -169,7 +169,7 @@ html_theme_options = {
     "navbar_start": ["navbar-logo"],
     "navbar_center": ["navbar-nav"],
     "navbar_end": ["navbar-icon-links"],
-    "navbar_persistent": ["search-button"],
+    "navbar_persistent": ["search-button", "theme-switcher"],
     'footer_start': ['copyright', 'sphinx-version'],
     'footer_end': ['theme-version', 'footer_notes']
 }
@@ -226,8 +226,11 @@ html_css_files = [
 # html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
-# html_sidebars = {}
-
+html_sidebars = {
+    "qstartguide/index": [], 
+    "installation/index": [],
+    "database/index": [],              
+}
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
 # html_additional_pages = {}
