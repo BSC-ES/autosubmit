@@ -17,6 +17,8 @@
 
 """Integration tests for ``experiment_common.py``."""
 
+import pytest
+
 from autosubmit.experiment.experiment_common import delete_experiment
 
 
@@ -37,6 +39,7 @@ def test_delete_experiment_cancelled(autosubmit_exp, mocker):
 
 
 def test_delete_experiment_failed(autosubmit_exp, mocker):
+    """Test that if the experiment deletion fails, the experiment is not deleted."""
     exp = autosubmit_exp(experiment_data={})
     mocker.patch('autosubmit.experiment.experiment_common._delete_experiment', side_effect=ValueError)
 
@@ -44,14 +47,48 @@ def test_delete_experiment_failed(autosubmit_exp, mocker):
 
 
 def test_delete_experiment_that_is_running(autosubmit_exp, mocker):
+    """Test that if the experiment is running, the experiment is not deleted."""
     exp = autosubmit_exp(experiment_data={})
     mocker.patch('autosubmit.experiment.experiment_common.process_id', return_value=True)
 
     assert not delete_experiment(exp.expid, force=True)
 
 
-def test_delete_experiment_fails_db_details(autosubmit_exp, mocker):
+@pytest.mark.parametrize("update_metadata", [True, False], ids=["metadata update succeeds", "metadata update fails"])
+def test_delete_experiment_removes_directory_metadata_update(
+    autosubmit_exp, mocker, update_metadata
+):
+    """Test that the experiment directory is removed after deletion and logs are displayed."""
     exp = autosubmit_exp(experiment_data={})
-    mocker.patch('autosubmit.experiment.experiment_common.ExperimentDetails', side_effect=ValueError)
+    mocked_log = mocker.patch("autosubmit.experiment.experiment_common.Log")
+    # We can update the metadata successfully, so db_common.delete_experiment should be called without exceptions
+    if update_metadata:
+        mocked_delete_metadata = mocker.patch(
+            "autosubmit.experiment.experiment_common.db_common.delete_experiment"
+        )
+    # We simulate a failure updating the metadata, so db_common.delete_experiment should be called but raise an exception
+    else:
+        mocked_delete_metadata = mocker.patch(
+            "autosubmit.experiment.experiment_common.db_common.delete_experiment",
+            side_effect=Exception("metadata update failed"),
+        )
 
-    assert not delete_experiment(exp.expid, force=True)
+    # Check that the experiment directory is correctly removed
+    assert exp.exp_path.exists()
+    result = delete_experiment(exp.expid, force=True)
+    assert not exp.exp_path.exists()
+    mocked_log.info.assert_any_call("Removing experiment directory...")
+    mocked_log.info.assert_any_call("Updating experiment status in sqlite database...")
+
+    # Check that metadata update is attempted in both cases
+    if update_metadata:
+        assert result
+        mocked_delete_metadata.assert_called_once_with(exp.expid)
+        mocked_log.info.assert_any_call(f"Experiment {exp.expid} has been deleted")
+        mocked_log.result.assert_any_call(
+            f"Experiment {exp.expid} marked as deleted in database"
+        )
+    else:
+        assert not result
+        mocked_delete_metadata.assert_called_once_with(exp.expid)
+        mocked_log.error.assert_called()

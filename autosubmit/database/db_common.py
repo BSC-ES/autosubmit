@@ -22,10 +22,10 @@ import os
 import sqlite3
 from contextlib import suppress
 from pathlib import Path
-from typing import List, Optional, cast
+from typing import List, Optional
 
 from autosubmit.config.basicconfig import BasicConfig
-from sqlalchemy import delete, select, Connection, insert, text, update, func
+from sqlalchemy import delete, select, Connection, insert, update, func
 from sqlalchemy.schema import CreateTable
 
 from autosubmit.database import tables, session
@@ -286,11 +286,11 @@ def last_name_used(test=False, operational=False, evaluation=False):
 
 def delete_experiment(experiment_id):
     """
-    Removes experiment from database. Anti-lock version.
+    Marks experiment as deleted in metadata tables. Anti-lock version.
 
     :param experiment_id: experiment identifier
     :type experiment_id: str
-    :return: True if delete is successful
+    :return: True if operation is successful
     :rtype: bool
     """
     fn = _delete_experiment
@@ -554,27 +554,23 @@ def _last_name_used(test=False, operational=False, evaluation=False):
 
 def _delete_experiment(experiment_id):
     """
-    Removes experiment from database
+    Marks an experiment as deleted in database while preserving
+    the experiment row to avoid reusing assigned experiment IDs.
 
     :param experiment_id: experiment identifier
     :type experiment_id: str
-    :return: True if delete is successful
+    :return: True if operation is successful
     :rtype: bool
     """
-    check_db()
-
     if not _check_experiment_exists(experiment_id, False):  # Reference the no anti-lock version.
         return True
+    from autosubmit.history.experiment_status import ExperimentStatus
     try:
-        (conn, cursor) = open_conn()
-    except DbException as e:
-        raise AutosubmitCritical("Could not establish a connection to database", 7001, str(e))
-    cursor.execute('DELETE FROM experiment '
-                   'WHERE name=:name', {'name': experiment_id})
-    row = cursor.fetchone()
-    if row is None:
-        Log.debug(f'The experiment {experiment_id} has been deleted!!!')
-    close_conn(conn, cursor)
+        ExperimentStatus(experiment_id).set_as_deleted()
+    except Exception as e:
+        raise AutosubmitCritical('Could not mark experiment as deleted', 7001, str(e))
+
+    Log.debug(f'The experiment {experiment_id} has been marked as deleted.')
     return True
 
 
@@ -819,32 +815,14 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
         experiment_id, False
     ):  # Reference the no anti-lock version.
         return True
-
-    with _get_sqlalchemy_conn() as conn:
-        # Delete from experiment table
-        query = delete(tables.ExperimentTable).where(
-            tables.ExperimentTable.c.name == experiment_id  # type: ignore
-        )
-        result = conn.execute(query)
-        conn.commit()
-
-        # Drop schema
-        conn.execute(text(f'DROP SCHEMA IF EXISTS "{experiment_id}" CASCADE'))
-        conn.commit()
-
-        # Delete from experiment_status table
-        try:
-            query = delete(tables.ExperimentStatusTable).where(
-                tables.ExperimentStatusTable.c.name == experiment_id  # type: ignore
-            )
-            conn.execute(query)
-            conn.commit()
-        except Exception as e:
-            Log.debug(f"The experiment {experiment_id} has no status: {str(e)}")
-
-        if cast(int, result.rowcount) > 0:
-            Log.debug(f"The experiment {experiment_id} has been deleted!!!")
-        return True
+    from autosubmit.history.experiment_status import ExperimentStatus
+    try:
+        ExperimentStatus(experiment_id).set_as_deleted()
+    except Exception as e:
+        raise AutosubmitCritical("Could not mark experiment as deleted", 7001, str(e))
+    
+    Log.debug(f"The experiment {experiment_id} has been marked as deleted.")
+    return True
 
 
 def _get_experiment_id_sqlalchemy(name: str) -> int:

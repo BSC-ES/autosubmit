@@ -94,3 +94,49 @@ def test_save_experiment_sqlite_open_conn_error(monkeypatch, tmp_path, mocker):
             sig = inspect.signature(db_common_fn)
             params = ['' for _ in range(len(sig.parameters))]
             db_common_fn(*params)
+
+
+@pytest.mark.parametrize("engine", ["sqlite", "postgres"])
+def test_delete_experiment_not_exists(engine, mocker):
+    """Test _delete_experiment and _delete_experiment_sqlalchemy returns True when the experiment does not exist."""
+    if engine == "sqlite":
+        mocker.patch('autosubmit.database.db_common._check_experiment_exists', return_value=False)
+        assert db_common._delete_experiment("non_existent_experiment_id")
+    else:
+        mocker.patch('autosubmit.database.db_common._check_experiment_exists_sqlalchemy', return_value=False)
+        assert db_common._delete_experiment_sqlalchemy("non_existent_experiment_id")
+
+
+@pytest.mark.parametrize("engine", ["sqlite", "postgres"])
+def test_delete_experiment_exists(engine, mocker):
+    """Test _delete_experiment and _delete_experiment_sqlalchemy returns True when the experiment exists."""
+    if engine == "sqlite":
+        delete_fn = db_common._delete_experiment
+        mocker.patch('autosubmit.database.db_common._check_experiment_exists', return_value=True)
+    else:
+        delete_fn = db_common._delete_experiment_sqlalchemy
+        mocker.patch('autosubmit.database.db_common._check_experiment_exists_sqlalchemy', return_value=True)
+
+    mocked_status = mocker.patch('autosubmit.history.experiment_status.ExperimentStatus')
+    mocked_status.return_value.set_as_deleted.return_value = None
+
+    assert delete_fn("existing_experiment_id")
+    mocked_status.assert_called_once_with("existing_experiment_id")
+    mocked_status.return_value.set_as_deleted.assert_called_once()
+
+
+@pytest.mark.parametrize("engine", ["sqlite", "postgres"])
+def test_delete_experiment_set_as_deleted_fails(engine, mocker):
+    """Test that if set_as_deleted fails, the experiment is not deleted."""
+    if engine == "sqlite":
+        delete_fn = db_common._delete_experiment
+        mocker.patch('autosubmit.database.db_common._check_experiment_exists', return_value=True)
+    else:
+        delete_fn = db_common._delete_experiment_sqlalchemy
+        mocker.patch('autosubmit.database.db_common._check_experiment_exists_sqlalchemy', return_value=True)
+
+    mocked_status = mocker.patch('autosubmit.history.experiment_status.ExperimentStatus')
+    mocked_status.return_value.set_as_deleted.side_effect = Exception('Failed to set as deleted')
+
+    with pytest.raises(AutosubmitCritical, match='Could not mark experiment as deleted'):
+        delete_fn("existing_experiment_id")
