@@ -19,6 +19,7 @@ User Guide
    /userguide/user_mapping
    /userguide/templates
    /userguide/user_metrics/index
+   /userguide/performance/index
    /userguide/log_operations
    /userguide/debug/index
 

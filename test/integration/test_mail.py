@@ -18,22 +18,20 @@
 from typing import Any, Callable, Generator, Optional, Union, TYPE_CHECKING
 
 import pytest
-import requests
 
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
-from test.integration.test_utils.docker import get_mail_container, prepare_and_test_mail_container
+from test.integration.test_utils.docker import (
+    get_mail_container,
+    get_mailhog_messages,
+    prepare_and_test_mail_container,
+)
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from integration.conftest import AutosubmitExperiment
     from integration.conftest import AutosubmitExperimentFixture
     from pathlib import Path
-    from requests import Response
-
-
-def _get_messages(api_base: str) -> 'Response':
-    return requests.get(f"{api_base}/api/v2/messages")
 
 
 def _find_email_by_subject(search_text: str, emails) -> Any:
@@ -59,6 +57,32 @@ def fake_smtp_server() -> Generator[tuple[int, str], None, None]:
 
         yield smtp_port, api_base
         # requests.delete(f"{api_base}/api/v2/messages")
+
+
+@pytest.fixture
+def configured_mail(
+        fake_smtp_server: tuple[int, str]
+) -> Callable[['AutosubmitExperiment'], tuple[int, str]]:
+    """Factory that points an experiment's ``BasicConfig`` at the fake SMTP server.
+
+    Usage::
+
+        smtp_port, api_base = configured_mail(exp)
+
+    Mutates ``BasicConfig`` class attributes (``exp.as_conf.basic_config`` is
+    the class itself, not an instance). Auto-revert is not performed; rely on
+    every consumer re-assigning before reading, as the rest of this module does.
+    Inbox is fresh for free since ``fake_smtp_server`` is function-scoped.
+    """
+    smtp_port, api_base = fake_smtp_server
+
+    def _configure(autosubmit_experiment: 'AutosubmitExperiment') -> tuple[int, str]:
+        basic_config = autosubmit_experiment.as_conf.basic_config
+        basic_config.MAIL_FROM = 'notifier@localhost'
+        basic_config.SMTP_SERVER = f'127.0.0.1:{smtp_port}'
+        return smtp_port, api_base
+
+    return _configure
 
 
 @pytest.fixture
@@ -115,7 +139,7 @@ def test_notify_status_change(
         to_email
     )
 
-    resp = _get_messages(api_base)
+    resp = get_mailhog_messages(api_base)
     assert resp.json()["count"] == 1
     emails = resp.json()["items"]
     _check_metadata(emails, "status has changed to FAILED", exp.expid, 'notifier@localhost', to_email)
@@ -134,7 +158,7 @@ def test_experiment_status(
 
     mail_notifier.notify_experiment_status(exp.expid, to_email, exp.platform)
 
-    resp = _get_messages(api_base)
+    resp = get_mailhog_messages(api_base)
     assert resp.json()["count"] == 1
     emails = resp.json()["items"]
     _check_metadata(emails, "platform is malfunctioning", exp.expid, 'notifier@localhost', to_email)
@@ -175,7 +199,7 @@ def test_notify_cpmip_threshold_violations(
 
     mail_notifier.notify_cpmip_threshold_violations(exp.expid, job_name, violations, to_email)
 
-    resp = _get_messages(api_base)
+    resp = get_mailhog_messages(api_base)
     emails: Any = resp.json()["items"]
     _check_metadata(emails, "CPMIP Threshold Violation detected", exp.expid, 'notifier@localhost', to_email)
 
@@ -236,5 +260,5 @@ def test_recipients_list(
             exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING], Status.VALUE_TO_KEY[Status.FAILED],
             list_recipients  # type: ignore
         )
-        response = _get_messages(api_base)
+        response = get_mailhog_messages(api_base)
         assert len(response.json()["items"][0]["Raw"]["To"]) == len(list_recipients)
