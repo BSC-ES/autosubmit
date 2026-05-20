@@ -45,12 +45,17 @@ def test_invalid_commands(command, args, mocker):
 
 
 @pytest.mark.parametrize(
-    'exception,raised,status',
+    "exception,raised,status",
     [
         (SystemExit, None, 1),
         (BaseException, AutosubmitCritical, None),
-        (ValueError, AutosubmitCritical, None)
-    ]
+        (ValueError, AutosubmitCritical, None),
+    ],
+    ids=[
+        "SystemExit raised for invalid args",
+        "AutosubmitCritical raised for BaseException",
+        "AutosubmitCritical raised for ValueError",
+    ],
 )
 def test_exceptions_raised(exception: BaseException, raised: BaseException, status: Optional[int], mocker):
     """Test exceptions being raised (for whatever reason) when running commands."""
@@ -66,9 +71,13 @@ def test_exceptions_raised(exception: BaseException, raised: BaseException, stat
         assert status_returned == status
 
 
-@pytest.mark.parametrize("command", ["setstatus", "monitor", "recovery"])
+@pytest.mark.parametrize(
+    "command",
+    ["setstatus", "monitor", "recovery"],
+    ids=["setstatus", "monitor", "recovery"],
+)
 def test_combined_filters_parsed_for_commands(mocker, command):
-    """Test that combined filters parse correctly for multiple commands."""
+    """Test combined filters parse correctly for multiple commands."""
     base_args = [
         "autosubmit",
         command,
@@ -98,9 +107,13 @@ def test_combined_filters_parsed_for_commands(mocker, command):
     assert args.filter_status == "WAITING"
 
 
-@pytest.mark.parametrize("command", ["setstatus", "monitor", "recovery"])
-def test_setstatus_accepts_section_splits_in_ft(mocker, command):
-    """Test that ``setstatus`` accepts section/split syntax in ``-ft``."""
+@pytest.mark.parametrize(
+    "command",
+    ["setstatus", "monitor", "recovery"],
+    ids=["setstatus", "monitor", "recovery"],
+)
+def test_command_accepts_section_splits_in_ft(mocker, command):
+    """Test command accepts section/split syntax in ``-ft``."""
     base_args = [
         "autosubmit",
         command,

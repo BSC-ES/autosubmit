@@ -2743,7 +2743,7 @@ class Autosubmit:
                     selected_job_names = apply_job_filters(
                         job_list=job_list,
                         base_job_names={job.name for job in jobs},
-                        fitler_section=filter_section,
+                        filter_section=filter_section,
                         filter_chunk=filter_chunks,
                         filter_status=filter_status,
                         filter_list=lst,
@@ -2753,7 +2753,6 @@ class Autosubmit:
                     )
 
                     jobs = [job for job in jobs if job.name in selected_job_names]
-
         except BaseException as e:
             if profile:
                 profiler.stop()
