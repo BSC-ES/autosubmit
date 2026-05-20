@@ -16,8 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from typing import Any, TYPE_CHECKING
-
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
