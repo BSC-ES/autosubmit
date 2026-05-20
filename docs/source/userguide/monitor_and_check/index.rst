@@ -81,7 +81,7 @@ For example:
 How to generate cmd files
 -------------------------
 
-To generate  the cmd files of the current non-active jobs experiment, it is possible to use the command:
+To generate the cmd files of the current non-active jobs experiment, use the command:
 ::
 
     autosubmit inspect EXPID
@@ -126,6 +126,10 @@ To generate cmd only for a single job of the section :
 How to monitor an experiment
 ----------------------------
 
+The `monitor` command allows you to visualize the experiment workflow and shows each job's status (color coded)
+or stores a text file with the status of each job. You can select which jobs to monitor by using optional filters
+and grouping options.
+
 To monitor the status of the experiment, use the command:
 ::
 
@@ -155,7 +159,33 @@ The location where the user can find the txt output containing the status of eac
 
     <experiments_directory>/<EXPID>/status/<EXPID>_<DATE>_<TIME>.txt
 
-.. _job_status_reference:
+
+The following filters can be combined to select jobs to monitor.
+
++--------+----------------------------------------------+----------------------------------------------+
+| FILTER | Meaning                                      | Example of VALUE_TO_FILTER                   |
++========+==============================================+==============================================+
+| -fl    | filter by job name                           | ``-fl "a000_20101101_fc3_21_SIM"``           |
++--------+----------------------------------------------+----------------------------------------------+
+| -fs    | filter by job status                         | ``-fs FAILED``                               |
++--------+----------------------------------------------+----------------------------------------------+
+| -ft    | filter by job type  (and optionally split)   | ``-ft TRANSFER``                             |
++--------+----------------------------------------------+----------------------------------------------+
+| -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
++--------+----------------------------------------------+----------------------------------------------+
+
+If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will be selected for monitoring.
+
+Example of combined filters:
+
+::
+
+        autosubmit monitor <EXPID> \
+            -fc "[20200101 [ fc0 [1] ] ]" \
+            -fs WAITING \
+            -ft LOCALJOB \
+            -fl "<EXPID>_20200101_fc0_1_1_LOCALJOB"
+
 
 Possible job status
 ~~~~~~~~~~~~~~~~~~~

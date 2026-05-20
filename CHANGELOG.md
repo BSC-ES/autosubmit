@@ -54,6 +54,7 @@
 - verbosity adjusted #2976
 - Implement filters for `recovery` command #2923
 - Add detection of inneficiencies for key CPMIP metrics #3022
+- Allow multiple filters in the `monitor` command #3020
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

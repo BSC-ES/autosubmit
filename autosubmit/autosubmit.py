@@ -2661,21 +2661,38 @@ class Autosubmit:
 
         Plot is created in experiment's plot folder with name <expid>_<date>_<time>.<file_format>
 
-        :param txt_logfiles:
+        :param txt_logfiles: Whether to include log file paths in the text output.
+        :type txt_logfiles: bool
         :param expid: Identifier of the experiment to plot.
+        :type expid: str
         :param file_format: Plot file format. It can be pdf, png, ps or svg
+        :type file_format: str
         :param lst: list of jobs to change status
+        :type lst: str
         :param filter_chunks: chunks to change status
+        :type filter_chunks: str
         :param filter_status: current status of the jobs to change status
+        :type filter_status: str
         :param filter_section: sections to change status
+        :type filter_section: str
         :param hide: hides plot window
+        :type hide: bool
         :param txt_only: workflow will only be written as text
+        :type txt_only: bool
         :param group_by: workflow will only be written as text
+        :type group_by: Optional[str]
         :param expand: Filtering of jobs for its visualization
+        :type expand: str
         :param expand_status: Filtering of jobs for its visualization
+        :type expand_status: str
         :param hide_groups: Simplified workflow illustration by encapsulating the jobs.
+        :type hide_groups: bool
         :param check_wrapper: Shows a preview of how the wrappers will look
+        :type check_wrapper: bool
         :param profile: Whether to enable a profiler during the command execution or not.
+        :type profile: bool
+        :return: True if monitor was executed successfully, False otherwise
+        :rtype: bool
         """
         from .monitor.monitor import Monitor
 
