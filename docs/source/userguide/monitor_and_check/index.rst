@@ -565,72 +565,226 @@ The location where user can put this stats is in the file:
 .. _report:
 
 How to extract information about the experiment parameters
-----------------------------------------------------------
+------------------------------------------------------------
 
-This procedure allows you to extract the experiment variables that you want.
+The ``autosubmit report`` command extracts the parameters and resolved values
+of an experiment. It has two modes, each generating their own file, and they can be used together:
 
+* ``-all`` dumps every parameter Autosubmit knows about into a flat
+  ``<expid>_parameter_list_<timestamp>.txt`` file. Useful for discovery and
+  debugging.
+* ``-t <template>`` renders a user-supplied template, substituting
+  ``%KEY%`` markers with the corresponding values, into
+  ``<expid>_report_<timestamp>.<ext>``. The output preserves the template's
+  extension (``.md``, ``.html``, ``.rst``, …); files without an extension
+  default to ``.txt``.
+
+Both files land in the experiment's ``tmp/`` folder by default. Use ``-fp``
+to write them elsewhere.
 
 The command can be called with:
+
 ::
 
     autosubmit report EXPID -t "absolute_file_path"
 
 Alternatively it also can be called as follows:
+
 ::
 
-    autosubmit report EXPID
-
-Or combined as follows:
-::
-
-    autosubmit report EXPID -t "absolute_file_path"
+    autosubmit report EXPID -all
 
 Options:
 
 .. runcmd:: autosubmit report -h
 
+What goes into the parameter list
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Autosubmit parameters are encapsulated by %_%. Once you know how the parameter is called, you can create a template similar to the one as follows:
+The flat ``-all`` output contains, in order:
+
+* **Global configuration** — paths, ``HPCARCH``, the full ``PLATFORMS.*``
+  block, and the top-level YAML blocks (``EXPERIMENT.*``, ``PROJECT.*``,
+  ``CONFIG.*``, ``GIT.*``, ``SVN.*``, ``RERUN.*``, ``STORAGE.*``,
+  ``MAIL.*``, ``DEFAULT.*``).
+* **Per-section job configuration** — for each job section defined in
+  ``jobs_<expid>.yml``, the static YAML keys (``FILE``, ``PLATFORM``,
+  ``RUNNING``, ``WALLCLOCK``, ``ADDITIONAL_FILES``) plus the runtime-resolved
+  values (``CURRENT_HOST``, ``CURRENT_SCRATCH_DIR``, ``JOBNAME``, ``CHUNK``,
+  ``PROCESSORS``, chunk dates, …).
+* **Performance metrics** appended at the end, when the Autosubmit API is
+  reachable.
+
+For the full catalogue of variables, see the
+:doc:`Variables reference <../variables>`.
+
+Template syntax
+~~~~~~~~~~~~~~~~~
+
+Autosubmit parameters are encapsulated by ``%KEY%``, where ``KEY`` is any
+parameter name from the ``-all`` output. Keys are case-insensitive, so
+``%HPCARCH%``, ``%hpcarch%``, and ``%HpcArch%`` all substitute to the same
+value.
+
+Dotted keys reference nested values directly: ``%EXPERIMENT.DATELIST%``,
+``%PLATFORMS.MARENOSTRUM5.HOST%``, ``%JOBS.SIM.WALLCLOCK%``.
+
+To keep a literal ``%KEY%`` in the output (no substitution), wrap it as
+``%%KEY%%``. For example, ``%%PLATFORMS.MARENOSTRUM5.HOST%%`` in the template
+renders as the literal text ``%PLATFORMS.MARENOSTRUM5.HOST%`` in the output.
+
+Unknown placeholders render as ``-`` by default. Pass ``--placeholders`` to
+leave them in the output verbatim — useful while iterating on a template,
+since unmatched keys remain greppable. Autosubmit also logs a warning
+listing the first unmatched keys it encountered.
+
+Once you know how a parameter is called, you can create a template similar to
+the one as follows:
 
 .. code-block:: ini
    :caption: Template format and example.
 
-    - **CHUNKS:** %NUMCHUNKS% - %CHUNKSIZE% %CHUNKSIZEUNIT%
-    - **VERSION:** %VERSION%
-    - **MODEL_RES:** %MODEL_RES%
-    - **PROCS:** %XIO_NUMPROC% / %NEM_NUMPROC% / %IFS_NUMPROC% / %LPJG_NUMPROC% / %TM5_NUMPROC_X% / %TM5_NUMPROC_Y%
-    - **PRODUCTION_EXP:** %PRODUCTION_EXP%
-    - **OUTCLASS:** %BSC_OUTCLASS% / %CMIP6_OUTCLASS%
+    === CONFIG ===
+    CONFIG.AUTOSUBMIT_VERSION : %CONFIG.AUTOSUBMIT_VERSION%
+    CONFIG.TOTALJOBS : %CONFIG.TOTALJOBS%
+    CONFIG.SAFETYSLEEPTIME : %CONFIG.SAFETYSLEEPTIME%
+    CONFIG.RETRIALS : %CONFIG.RETRIALS%
+
+    === EXPERIMENT ===
+    EXPERIMENT.DATELIST : %EXPERIMENT.DATELIST%
+    EXPERIMENT.MEMBERS : %EXPERIMENT.MEMBERS%
+    EXPERIMENT.CHUNKSIZEUNIT : %EXPERIMENT.CHUNKSIZEUNIT%
+    EXPERIMENT.CHUNKSIZE : %EXPERIMENT.CHUNKSIZE%
+    EXPERIMENT.NUMCHUNKS : %EXPERIMENT.NUMCHUNKS%
+    EXPERIMENT.CALENDAR : %EXPERIMENT.CALENDAR%
+
+    === PLATFORMS ===
+    PLATFORMS.<PLATFORM_NAME>.TYPE : %PLATFORMS.<PLATFORM_NAME>.TYPE%
+    PLATFORMS.<PLATFORM_NAME>.HOST : %PLATFORMS.<PLATFORM_NAME>.HOST%
+    PLATFORMS.<PLATFORM_NAME>.USER : %PLATFORMS.<PLATFORM_NAME>.USER%
+    PLATFORMS.<PLATFORM_NAME>.PROJECT : %PLATFORMS.<PLATFORM_NAME>.PROJECT%
 
 This will be understood by Autosubmit and the result would be similar to:
 
 .. code-block:: ini
 
-    - CHUNKS: 2 - 1 month
-    - VERSION: trunk
-    - MODEL_RES: LR
-    - PROCS: 96 / 336 / - / - / 1 / 45
-    - PRODUCTION_EXP: FALSE
-    - OUTCLASS: reduced /  -
+    === CONFIG ===
+    CONFIG.AUTOSUBMIT_VERSION : 4.1.17
+    CONFIG.TOTALJOBS : 20
+    CONFIG.SAFETYSLEEPTIME : 10
+    CONFIG.RETRIALS : 0
+
+    === EXPERIMENT ===
+    EXPERIMENT.DATELIST : 20000101
+    EXPERIMENT.MEMBERS : fc0
+    EXPERIMENT.CHUNKSIZEUNIT : month
+    EXPERIMENT.CHUNKSIZE : 4
+    EXPERIMENT.NUMCHUNKS : 2
+    EXPERIMENT.CALENDAR : standard
+
+    === PLATFORMS ===
+    PLATFORMS.MARENOSTRUM4.TYPE : slurm
+    PLATFORMS.MARENOSTRUM4.HOST : mn1.bsc.es
+    PLATFORMS.MARENOSTRUM4.USER : None
+    PLATFORMS.MARENOSTRUM4.PROJECT : bsc32
 
 Although it depends on the experiment.
 
-If the parameter doesn't exist, it will be returned as '-', while if the parameter is declared but empty, it will remain empty.
+If the parameter doesn't exist, it will be returned as ``-``, while if the
+parameter is declared but empty, it will remain empty.
+
+Starter template
+~~~~~~~~~~~~~~~~~~
+
+The template below covers the most common parameters from ``CONFIG``,
+``EXPERIMENT``, ``PLATFORMS``, and the top-level namespace. It is a starting
+point: add, remove, or reorder lines freely.
+
+.. code-block:: text
+   :caption: Starter template.
+
+    # Edit this file, then run: autosubmit report <expid> -t <this_file>
+    #
+    # %KEY% is replaced by the value of KEY (case-insensitive).
+    # %%KEY%% renders as literal %KEY% (no substitution).
+    # Unknown keys become "-" (or stay verbatim with --placeholders).
+    #
+    # Replace <PLATFORM_NAME> below with your HPCARCH (e.g. MARENOSTRUM5, LOCAL).
+    #
+    # This is a starting point. Add, remove, or reorder lines freely. For the
+    # full set of keys available in your experiment, run `autosubmit report
+    # <expid> -all` and use the generated parameter_list file as a reference.
+
+    === CONFIG ===
+    CONFIG.AUTOSUBMIT_VERSION : %CONFIG.AUTOSUBMIT_VERSION%
+    CONFIG.TOTALJOBS          : %CONFIG.TOTALJOBS%
+    CONFIG.SAFETYSLEEPTIME    : %CONFIG.SAFETYSLEEPTIME%
+    CONFIG.RETRIALS           : %CONFIG.RETRIALS%
+
+    === EXPERIMENT ===
+    EXPERIMENT.DATELIST       : %EXPERIMENT.DATELIST%
+    EXPERIMENT.MEMBERS        : %EXPERIMENT.MEMBERS%
+    EXPERIMENT.CHUNKSIZEUNIT  : %EXPERIMENT.CHUNKSIZEUNIT%
+    EXPERIMENT.CHUNKSIZE      : %EXPERIMENT.CHUNKSIZE%
+    EXPERIMENT.NUMCHUNKS      : %EXPERIMENT.NUMCHUNKS%
+    EXPERIMENT.CALENDAR       : %EXPERIMENT.CALENDAR%
+
+    === PLATFORMS ===
+    PLATFORMS.<PLATFORM_NAME>.TYPE                : %PLATFORMS.<PLATFORM_NAME>.TYPE%
+    PLATFORMS.<PLATFORM_NAME>.HOST                : %PLATFORMS.<PLATFORM_NAME>.HOST%
+    PLATFORMS.<PLATFORM_NAME>.USER                : %PLATFORMS.<PLATFORM_NAME>.USER%
+    PLATFORMS.<PLATFORM_NAME>.PROJECT             : %PLATFORMS.<PLATFORM_NAME>.PROJECT%
+    PLATFORMS.<PLATFORM_NAME>.QUEUE               : %PLATFORMS.<PLATFORM_NAME>.QUEUE%
+    PLATFORMS.<PLATFORM_NAME>.SCRATCH_DIR         : %PLATFORMS.<PLATFORM_NAME>.SCRATCH_DIR%
+    PLATFORMS.<PLATFORM_NAME>.TEMP_DIR            : %PLATFORMS.<PLATFORM_NAME>.TEMP_DIR%
+    PLATFORMS.<PLATFORM_NAME>.MAX_WALLCLOCK       : %PLATFORMS.<PLATFORM_NAME>.MAX_WALLCLOCK%
+    PLATFORMS.<PLATFORM_NAME>.THREADS             : %PLATFORMS.<PLATFORM_NAME>.THREADS%
+    PLATFORMS.<PLATFORM_NAME>.ADD_PROJECT_TO_HOST : %PLATFORMS.<PLATFORM_NAME>.ADD_PROJECT_TO_HOST%
+
+    === TOP_LEVEL ===
+    HPCARCH        : %HPCARCH%
+    HPCROOTDIR     : %HPCROOTDIR%
+    HPCSCRATCH_DIR : %HPCSCRATCH_DIR%
+    ROOTDIR        : %ROOTDIR%
+    PROJDIR        : %PROJDIR%
+
+Save this as e.g. ``conf/report-template.txt`` and run:
+
+::
+
+    autosubmit report <expid> -t conf/report-template.txt
+
+Example output of ``-all``:
 
 .. code-block:: ini
    :caption: List of all parameters example.
 
-    HPCQUEUE: bsc_es
-    HPCARCH: marenostrum4
-    LOCAL_TEMP_DIR: /home/dbeltran/experiments/ASlogs
-    NUMCHUNKS: 1
-    PROJECT_ORIGIN: https://earth.bsc.es/gitlab/es/auto-ecearth3.git
-    MARENOSTRUM4_HOST: mn1.bsc.es
-    NORD3_QUEUE: bsc_es
-    NORD3_ARCH: nord3
-    CHUNKSIZEUNIT: month
-    MARENOSTRUM4_LOGDIR: /gpfs/scratch/bsc32/bsc32070/a01w/LOG_a01w
-    PROJECT_COMMIT:
-    SCRATCH_DIR: /gpfs/scratch
-    HPCPROJ: bsc32
-    NORD3_BUDG: bsc32
+    HPCARCH=MARENOSTRUM5
+    ROOTDIR=/home/user/autosubmit/a000
+    PROJDIR=/home/user/autosubmit/a000/proj
+    EXPERIMENT.DATELIST=20000101
+    EXPERIMENT.MEMBERS=fc0
+    EXPERIMENT.CHUNKSIZEUNIT=month
+    EXPERIMENT.CHUNKSIZE=1
+    EXPERIMENT.NUMCHUNKS=2
+    CONFIG.AUTOSUBMIT_VERSION=4.1.16
+    PLATFORMS.MARENOSTRUM5.HOST=glogin1.bsc.es
+    PLATFORMS.MARENOSTRUM5.QUEUE=gp_debug
+    PLATFORMS.MARENOSTRUM5.SCRATCH_DIR=/gpfs/scratch
+    JOBS.SIM.FILE=SIM.sh
+    JOBS.SIM.WALLCLOCK=02:00
+    JOBS.SIM.PROCESSORS=336
+    JOBS.SIM.RUNNING=chunk
+    ...
+
+Tips
+~~~~~
+
+* If a row in the rendered output contains ``-`` where you expected a value,
+  re-run with ``--placeholders`` to see exactly which key the renderer could
+  not resolve.
+* Some keys (``HPCSCRATCH_DIR``, the ``JOBS.<section>.CURRENT_*`` family) are
+  resolved at job-creation time. They may be empty for experiments that have
+  not yet run ``autosubmit create``.
+* The output filename follows the template's extension. Use ``.md`` for
+  Markdown-rendered reports, ``.html`` for emailable HTML, etc.

@@ -573,13 +573,12 @@ class Autosubmit:
                 "-db",
                 "--databasepath",
                 default=None,
-                help="path to SQLite database. If not supplied, "
-                     "it will prompt for it. Required for SQLite backend.",
+                help="path to SQLite database. Defaults to $HOME/autosubmit if not supplied. "
+                     "Required for SQLite backend.",
             )
             subparser.add_argument(
                 '-dbf', '--databasefilename', default=None, help='database filename')
-            subparser.add_argument('-lr', '--localrootpath', default=None, help='path to store experiments. If not '
-                                                                                'supplied, it will prompt for it')
+            subparser.add_argument('-lr', '--localrootpath', default=None, help='path to store experiments. Defaults to $HOME/autosubmit if not supplied')
             subparser.add_argument('-pc', '--platformsconfpath', default=None, help='path to platforms.yml file to '
                                                                                     'use by default. Optional')
             subparser.add_argument('-jc', '--jobsconfpath', default=None, help='path to jobs.yml file to use by '
@@ -3318,18 +3317,19 @@ class Autosubmit:
                 parameter_output = f'{expid}_parameter_list_{datetime.datetime.today().strftime("%Y%m%d-%H%M%S")}.txt'
                 parameter_file = open(os.path.join(
                     tmp_path, parameter_output), 'w')
-                # Common parameters
+                # parameters
+                parameters = as_conf.load_parameters()
+                global_keys = set(parameters.keys())
                 jobs_parameters = {}
                 try:
                     for job in job_list.get_job_list():
                         job_parameters = job.update_parameters(as_conf, set_attributes=True)
                         for key, value in job_parameters.items():
+                            if key in global_keys or key.startswith("JOBS."):
+                                continue
                             jobs_parameters["JOBS" + "." + job.section + "." + key] = value
                 except Exception:
                     pass
-                if len(jobs_parameters) > 0:
-                    del as_conf.experiment_data["JOBS"]
-                parameters = as_conf.load_parameters()
                 parameters.update(jobs_parameters)
                 for key, value in parameters.items():
                     if value is not None and len(str(value)) > 0:
@@ -3351,34 +3351,46 @@ class Autosubmit:
                 Log.result(f"A list of all parameters has been written on {os.path.join(tmp_path, parameter_output)}")
 
             if template_file_path is not None:
-                if os.path.exists(template_file_path):
-                    Log.info(
-                        "Gathering the selected parameters (all keys are on upper_case)")
-                    template_file = open(template_file_path, 'r')
-                    template_content = template_file.read()
-                    for key, value in parameters.items():
-                        template_content = re.sub(
-                            '%(?<!%%)' + key + '%(?!%%)', str(parameters[key]), template_content, flags=re.I)
-                    # Performance metrics
-                    if performance_metrics is not None and len(str(performance_metrics)) > 0:
-                        for key in performance_metrics:
-                            template_content = re.sub(
-                                '%(?<!%%)' + key + '%(?!%%)', str(performance_metrics[key]), template_content,
-                                flags=re.I)
-                    template_content = template_content.replace("%%", "%")
-                    if not placeholders:
-                        template_content = re.sub(
-                            r"%[^% \n\t]+%", "-", template_content, flags=re.I)
-                    report = f'{expid}_report_{datetime.datetime.today().strftime("%Y%m%d-%H%M%S")}.txt'
-                    open(os.path.join(tmp_path, report),
-                         'w').write(template_content)
-                    os.chmod(os.path.join(tmp_path, report), 0o755)
-                    template_file.close()
-                    Log.result(f"Report {report} has been created on {os.path.join(tmp_path, report)}")
-                    return True
-                else:
+                if not os.path.exists(template_file_path):
                     raise AutosubmitCritical(
-                        f"Template {template_file_path} doesn't exists ", 7014)
+                        f"Template {template_file_path} doesn't exist ", 7014)
+                Log.info("Rendering report template (keys are case-insensitive)")
+                with open(template_file_path, 'r') as f:
+                    template_content = f.read()
+                lookup = {k.upper(): str(v) for k, v in parameters.items()}
+                if performance_metrics:
+                    lookup.update({k.upper(): str(v) for k, v in performance_metrics.items()})
+                unknown: list[str] = []
+                def _sub(match):
+                    escaped, key = match.group(1), match.group(2)
+                    if escaped is not None:
+                        return f'%{escaped}%'
+                    value = lookup.get(key.upper())
+                    if value is None or value == '':
+                        unknown.append(key)
+                        return f'%{key}%' if placeholders else '-'
+                    return value
+                rendered = re.sub(r'%%([^%\s]+)%%|%([^%\s]+)%', _sub, template_content)
+                if unknown:
+                    unique = sorted(set(unknown))
+                    sample = ', '.join(unique[:10])
+                    suffix = '...' if len(unique) > 10 else ''
+                    rendering = 'kept verbatim' if placeholders else 'replaced with "-"'
+                    Log.warning(
+                        f"{len(unique)} placeholder(s) in the template did not "
+                        f"match any parameter and were {rendering}: {sample}{suffix}"
+                    )
+                template_suffix = os.path.splitext(template_file_path)[1] or '.txt'
+                report = (
+                    f'{expid}_report_'
+                    f'{datetime.datetime.today().strftime("%Y%m%d-%H%M%S")}'
+                    f'{template_suffix}'
+                )
+                report_path = os.path.join(tmp_path, report)
+                with open(report_path, 'w') as f:
+                    f.write(rendered)
+                os.chmod(report_path, 0o755)
+                Log.result(f"Report {report} has been created on {report_path}")
             return True
         except AutosubmitError:
             raise
