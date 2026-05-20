@@ -25,9 +25,6 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
 )
 
-if TYPE_CHECKING:
-    from docker.models.containers import Container
-
 
 @pytest.fixture(scope="function")
 def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
