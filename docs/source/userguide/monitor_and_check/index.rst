@@ -186,6 +186,7 @@ Example of combined filters:
             -ft LOCALJOB \
             -fl "<EXPID>_20200101_fc0_1_1_LOCALJOB"
 
+.. _job_status_reference:
 
 Possible job status
 ~~~~~~~~~~~~~~~~~~~
