@@ -3,7 +3,6 @@ import pytest
 from datetime import datetime
 from mock.mock import MagicMock
 from networkx import DiGraph
-from datetime import datetime as dt
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
@@ -779,9 +778,7 @@ def test_get_jobs_filtered_grouped_splits(parent_splits, child_splits, slice_siz
     the minimal form ``1*\\<slice_size>`` so the only information used is the slice size
     encoded in the ``*\\N`` suffix; the actual index computation must be purely arithmetic.
     """
-    from datetime import datetime as dt
-
-    date = dt(2000, 1, 1)
+    date = datetime(2000, 1, 1)
     as_conf.experiment_data = {
         'DEFAULT': {'EXPID': 'a000'},
         'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
@@ -796,9 +793,6 @@ def test_get_jobs_filtered_grouped_splits(parent_splits, child_splits, slice_siz
             },
         },
     }
-    as_conf.experiment_data["JOBS"] = as_conf.experiment_data["JOBS"]
-    as_conf.experiment_data["JOBS"] = as_conf.experiment_data["JOBS"]
-
     dictionary = DicJobs([date], ["fc0"], [1], "", default_retrials=0, as_conf=as_conf)
     dictionary.read_section("PARENT", 1, "bash")
 
@@ -1006,7 +1000,7 @@ def test_check_special_status(
 ])
 def test_apply_splits_filter_previous_n(steps_back, job_split, total_splits, expected_split, as_conf):
     """Test that ``previous`` and ``previous-N`` resolve to the correct split"""
-    date = dt(2000, 1, 1)
+    date = datetime(2000, 1, 1)
     as_conf.experiment_data = {
         'DEFAULT': {'EXPID': 'a000'},
         'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
@@ -1038,3 +1032,110 @@ def test_apply_splits_filter_previous_n(steps_back, job_split, total_splits, exp
     else:
         assert len(result) == 1, f"Expected exactly one result for split={job_split}, filter={splits_filter}"
         assert result[0].split == expected_split
+
+
+@pytest.mark.parametrize("filter_key", ["DATES_TO", "MEMBERS_TO", "CHUNKS_TO"])
+def test_get_jobs_filtered_none_filter(filter_key, as_conf):
+    """A 'none' filter at any level must yield an empty job list."""
+    date = datetime(2000, 1, 1)
+    as_conf.experiment_data = {
+        'DEFAULT': {'EXPID': 'a000'},
+        'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
+        'EXPERIMENT': {
+            'DATELIST': '20000101', 'MEMBERS': 'fc0', 'CHUNKSIZEUNIT': 'day',
+            'CHUNKSIZE': 1, 'NUMCHUNKS': 1, 'CHUNKINI': '', 'CALENDAR': 'standard',
+        },
+        'JOBS': {
+            'SIM': {
+                'FILE': 'sim.sh', 'RUNNING': 'chunk',
+                'SPLITS': 2, 'WALLCLOCK': '00:05',
+            },
+        },
+    }
+    dictionary = DicJobs([date], ["fc0"], [1], "", default_retrials=0, as_conf=as_conf)
+    dictionary.read_section("SIM", 1, "bash")
+
+    job = Job("a000_20000101_fc0_1_1_SIM", 0, Status.WAITING, 1)
+    job.date = date
+    job.member = "fc0"
+    job.chunk = 1
+    job.running = "chunk"
+    job.split = 1
+    job.splits = 2
+
+    filters_to = {filter_key: "none"}
+    result = dictionary.get_jobs_filtered("SIM", job, filters_to, date, "fc0", 1, {})
+    assert result == [], f"Expected empty list for {filter_key}=none, got {result}"
+
+
+def test_get_jobs_filtered_split_slice_zero_raises(as_conf):
+    """A grouped split filter with slice size 0 must raise a clear ValueError."""
+    date = datetime(2000, 1, 1)
+    as_conf.experiment_data = {
+        'DEFAULT': {'EXPID': 'a000'},
+        'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
+        'EXPERIMENT': {
+            'DATELIST': '20000101', 'MEMBERS': 'fc0', 'CHUNKSIZEUNIT': 'day',
+            'CHUNKSIZE': 1, 'NUMCHUNKS': 1, 'CHUNKINI': '', 'CALENDAR': 'standard',
+        },
+        'JOBS': {
+            'PARENT': {
+                'FILE': 'parent.sh', 'RUNNING': 'chunk',
+                'SPLITS': 4, 'WALLCLOCK': '00:10',
+            },
+        },
+    }
+    dictionary = DicJobs([date], ["fc0"], [1], "", default_retrials=0, as_conf=as_conf)
+    dictionary.read_section("PARENT", 1, "bash")
+
+    job = Job("a000_20000101_fc0_1_1_CHILD", 1, Status.WAITING, 1)
+    job.date = date
+    job.member = "fc0"
+    job.chunk = 1
+    job.running = "chunk"
+    job.split = 1
+    job.splits = 4
+
+    filters_to = {'SPLITS_TO': "1*\\0"}
+    with pytest.raises(ValueError, match="slice size must be > 0"):
+        dictionary.get_jobs_filtered("PARENT", job, filters_to, date, "fc0", 1, {})
+
+
+@pytest.mark.parametrize("split_value", [-1, 0, None])
+def test_get_jobs_filtered_negative_split_with_star(split_value, as_conf):
+    """Star-mapping with an invalid split index must not silently index from the end."""
+    date = datetime(2000, 1, 1)
+    as_conf.experiment_data = {
+        'DEFAULT': {'EXPID': 'a000'},
+        'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
+        'EXPERIMENT': {
+            'DATELIST': '20000101', 'MEMBERS': 'fc0', 'CHUNKSIZEUNIT': 'day',
+            'CHUNKSIZE': 1, 'NUMCHUNKS': 1, 'CHUNKINI': '', 'CALENDAR': 'standard',
+        },
+        'JOBS': {
+            'PARENT': {
+                'FILE': 'parent.sh', 'RUNNING': 'chunk',
+                'SPLITS': 4, 'WALLCLOCK': '00:10',
+            },
+        },
+    }
+    dictionary = DicJobs([date], ["fc0"], [1], "", default_retrials=0, as_conf=as_conf)
+    dictionary.read_section("PARENT", 1, "bash")
+
+    job = Job("a000_20000101_fc0_1_1_CHILD", 1, Status.WAITING, 1)
+    job.date = date
+    job.member = "fc0"
+    job.chunk = 1
+    job.running = "chunk"
+    job.split = split_value
+    job.splits = 4
+
+    # 1-to-1 star mapping
+    filters_to = {'SPLITS_TO': "1*"}
+    result = dictionary.get_jobs_filtered("PARENT", job, filters_to, date, "fc0", 1, {})
+    assert result == [], f"Expected empty list for split={split_value} with star mapping, got {result}"
+
+    # Grouped star mapping
+    filters_to = {'SPLITS_TO': "1*\\2"}
+    result = dictionary.get_jobs_filtered("PARENT", job, filters_to, date, "fc0", 1, {})
+    assert result == [], f"Expected empty list for split={split_value} with grouped star mapping, got {result}"

@@ -236,7 +236,8 @@ class DicJobs:
     def _collect_by_keys(self, jobs: dict, keys, final_jobs_list: list, jobs_aux: dict) -> dict:
         """Collect jobs from ``jobs`` for the given ``keys`` into the appropriate output.
 
-        Flat jobs (list or Job) are appended to ``final_jobs_list``; nested dicts are merged
+        Values that are ``list`` (terminal job lists) are extended into
+        ``final_jobs_list``; values that are ``dict`` (next nesting level) are merged
         into ``jobs_aux`` via `update_jobs_filtered`.
 
         :param jobs: Current level of the job dict.
@@ -251,8 +252,6 @@ class DicJobs:
                 continue
             if type(value) is list:
                 final_jobs_list.extend(value)
-            elif type(value) is Job:
-                final_jobs_list.append(value)
             elif type(value) is dict:
                 jobs_aux = self.update_jobs_filtered(jobs_aux, value)
         return jobs_aux
@@ -297,6 +296,57 @@ class DicJobs:
                 return self._collect_by_keys(jobs, [natural_key], final_jobs_list, jobs_aux)
             return {}
 
+    @staticmethod
+    def _resolve_star_splits(
+        final_jobs_list: list,
+        job: "Job",
+        part: str,
+        filters_to_of_parent: dict,
+    ) -> set:
+        """Resolve a single star-mapping part (* or *\\N) into matching jobs.
+
+        :param final_jobs_list: Candidate parent jobs.
+        :param job: The current job whose split number drives the mapping.
+        :param part: A single star-mapping part (e.g. ``"1*"`` or ``"1*\2"``).
+        :param filters_to_of_parent: The parent's filters_to dict.
+        :return: Set of matched Job objects.
+        """
+        if not final_jobs_list:
+            return set()
+
+        match = re.search(r"\\(\d+)", part)
+        if match:
+            split_slice = int(match.group(1))
+            if split_slice <= 0:
+                raise ValueError(
+                    f"Invalid SPLITS_TO filter part '{part}': grouped slice size must be > 0, got {split_slice}"
+                )
+            if job.split is None or job.split <= 0:
+                return set()
+
+            is_n_to_1 = int(job.splits) <= int(final_jobs_list[0].splits)
+            if is_n_to_1:
+                split_index = (job.split - 1) * split_slice
+                end = min(split_index + split_slice, len(final_jobs_list))
+                result = final_jobs_list[split_index:end]
+                if "previous" in filters_to_of_parent.get("SPLITS_TO", ""):
+                    result = [result[-1]] if result else []
+            else:
+                parent_index = min((job.split - 1) // split_slice, len(final_jobs_list) - 1)
+                result = final_jobs_list[parent_index]
+                if "previous" in filters_to_of_parent.get("SPLITS_TO", ""):
+                    result = [result] if result else []
+
+            return set(result) if type(result) is list else {result}
+
+        # Simple 1-to-1 * mapping
+        if job.split is None or job.split <= 0:
+            return set()
+        split_index = job.split - 1
+        if split_index < len(final_jobs_list):
+            return {final_jobs_list[split_index]}
+        return set()
+
     def _apply_splits_filter(
         self,
         final_jobs_list: list,
@@ -316,72 +366,70 @@ class DicJobs:
         :param split_filter: Raw SPLITS_TO string value.
         :param filters_to_of_parent: The parent's filters_to dict, used to detect ``previous``
             in the parent's SPLITS_TO for grouped-mapping edge cases.
-        :return: Filtered list of Job objects.
+        :return: Filtered list of matching Job objects.
         """
-        parts = split_filter.split(",")
-        one_to_one_splits = ",".join(s for s in parts if "*" in s).lower()
-        normal_splits = ",".join(s for s in parts if "*" not in s).lower()
+        parts = [p.strip() for p in split_filter.split(",")]
+        normal_parts = [p for p in parts if "*" not in p]
+        normal_parts_lower = ",".join(normal_parts).lower()
 
-        skip_one_to_one = False
-        if "none" in normal_splits:
-            result_normal = [
+        if "all" in normal_parts_lower:
+            return final_jobs_list
+
+        elif "none" in normal_parts_lower:
+            return [
                 f for f in final_jobs_list
                 if (f.split is None or f.split in (-1, 0)) and f.name != job.name
             ]
-            skip_one_to_one = True
-        elif "all" in normal_splits:
-            result_normal = final_jobs_list
-            skip_one_to_one = True
-        elif "previous" in normal_splits:
-            previous_match = re.search(r"previous(?:-(\d+))?", normal_splits)
-            steps_back = int(previous_match.group(1)) if previous_match and previous_match.group(1) else 1
-            result_normal = [
+        elif "previous" in normal_parts_lower:
+            match = re.search(r"previous(?:-(\d+))?", normal_parts_lower)
+            steps_back = int(match.group(1)) if match and match.group(1) else 1
+            return [
                 f for f in final_jobs_list
                 if job.split is not None and job.split > steps_back
                 and f.split == job.split - steps_back and f.name != job.name
             ]
-            skip_one_to_one = True
-        elif not normal_splits:
-            result_normal = []
-        else:
-            resolved = normal_splits.replace("natural", str(job.split))
-            resolved_set = resolved.split(",")
-            result_normal = [
-                f for f in final_jobs_list
-                if (f.split is None or f.split in (-1, 0) or str(f.split) in resolved_set)
-                and f.name != job.name
-            ]
 
-        result_special: list = []
-        if "*" in one_to_one_splits and not skip_one_to_one:
-            if not final_jobs_list:
-                return list(set(result_normal))
-            easier_to_filter = "," + one_to_one_splits + ","
-            slice_matches = re.findall(r"\\[0-9]+", easier_to_filter)
-            if slice_matches:  # N-to-1 or 1-to-N grouped mapping (*\N)
-                split_slice = int(slice_matches[0].split("\\")[1])
-                is_n_to_1 = int(job.splits) <= int(final_jobs_list[0].splits)
-                if is_n_to_1:
-                    split_index = (job.split - 1) * split_slice
-                    end = min(split_index + split_slice, len(final_jobs_list))
-                    result_special = final_jobs_list[split_index:end]
-                    if "previous" in filters_to_of_parent.get("SPLITS_TO", ""):
-                        result_special = [result_special[-1]] if result_special else []
-                else:
-                    parent_index = min((job.split - 1) // split_slice, len(final_jobs_list) - 1)
-                    result_special = final_jobs_list[parent_index] if final_jobs_list else []
-                    if "previous" in filters_to_of_parent.get("SPLITS_TO", ""):
-                        if type(result_special) is list:
-                            result_special = [result_special[-1]] if result_special else []
-            else:  # 1-to-1 mapping (*)
-                split_index = job.split - 1
-                result_special = [final_jobs_list[split_index]] if split_index < len(final_jobs_list) else []
+        results = set()
 
-        if type(result_special) is not list:
-            result_special = [result_special]
-        if type(result_normal) is not list:
-            result_normal = [result_normal]
-        return list(set(result_normal + result_special))
+        for part in parts:
+            part_lower = part.lower()
+            if "*" in part:
+                results.update(self._resolve_star_splits(
+                    final_jobs_list, job, part, filters_to_of_parent
+                ))
+            elif part_lower == "natural":
+                val = str(job.split)
+                results.update(
+                    f for f in final_jobs_list
+                    if f.name != job.name and (str(f.split) == val or (f.split or 0) <= 0)
+                )
+            else:
+                results.update(
+                    f for f in final_jobs_list
+                    if f.name != job.name and (str(f.split) == part or (f.split or 0) <= 0)
+                )
+
+        return list(results)
+
+    def _consume_level(self, jobs, final_jobs_list, filter_value, explicit_keys, natural_key, use_all_keys):
+        """Consume one traversal level: extend flat jobs or apply a filter.
+
+        :param jobs: Current level (dict, list, or empty).
+        :param final_jobs_list: Accumulator for resolved Job objects.
+        :param filter_value: Raw filter string (or None).
+        :param explicit_keys: Pre-parsed keys for the filter.
+        :param natural_key: The job's own key at this level.
+        :param use_all_keys: Whether to iterate every key when no filter is set.
+        :return: The next-level dict (empty if this level is terminal).
+        """
+        if not jobs:
+            return {}
+        if type(jobs) is list:
+            final_jobs_list.extend(jobs)
+            return {}
+        return self._filter_level(
+            jobs, filter_value, explicit_keys, natural_key, use_all_keys, final_jobs_list
+        )
 
     def get_jobs_filtered(self, section, job, filters_to, natural_date, natural_member, natural_chunk,
                           filters_to_of_parent):
@@ -403,74 +451,52 @@ class DicJobs:
         final_jobs_list: list = []
 
         # date
-        if len(jobs) > 0:
-            if type(jobs) is list:
-                final_jobs_list.extend(jobs)
-                jobs = {}
-            else:
-                date_filter = filters_to.get("DATES_TO", None)
-                explicit_dates = (
-                    [datetime.datetime.strptime(d, "%Y%m%d") for d in date_filter.split(",")]
-                    if date_filter and "none" not in date_filter.lower() and "all" not in date_filter.lower()
-                    else []
-                )
-                jobs = self._filter_level(
-                    jobs, date_filter, explicit_dates, natural_date,
-                    use_all_keys=(job.running == "once"),
-                    final_jobs_list=final_jobs_list,
-                )
+        date_filter = filters_to.get("DATES_TO", None)
+        explicit_dates = (
+            [datetime.datetime.strptime(d, "%Y%m%d") for d in date_filter.split(",")]
+            if date_filter and "none" not in date_filter.lower() and "all" not in date_filter.lower()
+            else []
+        )
+        jobs = self._consume_level(
+            jobs, final_jobs_list, date_filter, explicit_dates, natural_date,
+            use_all_keys=(job.running == "once"),
+        )
 
         # member
-        if len(jobs) > 0:
-            if type(jobs) is list:
-                final_jobs_list.extend(jobs)
-                jobs = {}
-            else:
-                # Normalize member keys to uppercase.
-                jobs = {k.upper(): v for k, v in jobs.items()}
-                member_filter = filters_to.get("MEMBERS_TO", None)
-                explicit_members = (
-                    [m.strip().upper() for m in member_filter.split(",")]
-                    if member_filter and "none" not in member_filter.lower() and "all" not in member_filter.lower()
-                    else []
-                )
-                natural_member_key = natural_member.upper() if natural_member else None
-                jobs = self._filter_level(
-                    jobs, member_filter, explicit_members, natural_member_key,
-                    use_all_keys=(job.running == "once" or not job.member),
-                    final_jobs_list=final_jobs_list,
-                )
+        if jobs:
+            # Normalize member keys to uppercase.
+            jobs = {k.upper(): v for k, v in jobs.items()}
+        member_filter = filters_to.get("MEMBERS_TO", None)
+        explicit_members = (
+            [m.strip().upper() for m in member_filter.split(",")]
+            if member_filter and "none" not in member_filter.lower() and "all" not in member_filter.lower()
+            else []
+        )
+        natural_member_key = natural_member.upper() if natural_member else None
+        jobs = self._consume_level(
+            jobs, final_jobs_list, member_filter, explicit_members, natural_member_key,
+            use_all_keys=(job.running == "once" or not job.member),
+        )
 
         # chunk
-        if len(jobs) > 0:
-            if type(jobs) is list:
-                final_jobs_list.extend(jobs)
-                jobs = {}
-            else:
-                chunk_filter = filters_to.get("CHUNKS_TO", None)
-                explicit_chunks = (
-                    [int(c.strip()) for c in chunk_filter.split(",")]
-                    if chunk_filter and "none" not in chunk_filter.lower() and "all" not in chunk_filter.lower()
-                    else []
-                )
-                jobs = self._filter_level(
-                    jobs, chunk_filter, explicit_chunks, natural_chunk,
-                    use_all_keys=(job.running == "once" or not job.chunk),
-                    final_jobs_list=final_jobs_list,
-                )
-                # Remaining jobs at chunk level are always flat (list or Job).
-                if len(jobs) > 0 and not isinstance(jobs, dict):
-                    final_jobs_list.extend(jobs if type(jobs) is list else [jobs])
+        chunk_filter = filters_to.get("CHUNKS_TO", None)
+        explicit_chunks = (
+            [int(c.strip()) for c in chunk_filter.split(",")]
+            if chunk_filter and "none" not in chunk_filter.lower() and "all" not in chunk_filter.lower()
+            else []
+        )
+        self._consume_level(
+            jobs, final_jobs_list, chunk_filter, explicit_chunks, natural_chunk,
+            use_all_keys=(job.running == "once" or not job.chunk),
+        )
 
-        #  splits
+        # splits
         split_filter = filters_to.get("SPLITS_TO", None)
         if final_jobs_list and split_filter:
             final_jobs_list = self._apply_splits_filter(
                 final_jobs_list, job, split_filter, filters_to_of_parent
             )
 
-        if type(final_jobs_list) is not list:
-            return [final_jobs_list]
         return list(set(final_jobs_list))
 
     def get_jobs(self, section, date=None, member=None, chunk=None, sort_string=False):

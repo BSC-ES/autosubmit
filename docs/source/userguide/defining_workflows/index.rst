@@ -842,7 +842,7 @@ In this example:
 * ``B`` split 3 depends on ``A`` split 2.
 * ``B`` split 4 depends on ``A`` split 3.
 
-Example 4: ``previous-N`` split dependency
+Example 6: ``previous-N`` split dependency
 
 The ``previous`` keyword in ``SPLITS_TO`` links each split to its **immediately preceding** split.
 The generalised form ``previous-N`` links each split to the split that is **N positions earlier**.
