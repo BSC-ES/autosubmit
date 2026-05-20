@@ -66,79 +66,56 @@ def test_exceptions_raised(exception: BaseException, raised: BaseException, stat
         assert status_returned == status
 
 
-def test_setstatus_accepts_combined_filters(mocker):
-    """Test that the combined ``setstatus`` filters should parse correctly."""
-    mocker.patch(
-        "sys.argv",
-        [
-            "autosubmit",
-            "setstatus",
-            "a000",
-            "-fl",
-            "a000_20200101_fc0_1_1_LOCALJOB",
-            "-fc",
-            "[20200101 [ fc0 [1] ] ]",
-            "-ft",
-            "LOCALJOB",
-            "-fs",
-            "WAITING",
-            "-t",
-            "READY",
-        ],
-    )
+@pytest.mark.parametrize("command", ["setstatus", "monitor", "recovery"])
+def test_combined_filters_parsed_for_commands(mocker, command):
+    """Test that combined filters parse correctly for multiple commands."""
+    base_args = [
+        "autosubmit",
+        command,
+        "a000",
+        "-fl",
+        "a000_20200101_fc0_1_1_LOCALJOB",
+        "-fc",
+        "[20200101 [ fc0 [1] ] ]",
+        "-ft",
+        "LOCALJOB",
+        "-fs",
+        "WAITING",
+    ]
+
+    # setstatus requires target status (-t)
+    if command == "setstatus":
+        base_args += ["-t", "READY"]
+
+    mocker.patch("sys.argv", base_args)
     status, args = Autosubmit.parse_args()
 
     assert status == 0
-    assert args.command == "setstatus"
+    assert args.command == command
     assert args.list == "a000_20200101_fc0_1_1_LOCALJOB"
     assert args.filter_chunks == "[20200101 [ fc0 [1] ] ]"
     assert args.filter_type == "LOCALJOB"
     assert args.filter_status == "WAITING"
 
 
-def test_setstatus_accepts_section_splits_in_ft(mocker):
+@pytest.mark.parametrize("command", ["setstatus", "monitor", "recovery"])
+def test_setstatus_accepts_section_splits_in_ft(mocker, command):
     """Test that ``setstatus`` accepts section/split syntax in ``-ft``."""
-    mocker.patch(
-        "sys.argv",
-        [
-            "autosubmit",
-            "setstatus",
-            "a000",
-            "-ft",
-            "LOCALJOB [ 1 2 5-8 ]",
-            "-t",
-            "READY",
-        ],
-    )
+    base_args = [
+        "autosubmit",
+        command,
+        "a000",
+        "-ft",
+        "LOCALJOB [ 1 2 5-8 ]",
+    ]
+
+    # setstatus requires target status (-t)
+    if command == "setstatus":
+        base_args += ["-t", "READY"]
+
+    mocker.patch("sys.argv", base_args)
     status, args = Autosubmit.parse_args()
 
     assert status == 0
-    assert args.command == "setstatus"
+    assert args.command == command
     assert args.filter_type == "LOCALJOB [ 1 2 5-8 ]"
-
-def test_monitor_accepts_combined_filters(mocker):
-    """Test that combined ``monitor`` filters should parse correctly."""
-    mocker.patch(
-        "sys.argv",
-        [
-            "autosubmit",
-            "monitor",
-            "a000",
-            "-fl",
-            "a000_20200101_fc0_1_1_LOCALJOB",
-            "-fc",
-            "[20200101 [ fc0 [1] ] ]",
-            "-ft",
-            "LOCALJOB",
-            "-fs",
-            "WAITING",
-        ],
-    )
-    status, args = Autosubmit.parse_args()
-
-    assert status == 0
-    assert args.command == "monitor"
-    assert args.list == "a000_20200101_fc0_1_1_LOCALJOB"
-    assert args.filter_chunks == "[20200101 [ fc0 [1] ] ]"
-    assert args.filter_type == "LOCALJOB"
-    assert args.filter_status == "WAITING"
