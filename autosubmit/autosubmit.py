@@ -1081,6 +1081,9 @@ class Autosubmit:
             host = fullhost.split(",")[0]
         else:
             host = fullhost
+
+        # Obsolete host-command restrictions, kept for compatibility.
+        # Used to prevent execution of specific commands on specific hosts in shared-filesystem deployments.
         forbidden = BasicConfig.DENIED_HOSTS
         authorized = BasicConfig.ALLOWED_HOSTS
         message = f"Command: {args.command.upper()} is not allowed to run in host: {host}.\n"
@@ -1100,6 +1103,7 @@ class Autosubmit:
                     host in BasicConfig.ALLOWED_HOSTS[args.command] or fullhost in BasicConfig.ALLOWED_HOSTS[
                 args.command]):
                 raise AutosubmitCritical(message, 7071)
+        
         if (expid != 'None' and expid) and args.command not in expid_less and args.command not in global_log_command:
             if isinstance(expid, list):
                 expids = cast(list[str], expid)
