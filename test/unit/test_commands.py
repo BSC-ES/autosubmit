@@ -115,3 +115,30 @@ def test_setstatus_accepts_section_splits_in_ft(mocker):
     assert status == 0
     assert args.command == "setstatus"
     assert args.filter_type == "LOCALJOB [ 1 2 5-8 ]"
+
+def test_monitor_accepts_combined_filters(mocker):
+    """Test that combined ``monitor`` filters should parse correctly."""
+    mocker.patch(
+        "sys.argv",
+        [
+            "autosubmit",
+            "monitor",
+            "a000",
+            "-fl",
+            "a000_20200101_fc0_1_1_LOCALJOB",
+            "-fc",
+            "[20200101 [ fc0 [1] ] ]",
+            "-ft",
+            "LOCALJOB",
+            "-fs",
+            "WAITING",
+        ],
+    )
+    status, args = Autosubmit.parse_args()
+
+    assert status == 0
+    assert args.command == "monitor"
+    assert args.list == "a000_20200101_fc0_1_1_LOCALJOB"
+    assert args.filter_chunks == "[20200101 [ fc0 [1] ] ]"
+    assert args.filter_type == "LOCALJOB"
+    assert args.filter_status == "WAITING"
