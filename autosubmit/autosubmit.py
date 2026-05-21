@@ -281,19 +281,17 @@ class Autosubmit:
             subparser.add_argument('-cw', '--check_wrapper', action='store_true',
                                    default=False, help='Generate possible wrapper in the current workflow')
             group2 = subparser.add_mutually_exclusive_group(required=False)
-
-            group = subparser.add_mutually_exclusive_group(required=False)
-            group.add_argument('-fl', '--list', type=str,
+            subparser.add_argument('-fl', '--list', type=str,
                                help='Supply the list of job names to be filtered. Default = "Any". '
                                     'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
-            group.add_argument('-fc', '--filter_chunks', type=str,
+            subparser.add_argument('-fc', '--filter_chunks', type=str,
                                help='Supply the list of chunks to filter the list of jobs. Default = "Any". '
                                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
-            group.add_argument('-fs', '--filter_status', type=str,
+            subparser.add_argument('-fs', '--filter_status', type=str,
                                choices=('Any', 'READY', 'COMPLETED',
                                         'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
                                help='Select the original status to filter the list of jobs')
-            group.add_argument('-ft', '--filter_type', type=str,
+            subparser.add_argument('-ft', '--filter_type', type=str,
                                help='Select the job type to filter the list of jobs')
             subparser.add_argument('--hide', action='store_true', default=False,
                                    help='hides plot window')
@@ -1083,6 +1081,9 @@ class Autosubmit:
             host = fullhost.split(",")[0]
         else:
             host = fullhost
+
+        # Obsolete host-command restrictions, kept for compatibility.
+        # Used to prevent execution of specific commands on specific hosts in shared-filesystem deployments.
         forbidden = BasicConfig.DENIED_HOSTS
         authorized = BasicConfig.ALLOWED_HOSTS
         message = f"Command: {args.command.upper()} is not allowed to run in host: {host}.\n"
@@ -1102,6 +1103,7 @@ class Autosubmit:
                     host in BasicConfig.ALLOWED_HOSTS[args.command] or fullhost in BasicConfig.ALLOWED_HOSTS[
                 args.command]):
                 raise AutosubmitCritical(message, 7071)
+        
         if (expid != 'None' and expid) and args.command not in expid_less and args.command not in global_log_command:
             if isinstance(expid, list):
                 expids = cast(list[str], expid)
@@ -2663,21 +2665,38 @@ class Autosubmit:
 
         Plot is created in experiment's plot folder with name <expid>_<date>_<time>.<file_format>
 
-        :param txt_logfiles:
+        :param txt_logfiles: Whether to include log file paths in the text output.
+        :type txt_logfiles: bool
         :param expid: Identifier of the experiment to plot.
+        :type expid: str
         :param file_format: Plot file format. It can be pdf, png, ps or svg
+        :type file_format: str
         :param lst: list of jobs to change status
+        :type lst: str
         :param filter_chunks: chunks to change status
+        :type filter_chunks: str
         :param filter_status: current status of the jobs to change status
+        :type filter_status: str
         :param filter_section: sections to change status
+        :type filter_section: str
         :param hide: hides plot window
+        :type hide: bool
         :param txt_only: workflow will only be written as text
+        :type txt_only: bool
         :param group_by: workflow will only be written as text
+        :type group_by: Optional[str]
         :param expand: Filtering of jobs for its visualization
+        :type expand: str
         :param expand_status: Filtering of jobs for its visualization
+        :type expand_status: str
         :param hide_groups: Simplified workflow illustration by encapsulating the jobs.
+        :type hide_groups: bool
         :param check_wrapper: Shows a preview of how the wrappers will look
+        :type check_wrapper: bool
         :param profile: Whether to enable a profiler during the command execution or not.
+        :type profile: bool
+        :return: True if monitor was executed successfully, False otherwise
+        :rtype: bool
         """
         from .monitor.monitor import Monitor
 
@@ -2713,59 +2732,31 @@ class Autosubmit:
         try:
             jobs = []
             if not isinstance(job_list, type([])):
-                if filter_chunks:
-                    fc = filter_chunks
-                    Log.debug(fc)
+                jobs = job_list.get_job_list()
 
-                    if fc == 'Any':
-                        jobs = job_list.get_job_list()
-                    else:
-                        # noinspection PyTypeChecker
-                        data = json.loads(Autosubmit._create_json(fc))
-                        for date_json in data['sds']:
-                            date = date_json['sd']
-                            jobs_date = [j for j in job_list.get_job_list() if date2str(
-                                j.date) == date]
+                if filter_section or filter_chunks or filter_status or lst:
+                    Autosubmit._validate_job_filters(
+                        as_conf,
+                        job_list,
+                        lst,
+                        filter_chunks,
+                        filter_status,
+                        filter_section,
+                    )
 
-                            for member_json in date_json['ms']:
-                                member = member_json['m']
-                                jobs_member = [j for j in jobs_date if j.member == member]
+                    selected_job_names = apply_job_filters(
+                        job_list=job_list,
+                        base_job_names={job.name for job in jobs},
+                        filter_section=filter_section,
+                        filter_chunk=filter_chunks,
+                        filter_status=filter_status,
+                        filter_list=lst,
+                        filter_sections_splits_fn=Autosubmit._filter_sections_splits,
+                        filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
+                        status_from_str_fn=Autosubmit._get_status,
+                    )
 
-                                for chunk_json in member_json['cs']:
-                                    chunk = int(chunk_json)
-                                    jobs = jobs + \
-                                           [job for job in [j for j in jobs_member if j.chunk == chunk]]
-
-                elif filter_status:
-                    Log.debug(f"Filtering jobs with status {filter_status}")
-                    if filter_status == 'Any':
-                        jobs = job_list.get_job_list()
-                    else:
-                        fs = Autosubmit._get_status(filter_status)
-                        jobs = [job for job in [j for j in job_list.get_job_list() if j.status == fs]]
-
-                elif filter_section:
-                    ft = filter_section
-                    Log.debug(ft)
-
-                    if ft == 'Any':
-                        jobs = job_list.get_job_list()
-                    else:
-                        for job in job_list.get_job_list():
-                            if job.section == ft:
-                                jobs.append(job)
-
-                elif lst:
-                    jobs_lst = lst.split()
-
-                    if jobs == 'Any':
-                        jobs = job_list.get_job_list()
-                    else:
-                        for job in job_list.get_job_list():
-                            if job.name in jobs_lst:
-                                jobs.append(job)
-                else:
-                    jobs = job_list.get_job_list()
+                    jobs = [job for job in jobs if job.name in selected_job_names]
         except BaseException as e:
             if profile:
                 profiler.stop()
@@ -3130,9 +3121,9 @@ class Autosubmit:
             jobs_to_recover = job_list.get_job_list()
         else:
             jobs_to_recover = job_list.get_active()
-        
+
         selected_job_names = {job.name for job in jobs_to_recover}
-        
+
         # filters will be applied to all_jobs or only active_jobs, depending on the all_jobs flag
         if filter_section or filter_chunks or filter_status or filter_list:
             # Validate filters. Raises AutosubmitCritical if any filter is invalid, with a message specifying the issue.
@@ -3667,7 +3658,7 @@ class Autosubmit:
 
         sep = '\n\t'
         Log.result(sep.join(['Directories have been created and configured successfully:'] + [str(d) for d in dirs]))
-        
+
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             if not os.path.exists(BasicConfig.DB_PATH):
                 Log.info("Creating autosubmit database...")
@@ -5377,9 +5368,9 @@ class Autosubmit:
                 jobs_to_set_status = job_list.get_job_list()
                 selected_job_names = {job.name for job in jobs_to_set_status}
                 final_status = Autosubmit._get_status(final)
-                
+
                 Log.info("Filtering jobs...")
-                
+
                 selected_job_names = apply_job_filters(
                     job_list=job_list,
                     base_job_names=selected_job_names,
@@ -5391,7 +5382,7 @@ class Autosubmit:
                     filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
                     status_from_str_fn=Autosubmit._get_status,
                 )
-                
+
                 # preserve job list ordering
                 final_list = [job for job in jobs_to_set_status if job.name in selected_job_names]
                 # Time to change status
