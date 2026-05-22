@@ -2707,13 +2707,13 @@ class Autosubmit:
             profiler.start()
 
         try:
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
             Log.info("Getting job list...")
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(False)
             # Getting output type from configuration
             output_type = as_conf.get_output_type()
-            pkl_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl')
+            pkl_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / 'pkl'
             job_list = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
             Log.debug(f"Job list restored from {pkl_dir} files")
         except AutosubmitError as e:
@@ -2808,8 +2808,7 @@ class Autosubmit:
         monitor_exp = Monitor()
         try:
             if txt_only or txt_logfiles or file_format == "txt":
-                monitor_exp.generate_output_txt(expid, jobs, os.path.join(
-                    exp_path, "/tmp/LOG_" + expid), txt_logfiles, job_list_object=job_list)
+                monitor_exp.generate_output_txt(expid, jobs, str(exp_path / "tmp" / f"LOG_{expid}"), txt_logfiles, job_list_object=job_list)
                 if txt_only:
                     current_length = len(job_list.get_job_list())
                     if current_length > 1000:
@@ -2822,8 +2821,7 @@ class Autosubmit:
                 # if file_format is set, use file_format, otherwise use conf value
                 monitor_exp.generate_output(expid,
                                             jobs,
-                                            os.path.join(
-                                                exp_path, "/tmp/LOG_", expid),
+                                            str(exp_path / "tmp" / f"LOG_{expid}"),
                                             output_format=file_format if file_format is not None and len(
                                                 str(file_format)) > 0 else output_type,
                                             packages=packages,
