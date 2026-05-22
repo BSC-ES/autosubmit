@@ -719,7 +719,7 @@ class BashWrapperBuilder(WrapperBuilder):
 
     def build_wrapper_stat(self) -> str:
         """Return bash code that records wrapper start/end time and exit status."""
-        return textwrap.dedent(f"""
+        return textwrap.dedent(f"""\
         _wrapper_stat_file="$(pwd)/{self.name}_STAT_{self.fail_count}"
         date +%s > "$_wrapper_stat_file"
         _write_wrapper_stat() {{

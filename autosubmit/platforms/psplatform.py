@@ -37,6 +37,7 @@ class PsPlatform(ParamikoPlatform):
         self.cancel_cmd = None
         self._header = PsHeader()
         self.job_status = dict()
+        # TODO: revise this and `parse_all_jobs_outputs` why it returns '1'/'0' instead of 1/0
         self.job_status['COMPLETED'] = ['1']
         self.job_status['RUNNING'] = ['0']
         self.job_status['QUEUING'] = []

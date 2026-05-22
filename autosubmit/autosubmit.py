@@ -2435,7 +2435,6 @@ class Autosubmit:
         """Update the finish time of the current experiment run in the database.
 
         :param expid: a string with the experiment id
-        :return: None
         """
         # TODO: Add all methods and functions to the new historical db manager
         old_exp_history = ExperimentHistory(expid)

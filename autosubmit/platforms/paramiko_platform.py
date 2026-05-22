@@ -908,7 +908,7 @@ class ParamikoPlatform(Platform):
 
     def confirm_done_jobs_via_stat(self, job_list: list) -> dict[str, "Status"]:
         """Checks the STAT files for the given jobs to confirm their completion status.
-            This method retrieves the last line of each STAT file corresponding to the jobs in the job_list and resolves their status using the _resolve_status method.
+        This method retrieves the last line of each STAT file corresponding to the jobs in the job_list and resolves their status using the _resolve_status method.
         :param job_list: A list of Job objects for which to check the STAT files.
         :return: A dictionary mapping job names to their resolved Status.
         """
@@ -956,6 +956,7 @@ class ParamikoPlatform(Platform):
         job_list_cmd = ""
         if job_list:
             for job in job_list:
+                # TODO: revise the why of having this default value
                 job_list_cmd += str(job.id) + "," if job.id else "0,"
             if job_list_cmd[-1] == ",":
                 job_list_cmd = job_list_cmd[:-1]

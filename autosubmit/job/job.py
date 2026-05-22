@@ -3273,6 +3273,4 @@ class WrapperJob(Job):
             # For vertical wrappers, the inner job may run self.retrials times consecutively,
             # so the effective wallclock threshold is self.retrials times the job wallclock.
             effective_wallclock *= (job.retrials + 1)
-        if self.is_over_wallclock(effective_wallclock):
-            return True
-        return False
+        return self.is_over_wallclock(effective_wallclock)

@@ -381,8 +381,11 @@ def pbs_platform(autosubmit_config, tmp_path):
     aslogs.mkdir(parents=True, exist_ok=True)
     (aslogs / "submit_local.sh").touch()
     return PBSPlatform(expid="a000", name="pytest-pbs", config=as_conf.experiment_data)
+
+
 class FakePlatform:
     """Minimal platform stub for testing wrapper and job-check logic."""
+
     def __init__(self):
         self.name = 'fake_platform'
         # serial_platform is accessed by get_in_queue for platform matching.
@@ -395,6 +398,8 @@ class FakePlatform:
         # Replaced by mocker.MagicMock() in fixtures that need them:
         self.check_all_jobs = None
         self.check_job = None
+
+
 @pytest.fixture
 def fake_platform(mocker) -> FakePlatform:
     """Return a :class:`FakePlatform` with mocker-backed method stubs.
@@ -406,6 +411,8 @@ def fake_platform(mocker) -> FakePlatform:
     fp.check_all_jobs = mocker.MagicMock()
     fp.check_job = mocker.MagicMock()
     return fp
+
+
 @pytest.fixture
 def fake_job_list(mocker) -> JobList:
     """Return a minimal :class:`JobList` for wrapper/job-check unit tests.

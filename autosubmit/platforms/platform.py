@@ -987,12 +987,16 @@ class Platform:
         :return: True if there is work to process, False otherwise.
         """
         process_log = False
-        for _ in range(self.keep_alive_timeout, 0, -1):
+        start_time = time.time()
+        while (time.time() - start_time) < self.keep_alive_timeout:
             if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
                 process_log = True
                 break
-            else:
-                time.sleep(1)
+            time.sleep(1)
+        else:
+            # Final check in case something arrived just after the last sleep
+            if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
+                process_log = True
 
         self.work_event.clear()
         return process_log

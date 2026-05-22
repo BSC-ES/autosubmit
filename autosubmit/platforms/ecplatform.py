@@ -243,18 +243,15 @@ class EcPlatform(ParamikoPlatform):
             remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
             local_path = Path(self.tmp_path) / stat_name
 
-            try:
-                subprocess.check_output(
-                    f"{self.get_cmd} {remote_path} {local_path}",
-                    shell=True,
-                    stderr=subprocess.DEVNULL,
-                )
-                content = local_path.read_text().strip()
-                if content:
-                    last_line = content.splitlines()[-1]
-                    result[job.name] = self._resolve_status(last_line)
-            except Exception:
-                pass
+            subprocess.check_output(
+                f"{self.get_cmd} {remote_path} {local_path}",
+                shell=True,
+                stderr=subprocess.DEVNULL,
+            )
+            content = local_path.read_text().strip()
+            if content:
+                last_line = content.splitlines()[-1]
+                result[job.name] = self._resolve_status(last_line)
 
         return result
 
@@ -272,11 +269,8 @@ class EcPlatform(ParamikoPlatform):
             return
 
         # List files in the remote log directory
-        try:
-            self.send_command(f"ecaccess-file-dir {self.host}:{self.remote_log_dir}")
-            dir_output = self.get_ssh_output()
-        except Exception:
-            return
+        self.send_command(f"ecaccess-file-dir {self.host}:{self.remote_log_dir}")
+        dir_output = self.get_ssh_output()
 
         # ecaccess-file-dir output format: filename|size  NNNN
         available_stats: set[str] = set()
@@ -435,9 +429,11 @@ class EcPlatform(ParamikoPlatform):
         with suppress(Exception):
             subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}", shell=True)
         with suppress(Exception):
-            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}/{self.user}", shell=True)
+            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}/{self.user}",
+                                    shell=True)
         with suppress(Exception):
-            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}", shell=True)
+            subprocess.check_output(
+                f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}", shell=True)
         try:
             subprocess.check_output(self.check_remote_permissions_cmd, shell=True)
             subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
@@ -637,7 +633,7 @@ class EcPlatform(ParamikoPlatform):
         """
         if not job_names or self.expid not in str(self.remote_log_dir):
             return
-        with suppress(Exception):
+        try:
             self.send_command(f"ecaccess-file-dir {self.host}:{self.remote_log_dir}")
             output = self.get_ssh_output()
             name_set = set(job_names)
@@ -657,6 +653,8 @@ class EcPlatform(ParamikoPlatform):
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
+        except Exception as e:
+            Log.debug(f"Could not delete previous stat files: {e}")
 
     def cancel_jobs(self, job_ids: list[str]) -> None:
         """Cancel ecaccess jobs by their IDs.

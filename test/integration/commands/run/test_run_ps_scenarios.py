@@ -181,7 +181,7 @@ def test_run_interrupted(
         as_exp.autosubmit.run_experiment,
         expid=as_exp.expid
     )
-
+    #TODO: Instead of adding sleeps, make the workflow stop after X iterations
     time.sleep(2)
 
     if as_thread.is_alive():

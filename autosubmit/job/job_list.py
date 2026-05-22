@@ -2919,11 +2919,11 @@ class JobList(object):
         un_mapped_wrapper_info, un_mapped_inner_jobs = self.get_packages_persistence().load(preview, self._job_list)
 
         # Build a dictionary of wrapper info indexed by wrapper name.
-        wrappers_info: Dict[str, dict] = {
+        wrappers_info: dict[str, dict] = {
             dict(wrapper)['name']: dict(wrapper) for wrapper in un_mapped_wrapper_info
         }
         # Group inner jobs by package name.
-        inner_jobs_by_package: Dict[str, list] = {}
+        inner_jobs_by_package: dict[str, list] = {}
         for job in un_mapped_inner_jobs:
             inner_jobs_by_package.setdefault(job['package_name'], []).append(job['job_name'])
 
