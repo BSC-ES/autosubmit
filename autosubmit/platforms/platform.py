@@ -82,6 +82,9 @@ def recover_platform_job_logs_wrapper(
                                                                                     "DEBUG"),
         "LOG_RECOVERY_FILE_LEVEL": as_conf.experiment_data.get("CONFIG", {}).get("LOG_RECOVERY_FILE_LEVEL",
                                                                                  "EVERYTHING"),
+        # CPMIP notification needs EXPERIMENT (for CALENDAR) and MAIL (for NOTIFICATIONS, TO)
+        "EXPERIMENT": as_conf.experiment_data.get("EXPERIMENT", {}),
+        "MAIL": as_conf.experiment_data.get("MAIL", {}),
     }
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
@@ -1012,6 +1015,7 @@ class Platform:
             job.platform_name = self.name  # Change the original platform to this process platform.
             job.platform = self
             report = job.retrieve_logfiles()
+            job.send_cpmip_notification(self._as_conf)
 
             if not report.all_succeeded:
                 failed = [a for a in report.attempts if not a.success]
@@ -1030,6 +1034,7 @@ class Platform:
         """Recovers the logs of the jobs that have been submitted.
         When this is executed as a process, the exit is controlled by the work_event and cleanup_events of the main process.
         """
+        self._as_conf = as_conf
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
         try:

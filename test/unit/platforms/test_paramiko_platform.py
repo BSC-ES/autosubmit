@@ -683,6 +683,48 @@ def test_check_and_cancel_duplicated_job_names_empty_output(
     assert cancelled == []
 
 
+@pytest.mark.parametrize(
+    "ssh_output, expected_job_ids",
+    [
+        pytest.param(
+            "JOBID,NAME\n12345,short_name\n",
+            ["12345"],
+            id="short-name",
+        ),
+        pytest.param(
+            "JOBID,NAME\n12345," + "a" * 50 + "\n",
+            ["12345"],
+            id="long-truncated-name",
+        ),
+        pytest.param(
+            "JOBID,NAME\n12345,short\n67890," + "b" * 50 + "\n",
+            ["12345", "67890"],
+            id="mixed-names",
+        ),
+    ],
+)
+def test_get_job_id_by_job_name_parses_truncated_names(
+        slurm_platform: SlurmPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+        ssh_output: str,
+        expected_job_ids: list[str],
+) -> None:
+    """Parse job IDs correctly even when squeue truncates long job names.
+
+    ``squeue -o %A,%.50j`` limits the name column to 50 chars.  Autosubmit
+    only needs the first column (job ID), so truncation must not break parsing.
+
+    :param slurm_platform: Slurm platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param ssh_output: Simulated squeue output.
+    :param expected_job_ids: Expected parsed job identifiers.
+    """
+    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)
+    slurm_platform._ssh_output = ssh_output
+
+    assert slurm_platform.get_job_id_by_job_name("any_name") == expected_job_ids
+
+
 def test_submit_multiple_jobs_empty_input_returns_empty(
         paramiko_platform: ParamikoPlatform,
 ) -> None:

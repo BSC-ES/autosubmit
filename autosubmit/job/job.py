@@ -3003,6 +3003,26 @@ class Job(object):
                         '%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
 
+    def send_cpmip_notification(self, as_conf) -> None:
+        """Capture CPMIP metrics for *job* and send them as a notification.
+
+        Called before job attributes are cleared upon termination.
+        If capture fails (returns None) the notification is silently skipped.
+        If the notification itself fails the error is logged but not re-raised.
+
+        :param as_conf: experiment_configuration"""
+        # Lazy import to avoid circular dependency:
+        # statistics.utils -> job -> cpmip_notifier -> statistics.jobs_stat -> statistics.utils
+        from autosubmit.notifications.cpmip_notifier import CPMIPNotifier
+
+        cpmip_evaluation = CPMIPNotifier.capture(self, as_conf)
+
+        if cpmip_evaluation is not None:
+            try:
+                CPMIPNotifier.notify(as_conf, self.expid, self, cpmip_evaluation)
+            except Exception as error:
+                Log.error(f"Error sending CPMIP notification for {self.name}: {error}")
+
 
 class WrapperJob(Job):
     """Defines a wrapper from a package.

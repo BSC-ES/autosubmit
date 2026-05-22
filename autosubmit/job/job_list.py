@@ -2605,6 +2605,7 @@ class JobList(object):
         if str(self._config.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
                                                                  "false")).lower() == "true":
             job.retrieve_logfiles()
+            job.send_cpmip_notification(self._config)
         else:
             # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
             job.write_submit_time()
@@ -2622,26 +2623,9 @@ class JobList(object):
         jobs_to_recover = [job for job in self._job_list if
                            job.status in self._FINAL_STATUSES and job.updated_log <= job.fail_count]
         for job in jobs_to_recover:
-            self.send_cpmip_notification(job)
             self._recover_log(job)
         return len(jobs_to_recover) > 0
 
-    def send_cpmip_notification(self, job: Job) -> None:
-        """Capture CPMIP metrics for *job* and send them as a notification.
-
-        Called before job attributes are cleared upon termination.
-        If capture fails (returns None) the notification is silently skipped.
-        If the notification itself fails the error is logged but not re-raised.
-
-        :param job: the job whose CPMIP metrics will be captured and notified."""
-
-        cpmip_evaluation = CPMIPNotifier.capture(job, self._config)
-
-        if cpmip_evaluation is not None:
-            try:
-                CPMIPNotifier.notify(self._config, self.expid, job, cpmip_evaluation)
-            except Exception as error:
-                Log.error(f"Error sending CPMIP notification for {job.name}: {error}")
 
     def check_completed_jobs_after_recovery(self):
         for job in (job for job in self.get_job_list() if job.status == Status.COMPLETED):
