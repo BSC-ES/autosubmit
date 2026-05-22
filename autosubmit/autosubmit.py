@@ -2810,13 +2810,14 @@ class Autosubmit:
             if txt_only or txt_logfiles or file_format == "txt":
                 monitor_exp.generate_output_txt(expid, jobs, str(exp_path / "tmp" / f"LOG_{expid}"), txt_logfiles, job_list_object=job_list)
                 if txt_only:
-                    current_length = len(job_list.get_job_list())
+                    current_length = len(jobs)
                     if current_length > 1000:
                         Log.info(
                             "Experiment has too many jobs to be printed in the terminal. Maximum job quantity is 1000, your experiment has " + str(
                                 current_length) + " jobs.")
                     else:
-                        Log.info(job_list.print_with_status())
+                        # Print the filtered jobs, not the entire job_list
+                        Log.info(job_list.print_with_status(existing_list=jobs if jobs else None))
             else:
                 # if file_format is set, use file_format, otherwise use conf value
                 monitor_exp.generate_output(expid,

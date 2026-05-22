@@ -339,9 +339,13 @@ class Monitor:
         exp = pydotplus.Subgraph(graph_name='Experiment', label=expid)
         self.nodes_plotted = set()
         Log.debug('Creating job graph...')
+        joblist_names = {j.name for j in joblist}
 
         for job in joblist:
-            if job.has_parents():
+            # Only skip if this job's parents are also in the filtered joblist
+            # If parents are not in the filtered joblist, treat the job as a root
+            parent_names = {p.name for p in job.parents}
+            if parent_names & joblist_names:
                 continue
 
             if not groups or job.name not in groups['jobs'] or (job.name in groups['jobs'] and len(groups['jobs'][job.name]) == 1):
@@ -578,7 +582,7 @@ class Monitor:
                 # strange ANSI codes in our plain text file
                 if job_list_object is not None:
                     job_list_txt = job_list_object.print_with_status(status_change=None, nocolor=True,
-                                                                     existing_list=joblist)
+                                                                     existing_list=joblist if joblist else None)
                     output_file.write(job_list_txt)
                 else:
                     output_file.write("Writing jobs, they're grouped by [FC and DATE] \n")

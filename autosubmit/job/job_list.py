@@ -3023,11 +3023,19 @@ class JobList(object):
         else:
             result += " ## "
 
-        # Find root
+        # Find root. When existing_list is provided (filtered jobs), treat jobs as roots
+        # if their parents are not present in the filtered set.
         roots = []
-        for job in all_jobs:
-            if len(job.parents) == 0:
-                roots.append(job)
+        if existing_list is None:
+            for job in all_jobs:
+                if len(job.parents) == 0:
+                    roots.append(job)
+        else:
+            existing_names = {j.name for j in all_jobs}
+            for job in all_jobs:
+                parent_names = {p.name for p in job.parents}
+                if not (parent_names & existing_names):
+                    roots.append(job)
         visited = list()
         # print(root)
         # root exists
