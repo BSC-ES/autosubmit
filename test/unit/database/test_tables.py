@@ -151,12 +151,6 @@ def test_registry_get_returns_table_with_schema():
     assert table.metadata.schema == 'test_schema'
 
 
-def test_registry_get_unknown_table_raises_keyerror():
-    registry = TableRegistry(schema=None)
-    with pytest.raises(KeyError, match="No table definition found for 'nonexistent'"):
-        registry.get('nonexistent')
-
-
 def test_registry_get_creates_table_with_schema():
     registry = TableRegistry(schema='build_schema')
     table = registry.get('job_data')

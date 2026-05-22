@@ -81,7 +81,6 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values, apply_job_filters
-from autosubmit.notifications.cpmip_notifier import CPMIPNotifier
 
 if TYPE_CHECKING:
     from rocrate.rocrate import ROCrate
