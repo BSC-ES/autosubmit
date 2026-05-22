@@ -2220,18 +2220,6 @@ class Autosubmit:
 
                 pending_logs = job_list.recover_logs()
                 while pending_logs:
-                    # TODO: rebase move
-                    # Capture CPMIP metric inputs before update_log_status clears the
-                    # # job's runtime attributes on successful log recovery.
-                    # cpmip_evaluation = CPMIPNotifier.capture(job, as_conf)
-                    #
-                    # log_recovered = job_list.update_log_status(job, as_conf, new_run)
-                    #
-                    # if log_recovered and cpmip_evaluation is not None:
-                    #     try:
-                    #         CPMIPNotifier.notify(as_conf, job_list.expid, job, cpmip_evaluation)
-                    #     except Exception as error:
-                    #         Log.error(f"Error sending CPMIP notification for {job.name}: {error}")
                     pending_logs = job_list.recover_logs()
                 job_list.save()
                 while job_list.get_active():

@@ -46,6 +46,7 @@ from autosubmit.job.job_utils import Dependency
 from autosubmit.job.job_utils import transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.monitor.diagram import JobData
+from autosubmit.notifications.cpmip_notifier import CPMIPNotifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 
@@ -2621,11 +2622,29 @@ class JobList(object):
         jobs_to_recover = [job for job in self._job_list if
                            job.status in self._FINAL_STATUSES and job.updated_log <= job.fail_count]
         for job in jobs_to_recover:
+            self.send_cpmip_notification(job)
             self._recover_log(job)
         if len(jobs_to_recover) > 0:
             return True
         else:
             return False
+
+    def send_cpmip_notification(self, job: Job) -> None:
+        """Capture CPMIP metrics for *job* and send them as a notification.
+
+        Called before job attributes are cleared upon termination.
+        If capture fails (returns None) the notification is silently skipped.
+        If the notification itself fails the error is logged but not re-raised.
+
+        :param job: the job whose CPMIP metrics will be captured and notified."""
+
+        cpmip_evaluation = CPMIPNotifier.capture(job, self._config)
+
+        if cpmip_evaluation is not None:
+            try:
+                CPMIPNotifier.notify(self._config, self.expid, job, cpmip_evaluation)
+            except Exception as error:
+                Log.error(f"Error sending CPMIP notification for {job.name}: {error}")
 
     def check_completed_jobs_after_recovery(self):
         for job in (job for job in self.get_job_list() if job.status == Status.COMPLETED):
