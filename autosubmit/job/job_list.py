@@ -2624,10 +2624,7 @@ class JobList(object):
         for job in jobs_to_recover:
             self.send_cpmip_notification(job)
             self._recover_log(job)
-        if len(jobs_to_recover) > 0:
-            return True
-        else:
-            return False
+        return len(jobs_to_recover) > 0
 
     def send_cpmip_notification(self, job: Job) -> None:
         """Capture CPMIP metrics for *job* and send them as a notification.
