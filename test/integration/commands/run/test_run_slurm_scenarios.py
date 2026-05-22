@@ -1314,66 +1314,66 @@ _DESTINE_LIKE_PARAMS = [
             DEPENDENCIES:
                 remote_setup: {}
             wallclock: 00:01
-        sim:
+        sim_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
             SCRIPT: |
                 echo "sim chunk=%CHUNK%"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             DEPENDENCIES:
                 init: {}
-                sim-1: {}
+                sim_really_long_name_to_ensure_that_the_truncate_bug_is_fixed-1: {}
             wallclock: 00:01
-        downstream:
+        downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
             SCRIPT: |
                 echo "downstream chunk=%CHUNK% split=%SPLIT%"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             SPLITS: '4'
             DEPENDENCIES:
-                sim:
+                sim_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
                     STATUS: RUNNING
                     ANY_FINAL_STATUS_IS_VALID: true
-                downstream:
+                downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: previous
-                downstream-1: {}
+                downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed-1: {}
             wallclock: 00:01
-        operator:
+        operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
             SCRIPT: |
                 echo "operator chunk=%CHUNK% split=%SPLIT%"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             SPLITS: '4'
             DEPENDENCIES:
-                downstream:
+                downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: '[1:4]*\\1'
-                operator:
+                operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: previous
-                operator-1: {}
+                operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed-1: {}
             wallclock: 00:01
-        application:
+        application_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
             SCRIPT: |
                 echo "application chunk=%CHUNK% split=%SPLIT%"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             SPLITS: '4'
             DEPENDENCIES:
-                operator:
+                operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: '[1:4]*\\1'
-                application:
+                application_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: previous
-                application-1: {}
+                application_really_long_name_to_ensure_that_the_truncate_bug_is_fixed-1: {}
             wallclock: 00:01
-        finalize:
+        finalize_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
             SCRIPT: |
                 echo "finalize"
             PLATFORM: TEST_SLURM
@@ -1383,26 +1383,26 @@ _DESTINE_LIKE_PARAMS = [
 
     wrappers:
         wrapper_sim:
-            JOBS_IN_WRAPPER: sim
+            JOBS_IN_WRAPPER: sim_really_long_name_to_ensure_that_the_truncate_bug_is_fixed
             TYPE: vertical
             policy: strict
             MIN_WRAPPED: 2
             MAX_WRAPPED: 4
         wrapper_downstream:
-            JOBS_IN_WRAPPER: downstream
+            JOBS_IN_WRAPPER: downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed
             TYPE: vertical
             policy: strict
             MIN_WRAPPED: 4
             MAX_WRAPPED: 4
 
         wrapper_operator:
-            JOBS_IN_WRAPPER: operator
+            JOBS_IN_WRAPPER: operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed
             TYPE: vertical
             policy: strict
             MIN_WRAPPED: 4
             MAX_WRAPPED: 4
         wrapper_application:
-            JOBS_IN_WRAPPER: application
+            JOBS_IN_WRAPPER: application_really_long_name_to_ensure_that_the_truncate_bug_is_fixed
             TYPE: vertical
             policy: strict
             MIN_WRAPPED: 4

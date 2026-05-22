@@ -66,12 +66,12 @@ def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
     local.spawn_log_retrieval_process(as_conf)
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
-    time.sleep(0.5)
     assert local.log_recovery_process.is_alive()
-    local.work_event.set()
-    time.sleep(1.1)
+    # there is new auto-fixture that doesn't allow sleeps higher than 1 while testing
+    deadline = time.monotonic() + 1.2
+    while time.monotonic() < deadline and local.log_recovery_process.is_alive():
+        time.sleep(0.1)
     assert local.log_recovery_process.is_alive() is False
-    local.cleanup_event.set()
 
 
 def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
