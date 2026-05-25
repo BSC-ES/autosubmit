@@ -30,7 +30,10 @@ class PBSHeader(object):
         :param parameters:
         :param job: job to create queue directive for
         :type job: Job
-        :param het:
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
+        :param het: represents the interation of the header currently at
+        :type het: int
         :return: queue directive
         :rtype: str
         """
@@ -45,7 +48,10 @@ class PBSHeader(object):
         :param parameters:
         :param job: job to create custom directive for
         :type job: Job
-        :param het:
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
+        :param het: represents the interation of the header currently at
+        :type het: int
         :return: custom directives
         :rtype: str
         """
@@ -60,7 +66,10 @@ class PBSHeader(object):
         :param parameters:
         :param job: job to create account directive for
         :type job: Job
-        :param het:
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
+        :param het: represents the interation of the header currently at
+        :type het: int
         :return: account directive
         :rtype: str
         """
@@ -75,7 +84,10 @@ class PBSHeader(object):
         :param parameters:
         :param job: job to create nodes directive for
         :type job: Job
-        :param het:
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
+        :param het: represents the interation of the header currently at
+        :type het: int
         :return: nodes directive
         :rtype: str
         """
@@ -90,7 +102,10 @@ class PBSHeader(object):
         :param parameters:
         :param job: job to create memory directive for
         :type job: Job
-        :param het:
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
+        :param het: represents the interation of the header currently at
+        :type het: int
         :return: memory directive
         :rtype: str
         """
@@ -105,7 +120,10 @@ class PBSHeader(object):
         :param parameters:
         :param job: job to create memory per task directive for
         :type job: Job
-        :param het:
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
+        :param het: represents the interation of the header currently at
+        :type het: int
         :return: memory per task directive
         :rtype: str
         """
@@ -120,7 +138,10 @@ class PBSHeader(object):
         :param parameters:
         :param job: job to create threads per task directive for
         :type job: Job
-        :param het:
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
+        :param het: represents the interation of the header currently at
+        :type het: int
         :return: threads per task directive
         :rtype: str
         """
@@ -132,10 +153,13 @@ class PBSHeader(object):
     def get_reservation_directive(self, job, parameters, het=-1):
         """Returns reservation directive for the specified job
 
-        :param parameters:
-        :param job:
-        :param het:
-        :return:
+        :param job: job to create reservation directive for
+        :type job: Job
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
+        :param het: represents the interation of the header currently at
+        :type het: int
+        :return: reservation directive
         """
         if parameters['RESERVATION'] != '':
             return f"PBS -W x={parameters['RESERVATION']}"
@@ -148,7 +172,10 @@ class PBSHeader(object):
         :param parameters:
         :param job: job to create tasks per node directive for
         :type job: Job
-        :param het:
+        :param parameters: List of parameters related to the header of the job
+        :type parameters: List[str]
+        :param het: represents the interation of the header currently at
+        :type het: int
         :return: tasks per node directive
         :rtype: str
         """
@@ -174,3 +201,33 @@ class PBSHeader(object):
             #
             ###############################################################################            
             """)
+
+
+    def wrapper_header(self, **kwargs):
+
+        wr_header = f"""
+###############################################################################
+#              {kwargs["name"].split("_")[0] + "_Wrapper"}
+###############################################################################
+"""
+        wr_header += f"""
+{kwargs["nodes"]}:{kwargs["tasks"]}:{kwargs["threads"]}
+{kwargs["queue"]}
+#PBS -W group_list={kwargs["project"]}
+#PBS -l walltime={kwargs["wallclock"]}:00
+#PBS -N {kwargs["name"]}
+#PBS -o {kwargs["name"]}.out
+#PBS -e {kwargs["name"]}.err
+{kwargs["custom_directives"]}
+#
+    """
+        if kwargs["method"] == 'mpiexec':
+            language = kwargs["executable"]
+            if language is None or len(language) == 0:
+                language = "#!/bin/bash"
+            return language + wr_header
+        else:
+            language = kwargs["executable"]
+            if language is None or len(language) == 0 or "bash" in language:
+                language = "#!/usr/bin/env python3"
+            return language + wr_header

@@ -20,7 +20,8 @@ import re
 from autosubmit.platforms.wrappers.wrapper_builder import (
     WrapperDirector, PythonVerticalWrapperBuilder, PythonHorizontalWrapperBuilder,
     PythonHorizontalVerticalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder, BashHorizontalWrapperBuilder,
-    BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder, SrunVerticalHorizontalWrapperBuilder
+    BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder, SrunVerticalHorizontalWrapperBuilder,
+    QsubHorizontalWrapperBuilder, QsubVerticalHorizontalWrapperBuilder
 )
 
 
@@ -215,6 +216,71 @@ class SlurmWrapperFactory(WrapperFactory):
 
     def threads_directive(self, threads) -> str:
         return f'#SBATCH --cpus-per-task={threads}'
+
+
+class PBSWrapperFactory(WrapperFactory):
+
+    def vertical_wrapper(self, **kwargs):
+        return PythonVerticalWrapperBuilder(**kwargs)
+
+
+    def horizontal_wrapper(self, **kwargs):
+
+        if kwargs["method"] == 'qsub':
+            return QsubHorizontalWrapperBuilder(**kwargs)
+        else:
+            return PythonHorizontalWrapperBuilder(**kwargs)
+
+
+    def hybrid_wrapper_horizontal_vertical(self, **kwargs):
+        return PythonHorizontalVerticalWrapperBuilder(**kwargs)
+
+
+    def hybrid_wrapper_vertical_horizontal(self, **kwargs):
+        if kwargs["method"] == 'qsub':
+            return QsubVerticalHorizontalWrapperBuilder(**kwargs)
+        else:
+            return PythonVerticalHorizontalWrapperBuilder(**kwargs)
+
+
+    def header_directives(self, **kwargs):
+        return self.platform.wrapper_header(**kwargs)
+
+
+    def allocated_nodes(self):
+        return self.platform.allocated_nodes()
+
+
+    def reservation_directive(self, reservation):
+        return f"#PBS --reservation={reservation}"
+
+
+    def queue_directive(self, queue):
+        return f'#PBS -q {queue}'
+
+
+    def partition_directive(self, partition):
+        return f'PBS -q {partition}'
+
+
+    def exclusive_directive(self, exclusive):
+        return '#PBS -l naccesspolicy=singlejob'
+
+
+    def tasks_directive(self, tasks) -> str:
+        return f'mpiprocs={tasks}'
+
+
+    def nodes_directive(self, nodes):
+        return f'#PBS -l select={nodes}'
+
+
+    def processors_directive(self, processors):
+       return f'-l mppwidth={processors}'
+
+
+    def threads_directive(self, threads) -> str:
+        return f'ompthreads={threads}'
 
 
 class PJMWrapperFactory(WrapperFactory):
