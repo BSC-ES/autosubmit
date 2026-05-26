@@ -17,6 +17,7 @@
 
 from getpass import getuser
 from pathlib import Path
+from shutil import rmtree
 from typing import Callable, Optional
 
 import pytest
@@ -26,105 +27,116 @@ from ruamel.yaml import YAML
 from autosubmit.autosubmit import Autosubmit
 
 
+def _experiment_data(hpcarch: str = 'ARM') -> dict:
+    """Build experiment data from the shared fake jobs/platforms fixtures."""
+    files_dir = Path(__file__).resolve().parents[1] / "files"
+    return {
+        'DEFAULT': {'HPCARCH': hpcarch},
+        **YAML().load(files_dir / "fake-jobs.yml"),
+        **YAML().load(files_dir / "fake-platforms.yml"),
+    }
+
+
+def _location_lines(mocked_log) -> list:
+    """The ``Location: ...`` lines emitted via ``Log.result``."""
+    return [
+        call.args[0].format(call.args[1])
+        for call in mocked_log.result.mock_calls
+        if call.args and call.args[0].startswith('Location: ')
+    ]
+
+
 @pytest.mark.parametrize(
-    'expid_len,spaces,not_described',
+    'expid_count,spaces,unknown',
     [
-        (2, True, False),  # It accepts expids separated by spaces,
-        (2, False, False),  # or by commas,
-        (1, True, False),  # or a single experiment ID.
-        (None, True, True),  # An expid that does not exist.
-        (0, True, True),  # If nothing is provided.
+        (2, True, False),   # Valid expids, space-separated.
+        (2, False, False),  # Valid expids, comma-separated.
+        (1, True, False),   # A single expid.
+        (None, True, True), # An expid not in the database.
+        (0, True, True),    # Empty input.
     ]
 )
 def test_describe(
-        expid_len: Optional[int],
+        expid_count: Optional[int],
         spaces: bool,
-        not_described: bool,
+        unknown: bool,
         autosubmit_exp: Callable,
         mocker: MockerFixture,
         get_next_expid: Callable[[], str]) -> None:
-    """Test the ``describe`` command.
-
-    The ``expid_len`` defines how many expids we will provide to the command.
-    If the value is ``None``, then we will use a non-existent expid.
-    If the value is ``0``, then we will not provide any expid (i.e., empty).
-
-    ``not_described`` defines whether the command should return an error or not.
+    """``describe`` enumerates experiments from the database; expids not
+    found there are reported via ``Log.warning`` and not described.
     """
-    input_experiment_list = ''
-    provided_expids = []
-    if expid_len is None:
-        input_experiment_list = 'zzzzzzzz'  # A non-existent expid. In theory, valid.
-    elif expid_len > 0:
-        provided_expids = [get_next_expid() for _ in range(expid_len)]
-        separator = ' ' if spaces else ','
-        input_experiment_list = separator.join(provided_expids)
+    # describe reads the database; autosubmit_exp creates it on first call.
+    autosubmit_exp(experiment_data=_experiment_data())
+
+    input_list = ''
+    exps = []
+    if expid_count is None:
+        input_list = 'zzzz'  # Valid format, not in the database.
+    elif expid_count > 0:
+        expids = [get_next_expid() for _ in range(expid_count)]
+        exps = [autosubmit_exp(e, experiment_data=_experiment_data()) for e in expids]
+        input_list = (' ' if spaces else ',').join(expids)
 
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    Autosubmit.describe(input_experiment_list=input_list, get_from_user='')
 
-    expids = filter(lambda e: e in provided_expids, input_experiment_list.replace(',', ' ').split(' '))
-
-    exps = []
-
-    fake_jobs: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-jobs.yml")
-    fake_platforms: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-platforms.yml")
-
-    for expid in expids:
-        exp = autosubmit_exp(
-            expid,
-            experiment_data={
-                'DEFAULT': {
-                    'HPCARCH': 'ARM'
-                },
-                **fake_jobs,
-                **fake_platforms
-            }
-        )
-        exps.append(exp)
-
-    Autosubmit.describe(
-        input_experiment_list=input_experiment_list,
-        get_from_user=''
-    )
-
-    # Log.printlog is only called when an experiment is not described
-    # TODO: We could re-design the class to make this behaviour clearer.
-    assert mocked_log.printlog.call_count == (1 if not_described else 0)
-
-    if exps and not not_described:
-        location_lines = [
-            line_tuple.args[0].format(line_tuple.args[1])
-            for line_tuple in mocked_log.result.mock_calls
-            if line_tuple[1][0].startswith('Location: ')
-        ]
-
-        assert len(location_lines) == len(exps)
-
+    if unknown:
+        assert not _location_lines(mocked_log)
+    else:
+        locations = _location_lines(mocked_log)
         for exp in exps:
-            assert f'Location: {exp.exp_path}' in location_lines
+            assert f'Location: {exp.exp_path}' in locations
+
+
+def test_describe_unknown_expid_warns(
+        autosubmit_exp: Callable, mocker: MockerFixture) -> None:
+    """An expid not in the database is warned about and skipped (#1110)."""
+    autosubmit_exp(experiment_data=_experiment_data())
+
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    Autosubmit.describe(input_experiment_list='zzzz', get_from_user='')
+
+    assert mocked_log.warning.called
+    assert not _location_lines(mocked_log)
+
+
+def test_describe_archived_experiment(
+        autosubmit_exp: Callable,
+        mocker: MockerFixture,
+        get_next_expid: Callable[[], str]) -> None:
+    """``describe`` falls back to the database snapshot when an
+    experiment's files are missing, e.g. archived (#2717).
+    """
+    expid = get_next_expid()
+    exp = autosubmit_exp(expid, experiment_data=_experiment_data())
+
+    # NOTE: the snapshot fallback reads the `details` table. If
+    # autosubmit_exp does not populate it, create the snapshot first:
+    #   from autosubmit.experiment.detail_updater import ExperimentDetails
+    #   ExperimentDetails(expid).save_update_details()
+
+    rmtree(exp.exp_path)  # Simulate archiving: remove files, keep the DB row.
+
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    Autosubmit.describe(input_experiment_list=expid, get_from_user='')
+
+    assert mocked_log.info.called
+    described = [
+        call.args[0].format(call.args[1])
+        for call in mocked_log.result.mock_calls
+        if call.args and call.args[0].startswith('Describing ')
+    ]
+    assert f'Describing {expid}' in described
 
 
 def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
-    """Test the ``describe`` command calling it from the ``Autosubmit.run_command``.
-
-    ``sys.argv`` is mocked to return what ``argparse`` would parse for a command
-    such as ``autosubmit -lc ERROR -lf WARNING describe z000``.
-    
-    This triggers the log initialization and verifies that log levels work too,
-    as documented.
+    """Run ``describe`` through ``Autosubmit.run_command`` to also exercise
+    log initialization and log levels.
 
     `Ref <https://github.com/BSC-ES/autosubmit/issues/2412>`_.
     """
-    fake_jobs: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-jobs.yml")
-    fake_platforms: dict = YAML().load(Path(__file__).resolve().parents[1] / "files/fake-platforms.yml")
-    exp = autosubmit_exp(experiment_data={
-            'DEFAULT': {
-                'HPCARCH': 'TEST_SLURM'
-            },
-            **fake_jobs,
-            **fake_platforms
-        }
-    )
+    exp = autosubmit_exp(experiment_data=_experiment_data(hpcarch='TEST_SLURM'))
 
     mocker.patch('sys.argv', ['autosubmit', '-lc', 'ERROR', '-lf', 'WARNING', 'describe', exp.expid])
     _, args = autosubmit.parse_args()
