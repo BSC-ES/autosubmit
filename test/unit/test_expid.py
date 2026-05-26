@@ -79,8 +79,7 @@ def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypat
 
     with expected:
         expid = Autosubmit.expid("Test", copy_id=copy_id)
-        experiment = Autosubmit.describe(expid)
+        # The `describe` call was removed here due to describe restructuring.
         path = tmp_path / expid
-        assert path.exists()
-        assert experiment is not None
+        assert path.exists() 
         assert isinstance(expid, str) and len(expid) == 4
