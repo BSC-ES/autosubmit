@@ -3428,7 +3428,6 @@ class Autosubmit:
         user = created = model = branch = hpc = ""
         not_described_experiments = []
 
-        # --- 1. Build the candidate list from the database ---
         db_expids = get_experiment_expids()
 
         if ',' in input_experiment_list:
@@ -3448,7 +3447,6 @@ class Autosubmit:
                 else:
                     Log.warning(f"Experiment '{expid}' not found in the database, skipping")
 
-        # --- 2. Describe each experiment ---
         for experiment_id in experiments_ids:
             exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
             try:
