@@ -166,6 +166,30 @@ def save_experiment(name: str, description: Optional[str], version: Optional[str
     return result
 
 
+def get_experiment_expids() -> set[str]:
+    """Get the expids of all experiments in the database.
+
+    :return: a set with every experiment expid in the database.
+    :rtype: set[str]
+    """
+    if BasicConfig.DATABASE_BACKEND == 'postgres':
+        return _get_experiment_expids_sqlalchemy()
+
+    check_db()
+
+    try:
+        (conn, cursor) = open_conn()
+    except DbException as e:
+        raise AutosubmitCritical(
+            "Could not establish a connection to the database.", 7001, str(e))
+    conn.isolation_level = None
+    conn.text_factory = str
+    cursor.execute("SELECT name FROM experiment")
+    expids = {row[0] for row in cursor}
+    close_conn(conn, cursor)
+    return expids
+
+
 def check_experiment_exists(name, error_on_inexistence=True):
     """ 
     Checks if exist an experiment with the given name. Anti-lock version.  
@@ -366,6 +390,12 @@ def _save_experiment(name, description, version):
     conn.commit()
     close_conn(conn, cursor)
     return True
+
+
+def _get_experiment_expids_sqlalchemy() -> set[str]:
+    with _get_sqlalchemy_conn() as conn:
+        rows = conn.execute(select(tables.ExperimentTable.c.name)).all()
+    return {row.name for row in rows}
 
 
 def _check_experiment_exists(name, error_on_inexistence=True):
