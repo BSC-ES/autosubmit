@@ -2,6 +2,7 @@
 
 **Bug fixes:**
 
+- Fixed autosubmit describe warning about non-experiment directories (e.g. logs, archive folders) by enumerating experiments from the database instead of scanning the root directory #1110
 - Fixed generate_output and generate_output_txt in Monitor to include seconds in the output filename timestamp, preventing files from being overwritten when generated within the same minute #1159 #1368
 - Fix for energy data that was not being stored for the last job of the batch #2657 #2418
 - Reduce the frequency with which energy data was not being stored for the last job of the batch #2657 #2418
@@ -25,6 +26,7 @@
 
 **Enhancements:**
 
+- Autosubmit describe now works on archived experiments, falling back to the last details snapshot stored in the database when the experiment files are not available #2717
 - Moved Autosubmit directory creation from `autosubmit configure` to `autosubmit install` #2640
 - Replaced redundant `list(dict.keys())` and `.keys()` patterns with direct dictionary iteration and membership checks #2477
 - Added txt report generation using autosubmit create -o txt, similar to autosubmit monitor -o txt #2264"
