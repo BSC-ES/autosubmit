@@ -111,7 +111,7 @@ with autosubmit.lock present or not:
 without autosubmit.lock:
 ::
 
-    autosubmit inspect <EXPID> -fl [-fc,-fs or ft]
+    autosubmit inspect <EXPID> -fl [-fc,-fs or -ft]
 
 To generate cmd for wrappers:
 ::
@@ -123,10 +123,37 @@ With autosubmit.lock and no (-f) force, it will only generate all files that are
 
 Without autosubmit.lock, it will generate all unless filtered by -fl,-fc,-fs or -ft.
 
+The following filters can be combined to select jobs to inspect.
+
++--------+----------------------------------------------+----------------------------------------------+
+| FILTER | Meaning                                      | Example of VALUE_TO_FILTER                   |
++========+==============================================+==============================================+
+| -fl    | filter by job name                           | ``-fl "a000_20101101_fc3_21_SIM"``         |
++--------+----------------------------------------------+----------------------------------------------+
+| -fs    | filter by job status                         | ``-fs FAILED``                               |
++--------+----------------------------------------------+----------------------------------------------+
+| -ft    | filter by job type  (and optionally split)   | ``-ft TRANSFER``                             |
++--------+----------------------------------------------+----------------------------------------------+
+| -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``         |
++--------+----------------------------------------------+----------------------------------------------+
+
+If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will be selected for inspection.
+
+To combine multiple filters:
+::
+
+    autosubmit inspect <EXPID> \
+        -fc "[20200101 [ fc0 [1] ] ]" \
+        -fs WAITING \
+        -ft LOCALJOB \
+        -fl "<EXPID>_20200101_fc0_1_1_LOCALJOB"
+
+        
 To generate cmd only for one job per section:
 ::
 
     autosubmit inspect <EXPID> -q
+
 
 How to monitor an experiment
 ----------------------------
