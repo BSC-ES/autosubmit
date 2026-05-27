@@ -741,6 +741,7 @@ class Job(object):
     def validate_template(self, value):
         self._validate_template = value
 
+
     def read_header_tailer_script(self, script_path: str, as_conf: AutosubmitConfig, is_header: bool):
         """
         Opens and reads a script. If it is not a BASH script it will fail :(
@@ -2612,6 +2613,12 @@ class Job(object):
         """
         tmp_path = Path(self._tmp_path)
         full_path = tmp_path.joinpath(self.construct_real_additional_file_name(additional_file))
+
+        if full_path.exists():
+            Log.warning(f"A file named {full_path.name} already exists."
+                        f"If multiple files share the same name, ignoring the extension, only the data from the last file will be saved."
+                        f"This behavior will be updated in a future release.")
+
         with full_path.open('wb') as f:
             f.write(content.encode(lang))
 
