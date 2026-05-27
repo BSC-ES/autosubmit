@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.job.job_common import Status
 from bscearth.utils.date import date2str
 
 """Integration tests for argument behavior."""
@@ -62,7 +63,9 @@ def cleanup_lock(as_exp) -> None:
             pass
 
 
-def do_inspect(as_exp, fl=None, fc=None, fs=None, ft=None, quick=False):
+def do_inspect(
+    as_exp, fl=None, fc=None, fs=None, ft=None, quick=False, check_wrapper=False
+):
     """Call the inspect command with the given filters and return the list of generated .cmd files."""
     as_exp.as_conf.set_last_as_command("inspect")
     templates = (
@@ -80,7 +83,7 @@ def do_inspect(as_exp, fl=None, fc=None, fs=None, ft=None, quick=False):
         filter_status=fs,
         filter_section=ft,
         force=False,
-        check_wrapper=False,
+        check_wrapper=check_wrapper,
         quick=quick,
     )
 
@@ -149,3 +152,28 @@ def test_inpect_no_filters_selects_all_jobs(as_exp, mocker):
     do_inspect(as_exp)
 
     assert set(captured_jobs["names"]) == set(all_job_names)
+
+
+def test_check_wrappers_selects_uncompleted_jobs(as_exp, mocker):
+    """Test that when inspect is called with check_wrapper=True, the uncompleted jobs are selected."""
+    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    expected_jobs = {job.name for job in job_list.get_uncompleted()}
+
+    captured_jobs = {}
+
+    def capture_generate_scripts(
+        as_conf, job_list_obj, jobs_filtered, packages_persistence, only_wrappers=False
+    ):
+        captured_jobs["names"] = [job.name for job in jobs_filtered]
+
+    mocker.patch(
+        "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers",
+        side_effect=capture_generate_scripts,
+    )
+
+    do_inspect(as_exp, ft="LOCALJOB", check_wrapper=True)
+
+    assert set(captured_jobs["names"]) == expected_jobs
+    for job_name in captured_jobs["names"]:
+        job = job_list.get_job_by_name(job_name)
+        assert job.status == Status.WAITING
