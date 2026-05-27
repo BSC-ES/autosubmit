@@ -122,7 +122,7 @@ def reset(as_exp_, target="WAITING"):
 
 
 def do_recovery(as_exp, fl=None, fc=None, fs=None, ft=None, all_jobs=True):
-
+    """Call the recovery command with the given filters and return the job list after recovery."""
     as_exp.autosubmit.recovery(
         as_exp.expid,
         noplot=False,
