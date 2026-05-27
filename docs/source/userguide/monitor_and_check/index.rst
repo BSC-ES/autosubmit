@@ -81,12 +81,17 @@ For example:
 How to generate cmd files
 -------------------------
 
-To generate the cmd files of the current non-active jobs experiment, use the command:
+The `inspect` command generates the ``.cmd`` files for jobs in an experiment without
+submitting them. This allows you to preview the rendered scripts and verify that all
+parameters are correctly substituted prior to submission.
+
+To generate the cmd files of the current **non-active** jobs experiment, use the command:
 ::
 
     autosubmit inspect EXPID
 
 EXPID is the experiment identifier.
+
 Options:
 
 .. runcmd:: autosubmit inspect -h
@@ -116,9 +121,9 @@ To generate cmd for wrappers:
 
 With autosubmit.lock and no (-f) force, it will only generate all files that are not submitted.
 
-Without autosubmit.lock, it will generate all unless filtered by -fl,fc,fs or ft.
+Without autosubmit.lock, it will generate all unless filtered by -fl,-fc,-fs or -ft.
 
-To generate cmd only for a single job of the section :
+To generate cmd only for one job per section:
 ::
 
     autosubmit inspect <EXPID> -q
