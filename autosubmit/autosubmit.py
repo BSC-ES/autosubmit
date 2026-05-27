@@ -1098,7 +1098,6 @@ class Autosubmit:
                     host in BasicConfig.ALLOWED_HOSTS[args.command] or fullhost in BasicConfig.ALLOWED_HOSTS[
                 args.command]):
                 raise AutosubmitCritical(message, 7071)
-        
         if (expid != 'None' and expid) and args.command not in expid_less and args.command not in global_log_command:
             if isinstance(expid, list):
                 expids = cast(list[str], expid)
@@ -1517,22 +1516,33 @@ class Autosubmit:
                 check_wrapper=False, quick=False) -> bool:
         """Generates cmd files experiment.
 
-         :param expid: identifier of experiment to be run
-         :param lst:
-         :param filter_chunks:
-         :param filter_status:
-         :param filter_section:
-         :param force:
-         :param check_wrapper:
-         :param quick:
-         :return: True if run to the end, False otherwise
-         """
+        :param expid: Identifier of experiment to be run
+        :type expid: str
+        :param lst: Optional list of job names to filter for inspect.
+        :type lst: Optional[str]
+        :param filter_chunks: Optional list of chunk identifiers to filter for inspect.
+        :type filter_chunks: Optional[str]
+        :param filter_status: Optional list of job statuses to filter for inspect.
+        :type filter_status: Optional[str]
+        :param filter_section: Optional list of job sections to filter for inspect.
+        :type filter_section: Optional[str]
+        :param force: If true, forces the generation of all cmd files.
+        :type force: bool
+        :param check_wrapper: If true, checks the wrapper.
+        :type check_wrapper: bool
+        :param quick: If true, performs a quick inspect.
+        :type quick: bool
+        :return: True if run to the end, False otherwise
+        :rtype: bool
+        :raises AutosubmitCritical: If there is a critical error during the inspection process.
+        """
+
         try:
             Log.info(f"Inspecting experiment {expid}")
             check_ownership(expid, raise_error=True)
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-            tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-            if os.path.exists(os.path.join(tmp_path, 'autosubmit.lock')):
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+            tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
+            if (tmp_path / 'autosubmit.lock').exists():
                 locked = True
             else:
                 locked = False
@@ -1634,13 +1644,13 @@ class Autosubmit:
 
             if isinstance(jobs, type([])):
                 for job in jobs:
-                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd | {job.file}\n"
+                    file_paths += f"{str(tmp_path / (job.name + '.cmd'))} | {job.file}\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs, packages_persistence, False)
             if len(jobs_cw) > 0:
                 for job in jobs_cw:
-                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
+                    file_paths += f"{str(tmp_path / (job.name + '.cmd'))}\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs_cw, packages_persistence, False)
