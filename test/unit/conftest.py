@@ -20,7 +20,7 @@
 from datetime import datetime
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
-from random import seed, randint, choice
+from random import seed, randint, choice, randrange
 from time import time
 from typing import Any, Callable, Optional, Protocol
 
@@ -29,6 +29,7 @@ import pytest
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.platforms.ecplatform import EcPlatform
@@ -37,6 +38,11 @@ from autosubmit.platforms.pbsplatform import PBSPlatform
 from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
+from autosubmit.job.job_list import JobList
+from autosubmit.job.job_list_persistence import JobListPersistencePkl
+
+
+_EXPID = 'a000'
 
 
 # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
@@ -378,3 +384,75 @@ def pbs_platform(autosubmit_config, tmp_path):
     aslogs.mkdir(parents=True, exist_ok=True)
     (aslogs / "submit_local.sh").touch()
     return PBSPlatform(expid="a000", name="pytest-pbs", config=as_conf.experiment_data)
+
+
+@pytest.fixture
+def as_conf(autosubmit_config):
+    return autosubmit_config(_EXPID, experiment_data={
+        'JOBS': {},
+        'PLATFORMS': {}
+    })
+
+
+def _create_dummy_job_with_status(job_id: int, status: int) -> Job:
+    job_name = f'job_{job_id}'
+    job = Job(job_name, job_id, status, 0)
+    job.type = randrange(0, 2)
+    return job
+
+
+@pytest.fixture
+def jobs_as_dict(next_job_id):
+    return {
+        Status.COMPLETED: [
+            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
+            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
+            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
+            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED)
+        ],
+        Status.SUBMITTED: [
+            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
+            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
+            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED)
+        ],
+        Status.RUNNING: [
+            _create_dummy_job_with_status(next_job_id(), Status.RUNNING),
+            _create_dummy_job_with_status(next_job_id(), Status.RUNNING)
+        ],
+        Status.QUEUING: [
+            _create_dummy_job_with_status(next_job_id(), Status.QUEUING)
+        ],
+        Status.FAILED: [
+            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
+            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
+            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
+            _create_dummy_job_with_status(next_job_id(), Status.FAILED)
+        ],
+        Status.READY: [
+            _create_dummy_job_with_status(next_job_id(), Status.READY),
+            _create_dummy_job_with_status(next_job_id(), Status.READY),
+            _create_dummy_job_with_status(next_job_id(), Status.READY)
+        ],
+        Status.WAITING: [
+            _create_dummy_job_with_status(next_job_id(), Status.WAITING),
+            _create_dummy_job_with_status(next_job_id(), Status.WAITING)
+        ],
+        Status.UNKNOWN: [
+            _create_dummy_job_with_status(next_job_id(), Status.UNKNOWN)
+        ]
+    }
+
+
+@pytest.fixture
+def job_list(as_conf, mocker, jobs_as_dict):
+    parameters = {'fake-key': 'fake-value',
+                  'fake-key2': 'fake-value2'}
+    as_conf.load_parameters = mocker.Mock(return_value=parameters)
+    as_conf.default_parameters = {}
+    joblist_persistence = JobListPersistencePkl()
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), joblist_persistence)
+
+    for status, jobs in jobs_as_dict.items():
+        # noinspection PyProtectedMember
+        job_list._job_list.extend(jobs)
+    return job_list

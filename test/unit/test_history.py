@@ -15,26 +15,26 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from collections import namedtuple
-
 import os
 import re
-from autosubmit.history.utils import get_current_datetime
-import pytest
 import time
 import traceback
+from collections import namedtuple
 from shutil import copy2
 
+import pytest
+
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
 from autosubmit.history.strategies import StraightWrapperAssociationStrategy, GeneralizedWrapperDistributionStrategy, \
     PlatformInformationHandler
-from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.history.utils import get_current_datetime
 
 EXPID_TT00_SOURCE = "test_database.db~"
 EXPID_TT01_SOURCE = "test_database_no_run.db~"
-EXPID = "tt00"
+EXPID = "a000"
 EXPID_NONE = "tt01"
 BasicConfig.read()
 JOBDATA_DIR = BasicConfig.JOBDATA_DIR
@@ -320,8 +320,8 @@ class TestExperimentHistory:
         PLATFORM_NAME = "marenostrum4"
         JOB_ID = 101
         exp_history.write_submit_time(JOB_NAME, time.time(), "SUBMITTED", NCPUS, "00:30",
-                                                                    "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME,
-                                                                    JOB_ID, "bsc_es", 1, "")
+                                      "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME,
+                                      JOB_ID, "bsc_es", 1, "")
         inserted_job_data_dc = exp_history.write_start_time(JOB_NAME, time.time(), "RUNNING", NCPUS, "00:30", "debug",
                                                             "20000101", "fc2", "SIM", 1, PLATFORM_NAME, JOB_ID,
                                                             "bsc_es", 1, "")
@@ -356,3 +356,29 @@ class TestLogging:
 
     def test_log(self):
         self.log.log(self.exp_message, self.trace_message)
+
+
+@pytest.mark.parametrize("manager", [
+        False,
+        True,
+    ], ids=["With Manager", "Without Manager"])
+def test_process_status_changes_exception(mocker, job_list, manager):
+    mocked_log = mocker.patch('autosubmit.history.experiment_history.Log')
+    mocked_exp_history = mocker.Mock()
+
+    exp_history = ExperimentHistory(EXPID)
+    exp_history.initialize_database()
+    if manager:
+        exp_history.manager = None
+
+    CHUNK_UNIT = "month"
+    CHUNK_SIZE = 20
+    CURRENT_CONFIG = "CURRENT CONFIG"
+
+    mocked_exp_history.manager.get_experiment_run_dc_with_max_id.side_effect = None
+    exp_history.process_status_changes(job_list=job_list, chunk_unit=CHUNK_UNIT,
+                                                 chunk_size=CHUNK_SIZE,
+                                                 current_config=CURRENT_CONFIG)  # Generates new run
+
+    assert mocked_log.debug.call_count > 0
+    assert "Historical Database error:" in mocked_log.debug.call_args.args[0]
