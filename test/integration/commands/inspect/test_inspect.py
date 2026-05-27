@@ -22,6 +22,7 @@ import pytest
 from autosubmit.config.basicconfig import BasicConfig
 from bscearth.utils.date import date2str
 
+"""Integration tests for argument behavior."""
 
 @pytest.fixture(scope="function")
 def templates_dir(as_exp) -> Path:
@@ -125,3 +126,25 @@ def test_inspect_combined_filters(as_exp, mocker, templates_dir):
     )
 
     assert captured_jobs["names"] == [target_job]
+
+
+def test_inpect_no_filters_selects_all_jobs(as_exp, mocker):
+    """Test that when inspect is called without filters, all jobs are selected."""
+    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    all_job_names = [job.name for job in job_list.get_job_list()]
+
+    captured_jobs = {}
+
+    def capture_generate_scripts(
+        as_conf, job_list_obj, jobs_filtered, packages_persistence, only_wrappers=False
+    ):
+        captured_jobs["names"] = [job.name for job in jobs_filtered]
+
+    mocker.patch(
+        "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers",
+        side_effect=capture_generate_scripts,
+    )
+
+    do_inspect(as_exp)
+
+    assert set(captured_jobs["names"]) == set(all_job_names)
