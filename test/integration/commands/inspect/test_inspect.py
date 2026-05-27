@@ -24,6 +24,7 @@ from bscearth.utils.date import date2str
 
 """Integration tests for argument behavior."""
 
+
 @pytest.fixture(scope="function")
 def templates_dir(as_exp) -> Path:
     """Return the path to the templates directory for the given experiment."""
