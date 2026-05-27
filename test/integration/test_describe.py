@@ -40,7 +40,7 @@ def _experiment_data(hpcarch: str = 'ARM') -> dict:
 def _location_lines(mocked_log) -> list:
     """The ``Location: ...`` lines emitted via ``Log.result``."""
     return [
-        call.args[0].format(call.args[1])
+        call.args[0]
         for call in mocked_log.result.mock_calls
         if call.args and call.args[0].startswith('Location: ')
     ]
@@ -123,7 +123,7 @@ def test_describe_archived_experiment(
 
     assert mocked_log.info.called
     described = [
-        call.args[0].format(call.args[1])
+        call.args[0]
         for call in mocked_log.result.mock_calls
         if call.args and call.args[0].startswith('Describing ')
     ]

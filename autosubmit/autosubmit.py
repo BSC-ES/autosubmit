@@ -3448,7 +3448,7 @@ class Autosubmit:
                     Log.warning(f"Experiment '{expid}' not found in the database, skipping")
 
         for experiment_id in experiments_ids:
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(experiment_id)
             try:
                 try:
                     # Preferred source of truth: the on-disk config files.
@@ -3494,18 +3494,18 @@ class Autosubmit:
                     branch = snapshot["branch"]
                     hpc = snapshot["hpc"]
                     description = get_experiment_description(experiment_id)
-                    description = description if description else ""
+                    description = description[0][0] if description else ""
                     Log.info(f"Experiment '{experiment_id}' files not found; "
                             f"it may have been archived. Showing the last "
                             f"stored snapshot.")
-                Log.result("Describing {0}", experiment_id)
-                Log.result("Owner: {0}", user)
-                Log.result("Location: {0}", exp_path)
-                Log.result("Created: {0}", created)
-                Log.result("Model: {0}", model)
-                Log.result("Branch: {0}", branch)
-                Log.result("HPC: {0}", hpc)
-                Log.result("Description: {0}", description)
+                Log.result(f"Describing {experiment_id}")
+                Log.result(f"Owner: {user}")
+                Log.result(f"Location: {exp_path}")
+                Log.result(f"Created: {created}")
+                Log.result(f"Model: {model}")
+                Log.result(f"Branch: {branch}")
+                Log.result(f"HPC: {hpc}")
+                Log.result(f"Description: {description}")
             except Exception:
                 not_described_experiments.append(experiment_id)
         if len(not_described_experiments) > 0:
