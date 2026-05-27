@@ -20,21 +20,18 @@ from pathlib import Path
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import AutosubmitCritical
 from bscearth.utils.date import date2str
-
-
-@pytest.fixture(scope="function")
-def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
-    config_data = general_data | experiment_data | jobs_data
-    return autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
 
 
 @pytest.fixture(scope="function")
 def templates_dir(as_exp) -> Path:
     """Return the path to the templates directory for the given experiment."""
     as_conf = as_exp.as_conf
-    return Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_exp.expid / BasicConfig.LOCAL_TMP_DIR
+    return (
+        Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+        / as_exp.expid
+        / BasicConfig.LOCAL_TMP_DIR
+    )
 
 
 def cleanup_cmds(templates_dir: Path) -> None:
@@ -66,7 +63,11 @@ def cleanup_lock(as_exp) -> None:
 def do_inspect(as_exp, fl=None, fc=None, fs=None, ft=None, quick=False):
     """Call the inspect command with the given filters and return the list of generated .cmd files."""
     as_exp.as_conf.set_last_as_command("inspect")
-    templates = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR) / as_exp.expid / BasicConfig.LOCAL_TMP_DIR
+    templates = (
+        Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+        / as_exp.expid
+        / BasicConfig.LOCAL_TMP_DIR
+    )
     cleanup_cmds(templates)
     cleanup_lock(as_exp)
 
@@ -89,7 +90,8 @@ def test_inspect_combined_filters(as_exp, mocker, templates_dir):
     job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
 
     target = next(
-        job for job in job_list.get_job_list()
+        job
+        for job in job_list.get_job_list()
         if job.section == "LOCALJOB"
         and date2str(job.date) == "20200101"
         and job.member == "fc0"
@@ -97,12 +99,16 @@ def test_inspect_combined_filters(as_exp, mocker, templates_dir):
         and str(job.split) == "2"
     )
     target_job = target.name
-    no_matching_job = next(job.name for job in job_list.get_job_list() if job.name != target_job)
+    no_matching_job = next(
+        job.name for job in job_list.get_job_list() if job.name != target_job
+    )
     filter_list = f"{target_job} {no_matching_job}"
 
     captured_jobs = {}
 
-    def capture_generate_scripts(as_conf, job_list_obj, jobs_filtered, packages_persistence, only_wrappers=False):
+    def capture_generate_scripts(
+        as_conf, job_list_obj, jobs_filtered, packages_persistence, only_wrappers=False
+    ):
         captured_jobs["names"] = [job.name for job in jobs_filtered]
 
     mocker.patch(

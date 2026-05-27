@@ -37,12 +37,6 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(scope="function")
-def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
-    config_data = general_data | experiment_data | jobs_data
-    return autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
-
-
-@pytest.fixture(scope="function")
 def submitter(as_exp):
     submitter = as_exp.autosubmit._get_submitter(as_exp.as_conf)
     submitter.load_platforms(as_exp.as_conf)
