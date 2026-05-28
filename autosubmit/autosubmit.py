@@ -63,7 +63,7 @@ from autosubmit.experiment.experiment_common import (
 )
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, user_yes_no_query
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, user_yes_no_query, describe_command_details
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job import Job
@@ -907,6 +907,9 @@ class Autosubmit:
 
         if hasattr(args, 'expid'):
             expid = args.expid
+
+        describe_command_details(args)
+
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
         if args.command == 'run':

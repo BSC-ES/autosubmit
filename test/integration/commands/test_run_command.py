@@ -133,6 +133,7 @@ def test_run_command(
         assert exp.autosubmit.run_command(args=args) == 0
     else:
         assert exp.autosubmit.run_command(args=args)
+    assert Path(exp.as_conf.basic_config.GLOBAL_LOG_DIR).glob("*"+args.command + "_details.log")
 
 
 @pytest.mark.parametrize(

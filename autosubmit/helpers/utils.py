@@ -22,15 +22,13 @@ import sys
 from contextlib import suppress
 from itertools import zip_longest
 from pathlib import Path
-from typing import Iterable, Optional, Union, TYPE_CHECKING
+from typing import Iterable, Optional, Union
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
-
-if TYPE_CHECKING:
-    from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 
 
 def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: Optional[str] = None):
@@ -329,3 +327,18 @@ def user_yes_no_query(question: str) -> bool:
             sys.stdout.write('Please respond with \'y\' or \'n\'.\n')
         except Exception as e:
             raise AutosubmitCritical("No input detected, the experiment will not be erased.", 7011, str(e))
+
+def describe_command_details(args) -> None:
+    Log.set_file(
+        str(
+            Path(
+                BasicConfig.GLOBAL_LOG_DIR,
+                args.command + "_details.log",
+            )
+        ),
+        "out",
+        4020,
+    )
+    Log.info("Full range of command descriptors will be printed bellow")
+    for key, val in vars(args).items():
+        Log.info(f"{key.upper()}: {val}")
