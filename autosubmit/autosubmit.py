@@ -81,6 +81,7 @@ from autosubmit.helpers.utils import (
     get_rc_path,
     recover_stale_job_data,
     user_yes_no_query,
+    describe_command_details,
 )
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
@@ -924,6 +925,9 @@ class Autosubmit:
 
         if hasattr(args, 'expid'):
             expid = args.expid
+
+        describe_command_details(args)
+
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
         if args.command == 'run':
