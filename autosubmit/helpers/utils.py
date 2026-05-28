@@ -465,3 +465,18 @@ def _parse_stat_file(path: Path) -> tuple[int, int]:
         Log.warning(f"STAT file {path} contains non-integer data, skipping")
         return 0, 0
     return (values[0], values[1]) if len(values) >= 2 else (values[0], 0) if values else (0, 0)
+
+def describe_command_details(args) -> None:
+    Log.set_file(
+        str(
+            Path(
+                BasicConfig.GLOBAL_LOG_DIR,
+                args.command + "_details.log",
+            )
+        ),
+        "out",
+        4020,
+    )
+    Log.info("Full range of command descriptors will be printed bellow")
+    for key, val in vars(args).items():
+        Log.info(f"{key.upper()}: {val}")
