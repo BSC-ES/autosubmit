@@ -269,7 +269,7 @@ class Job(object):
         self.reservation = ""
         self.delete_when_edgeless = False
         # hetjobs
-        self.het = None
+        self.het = {}
         self.updated_log = False
         self._log_recovered = False
         self.log_recovered = False
@@ -341,7 +341,7 @@ class Job(object):
         self.current_checkpoint_step = None
         self.max_checkpoint_step = None
         self.reservation = None
-        self.het = None
+        self.het = {}
         self.updated_log = False
         self._script = None
         self._log_recovery_retries = None

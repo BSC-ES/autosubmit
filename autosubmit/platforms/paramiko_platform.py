@@ -1544,9 +1544,7 @@ class ParamikoPlatform(Platform):
             out_filename = f"{job.name}.cmd.out"
             err_filename = f"{job.name}.cmd.err"
 
-        het = job.het or {}
-
-        if len(het) > 0:
+        if len(job.het) > 0:
             header = self.header.calculate_het_header(job, parameters)
         elif str(job.processors) == '1':
             header = self.header.SERIAL
@@ -1555,7 +1553,7 @@ class ParamikoPlatform(Platform):
 
         header = header.replace('%OUT_LOG_DIRECTIVE%', out_filename)
         header = header.replace('%ERR_LOG_DIRECTIVE%', err_filename)
-        if het.get("HETSIZE", 0) <= 1:
+        if job.het.get("HETSIZE", 0) <= 1:
             if hasattr(self.header, 'get_queue_directive'):
                 header = header.replace(
                     '%QUEUE_DIRECTIVE%', self.header.get_queue_directive(job, parameters))
