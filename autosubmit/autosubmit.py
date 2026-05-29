@@ -908,10 +908,11 @@ class Autosubmit:
         if hasattr(args, 'expid'):
             expid = args.expid
 
-        describe_command_details(args)
-
         if args.command != "configure" and args.command != "install":
             Autosubmit._init_logs(args, args.logconsole, args.logfile, expid)
+
+        describe_command_details(args)
+
         if args.command == 'run':
             if args.trace and args.profile is None:
                 raise AutosubmitCritical('Tracing is only available with profiling. Please add -p/--profile flag to run with tracing.', 7012)

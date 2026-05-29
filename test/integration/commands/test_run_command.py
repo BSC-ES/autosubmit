@@ -16,8 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
+import sys
 from pathlib import Path
-from typing import Callable, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING, Optional
 
 import pytest
 from ruamel.yaml import YAML
@@ -133,7 +134,22 @@ def test_run_command(
         assert exp.autosubmit.run_command(args=args) == 0
     else:
         assert exp.autosubmit.run_command(args=args)
-    assert Path(exp.as_conf.basic_config.GLOBAL_LOG_DIR).glob("*"+args.command + "_details.log")
+    flags = expid = subcommand = commands = False
+    if 'create' not in command and 'delete' not in command and 'archive' not in command:
+        for file in exp.aslogs_dir.iterdir():
+            if f"_{command[1]}.log" in file.name:
+                with open(file, 'r') as f:
+                    lines = f.readlines()
+                    for line in lines:
+                        if not flags:
+                            flags = 'FLAGS' in line.split()
+                        if not expid:
+                            expid = 'EXPID' in line.split()
+                        if not subcommand:
+                            subcommand = 'SUBCOMMAND' in line.split()
+                        if not commands:
+                            commands = 'COMMAND' in line.split()
+                assert flags and expid and subcommand and commands
 
 
 @pytest.mark.parametrize(
@@ -441,3 +457,68 @@ def test_run_report_template_edge_cases(
     report = next(Path(exp.tmp_dir).glob(f"{expid}_report_*"))
     rendered = report.read_text().rstrip('\n')
     assert rendered == expected_output
+
+
+@pytest.mark.parametrize(
+    "argv, expected_profile, expected_trace",
+    [
+        (["autosubmit", "run"], None, False),
+        (["autosubmit", "run", "--profile"], 0, False),
+        (["autosubmit", "run", "--profile", "3"], 3, False),
+        (["autosubmit", "run", "--profile", "--trace"], 0, True),
+    ],
+)
+def test_run_command_forwards_profile_arguments(
+        argv: list[str],
+        expected_profile: Optional[int],
+        autosubmit_exp: "AutosubmitExperimentFixture",
+        expected_trace: bool,
+        mocker,
+        get_next_expid: Callable[[], str],
+) -> None:
+    expid = get_next_expid()
+    argv.insert(2, expid)
+    exp, args, command = set_up_test(expid, argv, autosubmit_exp, mocker)
+
+    mocker.patch("sys.argv", argv)
+    mocked_run = mocker.patch(
+        "autosubmit.autosubmit.Autosubmit.run_experiment",
+        return_value=0,
+    )
+    mocker.patch("autosubmit.autosubmit.Autosubmit._init_logs", return_value=None)
+
+    status, args = exp.autosubmit.parse_args()
+
+    assert status == 0
+    assert args is not None
+
+    exp.autosubmit.run_command(args)
+
+    mocked_run.assert_called_once_with(
+        expid,
+        None,
+        None,
+        None,
+        expected_profile,
+        expected_trace,
+    )
+
+
+def test_run_command_rejects_trace_without_profile(mocker,
+        autosubmit_exp: "AutosubmitExperimentFixture",
+        get_next_expid: Callable[[], str],) -> None:
+    expid = get_next_expid()
+    mocker.patch("sys.argv", ["autosubmit", "run", expid, "--trace"])
+    mocker.patch("autosubmit.autosubmit.Autosubmit._init_logs", return_value=None)
+
+    exp, args, _ = set_up_test(expid, sys.argv, autosubmit_exp, mocker)
+
+    status, args = exp.autosubmit.parse_args()
+
+    assert status == 0
+    assert args is not None
+
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        exp.autosubmit.run_command(args)
+
+    assert exc_info.value.code == 7012

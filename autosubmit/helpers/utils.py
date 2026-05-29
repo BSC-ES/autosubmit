@@ -329,16 +329,24 @@ def user_yes_no_query(question: str) -> bool:
             raise AutosubmitCritical("No input detected, the experiment will not be erased.", 7011, str(e))
 
 def describe_command_details(args) -> None:
-    Log.set_file(
-        str(
-            Path(
-                BasicConfig.GLOBAL_LOG_DIR,
-                args.command + "_details.log",
-            )
-        ),
-        "out",
-        4020,
-    )
-    Log.info("Full range of command descriptors will be printed bellow")
-    for key, val in vars(args).items():
-        Log.info(f"{key.upper()}: {val}")
+    keys = ['FLAGS', 'EXPID', 'SUBCOMMAND', 'COMMAND']
+    flags = ''
+    descriptor = '\n'
+    for val in sys.argv:
+        descriptor += f'{keys.pop()} : {val}\n'
+        if keys[-1] == "FLAGS":
+            break
+    flags += f'{keys[0]} : '
+    for val in sys.argv[3:]:
+        flags += f'{val} '
+    descriptor += flags+'\n'
+    if hasattr(args, 'expid') and args.expid and args.expid != '*':
+        current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, args.expid).stat().st_uid
+        try:
+            current_owner = pwd.getpwuid(current_owner_id).pw_name
+        except (TypeError, KeyError) as e:
+            Log.warning(f"Current owner of experiment {args.expid} could not be retrieved. "
+                        f"The owner is no longer in the system database: {str(e)}")
+        user_descriptor = current_owner if current_owner is not None else current_owner_id
+        descriptor += f'USER: {user_descriptor}'
+    Log.info(f"{descriptor}")
