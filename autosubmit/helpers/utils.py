@@ -467,16 +467,22 @@ def _parse_stat_file(path: Path) -> tuple[int, int]:
     return (values[0], values[1]) if len(values) >= 2 else (values[0], 0) if values else (0, 0)
 
 def describe_command_details(args) -> None:
-    Log.set_file(
-        str(
-            Path(
-                BasicConfig.GLOBAL_LOG_DIR,
-                args.command + "_details.log",
-            )
-        ),
-        "out",
-        4020,
-    )
-    Log.info("Full range of command descriptors will be printed bellow")
-    for key, val in vars(args).items():
-        Log.info(f"{key.upper()}: {val}")
+    descriptor = '\n'
+    if 'autosubmit' in sys.argv[0]:
+        descriptor += f'CLI_PATH : {sys.argv[0]}\n'
+        cli_args = ["autosubmit"] + sys.argv[1:]
+    else:
+        cli_args = sys.argv
+    command = ' '.join(arg for arg in cli_args)
+    descriptor += f'COMMAND : {command}\n'
+    if hasattr(args, 'expid') and args.expid and args.expid != '*':
+        descriptor += f'EXPID : {args.expid}\n'
+        current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, args.expid).stat().st_uid
+        try:
+            current_owner = pwd.getpwuid(current_owner_id).pw_name
+        except (TypeError, KeyError) as e:
+            Log.warning(f"Current owner of experiment {args.expid} could not be retrieved. "
+                        f"The owner is no longer in the system database: {str(e)}")
+        user_descriptor = current_owner if current_owner is not None else current_owner_id
+        descriptor += f'USER: {user_descriptor}'
+    Log.info(f"{descriptor}")
