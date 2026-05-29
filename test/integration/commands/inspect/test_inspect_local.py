@@ -24,6 +24,8 @@ from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 
+"""Integration tests focused on `inspect` command output and template content."""
+
 # -- Tests
 _TEMPLATE_CONTENT = dedent("""
 echo "Hello World with id=Success"

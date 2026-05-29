@@ -455,22 +455,17 @@ class Autosubmit:
             subparser.add_argument(
                 '-q', '--quick', action="store_true", help='Only checks one job per each section')
 
-            group.add_argument('-fs', '--filter_status', type=str,
-                               choices=('Any', 'READY', 'COMPLETED',
-                                        'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
-                               help='Select the original status to filter the list of jobs')
-            group = subparser.add_mutually_exclusive_group(required=False)
-            group.add_argument('-fl', '--list', type=str,
+            subparser.add_argument('-fl', '--list', type=str,
                                help='Supply the list of job names to be filtered. Default = "Any". '
                                     'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
-            group.add_argument('-fc', '--filter_chunks', type=str,
+            subparser.add_argument('-fc', '--filter_chunks', type=str,
                                help='Supply the list of chunks to filter the list of jobs. Default = "Any". '
                                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
-            group.add_argument('-fs', '--filter_status', type=str,
+            subparser.add_argument('-fs', '--filter_status', type=str,
                                choices=('Any', 'READY', 'COMPLETED',
                                         'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
                                help='Select the original status to filter the list of jobs')
-            group.add_argument('-ft', '--filter_type', type=str,
+            subparser.add_argument('-ft', '--filter_type', type=str,
                                help='Select the job type to filter the list of jobs')
 
             # Check
@@ -1103,7 +1098,6 @@ class Autosubmit:
                     host in BasicConfig.ALLOWED_HOSTS[args.command] or fullhost in BasicConfig.ALLOWED_HOSTS[
                 args.command]):
                 raise AutosubmitCritical(message, 7071)
-        
         if (expid != 'None' and expid) and args.command not in expid_less and args.command not in global_log_command:
             if isinstance(expid, list):
                 expids = cast(list[str], expid)
@@ -1522,22 +1516,33 @@ class Autosubmit:
                 check_wrapper=False, quick=False) -> bool:
         """Generates cmd files experiment.
 
-         :param expid: identifier of experiment to be run
-         :param lst:
-         :param filter_chunks:
-         :param filter_status:
-         :param filter_section:
-         :param force:
-         :param check_wrapper:
-         :param quick:
-         :return: True if run to the end, False otherwise
-         """
+        :param expid: Identifier of experiment to be run
+        :type expid: str
+        :param lst: Optional list of job names to filter for inspect.
+        :type lst: Optional[str]
+        :param filter_chunks: Optional list of chunk identifiers to filter for inspect.
+        :type filter_chunks: Optional[str]
+        :param filter_status: Optional list of job statuses to filter for inspect.
+        :type filter_status: Optional[str]
+        :param filter_section: Optional list of job sections to filter for inspect.
+        :type filter_section: Optional[str]
+        :param force: If true, forces the generation of all cmd files.
+        :type force: bool
+        :param check_wrapper: If true, checks the wrapper.
+        :type check_wrapper: bool
+        :param quick: If true, performs a quick inspect.
+        :type quick: bool
+        :return: True if run to the end, False otherwise
+        :rtype: bool
+        :raises AutosubmitCritical: If there is a critical error during the inspection process.
+        """
+
         try:
             Log.info(f"Inspecting experiment {expid}")
             check_ownership(expid, raise_error=True)
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-            tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-            if os.path.exists(os.path.join(tmp_path, 'autosubmit.lock')):
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+            tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
+            if (tmp_path / 'autosubmit.lock').exists():
                 locked = True
             else:
                 locked = False
@@ -1585,55 +1590,30 @@ class Autosubmit:
                         jobs = job_list.get_job_list()
                     else:
                         Log.info("Generating cmd scripts only for selected jobs")
-                        if filter_chunks:
-                            fc = filter_chunks
-                            Log.debug(fc)
-                            if fc == 'Any':
-                                jobs = job_list.get_job_list()
-                            else:
-                                # noinspection PyTypeChecker
-                                data = json.loads(Autosubmit._create_json(fc))
-                                for date_json in data['sds']:
-                                    date = date_json['sd']
-                                    jobs_date = [j for j in job_list.get_job_list() if date2str(
-                                        j.date) == date]
+                        jobs = job_list.get_job_list()
+                        if filter_section or filter_chunks or filter_status or lst:
+                            Autosubmit._validate_job_filters(
+                                as_conf,
+                                job_list,
+                                lst,
+                                filter_chunks,
+                                filter_status,
+                                filter_section,
+                            )
 
-                                    for member_json in date_json['ms']:
-                                        member = member_json['m']
-                                        jobs_member = [j for j in jobs_date if j.member == member]
+                            selected_job_names = apply_job_filters(
+                                job_list=job_list,
+                                base_job_names={job.name for job in jobs},
+                                filter_section=filter_section,
+                                filter_chunk=filter_chunks,
+                                filter_status=filter_status,
+                                filter_list=lst,
+                                filter_sections_splits_fn=Autosubmit._filter_sections_splits,
+                                filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
+                                status_from_str_fn=Autosubmit._get_status,
+                            )
 
-                                        for chunk_json in member_json['cs']:
-                                            chunk = int(chunk_json)
-                                            jobs = jobs + [job for job in [j for j in jobs_member if j.chunk == chunk]]
-
-                        elif filter_status:
-                            Log.debug(
-                                f"Filtering jobs with status {filter_status}")
-                            if filter_status == 'Any':
-                                jobs = job_list.get_job_list()
-                            else:
-                                fs = Autosubmit._get_status(filter_status)
-                                jobs = [job for job in [j for j in job_list.get_job_list() if j.status == fs]]
-
-                        elif filter_section:
-                            ft = filter_section
-                            Log.debug(ft)
-
-                            if ft == 'Any':
-                                jobs = job_list.get_job_list()
-                            else:
-                                for job in job_list.get_job_list():
-                                    if job.section == ft:
-                                        jobs.append(job)
-                        elif lst:
-                            jobs_lst = lst.split()
-
-                            if jobs == 'Any':
-                                jobs = job_list.get_job_list()
-                            else:
-                                for job in job_list.get_job_list():
-                                    if job.name in jobs_lst:
-                                        jobs.append(job)
+                            jobs = [job for job in jobs if job.name in selected_job_names]
                         else:
                             jobs = job_list.get_job_list()
             if quick:
@@ -1664,13 +1644,13 @@ class Autosubmit:
 
             if isinstance(jobs, type([])):
                 for job in jobs:
-                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd | {job.file}\n"
+                    file_paths += f"{str(tmp_path / (job.name + '.cmd'))} | {job.file}\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs, packages_persistence, False)
             if len(jobs_cw) > 0:
                 for job in jobs_cw:
-                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
+                    file_paths += f"{str(tmp_path / (job.name + '.cmd'))}\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs_cw, packages_persistence, False)
