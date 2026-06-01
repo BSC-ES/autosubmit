@@ -456,18 +456,18 @@ def test_log_paths_in_outptut_txt(status, tmp_path, autosubmit_config, mocker):
         job_list_object=None,
     )
 
+    # Assert
+    assert status_file.exists()
+    content = status_file.read_text()
+
     if status in [Status.FAILED, Status.COMPLETED]:
-        assert status_file.exists()
-        content = status_file.read_text()
         expected_line = (
             f"{job.name} {Status.VALUE_TO_KEY[status]} "
             f"{expected_log_root / out_filename} {expected_log_root / err_filename}\n"
         )
         assert content == expected_line
     else:
-        assert status_file.exists()
-        content = status_file.read_text()
-        assert f"{job.name} RUNNING  \n" in content
+        assert f"{job.name} {Status.VALUE_TO_KEY[status]}  \n" in content
 
 
 def test_generate_output_txt_job_with_children(tmp_path, autosubmit_config, mocker):
