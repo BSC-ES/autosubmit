@@ -2788,8 +2788,13 @@ class Autosubmit:
         monitor_exp = Monitor()
         try:
             if txt_only or txt_logfiles or file_format == "txt":
-                monitor_exp.generate_output_txt(expid, jobs, os.path.join(
-                    exp_path, "/tmp/LOG_" + expid), txt_logfiles, job_list_object=job_list)
+                monitor_exp.generate_output_txt(
+                    expid,
+                    jobs,
+                    str(BasicConfig.expid_log_dir(expid)),
+                    txt_logfiles,
+                    job_list_object=job_list,
+                )
                 if txt_only:
                     current_length = len(job_list.get_job_list())
                     if current_length > 1000:
@@ -2802,8 +2807,7 @@ class Autosubmit:
                 # if file_format is set, use file_format, otherwise use conf value
                 monitor_exp.generate_output(expid,
                                             jobs,
-                                            os.path.join(
-                                                exp_path, "/tmp/LOG_", expid),
+                                            str(BasicConfig.expid_log_dir(expid)),
                                             output_format=file_format if file_format is not None and len(
                                                 str(file_format)) > 0 else output_type,
                                             packages=packages,
@@ -3188,9 +3192,15 @@ class Autosubmit:
                 Log.info("\nPlotting the jobs list...")
                 monitor_exp = Monitor()
                 monitor_exp.generate_output(
-                    expid, job_list.get_job_list(), os.path.join(exp_path, "/tmp/LOG_", expid),
-                    output_format=output_type, packages=packages, show=not hide, groups=groups_dict,
-                    job_list_object=job_list)
+                    expid,
+                    job_list.get_job_list(),
+                    str(BasicConfig.expid_log_dir(expid)),
+                    output_format=output_type,
+                    packages=packages,
+                    show=not hide,
+                    groups=groups_dict,
+                    job_list_object=job_list,
+                )
         except Exception as e:
             Log.warning("An error has occurred while plotting the jobs list after recovery. "
                         f"Check if you have X11 redirection and an img viewer correctly set. Trace: {str(e)}")
@@ -4471,14 +4481,16 @@ class Autosubmit:
                         Log.info("\nPlotting the jobs list...")
                         monitor_exp = Monitor()
                         # if output is set, use output
-                        monitor_exp.generate_output(expid, job_list.get_job_list(),
-                                                    os.path.join(
-                                                        exp_path, "/tmp/LOG_", expid),
-                                                    output if output is not None else output_type,
-                                                    packages,
-                                                    not hide,
-                                                    groups=groups_dict,
-                                                    job_list_object=job_list)
+                        monitor_exp.generate_output(
+                            expid,
+                            job_list.get_job_list(),
+                            str(BasicConfig.expid_log_dir(expid)),
+                            output if output is not None else output_type,
+                            packages,
+                            not hide,
+                            groups=groups_dict,
+                            job_list_object=job_list,
+                        )
                     Log.result("\nJob list created successfully")
                     Log.warning(
                         "Remember to MODIFY the MODEL config files!")
@@ -5463,7 +5475,7 @@ class Autosubmit:
                     monitor_exp = Monitor()
                     monitor_exp.generate_output(expid,
                                                 job_list.get_job_list(),
-                                                str(Path(exp_path, "tmp", "LOG_" + expid)),
+                                                str(BasicConfig.expid_log_dir(expid)),
                                                 output_format=output_type,
                                                 packages=packages,
                                                 show=not hide,
