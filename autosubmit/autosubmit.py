@@ -2687,7 +2687,6 @@ class Autosubmit:
             profiler.start()
 
         try:
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
             Log.info("Getting job list...")
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(False)
@@ -3044,7 +3043,6 @@ class Autosubmit:
             Log.warning("Changes will be NOT saved to the jobList. Use -s option to save")
 
         check_ownership(expid, raise_error=True)
-        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
         as_conf.check_conf_files(True)
         Log.info(f'Recovering experiment {expid}')
