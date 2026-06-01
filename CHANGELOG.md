@@ -25,7 +25,7 @@
 - Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
 - Fixed `autosubmit stats` command that was not considering parameters defined in the platform, like NODES, TASKS, etc. #2978
 - Fixes 1-N grouped split dependencies #2958
-
+- Fixed inconsistent log paths in status txt output #3040
 
 **Enhancements:**
 
