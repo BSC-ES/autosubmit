@@ -296,7 +296,7 @@ class SlurmPlatform(ParamikoPlatform):
         :return: Command to look for a job in the queue.
         :rtype: str
         """
-        return f'squeue -o %A,%.50j -n {job_name}'
+        return f'squeue -o %A,%j -n {job_name}'
 
     def get_job_energy_cmd(self, job_id: str) -> str:
         """Generates a command to get data from a job
