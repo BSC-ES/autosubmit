@@ -799,8 +799,7 @@ def test_wrapper_config(
 
     if run_type.startswith("invalid"):
         with pytest.raises(AutosubmitCritical):
-            autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True,
-                           check_wrappers=True)
+            autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True, wrapper=True)
     else:
         as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
 

@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import mock
 import pytest
 
 from autosubmit.job.job import Job
@@ -37,7 +36,7 @@ def create_packages(mocker, autosubmit_config):
             Job("dummy-3", 3, Status.SUBMITTED, 0)]
     platform = mocker.MagicMock()
     platform.name = 'dummy'
-    platform.serial_platform = mock.MagicMock()
+    platform.serial_platform = mocker.MagicMock()
     platform.serial_platform.max_wallclock = '24:00'
     for job in jobs:
         job._platform = platform

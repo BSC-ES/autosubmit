@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -24,20 +24,26 @@ from getpass import getuser
 from itertools import permutations, product
 from pathlib import Path
 from textwrap import dedent
-from typing import cast, Any, Iterable
+from typing import cast, Any, Iterator, Union, TYPE_CHECKING
 
 import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.experiment_common import check_ownership
 # noinspection PyProtectedMember
 from autosubmit.experiment.experiment_common import (
-    check_ownership, copy_experiment, delete_experiment,
-    _delete_expid, new_experiment, _perform_deletion
+    delete_experiment,
+    _delete_expid, _perform_deletion
 )
+from autosubmit.experiment.experiment_common import new_experiment, copy_experiment
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.utils import as_conf_default_values
+
+if TYPE_CHECKING:
+    from integration.conftest import AutosubmitExperimentFixture
+    from datetime import datetime
 
 _DESCRIPTION = "for testing"
 _VERSION = "test-version"
@@ -88,8 +94,8 @@ def test_copying_experiment_with_hpc_in_command(autosubmit_exp: Callable, autosu
         assert not yaml_data["MAIL"]["NOTIFICATIONS"]
         assert yaml_data["MAIL"]["TO"] == ""
         assert (
-            yaml_data["JOBS"]["LOCAL_SEND_INITIAL"]["CHUNKS_FROM"]["1"]["CHUNKS_TO"]
-            == "1"
+                yaml_data["JOBS"]["LOCAL_SEND_INITIAL"]["CHUNKS_FROM"]["1"]["CHUNKS_TO"]
+                == "1"
         )
         assert yaml_data["LOCAL"]["PROJECT_PATH"] == ""
         assert yaml_data["GIT"]["PROJECT_ORIGIN"] == "origin_test"
@@ -212,12 +218,12 @@ def test_copying_experiment_with_hpc_in_file(autosubmit_exp: Callable, autosubmi
     ],
 )
 def test_as_conf_default_values(
-    git_command,
-    git_session,
-    autosubmit_exp: Callable,
-    autosubmit: Autosubmit,
-    tmp_path,
-    mocker,
+        git_command,
+        git_session,
+        autosubmit_exp: Callable,
+        autosubmit: Autosubmit,
+        tmp_path,
+        mocker,
 ):
     """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
     exp = autosubmit_exp(
@@ -250,8 +256,8 @@ def test_as_conf_default_values(
         assert yaml_data["DEFAULT"]["EXPID"] == exp.expid
         if git_command[0]:
             assert (
-                yaml_data["DEFAULT"]["CUSTOM_CONFIG"]
-                == f"{tmp_path}/{exp.expid}/proj/test_3"
+                    yaml_data["DEFAULT"]["CUSTOM_CONFIG"]
+                    == f"{tmp_path}/{exp.expid}/proj/test_3"
             )
         else:
             assert "CUSTOM_CONFIG" not in yaml_data["DEFAULT"]
@@ -284,17 +290,17 @@ def test_as_conf_default_values(
         ("https://earth.bsc.es/gitlab/ces/auto-advanced_config_example", ""),
         ("https://earth.bsc.es/gitlab/ces/auto-advanced_config_example", "   "),
         (
-            "https://earth.bsc.es/gitlab/ces/auto-advanced_config_example",
-            "existing_destination",
+                "https://earth.bsc.es/gitlab/ces/auto-advanced_config_example",
+                "existing_destination",
         ),
     ],
 )
 def test_expid_git_repo_sets_project_type_and_destination(
-    git_repo: str,
-    project_destination: str,
-    autosubmit_exp: Callable,
-    autosubmit: Autosubmit,
-    tmp_path,
+        git_repo: str,
+        project_destination: str,
+        autosubmit_exp: Callable,
+        autosubmit: Autosubmit,
+        tmp_path,
 ):
     """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
     exp = autosubmit_exp(
@@ -327,7 +333,7 @@ def test_expid_git_repo_sets_project_type_and_destination(
         "as_conf",
     )
 
-    project_data = None
+    project_data: Union[dict[str, Any], None] = None
     for conf_file in conf_path.iterdir():
         if conf_file.name.lower().endswith((".yml", ".yaml")):
             with open(conf_file, "r") as file:
@@ -364,7 +370,7 @@ def test_copy_experiment(type_flag: str, autosubmit_exp: Callable, autosubmit: A
     :return: None
     """
     autosubmit.install()
-    base_experiment = autosubmit_exp('t000', experiment_data={}, include_jobs=True)
+    base_experiment = autosubmit_exp(experiment_data={}, include_jobs=True)
 
     is_operational = type_flag == 'op'
     is_evaluation = type_flag == 'ev'
@@ -469,7 +475,7 @@ def test_create_expid_default_hpc(autosubmit: Autosubmit):
     )
 
     # capture the platform using the "describe"
-    describe = autosubmit.describe(experiment_id)
+    describe: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(experiment_id)  # type: ignore
     hpc_result = describe[4].lower()
 
     assert hpc_result == "local"
@@ -500,7 +506,7 @@ def test_create_expid_flag_hpc(fake_hpc: str, expected_hpc: str, autosubmit: Aut
     )
 
     # capture the platform using the "describe"
-    describe_experiment = autosubmit.describe(experiment_id)
+    describe_experiment: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(experiment_id)  # type: ignore
     hpc_result_experiment = describe_experiment[4].lower()
 
     assert hpc_result_experiment == expected_hpc
@@ -509,7 +515,7 @@ def test_create_expid_flag_hpc(fake_hpc: str, expected_hpc: str, autosubmit: Aut
 @pytest.mark.parametrize("experiment_hpc,expected_hpc", [
     ("local", "mn5"),
     ("mn5", "marenostrum"), ])
-def test_copy_expid_with_flag_hpc(tmp_path: Path, autosubmit: Autosubmit, experiment_hpc, expected_hpc):
+def test_copy_expid_with_flag_hpc(experiment_hpc: str, expected_hpc: str, tmp_path: Path, autosubmit: Autosubmit):
     """Create expid using the flag -H. Defining a value for the flag and not defining any value for that flag.
 
     code-block:: console
@@ -525,10 +531,10 @@ def test_copy_expid_with_flag_hpc(tmp_path: Path, autosubmit: Autosubmit, experi
     exp_id = autosubmit.expid('experiment', hpc=experiment_hpc, minimal_configuration=True)
     copy_exp = autosubmit.expid('copy', hpc=expected_hpc, copy_id=exp_id, minimal_configuration=True)
 
-    describe = autosubmit.describe(exp_id)
+    describe: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(exp_id)  # type: ignore
     hpc_experiment = describe[4].lower()
 
-    describe_copy = autosubmit.describe(copy_exp)
+    describe_copy: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(copy_exp)  # type: ignore
     hpc_experiment_copy = describe_copy[4].lower()
 
     assert hpc_experiment != hpc_experiment_copy
@@ -563,7 +569,7 @@ def test_copy_expid(fake_hpc: str, expected_hpc: str, autosubmit: Autosubmit):
     copy_id = autosubmit.expid('copy', "", original_id)
 
     # capture the platform using the "describe"
-    describe_copy = autosubmit.describe(copy_id)
+    describe_copy: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(copy_id)  # type: ignore
     hpc_result_copy = describe_copy[4].lower()
 
     assert hpc_result_copy == expected_hpc
@@ -586,7 +592,8 @@ def test_copy_expid_no(autosubmit: Autosubmit):
     experiment_id = autosubmit.expid('original', fake_hpc)
     copy_experiment_id = autosubmit.expid("copy experiment", new_hpc, experiment_id)
     # capture the platform using the "describe"
-    describe = autosubmit.describe(copy_experiment_id)
+    describe: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(  # type: ignore
+        copy_experiment_id)
     hpc_result = describe[4].lower()
 
     assert hpc_result == new_hpc
@@ -718,16 +725,18 @@ def test_autosubmit_generate_config_resource_listdir_order(autosubmit, mocker):
 
     yaml_mock = mocker.patch('autosubmit.autosubmit.YAML.dump', return_value=None)
     read_files_mock = mocker.patch('autosubmit.autosubmit.read_files', return_value=None)
-    resources = permutations(
+    resources: Iterator[tuple[str, ...]] = permutations(
         ['dummy.yml', 'local-minimal.yml', 'git-minimal.yml', 'include_me_please.yml', 'me_too.yml'])
     dummy = [True, False]
     local = [True, False]
     minimal_configuration = [True, False]
-    test_cases = product(resources, dummy, local, minimal_configuration)
+    test_cases: list[tuple[tuple[str, ...], bool, bool, bool]] = list(
+        product(resources, dummy, local, minimal_configuration)
+    )
     keys = ['resources', 'dummy', 'local', 'minimal_configuration']
 
     for test_case in test_cases:
-        test: dict[str, Iterable[Any]] = cast(dict[str, Iterable], dict(zip(keys, test_case)))
+        test: dict[str, Any] = dict(zip(keys, test_case))
         expid = 'ff99'
         original_local_root_dir = BasicConfig.LOCAL_ROOT_DIR
 
@@ -741,7 +750,7 @@ def test_autosubmit_generate_config_resource_listdir_order(autosubmit, mocker):
             resources_return = []
             filenames_return = []
 
-            for file_name in test['resources']:
+            for file_name in cast(tuple[str, ...], test['resources']):
                 input_path = Path(temp_file_path, file_name)
                 with open(input_path, 'w+') as source_yaml:
                     source_yaml.write('TEST: YES')
@@ -772,8 +781,15 @@ def test_expid_generated_correctly(tmp_path, autosubmit_exp, autosubmit):
     autosubmit.install()
     as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
     run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
-    autosubmit.inspect(expid=f'{as_exp.expid}', check_wrapper=True, force=True, lst=None,  # type: ignore
-                       filter_chunks=None, filter_status=None, filter_section=None)  # type: ignore
+    autosubmit.inspect(
+        expid=f'{as_exp.expid}',
+        check_wrapper=True,
+        force=True,
+        lst=None,  # type: ignore[arg-type]
+        filter_chunks=None,  # type: ignore[arg-type]
+        filter_status=None,  # type: ignore[arg-type]
+        filter_section=None  # type: ignore[arg-type]
+    )
     assert f"{as_exp.expid}_DEBUG.cmd" in [
         Path(f).name for f in Path(f"{run_dir}/{as_exp.expid}/tmp").iterdir()
     ]
@@ -893,3 +909,70 @@ def test_perform_deletion(mocker, tmp_path, autosubmit_exp, autosubmit):
     mocker.patch("autosubmit.database.db_common.delete_experiment", side_effect=FileNotFoundError)
     err_message = _perform_deletion(experiment_path, structure_db_path, job_data_db_path, as_exp.expid)
     assert all(x in err_message for x in ["Cannot delete experiment entry", "Cannot delete directory"])
+
+
+def test_new_experiment_fails_for_some_unknown_reason(mocker, autosubmit_exp: 'AutosubmitExperimentFixture'):
+    mocker.patch('autosubmit.autosubmit.new_experiment', return_value='')
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit_exp()
+
+    assert 'Autosubmit failed to create an expid' in str(cm.value)
+
+
+def test_required_folders_fail_to_be_created(mocker, autosubmit_exp: 'AutosubmitExperimentFixture'):
+    mocker.patch('autosubmit.autosubmit.create_required_folders', side_effect=FileNotFoundError('GPFS error!'))
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit_exp()
+
+    assert 'Error creating the experiment structure' in str(cm.value)
+
+
+def test_generate_as_config_fails(mocker, autosubmit_exp: 'AutosubmitExperimentFixture'):
+    mocker.patch('autosubmit.autosubmit.Autosubmit.generate_as_config', side_effect=FileNotFoundError('GPFS error!'))
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit_exp()
+
+    assert 'Error creating the experiment configuration' in str(cm.value)
+
+
+def test_as_conf_default_values_fails(mocker, autosubmit_exp: 'AutosubmitExperimentFixture'):
+    mocker.patch('autosubmit.autosubmit.as_conf_default_values', side_effect=ValueError('Unknown error'))
+    with pytest.raises(AutosubmitCritical) as cm:
+        autosubmit_exp()
+
+    assert 'Error setting the default values' in str(cm.value)
+
+
+@pytest.mark.parametrize(
+    'use_local_minimal',
+    [True, False]
+)
+def test_local_minimal_using_git_repository(
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        use_local_minimal: bool) -> None:
+    """Test a local minimal file, using Git.
+
+    There is a special case near the end of the ``expid`` function, where it checks if the
+    user specified a local minimal file and the Git repository given is a valid URL.
+
+    When that is true, it sets the Git repository and branch to an empty string before
+    setting the AS configuration default values.
+    """
+    git_repo = 'git@github.com:BSC-ES/autosubmit.git'
+    git_branch = 'master'
+    exp = autosubmit_exp(
+        use_local_minimal=use_local_minimal,
+        git_repo=git_repo,
+        git_branch=git_branch,
+        create=False
+    )
+    exp.as_conf.reload(force_load=True)
+
+    if use_local_minimal:
+        # So here, even though we specified a Git repository and a branch to use when
+        # creating the experiment, Autosubmit will set those to an empty string.
+        assert exp.as_conf.experiment_data['GIT']['PROJECT_ORIGIN'] == ''
+        assert exp.as_conf.experiment_data['GIT']['PROJECT_BRANCH'] == ''
+    else:
+        assert exp.as_conf.experiment_data['GIT']['PROJECT_ORIGIN'] == git_repo
+        assert exp.as_conf.experiment_data['GIT']['PROJECT_BRANCH'] == git_branch
