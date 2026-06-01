@@ -2791,7 +2791,14 @@ class Autosubmit:
                 monitor_exp.generate_output_txt(
                     expid,
                     jobs,
-                    str(BasicConfig.expid_log_dir(expid)),
+                    str(
+                        Path(
+                            BasicConfig.LOCAL_ROOT_DIR,
+                            expid,
+                            BasicConfig.LOCAL_TMP_DIR,
+                            f"LOG_{expid}",
+                        )
+                    ),
                     txt_logfiles,
                     job_list_object=job_list,
                 )
@@ -2807,7 +2814,7 @@ class Autosubmit:
                 # if file_format is set, use file_format, otherwise use conf value
                 monitor_exp.generate_output(expid,
                                             jobs,
-                                            str(BasicConfig.expid_log_dir(expid)),
+                                            str(Path(BasicConfig.LOCAL_ROOT_DIR, expid, BasicConfig.LOCAL_TMP_DIR, f"LOG_{expid}")),
                                             output_format=file_format if file_format is not None and len(
                                                 str(file_format)) > 0 else output_type,
                                             packages=packages,
@@ -3194,7 +3201,14 @@ class Autosubmit:
                 monitor_exp.generate_output(
                     expid,
                     job_list.get_job_list(),
-                    str(BasicConfig.expid_log_dir(expid)),
+                    str(
+                        Path(
+                            BasicConfig.LOCAL_ROOT_DIR,
+                            expid,
+                            BasicConfig.LOCAL_TMP_DIR,
+                            f"LOG_{expid}",
+                        )
+                    ),
                     output_format=output_type,
                     packages=packages,
                     show=not hide,
@@ -4484,7 +4498,14 @@ class Autosubmit:
                         monitor_exp.generate_output(
                             expid,
                             job_list.get_job_list(),
-                            str(BasicConfig.expid_log_dir(expid)),
+                            str(
+                                Path(
+                                    BasicConfig.LOCAL_ROOT_DIR,
+                                    expid,
+                                    BasicConfig.LOCAL_TMP_DIR,
+                                    f"LOG_{expid}",
+                                )
+                            ),
                             output if output is not None else output_type,
                             packages,
                             not hide,
@@ -5473,14 +5494,23 @@ class Autosubmit:
                         groups_dict = job_grouping.group_jobs()
                     Log.info("\nPlotting joblist...")
                     monitor_exp = Monitor()
-                    monitor_exp.generate_output(expid,
-                                                job_list.get_job_list(),
-                                                str(BasicConfig.expid_log_dir(expid)),
-                                                output_format=output_type,
-                                                packages=packages,
-                                                show=not hide,
-                                                groups=groups_dict,
-                                                job_list_object=job_list)
+                    monitor_exp.generate_output(
+                        expid,
+                        job_list.get_job_list(),
+                        str(
+                            Path(
+                                BasicConfig.LOCAL_ROOT_DIR,
+                                expid,
+                                BasicConfig.LOCAL_TMP_DIR,
+                                f"LOG_{expid}",
+                            )
+                        ),
+                        output_format=output_type,
+                        packages=packages,
+                        show=not hide,
+                        groups=groups_dict,
+                        job_list_object=job_list,
+                    )
                 return True
         except Exception:
             raise
