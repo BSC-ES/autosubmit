@@ -418,7 +418,9 @@ def test_generate_output_txt(jobs: list[Job], classictxt: bool, status_dir_exist
 
 
 @pytest.mark.parametrize(
-    "status", [Status.FAILED, Status.COMPLETED], ids=["failed job", "completed job"]
+    "status",
+    [Status.FAILED, Status.COMPLETED, Status.RUNNING],
+    ids=["failed job", "completed job", "running job"],
 )
 def test_log_paths_in_outptut_txt(status, tmp_path, autosubmit_config, mocker):
     """Test that the log paths are correctly written in the output txt file."""
@@ -454,13 +456,18 @@ def test_log_paths_in_outptut_txt(status, tmp_path, autosubmit_config, mocker):
         job_list_object=None,
     )
 
-    assert status_file.exists()
-    content = status_file.read_text()
-    expected_line = (
-        f"{job.name} {Status.VALUE_TO_KEY[status]} "
-        f"{expected_log_root / out_filename} {expected_log_root / err_filename}\n"
-    )
-    assert content == expected_line
+    if status in [Status.FAILED, Status.COMPLETED]:
+        assert status_file.exists()
+        content = status_file.read_text()
+        expected_line = (
+            f"{job.name} {Status.VALUE_TO_KEY[status]} "
+            f"{expected_log_root / out_filename} {expected_log_root / err_filename}\n"
+        )
+        assert content == expected_line
+    else:
+        assert status_file.exists()
+        content = status_file.read_text()
+        assert f"{job.name} RUNNING  \n" in content
 
 
 def test_generate_output_txt_job_with_children(tmp_path, autosubmit_config, mocker):
