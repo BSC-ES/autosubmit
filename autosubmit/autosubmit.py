@@ -81,6 +81,7 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values, apply_job_filters
+from autosubmit.notifications.cpmip_notifier import CPMIPNotifier
 
 
 if TYPE_CHECKING:
@@ -280,19 +281,17 @@ class Autosubmit:
             subparser.add_argument('-cw', '--check_wrapper', action='store_true',
                                    default=False, help='Generate possible wrapper in the current workflow')
             group2 = subparser.add_mutually_exclusive_group(required=False)
-
-            group = subparser.add_mutually_exclusive_group(required=False)
-            group.add_argument('-fl', '--list', type=str,
+            subparser.add_argument('-fl', '--list', type=str,
                                help='Supply the list of job names to be filtered. Default = "Any". '
                                     'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
-            group.add_argument('-fc', '--filter_chunks', type=str,
+            subparser.add_argument('-fc', '--filter_chunks', type=str,
                                help='Supply the list of chunks to filter the list of jobs. Default = "Any". '
                                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
-            group.add_argument('-fs', '--filter_status', type=str,
+            subparser.add_argument('-fs', '--filter_status', type=str,
                                choices=('Any', 'READY', 'COMPLETED',
                                         'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
                                help='Select the original status to filter the list of jobs')
-            group.add_argument('-ft', '--filter_type', type=str,
+            subparser.add_argument('-ft', '--filter_type', type=str,
                                help='Select the job type to filter the list of jobs')
             subparser.add_argument('--hide', action='store_true', default=False,
                                    help='hides plot window')
@@ -456,22 +455,17 @@ class Autosubmit:
             subparser.add_argument(
                 '-q', '--quick', action="store_true", help='Only checks one job per each section')
 
-            group.add_argument('-fs', '--filter_status', type=str,
-                               choices=('Any', 'READY', 'COMPLETED',
-                                        'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
-                               help='Select the original status to filter the list of jobs')
-            group = subparser.add_mutually_exclusive_group(required=False)
-            group.add_argument('-fl', '--list', type=str,
+            subparser.add_argument('-fl', '--list', type=str,
                                help='Supply the list of job names to be filtered. Default = "Any". '
                                     'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
-            group.add_argument('-fc', '--filter_chunks', type=str,
+            subparser.add_argument('-fc', '--filter_chunks', type=str,
                                help='Supply the list of chunks to filter the list of jobs. Default = "Any". '
                                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
-            group.add_argument('-fs', '--filter_status', type=str,
+            subparser.add_argument('-fs', '--filter_status', type=str,
                                choices=('Any', 'READY', 'COMPLETED',
                                         'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
                                help='Select the original status to filter the list of jobs')
-            group.add_argument('-ft', '--filter_type', type=str,
+            subparser.add_argument('-ft', '--filter_type', type=str,
                                help='Select the job type to filter the list of jobs')
 
             # Check
@@ -1082,6 +1076,9 @@ class Autosubmit:
             host = fullhost.split(",")[0]
         else:
             host = fullhost
+
+        # Obsolete host-command restrictions, kept for compatibility.
+        # Used to prevent execution of specific commands on specific hosts in shared-filesystem deployments.
         forbidden = BasicConfig.DENIED_HOSTS
         authorized = BasicConfig.ALLOWED_HOSTS
         message = f"Command: {args.command.upper()} is not allowed to run in host: {host}.\n"
@@ -1519,22 +1516,33 @@ class Autosubmit:
                 check_wrapper=False, quick=False) -> bool:
         """Generates cmd files experiment.
 
-         :param expid: identifier of experiment to be run
-         :param lst:
-         :param filter_chunks:
-         :param filter_status:
-         :param filter_section:
-         :param force:
-         :param check_wrapper:
-         :param quick:
-         :return: True if run to the end, False otherwise
-         """
+        :param expid: Identifier of experiment to be run
+        :type expid: str
+        :param lst: Optional list of job names to filter for inspect.
+        :type lst: Optional[str]
+        :param filter_chunks: Optional list of chunk identifiers to filter for inspect.
+        :type filter_chunks: Optional[str]
+        :param filter_status: Optional list of job statuses to filter for inspect.
+        :type filter_status: Optional[str]
+        :param filter_section: Optional list of job sections to filter for inspect.
+        :type filter_section: Optional[str]
+        :param force: If true, forces the generation of all cmd files.
+        :type force: bool
+        :param check_wrapper: If true, checks the wrapper.
+        :type check_wrapper: bool
+        :param quick: If true, performs a quick inspect.
+        :type quick: bool
+        :return: True if run to the end, False otherwise
+        :rtype: bool
+        :raises AutosubmitCritical: If there is a critical error during the inspection process.
+        """
+
         try:
             Log.info(f"Inspecting experiment {expid}")
             check_ownership(expid, raise_error=True)
-            exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-            tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
-            if os.path.exists(os.path.join(tmp_path, 'autosubmit.lock')):
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+            tmp_path = exp_path / BasicConfig.LOCAL_TMP_DIR
+            if (tmp_path / 'autosubmit.lock').exists():
                 locked = True
             else:
                 locked = False
@@ -1582,55 +1590,30 @@ class Autosubmit:
                         jobs = job_list.get_job_list()
                     else:
                         Log.info("Generating cmd scripts only for selected jobs")
-                        if filter_chunks:
-                            fc = filter_chunks
-                            Log.debug(fc)
-                            if fc == 'Any':
-                                jobs = job_list.get_job_list()
-                            else:
-                                # noinspection PyTypeChecker
-                                data = json.loads(Autosubmit._create_json(fc))
-                                for date_json in data['sds']:
-                                    date = date_json['sd']
-                                    jobs_date = [j for j in job_list.get_job_list() if date2str(
-                                        j.date) == date]
+                        jobs = job_list.get_job_list()
+                        if filter_section or filter_chunks or filter_status or lst:
+                            Autosubmit._validate_job_filters(
+                                as_conf,
+                                job_list,
+                                lst,
+                                filter_chunks,
+                                filter_status,
+                                filter_section,
+                            )
 
-                                    for member_json in date_json['ms']:
-                                        member = member_json['m']
-                                        jobs_member = [j for j in jobs_date if j.member == member]
+                            selected_job_names = apply_job_filters(
+                                job_list=job_list,
+                                base_job_names={job.name for job in jobs},
+                                filter_section=filter_section,
+                                filter_chunk=filter_chunks,
+                                filter_status=filter_status,
+                                filter_list=lst,
+                                filter_sections_splits_fn=Autosubmit._filter_sections_splits,
+                                filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
+                                status_from_str_fn=Autosubmit._get_status,
+                            )
 
-                                        for chunk_json in member_json['cs']:
-                                            chunk = int(chunk_json)
-                                            jobs = jobs + [job for job in [j for j in jobs_member if j.chunk == chunk]]
-
-                        elif filter_status:
-                            Log.debug(
-                                f"Filtering jobs with status {filter_status}")
-                            if filter_status == 'Any':
-                                jobs = job_list.get_job_list()
-                            else:
-                                fs = Autosubmit._get_status(filter_status)
-                                jobs = [job for job in [j for j in job_list.get_job_list() if j.status == fs]]
-
-                        elif filter_section:
-                            ft = filter_section
-                            Log.debug(ft)
-
-                            if ft == 'Any':
-                                jobs = job_list.get_job_list()
-                            else:
-                                for job in job_list.get_job_list():
-                                    if job.section == ft:
-                                        jobs.append(job)
-                        elif lst:
-                            jobs_lst = lst.split()
-
-                            if jobs == 'Any':
-                                jobs = job_list.get_job_list()
-                            else:
-                                for job in job_list.get_job_list():
-                                    if job.name in jobs_lst:
-                                        jobs.append(job)
+                            jobs = [job for job in jobs if job.name in selected_job_names]
                         else:
                             jobs = job_list.get_job_list()
             if quick:
@@ -1661,13 +1644,13 @@ class Autosubmit:
 
             if isinstance(jobs, type([])):
                 for job in jobs:
-                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd | {job.file}\n"
+                    file_paths += f"{str(tmp_path / (job.name + '.cmd'))} | {job.file}\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs, packages_persistence, False)
             if len(jobs_cw) > 0:
                 for job in jobs_cw:
-                    file_paths += f"{BasicConfig.LOCAL_ROOT_DIR}/{expid}/tmp/{job.name}.cmd\n"
+                    file_paths += f"{str(tmp_path / (job.name + '.cmd'))}\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs_cw, packages_persistence, False)
@@ -2155,7 +2138,17 @@ class Autosubmit:
             if new_run:
                 job.platform.spawn_log_retrieval_process(as_conf)
 
-            job_list.update_log_status(job, as_conf, new_run)
+            # Capture CPMIP metric inputs before update_log_status clears the
+            # job's runtime attributes on successful log recovery.
+            cpmip_evaluation = CPMIPNotifier.capture(job, as_conf)
+
+            log_recovered = job_list.update_log_status(job, as_conf, new_run)
+
+            if log_recovered and cpmip_evaluation is not None:
+                try:
+                    CPMIPNotifier.notify(as_conf, job_list.expid, job, cpmip_evaluation)
+                except Exception as error:
+                    Log.error(f"Error sending CPMIP notification for {job.name}: {error}")
 
     @staticmethod
     def refresh_log_recovery_process(platforms: list[Platform], as_conf: AutosubmitConfig) -> None:
@@ -2652,21 +2645,38 @@ class Autosubmit:
 
         Plot is created in experiment's plot folder with name <expid>_<date>_<time>.<file_format>
 
-        :param txt_logfiles:
+        :param txt_logfiles: Whether to include log file paths in the text output.
+        :type txt_logfiles: bool
         :param expid: Identifier of the experiment to plot.
+        :type expid: str
         :param file_format: Plot file format. It can be pdf, png, ps or svg
+        :type file_format: str
         :param lst: list of jobs to change status
+        :type lst: str
         :param filter_chunks: chunks to change status
+        :type filter_chunks: str
         :param filter_status: current status of the jobs to change status
+        :type filter_status: str
         :param filter_section: sections to change status
+        :type filter_section: str
         :param hide: hides plot window
+        :type hide: bool
         :param txt_only: workflow will only be written as text
+        :type txt_only: bool
         :param group_by: workflow will only be written as text
+        :type group_by: Optional[str]
         :param expand: Filtering of jobs for its visualization
+        :type expand: str
         :param expand_status: Filtering of jobs for its visualization
+        :type expand_status: str
         :param hide_groups: Simplified workflow illustration by encapsulating the jobs.
+        :type hide_groups: bool
         :param check_wrapper: Shows a preview of how the wrappers will look
+        :type check_wrapper: bool
         :param profile: Whether to enable a profiler during the command execution or not.
+        :type profile: bool
+        :return: True if monitor was executed successfully, False otherwise
+        :rtype: bool
         """
         from .monitor.monitor import Monitor
 
@@ -2702,59 +2712,31 @@ class Autosubmit:
         try:
             jobs = []
             if not isinstance(job_list, type([])):
-                if filter_chunks:
-                    fc = filter_chunks
-                    Log.debug(fc)
+                jobs = job_list.get_job_list()
 
-                    if fc == 'Any':
-                        jobs = job_list.get_job_list()
-                    else:
-                        # noinspection PyTypeChecker
-                        data = json.loads(Autosubmit._create_json(fc))
-                        for date_json in data['sds']:
-                            date = date_json['sd']
-                            jobs_date = [j for j in job_list.get_job_list() if date2str(
-                                j.date) == date]
+                if filter_section or filter_chunks or filter_status or lst:
+                    Autosubmit._validate_job_filters(
+                        as_conf,
+                        job_list,
+                        lst,
+                        filter_chunks,
+                        filter_status,
+                        filter_section,
+                    )
 
-                            for member_json in date_json['ms']:
-                                member = member_json['m']
-                                jobs_member = [j for j in jobs_date if j.member == member]
+                    selected_job_names = apply_job_filters(
+                        job_list=job_list,
+                        base_job_names={job.name for job in jobs},
+                        filter_section=filter_section,
+                        filter_chunk=filter_chunks,
+                        filter_status=filter_status,
+                        filter_list=lst,
+                        filter_sections_splits_fn=Autosubmit._filter_sections_splits,
+                        filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
+                        status_from_str_fn=Autosubmit._get_status,
+                    )
 
-                                for chunk_json in member_json['cs']:
-                                    chunk = int(chunk_json)
-                                    jobs = jobs + \
-                                           [job for job in [j for j in jobs_member if j.chunk == chunk]]
-
-                elif filter_status:
-                    Log.debug(f"Filtering jobs with status {filter_status}")
-                    if filter_status == 'Any':
-                        jobs = job_list.get_job_list()
-                    else:
-                        fs = Autosubmit._get_status(filter_status)
-                        jobs = [job for job in [j for j in job_list.get_job_list() if j.status == fs]]
-
-                elif filter_section:
-                    ft = filter_section
-                    Log.debug(ft)
-
-                    if ft == 'Any':
-                        jobs = job_list.get_job_list()
-                    else:
-                        for job in job_list.get_job_list():
-                            if job.section == ft:
-                                jobs.append(job)
-
-                elif lst:
-                    jobs_lst = lst.split()
-
-                    if jobs == 'Any':
-                        jobs = job_list.get_job_list()
-                    else:
-                        for job in job_list.get_job_list():
-                            if job.name in jobs_lst:
-                                jobs.append(job)
-                else:
-                    jobs = job_list.get_job_list()
+                    jobs = [job for job in jobs if job.name in selected_job_names]
         except BaseException as e:
             if profile:
                 profiler.stop()
@@ -3119,9 +3101,9 @@ class Autosubmit:
             jobs_to_recover = job_list.get_job_list()
         else:
             jobs_to_recover = job_list.get_active()
-        
+
         selected_job_names = {job.name for job in jobs_to_recover}
-        
+
         # filters will be applied to all_jobs or only active_jobs, depending on the all_jobs flag
         if filter_section or filter_chunks or filter_status or filter_list:
             # Validate filters. Raises AutosubmitCritical if any filter is invalid, with a message specifying the issue.
@@ -3656,7 +3638,7 @@ class Autosubmit:
 
         sep = '\n\t'
         Log.result(sep.join(['Directories have been created and configured successfully:'] + [str(d) for d in dirs]))
-        
+
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             if not os.path.exists(BasicConfig.DB_PATH):
                 Log.info("Creating autosubmit database...")
@@ -4652,32 +4634,62 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def change_status(final, final_status, job, save):
-        """Set job status to final.
+    def change_status(
+            final: str,
+            final_status: int,
+            final_list: list["Job"],
+            save: bool,
+            definitive_platforms: list[str],
+            platforms: dict[str, ParamikoPlatform],
+    ) -> dict[str, str]:
+        """Apply a status change to all jobs in final_list and cancel active jobs on their platforms.
 
-        :param save:
-        :param final:
-        :param final_status:
-        :param job:
+        Iterates over ``final_list``, skipping jobs already at ``final_status``.
+        For jobs moving out of an active status, the platform connection is verified
+        and a batch cancel command is queued. All queued cancels are dispatched
+        once after the loop.
+
+        :param final: Human-readable name of the target status.
+        :param final_status: Numeric status value to assign.
+        :param final_list: Jobs selected for the status change.
+        :param save: Whether changes should be persisted.
+        :param definitive_platforms: Names of platforms with a confirmed connection.
+        :param platforms: Mapping of platform name to Platform instance.
+        :return: Mapping of job name to ``"old_status -> new_status"`` strings.
         """
-        if save:
-            if job.status in [Status.SUBMITTED, Status.QUEUING, Status.HELD] and final_status not in [Status.QUEUING,
-                                                                                                      Status.HELD,
-                                                                                                      Status.SUSPENDED]:
-                job.hold = False
-                if job.platform_name and job.platform_name.upper() != "LOCAL":
-                    job.platform.send_command(job.platform.cancel_cmd + " " + str(job.id), ignore_log=True)
-            elif job.status in [Status.QUEUING, Status.RUNNING, Status.SUBMITTED] and final_status == Status.SUSPENDED:
-                if job.platform_name and job.platform_name.upper() != "LOCAL":
-                    job.platform.send_command("scontrol hold " + f"{job.id}", ignore_log=True)
-            elif final_status in [Status.QUEUING, Status.RUNNING] and (job.status == Status.SUSPENDED):
-                if job.platform_name and job.platform_name.upper() != "LOCAL":
-                    job.platform.send_command("scontrol release " + f"{job.id}", ignore_log=True)
-        if job.status == Status.FAILED and job.status != final_status:
-            job._fail_count = 0
-        job.status = final_status
-        Log.info("CHANGED: job: " + job.name + " status to: " + final)
-        Log.status("CHANGED: job: " + job.name + " status to: " + final)
+        performed_changes: dict[str, str] = {}
+        batch_cancel_commands: dict[str, list[str]] = defaultdict(list)
+        _active_statuses = {Status.QUEUING, Status.RUNNING, Status.SUBMITTED}
+
+        for job in final_list:
+            if job.status == final_status:
+                continue
+
+            if save and job.status in _active_statuses and final_status not in _active_statuses:
+                if job.platform.name not in definitive_platforms:
+                    Log.error(
+                        f"Cannot change status of job [{job.name}] because the connection to its "
+                        f"platform [{job.platform.name}] could not be established. "
+                        f"Please check the platform connection and try again.",
+                        7013,
+                    )
+                    Log.error(f"Job [{job.name}] status will remain as {Status.VALUE_TO_KEY[job.status]}.")
+                    continue
+                batch_cancel_commands[job.platform.name].append(f"{job.platform.cancel_cmd} {job.id}; ")
+
+            performed_changes[job.name] = f"{Status.VALUE_TO_KEY[job.status]} -> {final}"
+            job.status = final_status
+            Log.info(f"CHANGED: job: {job.name} status to: {final}")
+            Log.status(f"CHANGED: job: {job.name} status to: {final}")
+
+        if save and batch_cancel_commands:
+            for platform_name, cancel_cmds in batch_cancel_commands.items():
+                try:
+                    platforms[platform_name].send_command("".join(cancel_cmds), ignore_log=True)
+                except Exception as e:
+                    Log.error(f"Failed to send batch cancel command to platform {platform_name}: {e}")
+
+        return performed_changes
 
     @staticmethod
     def _validate_section(as_conf: AutosubmitConfig, filter_section: str) -> None:
@@ -5366,9 +5378,9 @@ class Autosubmit:
                 jobs_to_set_status = job_list.get_job_list()
                 selected_job_names = {job.name for job in jobs_to_set_status}
                 final_status = Autosubmit._get_status(final)
-                
+
                 Log.info("Filtering jobs...")
-                
+
                 selected_job_names = apply_job_filters(
                     job_list=job_list,
                     base_job_names=selected_job_names,
@@ -5380,27 +5392,15 @@ class Autosubmit:
                     filter_chunks_fn=Autosubmit._filter_jobs_by_chunks_splits,
                     status_from_str_fn=Autosubmit._get_status,
                 )
-                
+
                 # preserve job list ordering
                 final_list = [job for job in jobs_to_set_status if job.name in selected_job_names]
                 # Time to change status
-                performed_changes = {}
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")
-                for job in final_list:
-                    if final_status in [Status.WAITING, Status.PREPARED, Status.DELAYED, Status.READY]:
-                        job.fail_count = 0
-                    if job.status in [Status.QUEUING, Status.RUNNING,
-                                      Status.SUBMITTED] and job.platform.name not in definitive_platforms:
-                        Log.printlog(f"JOB: [{job.platform.name}] is ignored as the [{job.name}] platform is currently"
-                                     f" offline", 6000)
-                        continue
-                    if job.status != final_status:
-                        # Only real changes
-                        performed_changes[job.name] = str(
-                            Status.VALUE_TO_KEY[job.status]) + " -> " + str(final)
-                        Autosubmit.change_status(
-                            final, final_status, job, save)
-                # If changes have been performed
+                performed_changes = Autosubmit.change_status(
+                    final, final_status, final_list, save, definitive_platforms, platforms
+                )
+
                 if performed_changes:
                     if detail:
                         current_length = len(job_list.get_job_list())

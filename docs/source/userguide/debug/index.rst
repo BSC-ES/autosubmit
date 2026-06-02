@@ -60,6 +60,22 @@ submit them. When combined with the ``--quick`` flag, it only processes one job
 per section, allowing you to verify all your ``.cmd`` templates inexpensively.
 
 
+Filters
+-------
+
+You can limit the jobs to inspect using the same filters available to the
+`monitor`, `recovery` and `setstatus` commands: `-fl` (filter by job names), 
+`-fc` (filter by chunks), `-fs` (filter by status), and `-ft` (filter by section). 
+Concadenating multiple filters applies a logical AND (intersection), meaning a 
+job must match all provided filters to be selected.
+
+Example (combined filters):
+
+.. code-block:: bash
+
+   autosubmit inspect <EXPID> -fl "jobA jobB" -fc "[ 20200101 [ fc0 [1] ] ]" -ft SECTION -fs WAITING
+
+
 What inspect checks
 -------------------
 

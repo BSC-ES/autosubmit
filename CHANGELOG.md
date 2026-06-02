@@ -20,6 +20,7 @@
 - Fixed recovery and setstatus for experiments with more than > 32k jobs #2894
 - Removed invalid message about the template script showing the error with a difference of ~5 lines #2962
 - Fix queuing time for the first vertical job
+- Fixes an issue with `setstatus` calling to hardcoded platform code #2919
 - Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
 - Fixed `autosubmit stats` command that was not considering parameters defined in the platform, like NODES, TASKS, etc. #2978
 
@@ -51,8 +52,12 @@
 - Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
 - Updated `Defining the workflow` documentation section #2954
 - Improving the handling of leakages that were happening when dealing with queues and processes #2900
+- Added batch canceling to the `setstatus` command #2919
 - verbosity adjusted #2976
 - Implement filters for `recovery` command #2923
+- Add detection of inneficiencies for key CPMIP metrics #3022
+- Allow multiple filters in the `monitor` command #3020
+- Allow multiple filters in the `inspect` command #3029
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

@@ -23,6 +23,12 @@ import pytest
 
 
 @pytest.fixture(scope="function")
+def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
+    config_data = general_data | experiment_data | jobs_data
+    return autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
+
+
+@pytest.fixture(scope="function")
 def general_data(tmp_path: Path) -> dict[str, Any]:
     """
     Provides part of the `experiment_data` dictionary used by the

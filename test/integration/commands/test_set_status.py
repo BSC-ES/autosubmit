@@ -27,12 +27,6 @@ from autosubmit.log.log import AutosubmitCritical
 from bscearth.utils.date import date2str
 
 
-@pytest.fixture(scope="function")
-def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
-    config_data = general_data | experiment_data | jobs_data
-    return autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
-
-
 def reset(as_exp_, target="WAITING"):
     job_list_ = as_exp_.autosubmit.load_job_list(
         as_exp_.expid, as_exp_.as_conf, new=False

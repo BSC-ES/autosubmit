@@ -189,7 +189,7 @@ Where:
 | -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
 +--------+----------------------------------------------+----------------------------------------------+
 
-If multiple filters are provided (``-fl, fs, ft, fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
+If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
 
 Mandatory arguments:
 
