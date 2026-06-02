@@ -248,9 +248,9 @@ class JobPackagePersistence:
 
     def reset_table(self, preview=False):
         """Drops and recreates the database."""
-
-        self.db_manager.drop_table(PreviewWrapperInfoTable.name)
-        self.db_manager.drop_table(PreviewWrapperJobsTable.name)
         if not preview:
             self.db_manager.drop_table(WrapperInfoTable.name)
             self.db_manager.drop_table(WrapperJobsTable.name)
+        else:
+            self.db_manager.drop_table(PreviewWrapperInfoTable.name)
+            self.db_manager.drop_table(PreviewWrapperJobsTable.name)

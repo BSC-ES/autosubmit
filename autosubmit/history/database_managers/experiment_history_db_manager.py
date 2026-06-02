@@ -142,8 +142,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
             children TEXT,
             platform_output TEXT,
             workflow_commit TEXT,
-            split TEXT,
-            splits TEXT,
+            split INTEGER,
+            splits INTEGER,
             fail_count INTEGER NOT NULL DEFAULT 0,
             UNIQUE(counter,job_name)
             );
@@ -184,8 +184,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
         ])
         # Version 19
         self.version_schema_changes.extend([
-            "ALTER TABLE job_data ADD COLUMN split TEXT",
-            "ALTER TABLE job_data ADD COLUMN splits TEXT"
+            "ALTER TABLE job_data ADD COLUMN split INTEGER",
+            "ALTER TABLE job_data ADD COLUMN splits INTEGER"
         ])
         # Version 20
         self.version_schema_changes.extend([

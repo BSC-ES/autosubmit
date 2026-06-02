@@ -75,8 +75,8 @@ class JobData(object):
         self.children = children  # DB 17
         self.platform_output = platform_output  # DB 17
         self.workflow_commit = workflow_commit
-        self.split = split
-        self.splits = splits
+        self.split = int(split) if split is not None else None
+        self.splits = int(splits) if splits is not None else None
         self.fail_count = fail_count
 
     @classmethod
