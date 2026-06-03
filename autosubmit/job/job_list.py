@@ -88,6 +88,7 @@ class JobList(object):
                                  self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
         self._FINAL_STATUSES = [Status.COMPLETED, Status.FAILED, Status.SKIPPED]
         self._packages_persistence: Optional[JobPackagePersistence] = None
+        self._fake_id_counter = 0
 
     def __getstate__(self):
         """Exclude non-picklable SQLAlchemy engine from pickled state."""
@@ -2906,7 +2907,8 @@ class JobList(object):
 
         :param package: The job package whose first job will receive a fake ID.
         """
-        package.jobs[0].id = -id(package)
+        self._fake_id_counter -= 1
+        package.jobs[0].id = self._fake_id_counter
 
     def load_wrappers(self, preview: bool = False) -> None:
         """Load wrapper jobs and their inner jobs from the database.

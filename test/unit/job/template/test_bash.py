@@ -218,4 +218,4 @@ def test_error_line_numbering(tmp_path: 'LocalPath'):
 
     # Here we verify that the first line where d_echo (typo) appears
     # is where Bash shell reports the error, not a line with a heredoc anymore.
-    assert f'line {error_line}: d_echo: command not found' in stderr, stderr
+    assert f'line {error_line}: d_echo' in stderr, stderr

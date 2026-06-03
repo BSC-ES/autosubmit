@@ -1258,7 +1258,8 @@ class ParamikoPlatform(Platform):
         :type timeout: int
         :return: the stdin, stdout, and stderr of the executing command
         """
-        for retry in range(0, retries):
+        retry = 0
+        while retry < retries:
             Log.debug(f'Executing command {command}, retry #{retry + 1} out of {retries}')
             try:
                 chan: Channel = self.transport.open_session()
@@ -1288,6 +1289,8 @@ class ParamikoPlatform(Platform):
                 Log.warning(f'A networking error occurred while executing command [{command}]: {str(e)}')
                 if not self.connected or not self.transport or not self.transport.active:
                     self.restore_connection(None)
+                    if self.transport and self.transport.active:
+                        continue
                 else:
                     Log.warning(f'The SSH transport is still active, will not try to reconnect: {str(e)}')
                 # TODO: We need to understand why we are increasing in increments of 60 seconds, then document it.
@@ -1300,6 +1303,7 @@ class ParamikoPlatform(Platform):
                 #        earlier...).
                 #        https://github.com/BSC-ES/autosubmit/issues/2439
                 # chan.settimeout(timeout)
+            retry += 1
 
         return False, False, False
 

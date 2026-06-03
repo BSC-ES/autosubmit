@@ -106,7 +106,7 @@ if TYPE_CHECKING:
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
-            retrials: 2  
+            retrials: 2
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
 
@@ -166,7 +166,7 @@ PLATFORMS:
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:
-        blocking_running_job: 
+        blocking_running_job:
             SCRIPT: |
                 echo "Hello world"
                 sleep 5
@@ -195,7 +195,7 @@ PLATFORMS:
         EXPERIMENT:
             NUMCHUNKS: '2'
         JOBS:
-            blocking_running_job: 
+            blocking_running_job:
                 SCRIPT: |
                     echo "Hello world"
                     sleep 5
@@ -330,14 +330,14 @@ def test_run_uninterrupted(
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
-            retrials: 10  
+            retrials: 10
         job2:
             SCRIPT: |
                 d_echo "Hello World with id=FAILED"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
-            retrials: 10 
+            retrials: 10
         job3:
             SCRIPT: |
                 sleep 1
@@ -461,7 +461,7 @@ LOCAL:
     PROJECT_PATH: "tofill"
 JOBS:
     job:
-        FILE: 
+        FILE:
             - "test.sh"
             - "additional1.sh"
             - "additional2.sh"
@@ -488,7 +488,7 @@ LOCAL:
     PROJECT_PATH: "tofill"
 JOBS:
     job:
-        FILE: 
+        FILE:
             - "test.sh"
             - "additional1.sh"
             - "thisdoesntexists.sh"
