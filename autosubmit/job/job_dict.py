@@ -252,7 +252,7 @@ class DicJobs:
                 continue
             if type(value) is list:
                 final_jobs_list.extend(value)
-            elif type(value) is dict:
+            else:
                 jobs_aux = self.update_jobs_filtered(jobs_aux, value)
         return jobs_aux
 
