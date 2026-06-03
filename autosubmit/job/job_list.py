@@ -46,7 +46,6 @@ from autosubmit.job.job_utils import Dependency
 from autosubmit.job.job_utils import transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.monitor.diagram import JobData
-from autosubmit.notifications.cpmip_notifier import CPMIPNotifier
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
 
