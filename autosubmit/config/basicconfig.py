@@ -61,6 +61,7 @@ class BasicConfig:
     CUSTOM_PLATFORMS_PATH = ''
     DEFAULT_JOBS_CONF = ''
     SMTP_SERVER = ''
+    ATTACHMENT = ''
     MAIL_FROM = ''
     ALLOWED_HOSTS: Union[str, dict] = ''
     DENIED_HOSTS: Union[str, dict] = ''
@@ -69,21 +70,21 @@ class BasicConfig:
     DATABASE_CONN_URL = ""
 
     @staticmethod
-    def expid_dir(exp_id):
+    def expid_dir(exp_id) -> Path:
         if not isinstance(exp_id, str) or len(exp_id) != 4 or "/" in exp_id:
             raise TypeError("Experiment ID must be a string of 4 characters without the folder separator symbol")
         return Path(BasicConfig.LOCAL_ROOT_DIR, exp_id)
 
     @staticmethod
-    def expid_tmp_dir(exp_id):
+    def expid_tmp_dir(exp_id) -> Path:
         return BasicConfig.expid_dir(exp_id).joinpath(BasicConfig.LOCAL_TMP_DIR)
 
     @staticmethod
-    def expid_log_dir(exp_id):
+    def expid_log_dir(exp_id) -> Path:
         return BasicConfig.expid_tmp_dir(exp_id).joinpath(f'LOG_{exp_id}')
 
     @staticmethod
-    def expid_aslog_dir(exp_id):
+    def expid_aslog_dir(exp_id) -> Path:
         return BasicConfig.expid_tmp_dir(exp_id).joinpath(BasicConfig.LOCAL_ASLOG_DIR)
 
     @staticmethod
@@ -132,6 +133,8 @@ class BasicConfig:
             BasicConfig.DEFAULT_JOBS_CONF = parser.get('conf', 'jobs')
         if parser.has_option('mail', 'smtp_server'):
             BasicConfig.SMTP_SERVER = parser.get('mail', 'smtp_server')
+        if parser.has_option('mail', 'attachment'):
+            BasicConfig.ATTACHMENT = parser.get('mail', 'attachment')
         if parser.has_option('mail', 'mail_from'):
             BasicConfig.MAIL_FROM = parser.get('mail', 'mail_from')
         if parser.has_option('hosts', 'authorized'):

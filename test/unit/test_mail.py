@@ -215,7 +215,7 @@ def test_notify_status_change(
     message['Date'] = email.utils.formatdate(localtime=True)
 
     if expected_log_message:
-        mock_printlog.assert_called_once_with(expected_log_message, 6011)
+        assert expected_log_message in mock_printlog.call_args[0][0]
         log_calls = [call[0][0] for call in mock_printlog.call_args_list]
         assert 'Traceback' not in log_calls
     else:

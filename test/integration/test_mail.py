@@ -260,5 +260,6 @@ def test_recipients_list(
             exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING], Status.VALUE_TO_KEY[Status.FAILED],
             list_recipients  # type: ignore
         )
+
         response = get_mailhog_messages(api_base)
         assert len(response.json()["items"][0]["Raw"]["To"]) == len(list_recipients)

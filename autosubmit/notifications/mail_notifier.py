@@ -19,6 +19,7 @@ import email.utils
 import re
 import smtplib
 import zipfile
+from copy import deepcopy
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -208,6 +209,30 @@ class MailNotifier:
     def __init__(self, basic_config):
         self.config = basic_config
 
+    def _collect_logfiles(self, message, exp_id):
+        """Collect the logfiles of an experiment to attach to the mail message.
+
+        :param message: Message to have the files attached to.
+        :type message: MIMEMultipart
+        :param exp_id: expid of the experiment that has a report.
+        :type exp_id: str
+
+        :raises AutosubmitError: The file cannot be attached.
+        """
+        run_log_files = [f for f in self.config.expid_aslog_dir(
+            exp_id).glob('*_run.log') if Path(f).is_file()]
+        if run_log_files:
+            latest_run_log: Path = max(run_log_files)
+            temp_dir = TemporaryDirectory()
+            try:
+                compressed_run_log = _compress_file(temp_dir, latest_run_log)
+                _attach_file(compressed_run_log, message)
+            except AutosubmitError as e:
+                Log.printlog(code=e.code, message=e.message)
+            finally:
+                if temp_dir:
+                    temp_dir.cleanup()
+
     def notify_experiment_status(
             self,
             exp_id: str,
@@ -233,20 +258,7 @@ class MailNotifier:
         message['Subject'] = '[Autosubmit] Warning: a remote platform is malfunctioning'
         message['Date'] = email.utils.formatdate(localtime=True)
         message.attach(MIMEText(message_text))
-
-        run_log_files = [f for f in self.config.expid_aslog_dir(
-            exp_id).glob('*_run.log') if Path(f).is_file()]
-        if run_log_files:
-            latest_run_log: Path = max(run_log_files)
-            temp_dir = TemporaryDirectory()
-            try:
-                compressed_run_log = _compress_file(temp_dir, latest_run_log)
-                _attach_file(compressed_run_log, message)
-            except AutosubmitError as e:
-                Log.printlog(code=e.code, message=e.message)
-            finally:
-                if temp_dir:
-                    temp_dir.cleanup()
+        self._collect_logfiles(message, exp_id)
 
         self._send_message(mail_to, self.config.MAIL_FROM, message)
 
@@ -266,7 +278,8 @@ class MailNotifier:
             ('Autosubmit', self.config.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {status}'
         message['Date'] = email.utils.formatdate(localtime=True)
-
+        if status == "FAILED":
+            self._collect_logfiles(deepcopy(message), exp_id)
         self._send_message(mail_to, self.config.MAIL_FROM, message)
 
     def notify_cpmip_threshold_violations(
