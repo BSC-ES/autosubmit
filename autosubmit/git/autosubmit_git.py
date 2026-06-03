@@ -39,7 +39,7 @@ _GIT_URL_PATTERN = re.compile(
     )''', re.VERBOSE)
 """Regular expression to match Git URL."""
 
-_GIT_UNCOMMITTED_CMD = ('git', 'status', '--porcelain')
+_GIT_UNCOMMITTED_CMD = ('git', 'status', '--porcelain', '--', '.', ':(exclude)catalog')
 """Command to check if there are changes not committed go local Git repository."""
 
 _GIT_UNPUSHED_CMD = ('git', 'log', '--branches', '--not', '--remotes')

@@ -76,6 +76,7 @@ def _get_experiment_data(tmp_path) -> dict:
         ('git', False, False, 'a810', does_not_raise()),
         ('git', True, False, 'a811', does_not_raise()),
         ('git', True, True, 'a812', does_not_raise()),
+        ('git', False, False, 'o813', does_not_raise()),
     ],
     ids=[
         'NOK: Did not commit nor push an operational experiment',
@@ -83,7 +84,8 @@ def _get_experiment_data(tmp_path) -> dict:
         'OK: Commited and pushed an operational experiment',
         'OK: Did not commit nor push a common experiment',
         'OK: Committed but did not commit nor push a common experiment',
-        'OK: Committed and pushed a common experiment'
+        'OK: Committed and pushed a common experiment',
+        'OK: Commited and pushed an operational experiment'
     ]
 )
 @pytest.mark.docker
@@ -117,6 +119,13 @@ def test_git_local_dirty(
 
     if project_type == 'git' and commit:
         git_commit_all_in_dir(proj_dir, push=push)
+
+    # test whether aqua catalog changes will trigger the error
+    if expid == 'o813':
+        catalog_dir = proj_dir / 'catalog'
+        catalog_dir.mkdir(parents=True, exist_ok=True)
+        with open(catalog_dir / "a_file.yaml", "w") as f:
+            f.write("initial content")
 
     with expected:
         check_unpushed_changes(expid, as_conf)
