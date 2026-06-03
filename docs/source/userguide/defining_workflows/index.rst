@@ -675,10 +675,10 @@ Example 1: explicit split mapping
 
 In this example:
 
-* ``FOURTH`` job will be split into 3 parts.  
+* ``FOURTH`` job will be split into 3 parts.
 * ``FOURTH`` job split 1 will depend on all the splits of the ``THIRD`` job due to not being present in ``SPLITS_FROM`` (default split linkage).
-* ``FOURTH`` job split 2 will depend on the splits 1 and 2 of the ``THIRD`` job due to the 2* mapping.  
-* ``FOURTH`` job split 3 will depend on the splits 1 and 3 of the ``THIRD`` job due to the 3* mapping.  
+* ``FOURTH`` job split 2 will depend on the splits 1 and 2 of the ``THIRD`` job due to the 2* mapping.
+* ``FOURTH`` job split 3 will depend on the splits 1 and 3 of the ``THIRD`` job due to the 3* mapping.
 
 Example 2: 1-to-1 dependency
 
@@ -719,7 +719,7 @@ In this example:
 
 * ``TEST`` and ``TEST2`` jobs will be split into 2 parts each.
 * ``[1:auto]*\1`` mapping creates one-to-one mapping across all existing splits indices.
-* So ``TEST2`` job split 1 will depend on ``TEST`` job split 1 and ``TEST2`` job split 2 will depend on ``TEST`` job split 2. 
+* So ``TEST2`` job split 1 will depend on ``TEST`` job split 1 and ``TEST2`` job split 2 will depend on ``TEST`` job split 2.
 
 Example 3: N-to-1 dependency
 
@@ -757,7 +757,7 @@ Example 3: N-to-1 dependency
 In this example:
 
 * ``TEST_DEPENDENCY`` job will be split into 4 parts and ``TEST_DEPENDENCY2`` job will be split into 2 parts.
-* ``[1:4]*\2`` mapping creates a grouped mapping with group size 2. 
+* ``[1:4]*\2`` mapping creates a grouped mapping with group size 2.
 * So split 1 of ``TEST_DEPENDENCY2`` job will depend on splits 1 and 2 of ``TEST_DEPENDENCY`` job and split 2 of ``TEST_DEPENDENCY2`` job will depend on splits 3 and 4 of ``TEST_DEPENDENCY`` job.
 
 Example 4: 1-to-N dependency
@@ -796,7 +796,7 @@ Example 4: 1-to-N dependency
 In this example:
 
 * ``TEST`` job will be split into 2 parts and ``TEST2`` job will be split into 4 parts.
-* ``[1:2]*\2`` mapping creates a grouped mapping with group size 2. 
+* ``[1:2]*\2`` mapping creates a grouped mapping with group size 2.
 * So splits 1 and 2 of ``TEST2`` job will depend on split 1 of ``TEST`` job and splits 3 and 4 of ``TEST2`` job will depend on split 2 of ``TEST`` job.
 
 Example 5: using ``previous`` and ``none``
@@ -841,6 +841,65 @@ In this example:
 * ``B`` split 2 depends on ``A`` split 1.
 * ``B`` split 3 depends on ``A`` split 2.
 * ``B`` split 4 depends on ``A`` split 3.
+
+Example 6: ``previous-N`` split dependency
+
+The ``previous`` keyword in ``SPLITS_TO`` links each split to its **immediately preceding** split.
+The generalised form ``previous-N`` links each split to the split that is **N positions earlier**.
+
+In the example below ``DN`` uses ``previous`` (= ``previous-1``) for its own self-dependency while
+``POST`` uses ``previous-2`` for its dependency on ``DN`` and ``previous`` for its self-dependency.
+
+.. code-block:: yaml
+
+    EXPERIMENT:
+      DATELIST: 19900101
+      MEMBERS: fc0
+      CHUNKSIZEUNIT: day
+      CHUNKSIZE: 1
+      NUMCHUNKS: 1
+      CALENDAR: standard
+
+    JOBS:
+      DN:
+        FILE: dn.sh
+        RUNNING: chunk
+        SPLITS: 4
+        DEPENDENCIES:
+          DN:
+            SPLITS_FROM:
+              all:
+                SPLITS_TO: previous       # same as previous-1
+
+      POST:
+        FILE: post.sh
+        RUNNING: chunk
+        SPLITS: 4
+        DEPENDENCIES:
+          DN:
+            SPLITS_FROM:
+              all:
+                SPLITS_TO: previous-2     # each POST split waits for DN split N-2
+          POST:
+            SPLITS_FROM:
+              all:
+                SPLITS_TO: previous       # each POST split waits for POST split N-1
+
+.. note::
+
+   ``SPLITS_TO: previous`` and ``SPLITS_TO: previous-1`` are identical. Use ``previous-N`` with
+   N > 1 when you need a larger look-back window between splits.
+
+.. autosubmitfigure::
+    :command: create
+    :args: -plt
+    :expid: a000
+    :type: png
+    :figure: splits_previous.png
+    :name: splits_previous
+    :width: 100%
+    :align: center
+    :caption: Example showing ``previous`` (``previous-1``) and ``previous-2`` split dependencies.
 
 Job Splits with calendar
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1438,5 +1497,3 @@ In this workflow you can see an illustrated example of select member. Using 4 me
     :align: center
     :caption: Example showing the asim job starting only from chunk 3.
     :alt: select_members
-
-
