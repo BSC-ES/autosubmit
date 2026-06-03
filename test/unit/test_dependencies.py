@@ -1035,7 +1035,8 @@ def test_apply_splits_filter_previous_n(steps_back, job_split, total_splits, exp
 
 
 @pytest.mark.parametrize("filter_key", ["DATES_TO", "MEMBERS_TO", "CHUNKS_TO"])
-def test_get_jobs_filtered_none_filter(filter_key, as_conf):
+@pytest.mark.parametrize("filter_value", ["none", "None", "NONE", "blah_none_blah"])
+def test_get_jobs_filtered_none_filter(filter_key, filter_value, as_conf):
     """A 'none' filter at any level must yield an empty job list."""
     date = datetime(2000, 1, 1)
     as_conf.experiment_data = {
@@ -1063,9 +1064,46 @@ def test_get_jobs_filtered_none_filter(filter_key, as_conf):
     job.split = 1
     job.splits = 2
 
-    filters_to = {filter_key: "none"}
+    filters_to = {filter_key: filter_value}
     result = dictionary.get_jobs_filtered("SIM", job, filters_to, date, "fc0", 1, {})
-    assert result == [], f"Expected empty list for {filter_key}=none, got {result}"
+    assert result == [], f"Expected empty list for {filter_key}={filter_value}, got {result}"
+
+
+@pytest.mark.parametrize("filter_key", ["DATES_TO", "MEMBERS_TO", "CHUNKS_TO"])
+def test_get_jobs_filtered_no_filter_falls_to_empty(filter_key, as_conf):
+    """No filter at a level + no natural key falls through to the default return {}."""
+    date = datetime(2000, 1, 1)
+    as_conf.experiment_data = {
+        'DEFAULT': {'EXPID': 'a000'},
+        'STORAGE': {'TYPE': 'pkl', 'COPY_REMOTE_LOGS': True},
+        'EXPERIMENT': {
+            'DATELIST': '20000101', 'MEMBERS': 'fc0', 'CHUNKSIZEUNIT': 'day',
+            'CHUNKSIZE': 1, 'NUMCHUNKS': 1, 'CHUNKINI': '', 'CALENDAR': 'standard',
+        },
+        'JOBS': {
+            'SIM': {
+                'FILE': 'sim.sh', 'RUNNING': 'chunk',
+                'SPLITS': 2, 'WALLCLOCK': '00:05',
+            },
+        },
+    }
+    dictionary = DicJobs([date], ["fc0"], [1], "", default_retrials=0, as_conf=as_conf)
+    dictionary.read_section("SIM", 1, "bash")
+
+    job = Job("a000_20000101_fc0_1_1_SIM", 0, Status.WAITING, 1)
+    job.date = date
+    job.member = "fc0"
+    job.chunk = 1
+    job.running = "chunk"
+    job.split = 1
+    job.splits = 2
+
+    filters_to = {}
+    natural_date = None if filter_key == "DATES_TO" else date
+    natural_member = None if filter_key == "MEMBERS_TO" else "fc0"
+    natural_chunk = None if filter_key == "CHUNKS_TO" else 1
+    result = dictionary.get_jobs_filtered("SIM", job, filters_to, natural_date, natural_member, natural_chunk, {})
+    assert result == [], f"Expected empty list for missing {filter_key}, got {result}"
 
 
 def test_get_jobs_filtered_split_slice_zero_raises(as_conf):
@@ -1139,3 +1177,60 @@ def test_get_jobs_filtered_negative_split_with_star(split_value, as_conf):
     filters_to = {'SPLITS_TO': "1*\\2"}
     result = dictionary.get_jobs_filtered("PARENT", job, filters_to, date, "fc0", 1, {})
     assert result == [], f"Expected empty list for split={split_value} with grouped star mapping, got {result}"
+
+
+def _make_parent_jobs(count, prefix="PARENT", splits=1):
+    jobs = []
+    for i in range(count):
+        job = Job(f"{prefix}_{i}", i, Status.WAITING, 1)
+        job.splits = splits
+        jobs.append(job)
+    return jobs
+
+
+def _make_split_jobs(split_values, prefix="parent"):
+    jobs = []
+    for v in split_values:
+        job = Job(f"{prefix}_{v}", 1, Status.WAITING, 1)
+        job.split = v
+        jobs.append(job)
+    return jobs
+
+
+@pytest.mark.parametrize("part,parent_count,parent_splits,job_split,job_splits,previous,expected_idx", [
+    pytest.param("1*",    0, 1, 1, 1, False, -1, id="empty-list"),
+    pytest.param("1*",    5, 1, 1, 1, False,  0, id="simple-1to1-first"),
+    pytest.param("1*",    5, 1, 3, 1, False,  2, id="simple-1to1-middle"),
+    pytest.param("1*",    5, 1, 5, 1, False,  4, id="simple-1to1-last"),
+    pytest.param("1*",    3, 1, 10, 1, False, -1, id="simple-out-of-range"),
+    pytest.param("1*\\2", 0, 1, 1, 1, False, -1, id="grouped-empty-list"),
+    pytest.param("1*\\2", 2, 2, 5, 8, True,   1, id="nto1-previous"),
+    pytest.param("1*\\2", 3, 8, 5, 2, True,  -1, id="1ton-previous-empty-slice"),
+])
+def test_resolve_star_splits(part, parent_count, parent_splits, job_split, job_splits, previous, expected_idx):
+    """All _resolve_star_splits branches: empty guard, simple 1-to-1, grouped with/without previous."""
+    parents = _make_parent_jobs(parent_count, splits=parent_splits)
+    job = Job("child", 1, Status.WAITING, 1)
+    job.split = job_split
+    job.splits = job_splits
+    filters_to_of_parent = {"SPLITS_TO": "previous"} if previous else {}
+    result = DicJobs._resolve_star_splits(parents, job, part, filters_to_of_parent)
+    if expected_idx == -1:
+        assert result == set()
+    else:
+        assert result == {parents[expected_idx]}
+
+
+@pytest.mark.parametrize("filter_value,split_values,child_split,expected_splits", [
+    pytest.param("none",    [None, -1, 0, 1, 2, 3], None,  {None, -1, 0},    id="none"),
+    pytest.param("natural", [-1, 0, 1, 2, 3, 4],    2,     {-1, 0, 2},       id="natural"),
+])
+def test_apply_splits_filter(as_conf, filter_value, split_values, child_split, expected_splits):
+    """SPLITS_TO=none and SPLITS_TO=natural filter correct splits."""
+    dictionary = DicJobs([], [], [], "", default_retrials=0, as_conf=as_conf)
+    parents = _make_split_jobs(split_values)
+    child = Job("child", 2, Status.WAITING, 1)
+    child.split = child_split
+    result = dictionary._apply_splits_filter(parents, child, filter_value, {})
+    assert child.name not in {j.name for j in result}
+    assert {j.split for j in result} == expected_splits

@@ -58,7 +58,7 @@
 - Added batch canceling to the `setstatus` command #2919
 - verbosity adjusted #2976
 - Implement filters for `recovery` command #2923
-- Enchanced previous to accept previous-N #
+- Enchanced previous to accept previous-N #2971
 - Enchanced splits_to previous keyword to accept previous-N #2958
 - Add detection of inneficiencies for key CPMIP metrics #3022
 - Allow multiple filters in the `monitor` command #3020
