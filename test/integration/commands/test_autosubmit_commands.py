@@ -23,12 +23,6 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
 )
 
 
-@pytest.fixture(scope="function")
-def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
-    config_data = general_data | experiment_data | jobs_data
-    return autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
-
-
 @pytest.mark.parametrize("noplot", [True, False])
 def test_create_noplot_calls_generate_output(as_exp, mocker, noplot):
     """Test that create calls generate_output when noplot is False and does not call it when noplot is True."""
