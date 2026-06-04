@@ -382,8 +382,8 @@ def test_add_invalid_platform(autosubmit_config):
         'MAX_WAITING_JOBS'
     ]
 )
-def test_platform_parameters_zero_values_raises_error(autosubmit_config, parameter_name):
-    """Test that setting TOTALJOBS to 0 for a platform raises ``AutosubmitCritical``."""
+def test_platform_parameter_zero_raises_error(autosubmit_config, parameter_name):
+    """Test that setting a platform parameter to 0 raises ``AutosubmitCritical``."""
     user = getuser()
     as_conf = autosubmit_config(_EXPID, {
         'PLATFORMS': {
