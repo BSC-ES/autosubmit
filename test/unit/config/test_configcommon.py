@@ -716,7 +716,7 @@ def test_immutable_variables_overwrites_default_values(
 
     # Check immutable variables keep original values, other variables not affected
     assert pinned["DEFAULT"]["EXPID"] == "a000"
-    assert pinned["DEFAULT"]["HPCARCH"] == "LOCAL"
+    assert pinned["DEFAULT"]["HPCARCH"] == "MARENOSTRUM5"
     assert pinned["DEFAULT"]["OTHER"] == "value"
 
 
@@ -732,7 +732,6 @@ def test_immutable_variables_adds_missing_sections(
 
     # Check that missing DEFAULT section is added with original values
     assert pinned["DEFAULT"]["EXPID"] == "a000"
-    assert pinned["DEFAULT"]["HPCARCH"] == "LOCAL"
 
 
 def test_load_custom_config(autosubmit_config, tmp_path) -> None:
