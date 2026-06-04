@@ -373,3 +373,32 @@ def test_add_invalid_platform(autosubmit_config):
         ParamikoSubmitter(as_conf=as_conf)
 
     assert 'must be defined' in str(cm.value.message)
+
+
+def test_total_jobs_zero_raises_error(autosubmit_config):
+    """Test that setting TOTALJOBS to 0 for a platform raises ``AutosubmitCritical``."""
+    user = getuser()
+    as_conf = autosubmit_config(_EXPID, {
+        'PLATFORMS': {
+            'sample_zero_jobs': {
+                'TYPE': 'slurm',
+                'USER': user,
+                'HOST': 'sample_zero_jobs.bsc.es',
+                'MAX_WALLCLOCK': '48:00',
+                'TOTAL_JOBS': 0
+            }
+        },
+        'JOBS': {
+            'A': {
+                'RUNNING': 'once',
+                'SCRIPT': 'sleep 0',
+                'PLATFORM': 'sample_zero_jobs'
+            }
+        }
+    })
+
+    with pytest.raises(AutosubmitCritical) as cm:
+        ParamikoSubmitter(as_conf=as_conf)
+
+    assert "TOTALJOBS" in str(cm.value.message)
+    assert "greater than 0" in str(cm.value.message)
