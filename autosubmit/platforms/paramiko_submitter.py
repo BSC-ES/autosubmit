@@ -91,6 +91,26 @@ def _get_host(section_host: str, add_project_to_host: bool, project: str) -> str
     return host.strip(" ")
 
 
+def _validate_platform_config(platform_name: str, platform: 'ParamikoPlatform') -> None:
+    """Validate platform configuration values.
+
+    :param platform_name: The name of the platform (as used in PLATFORMS config).
+    :type platform_name: str
+    :param platform: The platform object with configuration already loaded.
+    :type platform: ParamikoPlatform
+    :return: None
+    :raises AutosubmitCritical: If any configuration value is invalid.
+    """
+    if platform.total_jobs is not None and int(platform.total_jobs) == 0:
+        raise AutosubmitCritical(
+            f"PLATFORMS.{platform_name.upper()}.TOTALJOBS must be greater than 0. "
+            f"Current value: {platform.total_jobs}.", 7012)
+    if platform.max_waiting_jobs is not None and int(platform.max_waiting_jobs) == 0:
+        raise AutosubmitCritical(
+            f"PLATFORMS.{platform_name.upper()}.MAX_WAITING_JOBS must be greater than 0. "
+            f"Current value: {platform.max_waiting_jobs}.", 7012)
+
+
 def _get_platform_by_type(platform_type: str, expid: str, platform_name: str, experiment_data: dict,
                           platform_version: str, auth_password: Optional[str]) -> Optional['ParamikoPlatform']:
     if platform_type == 'ps':
@@ -221,6 +241,7 @@ class ParamikoSubmitter:
             if len(remote_platform.custom_directives) > 0:
                 Log.debug(f'Custom directives for {platform_used}: {remote_platform.custom_directives}')
             remote_platform.scratch_free_space = str(section_platform.get('SCRATCH_FREE_SPACE', False)).lower()
+            _validate_platform_config(platform_used, remote_platform)
             try:
                 remote_platform.root_dir = os.path.join(remote_platform.scratch, remote_platform.project,
                                                         remote_platform.user, remote_platform.expid)
