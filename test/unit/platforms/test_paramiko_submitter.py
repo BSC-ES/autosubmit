@@ -375,7 +375,14 @@ def test_add_invalid_platform(autosubmit_config):
     assert 'must be defined' in str(cm.value.message)
 
 
-def test_total_jobs_zero_raises_error(autosubmit_config):
+@pytest.mark.parametrize(
+    'parameter_name',
+    [
+        'TOTALJOBS',
+        'MAX_WAITING_JOBS'
+    ]
+)
+def test_platform_parameters_zero_values_raises_error(autosubmit_config, parameter_name):
     """Test that setting TOTALJOBS to 0 for a platform raises ``AutosubmitCritical``."""
     user = getuser()
     as_conf = autosubmit_config(_EXPID, {
@@ -385,7 +392,7 @@ def test_total_jobs_zero_raises_error(autosubmit_config):
                 'USER': user,
                 'HOST': 'sample_zero_jobs.bsc.es',
                 'MAX_WALLCLOCK': '48:00',
-                'TOTAL_JOBS': 0
+                parameter_name: 0
             }
         },
         'JOBS': {
@@ -400,5 +407,5 @@ def test_total_jobs_zero_raises_error(autosubmit_config):
     with pytest.raises(AutosubmitCritical) as cm:
         ParamikoSubmitter(as_conf=as_conf)
 
-    assert "TOTALJOBS" in str(cm.value.message)
+    assert parameter_name in str(cm.value.message)
     assert "greater than 0" in str(cm.value.message)
