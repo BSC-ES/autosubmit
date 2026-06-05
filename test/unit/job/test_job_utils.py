@@ -181,22 +181,22 @@ def test_get_split_size_unit(data, result):
     "date_str, cal, expected_days",
     [
         # Februray with standard calendar (leap year)
-        ("20000201", "standard", 29),  # 2000 is a leap year
-        ("19000201", "standard", 28),  # 1900 is not a leap year
-        ("20040201", "standard", 29),  # 2004 is a leap year
-        ("20010201", "standard", 28),  # 2001 is not a leap year
+        ("20000201", "standard", 29), # 2000 is a leap year
+        ("19000201", "standard", 28), # 1900 is not a leap year
+        ("20040201", "standard", 29), # 2004 is a leap year
+        ("20010201", "standard", 28), # 2001 is not a leap year
         # February with noleap calendar (no leap years)
-        ("20000201", "noleap", 28),  # leap year ignored under noleap calendar
-        ("20040201", "noleap", 28),  # leap year ignored under noleap calendar
+        ("20000201", "noleap", 28), # leap year ignored under noleap calendar
+        ("20040201", "noleap", 28), # leap year ignored under noleap calendar
         # 30 day months
-        ("20000401", "standard", 30),  # regular April
-        ("20000601", "standard", 30),  # regular June
-        ("20000901", "standard", 30),  # regular September
-        ("20001101", "standard", 30),  # regular November
+        ("20000401", "standard", 30), # regular April
+        ("20000601", "standard", 30), # regular June
+        ("20000901", "standard", 30), # regular September
+        ("20001101", "standard", 30), # regular November
         # 31 day months
-        ("20000101", "standard", 31),  # regular January
-        ("20000301", "standard", 31),  # regular March
-        ("20001201", "standard", 31),  # regular December
+        ("20000101", "standard", 31), # regular January
+        ("20000301", "standard", 31), # regular March
+        ("20001201", "standard", 31), # regular December
     ],
 )
 def test_month_days(date_str, cal, expected_days):
@@ -223,12 +223,12 @@ def test_split_unit_equal_to_chunk_unit_not_raise():
 @pytest.mark.parametrize(
     "cal, chunk_unit, split_unit, split_policy",
     [
-        ("standard", "hour", "hour", "flexible"),  # chunk unit is hour
-        ("invalid-calendar", "day", "hour", "flexible"),  # invalid calendar
-        ("standard", "invalid-chunk-unit", "hour", "flexible"),  # invalid chunk unit
-        ("standard", "day", "invalid-split-unit", "flexible"),  # invalid split unit
-        ("standard", "day", "year", "flexible"),  # split > chunk unit
-        ("standard", "day", "week", "invalid-split-policy"),  # invalid split policy
+        ("standard", "hour", "hour", "flexible"), # chunk unit is hour
+        ("invalid-calendar", "day", "hour", "flexible"), # invalid calendar
+        ("standard", "invalid-chunk-unit", "hour", "flexible"), # invalid chunk unit
+        ("standard", "day", "invalid-split-unit", "flexible"), # invalid split unit
+        ("standard", "day", "year", "flexible"), # split > chunk unit
+        ("standard", "day", "week", "invalid-split-policy"), # invalid split policy
     ],
     ids=[
         "chunk unit is hour raises",
@@ -261,6 +261,27 @@ def test_count_days_in_month_jan():
     result = _count_units_between_dates(start, end, "day", "standard")
     assert isinstance(result, float)
     assert result == 31.0
+
+
+def test_count_multiple_full_months():
+    """Test that _count_units_between_dates returns 3 months for a chunk covering January to April."""
+    start = datetime(2000, 1, 1)
+    end = datetime(2000, 4, 1)
+    result = _count_units_between_dates(start, end, "month", "standard")
+    assert isinstance(result, float)
+    assert result == 3.0
+
+
+def test_count_multiple_partial_months():
+    """Test that _count_units_between_dates returns the correct fraction of months for a chunk covering mid-January to mid-February."""
+    start = datetime(2000, 1, 16)
+    end = datetime(2000, 2, 15)
+    result = _count_units_between_dates(start, end, "month", "standard")
+    assert isinstance(result, float)
+    # January: 16 days (16th to 31st inclusive) out of 31 days -> 16/31
+    # February: 14 days (1st to 14th inclusive) out of 29 days (leap year) -> 14/29
+    expected = (16 / 31) + (14 / 29)
+    assert abs(result - expected) < 1e-6
 
 
 @pytest.mark.parametrize(
