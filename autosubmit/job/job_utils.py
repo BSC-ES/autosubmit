@@ -74,32 +74,40 @@ def calendar_unitsize_getlowersize(unitsize: str) -> str:
         return list(CALENDAR_UNITSIZE_ENUM.keys())[unit_value - 1]
 
 
-def calendar_get_month_days(date_str: str) -> int:
+def calendar_get_month_days(date_str: str, cal: str = "standard") -> int:
     """
-    Get the number of days in a month
+    Get the number of days in a month, respecting the calendar type (leap year or not).
     :param date_str: Date in string format (YYYYMMDD)
+    :dtype date_str: str
+    :param cal: Calendar type (standard, noleap)
+    :dtype cal: str
     :return: int
     """
     year = int(date_str[0:4])
     month = int(date_str[4:6])
     if month == 2:
-        if is_leap_year(year):
+        if cal != "noleap" and is_leap_year(year):
             return 29
-        else:
-            return 28
+        return 28
     elif month in [4, 6, 9, 11]:
         return 30
     else:
         return 31
 
 
-def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int) -> int:
+def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int, cal: str = "standard") -> int:
     """
     Get the chunk size in hours
     :param date_str: Date in string format (YYYYMMDD)
+    :dtype date_str: str
     :param chunk_unit: Unit of the chunk
+    :dtype chunk_unit: str
     :param chunk_length: Length of the chunk
-    :return: int
+    :dtype chunk_length: int
+    :param cal: Calendar type (standard, noleap)
+    :dtype cal: str
+    :return: The chunk size in hours
+    :rtype: int
     """
     if is_leap_year(int(date_str[0:4])):
         num_days_in_a_year = 366
@@ -108,7 +116,7 @@ def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int) ->
     if chunk_unit == "year":
         chunk_size_in_hours = num_days_in_a_year * 24 * chunk_length
     elif chunk_unit == "month":
-        chunk_size_in_hours = calendar_get_month_days(date_str) * 24 * chunk_length
+        chunk_size_in_hours = calendar_get_month_days(date_str, cal) * 24 * chunk_length
     elif chunk_unit == "day":
         chunk_size_in_hours = 24 * chunk_length
     else:
@@ -117,14 +125,21 @@ def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int) ->
 
 
 def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
-                                chunk_size_in_hours: int) -> bool:
+                                chunk_size_in_hours: int, cal: str = "standard") -> bool:
     """
     Check if the split size is valid for the calendar
     :param date_str: Date in string format (YYYYMMDD)
+    :dtype date_str: str
     :param split_size: Size of the split
+    :dtype split_size: int
     :param split_unit: Unit of the split
+    :dtype split_unit: str
     :param chunk_size_in_hours: chunk size in hours
-    :return: bool
+    :dtype chunk_size_in_hours: int
+    :param cal: Calendar type (standard, noleap)
+    :dtype cal: str
+    :return: If the split size is valid for the calendar
+    :rtype: bool
     """
     if is_leap_year(int(date_str[0:4])):
         num_days_in_a_year = 366
@@ -134,7 +149,7 @@ def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
     if split_unit == "year":
         split_size_in_hours = num_days_in_a_year * 24 * split_size
     elif split_unit == "month":
-        split_size_in_hours = calendar_get_month_days(date_str) * 24 * split_size
+        split_size_in_hours = calendar_get_month_days(date_str, cal) * 24 * split_size
     elif split_unit == "day":
         split_size_in_hours = 24 * split_size
     else:
@@ -209,26 +224,24 @@ def _count_units_between_dates(start_date, end_date, unit, cal) -> float:
         current = start_date.replace(day=1)
         while current < end_date:
             month_start = max(current, start_date)
-            year = current.year + current.month // 12
-            month = current.month % 12 + 1
-            day = min(current.day, calendar_get_month_days(f"{year:04d}{month:02d}01"))
-            next_month = current.replace(year=year, month=month, day=day)
+            next_year = current.year + current.month // 12
+            next_month_num = current.month % 12 + 1
+            next_month = current.replace(year=next_year, month=next_month_num, day=1)
             month_end = min(end_date, next_month)
             days_covered = float((month_end - month_start).days)
             if days_covered > 0:
                 total += days_covered / calendar_get_month_days(
-                    f"{current.year:04d}{current.month:02d}01"
+                    f"{current.year:04d}{current.month:02d}01", cal
                 )
             current = next_month
         return total
     elif unit == "year":
         total = 0.0
-        current = start_date.replace(month=1, day=1)
+        current = start_date
         while current < end_date:
-            year_start = max(current, start_date)
-            next_year = current.replace(year=current.year + 1)
+            next_year = current.replace(year=current.year + 1, month=1, day=1)
             year_end = min(end_date, next_year)
-            days_covered = (year_end - year_start).days
+            days_covered = (year_end - current).days
             if days_covered > 0:
                 if is_leap_year(current.year) and cal != "noleap":
                     total += days_covered / 366
@@ -291,11 +304,11 @@ def calendar_chunk_section(exp_data: dict, section: str, date: str, chunk: int) 
 
     num_max_splits = _count_units_between_dates(chunk_start, chunk_end, split_unit, cal)
     chunk_size_in_hours = get_chunksize_in_hours(
-        date2str(chunk_start), chunk_unit, chunk_length
+        date2str(chunk_start), chunk_unit, chunk_length, cal
     )
 
     if not calendar_split_size_isvalid(
-        date2str(chunk_start), split_length, split_unit, chunk_size_in_hours
+        date2str(chunk_start), split_length, split_unit, chunk_size_in_hours, cal
     ):
         raise AutosubmitCritical(
             f"Invalid split size for the calendar. The split size is {split_length} and the unit is {split_unit}. It doesn't fit in the chunk size of {chunk_size_in_hours} hours."
