@@ -34,13 +34,16 @@ CALENDAR_UNITSIZE_ENUM = {
     "year": 3
 }
 
+VALID_CALENDARS = ["standard", "noleap"]
+SPLIT_POLICIES = ["flexible", "strict"]
 
-def is_leap_year(year) -> bool:
+
+def is_leap_year(year: int) -> bool:
     """Determine whether a year is a leap year."""
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
-def calendar_unitsize_isgreater(split_unit, chunk_unit) -> bool:
+def calendar_unitsize_isgreater(split_unit: str, chunk_unit: str) -> bool:
     """
     Check if the split unit is greater than the chunk unit
     :param split_unit:
@@ -55,20 +58,23 @@ def calendar_unitsize_isgreater(split_unit, chunk_unit) -> bool:
         raise AutosubmitCritical("Invalid calendar unit size")
 
 
-def calendar_unitsize_getlowersize(unitsize) -> str:
+def calendar_unitsize_getlowersize(unitsize: str) -> str:
     """
     Get the lower size of a calendar unit
     :return: str
     """
     unit_size = unitsize.lower()
-    unit_value = CALENDAR_UNITSIZE_ENUM[unit_size]
+    try:
+        unit_value = CALENDAR_UNITSIZE_ENUM[unit_size]
+    except KeyError:
+        raise AutosubmitCritical("Invalid calendar unit size")
     if unit_value == 0:
         return "hour"
     else:
         return list(CALENDAR_UNITSIZE_ENUM.keys())[unit_value - 1]
 
 
-def calendar_get_month_days(date_str) -> int:
+def calendar_get_month_days(date_str: str) -> int:
     """
     Get the number of days in a month
     :param date_str: Date in string format (YYYYMMDD)
@@ -87,7 +93,14 @@ def calendar_get_month_days(date_str) -> int:
         return 31
 
 
-def get_chunksize_in_hours(date_str, chunk_unit, chunk_length) -> int:
+def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int) -> int:
+    """
+    Get the chunk size in hours
+    :param date_str: Date in string format (YYYYMMDD)
+    :param chunk_unit: Unit of the chunk
+    :param chunk_length: Length of the chunk
+    :return: int
+    """
     if is_leap_year(int(date_str[0:4])):
         num_days_in_a_year = 366
     else:
@@ -103,8 +116,8 @@ def get_chunksize_in_hours(date_str, chunk_unit, chunk_length) -> int:
     return chunk_size_in_hours
 
 
-def calendar_split_size_isvalid(date_str, split_size, split_unit,
-                                chunk_size_in_hours) -> bool:
+def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
+                                chunk_size_in_hours: int) -> bool:
     """
     Check if the split size is valid for the calendar
     :param date_str: Date in string format (YYYYMMDD)
@@ -135,129 +148,171 @@ def calendar_split_size_isvalid(date_str, split_size, split_unit,
     return split_size_in_hours <= chunk_size_in_hours
 
 
-def calendar_chunk_section(exp_data, section, date, chunk) -> int:
+def _validate_calendar_inputs(cal: str, chunk_unit: str, split_unit: str, split_policy: str) -> None:
+    """
+    Validate the calendar inputs
+    :param cal: Calendar type
+    :dtype cal: str
+    :param chunk_unit: Unit of the chunk
+    :dtype chunk_unit: str
+    :param split_unit: Unit of the split
+    :dtype split_unit: str
+    :param split_policy: Policy for handling split sizes
+    :dtype split_policy: str
+    :return: None
+    :raises: AutosubmitCritical if any of the inputs are invalid
+    """
+    if chunk_unit == "hour":
+        raise AutosubmitCritical(
+            "Chunk unit is hour, Autosubmit doesn't support lower than hour splits. Please change the chunk unit to day or higher. Or don't use calendar splits."
+        )
+    if cal not in VALID_CALENDARS:
+        raise AutosubmitCritical(
+            f"Invalid calendar type {cal}. Autosubmit only supports 'standard' and 'noleap' calendars."
+        )
+    if chunk_unit not in CALENDAR_UNITSIZE_ENUM:
+        raise AutosubmitCritical(
+            f"Invalid chunk unit {chunk_unit}. Autosubmit only supports 'hour', 'day', 'month' and 'year' units."
+        )
+    if split_unit not in CALENDAR_UNITSIZE_ENUM:
+        raise AutosubmitCritical(
+            f"Invalid split unit {split_unit}. Autosubmit only supports 'hour', 'day', 'month' and 'year' units, or 'none' to automatically select the lower unit of the chunk unit."
+        )
+    if calendar_unitsize_isgreater(split_unit, chunk_unit):
+        raise AutosubmitCritical(
+            f"Split unit {split_unit} is greater than chunk unit {chunk_unit}. Autosubmit doesn't support this configuration. Please change the split unit to day or lower. Or don't use calendar splits."
+        )
+    if split_policy not in SPLIT_POLICIES:
+        raise AutosubmitCritical(
+            f"Invalid split policy {split_policy}. Autosubmit only supports 'flexible' and 'strict' split policies."
+        )
+
+
+def _count_units_between_dates(start_date, end_date, unit, cal) -> float:
+    """
+    Count the number of units between two dates
+    :param start_date: Start date
+    :param end_date: End date
+    :param unit: Unit to count (hour, day, month, year)
+    :param cal: Calendar type (standard, noleap)
+    :return: Number of units between the two dates
+    :rtype: float
+    """
+    if unit == "hour":
+        return float((end_date - start_date).days * 24)
+    elif unit == "day":
+        return float((end_date - start_date).days)
+    elif unit == "month":
+        total = 0.0
+        current = start_date.replace(day=1)
+        while current < end_date:
+            month_start = max(current, start_date)
+            year = current.year + current.month // 12
+            month = current.month % 12 + 1
+            day = min(current.day, calendar_get_month_days(f"{year:04d}{month:02d}01"))
+            next_month = current.replace(year=year, month=month, day=day)
+            month_end = min(end_date, next_month)
+            days_covered = float((month_end - month_start).days)
+            if days_covered > 0:
+                total += days_covered / calendar_get_month_days(f"{current.year:04d}{current.month:02d}01")
+            current = next_month
+        return total
+    elif unit == "year":
+        total = 0.0
+        current = start_date.replace(month=1, day=1)
+        while current < end_date:
+            year_start = max(current, start_date)
+            next_year = current.replace(year=current.year + 1)
+            year_end = min(end_date, next_year)
+            days_covered = (year_end - year_start).days
+            if days_covered > 0:
+                if is_leap_year(current.year) and cal != "noleap":
+                    total += days_covered / 366
+                else:
+                    total += days_covered / 365
+            current = next_year
+        return total
+    else:
+        raise AutosubmitCritical(
+            f"Invalid split unit {unit}. Autosubmit only supports 'hour', 'day', 'month' and 'year' units, or 'none' to automatically select the lower unit of the chunk unit."
+        )
+
+
+def calendar_chunk_section(exp_data: dict, section: str, date: str, chunk: int) -> int:
     """
     Calendar for chunks
-    :param section:
-    :param parameters:
-    :return: int
+    :param exp_data: Experiment configuration dictionary
+    :dtype exp_data: dict
+    :param section: Job section name
+    :dtype section: str
+    :param date: Start date of the experiment
+    :dtype date: str
+    :param chunk: Chunk number
+    :dtype chunk: int
+    :return: Number of splits for the chunk
+    :rtype: int
     """
-    # next_auto_date = date
-    splits = 0
-    jobs_data = exp_data.get('JOBS', {})
-    split_unit = str(exp_data.get("EXPERIMENT", {}).get('SPLITSIZEUNIT',
-                                                        jobs_data.get(section, {}).get("SPLITSIZEUNIT", None))).lower()
-    chunk_unit = str(exp_data.get("EXPERIMENT", {}).get('CHUNKSIZEUNIT', "day")).lower()
-    split_policy = str(exp_data.get("EXPERIMENT", {}).get('SPLITPOLICY', jobs_data.get(section, {}).get("SPLITPOLICY",
-                                                                                                        "flexible"))).lower()
-    if jobs_data.get(section, {}).get("RUNNING", "once") == "chunk":
-        chunk_length = int(exp_data.get("EXPERIMENT", {}).get('CHUNKSIZE', 1))
-        cal = str(exp_data.get('CALENDAR', "standard")).lower()
-        split_length = get_split_size(exp_data, section)
+    jobs_data = exp_data.get("JOBS", {})
 
-        # VALIDATIONS
-        if chunk_unit == "hour":
-            raise AutosubmitCritical(
-                "Chunk unit is hour, Autosubmit doesn't support lower than hour splits. Please change the chunk unit to day or higher. Or don't use calendar splits."
-            )
-        # 1. Calendar
-        if cal not in ["standard", "noleap"]:
-            raise AutosubmitCritical(
-                f"Invalid calendar type {cal}. Autosubmit only supports 'standard' and 'noleap' calendars."
-            )
-        # 2. Chunk unit
-        if chunk_unit not in CALENDAR_UNITSIZE_ENUM:
-            raise AutosubmitCritical(
-                f"Invalid chunk unit {chunk_unit}. Autosubmit only supports 'hour', 'day', 'month' and 'year' units."
-            )
+    # Return early
+    if jobs_data.get(section, {}).get("RUNNING", "once") != "chunk":
+        return 0
 
-        # 3. Split unit
-        if split_unit == "none":
-            split_unit = calendar_unitsize_getlowersize(chunk_unit)
-        if split_unit not in CALENDAR_UNITSIZE_ENUM:
-            raise AutosubmitCritical(
-                f"Invalid split unit {split_unit}. Autosubmit only supports 'hour', 'day', 'month' and 'year' units, or 'none' to automatically select the lower unit of the chunk unit."
-            )
+    # Retrieve all parameters from the config files
+    chunk_unit = str(exp_data.get("EXPERIMENT", {}).get("CHUNKSIZEUNIT", "day")).lower()
+    split_unit = str(
+        exp_data.get("EXPERIMENT", {}).get(
+            "SPLITSIZEUNIT", jobs_data.get(section, {}).get("SPLITSIZEUNIT", None)
+        )
+    ).lower()
+    split_policy = str(
+        exp_data.get("EXPERIMENT", {}).get(
+            "SPLITPOLICY", jobs_data.get(section, {}).get("SPLITPOLICY", "flexible")
+        )
+    ).lower()
+    chunk_length = int(exp_data.get("EXPERIMENT", {}).get("CHUNKSIZE", 1))
+    cal = str(exp_data.get("CALENDAR", "standard")).lower()
+    split_length = get_split_size(exp_data, section)
 
-        # 4. Split unit higher than chunk unit
-        if calendar_unitsize_isgreater(split_unit, chunk_unit):
-            raise AutosubmitCritical(
-                f"Split unit {split_unit} is greater than chunk unit {chunk_unit}. Autosubmit doesn't support this configuration. Please change the split unit to day or lower. Or don't use calendar splits."
-            )
+    if split_unit == "none":
+        split_unit = calendar_unitsize_getlowersize(chunk_unit)
+        Log.info(
+            f"The split unit for the section {section} is set to 'none'. The split unit will be automatically set to {split_unit}, which is the lower unit of the chunk unit {chunk_unit}."
+        )
 
-        # THRESHOLDS
-        # 1. Start and end date of the chunk
-        chunk_start = chunk_start_date(
-            date, chunk, chunk_length, chunk_unit, cal)
-        chunk_end = chunk_end_date(
-            chunk_start, chunk_length, chunk_unit, cal)
+    _validate_calendar_inputs(cal, chunk_unit, split_unit, split_policy)
 
-        # 2. Compute the number of units (hours, days, months or years) between start date (inclusive) and end date (exclusive)
-        # taking into account calendar type
-        if split_unit == "hour":
-            # If split unit is hour, we can directly compute the number of hours between the two dates
-            # because each day always has 24 hours even in leap years and noleap calendars.
-            num_max_splits = (chunk_end - chunk_start).days * 24
-        elif split_unit == "day":
-            # If split unit is day, we can directly compute the number of days between the two dates
-            # because each month and year always have a whole number of days even in leap years and noleap calendars.
-            num_max_splits = float((chunk_end - chunk_start).days)
-        # here comes the problems
-        elif split_unit == "month":
-            total = 0.0
-            current = chunk_start.replace(day=1)
-            while current < chunk_end:
-                month_start = max(current, chunk_start)
-                year = current.year + current.month // 12
-                month = current.month % 12 + 1
-                day = min(current.day, calendar_get_month_days(f"{year:04d}{month:02d}01"))
-                next_month = current.replace(year=year, month=month, day=day)
-                month_end = min(chunk_end, next_month)
-                days_covered = (month_end - month_start).days
-                if days_covered > 0:
-                    total += days_covered / calendar_get_month_days(f"{current.year:04d}{current.month:02d}01")
-                current = next_month
-            num_max_splits = total
-        elif split_unit == "year":
-            total = 0.0
-            current = chunk_start.replace(month=1, day=1)
-            while current < chunk_end:
-                year_start = max(current, chunk_start)
-                next_year = current.replace(year=current.year + 1)
-                year_end = min(chunk_end, next_year)
-                days_covered = (year_end - year_start).days
-                if days_covered > 0:
-                    if is_leap_year(current.year) and cal != "noleap":
-                        total += days_covered / 366
-                    else:
-                        total += days_covered / 365
-                current = next_year
-            num_max_splits = total
-        else:
-            raise AutosubmitCritical(
-                f"Invalid split unit {split_unit}. Autosubmit only supports 'hour', 'day', 'month' and 'year' units, or 'none' to automatically select the lower unit of the chunk unit."
-            )
+    chunk_start = chunk_start_date(date, chunk, chunk_length, chunk_unit, cal)
+    chunk_end = chunk_end_date(chunk_start, chunk_length, chunk_unit, cal)
 
-        # 3. Compute the chunk size in hours
-        chunk_size_in_hours = get_chunksize_in_hours(date2str(chunk_start), chunk_unit, chunk_length)
+    num_max_splits = _count_units_between_dates(chunk_start, chunk_end, split_unit, cal)
+    chunk_size_in_hours = get_chunksize_in_hours(
+        date2str(chunk_start), chunk_unit, chunk_length
+    )
 
-        # 4. Validate the split size fits in chunk
-        if not calendar_split_size_isvalid(date2str(chunk_start), split_length, split_unit, chunk_size_in_hours):
-            raise AutosubmitCritical(
-                f"Invalid split size for the calendar. The split size is {split_length} and the unit is {split_unit}. It doesn't fit in the chunk size of {chunk_size_in_hours} hours."
-            )
-        
-        # 5. Final split count
-        splits = num_max_splits / split_length
-        if not splits.is_integer() and split_policy == "flexible":
+    if not calendar_split_size_isvalid(
+        date2str(chunk_start), split_length, split_unit, chunk_size_in_hours
+    ):
+        raise AutosubmitCritical(
+            f"Invalid split size for the calendar. The split size is {split_length} and the unit is {split_unit}. It doesn't fit in the chunk size of {chunk_size_in_hours} hours."
+        )
+
+    splits = num_max_splits / split_length
+
+    if not splits.is_integer():
+        if split_policy == "flexible":
             Log.warning(
-                f"The number of splits:{num_max_splits}/{split_length} is not an integer. The number of splits will be rounded up due the flexible split policy.\n You can modify the SPLITPOLICY parameter in the section {section} to 'strict' to avoid this behavior.")
-        elif not splits.is_integer() and split_policy == "strict":
+                f"The number of splits:{num_max_splits}/{split_length} is not an integer. The number of splits will be rounded up due the flexible split policy.\n You can modify the SPLITPOLICY parameter in the section {section} to 'strict' to avoid this behavior."
+            )
+        elif split_policy == "strict":
             raise AutosubmitCritical(
-                f"The number of splits is not an integer. Autosubmit can't continue.\nYou can modify the SPLITPOLICY parameter in the section {section} to 'flexible' to roundup the number. Or change the SPLITSIZE parameter to a value in which the division is an integer.")
-        splits = math.ceil(splits)
-        Log.info(f"For the section {section} with date:{date2str(chunk_start)} the number of splits is {splits}.")
-    
+                f"The number of splits is not an integer. Autosubmit can't continue.\nYou can modify the SPLITPOLICY parameter in the section {section} to 'flexible' to roundup the number. Or change the SPLITSIZE parameter to a value in which the division is an integer."
+            )
+
+    splits = math.ceil(splits)
+    Log.info(
+        f"For the section {section} with date:{date2str(chunk_start)} the number of splits is {splits}."
+    )
     return splits
 
 
