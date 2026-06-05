@@ -18,7 +18,7 @@
 import math
 from typing import Dict, Optional, TYPE_CHECKING
 
-from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date, subs_dates
+from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date
 from networkx.classes import DiGraph
 
 from autosubmit.job.job_common import Status
