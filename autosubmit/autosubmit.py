@@ -3427,8 +3427,7 @@ class Autosubmit:
 
         user = created = model = branch = hpc = ""
         not_described_experiments = []
-
-        db_expids = get_experiment_expids()
+        experiments_ids_not_in_db = []
 
         if ',' in input_experiment_list:
             requested = [e.strip().lower() for e in input_experiment_list.split(',') if e.strip()]
@@ -3438,17 +3437,25 @@ class Autosubmit:
             requested = [e.strip().lower() for e in input_experiment_list.split(' ') if e.strip()]
 
         if requested is None:
-            experiments_ids = sorted(db_expids)
+            experiments_ids = sorted(get_experiment_expids())
         else:
+            found = get_experiment_expids(expids=requested)
             experiments_ids = []
-            for expid in requested:
-                if expid in db_expids:
-                    experiments_ids.append(expid)
-                else:
-                    Log.warning(f"Experiment '{expid}' not found in the database, skipping")
+            for e in requested:
+                (experiments_ids if e in found else experiments_ids_not_in_db).append(e)
+
+        if experiments_ids_not_in_db:
+            Log.warning(f"Experiments not found in the database, skipping: {experiments_ids_not_in_db}")
 
         for experiment_id in experiments_ids:
             exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(experiment_id)
+            if exp_path.is_dir():
+                try:
+                    folder_owner = pwd.getpwuid(exp_path.stat().st_uid).pw_name
+                    if folder_owner != get_from_user:
+                        continue
+                except Exception:
+                    pass
             try:
                 try:
                     # Preferred source of truth: the on-disk config files.

@@ -72,7 +72,7 @@ def test_describe(
     input_list = ''
     exps = []
     if expid_count is None:
-        input_list = 'zzzz'  # Valid format, not in the database.
+        input_list = 'zzzz'  # An expid not registered in the database.
     elif expid_count > 0:
         expids = [get_next_expid() for _ in range(expid_count)]
         exps = [autosubmit_exp(e, experiment_data=_experiment_data()) for e in expids]
