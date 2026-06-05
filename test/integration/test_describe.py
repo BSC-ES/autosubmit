@@ -101,6 +101,22 @@ def test_describe_unknown_expid_warns(
     assert not _location_lines(mocked_log)
 
 
+def test_describe_unknown_expids_emit_single_warning(
+        autosubmit_exp: Callable,
+        mocker: MockerFixture,
+        get_next_expid: Callable[[], str]) -> None:
+    """Multiple unknown expids are reported in one batched warning."""
+    expid = get_next_expid()
+    autosubmit_exp(expid, experiment_data=_experiment_data())
+
+    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    Autosubmit.describe(input_experiment_list=f'zzzz,yyyy,{expid}', get_from_user='')
+
+    assert mocked_log.warning.call_count == 1
+    warning_msg = mocked_log.warning.call_args[0][0]
+    assert 'zzzz' in warning_msg and 'yyyy' in warning_msg
+
+
 def test_describe_archived_experiment(
         autosubmit_exp: Callable,
         mocker: MockerFixture,
@@ -110,12 +126,6 @@ def test_describe_archived_experiment(
     """
     expid = get_next_expid()
     exp = autosubmit_exp(expid, experiment_data=_experiment_data())
-
-    # NOTE: the snapshot fallback reads the `details` table. If
-    # autosubmit_exp does not populate it, create the snapshot first:
-    #   from autosubmit.experiment.detail_updater import ExperimentDetails
-    #   ExperimentDetails(expid).save_update_details()
-
     rmtree(exp.exp_path)  # Simulate archiving: remove files, keep the DB row.
 
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
@@ -143,3 +153,4 @@ def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
     output = autosubmit.run_command(args=args)
 
     assert getuser() == output[0]
+    
