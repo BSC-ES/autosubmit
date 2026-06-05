@@ -23,7 +23,14 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_utils import calendar_chunk_section, cancel_jobs, get_split_size_unit
+from autosubmit.job.job_utils import (
+    calendar_chunk_section,
+    calendar_get_month_days,
+    _validate_calendar_inputs,
+    _count_units_between_dates,
+    cancel_jobs,
+    get_split_size_unit,
+)
 from autosubmit.log.log import AutosubmitCritical
 
 """Tests for ``autosubmit.job.job_utils``."""
@@ -147,6 +154,7 @@ def test_cancel_jobs(create_job_list):
     for job in job_list.get_job_list():
         assert job.status == Status.KEY_TO_VALUE[target_status]
 
+
 @pytest.mark.parametrize(
     'data,result',
     [
@@ -165,7 +173,94 @@ def test_cancel_jobs(create_job_list):
     ]
 )
 def test_get_split_size_unit(data, result):
+    """Test the get_split_size_unit function for different combinations of chunk size unit and split size unit."""
     assert get_split_size_unit(data, 'TEST') == result
+
+
+@pytest.mark.parametrize(
+    "date_str, cal, expected_days",
+    [
+        # Februray with standard calendar (leap year)
+        ("20000201", "standard", 29),  # 2000 is a leap year
+        ("19000201", "standard", 28),  # 1900 is not a leap year
+        ("20040201", "standard", 29),  # 2004 is a leap year
+        ("20010201", "standard", 28),  # 2001 is not a leap year
+        # February with noleap calendar (no leap years)
+        ("20000201", "noleap", 28),  # leap year ignored under noleap calendar
+        ("20040201", "noleap", 28),  # leap year ignored under noleap calendar
+        # 30 day months
+        ("20000401", "standard", 30),  # regular April
+        ("20000601", "standard", 30),  # regular June
+        ("20000901", "standard", 30),  # regular September
+        ("20001101", "standard", 30),  # regular November
+        # 31 day months
+        ("20000101", "standard", 31),  # regular January
+        ("20000301", "standard", 31),  # regular March
+        ("20001201", "standard", 31),  # regular December
+    ],
+)
+def test_month_days(date_str, cal, expected_days):
+    """Test the calendar_get_month_days function for different dates and calendar types."""
+    assert calendar_get_month_days(date_str, cal) == expected_days
+
+
+def test_default_calendar_is_standard():
+    """Default calendar should behave as the standard calendar."""
+    assert calendar_get_month_days("20000201") == 29 # 2000 is a leap year
+
+
+def test_validate_inputs_not_raise():
+    """Test that calendar_chunk_section does not raise when inputs are valid."""
+    _validate_calendar_inputs("standard", "day", "hour", "flexible")
+    _validate_calendar_inputs("noleap", "year", "month", "strict")
+
+
+def test_split_unit_equal_to_chunk_unit_not_raise():
+    """Test that calendar_chunk_section does not raise when split unit is equal to chunk unit."""
+    _validate_calendar_inputs("standard", "day", "day", "flexible")
+    _validate_calendar_inputs("noleap", "month", "month", "strict")
+
+@pytest.mark.parametrize(
+    "cal, chunk_unit, split_unit, split_policy",
+    [
+        ("standard", "hour", "hour", "flexible"),  # chunk unit is hour
+        ("invalid-calendar", "day", "hour", "flexible"),  # invalid calendar
+        ("standard", "invalid-chunk-unit", "hour", "flexible"),  # invalid chunk unit
+        ("standard", "day", "invalid-split-unit", "flexible"),  # invalid split unit
+        ("standard", "day", "year", "flexible"),  # split > chunk unit
+        ("standard", "day", "week", "invalid-split-policy"),  # invalid split policy
+    ],
+    ids=[
+        "chunk unit is hour raises",
+        "invalid calendar raises",
+        "invalid chunk unit raises",
+        "invalid split unit raises",
+        "split unit greater than chunk unit raises",
+        "invalid split policy raises",
+    ],
+)
+def test_validate_calendar_inputs_invalid(cal, chunk_unit, split_unit, split_policy):
+    """Test that _validate_calendar_inputs raises AutosubmitCritical for invalid inputs."""
+    with pytest.raises(AutosubmitCritical):
+        _validate_calendar_inputs(cal, chunk_unit, split_unit, split_policy)
+
+
+def test_count_hours_in_a_day():
+    """Test that _count_units_between_dates returns 24 hours for a day chunk and hour split."""
+    start = datetime(2000, 1, 1)
+    end = datetime(2000, 1, 2)
+    result = _count_units_between_dates(start, end, "hour", "standard")
+    assert isinstance(result, float)
+    assert result == 24.0
+
+
+def test_count_days_in_month_jan():
+    """Test that _count_units_between_dates returns 31 days for a month chunk and day split in January."""
+    start = datetime(2000, 1, 1)
+    end = datetime(2000, 2, 1)
+    result = _count_units_between_dates(start, end, "day", "standard")
+    assert isinstance(result, float)
+    assert result == 31.0
 
 
 @pytest.mark.parametrize(
