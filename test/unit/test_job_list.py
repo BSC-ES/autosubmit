@@ -986,3 +986,42 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
         f"map keys: {list(fake_job_list.job_package_map.keys())}"
     )
     assert '999' not in fake_job_list.job_package_map
+
+
+@pytest.mark.parametrize("wrapper_job_is_none", [False, True])
+def test_save_wrapper_info_only_upserts_wrapper_info_not_inner_jobs(
+        fake_job_list, mocker, wrapper_job_is_none
+) -> None:
+    """save_wrapper_info must only upsert wrapper info, not insert inner jobs.
+
+    The inner jobs table is already populated by ``save_wrappers`` at submit
+    time.  ``save_wrapper_info`` (called on status changes) must not re-insert
+    them, or it triggers UNIQUE constraint violations.
+
+    When ``wrapper_job`` is falsy the call must be a no-op.
+    """
+    if wrapper_job_is_none:
+        wrapper_job = None
+    else:
+        inner_job = mocker.MagicMock()
+        inner_job.name = "job_inside_wrapper"
+
+        platform_mock = mocker.MagicMock()
+        platform_mock.name = "test_platform"
+
+        wrapper_job = mocker.MagicMock()
+        wrapper_job.name = "wrapper_test"
+        wrapper_job.id = 42
+        wrapper_job.status = Status.SUBMITTED
+        wrapper_job.wallclock = "00:30"
+        wrapper_job.platform = platform_mock
+        wrapper_job.job_list = [inner_job]
+
+    fake_job_list.save_wrapper_info(wrapper_job)
+
+    persistence_mock = fake_job_list.get_packages_persistence()
+    if wrapper_job_is_none:
+        persistence_mock.upsert_wrapper_info.assert_not_called()
+    else:
+        persistence_mock.upsert_wrapper_info.assert_called_once()
+    persistence_mock.save.assert_not_called()

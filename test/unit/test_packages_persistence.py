@@ -103,8 +103,9 @@ def test_init_creates_parent_directory(mocker, tmp_path):
 
 
 @pytest.mark.parametrize("preview", [False, True])
-def test_save_calls_insert_many(persistence, mock_db_manager, mock_engine, preview):
-    """Test save persists to the correct tables for both preview modes."""
+def test_save_calls_bulk_insert_inner_jobs(persistence, mock_db_manager, mock_engine, mocker, preview):
+    """Test save persists inner jobs via _bulk_insert_inner_jobs for both preview modes."""
+    mock_bulk = mocker.patch.object(persistence, '_bulk_insert_inner_jobs')
     status = str(Status.SUBMITTED if not preview else Status.READY)
     wrapper_name = "wrapper1" if not preview else "preview_wrapper"
     wrapper_info = {"name": wrapper_name, "status": status, "job_list": "job1"}
@@ -112,11 +113,12 @@ def test_save_calls_insert_many(persistence, mock_db_manager, mock_engine, previ
 
     persistence.save(wrappers=[(wrapper_info, inner_jobs)], preview=preview)
 
-    mock_db_manager.insert_many.assert_called()
+    mock_bulk.assert_called_once()
 
 
-def test_save_with_multiple_wrapper_infos(persistence, mock_db_manager, mock_engine):
+def test_save_with_multiple_wrapper_infos(persistence, mock_db_manager, mock_engine, mocker):
     """Test save handles wrapper_info as a list of dicts."""
+    mock_bulk = mocker.patch.object(persistence, '_bulk_insert_inner_jobs')
     wrapper_info = [
         {"name": "w1", "status": str(Status.SUBMITTED), "job_list": "job1"},
         {"name": "w2", "status": str(Status.READY), "job_list": "job2"},
@@ -128,13 +130,16 @@ def test_save_with_multiple_wrapper_infos(persistence, mock_db_manager, mock_eng
 
     persistence.save(wrappers=[(wrapper_info, inner_jobs)], preview=False)
 
-    mock_db_manager.insert_many.assert_called()
+    mock_bulk.assert_called_once()
 
 
 def test_save_logs_warning_on_integrity_error(persistence, mock_db_manager, mock_engine, mocker):
     """Test save logs a warning when IntegrityError is raised."""
     mock_warning = mocker.patch("autosubmit.job.job_package_persistence.Log.warning")
-    mock_db_manager.insert_many.side_effect = IntegrityError("unique constraint", {}, None)
+    mocker.patch.object(
+        persistence, '_bulk_insert_inner_jobs',
+        side_effect=IntegrityError("unique constraint", {}, None),
+    )
 
     wrapper_info = {"name": "wrapper1", "status": str(Status.SUBMITTED), "job_list": "job1"}
     inner_jobs = [{"job_name": "job1", "package_name": "wrapper1", "package_id": 1}]
@@ -182,3 +187,34 @@ def test_reset_table(persistence, mock_db_manager, preview, expected_drops):
     drop_calls = [c[0][0] for c in mock_db_manager.drop_table.call_args_list]
     for table in expected_drops:
         assert table in drop_calls
+
+
+@pytest.mark.parametrize("preview", [False, True])
+def test_upsert_wrapper_info_does_not_insert_inner_jobs(
+        persistence, mock_db_manager, mock_engine, mocker, preview
+):
+    """Test upsert_wrapper_info does not call insert_many on inner jobs table."""
+    mock_warning = mocker.patch("autosubmit.job.job_package_persistence.Log.warning")
+    mock_bulk = mocker.patch.object(persistence, '_bulk_insert_inner_jobs')
+
+    wrapper_info_list = [
+        {"name": "w1", "status": str(Status.SUBMITTED)},
+        {"name": "w2", "status": str(Status.READY)},
+    ]
+
+    persistence.upsert_wrapper_info(wrapper_info_list, preview=preview)
+
+    mock_db_manager.insert_many.assert_not_called()
+    mock_bulk.assert_not_called()
+    mock_warning.assert_not_called()
+
+
+def test_upsert_wrapper_info_empty_list_returns_early(
+        persistence, mock_db_manager, mock_engine
+):
+    """Test upsert_wrapper_info with empty list does not touch the database."""
+    create_count_before = mock_db_manager.create_table.call_count
+
+    persistence.upsert_wrapper_info([], preview=False)
+
+    assert mock_db_manager.create_table.call_count == create_count_before

@@ -1767,7 +1767,6 @@ class Autosubmit:
             check_wrapper = True if datetime.timedelta.total_seconds(datetime.datetime.now(
             ) - wrapper_job.checked_time) >= check_wrapper_jobs_sleeptime else False
         if check_wrapper:
-            job_list.get_packages_persistence().reset_table(preview=True)
             Log.debug(f'Checking Wrapper {str(wrapper_job.id)}')
             wrapper_job.checked_time = datetime.datetime.now()
             save |= wrapper_job.check_and_update_status(as_conf)
@@ -4394,6 +4393,13 @@ class Autosubmit:
                         output = 'txt'
                     if output == 'txt':
                         noplot = False
+                    packages = None
+                    if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
+                        job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
+                        Autosubmit.generate_scripts_andor_wrappers(
+                            as_conf, job_list_wr, job_list_wr.get_job_list(), True)
+                        packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
+                        packages += JobPackagePersistence(expid).db_manager.select_all("preview_wrappers_jobs")
                     if not noplot:
                         from .monitor.monitor import Monitor
                         if group_by:
@@ -4406,15 +4412,6 @@ class Autosubmit:
                             job_grouping = JobGrouping(group_by, copy.deepcopy(job_list.get_job_list()), job_list,
                                                        expand_list=expand, expanded_status=status)
                             groups_dict = job_grouping.group_jobs()
-                        # WRAPPERS
-                        if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
-                            job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
-                            Autosubmit.generate_scripts_andor_wrappers(
-                                as_conf, job_list_wr, job_list_wr.get_job_list(), True)
-                            packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
-                            packages += JobPackagePersistence(expid).db_manager.select_all("preview_wrappers_jobs")
-                        else:
-                            packages = None
 
                         Log.info("\nPlotting the jobs list...")
                         monitor_exp = Monitor()

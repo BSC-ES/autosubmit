@@ -2895,8 +2895,10 @@ class JobList(object):
 
     def save_wrapper_info(self, wrapper_job):
         """Save wrapper job info to the database for all wrapper jobs in the job list."""
-        Log.info("Saving wrapper job info to the database...")
-        self.get_packages_persistence().save([self._wrapper_job_dict(wrapper_job)], preview=False)
+        if wrapper_job:
+            Log.info("Saving wrapper job info to the database...")
+            wrapper_info, _ = self._wrapper_job_dict(wrapper_job)
+            self.get_packages_persistence().upsert_wrapper_info([wrapper_info], preview=False)
 
     def assign_unique_fake_id(self, package: 'JobPackageThread') -> None:
         """Assign a unique negative fake ID to a package's first job for preview use.

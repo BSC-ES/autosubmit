@@ -133,9 +133,63 @@ class JobPackagePersistence:
                 ]
             self._upsert_wrapper_info(wrapper_info_table, updated_wrappers)
             try:
-                self.db_manager.insert_many(innerjobs_table.name, inner_jobs)
+                self._bulk_insert_inner_jobs(innerjobs_table, inner_jobs)
             except IntegrityError as e:
                 Log.warning(f"Unique constraint failed when inserting inner jobs: {e}")
+
+    def _bulk_insert_inner_jobs(
+            self, target_table: Table, inner_jobs: list[dict[str, Any]]
+    ) -> int:
+        """Insert inner jobs via a temporary table to avoid SQLite's bind-variable limit.
+
+        Each row is inserted individually into the temp table, then a single
+        ``INSERT INTO … SELECT …`` copies everything to the target.
+
+        :param target_table: The SQLAlchemy Table to insert into.
+        :param inner_jobs: List of dicts with the rows to insert.
+        :return: Number of rows inserted.
+        """
+        if not inner_jobs:
+            return 0
+        col_names = [col.name for col in target_table.columns]
+        target = (
+            f"{self.db_manager.schema}.{target_table.name}"
+            if self.db_manager.schema
+            else target_table.name
+        )
+        temp_name = f"_tmp_inner_jobs_{target_table.name}_{time.time_ns()}"
+        col_defs = ", ".join(
+            f'"{col.name}" {col.type}' for col in target_table.columns
+        )
+        col_list = ", ".join(f'"{name}"' for name in col_names)
+        placeholders = ", ".join(f":{name}" for name in col_names)
+
+        with self.db_manager.engine.connect() as conn:
+            try:
+                conn.execute(
+                    text(f"CREATE TEMPORARY TABLE {temp_name} ({col_defs})")
+                )
+                for row in inner_jobs:
+                    conn.execute(
+                        text(
+                            f"INSERT INTO {temp_name} ({col_list}) "
+                            f"VALUES ({placeholders})"
+                        ),
+                        row,
+                    )
+                result = conn.execute(
+                    text(
+                        f"INSERT INTO {target} ({col_list}) "
+                        f"SELECT {col_list} FROM {temp_name}"
+                    )
+                )
+                conn.commit()
+                return result.rowcount
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.execute(text(f"DROP TABLE IF EXISTS {temp_name}"))
 
     @contextmanager
     def _names_tmp_table(
@@ -230,6 +284,30 @@ class JobPackagePersistence:
                 rows = conn.execute(base_query).all()
         return [dict(zip(col_names, row)) for row in rows]
 
+    def upsert_wrapper_info(
+            self,
+            wrapper_info_list: List[dict[str, Any]],
+            preview: bool = False,
+    ) -> None:
+        """Upsert wrapper-info records without modifying inner jobs.
+
+        :param wrapper_info_list: List of wrapper-info dicts to upsert.
+        :param preview: If True, persist to preview tables; otherwise to production tables.
+        """
+        if not wrapper_info_list:
+            return
+        if preview:
+            wrapper_info_table = self.table_registry.get(PreviewWrapperInfoTable.name)
+        else:
+            wrapper_info_table = self.table_registry.get(WrapperInfoTable.name)
+
+        self.db_manager.create_table(wrapper_info_table.name)
+        updated_wrappers = [
+            {**wi, 'status': Status.VALUE_TO_KEY[int(wi['status'])]}
+            for wi in wrapper_info_list
+        ]
+        self._upsert_wrapper_info(wrapper_info_table, updated_wrappers)
+
     def _upsert_wrapper_info(
             self, table: Table, records: list[dict[str, Any]]
     ) -> None:
@@ -251,6 +329,10 @@ class JobPackagePersistence:
         if not preview:
             self.db_manager.drop_table(WrapperInfoTable.name)
             self.db_manager.drop_table(WrapperJobsTable.name)
+            self.db_manager.create_table(WrapperInfoTable.name)
+            self.db_manager.create_table(WrapperJobsTable.name)
         else:
             self.db_manager.drop_table(PreviewWrapperInfoTable.name)
             self.db_manager.drop_table(PreviewWrapperJobsTable.name)
+            self.db_manager.create_table(PreviewWrapperInfoTable.name)
+            self.db_manager.create_table(PreviewWrapperJobsTable.name)
