@@ -782,11 +782,11 @@ CONFIG:
             ("day", "year", None, None),
             ("month", "hour", 744, 372),
             ("month", "day", 31, 16),
-            ("month", "month", 2, None),
+            ("month", "month", 1, None),
             ("month", "year", None, None),
             ("year", "hour", 8784, 4392),
             ("year", "day", 366, 183),
-            ("year", "month", 13, 7),
+            ("year", "month", 12, 6),
             ("year", "year", 1, None),
         ],
     )
