@@ -2917,15 +2917,15 @@ class JobList(object):
 
         :param preview: If True, load from the preview tables.
         """
-        un_mapped_wrapper_info, un_mapped_inner_jobs = self.get_packages_persistence().load(preview, self._job_list)
+        unmapped_wrapper_info, unmapped_inner_jobs = self.get_packages_persistence().load(preview, self._job_list)
 
         # Build a dictionary of wrapper info indexed by wrapper name.
         wrappers_info: dict[str, dict] = {
-            dict(wrapper)['name']: dict(wrapper) for wrapper in un_mapped_wrapper_info
+            dict(wrapper)['name']: dict(wrapper) for wrapper in unmapped_wrapper_info
         }
         # Group inner jobs by package name.
         inner_jobs_by_package: dict[str, list] = {}
-        for job in un_mapped_inner_jobs:
+        for job in unmapped_inner_jobs:
             inner_jobs_by_package.setdefault(job['package_name'], []).append(job['job_name'])
 
         # Attach job objects to each wrapper's job list and update packages_dict.

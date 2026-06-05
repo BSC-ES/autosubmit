@@ -1354,20 +1354,6 @@ class Job(object):
         self.write_start_time(fail_count=attempt)
         self.write_end_time(self.status == Status.COMPLETED, attempt)
 
-    @staticmethod
-    def _is_datetime(value: str) -> bool:
-        """Check if a given string value can be parsed as a datetime object.
-
-        :param value: The string value to check.
-        :type value: str
-        :return: True if the value can be parsed as a datetime, False otherwise.
-        :rtype: bool
-        """
-        try:
-            datetime.datetime.strptime(value, "%Y%m%d%H%M%S")
-            return True
-        except ValueError:
-            return False
 
     def retrieve_logfiles(self) -> RecoveryReport:
         """Retrieves log files from the remote host for all pending attempts.

@@ -2314,14 +2314,6 @@ def test_datestr_to_epoch():
     assert result == expected
 
 
-@pytest.mark.parametrize("value,expected", [
-    ("20250101120000", True),
-    ("invalid", False),
-    ("", False),
-])
-def test_is_datetime(value, expected):
-    assert Job._is_datetime(value) == expected
-
 
 def test_update_submit_time_on_db(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)

@@ -35,7 +35,6 @@ if TYPE_CHECKING:
 
 # -- Tests
 
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.ssh
 @pytest.mark.parametrize(
@@ -124,7 +123,7 @@ def test_run_uninterrupted(
         pytest.fail(e_msg)
 
 
-@pytest.mark.xdist_group("slurm")
+
 @pytest.mark.docker
 @pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [

@@ -927,9 +927,16 @@ class ParamikoPlatform(Platform):
 
         output = self._ssh_output
         for line in output.splitlines():
-            current_path = line.split(":")[0].strip()
-            job: "Job" = file_to_job.get(current_path)
-            status = line.split(":")[1].strip().strip('"')
+            parts = line.split(":", 1)
+            if len(parts) != 2:
+                Log.debug(f"Unexpected STAT output line (no separator): {line}")
+                continue
+            current_path = parts[0].strip()
+            job = file_to_job.get(current_path)
+            if not job:
+                Log.debug(f"STAT file path did not match any job: {current_path}")
+                continue
+            status = parts[1].strip().strip('"')
             result[job] = self._resolve_status(status)
 
         return result
@@ -1258,8 +1265,7 @@ class ParamikoPlatform(Platform):
         :type timeout: int
         :return: the stdin, stdout, and stderr of the executing command
         """
-        retry = 0
-        while retry < retries:
+        for retry in range(retries):
             Log.debug(f'Executing command {command}, retry #{retry + 1} out of {retries}')
             try:
                 chan: Channel = self.transport.open_session()
@@ -1303,7 +1309,6 @@ class ParamikoPlatform(Platform):
                 #        earlier...).
                 #        https://github.com/BSC-ES/autosubmit/issues/2439
                 # chan.settimeout(timeout)
-            retry += 1
 
         return False, False, False
 

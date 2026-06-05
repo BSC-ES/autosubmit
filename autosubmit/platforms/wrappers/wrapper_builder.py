@@ -148,7 +148,7 @@ class PythonWrapperBuilder(WrapperBuilder):
         return textwrap.dedent(f"""
         import os
         import sys
-        #from bscearth.utils.date import date2str 
+        #from bscearth.utils.date import date2str
         from threading import Thread
         from subprocess import getstatusoutput
         from datetime import datetime
@@ -176,6 +176,7 @@ class PythonWrapperBuilder(WrapperBuilder):
 
     def build_wrapper_stat(self) -> str:
         """Return a code snippet that records wrapper start time and registers an atexit handler."""
+        # TODO: move atexit to def build_import
         return textwrap.dedent(f"""
         import atexit
         stat_file = os.path.join(os.getcwd(), f"{self.name}_STAT_{self.fail_count}")
@@ -201,7 +202,7 @@ class PythonWrapperBuilder(WrapperBuilder):
                 self.template = str(template)
                 self.id_run = id_run
                 self.fail_count = {self.fail_count}
-                
+
             def run(self):
                 jobname = self.template.replace('.cmd', '')
                 out = f"{self.working_dir}/{{self.template}}.out.{{self.fail_count}}"
@@ -311,7 +312,7 @@ processors_per_node = int(jobs_resources['PROCESSORS_PER_NODE'])
         {self._create_components_dict()}
 
         machines = str()
-        for component, cores in jobs_resources[section]['COMPONENTS'].items():        
+        for component, cores in jobs_resources[section]['COMPONENTS'].items():
             while cores > 0:
                 if len(all_cores) > 0:
                     node = all_cores.pop(0)
@@ -520,7 +521,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
         failed_wrapper = os.path.join(os.getcwd(),wrapper_id)
         retrials = {self.retrials}
         total_steps = 0
-        try: 
+        try:
             print("JOB.ID:"+ os.getenv('SLURM_JOBID'))
         except:
             print("JOB.ID")
@@ -556,7 +557,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
             {os.linesep.ljust(13)}"""), 8)
             sequential_threads_launcher += self._indent(textwrap.dedent(f"""
             from pathlib import Path
-            fail_count = 0 
+            fail_count = 0
             while fail_count <= job_retrials:
                 fail_count = fail_count + 1
             if not os.path.exists(completed_path):
@@ -906,7 +907,7 @@ processors_per_node = int(jobs_resources['PROCESSORS_PER_NODE'])
         {self._create_components_dict()}
 
         machines = str()
-        for component, cores in jobs_resources[section]['COMPONENTS'].items():        
+        for component, cores in jobs_resources[section]['COMPONENTS'].items():
             while cores > 0:
                 if len(all_cores) > 0:
                     node = all_cores.pop(0)
@@ -957,7 +958,7 @@ class SrunHorizontalWrapperBuilder(SrunWrapperBuilder):
         suffix=".cmd"
         for template in "${{{jobs_list}[@]}}"; do
             jobname=${{template%"$suffix"}}
-            out="${{template}}.out" 
+            out="${{template}}.out"
             err="${{template}}.err"
             srun --ntasks=1 --cpus-per-task={self.threads} $template > $out 2> $err &
             sleep "0.2"
@@ -976,7 +977,7 @@ class SrunHorizontalWrapperBuilder(SrunWrapperBuilder):
             then
                 echo "`date '+%d/%m/%Y_%H:%M:%S'` $template has been COMPLETED"
             else
-                echo "`date '+%d/%m/%Y_%H:%M:%S'` $template has FAILED" 
+                echo "`date '+%d/%m/%Y_%H:%M:%S'` $template has FAILED"
             fi
         done
             {os.linesep.ljust(13)}"""), 0)

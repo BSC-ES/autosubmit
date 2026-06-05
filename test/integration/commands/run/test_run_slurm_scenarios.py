@@ -39,7 +39,6 @@ if TYPE_CHECKING:
 # -- Tests
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
@@ -918,7 +917,6 @@ _MULTIPLE_VERTICAL_WRAPPERS_IDS = [
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.parametrize(
@@ -975,7 +973,6 @@ def test_run_uninterrupted_multiple_vertical_wrappers(
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.parametrize(
@@ -1420,7 +1417,6 @@ _DESTINE_LIKE_IDS = [
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.parametrize(
@@ -1482,7 +1478,6 @@ def test_run_interrupted_destine_like(
 
 
 @pytest.mark.docker
-@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.parametrize(

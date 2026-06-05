@@ -3018,7 +3018,7 @@ class Autosubmit:
                     Log.warning(f"Platform {p.name} is not reachable")
             if not all_connected:
                 raise AutosubmitCritical(
-                    "Some platforms are not reachable, cannot proceed with forced recovery. You can add --offline with -f to don't cancel jobs",
+                    "You can use --offline and -f to avoid cancelling jobs",
                     7050)
         # TODO: https://github.com/BSC-ES/autosubmit/issues/1251 don't need force flag
         if save:
