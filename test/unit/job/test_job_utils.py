@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from datetime import datetime
 from typing import Any, Callable, Dict, List
 
 import pytest
@@ -22,7 +23,7 @@ import pytest
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_utils import cancel_jobs, get_split_size_unit
+from autosubmit.job.job_utils import calendar_chunk_section, cancel_jobs, get_split_size_unit
 from autosubmit.log.log import AutosubmitCritical
 
 """Tests for ``autosubmit.job.job_utils``."""
@@ -165,3 +166,91 @@ def test_cancel_jobs(create_job_list):
 )
 def test_get_split_size_unit(data, result):
     assert get_split_size_unit(data, 'TEST') == result
+
+
+@pytest.mark.parametrize(
+    # if chunksizeunit is hour, raises error
+    # if splitsizeunit is bigger than chunksizeunit, raises error
+    # TEST CASE CALCULATIONS:
+    # date = 2000-01-01, chunk lenght is 1
+    # for day chunk_size_unit, run_days = 1
+    # for month chunk_size_unit (jan 2000), run_days = 31
+    # for year chunk_size_unit (2000), run_days = 366 (leap year)
+    # So:
+    # day + hour -> 1 x 24 = 24
+    # day + day -> ceil(1 / 1) = 1
+    # month + hour -> 31 x 24 = 744
+    # month + day -> ceil(31 / 1) = 31
+    # month + month -> ceil(31 / 30) = 2
+    # month + year -> ceil(31 / 366) = 1
+    # year + hour -> 366 x 24 = 8784
+    # year + day -> ceil(366 / 1) = 366
+    # year + month -> ceil(366 / 30) = 13
+    # year + year -> ceil(366 / 366) = 1
+    "chunk_size_unit, split_size_unit, expected_splits_A, expected_splits_B",
+    [
+        ("hour", "hour", None, None),
+        ("hour", "day", None, None),
+        ("hour", "month", None, None),
+        ("hour", "year", None, None),
+        ("day", "hour", 24, 12),
+        ("day", "day", 1, None),
+        ("day", "month", None, None),
+        ("day", "year", None, None),
+        ("month", "hour", 744, 372),
+        ("month", "day", 31, 16),
+        ("month", "month", 1, None),
+        ("month", "year", None, None),
+        ("year", "hour", 8784, 4392),
+        ("year", "day", 366, 183),
+        ("year", "month", 12, 6),
+        ("year", "year", 1, None),
+    ],
+)
+def test_calendar_chunk_section(
+    chunk_size_unit, split_size_unit, expected_splits_A, expected_splits_B
+):
+    """Test the calendar_chunk_section function for different chunk size units and split units."""
+    experiment_data = {
+        "EXPERIMENT": {
+            "DATELIST": "20000101",
+            "MEMBERS": "fc0",
+            "CHUNKSIZEUNIT": chunk_size_unit,
+            "CHUNKSIZE": "1",
+            "NUMCHUNKS": "2",
+            "CALENDAR": "standard",
+        },
+        "JOBS": {
+            "A": {
+                "FILE": "a",
+                "PLATFORM": "test",
+                "RUNNING": "chunk",
+                "SPLITS": "auto",
+                "SPLITSIZE": 1,
+                "SPLITSIZEUNIT": split_size_unit,
+            },
+            "B": {
+                "FILE": "b",
+                "PLATFORM": "test",
+                "RUNNING": "chunk",
+                "SPLITS": "auto",
+                "SPLITSIZE": 2,
+                "SPLITSIZEUNIT": split_size_unit,
+            },
+        },
+    }
+    date = datetime.strptime("20000101", "%Y%m%d")
+    chunk = 1
+    if expected_splits_A is None:
+        with pytest.raises(AutosubmitCritical):
+            calendar_chunk_section(experiment_data, "A", date, chunk)
+    else:
+        splits_A = calendar_chunk_section(experiment_data, "A", date, chunk)
+        assert splits_A == expected_splits_A
+
+    if expected_splits_B is None:
+        with pytest.raises(AutosubmitCritical):
+            calendar_chunk_section(experiment_data, "B", date, chunk)
+    else:
+        splits_B = calendar_chunk_section(experiment_data, "B", date, chunk)
+        assert splits_B == expected_splits_B
