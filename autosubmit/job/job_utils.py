@@ -148,7 +148,9 @@ def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
     return split_size_in_hours <= chunk_size_in_hours
 
 
-def _validate_calendar_inputs(cal: str, chunk_unit: str, split_unit: str, split_policy: str) -> None:
+def _validate_calendar_inputs(
+    cal: str, chunk_unit: str, split_unit: str, split_policy: str
+) -> None:
     """
     Validate the calendar inputs
     :param cal: Calendar type
@@ -214,7 +216,9 @@ def _count_units_between_dates(start_date, end_date, unit, cal) -> float:
             month_end = min(end_date, next_month)
             days_covered = float((month_end - month_start).days)
             if days_covered > 0:
-                total += days_covered / calendar_get_month_days(f"{current.year:04d}{current.month:02d}01")
+                total += days_covered / calendar_get_month_days(
+                    f"{current.year:04d}{current.month:02d}01"
+                )
             current = next_month
         return total
     elif unit == "year":
