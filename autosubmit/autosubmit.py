@@ -2408,7 +2408,7 @@ class Autosubmit:
                         job_list.get_completed_failed_without_logs()) > 0:  # Revise if there is any log unrecovered from previous run
                     Log.info("Connecting to the platforms, to recover missing logs")
                     submitter = ParamikoSubmitter(as_conf=as_conf)
-                    if submitter.platforms is None:
+                    if not submitter.platforms:
                         Log.error("Failed to retrieve platforms configuration from ParamikoSubmitter.")
                         raise AutosubmitCritical("No platforms configured!!!", 7014)
                     platforms_to_test = [value for value in submitter.platforms.values()]
@@ -3466,7 +3466,7 @@ class Autosubmit:
                     branch = "Not Found"
 
                 submitter = ParamikoSubmitter(as_conf=as_conf)
-                if not submitter.platforms:
+                if len(submitter.platforms) == 0:
                     return False
                 hpc = as_conf.get_platform()
                 description = get_experiment_description(experiment_id)

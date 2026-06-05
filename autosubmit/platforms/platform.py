@@ -34,7 +34,7 @@ import setproctitle
 
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log
+from autosubmit.log.log import Log, AutosubmitCritical
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -97,7 +97,7 @@ class CopyQueue(Queue):
     A queue that copies the object gathered.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: Optional[float] = None, ctx: Any = None) -> None:
         """Initializes the Queue.
 
         :param maxsize: Maximum size of the queue. Defaults to -1 (infinite size).
@@ -164,8 +164,10 @@ class Platform:
         self._partition = None
         self.ec_queue = "hpc"
         self.processors_per_node = None
-        self.scratch_free_space = None
-        self.custom_directives = None
+        self.scratch_free_space: Optional[str] = None
+        self.custom_directives: Optional[dict] = None
+        self.shape: Optional[str] = None
+        self._version: Optional[int] = None
         self._host = ''
         self._user = ''
         self._project = ''
@@ -202,7 +204,7 @@ class Platform:
         self.two_factor_method = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
         if auth_password is not None and self.two_factor_auth:
             if isinstance(auth_password, list):
-                self.pw = auth_password[0]
+                self.pw: Optional[str] = auth_password[0]
             else:
                 self.pw = auth_password
         else:
@@ -232,7 +234,7 @@ class Platform:
             self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
 
         self.log_queue_size = log_queue_size
-        self.remote_log_dir = None
+        self.remote_log_dir: str = ""
         self.has_scheduler = True
 
     @classmethod
@@ -727,9 +729,10 @@ class Platform:
             filename = f"{job.stat_file}{job.fail_count}"
         else:
             filename = f'{job.name}_STAT_{str(count)}'
-        stat_local_path = os.path.join(
-            self.config.get("LOCAL_ROOT_DIR"), self.expid, self.config.get("LOCAL_TMP_DIR"), filename)
-        if os.path.exists(stat_local_path):
+        stat_local_path = (Path(
+            self.config.get("LOCAL_ROOT_DIR", ""),self.expid,
+            self.config.get("LOCAL_TMP_DIR", ""), filename))
+        if stat_local_path.exists():
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
@@ -749,7 +752,7 @@ class Platform:
         :rtype: str
         """
         if self.type == "local":
-            path = Path(self.root_dir) / self.config.get("LOCAL_TMP_DIR") / f'LOG_{self.expid}'
+            path = Path(self.root_dir, self.config.get("LOCAL_TMP_DIR", ""), f'LOG_{self.expid}')
         else:
             path = Path(self.remote_log_dir)
         return str(path)
@@ -994,6 +997,9 @@ class Platform:
         for _ in range(0, sleep_time, 5):
             time.sleep(5)
             try:
+                if self.work_event is None or self.recovery_queue is None or self.cleanup_event is None:
+                    raise AutosubmitCritical("An issue occurred in which some of the values "
+                                             "were not properly initialized")
                 if self.work_event.is_set() or not self.recovery_queue.empty() or self.cleanup_event.is_set():
                     process_log = True
                     break
@@ -1014,7 +1020,8 @@ class Platform:
         process_log = self.wait_mandatory_time(sleep_time)
         if not process_log:
             process_log = self.wait_mandatory_time(self.keep_alive_timeout - sleep_time)
-        self.work_event.clear()
+        if self.work_event is not None:
+            self.work_event.clear()
         return process_log
 
     def recover_job_log(self, identifier: str, jobs_pending_to_process: set[Any],
@@ -1026,6 +1033,9 @@ class Platform:
         :param as_conf: The Autosubmit configuration object containing experiment data.
         :return: Updated set of jobs pending to process.
         """
+        if self.recovery_queue is None:
+            raise AutosubmitCritical("As the recovery job was initialized some of"
+                                     "the variable were not properly initialized")
         while not self.recovery_queue.empty():
             try:
                 from autosubmit.job.job import Job
@@ -1085,7 +1095,7 @@ class Platform:
             self.keep_alive_timeout = max(log_recovery_timeout * 5, 60 * 5)
             while self.wait_for_work(sleep_time=max(log_recovery_timeout, 60)):
                 jobs_pending_to_process = self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
-                if self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
+                if self.cleanup_event is not None and self.cleanup_event.is_set():  # Check if the main process is waiting for this child to end.
                     self.recover_job_log(identifier, jobs_pending_to_process, as_conf)
                     break
         except Exception as e:
@@ -1110,7 +1120,7 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: Optional[int] = None) -> Union[bytes, None]:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path
@@ -1139,3 +1149,4 @@ class Platform:
         :param job_names: List of job names to check. If None, all jobs will be checked.
         :return: List of completed job names.
         """
+        raise NotImplementedError  # pragma: no cover

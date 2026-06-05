@@ -2848,7 +2848,8 @@ class JobList(object):
         except Exception as exp:
             Log.warning(str(exp))
 
-    def save_wrappers(self, submitted_scripts: dict, as_conf: AutosubmitConfig, packages_persistence: JobPackagePersistence,
+    def save_wrappers(self, submitted_scripts: dict, as_conf: AutosubmitConfig,
+                      packages_persistence: JobPackagePersistence,
                       inspect: bool = False):
         """Saves the wrapper jobs in the job list and the packages dict.
 
@@ -3203,9 +3204,9 @@ class JobList(object):
         energy = 0
         seconds_queued = 0
         seconds_running = 0
-        submit_time = datetime.timedelta()
-        start_time = datetime.timedelta()
-        finish_time = datetime.timedelta()
+        submit_time: datetime.timedelta = datetime.timedelta()
+        start_time: datetime.timedelta = datetime.timedelta()
+        finish_time: datetime.timedelta = datetime.timedelta()
 
         try:
             # Getting data from new job database

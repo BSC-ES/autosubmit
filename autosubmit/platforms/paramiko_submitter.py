@@ -17,10 +17,9 @@
 
 """Code for handling submitting jobs to platforms."""
 
-
 import os
 from collections import defaultdict
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
@@ -112,8 +111,8 @@ class ParamikoSubmitter:
     """Class to manage the experiments Paramiko platforms."""
 
     def __init__(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
-                       local_auth_password=None):
-        self.platforms: Optional[dict[str, 'ParamikoPlatform']] = None
+                 local_auth_password=None):
+        self.platforms: dict[str, 'ParamikoPlatform'] = {}
         self.load_platforms(as_conf=as_conf, auth_password=auth_password, local_auth_password=local_auth_password)
 
     def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: Optional[dict] = None,
@@ -146,13 +145,13 @@ class ParamikoSubmitter:
     def load_platforms(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
                        local_auth_password=None) -> None:
         """Create all the platform's object that will be used by the experiment."""
-        exp_data: dict = as_conf.experiment_data
-        platforms_used: set[str] = _get_platforms_used(
+        exp_data = as_conf.experiment_data
+        platforms_used = _get_platforms_used(
             hpcarch=as_conf.get_platform(),
             jobs_data=exp_data.get('JOBS', {})
         )
-        platforms_data: dict = exp_data.get('PLATFORMS', {})
-        platforms_serial_in_parallel: dict[str, list] = _get_serial_platforms(
+        platforms_data = exp_data.get('PLATFORMS', {})
+        platforms_serial_in_parallel = _get_serial_platforms(
             platforms_used=platforms_used,
             platforms_data=platforms_data
         )
@@ -186,8 +185,7 @@ class ParamikoSubmitter:
             remote_platform._version = platform_version
 
             # Concatenating the host with a project and adding to the object
-            add_project_to_host: Union[str, bool] = section_platform.get('ADD_PROJECT_TO_HOST', False)
-            add_project_to_host: bool = str(add_project_to_host).lower() != "false"
+            add_project_to_host = str(section_platform.get('ADD_PROJECT_TO_HOST', False)).lower() != "false"
             section_project = section_platform.get('PROJECT', "")
             section_host = section_platform.get('HOST', "")
             remote_platform.host = _get_host(section_host, add_project_to_host, section_project)
