@@ -140,10 +140,7 @@ class JobPackagePersistence:
     def _bulk_insert_inner_jobs(
             self, target_table: Table, inner_jobs: list[dict[str, Any]]
     ) -> int:
-        """Insert inner jobs via a temporary table to avoid SQLite's bind-variable limit.
-
-        Each row is inserted individually into the temp table, then a single
-        ``INSERT INTO … SELECT …`` copies everything to the target.
+        """Insert inner jobs in chunked batches to stay under SQLite's 999 bind-variable limit.
 
         :param target_table: The SQLAlchemy Table to insert into.
         :param inner_jobs: List of dicts with the rows to insert.
@@ -152,44 +149,15 @@ class JobPackagePersistence:
         if not inner_jobs:
             return 0
         col_names = [col.name for col in target_table.columns]
-        target = (
-            f"{self.db_manager.schema}.{target_table.name}"
-            if self.db_manager.schema
-            else target_table.name
-        )
-        temp_name = f"_tmp_inner_jobs_{target_table.name}_{time.time_ns()}"
-        col_defs = ", ".join(
-            f'"{col.name}" {col.type}' for col in target_table.columns
-        )
-        col_list = ", ".join(f'"{name}"' for name in col_names)
-        placeholders = ", ".join(f":{name}" for name in col_names)
+        binds_per_row = len(col_names)
+        chunk_size = 900 // max(binds_per_row, 1)
 
         with self.db_manager.engine.connect() as conn:
-            try:
-                conn.execute(
-                    text(f"CREATE TEMPORARY TABLE {temp_name} ({col_defs})")
-                )
-                for row in inner_jobs:
-                    conn.execute(
-                        text(
-                            f"INSERT INTO {temp_name} ({col_list}) "
-                            f"VALUES ({placeholders})"
-                        ),
-                        row,
-                    )
-                result = conn.execute(
-                    text(
-                        f"INSERT INTO {target} ({col_list}) "
-                        f"SELECT {col_list} FROM {temp_name}"
-                    )
-                )
-                conn.commit()
-                return result.rowcount
-            except Exception:
-                conn.rollback()
-                raise
-            finally:
-                conn.execute(text(f"DROP TABLE IF EXISTS {temp_name}"))
+            for i in range(0, len(inner_jobs), chunk_size):
+                chunk = inner_jobs[i:i + chunk_size]
+                conn.execute(insert(target_table), chunk)
+            conn.commit()
+        return len(inner_jobs)
 
     @contextmanager
     def _names_tmp_table(

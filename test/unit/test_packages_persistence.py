@@ -218,3 +218,37 @@ def test_upsert_wrapper_info_empty_list_returns_early(
     persistence.upsert_wrapper_info([], preview=False)
 
     assert mock_db_manager.create_table.call_count == create_count_before
+
+
+def test_bulk_insert_inner_jobs_empty_list(persistence, mock_engine):
+    """_bulk_insert_inner_jobs must return 0 for empty list without touching DB."""
+    from autosubmit.database.tables import WrapperJobsTable
+
+    table = persistence.table_registry.get(WrapperJobsTable.name)
+    calls_before = mock_engine.execute.call_count
+
+    result = persistence._bulk_insert_inner_jobs(table, [])
+
+    assert result == 0
+    assert mock_engine.execute.call_count == calls_before
+
+
+def test_bulk_insert_inner_jobs_chunks_above_limit(persistence, mock_engine):
+    """_bulk_insert_inner_jobs must batch inserts into chunks under 999 binds.
+
+    500 rows × 4 columns → chunk_size = 900 // 4 = 225 → 3 batches.
+    """
+    from autosubmit.database.tables import WrapperJobsTable
+
+    table = persistence.table_registry.get(WrapperJobsTable.name)
+    inner_jobs = [
+        {"package_id": 1, "package_name": "p1", "job_name": f"job_{i}", "timestamp": "t"}
+        for i in range(500)
+    ]
+    calls_before = mock_engine.execute.call_count
+
+    result = persistence._bulk_insert_inner_jobs(table, inner_jobs)
+
+    assert result == 500
+    # 500 / 225 = 2.22, ceil = 3 execute calls
+    assert mock_engine.execute.call_count - calls_before == 3
