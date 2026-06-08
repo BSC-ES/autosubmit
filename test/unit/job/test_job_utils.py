@@ -28,6 +28,7 @@ from autosubmit.job.job_utils import (
     calendar_get_month_days,
     _validate_calendar_inputs,
     _count_units_between_dates,
+    calendar_unitsize_getlowersize,
     cancel_jobs,
     get_split_size_unit,
 )
@@ -207,6 +208,13 @@ def test_month_days(date_str, cal, expected_days):
 def test_default_calendar_is_standard():
     """Default calendar should behave as the standard calendar."""
     assert calendar_get_month_days("20000201") == 29 # 2000 is a leap year
+
+
+
+def test_calendar_unitsize_getlowersize_raises():
+    """Test that an invalid unit raises AutosubmitCritical."""
+    with pytest.raises(AutosubmitCritical):
+        calendar_unitsize_getlowersize("invalid")
 
 
 def test_validate_inputs_not_raise():
