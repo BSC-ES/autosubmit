@@ -23,7 +23,7 @@ import subprocess
 from pathlib import Path
 from shutil import rmtree
 from time import time
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -175,7 +175,7 @@ class AutosubmitGit:
         git_remote_project_path = as_conf.get_git_remote_project_root()
 
         git_project_commit = as_conf.get_git_project_commit()
-        git_project_submodules: Union[False, List[str]] = as_conf.get_submodules_list()
+        git_project_submodules: Union[list[str], bool] = as_conf.get_submodules_list()
         git_project_submodules_depth = as_conf.get_project_submodules_depth()
         max_depth = -1
         if len(git_project_submodules_depth) > 0:

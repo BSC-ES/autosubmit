@@ -389,6 +389,7 @@ def test_generate_output_unexpected_error(error_msg: str, mocker):
 )
 def test_generate_output_txt(jobs: list[Job], classictxt: bool, status_dir_exists: bool, has_joblist: bool,
                              expected_text: str, expected_lines_count: int, tmp_path, autosubmit_config, mocker):
+    """Test that writing the output txt file works as expected."""
     time_str = 20250429_1200
     mocker.patch('autosubmit.monitor.monitor.time.strftime', return_value=time_str)
 
@@ -414,6 +415,59 @@ def test_generate_output_txt(jobs: list[Job], classictxt: bool, status_dir_exist
     status_file_content = status_file.read_text()
     assert len(status_file_content.split('\n')) == expected_lines_count
     assert expected_text in status_file_content
+
+
+@pytest.mark.parametrize(
+    "status",
+    [Status.FAILED, Status.COMPLETED, Status.RUNNING],
+    ids=["failed job", "completed job", "running job"],
+)
+def test_log_paths_in_outptut_txt(status, tmp_path, autosubmit_config, mocker):
+    """Test that the log paths are correctly written in the output txt file."""
+    out_filename = f"{_EXPID}_ONLY_JOB.20250429120010.out"
+    err_filename = f"{_EXPID}_ONLY_JOB.20250429120010.err"
+    time_str = "20250429_120010"
+    mocker.patch("autosubmit.monitor.monitor.time.strftime", return_value=time_str)
+
+    as_conf = autosubmit_config(_EXPID, experiment_data={})
+    exp_root = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID)
+    expected_log_root = exp_root / as_conf.basic_config.LOCAL_TMP_DIR / f"LOG_{_EXPID}"
+
+    # Create the log directory and log files
+    expected_log_root.mkdir(parents=True, exist_ok=True)
+    (expected_log_root / out_filename).touch()
+    (expected_log_root / err_filename).touch()
+
+    # Create the status directory and the expected output txt file
+    status_path = exp_root / "status"
+    status_path.mkdir(parents=True, exist_ok=True)
+    status_file = status_path / f"{_EXPID}_{time_str}.txt"
+
+    # Create a job with the status and local_logs
+    job = Job(f"{_EXPID}_ONLY_JOB", 1, status)
+    job.local_logs = (out_filename, err_filename)
+
+    monitor = Monitor()
+    monitor.generate_output_txt(
+        _EXPID,
+        joblist=[job],
+        path=str(expected_log_root),
+        classictxt=True,
+        job_list_object=None,
+    )
+
+    # Assert
+    assert status_file.exists()
+    content = status_file.read_text()
+
+    if status in [Status.FAILED, Status.COMPLETED]:
+        expected_line = (
+            f"{job.name} {Status.VALUE_TO_KEY[status]} "
+            f"{expected_log_root / out_filename} {expected_log_root / err_filename}\n"
+        )
+        assert content == expected_line
+    else:
+        assert f"{job.name} {Status.VALUE_TO_KEY[status]}  \n" in content
 
 
 def test_generate_output_txt_job_with_children(tmp_path, autosubmit_config, mocker):

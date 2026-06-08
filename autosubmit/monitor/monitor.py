@@ -567,10 +567,10 @@ class Monitor:
                     if job.status in [Status.FAILED, Status.COMPLETED]:
                         if type(job.local_logs) is not tuple:
                             job.local_logs = ("", "")
-                        log_out = path + "/" + job.local_logs[0]
-                        log_err = path + "/" + job.local_logs[1]
+                        log_out = str(Path(path) / job.local_logs[0]) if job.local_logs[0] else ""
+                        log_err = str(Path(path) / job.local_logs[1]) if job.local_logs[1] else ""
 
-                    output = f'{job.name} {Status.VALUE_TO_KEY[job.status]} {log_out} {log_err} \n'
+                    output = f'{job.name} {Status.VALUE_TO_KEY[job.status]} {log_out} {log_err}\n'
                     output_file.write(output)
             else:
                 # Replaced call to function for a call to the function of the object that

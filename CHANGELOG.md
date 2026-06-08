@@ -20,11 +20,14 @@
 - Fixed recovery and setstatus for experiments with more than > 32k jobs #2894
 - Removed invalid message about the template script showing the error with a difference of ~5 lines #2962
 - Fix queuing time for the first vertical job
+- Fixes Split-dependencies #2958
 - Fixes an issue with `setstatus` calling to hardcoded platform code #2919
 - Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
 - Fixed `autosubmit stats` command that was not considering parameters defined in the platform, like NODES, TASKS, etc. #2978
 - Fixed infinite loop in experiments using wrappers on MN5 #2985
 - Fixed wrapper deadlock when minimum limits are not reached #2469
+- Fixes 1-N grouped split dependencies #2958
+- Fixed inconsistent log paths in status txt output #3040
 
 **Enhancements:**
 
@@ -57,6 +60,8 @@
 - Added batch canceling to the `setstatus` command #2919
 - verbosity adjusted #2976
 - Implement filters for `recovery` command #2923
+- Enchanced previous to accept previous-N #2971
+- Enchanced splits_to previous keyword to accept previous-N #2958
 - Add detection of inneficiencies for key CPMIP metrics #3022
 - Allow multiple filters in the `monitor` command #3020
 - Allow multiple filters in the `inspect` command #3029
