@@ -150,7 +150,7 @@ class JobPackagePersistence:
             return 0
         col_names = [col.name for col in target_table.columns]
         binds_per_row = len(col_names)
-        chunk_size = 900 // max(binds_per_row, 1)
+        chunk_size = max(1, 900 // max(binds_per_row, 1))
 
         with self.db_manager.engine.connect() as conn:
             for i in range(0, len(inner_jobs), chunk_size):
@@ -179,7 +179,6 @@ class JobPackagePersistence:
             conn.execute(text(
                 f"CREATE TEMPORARY TABLE IF NOT EXISTS {table_name} ({column} TEXT)"
             ))
-            conn.execute(text(f"DELETE FROM {table_name}"))
             conn.execute(
                 text(f"INSERT INTO {table_name} ({column}) VALUES (:value)"),
                 [{"value": n} for n in names],

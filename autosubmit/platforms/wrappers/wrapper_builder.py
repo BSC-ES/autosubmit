@@ -177,7 +177,7 @@ class PythonWrapperBuilder(WrapperBuilder):
     def build_wrapper_stat(self) -> str:
         """Return a code snippet that records wrapper start time and registers an atexit handler."""
         # TODO: move atexit to def build_import
-        return textwrap.dedent(f"""
+        return textwrap.dedent(f"""\
         import atexit
         stat_file = os.path.join(os.getcwd(), f"{self.name}_STAT_{self.fail_count}")
         with open(stat_file, 'w') as stat:

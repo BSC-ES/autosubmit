@@ -2869,8 +2869,7 @@ class Job(object):
             thread_write_finish.start()
 
     def _get_submit_data_dc_from_db(self, attempt: int):
-        """
-        Retrieve submit data from the experiment history database for a given attempt.
+        """Retrieve submit data from the experiment history database for a given attempt.
 
         :param attempt: The attempt (fail_count) to look up.
         :type attempt: int
