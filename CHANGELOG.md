@@ -23,6 +23,8 @@
 - Fixes an issue with `setstatus` calling to hardcoded platform code #2919
 - Fixes an issue with SUSPENDED parents being ignored when STATUS: RUNNING is set in the dependencies #2960
 - Fixed `autosubmit stats` command that was not considering parameters defined in the platform, like NODES, TASKS, etc. #2978
+- Fixed infinite loop in experiments using wrappers on MN5 #2985
+- Fixed wrapper deadlock when minimum limits are not reached #2469
 
 **Enhancements:**
 
@@ -58,6 +60,11 @@
 - Add detection of inneficiencies for key CPMIP metrics #3022
 - Allow multiple filters in the `monitor` command #3020
 - Allow multiple filters in the `inspect` command #3029
+- Wrappers reworked with SQLAlchemy-backed persistence and structured tables, fixing wrapper lifecycle management across platforms #3007
+- Added STAT file validation #3007
+- Wrapper databases migrated from pickle to SQLAlchemy, with upsert operations and chunked batch inserts for SQLite compatibility #3007
+- Jobs now validated individually via STAT files in check_jobs to confirm completion or failure, for both wrapped and non-wrapped jobs #3007
+- Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
@@ -77,7 +84,7 @@ release.
 
 - Fixed issue with the verification of dirty Git local repositories in operational experiments #2446
 - Fixed error when cleaning projects that use Git #2524
-- Fixed bug that occurred when copying experiments with different HPC platforms, where the incorrect platform was used 
+- Fixed bug that occurred when copying experiments with different HPC platforms, where the incorrect platform was used
   instead of the user-specified platform #2650
 - Fixed bug that occurred when having "CUSTOM_" placeholders in the header section of a wrapper #2669
 - Fixes an issue with multi-day applications dependencies bug #2631
@@ -103,7 +110,7 @@ release.
 - The `migrate` command was removed as it had been broken since the release of
   AS 4. This command will be reintroduced in the future with updated syntax and
   with new tests and documentation.
-- Replaced regex by YAML parsing/writing when copying experiments to avoid edge 
+- Replaced regex by YAML parsing/writing when copying experiments to avoid edge
   cases when replacing values (e.g. NOTIFY.TO, CHUNKS_TO) #2665
 - Fix experiment not being copied when running `testcase` command #2799
 - Fixed bug where placeholder variables were not removed when they referenced
@@ -132,7 +139,7 @@ release.
 - Improvement of error message when `LOCAL` project location is a file, not a directory #1972 #1254
 - Removed the code for wrappers with local platform that were create only for tests #2522
 - Added SQLAlchemy as the main database entrypoint, enabling backends of Sqlite (default) and Postgres (new) #2187
-- Added mypy and ruff to the CI for the files touched by a change granting a 
+- Added mypy and ruff to the CI for the files touched by a change granting a
   higher quality and preservation of the code #2626 #2621
 - Updated base images of micromamba and debian for security update #2610
 - Added "CUSTOM_" directives support in the wrapper configuration #2669
@@ -150,7 +157,7 @@ release.
   fixed several ruff and mypy warnings, and did minor refactorings in the code like removing the
   `Submitter` class and using `ParamikoSubmitter` directly (only implementation) #2577
 - Improved submission time for slurm and pjm jobs #2742
-- Added documentation regarding in-line script definition. 
+- Added documentation regarding in-line script definition.
 - Fixes an issue with general wrapper parameters crashing during runtime when defined. #2743
 - Added a new configuration parameter to list a safe-list of placeholders that can be used in templates as they are, example: "%CUSTOM_MYVAR%" -> "%CUSTOM_MYVAR%".
 - Fix intermittent failures of unit tests, and enable print of AS exceptions.
@@ -187,7 +194,7 @@ the filter the jobs. Not using any value for `-fp` still returns all jobs.
 - EDITO Autosubmit-Demo container updated to install API in different environment #2398
 - Update portalocker requirement from <=3.1.1 to <=3.2.0 #2423
 - Additional files are now generated upon using the `autosubmit inspect` command #2323
-- Operational runs now require no pending commits, ensuring a cleaner workflow. [#2220](https://github.com/BSC-ES/autosubmit/issues/2220), [PR](https://github.com/BSC-ES/autosubmit/pull/2293) 
+- Operational runs now require no pending commits, ensuring a cleaner workflow. [#2220](https://github.com/BSC-ES/autosubmit/issues/2220), [PR](https://github.com/BSC-ES/autosubmit/pull/2293)
 
 ### 4.1.14: Bug fixes, enhancements, and new features
 
@@ -329,7 +336,7 @@ Others:
 4.1.10 - Hotfix
 ===============
 - Fixed an issue with the performance of the log retrieval.
- 
+
 4.1.9 - Zombies, splits, tests and bug fixes
 =====================================
 - Splits calendar: Added a complete example to the documentation.
@@ -337,7 +344,7 @@ Others:
 - Added two regression tests to check the .cmd with the default parameters.
 - Fixed the command inspect without the -f.
 - Yet another fix for zombie processors.
-- Fixed the describe command when a user disappears from the system. 
+- Fixed the describe command when a user disappears from the system.
 - Fixes an issue with dependency not being linked.
 - Docs improved.
 
@@ -355,7 +362,7 @@ Others:
 - Multiple QoL and bug fixes for wrappers and fixed horizontal ones.
 - Added a new parameter `SCRIPT` that allows to write templates in the yaml config.
 - Fixed an issue with STAT file.
-- Fixed all issues related to zombie processors. 
+- Fixed all issues related to zombie processors.
 
 4.1.6 - Bug fixes
 =====================
@@ -380,7 +387,7 @@ Others:
 - Fixed some issues with retrials squashing stats/ logs.
 - Added Marenostrum5 support.
 - Fixed some issues with jobs inside a wrapper not having their parameters updated in realtime.
-- Features a complete design rework of the autosubmit readthedocs 
+- Features a complete design rework of the autosubmit readthedocs
 - Fixed an issue with create without -f causing some jobs not having parent dependencies
 
 4.1.3 - Bug fixes
@@ -388,8 +395,8 @@ Others:
 - Added Leonardo support.
 - Improved inspect command.
 - Added a new option to inspect.
-- Wrapper now admits placeholders. 
-- Reworked the wrapper deadlock code and total _jobs code. And fixed issues with "on_submission" jobs and wrappers. 
+- Wrapper now admits placeholders.
+- Reworked the wrapper deadlock code and total _jobs code. And fixed issues with "on_submission" jobs and wrappers.
 - Fixed issues with create without -f and splits.
 - Improved error clarity.
 - Added RO-Crate.
