@@ -413,6 +413,35 @@ def test_calendar_chunk_section(
         assert splits_B == expected_splits_B
 
 
+def test_non_integer_splits_with_strict_policy_raises():
+    """Test that calendar_chunk_section raises AutosubmitCritical when the split policy is strict and the splits are not an integer."""
+    experiment_data = {
+        "EXPERIMENT": {
+            "DATELIST": "20000101",
+            "MEMBERS": "fc0",
+            "CHUNKSIZEUNIT": "day",
+            "CHUNKSIZE": "1",
+            "NUMCHUNKS": "2",
+            "CALENDAR": "standard",
+            "SPLITPOLICY": "strict",
+        },
+        "JOBS": {
+            "A": {
+                "FILE": "a",
+                "PLATFORM": "test",
+                "RUNNING": "chunk",
+                "SPLITS": "auto",
+                "SPLITSIZE": 5,
+                "SPLITSIZEUNIT": "hour",
+            },
+        },
+    }
+    date = datetime.strptime("20000101", "%Y%m%d")
+    chunk = 1
+    with pytest.raises(AutosubmitCritical):
+        calendar_chunk_section(experiment_data, "A", date, chunk)
+
+
 def test_calendar_chunk_section_running_not_chunk():
     """Test that calendar_chunk_section raises AutosubmitCritical when the job is not set to run by chunk."""
     experiment_data = {
