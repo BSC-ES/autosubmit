@@ -54,7 +54,7 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import (
     create_db, get_experiment_description, get_autosubmit_version, check_experiment_exists,
-    update_experiment_description_version
+    update_experiment_description_version, get_experiment_expids
 )
 from autosubmit.database.db_structure import get_structure
 from autosubmit.experiment.detail_updater import ExperimentDetails
@@ -3415,69 +3415,97 @@ class Autosubmit:
         :return: tuple with user, created time, model, branch, and HPC
         :rtype: bool | (str, str, str, str, str)
         """
-        experiments_ids = input_experiment_list
-        not_described_experiments = []
         if get_from_user == "*" or get_from_user == "":
             get_from_user = pwd.getpwuid(os.getuid())[0]
-        user = ""
-        created = ""
-        model = ""
-        branch = ""
-        hpc = ""
-        if ',' in experiments_ids:
-            experiments_ids = experiments_ids.split(',')
-        elif '*' in experiments_ids:
-            experiments_ids = []
-            basic_conf = BasicConfig()
-            for f in Path(basic_conf.LOCAL_ROOT_DIR).glob("????"):
-                # If it reaches there it means that f.owner() doesn't exist
-                # anymore( owner is an id) so we just skip it and continue.
-                with suppress(Exception):
-                    if f.is_dir() and f.owner() == get_from_user:
-                        experiments_ids.append(f.name)
+
+        user = created = model = branch = hpc = ""
+        not_described_experiments = []
+        experiments_ids_not_in_db = []
+
+        if ',' in input_experiment_list:
+            requested = [e.strip().lower() for e in input_experiment_list.split(',') if e.strip()]
+        elif '*' in input_experiment_list:
+            requested = None  # all experiments
         else:
-            experiments_ids = experiments_ids.split(' ')
+            requested = [e.strip().lower() for e in input_experiment_list.split(' ') if e.strip()]
+
+        if requested is None:
+            experiments_ids = sorted(get_experiment_expids())
+        else:
+            found = get_experiment_expids(expids=requested)
+            experiments_ids = []
+            for e in requested:
+                (experiments_ids if e in found else experiments_ids_not_in_db).append(e)
+
+        if experiments_ids_not_in_db:
+            Log.warning(f"Experiments not found in the database, skipping: {experiments_ids_not_in_db}")
+
         for experiment_id in experiments_ids:
-            try:
-                experiment_id = experiment_id.strip(" ")
-                exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
-
-                as_conf = AutosubmitConfig(experiment_id, BasicConfig, YAMLParserFactory())
-                as_conf.check_conf_files(False, no_log=True)
-                user = int(Path(as_conf.conf_folder_yaml).stat().st_uid)
+            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(experiment_id)
+            if exp_path.is_dir():
                 try:
-                    user = pwd.getpwuid(user).pw_name
+                    folder_owner = pwd.getpwuid(exp_path.stat().st_uid).pw_name
+                    if folder_owner != get_from_user:
+                        continue
                 except Exception:
-                    Log.warning(
-                        "The user does not exist anymore in the system, using id instead")
-                    continue
+                    pass
+            try:
+                try:
+                    # Preferred source of truth: the on-disk config files.
+                    as_conf = AutosubmitConfig(experiment_id, BasicConfig, YAMLParserFactory())
+                    as_conf.check_conf_files(False, no_log=True)
 
-                created = datetime.datetime.fromtimestamp(Path(as_conf.conf_folder_yaml).stat().st_mtime)
+                    uid = int(Path(as_conf.conf_folder_yaml).stat().st_uid)
+                    try:
+                        user = pwd.getpwuid(uid).pw_name
+                    except Exception:
+                        Log.warning("The user does not exist anymore in the system, using id instead")
+                        user = str(uid)
 
-                if as_conf.get_svn_project_url():
-                    model = as_conf.get_svn_project_url()
-                    branch = as_conf.get_svn_project_url()
-                else:
-                    model = as_conf.get_git_project_origin()
-                    branch = as_conf.get_git_project_branch()
-                if model == "":
-                    model = "Not Found"
-                if branch == "":
-                    branch = "Not Found"
+                    created = datetime.datetime.fromtimestamp(
+                        Path(as_conf.conf_folder_yaml).stat().st_mtime)
 
-                submitter = ParamikoSubmitter(as_conf=as_conf)
-                if not submitter.platforms:
-                    return False
-                hpc = as_conf.get_platform()
-                description = get_experiment_description(experiment_id)
-                Log.result("Describing {0}", experiment_id)
-                Log.result("Owner: {0}", user)
-                Log.result("Location: {0}", exp_path)
-                Log.result("Created: {0}", created)
-                Log.result("Model: {0}", model)
-                Log.result("Branch: {0}", branch)
-                Log.result("HPC: {0}", hpc)
-                Log.result("Description: {0}", description[0][0])
+                    if as_conf.get_svn_project_url():
+                        model = branch = as_conf.get_svn_project_url()
+                    else:
+                        model = as_conf.get_git_project_origin()
+                        branch = as_conf.get_git_project_branch()
+                    if model == "":
+                        model = "Not Found"
+                    if branch == "":
+                        branch = "Not Found"
+
+                    submitter = ParamikoSubmitter(as_conf=as_conf)
+                    if not submitter.platforms:
+                        return False
+                    hpc = as_conf.get_platform()
+
+                    description = get_experiment_description(experiment_id)
+                    description = description[0][0] if description else ""
+                except Exception:
+                    # Files not available (e.g. archived): fall back to the
+                    # last snapshot stored in the database.
+                    snapshot = ExperimentDetails(experiment_id, init_reload=False).get_details()
+                    if not snapshot:
+                        raise
+                    user = snapshot["user"]
+                    created = snapshot["created"]
+                    model = snapshot["model"]
+                    branch = snapshot["branch"]
+                    hpc = snapshot["hpc"]
+                    description = get_experiment_description(experiment_id)
+                    description = description[0][0] if description else ""
+                    Log.info(f"Experiment '{experiment_id}' files not found; "
+                            f"it may have been archived. Showing the last "
+                            f"stored snapshot.")
+                Log.result(f"Describing {experiment_id}")
+                Log.result(f"Owner: {user}")
+                Log.result(f"Location: {exp_path}")
+                Log.result(f"Created: {created}")
+                Log.result(f"Model: {model}")
+                Log.result(f"Branch: {branch}")
+                Log.result(f"HPC: {hpc}")
+                Log.result(f"Description: {description}")
             except Exception:
                 not_described_experiments.append(experiment_id)
         if len(not_described_experiments) > 0:
