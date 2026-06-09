@@ -49,13 +49,26 @@ def delete_lock_file(base_path: Optional[Union[str, Path]] = None, lock_file: st
 
 
 def _get_lock_path(args: Optional[argparse.Namespace]) -> Optional[Path]:
+    """Return the experiment ``tmp`` directory for the expid in ``args``, or ``None`` if no expid.
+
+    :param args: Parsed CLI arguments.
+    :type args: Optional[argparse.Namespace]
+    :return: Path to the experiment ``tmp`` directory, or ``None``.
+    :rtype: Optional[Path]
+    """
     if args and getattr(args, 'expid', None):
         return BasicConfig.expid_tmp_dir(args.expid)
     return None
 
 
 def _owns_lock(args: Optional[argparse.Namespace]) -> bool:
-    """Return True if the command in args is one that acquires the autosubmit lock."""
+    """Return ``True`` if the command in ``args`` acquires the autosubmit lock.
+
+    :param args: Parsed CLI arguments.
+    :type args: Optional[argparse.Namespace]
+    :return: ``True`` if the command is in ``LOCK_OWNING_COMMANDS``.
+    :rtype: bool
+    """
     return bool(args and getattr(args, 'command', None) in LOCK_OWNING_COMMANDS)
 
 
