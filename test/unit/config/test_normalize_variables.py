@@ -17,7 +17,7 @@
 
 import pytest
 
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
 
 
 @pytest.mark.parametrize(
@@ -543,7 +543,6 @@ def test_normalize_wrappers_jobs_in_wrapper(autosubmit_config):
         pytest.param({"WRAPPER2": {"JOBS_IN_WRAPPER": 12345, "TYPE": "VERTICAL"}}, id="non_string_single_value"),
         pytest.param({"WRAPPER3": {"JOBS_IN_WRAPPER": None, "TYPE": "VERTICAL"}}, id="none_value"),
         pytest.param({"WRAPPER4": {"TYPE": "VERTICAL"}}, id="missing_key"),
-        pytest.param({"WRAPPER5": {"JOBS_IN_WRAPPER": ["JOB1", "NON_EXISTENT_JOB"], "TYPE": "VERTICAL"}}, id="unknown_job"),
         pytest.param({"WRAPPER6": {"JOBS_IN_WRAPPER": [], "TYPE": "VERTICAL"}}, id="empty_list"),
         pytest.param({"WRAPPER7": {"JOBS_IN_WRAPPER": ["", " "], "TYPE": "VERTICAL"}}, id="blank_entries"),
         pytest.param({"WRAPPER8": {"JOBS_IN_WRAPPER": ["JOB1", 123]}, "TYPE": "VERTICAL"}, id="non_string_job_name"),
@@ -559,3 +558,16 @@ def test_normalize_wrappers_raise_error(autosubmit_config, wrappers):
     as_conf = autosubmit_config(expid='t000', experiment_data=input_data)
     with pytest.raises(AutosubmitCritical):
         as_conf._normalize_wrappers_section(input_data, raise_exception=True)
+
+
+def test_normalize_wrappers_warning_unknown_job(autosubmit_config, mocker):
+    input_data = {
+        "JOBS": {"JOB1": {}, "JOB2": {}},
+        "WRAPPERS": {"WRAPPER1": {"JOBS_IN_WRAPPER": ["JOB1", "NON_EXISTENT_JOB"], "TYPE": "VERTICAL"}},
+    }
+    mocker.patch.object(Log, "warning")
+    as_conf = autosubmit_config(expid='t000', experiment_data=input_data)
+    as_conf._normalize_wrappers_section(input_data, raise_exception=True)
+    Log.warning.assert_called_once_with(
+        "JOBS_IN_WRAPPER in WRAPPERS.WRAPPER1 contains job: NON_EXISTENT_JOB that is not defined in JOBS section"
+    )

@@ -72,6 +72,7 @@
 - Wrapper databases migrated from pickle to SQLAlchemy, with upsert operations and chunked batch inserts for SQLite compatibility #3007
 - Jobs now validated individually via STAT files in check_jobs to confirm completion or failure, for both wrapped and non-wrapped jobs #3007
 - Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
+- Changed JOBS_IN_WRAPPER unknown job from critical error to warning #3006
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
