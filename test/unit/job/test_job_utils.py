@@ -249,7 +249,7 @@ def test_split_unit_equal_to_chunk_unit_not_raise():
         ("standard", "invalid-chunk-unit", "hour", "flexible"), # invalid chunk unit
         ("standard", "day", "invalid-split-unit", "flexible"), # invalid split unit
         ("standard", "day", "year", "flexible"), # split > chunk unit
-        ("standard", "day", "week", "invalid-split-policy"), # invalid split policy
+        ("standard", "day", "hour", "invalid-split-policy"), # invalid split policy
     ],
     ids=[
         "chunk unit is hour raises",
