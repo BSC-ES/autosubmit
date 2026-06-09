@@ -496,7 +496,7 @@ class AutosubmitConfig(object):
                 elif len(element) == 0:
                     raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains empty job names ( check for double ,, or double && )", 7014)
                 elif element not in job_sections:
-                    raise AutosubmitCritical(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains job: {element} that is not defined in JOBS section", 7014)
+                    Log.warning(f"JOBS_IN_WRAPPER in WRAPPERS.{wrapper} contains job: {element} that is not defined in JOBS section")
 
         wrapper_data["JOBS_IN_WRAPPER"] = sanitized_jobs_in_wrapper
 
