@@ -26,7 +26,7 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
     _assert_db_fields, _assert_files_recovered, run_in_thread, assert_run_results, _check_wrapper_db_fields, \
     _assert_wrapper_db_fields
@@ -652,7 +652,7 @@ def test_run_with_additional_files(
                     },
                 }
             },
-            "invalid-inspect1",
+            "warn-missing-jobs-in-wrapper",
     ),
     (
             {
@@ -752,6 +752,7 @@ def test_wrapper_config(
         autosubmit_exp,
         slurm_server: 'Container',
         tmp_path,
+        mocker,
 ):
     experiment_data = {
         "EXPERIMENT": {"MEMBERS": "fc0 fc1 fc2 fc3"},
@@ -791,6 +792,13 @@ def test_wrapper_config(
         with pytest.raises(AutosubmitCritical):
             autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True,
                            check_wrappers=True)
+    elif run_type == "warn-missing-jobs-in-wrapper":
+        mocker.patch.object(Log, "warning")
+        autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True,
+                       check_wrappers=True)
+        Log.warning.assert_any_call(
+            "JOBS_IN_WRAPPER in WRAPPERS.WRAPPER contains job: 1 that is not defined in JOBS section"
+        )
     else:
         as_exp = autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True)
 
