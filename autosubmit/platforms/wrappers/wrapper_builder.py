@@ -381,6 +381,179 @@ class FluxWrapperBuilder(DelegatedWrapperBuilder):
             main()
         """)
 
+class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
+
+    @property
+    def engine_name(self):
+        return "hyperqueue"
+    
+    @property
+    def command(self) -> str:
+        return f"srun --cpu-bind=none python {self._delegated_script_name}"
+    
+    def _generate_delegated_script(self) -> str:
+        return textwrap.dedent(f"""
+        #!/usr/bin/env python3
+
+        import datetime
+        import gc
+        import json
+        import os
+        from typing import Dict, List
+        from collections import defaultdict, deque
+
+        from hyperqueue import Client, Job, LocalCluster
+        from hyperqueue.task.task import ResourceRequest
+
+
+        class HyperQueueWrapperSubmitter:
+            def __init__(self, dag_json: str):
+                self.dag = json.loads(dag_json)
+                self.tasks: Dict[str, Dict] = {{n["id"]: n for n in self.dag["tasks"]}}
+                self.dependencies: List[Dict] = self.dag["dependencies"]
+                self.cwd = self.dag["graph"]["wrapper_defaults"]["cwd"]
+
+                self.hq_tasks: Dict[str, object] = {{}}
+                self.parents: Dict[str, List[str]] = defaultdict(list)   # child -> [parents]
+                self.children: Dict[str, List[str]] = defaultdict(list)  # parent -> [children]
+
+                self.cluster = LocalCluster()
+                self.client: Client = self.cluster.client()
+                self.job = Job() # a job contains all the tasks of the DAG
+                self.submitted_job = None
+
+                self._build_dependency_graph()
+
+            def submit_wrapper(self):
+                # Submit wrapped jobs in topological order respecting dependencies
+                order = self._topological_order()
+
+                for task_id in order:
+                    deps_tasks = [self.hq_tasks[parent_id] for parent_id in self.parents[task_id]]
+                    self.hq_tasks[task_id] = self._submit_job(task_id, deps_tasks)
+
+                self.cluster.start_worker()
+                self.submitted_job = self.client.submit(self.job)
+
+                self._release_graph_memory()
+
+                print(f"Wrapper submitted.")
+
+            def wait_for_completion(self):
+                self.client.wait_for_jobs([self.submitted_job])
+
+                wrapper_failed = False
+                for task_id in self.hq_tasks.keys():
+                    if os.path.exists(task_id + "_COMPLETED"):
+                        print(f"Task completed: {{task_id}}")
+                    else:
+                        print(f"Task failed: {{task_id}}")
+                        open(task_id + "_FAILED", 'w').close()
+                        wrapper_failed = True
+
+                if wrapper_failed:
+                    open("WRAPPER_FAILED", 'w').close()
+
+            def _build_dependency_graph(self):
+                # Build the dependency graph, with children containing their parents
+                for dependency in self.dependencies:
+                    parent = dependency["from"]
+                    child = dependency["to"]
+                    self.parents[child].append(parent)
+                    self.children[parent].append(child)
+
+            def _topological_order(self) -> List[str]:
+                indegree = {{task: len(self.parents.get(task, [])) for task in self.tasks}}
+
+                queue = deque([task for task, d in indegree.items() if d == 0])
+                order = []
+
+                while queue:
+                    task = queue.popleft()
+                    order.append(task)
+
+                    for child in self.children[task]:
+                        indegree[child] -= 1
+                        if indegree[child] == 0:
+                            queue.append(child)
+
+                return order
+
+            def _submit_job(self, task_id: str, deps_tasks: List[object] | None = None):
+                task = self.tasks[task_id]
+
+                script_path = os.path.join(self.cwd, f"{{task_id}}.cmd")
+                wallclock = task.get("wallclock")
+
+                args = ["timeout", "-k", "10s", str(wallclock), script_path]
+                print(f"Submitting task {{task_id}} with command: {{' '.join(args)}}")
+
+                task_kwargs = dict(
+                    cwd=self.cwd,
+                    stdout=script_path + ".out.0",
+                    stderr=script_path + ".err.0",
+                    env=os.environ.copy(),
+                    name=task_id,
+                )
+
+                if deps_tasks:
+                    task_kwargs["deps"] = deps_tasks
+
+                processors = task.get("processors")
+                threads = task.get("threads")
+                nodes = task.get("nodes")
+
+                # TODO: [ENGINES] ntasks/nslots management (?)
+
+                cpus = 1
+                if processors is not None and threads is not None:
+                    cpus = processors * threads
+                elif processors is not None:
+                    cpus = processors
+                elif threads is not None:
+                    cpus = threads
+
+                req = None
+                resource_kwargs = {{}}
+                if cpus is not None:
+                    resource_kwargs["cpus"] = cpus
+                if nodes is not None:
+                    resource_kwargs["n_nodes"] = nodes
+                resource_kwargs["min_time"] = datetime.timedelta(seconds=wallclock)
+
+                req = ResourceRequest(**resource_kwargs)
+
+                task_kwargs["resources"] = req
+
+                hq_task = self.job.program(args, **task_kwargs)
+
+                print(f"Task {{task_id}} added to HQ job")
+                return hq_task
+
+            def _release_graph_memory(self):
+                # Release memory used by the graph after submission
+                del self.dag
+                del self.tasks
+                del self.dependencies
+                del self.cwd
+                del self.parents
+                del self.children
+                gc.collect()
+
+
+        def main():
+            with open("subworkflow_{self._unique_part}.json", "r") as f:
+                dag_json = f.read()
+
+            submitter = HyperQueueWrapperSubmitter(dag_json)
+            submitter.submit_wrapper()
+            submitter.wait_for_completion()
+
+
+        if __name__ == "__main__":
+            main()
+        """)
+
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self, letters_count, digits_count):
         sample_str = ''.join((random.choice(string.ascii_letters) for _ in range(letters_count)))
