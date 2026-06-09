@@ -98,8 +98,7 @@ def exit_from_error(e: BaseException, lock_path: Optional[Union[str, Path]] = No
     elif lock_path is not None:
         delete_lock_file(lock_path)
 
-    if is_autosubmit_error:
-        e: Union[AutosubmitError, AutosubmitCritical] = e
+    if isinstance(e, (AutosubmitError, AutosubmitCritical)):
         if e.trace:
             Log.critical(f"Trace: {str(e.trace)}")
         Log.critical(f"{e.message} [eCode={e.code}]")

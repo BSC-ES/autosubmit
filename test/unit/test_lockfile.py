@@ -21,13 +21,7 @@ import pytest
 from portalocker.exceptions import BaseLockException
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
-from autosubmit.scripts.autosubmit import (
-    LOCK_OWNING_COMMANDS,
-    _owns_lock,
-    delete_lock_file,
-    exit_from_error,
-    main,
-)
+from autosubmit.scripts.autosubmit import _owns_lock, delete_lock_file, exit_from_error, main
 
 
 def test_delete_lockfile(tmp_path):
@@ -142,4 +136,3 @@ def test_main_only_deletes_lock_for_restrictive_commands(mocker, command, should
     main()
 
     assert mocked_delete.called is should_delete
-    
