@@ -29,6 +29,7 @@ from autosubmit.job.job_utils import (
     _validate_calendar_inputs,
     _count_units_between_dates,
     calendar_unitsize_getlowersize,
+    calendar_unitsize_isgreater,
     cancel_jobs,
     get_split_size_unit,
 )
@@ -178,13 +179,12 @@ def test_get_split_size_unit(data, result):
     assert get_split_size_unit(data, 'TEST') == result
 
 
-
 # TODO: delete comment. Start of the auto split tests
 
 def test_calendar_unitsize_isgreater_raises():
     """Test that an invalid unit in calendar_unitsize_isgreater raises AutosubmitCritical."""
     with pytest.raises(AutosubmitCritical):
-        calendar_unitsize_getlowersize("invalid")
+        calendar_unitsize_isgreater("invalid", "hour")
 
 
 @pytest.mark.parametrize(
@@ -303,6 +303,26 @@ def test_count_multiple_partial_months():
     # February: 14 days (1st to 14th inclusive) out of 29 days (leap year) -> 14/29
     expected = (16 / 31) + (14 / 29)
     assert abs(result - expected) < 1e-6
+
+
+@pytest.mark.parametrize(
+    "calendar", ["leap", "noleap"], ids=["accept leap year", "does not accept leap year"]
+)
+def test_count_years_with_different_calendars(calendar):
+    """Test that _count_units_between_dates returns 1 year for a chunk covering a non-leap year."""
+    start = datetime(2001, 1, 1)
+    end = datetime(2002, 1, 1)
+    result = _count_units_between_dates(start, end, "year", calendar)
+    assert isinstance(result, float)
+    assert result == 1.0
+
+
+def test_count_years_invalid_unit():
+    """Test that _count_units_between_dates raises AutosubmitCritical for an invalid unit."""
+    start = datetime(2000, 1, 1)
+    end = datetime(2001, 1, 1)
+    with pytest.raises(AutosubmitCritical):
+        _count_units_between_dates(start, end, "invalid-unit", "standard")
 
 
 @pytest.mark.parametrize(
