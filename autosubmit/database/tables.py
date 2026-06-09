@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from functools import cache, cached_property
 from typing import cast, List, Optional
 
 from sqlalchemy import (
@@ -27,11 +28,10 @@ from sqlalchemy import (
     Float,
     LargeBinary,
     UniqueConstraint,
-    Column,
+    Column, ForeignKey,
 )
 
 metadata_obj = MetaData()
-
 
 ExperimentTable = Table(
     "experiment",
@@ -70,31 +70,6 @@ ExperimentStatusTable = Table(
     Column("modified", Text, nullable=False),
 )
 """Stores the status of the experiments."""
-
-JobPackageTable = Table(
-    "job_package",
-    metadata_obj,
-    Column("exp_id", Text),
-    Column("package_name", Text),
-    Column("job_name", Text),
-    Column("wallclock", Text)
-)
-"""Stores a mapping between the wrapper name and the actual job in SLURM."""
-
-WrapperJobPackageTable = Table(
-    "wrapper_job_package",
-    metadata_obj,
-    Column("exp_id", Text),
-    Column("package_name", Text),
-    Column("job_name", Text),
-    Column("wallclock", Text)
-)
-"""It is a replication.
-It is only created/used when using inspect and create or monitor
-with flag -cw in Autosubmit.
-This replication is used to not interfere with the current
-autosubmit run of that experiment since wrapper_job_package
-will contain a preview, not the real wrapper packages."""
 
 # NOTE: The column ``metadata`` has a name that is reserved in
 #       SQLAlchemy ORM. It works for SQLAlchemy Core, here, but
@@ -156,6 +131,9 @@ JobDataTable = Table(
     Column("children", Text, nullable=True),
     Column("platform_output", Text, nullable=True),
     Column("workflow_commit", Text, nullable=True),
+    Column("split", Integer, nullable=True),
+    Column("splits", Integer, nullable=True),
+    Column("fail_count", Integer, nullable=False, default=0),
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
@@ -207,16 +185,58 @@ UserMetricsTable = Table(
     Column("modified", Text),
 )
 
+
+def create_wrapper_tables(name, metadata_obj_):
+    """Create a wrapper table for the given name."""
+    table_package_info = Table(
+        f"{name}_info",
+        metadata_obj_,
+        Column("name", String, nullable=False, primary_key=True),
+        Column("id", Integer),
+        Column("script_name", String),
+        Column("status", Text, nullable=False),  # Should be job_status_enum
+        Column("local_logs_out", String),  # TODO: We should recover the log from the remote at some point
+        Column("local_logs_err", String),  # TODO: We should recover the log from the remote at some point
+        Column("remote_logs_out", String),  # TODO: We should recover the log from the remote at some point
+        Column("remote_logs_err", String),  # TODO: We should recover the log from the remote at some point
+        Column("updated_log", Integer),  # TODO: We should recover the log from the remote at some point
+        Column("platform_name", String),
+        Column("wallclock", String),
+        Column("num_processors", Integer),
+        Column("type", Text),
+        Column("sections", Text),
+        Column("method", Text),
+    )
+
+    table_jobs_inside_wrapper = Table(
+        f"{name}_jobs",
+        metadata_obj_,
+        Column("package_id", Integer, nullable=False, primary_key=True),
+        Column("package_name", String, nullable=False, primary_key=True),
+        Column("job_name", String, ForeignKey("jobs.name"), nullable=False, primary_key=True),
+        Column("timestamp", String, nullable=True),
+        UniqueConstraint("package_id", "package_name", "job_name",
+                         name=f"unique_{name}_jobs_package_id_package_name_job_name"),
+
+    )
+    return table_package_info, table_jobs_inside_wrapper
+
+
+WrapperInfoTable, WrapperJobsTable = create_wrapper_tables("wrappers", metadata_obj)
+PreviewWrapperInfoTable, PreviewWrapperJobsTable = create_wrapper_tables("preview_wrappers", metadata_obj)
+
 TABLES = (
     ExperimentTable,
     ExperimentStatusTable,
     ExperimentStructureTable,
     ExperimentRunTable,
     DBVersionTable,
-    JobPackageTable,
+    WrapperInfoTable,
+    WrapperJobsTable,
+    PreviewWrapperInfoTable,
+    PreviewWrapperJobsTable,
     JobDataTable,
     JobListTable,
-    WrapperJobPackageTable,
     JobPklTable,
     DetailsTable,
     UserMetricsTable,
@@ -262,3 +282,39 @@ def get_table_from_name(*, schema: Optional[str], table_name: str) -> Table:
 
     table = next(filter(predicate, TABLES), None)
     return get_table_with_schema(schema, table)
+
+
+def get_all_tables_by_name() -> dict[str, Table]:
+    """Return a dictionary of all tables, combining general and job-list tables."""
+    return {table.name: table for table in TABLES}
+
+
+# From 4.2.0 , used for wrappers only to keep changes minimal
+class TableRegistry:
+    """Manage SQLAlchemy Table instances keyed by schema and table name.
+
+    Tables are created once per (schema, table_name) pair and reused on
+    subsequent lookups, avoiding redundant MetaData and Table construction.
+    """
+
+    def __init__(self, schema: Optional[str]) -> None:
+        """Initialize the registry with the target schema."""
+        self._schema = schema
+
+    @cached_property
+    def metadata(self) -> MetaData:
+        """Return the MetaData instance for the given schema, creating it once."""
+        return MetaData(schema=self._schema)
+
+    @cache
+    def get(self, table_name: str) -> Table:
+        """Return the Table for the given name and schema, creating it if needed.
+
+        :param table_name: The name of the table.
+        :return: The SQLAlchemy Table instance.
+        :raises KeyError: If no table definition exists for ``table_name``.
+        """
+        all_tables_def = get_all_tables_by_name()
+        if table_name not in all_tables_def:
+            raise KeyError(f"No table definition found for '{table_name}'.")
+        return all_tables_def[table_name].to_metadata(self.metadata)

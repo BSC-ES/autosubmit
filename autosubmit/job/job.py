@@ -21,13 +21,12 @@ import json
 import locale
 import os
 import re
-import textwrap
 import time
 from collections import OrderedDict
+from dataclasses import dataclass, field
 from functools import reduce
 from pathlib import Path
 from threading import Thread
-from time import sleep
 from typing import List, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
@@ -37,7 +36,7 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
-from autosubmit.job.job_utils import get_job_package_code, get_split_size_unit, get_split_size
+from autosubmit.job.job_utils import get_split_size_unit, get_split_size
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import get_template_snippet, Language
 from autosubmit.log.log import Log, AutosubmitCritical
@@ -50,7 +49,28 @@ if TYPE_CHECKING:
 
 Log.get_logger("Autosubmit")
 
+
 # A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
+
+
+@dataclass
+class RecoveryAttempt:
+    """Result of recovering logs for a single attempt."""
+    attempt: int
+    success: bool
+    local_logs: tuple[str, str]
+    remote_logs: tuple[str, str]
+    error: Optional[str] = None
+
+
+@dataclass
+class RecoveryReport:
+    """Structured report of log recovery across all pending attempts."""
+    job_name: str
+    attempts: list[RecoveryAttempt] = field(default_factory=list)
+    final_updated_log: int = 0
+    all_succeeded: bool = False
+
 
 EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
 
@@ -148,17 +168,22 @@ class Job(object):
         'delete_when_edgeless', 'het', 'updated_log',
         'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
         '_script', '_log_recovery_retries', 'ready_date', 'wrapper_name',
-        'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_cpmip_thresholds', '_chunk_size', '_chunk_size_unit', '_processors_per_node',
+        'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_cpmip_thresholds', '_chunk_size', '_chunk_size_unit',
+        '_processors_per_node',
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        '_log_recovered', 'packed_during_building', 'workflow_commit', '_validate_template', 'first_wrapped_level'
+        'packed_during_building', 'workflow_commit', '_validate_template', 'first_wrapped_level', 'finished_time'
     )
 
     def __setstate__(self, state):
         for slot, value in state.items():
             if slot in self.__slots__:
                 setattr(self, slot, value)
+        # Initialize timestamp fields if missing from old pickles or None
+        for attr in ('submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp'):
+            if not hasattr(self, attr) or getattr(self, attr) is None:
+                setattr(self, attr, 0)
 
     def __getstate__(self):
         return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
@@ -193,7 +218,7 @@ class Job(object):
         self.wrapper_type = None
         self.first_wrapped_level = False
         self._wrapper_queue = None
-        self._platform = None
+        self._platform: 'ParamikoPlatform' = None
         self._queue = None
         self._partition = None
         self.retry_delay = None
@@ -270,14 +295,11 @@ class Job(object):
         self.delete_when_edgeless = False
         # hetjobs
         self.het = None
-        self.updated_log = False
-        self._log_recovered = False
-        self.log_recovered = False
+        self.updated_log = 0
         self.submit_time_timestamp = None  # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
         self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
         self._script = None  # Inline code to be executed
-        self._log_recovery_retries = None
         self.ready_date = None
         self.wrapper_name = None
         self.is_wrapper = False
@@ -309,6 +331,7 @@ class Job(object):
                                                             Status.READY] else \
                 self.status
         self.validate_template = False
+        self.finished_time = None
 
     def clean_attributes(self):
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
@@ -342,7 +365,7 @@ class Job(object):
         self.max_checkpoint_step = None
         self.reservation = None
         self.het = None
-        self.updated_log = False
+        self.updated_log = 0
         self._script = None
         self._log_recovery_retries = None
         self.wrapper_name = None
@@ -377,7 +400,7 @@ class Job(object):
         self._processors = '1'
         self._memory = ''
         self._memory_per_task = ''
-        self.start_time_timestamp = time.time()
+        self.start_time_timestamp = 0
         self.processors_per_node = ""
         self.script_name = self.name + ".cmd"
         self.stat_file = f"{self.script_name[:-4]}_STAT_"
@@ -391,6 +414,7 @@ class Job(object):
         self.dependencies = ""
         self.packed_during_building = False
         self.packed = False
+        self.finished_time = None
 
     @property  # type: ignore
     def wallclock_in_seconds(self):
@@ -838,18 +862,6 @@ class Job(object):
         self._status = status
 
     @property  # type: ignore
-    @autosubmit_parameter(name='log_recovered')
-    def log_recovered(self):
-        return self._log_recovered
-
-    @log_recovered.setter
-    def log_recovered(self, log_recovered):
-        """
-        Sets the log_recovered
-        """
-        self._log_recovered = log_recovered
-
-    @property  # type: ignore
     def status_str(self):
         """
         String representation of the current status
@@ -1061,10 +1073,7 @@ class Job(object):
         self._processors_per_node = value
 
     def set_ready_date(self) -> None:
-        """
-        Sets the ready start date for the job
-        """
-        self.updated_log = False
+        """Sets the ready start date for the job"""
         self.ready_date = int(time.strftime("%Y%m%d%H%M%S"))
 
     def inc_fail_count(self):
@@ -1267,8 +1276,6 @@ class Job(object):
         if it exists, remote_log variable is updated
         :param
         """
-        if count == -1:
-            count = self._fail_count
         try:
             remote_logs = (f"{self.script_name}.out.{count}", f"{self.script_name}.err.{count}")
         except BaseException as e:
@@ -1330,99 +1337,103 @@ class Job(object):
         # Update local logs
         self.local_logs = remote_logs
 
-    def retrieve_external_retrials_logfiles(self):
-        log_recovered = False
-        self.remote_logs = self.get_new_remotelog_name()
-        if not self.remote_logs:
-            self.log_recovered = False
-        else:
-            if self.check_remote_log_exists():
-                try:
-                    self._sync_retrieve_logfiles()
-                    log_recovered = True
-                except BaseException as exc:
-                    Log.warning(
-                        f"Failed to retrieve log files for job {self.name} e=6002: {str(exc)}"
-                    )
-                    log_recovered = False
-        return log_recovered
-
-    def retrieve_internal_retrials_logfiles(self) -> tuple[int, bool]:
-        """Retrieves internal retrials log files for the given platform.
-        This function is used when the job is inside a vertical wrapper.
-
-        :return: The last retrial index where logs were successfully retrieved.
-        :rtype: tuple[int, bool]
-        """
-        log_recovered = False
-        last_retrial = 0
-        for i in range(0, int(self.retrials + 1)):
-            # Update local logs to give a name to the recovered log
-            self.update_local_logs(count=i, update_submit_time=False)
-
-            # Backup the remote log name in case that the log couldn't be recovered.
-            backup_log = copy.copy(self.remote_logs)
-            self.remote_logs = self.get_new_remotelog_name(i)
-            if self.check_remote_log_exists():
-                self._sync_retrieve_logfiles()
-                log_recovered = True
-                last_retrial = i
-            else:
-                self.remote_logs = backup_log
-                break
-
-        return last_retrial, log_recovered
-
     def update_stat_file(self):
         self.stat_file = f"{self.script_name[:-4]}_STAT_"
 
-    def write_stats(self, last_retrial: int) -> None:
-        """
-        Gathers the stat file, writes statistics into the job_data.db, and updates the total_stat file.
+    def write_stats(self, attempt: int) -> None:
+        """Gathers the stat file, writes statistics into the job_data.db, and updates the total_stat file.
         Considers whether the job is a vertical wrapper and the number of retrials to gather.
 
-        :param last_retrial: The last retrial count.
-        :type last_retrial: int
+        :param attempt: The last retrial count.
+        :type attempt: int
         """
-        # Write stats for vertical wrappers
-        if self.wrapper_type == "vertical":  # Disable AS retrials for vertical wrappers to use internal ones
-            first_submit_timestamp = self.submit_time_timestamp
-            for i in range(0, int(last_retrial + 1)):
-                self.platform.get_stat_file(self, count=i)
-                self.write_vertical_time(i, first_submit_timestamp)
-                self.inc_fail_count()
-        else:
-            # Update local logs without updating the submit time
-            self.update_local_logs(update_submit_time=False)
-            self.check_compressed_local_logs()
-            self.platform.get_stat_file(self)
-            self.write_submit_time()
-            self.write_start_time(count=self.fail_count)
-            self.write_end_time(self.status == Status.COMPLETED, self.fail_count)
 
-    def retrieve_logfiles(self, raise_error: bool = False) -> None:
-        """Retrieves log files from the remote host.
+        self.check_compressed_local_logs()
+        self.platform.get_stat_file(self, attempt)
+        self.update_start_time(attempt)
+        self.write_start_time(fail_count=attempt)
+        self.write_end_time(self.status == Status.COMPLETED, attempt)
 
-        :param raise_error: If True, raises an error if the log files are not retrieved.
+
+    def retrieve_logfiles(self) -> RecoveryReport:
+        """Retrieves log files from the remote host for all pending attempts.
+
+        :return: A structured report of what was attempted and what succeeded.
+        :rtype: RecoveryReport
         """
-        backup_logname = copy.copy(self.local_logs)
-        if self.wrapper_type == "vertical":
-            last_retrial, log_recovered = self.retrieve_internal_retrials_logfiles()
-        else:
-            log_recovered = self.retrieve_external_retrials_logfiles()
-            last_retrial = 0
-        if not log_recovered:
-            self.local_logs = backup_logname
-        else:
-            self.write_stats(last_retrial)
-            if self.wrapper_type == "vertical":
-                for retrial in range(0, last_retrial + 1):
-                    Log.result(
-                        f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{retrial}'.")
+        attempts = []
+        for attempt in range(self.updated_log, int(self.fail_count + 1)):
+            result = self._recover_attempt(attempt)
+            attempts.append(result)
+
+        return RecoveryReport(
+            job_name=self.name,
+            attempts=attempts,
+            final_updated_log=self.updated_log,
+            all_succeeded=all(a.success for a in attempts) if attempts else True
+        )
+
+    def _restore_previous_state(self, backup_log_local, backup_log_remote, backup_submit_time, backup_id):
+        """Restores the previous state of the job in case of a failure during log recovery.
+
+        :param backup_log_local: The backup of the local logs to restore.
+        :param backup_log_remote: The backup of the remote logs to restore.
+        :param backup_submit_time: The backup of the submit time timestamp to restore.
+        :param backup_id: The backup of the job ID to restore.
+        """
+        self.remote_logs = backup_log_remote
+        self.local_logs = backup_log_local
+        self.submit_time_timestamp = backup_submit_time
+        self.id = backup_id
+
+    def _recover_attempt(self, attempt: int) -> RecoveryAttempt:
+        """Recover logs for a single attempt.
+
+        :param attempt: The attempt number to recover.
+        :return: Result of the recovery attempt.
+        """
+        backup_log_local = copy.copy(self.local_logs)
+        backup_log_remote = copy.copy(self.remote_logs)
+        backup_submit_time = copy.copy(self.submit_time_timestamp)
+        backup_id = copy.copy(self.id)
+
+        success = False
+        result_local = backup_log_local
+        result_remote = backup_log_remote
+        error: Optional[str] = None
+
+        try:
+            self.update_submit_time_and_job_id(attempt)
+            self.update_local_logs()
+            self.remote_logs = self.get_new_remotelog_name(attempt)
+
+            if not self.check_remote_log_exists():
+                if not self.check_compressed_local_logs():
+                    self._restore_previous_state(backup_log_local, backup_log_remote, backup_submit_time, backup_id)
+                    error = f"Remote logs not found: {self.remote_logs}"
+                else:
+                    success = True
+                    result_local = self.local_logs
+                    result_remote = self.remote_logs
             else:
-                Log.result(
-                    f"{self.platform.name}(log_recovery) Successfully recovered log for job '{self.name}' and retry '{self.fail_count}'.")
-        self.log_recovered = log_recovered
+                self._sync_retrieve_logfiles()
+                self.check_compressed_local_logs()
+                self.write_stats(attempt)
+                success = True
+                result_local = self.local_logs
+                result_remote = self.remote_logs
+
+        except Exception as exc:
+            self._restore_previous_state(backup_log_local, backup_log_remote, backup_submit_time, backup_id)
+            error = str(exc)
+
+        return RecoveryAttempt(
+            attempt=attempt,
+            success=success,
+            local_logs=result_local,
+            remote_logs=result_remote,
+            error=error,
+        )
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
@@ -1472,64 +1483,36 @@ class Job(object):
                 time_params[name] = int(param)
         return datetime.timedelta(**time_params)
 
-    # TODO: Duplicated for wrappers and jobs to fix in 4.1.X but in wrappers is called
-    #       _is_over_wallclock for unknown reasons.
-    def is_over_wallclock(self) -> bool:
+    def is_over_wallclock(self, effective_wallclock=None) -> bool:
         """Check if the job is over the wallclock time, it is an alternative method to avoid platform issues."""
-        elapsed = datetime.datetime.now() - self.start_time
-        if int(elapsed.total_seconds()) > self.wallclock_in_seconds:
+        if not effective_wallclock:
+            effective_wallclock = self.wallclock_in_seconds
+        if not self.start_time_timestamp:  # Fallback, this should not happen as start_time_timestamp is set when the job is running
+            Log.warning(f"Job {self.name} does not have start time timestamp, trying to set it from remote stat file")
+            self.platform.set_start_time_from_remote_stat_file([self])
+        elapsed = datetime.datetime.now() - datetime.datetime.strptime(str(self.start_time_timestamp), "%Y%m%d%H%M%S")
+        if int(elapsed.total_seconds()) > effective_wallclock:
             Log.warning(f"Job {self.name} is over wallclock time, Autosubmit will check if it is completed")
             return True
         return False
 
-    def update_status(self, as_conf: AutosubmitConfig, failed_file: bool = False) -> Status:
+    def update_status(self, as_conf: AutosubmitConfig) -> Status:
         """Updates job status, checking COMPLETED file if needed.
 
         :param as_conf: Autosubmit configuration.
-        :param failed_file: boolean, if True, checks if the job failed
         :return: The new status.
         """
         previous_status = self.status
+
         self.prev_status = previous_status
-        new_status = self.new_status
-        if new_status == Status.COMPLETED:
-            Log.debug(f"{self.name} job seems to have completed: checking...")
-            self.check_completion()
-        else:
-            self.status = new_status
-
-        if self.status == Status.RUNNING:
-            Log.info(f"Job {self.name} is RUNNING")
-        elif self.status == Status.QUEUING:
-            Log.info(f"Job {self.name} is QUEUING")
-        elif self.status == Status.HELD:
-            Log.info(f"Job {self.name} is HELD")
-        elif self.status == Status.COMPLETED:
-            Log.result(f"Job {self.name} is COMPLETED")
-        elif self.status == Status.FAILED:
-            if not failed_file:
-                if self.status == Status.COMPLETED:
-                    Log.result(f"Job {self.name} is COMPLETED")
-                else:
-                    self.update_children_status()
-        elif self.status == Status.UNKNOWN:
-            Log.printlog(f"Job {self.name} is UNKNOWN. Checking completed files to confirm the failure...", 3000)
-            self.check_completion(Status.UNKNOWN)
-            if self.status == Status.UNKNOWN:
-                Log.printlog(f"Job {self.name} is UNKNOWN. Checking completed files to confirm the failure...", 6009)
-            elif self.status == Status.COMPLETED:
-                Log.result(f"Job {self.name} is COMPLETED")
-        elif self.status == Status.SUBMITTED:
-            # after checking the jobs , no job should have the status "submitted"
-            Log.printlog(f"Job {self.name} in SUBMITTED status. This should never happen on this step..", 6008)
-
-        # Updating logs
-        if self.status in [Status.COMPLETED, Status.FAILED, Status.UNKNOWN]:
-            if str(as_conf.platforms_data.get(self.platform.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                          "false")).lower() == "true":
-                self.retrieve_logfiles(raise_error=True)
-            else:
-                self.platform.add_job_to_log_recover(self)
+        if self.new_status in [Status.FAILED, Status.COMPLETED, Status.UNKNOWN]:
+            self.check_completion(default_status=Status.FAILED if self.new_status in [Status.COMPLETED,
+                                                                                      Status.FAILED] else Status.UNKNOWN)
+        if self.status != self.new_status:
+            Log.result(
+                f"Job {self.name} changed from {self.status_str} to {Status.VALUE_TO_KEY.get(self.new_status, 'UNKNOWN')}")
+            self.status = self.new_status
+            Log.status(f"Job {self.name} and id: {self.id} is {self.status_str}")
 
             # Read and store metrics here
             try:
@@ -1558,24 +1541,21 @@ class Job(object):
                 child.status = Status.FAILED
                 children += list(child.children)
 
-    def check_completion(self, default_status=Status.FAILED, over_wallclock=False):
-        """ Fetches the COMPLETED file from the platform and to COMPLETED if *COMPLETED* file exists and to FAILED otherwise.
+    def check_completion(self, default_status=Status.FAILED):
+        """Check whether a COMPLETED file exists on the platform.
 
-        :param over_wallclock:
-        :param default_status: status to set if job is not completed. By default, it is FAILED
+        This method sets ``self.new_status`` (the *proposed* status), not
+        ``self.status`` (the committed status). The caller must later call
+        ``update_status()`` to commit the change.
+
+        :param default_status: Status to propose when the COMPLETED file is
+            absent. Defaults to ``Status.FAILED``.
         :type default_status: Status
         """
         if self.platform.get_completed_job_names([self.name]):
-            if not over_wallclock:
-                self.status = Status.COMPLETED
-            else:
-                return Status.COMPLETED
+            self.new_status = Status.COMPLETED
         else:
-            Log.warning(f"Couldn't find {self.name} COMPLETED file")
-            if not over_wallclock:
-                self.status = default_status
-            else:
-                return default_status
+            self.new_status = default_status
 
     def get_metric_folder(self, as_conf: AutosubmitConfig) -> str:
         """
@@ -1857,7 +1837,8 @@ class Job(object):
                     try:
                         self.custom_directives = json.loads(self.custom_directives)
                     except (ValueError, TypeError) as e:
-                        raise AutosubmitCritical(f"Error parsing custom directives: '{self.custom_directives}: {e}'", 6000)
+                        raise AutosubmitCritical(f"Error parsing custom directives: '{self.custom_directives}: {e}'",
+                                                 6000)
 
             if len(self.het['CUSTOM_DIRECTIVES']) < self.het['HETSIZE']:
                 for x in range(self.het['HETSIZE'] - len(self.het['CUSTOM_DIRECTIVES'])):
@@ -1880,7 +1861,8 @@ class Job(object):
         # Increasing according to chunk
         self.wallclock = increase_wallclock_by_chunk(self.wallclock, self.wchunkinc, chunk)
 
-    def update_platform_associated_parameters(self, as_conf: AutosubmitConfig, parameters: dict, chunk, set_attributes) -> dict:
+    def update_platform_associated_parameters(self, as_conf: AutosubmitConfig, parameters: dict, chunk,
+                                              set_attributes) -> dict:
         if set_attributes:
             self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
             self.ec_queue = str(parameters.get("CURRENT_EC_QUEUE", ""))
@@ -1944,7 +1926,8 @@ class Job(object):
             parameters['EXTENDED_HEADER'] = self.read_header_tailer_script(self.ext_header_path, as_conf, True)
             parameters['EXTENDED_TAILER'] = self.read_header_tailer_script(self.ext_tailer_path, as_conf, False)
         elif self.ext_header_path or self.ext_tailer_path:
-            Log.warning(f"An extended header or tailer is defined in {self._section}, but it is ignored in dummy projects.")
+            Log.warning(
+                f"An extended header or tailer is defined in {self._section}, but it is ignored in dummy projects.")
         else:
             parameters['EXTENDED_HEADER'] = ""
             parameters['EXTENDED_TAILER'] = ""
@@ -2184,6 +2167,7 @@ class Job(object):
             if self.checkpoint:  # To activate placeholder substitution per <empty> in the template
                 parameters["AS_CHECKPOINT"] = self.checkpoint
             self.wchunkinc = as_conf.get_wchunkinc(self.section)
+            self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
             self.validate_template = parameters.get("CURRENT_VALIDATE", False)
 
         parameters['JOBNAME'] = self.name
@@ -2208,6 +2192,9 @@ class Job(object):
         parameters['EXPORT'] = self.export
         parameters['PROJECT_TYPE'] = as_conf.get_project_type()
         parameters['X11'] = self.x11
+        parameters['WORKFLOW_COMMIT'] = self.workflow_commit
+        parameters["AS_CHECKPOINT"] = self.checkpoint
+
         return parameters
 
     def update_job_variables_final_values(self, parameters: dict) -> None:
@@ -2239,10 +2226,9 @@ class Job(object):
         self.retrials = parameters["RETRIALS"]
         self.reservation = parameters["RESERVATION"]
 
-    def reset_logs(self, as_conf: AutosubmitConfig) -> None:
-        self.log_recovered = False
-        self.packed_during_building = False
-        self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
+    def reset_logs(self) -> None:
+        """Reset job log counters."""
+        self.updated_log = 0
 
     def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
         """Find and substitute dynamic placeholders in `parameters` using the provided
@@ -2322,7 +2308,7 @@ class Job(object):
         if set_attributes:
             as_conf.reload()
             if reset_logs:
-                self.reset_logs(as_conf)
+                self.reset_logs()
             self._init_runtime_parameters()
             if not hasattr(self, "start_time"):
                 self.start_time = datetime.datetime.now()
@@ -2512,7 +2498,8 @@ class Job(object):
             text=True
         )
         if result.returncode:
-            raise AutosubmitCritical(f"Syntax error in generated R script for job {self.name}: {result.stderr.strip()}", 7014)
+            raise AutosubmitCritical(f"Syntax error in generated R script for job {self.name}: {result.stderr.strip()}",
+                                     7014)
 
         return result.returncode == 0
 
@@ -2532,7 +2519,8 @@ class Job(object):
             text=True
         )
         if result.returncode:
-            raise AutosubmitCritical(f"Syntax error in generated Bash script for job {self.name}: {result.stderr.strip()}", 7014)
+            raise AutosubmitCritical(
+                f"Syntax error in generated Bash script for job {self.name}: {result.stderr.strip()}", 7014)
 
         return result.returncode == 0
 
@@ -2677,21 +2665,22 @@ class Job(object):
 
         return out
 
-    def update_local_logs(self, count: int = -1, update_submit_time: bool = True) -> None:
-        if update_submit_time:
-            self.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
-        if count > 0:
-            self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out_retrial_{count}",
-                               f"{self.name}.{self.submit_time_timestamp}.err_retrial_{count}")
+    def update_local_logs(self) -> None:
+        """Updates the local log filenames based on the fail count."""
+
+        if self.fail_count > 0:
+            self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out_attempt_{self.fail_count}",
+                               f"{self.name}.{self.submit_time_timestamp}.err_attempt_{self.fail_count}")
         else:
             self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out",
                                f"{self.name}.{self.submit_time_timestamp}.err")
 
-    def check_compressed_local_logs(self) -> None:
+    def check_compressed_local_logs(self) -> bool:
         """
         Checks if the current local log files are compressed versions (.gz or .xz)
         and updates the local_logs attribute accordingly.
         """
+        compressed = False
         compress_ext = [".gz", ".xz"]
         _aux_local_logs = list(copy.deepcopy(self.local_logs))
         for i, log_file in enumerate(self.local_logs):
@@ -2699,44 +2688,97 @@ class Job(object):
                 _aux_path = Path(self._tmp_path, f"LOG_{self.expid}").joinpath(log_file + ext)
                 if _aux_path.exists():
                     Log.debug(f"Found compressed log file: {_aux_path}")
+                    compressed = True
                     _aux_local_logs[i] += ext
                     break
-        self.local_logs = tuple(_aux_local_logs)
+        if compressed:
+            self.local_logs = tuple(_aux_local_logs)
+        return compressed
+
+    # TODO: To be removed when we rid of the TOTAL_STATS file used across multiple functions
+    def _write_time(self, column: str) -> None:
+        """Write a timestamp to a specific position in the TOTAL_STATS file ensuring that each
+        record has four whitespace-separated fields: submit start end status.
+
+        """
+
+        if column == "start":
+            value_to_write = str(self.start_time_timestamp)
+        elif column == "end":
+            value_to_write = str(self.finish_time_timestamp)
+        elif column == "submit":
+            value_to_write = str(self.submit_time_timestamp)
+        else:
+            value_to_write = self.status_str
+
+        path = Path(self._tmp_path) / f"{self.name}_TOTAL_STATS"
+        if path.exists():
+            text = path.read_text(encoding='utf-8')
+            lines: List[str] = text.splitlines()
+        else:
+            lines = []
+
+        if not lines or column == "submit":
+            lines.append('submit start end status')
+
+        lines[-1] = re.sub(rf'{column}', value_to_write, lines[-1])
+
+        with path.open('w', encoding='utf-8') as f:
+            f.write('\n'.join(lines))
 
     def write_submit_time(self) -> None:
-        """Writes submit date and time to the ``TOTAL_STATS`` file.
-
-        It doesn't write if hold is True.
-        """
-        data_time = ["", int(datetime.datetime.strptime(self.submit_time_timestamp, "%Y%m%d%H%M%S").timestamp())]
-        path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
-        if os.path.exists(path):
-            with open(path, 'a') as f:
-                f.write('\n')
-                f.write(self.submit_time_timestamp)
-        else:
-            with open(path, 'w') as f:
-                f.write(self.submit_time_timestamp)
+        """Writes submit date and time to the ``TOTAL_STATS`` file."""
+        self._write_time("submit")
 
         # Writing database
         exp_history = ExperimentHistory(self.expid)
-        exp_history.write_submit_time(self.name, submit=data_time[1],
-                                      status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), ncpus=self.processors,
+
+        status = self.status if self.status == Status.COMPLETED else Status.FAILED
+        # TODO: for compatibility reasons.. convert back to EPOCH for database storage
+        exp_history.write_submit_time(self.name, submit=self._datestr_to_epoch(str(self.submit_time_timestamp)),
+                                      status=Status.VALUE_TO_KEY.get(status, "UNKNOWN"), ncpus=0,
                                       wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member,
                                       section=self.section, chunk=self.chunk,
                                       platform=self.platform_name, job_id=self.id, wrapper_queue=self._wrapper_queue,
-                                      wrapper_code=get_job_package_code(self.expid, self.name),
-                                      children=self.children_names_str, workflow_commit=self.workflow_commit)
+                                      wrapper_code=2 if not self.packed else 1,
+                                      children=self.children_names_str, workflow_commit=self.workflow_commit,
+                                      split=self.split if self.split and int(self.split) > 0 else None,
+                                      splits=self.splits if self.splits and int(self.splits) > 0 else None,
+                                      fail_count=self.fail_count)
+
+    def update_submit_time_on_db(self) -> None:
+        """Updates an existing job submission entry in the history database for the current fail count.
+
+        Unlike :meth:`write_submit_time`, this method does not insert a new record but instead updates
+        the existing one identified by the job name and the current :attr:`fail_count`.
+        """
+        exp_history = ExperimentHistory(self.expid)
+        # TODO: for compatibility reasons.. convert back to EPOCH for database storage
+        status = self.status if self.status == Status.COMPLETED else Status.FAILED
+        exp_history.update_submit_time(self.name, submit=self._datestr_to_epoch(str(self.submit_time_timestamp)),
+                                       status=Status.VALUE_TO_KEY.get(status, "UNKNOWN"), ncpus=0,
+                                       wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member,
+                                       section=self.section, chunk=self.chunk,
+                                       platform=self.platform_name, job_id=self.id,
+                                       wrapper_queue=self._wrapper_queue,
+                                       wrapper_code=2 if not self.packed else 1,
+                                       children=self.children_names_str, workflow_commit=self.workflow_commit,
+                                       split=self.split if self.split and int(self.split) > 0 else None,
+                                       splits=self.splits if self.splits and int(self.splits) > 0 else None,
+                                       fail_count=self.fail_count)
 
     def update_start_time(self, count=-1):
+        """Updates the job's start time based on the count of retries.
+        :param count: The retry count.
+        :type count: int
+        """
         start_time_ = self.check_start_time(count)  # last known start time from the .cmd file
         if start_time_:
-            self.start_time_timestamp = start_time_
+            self.start_time_timestamp = datetime.datetime.fromtimestamp(start_time_).strftime("%Y%m%d%H%M%S")
         else:
-            Log.warning(f"Start time for job {self.name} not found in the .cmd file, using last known time.")
-            self.start_time_timestamp = self.start_time_timestamp if self.start_time_timestamp else time.time()
-        if count > 0 or not self.first_wrapped_level:
-            self.submit_time_timestamp = date2str(datetime.datetime.fromtimestamp(self.start_time_timestamp), 'S')
+            Log.warning(f"Start time for job {self.name} not found in the STAT file, using last known time.")
+            self.start_time_timestamp = self.start_time_timestamp if self.start_time_timestamp else date2str(
+                datetime.datetime.now(), 'S')
 
     def fix_local_logs_timestamps(self, current_timestamp: str, new_timestamp: str) -> None:
         """
@@ -2763,38 +2805,33 @@ class Job(object):
                 else:
                     Log.debug(f"Log file {old_log_path} does not exist, skipping rename.")
 
-    def write_start_time(self, count=-1, vertical_wrapper=False):
-        """
-        Writes start date and time to TOTAL_STATS file
+    def write_start_time(self, fail_count: int = -1):
+        """Writes start date and time to TOTAL_STATS file and the history database.
+
+        :param fail_count: The fail count to identify the correct database row.
+                           Defaults to ``self.fail_count``.
+        :type fail_count: int
         :return: True if successful, False otherwise
         :rtype: bool
         """
-        if not vertical_wrapper:
-            self.update_start_time(count)
-        path = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
-        f = open(path, 'a')
-        f.write(' ')
-        # noinspection PyTypeChecker
-        f.write(date2str(datetime.datetime.fromtimestamp(self.start_time_timestamp), 'S'))
-        # Writing database
+        if fail_count < 0:
+            fail_count = self.fail_count
+        self._write_time("start")
         exp_history = ExperimentHistory(self.expid)
-        exp_history.write_start_time(self.name, start=self.start_time_timestamp,
-                                     status=Status.VALUE_TO_KEY.get(self.status, "UNKNOWN"), qos=self.queue,
+        # TODO: for compatibility reasons.. convert back to EPOCH for database storage
+        status = self.status if self.status == Status.COMPLETED else Status.FAILED
+        exp_history.write_start_time(self.name, start=self._datestr_to_epoch(str(self.start_time_timestamp)),
+                                     status=Status.VALUE_TO_KEY.get(status, "UNKNOWN"), qos=self.queue,
                                      job_id=self.id, wrapper_queue=self._wrapper_queue,
-                                     wrapper_code=get_job_package_code(self.expid, self.name),
-                                     children=self.children_names_str)
+                                     wrapper_code=0 if not self.packed else 1,
+                                     children=self.children_names_str,
+                                     fail_count=fail_count)
         return True
 
-    def write_vertical_time(
-            self, count: int = -1, first_submit_timestamp: str = ''
-    ) -> None:
-        self.update_start_time(count=count)
-        self.update_local_logs(update_submit_time=False, count=count)
-        self.fix_local_logs_timestamps(first_submit_timestamp, self.submit_time_timestamp)
-        self.check_compressed_local_logs()
-        self.write_submit_time()
-        self.write_start_time(count=count, vertical_wrapper=True)
-        self.write_end_time(self.status == Status.COMPLETED, count=count)
+    @staticmethod
+    def _datestr_to_epoch(timestamp: str) -> int:
+        """Convert a date string in the format YYYYMMDDHHMMSS to epoch time."""
+        return int(datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S").timestamp())
 
     def write_end_time(self, completed, count=-1):
         """Writes end timestamp to TOTAL_STATS file and jobs_data.db
@@ -2803,27 +2840,26 @@ class Job(object):
         :param count: number of retrials
         :type count: int
         """
+        self.status = Status.COMPLETED if completed else Status.FAILED
         end_time = self.check_end_time(count)
         if end_time > 0:
-            self.finish_time_timestamp = int(end_time)
+            self.finish_time_timestamp = datetime.datetime.fromtimestamp(end_time).strftime("%Y%m%d%H%M%S")
         if not self.finish_time_timestamp:
-            self.finish_time_timestamp = int(time.time())
-        with open(Path(self._tmp_path) / f"{self.name}_TOTAL_STATS", 'a') as stat_file:
-            stat_file.write(' ')
-            stat_file.write(date2str(datetime.datetime.fromtimestamp(int(self.finish_time_timestamp)), 'S'))
-            stat_file.write(' ')
+            self.finish_time_timestamp = date2str(datetime.datetime.now(), 'S')
+        self._write_time("end")
+        self._write_time("status")
 
-            if completed:
-                final_status = "COMPLETED"
-                stat_file.write('COMPLETED')
-            else:
-                final_status = "FAILED"
-                stat_file.write('FAILED')
         out, err = self.local_logs
         # Launch first as simple non-threaded function
         exp_history = ExperimentHistory(self.expid)
-        job_data_dc = exp_history.write_finish_time(self.name, finish=self.finish_time_timestamp, status=final_status,
-                                                    job_id=self.id, out_file=out, err_file=err)
+        # TODO: For compatibility reasons.. convert back to EPOCH for database storage
+        status = self.status if self.status == Status.COMPLETED else Status.FAILED
+        status_str = Status.VALUE_TO_KEY.get(status, "UNKNOWN")
+        job_data_dc = exp_history.write_finish_time(self.name,
+                                                    finish=self._datestr_to_epoch(str(self.finish_time_timestamp)),
+                                                    status=status_str,
+                                                    job_id=self.id, out_file=out, err_file=err,
+                                                    fail_count=count if count >= 0 else self.fail_count)
 
         # Launch second as threaded function only for slurm
         if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
@@ -2831,6 +2867,51 @@ class Job(object):
                                          args=(job_data_dc, self.platform))
             thread_write_finish.name = "JOB_data_{}".format(self.name)
             thread_write_finish.start()
+
+    def _get_submit_data_dc_from_db(self, attempt: int):
+        """Retrieve submit data from the experiment history database for a given attempt.
+
+        :param attempt: The attempt (fail_count) to look up.
+        :type attempt: int
+        :return: The JobData for the submit record, or None if not found.
+        """
+        exp_history = ExperimentHistory(self.expid)
+        return exp_history.get_submit_data_dc(self.name, attempt)
+
+    def _get_finish_time_from_db(self, attempt: int):
+        """
+        Retrieve finish data from the experiment history database for a given attempt.
+
+        :param attempt: The attempt (fail_count) to look up.
+        :type attempt: int
+        :return: The JobData for the finish record, or None if not found.
+        """
+        exp_history = ExperimentHistory(self.expid)
+        return exp_history.get_finish_data_dc(self.name, attempt)
+
+    def update_submit_time_and_job_id(self, attempt: int) -> None:
+        """Update the submit time and job ID of the job from the database.
+
+        :param attempt: The retry count used to determine the matching database record.
+        :type attempt: int
+        """
+        job_data_dc = self._get_submit_data_dc_from_db(attempt)
+
+        if job_data_dc and job_data_dc.submit_datetime:
+            if self.wrapper_type == "vertical" and self.fail_count > 0:
+                previous_attempt_job_data_dc = self._get_finish_time_from_db(self.fail_count - 1)
+                if previous_attempt_job_data_dc and previous_attempt_job_data_dc.finish_datetime:
+                    self.submit_time_timestamp = previous_attempt_job_data_dc.finish_datetime.strftime("%Y%m%d%H%M%S")
+                    self.update_submit_time_on_db()
+                else:
+                    self.submit_time_timestamp = job_data_dc.submit_datetime.strftime("%Y%m%d%H%M%S")
+
+            else:
+                self.submit_time_timestamp = job_data_dc.submit_datetime.strftime("%Y%m%d%H%M%S")
+            self.id = job_data_dc.job_id
+        else:
+            Log.warning(f"Submit time for job {self.name} and retrial {attempt} not found in the database. "
+                        f"Keeping the previous submit time timestamp.")
 
     def check_started_after(self, date_limit):
         """
@@ -2882,42 +2963,14 @@ class Job(object):
         return False
 
     def synchronize_logs(self, platform: 'Platform', remote_logs, local_logs, last=True):
-        platform.move_file(remote_logs[0], local_logs[0], True)  # .out
-        platform.move_file(remote_logs[1], local_logs[1], True)  # .err
+        platform.move_file(remote_logs[0], local_logs[0])  # .out
+        platform.move_file(remote_logs[1], local_logs[1])  # .err
         if last and local_logs[0] != "":
             self.local_logs = local_logs
             self.remote_logs = copy.deepcopy(local_logs)
 
-    def _recover_last_log_name_from_filesystem(self) -> bool:
-        """
-        Recovers the log name for the job from the filesystem.
-        :return: True if the log name was already recovered, False otherwise
-        :rtype: bool
-        """
-        log_name: Optional[list[Path]] = sorted(list(self._log_path.glob(f"{self.name}*")), key=lambda x: x.stat().st_mtime)
-        log_name_path = log_name[-1] if log_name else None
-        if log_name_path:
-            file_timestamp = int(datetime.datetime.fromtimestamp(log_name_path.stat().st_mtime).strftime("%Y%m%d%H%M%S"))
-            if self.ready_date and file_timestamp >= int(self.ready_date):
-                self.local_logs = (log_name_path.with_suffix(".out").name, log_name_path.with_suffix(".err").name)
-                self.remote_logs = copy.deepcopy(self.local_logs)
-                return True
-        self.local_logs = (f"{self.name}.out.{self._fail_count}", f"{self.name}.err.{self._fail_count}")
-        self.remote_logs = copy.deepcopy(self.local_logs)
-        return False
-
-    def recover_last_log_name(self):
-        """
-        Recovers the last log name for the job
-        """
-        if not self.updated_log:
-            self.updated_log = self._recover_last_log_name_from_filesystem()
-            # TODO: After PostgreSQL migration, implement _recover_last_log_from_db() to retrieve the last log from the database.
-
     def recover_last_ready_date(self) -> None:
-        """
-        Recovers the last ready date for this job
-        """
+        """Recovers the last ready date for this job"""
         if not self.ready_date:
             stat_file = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
             if stat_file.exists():
@@ -2935,6 +2988,26 @@ class Job(object):
                         '%Y%m%d%H%M%S')
                     Log.debug(f"Failed to recover ready date for the job {self.name}")
 
+    def send_cpmip_notification(self, as_conf) -> None:
+        """Capture CPMIP metrics for *job* and send them as a notification.
+
+        Called before job attributes are cleared upon termination.
+        If capture fails (returns None) the notification is silently skipped.
+        If the notification itself fails the error is logged but not re-raised.
+
+        :param as_conf: experiment_configuration"""
+        # Lazy import to avoid circular dependency:
+        # statistics.utils -> job -> cpmip_notifier -> statistics.jobs_stat -> statistics.utils
+        from autosubmit.notifications.cpmip_notifier import CPMIPNotifier
+
+        cpmip_evaluation = CPMIPNotifier.capture(self, as_conf)
+
+        if cpmip_evaluation is not None:
+            try:
+                CPMIPNotifier.notify(as_conf, self.expid, self, cpmip_evaluation)
+            except Exception as error:
+                Log.error(f"Error sending CPMIP notification for {self.name}: {error}")
+
 
 class WrapperJob(Job):
     """Defines a wrapper from a package.
@@ -2949,6 +3022,7 @@ class WrapperJob(Job):
     :param total_wallclock: Wallclock of the package
     :param platform: Platform object defined for the package
     :param as_config: Autosubmit basic configuration object
+    :param hold: Whether the wrapper job is held on submission.
     """
 
     def __init__(
@@ -2961,7 +3035,11 @@ class WrapperJob(Job):
             total_wallclock: str,
             platform: 'ParamikoPlatform',
             as_config: AutosubmitConfig,
-            hold: bool,
+            hold: bool = False,
+            sections=None,
+            method=None,
+            wr_type=None,
+            num_processors=None
     ):
         super(WrapperJob, self).__init__(name, job_id, status, priority)
         self.failed = False
@@ -2969,13 +3047,17 @@ class WrapperJob(Job):
         # divide jobs in dictionary by state?
         self.wallclock = total_wallclock  # Now it is reloaded after a run -> stop -> run
         self.running_jobs_start: OrderedDict = OrderedDict()
+        self.hold = hold
         self._platform: 'ParamikoPlatform' = platform
         self.as_config = as_config
         # save start time, wallclock and processors?!
         self.checked_time = datetime.datetime.now()
-        self.hold = hold
         self.inner_jobs_running: list = list()
         self.is_wrapper = True
+        self.sections = sections
+        self.type = wr_type
+        self.method = method
+        self.num_processors = num_processors
 
     def _queuing_reason_cancel(self, reason: str) -> bool:
         """Function return True if a job was cancelled for a listed reason.
@@ -3005,143 +3087,185 @@ class WrapperJob(Job):
         except Exception:
             return False
 
-    def check_status(self, status: str) -> None:
-        """Update the status of a job, saving its previous status and update the current one.
+    @staticmethod
+    def _is_finished(job: Job, wrapper_job_set) -> bool:
+        """Return True if job counts as finished within this wrapper.
 
-        In case of failure it'll log all the files that were correctly created.
-
-        :param status: Reason of a job to be cancelled
+        A WAITING job counts as finished only when at least one of its
+        parents that also belongs to this wrapper has FAILED status.
         """
-        prev_status = self.status
-        self.prev_status = prev_status
-        self.status = status
+        if job.status in (Status.COMPLETED, Status.FAILED):
+            return True
+        if job.status == Status.WAITING:
+            return any(
+                parent.status == Status.FAILED
+                for parent in job.parents
+                if parent in wrapper_job_set
+            )
+        return False
 
-        Log.debug('Checking inner jobs status')
-        if self.status in [Status.HELD, Status.QUEUING]:  # If WRAPPER is QUEUED OR HELD
-            # This will update the inner jobs to QUEUE or HELD (normal behaviour) or WAITING ( if they fail to be held)
-            self._check_inner_jobs_queue(prev_status)
-        elif self.status == Status.RUNNING:  # If wrapper is running
-            # Log.info("Wrapper {0} is {1}".format(self.name, Status().VALUE_TO_KEY[self.status]))
-            # This will update the status from submitted or hold to running
-            # (if safety timer is high enough or queue is fast enough)
-            if prev_status in [Status.SUBMITTED]:
-                for job in self.job_list:
-                    job.status = Status.QUEUING
-            self._check_running_jobs()  # Check and update inner_jobs status that are eligible
-        # Completed wrapper will always come from check function.
-        elif self.status == Status.COMPLETED:
-            self._check_running_jobs()  # Check and update inner_jobs status that are eligible
-            self.check_inner_jobs_completed(self.job_list)
+    @staticmethod
+    def _inner_job_can_run(inner_job: Job, wrapper_job_set) -> bool:
+        """Return True if the inner job can run within this wrapper.
 
-        # Fail can come from check function or running/completed checkers.
-        if self.status in [Status.FAILED, Status.UNKNOWN]:
-            self.status = Status.FAILED
-            if self.prev_status in [Status.SUBMITTED, Status.QUEUING]:
-                self.update_failed_jobs(True)  # check false ready jobs
-            elif self.prev_status in [Status.FAILED, Status.UNKNOWN]:
-                self.failed = True
-                self._check_running_jobs()
-            if len(self.inner_jobs_running) > 0:
-                still_running = True
-                if not self.failed:
-                    if self._platform.check_file_exists('WRAPPER_FAILED', wrapper_failed=True):
-                        for job in self.inner_jobs_running:
-                            if job.platform.check_file_exists(f'{job.name}_FAILED', wrapper_failed=True):
-                                Log.info(
-                                    f"Wrapper {self.name} Failed, checking inner_jobs...")
-                                self.failed = True
-                                self._platform.delete_file('WRAPPER_FAILED')
-                                break
-                if self.failed:
-                    self.update_failed_jobs()
-                    if len(self.inner_jobs_running) <= 0:
-                        still_running = False
-            else:
-                still_running = False
-            if not still_running:
-                self.cancel_failed_wrapper_job()
-
-    def check_inner_jobs_completed(self, jobs: List[Job]) -> None:
-        """Will get all the jobs that the status are not completed and check if it was completed or not.
-
-        :param jobs: Jobs inside the wrapper
+        A inner_job can run when all of its parents of the current wrapper have COMPLETED status.
         """
-        not_completed_jobs = [
-            job for job in jobs if job.status != Status.COMPLETED]
-        not_completed_job_names = [job.name for job in not_completed_jobs]
-        job_names = ' '.join(not_completed_job_names)
-        if job_names:
-            completed_files = self._platform.check_completed_files(job_names)
-            completed_jobs = []
-            for job in not_completed_jobs:
-                if completed_files and len(completed_files) > 0:
-                    if job.name in completed_files:
-                        completed_jobs.append(job)
-                        job.new_status = Status.COMPLETED
-                        job.updated_log = False
-                        job.update_status(self.as_config)
+        return all(
+            parent.status == Status.COMPLETED or parent.new_status == Status.COMPLETED
+            for parent in inner_job.parents
+            if parent in wrapper_job_set
+        )
 
-            for job in completed_jobs:
-                self.running_jobs_start.pop(job, None)
+    def _handle_vertical_retries(self) -> None:
+        """Increment fail_count for vertical inner jobs eligible for retry."""
+        for inner_job in self.job_list:
+            if (inner_job.status == Status.FAILED and
+                    inner_job.wrapper_type == "vertical" and
+                    inner_job.updated_log > inner_job.fail_count and
+                    inner_job.fail_count < inner_job.retrials):
+                inner_job.inc_fail_count()
 
-            not_completed_jobs = list(
-                set(not_completed_jobs) - set(completed_jobs))
-
-        for job in not_completed_jobs:
-            self._check_finished_job(job)
-
-    def _check_inner_jobs_queue(self, prev_status: str) -> None:
-        """Update previous status of a job and updating the job to a new status.
-
-        If the platform being used is slurm the function will get the status of all the jobs,
-        get the parsed queue reason and cancel and fail jobs that has a known reason.
-
-        If job is held by admin or user the job will be held to be executed later.
-
-        :param prev_status: previous status of a job
+    def _apply_io_safe_wait(self, inner_job: Job, current_stat: Status, timeout_to: Status,
+                            keep_alive: Status = None) -> Status:
+        """Track elapsed time since wrapper finished; timeout transitions to timeout_to.
+        :param inner_job: The inner job to check.
+        :type inner_job: Job
+        :param current_stat: The current status of the inner job.
+        :type current_stat: Status
+        :param timeout_to: The status to transition to if the IO_SAFE_WAIT time has elapsed.
+        :type timeout_to: Status
+        :param keep_alive: Optional status to return if still within IO_SAFE_WAIT time.
+        :type keep_alive: Status, optional
+        :return: The new status for the inner job based on the IO_SAFE_WAIT logic.
+        :rtype: Status
         """
-        reason = str()
-        if self._platform.type == 'slurm':
-            self._platform.send_command(
-                self._platform.get_queue_status_cmd(self.id))
-            reason = self._platform.parse_queue_reason(
-                self._platform._ssh_output, self.id)
-            if self._queuing_reason_cancel(reason):
-                Log.printlog(f"Job {self.name} will be cancelled and set to FAILED as it was queuing due to {reason}",
-                             6009)
-                # while running jobs?
-                self._check_running_jobs()
-                self.update_failed_jobs(check_ready_jobs=True)
-                self.cancel_failed_wrapper_job()
+        if not inner_job.finished_time:
+            inner_job.finished_time = time.time()
+        elapsed = time.time() - inner_job.finished_time
+        if elapsed >= self.platform.IO_SAFE_WAIT:
+            inner_job.finished_time = None
+            return timeout_to
+        return keep_alive if keep_alive is not None else current_stat
 
-                return
-            if reason == '(JobHeldUser)':
-                if self.hold == "false":
-                    # SHOULD BE MORE CLASS
-                    # GET_scontrol release but not sure if this can be implemented on others PLATFORMS
-                    self._platform.send_command("scontrol release " + f"{self.id}")
-                    self.new_status = Status.QUEUING
-                    for job in self.job_list:
-                        job.hold = self.hold
-                        job.new_status = Status.QUEUING
-                        job.update_status(self.as_config)
-                    Log.info(f"Job {self.name} is QUEUING {reason}")
-                else:
-                    self.status = Status.HELD
-                    Log.info(f"Job {self.name} is HELD")
-            elif reason == '(JobHeldAdmin)':
-                Log.debug(
-                    f"Job {self.name} Failed to be HELD, canceling... ", )
-                self._platform.send_command(self._platform.cancel_cmd + f" {self.id}")
-                self.status = Status.WAITING
-            else:
-                Log.info(f"Job {self.name} is QUEUING {reason}")
-        if prev_status != self.status:
-            for job in self.job_list:
-                job.hold = self.hold
-                job.status = self.status
+    def _compute_inner_job_status(self, inner_job: Job, stat_statuses: dict,
+                                  wrapper_is_done: bool) -> Status:
+        """Determine the new status for a single inner job.
+        :param inner_job: The inner job to compute the status for.
+        :type inner_job: Job
+        :param stat_statuses: A dictionary mapping job names to their statuses as determined by platform stat checks.
+        :type stat_statuses: dict
+        :param wrapper_is_done: Whether the wrapper job is in a done state (COMPLETED or FAILED).
+        :type wrapper_is_done: bool
+        :return: The new status for the inner job.
+        :rtype: Status
+        """
+        if not self._inner_job_can_run(inner_job, self.job_list):
+            return Status.SUBMITTED
 
-    def _check_inner_job_wallclock(self, job: Job) -> bool:
+        stat = stat_statuses.get(inner_job.name, inner_job.status)
+
+        if stat == Status.RUNNING and wrapper_is_done:
+            return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.FAILED)
+        elif stat == Status.FAILED:
+            pass
+        elif stat == Status.QUEUING and wrapper_is_done:
+            return self._apply_io_safe_wait(inner_job, Status.QUEUING, Status.QUEUING,
+                                            keep_alive=Status.RUNNING)
+
+        return stat
+
+    def _check_wrapper_wallclock_and_handle(self) -> bool:
+        """Return True if over-wallclock and handled (wrapper set to FAILED)."""
+        over_wallclock = False
+        for inner_job in [job for job in self.job_list if job.status == Status.RUNNING]:
+            if self._check_inner_job_wallclock(inner_job, vertical_wrapper=self.wrapper_type == "vertical"):
+                over_wallclock = True
+            if self.is_over_wallclock():
+                over_wallclock = True
+
+        if not over_wallclock:
+            return False
+
+        self.platform.cancel_jobs([self.id])
+        self.new_status = Status.FAILED
+        for inner_job in self.job_list:
+            if inner_job.new_status == Status.RUNNING:
+                inner_job.new_status = Status.FAILED
+            elif inner_job.new_status not in [Status.COMPLETED, Status.FAILED]:
+                inner_job.new_status = Status.WAITING
+        return True
+
+    def _sync_inner_job_statuses(self, as_conf: AutosubmitConfig) -> None:
+        """Persist status changes for inner jobs that have transitioned.
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        """
+        for inner_job in [inner_job for inner_job in self.job_list if inner_job.status != inner_job.new_status]:
+            inner_job.update_status(as_conf)
+
+    def _finalize_wrapper_completion(self, as_conf: AutosubmitConfig) -> bool:
+        """Reset pending inner jobs to WAITING and log. Returns True if save is needed.
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        """
+        pending = [Status.QUEUING, Status.SUBMITTED, Status.RUNNING]
+
+        if any(inner_job.status == Status.RUNNING for inner_job in self.job_list):
+            self.status = Status.RUNNING
+            return False  # Not finalized yet
+
+        for inner_job in (j for j in self.job_list if j.status in pending):
+            if inner_job.status in [Status.QUEUING, Status.SUBMITTED]:
+                inner_job.new_status = Status.WAITING
+                inner_job.update_status(as_conf)
+
+        if self.status == Status.COMPLETED:
+            Log.result(f"Wrapper job {self.name} and id {self.id} finished with status {self.status_str}.")
+        elif self.status == Status.FAILED:
+            Log.warning(f"Wrapper job {self.name} and id {self.id} finished with status {self.status_str}.")
+
+        return True
+
+    def check_and_update_status(self, as_conf: AutosubmitConfig) -> bool:
+        """Check the status of the wrapper job and its inner jobs.
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: AutosubmitConfig
+        :return: True if the status of the wrapper job has changed, otherwise False.
+        :rtype: bool
+        """
+        save = False
+        self.platform.check_all_jobs([self], as_conf)
+        self._handle_vertical_retries()
+
+        inner_jobs_stat_statuses = self.platform.confirm_done_jobs_via_stat(self.job_list)
+        wrapper_is_done = self.new_status in [Status.COMPLETED, Status.FAILED]
+
+        for inner_job in self.job_list:
+            inner_job.new_status = self._compute_inner_job_status(
+                inner_job, inner_jobs_stat_statuses, wrapper_is_done
+            )
+
+        self.platform.set_start_time_from_remote_stat_file([
+            inner_job for inner_job in self.job_list
+            if not inner_job.start_time_timestamp and inner_job.new_status in [
+                Status.RUNNING, Status.COMPLETED, Status.FAILED
+            ]
+        ])
+
+        self._check_wrapper_wallclock_and_handle()
+
+        self._sync_inner_job_statuses(as_conf)
+        self.status = self.new_status
+
+        if self.status in [Status.COMPLETED, Status.FAILED]:
+            save = self._finalize_wrapper_completion(as_conf)
+        elif self.status != self.prev_status:
+            Log.debug(f"Wrapper job {self.name} and id {self.id} status updated to {self.status_str}.")
+            save = True
+
+        return save
+
+    def _check_inner_job_wallclock(self, job: Job, vertical_wrapper) -> bool:
         """This will check if the job is running longer than the wallclock was set to be run.
 
         :param job: The inner job of a job.
@@ -3149,217 +3273,9 @@ class WrapperJob(Job):
         :return: True if the job is running longer then wallclock, otherwise False.
         :rtype: bool
         """
-        start_time = self.running_jobs_start[job]
-        if self._is_over_wallclock(start_time, job.wallclock):
-            if job.wrapper_type != "vertical":
-                Log.printlog(f"Job {job.name} inside wrapper {self.name} is running for longer than it's wallclock!",
-                             6009)
-            return True
-        return False
-
-    def _check_running_jobs(self) -> None:
-        """Get all jobs that are not "COMPLETED" or "FAILED".
-
-        For each of the jobs still not completed that are still running a command will be
-        created and executed to either read the first few lines of the _STAT file created
-        or just print the JOB's name if the file don't exist.
-
-        Depending on the output of the file the status of a job will be set to RUNNING if
-        not over wallclock FAILED if over wallclock and not vertical wrapper.
-
-        If after 5 retries no file is created the status of the job is set to FAILED.
-        """
-        not_finished_jobs_dict: OrderedDict[str, Job] = OrderedDict()
-        self.inner_jobs_running = list()
-        not_finished_jobs = [job for job in self.job_list if job.status not in [
-            Status.COMPLETED, Status.FAILED]]
-        for job in not_finished_jobs:
-            tmp = [parent for parent in job.parents if parent.status ==
-                   Status.COMPLETED or self.status == Status.COMPLETED]
-            if job.parents is None or len(tmp) == len(job.parents):
-                not_finished_jobs_dict[job.name] = job
-                self.inner_jobs_running.append(job)
-        if len(list(not_finished_jobs_dict.keys())) > 0:  # Only running jobs will enter there
-            not_finished_jobs_names = ' '.join(list(not_finished_jobs_dict.keys()))
-            remote_log_dir = self._platform.get_remote_log_dir()
-            # PREPARE SCRIPT TO SEND
-            # When an inner_job is running? When the job has an _STAT file
-            command = textwrap.dedent(f"""
-            cd {str(remote_log_dir)}
-            for job in {str(not_finished_jobs_names)}
-            do
-                if [ -f "${{job}}_STAT_{self.fail_count}" ]
-                then
-                        echo ${{job}} $(head ${{job}}_STAT_{self.fail_count})
-                else
-                        echo ${{job}}
-                fi
-            done
-            """)
-
-            log_dir = Path(str(self._tmp_path) + f'/LOG_{self.expid}')
-            multiple_checker_inner_jobs = Path(log_dir / "inner_jobs_checker.sh")
-            if not log_dir.exists():
-                log_dir.mkdir(parents=True, exist_ok=True, mode=0o770)
-            open(multiple_checker_inner_jobs, 'w+').write(command)
-            os.chmod(multiple_checker_inner_jobs, 0o770)
-            if self.platform.name != "local":  # already "sent"...
-                self._platform.send_file(multiple_checker_inner_jobs, False)
-                command = (f"cd {self._platform.get_files_path()}; "
-                           f"{os.path.join(self._platform.get_files_path(), 'inner_jobs_checker.sh')}")
-            else:
-                command = f"cd {self._platform.get_files_path()}; ./inner_jobs_checker.sh; cd {os.getcwd()}"
-            #
-            wait = 2
-            retries = 5
-            over_wallclock = False
-            content = ''
-            while content == '' and retries > 0:
-                self._platform.send_command(command, False)
-                content = self._platform._ssh_output.split('\n')
-                # content.reverse()
-                for line in content[:-1]:
-                    out = line.split()
-                    if out:
-                        job_name = out[0]
-                        job = not_finished_jobs_dict[job_name]
-                        if len(out) > 1:
-                            if job not in self.running_jobs_start:
-                                start_time = self._check_time(out, 1)
-                                Log.info(f"Job {job_name} started at {str(parse_date(start_time))}")
-                                self.running_jobs_start[job] = start_time
-                                job.new_status = Status.RUNNING
-                                # job.status = Status.RUNNING
-                                job.update_status(self.as_config)
-                            if len(out) == 2:
-                                Log.info(f"Job {job_name} is RUNNING")
-                                over_wallclock = self._check_inner_job_wallclock(
-                                    job)  # messaged included
-                                if over_wallclock:
-                                    if job.wrapper_type != "vertical":
-                                        job.status = Status.FAILED
-                                        Log.printlog(
-                                            f"Job {job_name} is FAILED", 6009)
-                            elif len(out) == 3:
-                                end_time = self._check_time(out, 2)
-                                self._check_finished_job(job)
-                                Log.info(f"Job {job_name} finished at {str(parse_date(end_time))}")
-                if content == '':
-                    sleep(wait)
-                retries = retries - 1
-            if retries == 0 or over_wallclock:
-                self.status = Status.FAILED
-
-    def _check_finished_job(self, job: 'Job', failed_file: bool = False) -> None:
-        """Will set the jobs status to failed, unless they're completed, in which,
-        the function will change it to complete.
-
-        :param job: The job to have its status updated.
-        :param failed_file: True if system has created a file for a failed execution
-        """
-        job.new_status = Status.FAILED
-        if not failed_file:
-            wait = 2
-            retries = 2
-            output = ''
-            while output == '' and retries > 0:
-                output = self._platform.check_completed_files(job.name)
-                if output is None or len(output) == 0:
-                    sleep(wait)
-                retries = retries - 1
-            if (output is not None and len(str(output)) > 0) or 'COMPLETED' in output:
-                job.new_status = Status.COMPLETED
-            else:
-                failed_file = True
-        job.update_status(self.as_config, failed_file)
-        self.running_jobs_start.pop(job, None)
-
-    def update_failed_jobs(self, check_ready_jobs: bool = False) -> None:
-        """Check all jobs associated, and update their status either to complete or to Failed,
-        and if job is still running appends it to they inner jobs of the wrapper.
-
-        :param check_ready_jobs: if true check for running jobs with status "READY", "SUBMITTED", "QUEUING"
-        """
-        running_jobs = self.inner_jobs_running
-        real_running = copy.deepcopy(self.inner_jobs_running)
-        if check_ready_jobs:
-            running_jobs += [job for job in self.job_list if
-                             job.status == Status.READY or job.status == Status.SUBMITTED or job.status == Status.QUEUING]
-        self.inner_jobs_running = list()
-        for job in running_jobs:
-            if job.platform.check_file_exists(f'{job.name}_FAILED', wrapper_failed=True, max_retries=2):
-                if job.platform.get_file(f'{job.name}_FAILED', False, wrapper_failed=True):
-                    self._check_finished_job(job, True)
-            else:
-                if job in real_running:
-                    self.inner_jobs_running.append(job)
-
-    def cancel_failed_wrapper_job(self) -> None:
-        """When a wrapper is cancelled or run into some problem all its jobs are cancelled.
-
-        If there are jobs on the list that are not Running, and is not Completed, or Failed set it as WAITING.
-
-        If not on these status and it is a vertical wrapper it will set the fail_count to the number of retrials.
-        """
-        try:
-            Log.warning(f"Wrapper {self.name} failed, cancelling it")
-            self._platform.send_command(self._platform.cancel_cmd + " " + str(self.id))
-        except Exception as e:
-            Log.info(f'Job with {self.id} was finished before canceling it: {str(e)}')
-        self._check_running_jobs()
-        for job in self.inner_jobs_running:
-            job.status = Status.FAILED
-        for job in self.job_list:
-            if job.status not in [Status.COMPLETED, Status.FAILED]:
-                job.status = Status.WAITING
-            else:
-                if job.wrapper_type == "vertical":  # job is being retrieved internally by the wrapper
-                    job.fail_count = job.retrials
-
-    def _is_over_wallclock(self, start_time: str, wallclock: str) -> bool:
-        """This calculates if the job is over its wallclock time, which indicates that a jobs is running for too long.
-
-        :param start_time: When a job started to execute
-        :param wallclock: Time limit a job should run
-        :return: If start_time is bigger than wallclock return True, otherwise False
-        """
-        elapsed = datetime.datetime.now() - parse_date(start_time)
-        wallclock_time = datetime.datetime.strptime(wallclock, '%H:%M')
-        total = 0.0
-        if wallclock_time.hour > 0:
-            total = wallclock_time.hour
-        if wallclock_time.minute > 0:
-            total += wallclock_time.minute / 60.0
-        if wallclock_time.second > 0:
-            total += wallclock_time.second / 60.0 / 60.0
-        total = total * 1.15
-        hour = int(total)
-        minute = int((total - int(total)) * 60.0)
-        second = int(((total - int(total)) * 60 -
-                      int((total - int(total)) * 60.0)) * 60.0)
-        wallclock_delta = datetime.timedelta(hours=hour, minutes=minute,
-                                             seconds=second)
-        if elapsed > wallclock_delta:
-            return True
-        return False
-
-    def _parse_timestamp(self, timestamp: int) -> str:
-        """Parse a date from int to datetime.
-
-        :param timestamp: time to be converted
-        :return: return time converted
-        """
-        value = datetime.datetime.fromtimestamp(timestamp)
-        time = value.strftime('%Y-%m-%d %H:%M:%S')
-        return time
-
-    def _check_time(self, output: list[str], index: int) -> str:
-        """Generate the starting time of a job found by a generated command.
-
-        :param output: The output of a CMD command executed
-        :param index: line in which the "output" should be pointed at to get the time
-        :return: Job starting time
-        """
-        time = int(output[index])
-        parsed_time = self._parse_timestamp(time)
-        return parsed_time
+        effective_wallclock = job.wallclock_in_seconds
+        if vertical_wrapper:
+            # For vertical wrappers, the inner job may run self.retrials times consecutively,
+            # so the effective wallclock threshold is self.retrials times the job wallclock.
+            effective_wallclock *= (job.retrials + 1)
+        return self.is_over_wallclock(effective_wallclock)

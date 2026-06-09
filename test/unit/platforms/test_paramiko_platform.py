@@ -115,11 +115,11 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
     job.name = 'TEST'
     with pytest.raises(AutosubmitError) as cm:
         platform.check_all_jobs(
-            job_list=[[job, None]],
+            job_list=[job],
             as_conf=as_conf,
             retries=-1)
-    assert cm.value.message == 'Some Jobs are in Unknown status'
-    assert cm.value.code == 6008
+    assert cm.value.message == ae.error_message
+    assert cm.value.code == 6000
     assert cm.value.trace is None
 
 
@@ -143,7 +143,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
 
     with pytest.raises(AutosubmitError) as cm:
         platform.check_all_jobs(
-            job_list=[[job, None]],
+            job_list=[job],
             as_conf=as_conf,
             retries=1)
     assert cm.value.message == ae.error_message
@@ -274,7 +274,7 @@ def test_submit_multiple_jobs(mocker, autosubmit_config, tmpdir):
 def test_get_pscall(paramiko_platform):
     job_id = 42
     output = paramiko_platform.get_pscall(job_id)
-    assert f'kill -0 {job_id}' in output
+    assert f'-p {job_id}' in output
 
 
 def test_remove_multiple_files_no_error_path_does_not_exist(paramiko_platform):
@@ -333,21 +333,21 @@ def test_poller(platform: str, mocker, paramiko_platform):
         ),
         (
                 [
-                    [Job(job_id='10', name=''), True]
+                    Job(job_id='10', name='')
                 ],
                 '10'
         ),
         (
                 [
-                    [Job(job_id='1', name=''), True],
-                    [Job(job_id='2', name=''), True]
+                    Job(job_id='1', name=''),
+                    Job(job_id='2', name='')
                 ],
                 '1,2'
         ),
         (
                 [
-                    [Job(job_id=None, name=''), True],
-                    [Job(job_id='2', name=''), True]
+                    Job(job_id=None, name=''),
+                    Job(job_id='2', name='')
                 ],
                 '0,2'
         )
@@ -417,7 +417,8 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
         (Exception("garbage"), False, False)
     ]
 )
-def test_move_file_errors(error, must_exist, expected_error_or_return_value, paramiko_platform: ParamikoPlatform, mocker,
+def test_move_file_errors(error, must_exist, expected_error_or_return_value, paramiko_platform: ParamikoPlatform,
+                          mocker,
                           tmp_path):
     """Test the error paths for ``move_file``.
 
@@ -680,6 +681,48 @@ def test_check_and_cancel_duplicated_job_names_empty_output(
     slurm_platform._check_and_cancel_duplicated_job_names({"job_a.cmd": None})
 
     assert cancelled == []
+
+
+@pytest.mark.parametrize(
+    "ssh_output, expected_job_ids",
+    [
+        pytest.param(
+            "JOBID,NAME\n12345,short_name\n",
+            ["12345"],
+            id="short-name",
+        ),
+        pytest.param(
+            "JOBID,NAME\n12345," + "a" * 50 + "\n",
+            ["12345"],
+            id="long-truncated-name",
+        ),
+        pytest.param(
+            "JOBID,NAME\n12345,short\n67890," + "b" * 50 + "\n",
+            ["12345", "67890"],
+            id="mixed-names",
+        ),
+    ],
+)
+def test_get_job_id_by_job_name_parses_truncated_names(
+        slurm_platform: SlurmPlatform,
+        monkeypatch: pytest.MonkeyPatch,
+        ssh_output: str,
+        expected_job_ids: list[str],
+) -> None:
+    """Parse job IDs correctly even when squeue truncates long job names.
+
+    ``squeue -o %A,%.50j`` limits the name column to 50 chars.  Autosubmit
+    only needs the first column (job ID), so truncation must not break parsing.
+
+    :param slurm_platform: Slurm platform under test.
+    :param monkeypatch: Pytest monkeypatch fixture.
+    :param ssh_output: Simulated squeue output.
+    :param expected_job_ids: Expected parsed job identifiers.
+    """
+    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)
+    slurm_platform._ssh_output = ssh_output
+
+    assert slurm_platform.get_job_id_by_job_name("any_name") == expected_job_ids
 
 
 def test_submit_multiple_jobs_empty_input_returns_empty(

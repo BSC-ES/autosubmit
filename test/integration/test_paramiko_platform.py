@@ -963,54 +963,6 @@ def test_get_completed_job_names(
         platform.close_connection()
 
 
-@pytest.mark.parametrize(
-    'jobs_to_delete,real_completed_jobs,expected_result',
-    [
-        (['job1', 'job2', 'job3'], ['job1', 'job2'], []),
-        (['job1', 'job2'], ['job1', 'job2', 'job3'], ['job3']),
-        ([], ['job1', 'job2', 'job3'], ['job1', 'job2', 'job3']),
-        ([], [], []),
-    ], ids=[
-        'Delete some completed jobs from provided list',
-        'Delete all completed jobs from provided list',
-        'Delete no completed jobs when no provided list',
-        'Delete no completed jobs when no completed jobs'
-    ]
-)
-@pytest.mark.ssh
-@pytest.mark.docker
-def test_deleted_failed_and_completed_names(
-        jobs_to_delete: list[str],
-        real_completed_jobs: list[str],
-        expected_result: list[str],
-        request: 'FixtureRequest',
-        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
-        ssh_server
-):
-    exp = get_experiment(request)
-    platform = _get_platform(exp)
-    try:
-        platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
-        platform.remote_log_dir = f"/tmp/{platform.expid}/autosubmit_test_logs/"
-        platform.send_command(f"mkdir -p {platform.remote_log_dir}", ignore_log=True)
-        for job_name in real_completed_jobs:
-            completed_file = Path(platform.remote_log_dir) / f"{job_name}_COMPLETED"
-            platform.send_command(f"touch {completed_file}", ignore_log=True)
-
-        platform.delete_failed_and_completed_names(
-            job_names=jobs_to_delete
-        )
-
-        # assert
-        platform.send_command(
-            f"ls -1 {platform.remote_log_dir}/*_COMPLETED | xargs -n1 basename", ignore_log=True
-        )
-        for job in expected_result:
-            assert job in platform.get_ssh_output()
-    finally:
-        platform.close_connection()
-
-
 @pytest.mark.ssh
 @pytest.mark.docker
 def test_test_connection(

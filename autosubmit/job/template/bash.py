@@ -121,14 +121,15 @@ function as_exit_handler {
         AS_EXIT_CODE=$last_cmd_code
     fi
     
-    # Write the finish time in the job _STAT_
+    # Write the finish time and final status in the job _STAT_
     echo "$(date +%s)" >> "${job_name_ptrn}_STAT_%FAIL_COUNT%"
-    
     if [ "$AS_EXIT_CODE" -eq 0 ]; then
+        echo "COMPLETED" >> "${job_name_ptrn}_STAT_%FAIL_COUNT%"
         touch "${job_name_ptrn}_COMPLETED"
-        # If the user-provided script failed, we exit here with the same exit code.
+    else
+        echo "FAILED" >> "${job_name_ptrn}_STAT_%FAIL_COUNT%"
     fi
-    
+    sync
     trap - EXIT
     exit $AS_EXIT_CODE
 }
@@ -165,7 +166,6 @@ _AS_BASH_TAILER = dedent("""\
 # Job completed successfully
 
 %EXTENDED_TAILER%
-
 # https://support.schedmd.com/show_bug.cgi?id=9715
 wait
 

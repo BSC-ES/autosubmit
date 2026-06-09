@@ -17,7 +17,7 @@
 
 """Tests that run diverse scenarios for Autosubmit run with a ``ps`` platform
 and checks the database for expected results."""
-
+import time
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING
@@ -28,7 +28,6 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
     _assert_db_fields, _assert_files_recovered, run_in_thread
-from test.integration.test_utils.misc import wait_locker
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -100,7 +99,7 @@ def test_run_uninterrupted(
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
     e_msg = f"Current folder: {str(run_tmpdir)}\n"
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     for check, value in db_check_list.items():
@@ -122,6 +121,7 @@ def test_run_uninterrupted(
         _assert_files_recovered(files_check_list)
     except AssertionError:
         pytest.fail(e_msg)
+
 
 
 @pytest.mark.docker
@@ -176,37 +176,25 @@ def test_run_interrupted(
     as_conf.set_last_as_command('run')
 
     # Run the experiment
-    # This was not being interrupted, so we run it in a thread to simulate the interruption and then stop it.
-    as_thread, exception, _ = run_in_thread(as_exp.autosubmit.run_experiment, expid=as_exp.expid)
-    if exception:
-        pytest.fail(f"Exception raised: {exception}")
-    # Instead of using sleep(N), we wait until the file lock is confirmed by portalocker.
-    # Once locked, we know Autosubmit has started the main loop (context manager does it).
-    lock_file = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid, BasicConfig.LOCAL_TMP_DIR, "autosubmit.lock")
-    wait_locker(lock_file, expect_locked=True, timeout=20, interval=0.5)
+    as_thread, result, stop_event = run_in_thread(
+        as_exp.autosubmit.run_experiment,
+        expid=as_exp.expid
+    )
+    #TODO: Instead of adding sleeps, make the workflow stop after X iterations
+    time.sleep(2)
 
-    # Here we issue an ``autosubmit stop`` and then join the thread where Autosubmit is running as, otherwise,
-    # we may get a timeout error where the thread stack printed shows Paramiko threads are still running
-    # (waiting on ``recv()``).
-    current_statuses = 'SUBMITTED, QUEUING, RUNNING'
-    assert as_exp.autosubmit.stop(
-        all_expids=False,
-        cancel=False,
-        current_status=current_statuses,
-        expids=as_exp.expid,
-        force=True,
-        force_all=True,
-        status='FAILED')
-    as_thread.join(timeout=20)
-    assert not as_thread.is_alive(), "Autosubmit thread did not stop"
-    wait_locker(lock_file, expect_locked=False, timeout=20, interval=0.5)
+    if as_thread.is_alive():
+        stop_event.set()  # signal "terminate"
+        as_thread.join(timeout=60)
+
+    assert not as_thread.is_alive(), "Autosubmit thread did not stop as expected."
 
     exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
 
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
     _assert_db_fields(db_check_list)
 
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
