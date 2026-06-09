@@ -72,8 +72,9 @@ class ExperimentHistory:
 
     def write_submit_time(self, job_name, submit=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
                           member="", section="", chunk=0, platform="NA", job_id=0, wrapper_queue=None,
-                          wrapper_code=None, children="", workflow_commit=""):
-
+                          wrapper_code=None, children="", workflow_commit="", split=None, splits=None,
+                          fail_count=0):
+        status = status if status == "COMPLETED" else "FAILED"
         try:
             next_counter = self._get_next_counter_by_job_name(job_name)
             current_experiment_run = self.manager.get_experiment_run_dc_with_max_id()
@@ -94,7 +95,10 @@ class ExperimentHistory:
                                   job_id=job_id,
                                   children=children,
                                   run_id=current_experiment_run.run_id,
-                                  workflow_commit=workflow_commit)
+                                  workflow_commit=workflow_commit,
+                                  split=split,
+                                  splits=splits,
+                                  fail_count=fail_count)
             return self.manager.register_submitted_job_data_dc(job_data_dc)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
@@ -102,9 +106,96 @@ class ExperimentHistory:
 
             return None
 
+    def get_submit_data_dc(self, job_name: str, fail_count: int) -> Optional[JobData]:
+        """
+        Retrieve the latest submit JobData for a given job_name and fail_count.
+
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param fail_count: The fail count to look up.
+        :type fail_count: int
+        :return: The latest JobData instance, or None if not found.
+        :rtype: Optional[JobData]
+        """
+        try:
+            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+        except Exception:
+            return None
+
+    def get_finish_data_dc(self, job_name: str, fail_count: int) -> Optional[JobData]:
+        """
+        Retrieve the latest finish JobData for a given job_name and fail_count.
+
+        :param job_name: The name of the job.
+        :type job_name: str
+        :param fail_count: The fail count to look up.
+        :type fail_count: int
+        :return: The latest JobData instance, or None if not found.
+        :rtype: Optional[JobData]
+        """
+        try:
+            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+        except Exception:
+            return None
+
+    def update_submit_time(self, job_name, submit=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
+                           member="", section="", chunk=0, platform="NA", job_id=0, wrapper_queue=None,
+                           wrapper_code=None, children="", workflow_commit="", split=None, splits=None,
+                           fail_count=0):
+        """
+        Update an existing submit row in the database by job_name and fail_count.
+
+        :param job_name: The name of the job.
+        :param submit: The submit time timestamp.
+        :param status: The status of the job.
+        :param ncpus: Number of CPUs.
+        :param wallclock: Wallclock time.
+        :param qos: Quality of service.
+        :param date: Date string.
+        :param member: Member string.
+        :param section: Section string.
+        :param chunk: Chunk number.
+        :param platform: Platform name.
+        :param job_id: Job ID.
+        :param wrapper_queue: Wrapper queue.
+        :param wrapper_code: Wrapper code.
+        :param children: Children string.
+        :param workflow_commit: Workflow commit hash.
+        :param split: Split identifier.
+        :param splits: Splits range.
+        :param fail_count: Fail count.
+        :return: The updated JobData, or None if an exception occurs.
+        :rtype: JobData
+        """
+        try:
+            job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+            if not job_data_dc:
+                raise Exception("Job {0} has not been found in the database.".format(job_name))
+            job_data_dc.submit = submit
+            job_data_dc.status = status
+            job_data_dc.ncpus = ncpus
+            job_data_dc.wallclock = wallclock
+            job_data_dc.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
+            job_data_dc.date = date
+            job_data_dc.member = member
+            job_data_dc.section = section
+            job_data_dc.chunk = chunk
+            job_data_dc.platform = platform
+            job_data_dc.job_id = job_id
+            job_data_dc.children = children
+            job_data_dc.rowtype = self._get_defined_rowtype(wrapper_code)
+            job_data_dc.workflow_commit = workflow_commit
+            job_data_dc.split = split
+            job_data_dc.splits = splits
+            job_data_dc.fail_count = fail_count
+            return self.manager.update_job_data_dc_by_job_id_name(job_data_dc)
+        except Exception as exp:
+            self._log.log(str(exp), traceback.format_exc())
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
+
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
                          job_id: int = 0, wrapper_queue: Optional[str] = None, wrapper_code: Optional[str] = None,
-                         children: str = "") -> JobData:
+                         children: str = "", fail_count: int = 0) -> JobData:
         """
         Updates the start time and other details of a job in the database.
 
@@ -117,18 +208,20 @@ class ExperimentHistory:
         :param qos: The quality of service. Default to "debug".
         :type qos: str
         :param job_id: The job ID. Default to 0.
-        :type job_id: str
+        :type job_id: int
         :param wrapper_queue: The wrapper queue. Defaults to None.
-        :type wrapper_queue: str
+        :type wrapper_queue: Optional[str]
         :param wrapper_code: The wrapper code. Defaults to None.
-        :type wrapper_code: str
+        :type wrapper_code: Optional[str]
         :param children: The children. Default to an empty string.
         :type children: str
+        :param fail_count: The fail count for the attempt. Default to 0.
+        :type fail_count: int
         :return: The result of updating the job data, or None if an exception occurs.
         :rtype: JobData
         """
         try:
-            job_data_dc_last = self.manager.get_job_data_by_job_id_name(job_id, job_name)
+            job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
             if not job_data_dc_last:
                 raise Exception("Job {0} has not been found in the database.".format(job_name))
             job_data_dc_last.start = start
@@ -143,7 +236,8 @@ class ExperimentHistory:
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def write_finish_time(self, job_name: str, finish: int = 0, status: str = "UNKNOWN", job_id: int = 0,
-                          out_file: Optional[str] = None, err_file: Optional[str] = None) -> JobData:
+                          out_file: Optional[str] = None, err_file: Optional[str] = None,
+                          fail_count: int = 0) -> JobData:
         """Updates the finish time and other details of a job in the database.
 
         :param job_name: The name of the job.
@@ -158,11 +252,13 @@ class ExperimentHistory:
         :type out_file: Optional[str]
         :param err_file: The error file path. Defaults to None.
         :type err_file: Optional[str]
+        :param fail_count: The fail count for the attempt. Default to 0.
+        :type fail_count: int
         :return: The result of updating the job data, or None if an exception occurs.
         :rtype: JobData
         """
         try:
-            job_data_dc_last = self.manager.get_job_data_by_job_id_name(job_id, job_name)
+            job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
             if not job_data_dc_last:
                 raise Exception("Job {0} has not been found in the database.".format(job_name))
             job_data_dc_last.finish = finish if finish > 0 else int(time())
@@ -333,8 +429,9 @@ class ExperimentHistory:
         for job_dc in current_job_data_dcs:
             if job_dc.job_name in job_name_to_job:
                 if job_dc.status != job_name_to_job[job_dc.job_name].status_str:
-                    if not (job_dc.status in ["COMPLETED", "FAILED"] and job_name_to_job[
-                        job_dc.job_name].status_str in ["WAITING", "READY"]):
+                    _TERMINAL_STATUSES = {"COMPLETED", "FAILED"}
+                    if not (job_dc.status in _TERMINAL_STATUSES and job_name_to_job[
+                        job_dc.job_name].status_str not in _TERMINAL_STATUSES):
                         # If the job is not changing from a finalized status to a starting status
                         job_dc.status = job_name_to_job[job_dc.job_name].status_str
                         differences.append(job_dc)

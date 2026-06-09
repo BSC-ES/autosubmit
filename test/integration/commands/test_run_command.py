@@ -133,7 +133,7 @@ def test_run_command(
         assert exp.autosubmit.run_command(args=args) == 0
     else:
         assert exp.autosubmit.run_command(args=args)
-    
+
 
 @pytest.mark.parametrize(
     "command",
@@ -440,4 +440,3 @@ def test_run_report_template_edge_cases(
     report = next(Path(exp.tmp_dir).glob(f"{expid}_report_*"))
     rendered = report.read_text().rstrip('\n')
     assert rendered == expected_output
-            

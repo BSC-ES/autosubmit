@@ -33,7 +33,9 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
+from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.template import Language
+from test.unit.conftest import FakePlatform
 
 _EXPID = 'a000'
 
@@ -891,3 +893,135 @@ def test_get_in_queue_grouped_id(
         jobs_by_id_list = list(jobs_by_id.values())
         section_jobs = jobs_by_id_list[idx]
         assert len(section_jobs) == length
+
+
+@pytest.mark.parametrize(
+    'job_id,job_status,wrapper_status,in_map,expected',
+    [
+        # Wrapper is active — is_wrapper_still_running should return True.
+        (100, Status.RUNNING,   Status.RUNNING,   True,  True),
+        (100, Status.RUNNING,   Status.SUBMITTED, True,  True),
+        (100, Status.RUNNING,   Status.QUEUING,   True,  True),
+        # Job id not in map — never returns True regardless of status.
+        (100, Status.RUNNING,   None,             False, False),
+        # Wrapper finished — should return False even though id is in map.
+        (100, Status.COMPLETED, Status.COMPLETED, True,  False),
+        (100, Status.FAILED,    Status.FAILED,    True,  False),
+    ],
+    ids=[
+        'running-in-map',
+        'submitted-in-map',
+        'queuing-in-map',
+        'not-in-map',
+        'wrapper-completed',
+        'wrapper-failed',
+    ],
+)
+def test_is_wrapper_still_running(
+    fake_job_list,
+    mocker,
+    job_id: int,
+    job_status: Status,
+    wrapper_status: Status,
+    in_map: bool,
+    expected: bool,
+) -> None:
+    """is_wrapper_still_running must return True only when the wrapper is still active.
+
+    :param fake_job_list: Minimal JobList fixture.
+    :param mocker: pytest-mock mocker fixture.
+    :param job_id: Numeric job id.
+    :type job_id: int
+    :param job_status: Status of the inner job.
+    :type job_status: Status
+    :param wrapper_status: Status of the wrapper job in ``job_package_map``.
+    :type wrapper_status: Status
+    :param in_map: Whether to place the wrapper in ``job_package_map``.
+    :type in_map: bool
+    :param expected: Expected return value.
+    :type expected: bool
+    """
+    inner_job = Job('a000_20000101_fc0_1_SIM', job_id, job_status, 0)
+    if in_map:
+        wrapper_job = mocker.MagicMock()
+        wrapper_job.status = wrapper_status
+        fake_job_list.job_package_map[job_id] = wrapper_job
+    assert fake_job_list.is_wrapper_still_running(inner_job) is expected
+
+
+def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
+    """save_wrappers must store the job id as an ``int`` in ``job_package_map``.
+
+    Slurm platform returns job ids as strings.  If ``save_wrappers`` stored
+    them without casting, ``is_wrapper_still_running`` (which looks up by the
+    *inner* job's id, also an int after parsing) would silently miss the entry.
+
+    :param fake_job_list: Minimal JobList fixture.
+    :param mocker: pytest-mock mocker fixture.
+    """
+    as_conf = mocker.MagicMock()
+
+
+    job = Job('a000_20000101_fc0_1_SIM', '999', Status.SUBMITTED, 0)
+    package = mocker.MagicMock(spec=JobPackageThread)
+    package.is_wrapped = True
+    package.jobs = [job]
+    package.name = 'wrapper_1'
+    package._wallclock = '00:30'
+    package.platform = FakePlatform()
+    package.sections = "bla"
+    package.method = "bla"
+    package.wrapper_type = "bla"
+    package.num_processors = 1
+
+
+
+    submitted_scripts = {'section': {'pkg': package}}
+    fake_job_list.save_wrappers(submitted_scripts, as_conf)
+
+    # Key must be int (999), not string ('999'), so that subsequent id-based
+    # lookups with integer job ids work correctly.
+    assert 999 in fake_job_list.job_package_map, (
+        "save_wrappers did not cast job id to int; "
+        f"map keys: {list(fake_job_list.job_package_map.keys())}"
+    )
+    assert '999' not in fake_job_list.job_package_map
+
+
+@pytest.mark.parametrize("wrapper_job_is_none", [False, True])
+def test_save_wrapper_info_only_upserts_wrapper_info_not_inner_jobs(
+        fake_job_list, mocker, wrapper_job_is_none
+) -> None:
+    """save_wrapper_info must only upsert wrapper info, not insert inner jobs.
+
+    The inner jobs table is already populated by ``save_wrappers`` at submit
+    time.  ``save_wrapper_info`` (called on status changes) must not re-insert
+    them, or it triggers UNIQUE constraint violations.
+
+    When ``wrapper_job`` is falsy the call must be a no-op.
+    """
+    if wrapper_job_is_none:
+        wrapper_job = None
+    else:
+        inner_job = mocker.MagicMock()
+        inner_job.name = "job_inside_wrapper"
+
+        platform_mock = mocker.MagicMock()
+        platform_mock.name = "test_platform"
+
+        wrapper_job = mocker.MagicMock()
+        wrapper_job.name = "wrapper_test"
+        wrapper_job.id = 42
+        wrapper_job.status = Status.SUBMITTED
+        wrapper_job.wallclock = "00:30"
+        wrapper_job.platform = platform_mock
+        wrapper_job.job_list = [inner_job]
+
+    fake_job_list.save_wrapper_info(wrapper_job)
+
+    persistence_mock = fake_job_list.get_packages_persistence()
+    if wrapper_job_is_none:
+        persistence_mock.upsert_wrapper_info.assert_not_called()
+    else:
+        persistence_mock.upsert_wrapper_info.assert_called_once()
+    persistence_mock.save.assert_not_called()

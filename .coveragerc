@@ -15,8 +15,7 @@ disable_warnings =
 omit =
     tests/*
     autosubmit/job/template/common.py
-parallel = True
-source = ./autosubmit
+source = autosubmit
 timid = False
 sigterm = True
 

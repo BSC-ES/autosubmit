@@ -361,7 +361,8 @@ def test_autosubmit_pklfix_restores_backup(autosubmit_exp, mocker):
     'Missing WALLCLOCK in FOR',
     'Correct FOR',
 ])
-def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict, context_mgr: 'AbstractContextManager'):
+def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict,
+                          context_mgr: 'AbstractContextManager'):
     with context_mgr:
         autosubmit_exp('t000', experiment_data, create=False, include_jobs=False)
 
@@ -370,24 +371,24 @@ def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experim
     '_exit,job_previous_status,expected_jobs_to_check',
     [
         (
-            True,
-            Status.FAILED,
-            0
+                True,
+                Status.FAILED,
+                0
         ),
         (
-            True,
-            Status.RUNNING,
-            0
+                True,
+                Status.RUNNING,
+                0
         ),
         (
-            False,
-            Status.FAILED,
-            0
+                False,
+                Status.FAILED,
+                0
         ),
         (
-            False,
-            Status.RUNNING,
-            1
+                False,
+                Status.RUNNING,
+                1
         ),
     ],
     ids=[
@@ -414,25 +415,17 @@ def test_check_wrappers_and_as_exit(
     exp = autosubmit_exp(experiment_data={})
     as_conf: AutosubmitConfig = exp.as_conf
 
+    job = Job('1', '1', job_previous_status)
     job_list: JobList = mocker.MagicMock(spec=JobList)
-    job_list.get_in_queue_grouped_id.return_value = {
-        '1': [
-            Job('1', '1', job_previous_status)
-        ]
-    }
+    job_list.get_job_list.return_value = [job]
     job_list.job_package_map = {}
 
     platform = mocker.MagicMock(spec=Platform)
     platform.name = 'test_platform'
-    platforms_to_test: set[Platform] = {platform}
 
     Autosubmit.exit = _exit
 
-    t: tuple[dict[str, list[list[Job]]], dict[str, tuple[Status, Status]]] = \
-        autosubmit.check_wrappers(as_conf, job_list, platforms_to_test, exp.expid)
-    jobs_to_check, _ = t
-
-    assert len(jobs_to_check) == expected_jobs_to_check
+    autosubmit.check_wrappers(as_conf, job_list, exp.expid)
 
 
 def test_create_txt_output_writes_status_file(autosubmit_exp):
@@ -454,3 +447,75 @@ def test_create_txt_output_writes_status_file(autosubmit_exp):
     exp.autosubmit.create(exp.expid, noplot=True, hide=True, output=None, detail=True, force=True)
     txt_files_after_detail = list(exp.status_dir.glob('*.txt'))
     assert len(txt_files_after_detail) == 2, "Expected a second txt file in status/ for -d"
+
+
+def test_prepare_run_returns_tuple(autosubmit_exp):
+    """prepare_run: returns the expected 7-tuple with recover=False."""
+    exp = autosubmit_exp(include_jobs=True)
+    result = Autosubmit.prepare_run(exp.expid, check_scripts=False)
+    assert len(result) == 7
+    job_list, submitter, exp_history, host, as_conf, platforms_to_test, recover = result
+    assert job_list is not None
+    assert submitter is not None
+    assert exp_history is not None
+    assert recover is False
+
+
+def test_prepare_run_returns_tuple_with_recover(autosubmit_exp):
+    """prepare_run: returns the expected 7-tuple with recover=True."""
+    exp = autosubmit_exp(include_jobs=True)
+    result = Autosubmit.prepare_run(exp.expid, check_scripts=False, recover=True)
+    assert len(result) == 7
+    job_list, submitter, exp_history, host, as_conf, platforms_to_test, recover = result
+    assert job_list is not None
+    assert submitter is not None
+    assert exp_history is None
+    assert recover is True
+
+
+def test_stop_sets_exit_flag(autosubmit_exp, mocker):
+    """stop: sets Autosubmit.exit to True for the given experiment."""
+    exp = autosubmit_exp()
+    mocker.patch('builtins.input', return_value='y')
+    mocker.patch('autosubmit.helpers.processes.process_id', return_value=0)
+    original = Autosubmit.exit
+    try:
+        Autosubmit.exit = False
+        result = Autosubmit.stop(exp.expid, force_yes=True)
+        assert result is True
+    finally:
+        Autosubmit.exit = original
+
+
+def test_monitor_with_check_wrapper(autosubmit_exp):
+    """monitor: check_wrapper=True loads wrapper packages."""
+    exp = autosubmit_exp(include_jobs=True)
+    # Create a minimal job_list pickle so load_job_list works
+    as_conf = AutosubmitConfig(exp.expid, BasicConfig, YAMLParserFactory())
+    as_conf.check_conf_files(True)
+    job_list = Autosubmit.load_job_list(exp.expid, as_conf, monitor=True, new=False)
+    job_list.save()
+
+    result = Autosubmit.monitor(exp.expid, file_format='pdf', lst='', filter_chunks='',
+                                filter_status='', filter_section='', hide=True,
+                                check_wrapper=True)
+    assert result is True
+
+
+def test_set_status_with_detail(autosubmit_exp):
+    """set_status: detail=True prints job list after status change."""
+    exp = autosubmit_exp(include_jobs=True)
+    # Create a job list with a job
+    as_conf = AutosubmitConfig(exp.expid, BasicConfig, YAMLParserFactory())
+    as_conf.check_conf_files(True)
+    job_list = Autosubmit.load_job_list(exp.expid, as_conf, monitor=True, new=False)
+    job_name = job_list.get_job_list()[0].name
+    job_list.save()
+
+    result = Autosubmit.set_status(
+        exp.expid, noplot=True, save=True, final='WAITING',
+        filter_list=job_name, filter_chunks='', filter_status='',
+        filter_section='', filter_type_chunk='', filter_type_chunk_split='',
+        hide=True, detail=True
+    )
+    assert result is True

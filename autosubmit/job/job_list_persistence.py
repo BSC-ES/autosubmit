@@ -86,7 +86,7 @@ class JobListPersistencePkl(JobListPersistence):
 
         """
         path = os.path.join(persistence_path, persistence_file + '.pkl')
-        path_tmp = os.path.join(persistence_path[:-3]+"tmp", persistence_file + f'.pkl.tmp_{os.urandom(8).hex()}')
+        path_tmp = os.path.join(persistence_path[:-3] + "tmp", persistence_file + f'.pkl.tmp_{os.urandom(8).hex()}')
 
         try:
             open(path).close()

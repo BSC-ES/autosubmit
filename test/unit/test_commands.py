@@ -73,8 +73,8 @@ def test_exceptions_raised(exception: BaseException, raised: BaseException, stat
 
 @pytest.mark.parametrize(
     "command",
-    ["setstatus", "monitor", "recovery"],
-    ids=["setstatus", "monitor", "recovery"],
+    ["setstatus", "monitor", "recovery", "inspect"],
+    ids=["setstatus", "monitor", "recovery", "inspect"],
 )
 def test_combined_filters_parsed_for_commands(mocker, command):
     """Test combined filters parse correctly for multiple commands."""
@@ -109,8 +109,8 @@ def test_combined_filters_parsed_for_commands(mocker, command):
 
 @pytest.mark.parametrize(
     "command",
-    ["setstatus", "monitor", "recovery"],
-    ids=["setstatus", "monitor", "recovery"],
+    ["setstatus", "monitor", "recovery", "inspect"],
+    ids=["setstatus", "monitor", "recovery", "inspect"],
 )
 def test_command_accepts_section_splits_in_ft(mocker, command):
     """Test command accepts section/split syntax in ``-ft``."""

@@ -16,7 +16,6 @@ from shutil import copy
 # -- Tests
 
 @pytest.mark.local
-@pytest.mark.timeout(300)
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
@@ -65,7 +64,7 @@ def test_run_uninterrupted(
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, final_status, as_exp.expid)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
     e_msg = f"Current folder: {str(run_tmpdir)}\n"
     files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=expected_db_entries * 2)
     for check, value in db_check_list.items():

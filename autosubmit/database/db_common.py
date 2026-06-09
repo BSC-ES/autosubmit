@@ -36,6 +36,7 @@ Log.get_logger("Autosubmit")
 
 CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 15
+_SQLITE_MAX_VARIABLES = 999
 
 
 def create_db(qry):
@@ -163,6 +164,49 @@ def save_experiment(name: str, description: Optional[str], version: Optional[str
                                  f"Your experiment {name} couldn't be stored in the database.")
     finally:
         proc.terminate()
+    return result
+
+
+def get_experiment_expids(expids: Optional[List[str]] = None) -> set[str]:
+    """
+    Get the expids of all experiments in the database, or only the requested ones.
+
+    :param expids: optional list of expids to look up. When provided,
+        only those that exist in the database are returned. 
+        When ``None`` (default), all expids in the database are returned.
+    :return: a set of experiment expids.
+    :rtype: set[str]
+    """
+    if BasicConfig.DATABASE_BACKEND == 'postgres':
+        return _get_experiment_expids_sqlalchemy(expids)
+
+    check_db()
+
+    try:
+        (conn, cursor) = open_conn()
+    except DbException as e:
+        raise AutosubmitCritical(
+            "Could not establish a connection to the database.", 7001, str(e))
+    conn.isolation_level = None
+    conn.text_factory = str
+
+    result: set[str] = set()
+    try:
+        if expids is None:
+            cursor.execute("SELECT name FROM experiment")
+            result = {row[0] for row in cursor}
+        else:
+            requested = list(expids)
+            for i in range(0, len(requested), _SQLITE_MAX_VARIABLES):
+                batch = requested[i:i + _SQLITE_MAX_VARIABLES]
+                placeholders = ','.join('?' * len(batch))
+                cursor.execute(
+                    f"SELECT name FROM experiment WHERE name IN ({placeholders})",
+                    batch,
+                )
+                result.update(row[0] for row in cursor)
+    finally:
+        close_conn(conn, cursor)
     return result
 
 
@@ -366,6 +410,15 @@ def _save_experiment(name, description, version):
     conn.commit()
     close_conn(conn, cursor)
     return True
+
+
+def _get_experiment_expids_sqlalchemy(expids: Optional[List[str]] = None) -> set[str]:
+    with _get_sqlalchemy_conn() as conn:
+        query = select(tables.ExperimentTable.c.name)
+        if expids is not None:
+            query = query.where(tables.ExperimentTable.c.name.in_(list(expids)))
+        rows = conn.execute(query).all()
+    return {row.name for row in rows}
 
 
 def _check_experiment_exists(name, error_on_inexistence=True):

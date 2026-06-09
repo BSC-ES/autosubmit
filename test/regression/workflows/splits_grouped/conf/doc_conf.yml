@@ -1,0 +1,21 @@
+experiment:
+  DATELIST: 20000101
+  MEMBERS: "fc0"
+  CHUNKSIZEUNIT: day
+  CHUNKSIZE: '1'
+  NUMCHUNKS: '1'
+  CALENDAR: standard
+JOBS:
+  PARENT:
+    FILE: parent.sh
+    RUNNING: once
+    SPLITS: '8'
+  CHILD:
+    FILE: child.sh
+    RUNNING: once
+    SPLITS: '4'
+    DEPENDENCIES:
+      PARENT:
+        SPLITS_FROM:
+          ALL:
+            SPLITS_TO: '[1:auto]*\2'

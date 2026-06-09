@@ -269,6 +269,16 @@ class ExperimentDetails:
         self._details_repo.upsert_details(
             self.exp_id, self.user, self.created, self.model, self.branch, self.hpc
         )
+    
+    def get_details(self) -> Union[Dict[str, Any], None]:
+        """
+        Retrieve the last stored snapshot of the experiment's details
+        from the database.
+        """
+        exp_id = getattr(self, "exp_id", None)
+        if exp_id is None:
+            exp_id = get_experiment_id(self.expid)
+        return self._details_repo.get_details(exp_id)
 
     def delete_details(self):
         """

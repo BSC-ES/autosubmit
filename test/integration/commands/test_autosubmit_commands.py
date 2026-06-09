@@ -23,12 +23,6 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
 )
 
 
-@pytest.fixture(scope="function")
-def as_exp(autosubmit_exp, general_data, experiment_data, jobs_data):
-    config_data = general_data | experiment_data | jobs_data
-    return autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
-
-
 @pytest.mark.parametrize("noplot", [True, False])
 def test_create_noplot_calls_generate_output(as_exp, mocker, noplot):
     """Test that create calls generate_output when noplot is False and does not call it when noplot is True."""
@@ -76,4 +70,57 @@ def test_archive_noncreated_experiment(as_exp):
 
 def test_unarchive_nonarchived_experiment(as_exp):
     assert not as_exp.autosubmit.unarchive(as_exp.expid)
+
+
+def test_create_cw_calls_generate_scripts_andor_wrappers_without_plt(
+    autosubmit_exp, general_data, mocker
+):
+    """create -cw must call generate_scripts_andor_wrappers even without -plt.
+
+    Before the fix the wrapper generation was nested inside ``if not noplot:``
+    so ``create -cw`` without ``-plt`` silently skipped preview-table
+    population.
+    """
+    mock_gen = mocker.patch(
+        "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers"
+    )
+
+    exp_data = {
+        "EXPERIMENT": {
+            "DATELIST": "20200101",
+            "MEMBERS": "fc0",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": 1,
+            "NUMCHUNKS": 1,
+            "CALENDAR": "standard",
+        },
+        "JOBS": {
+            "SLURMJOB": {
+                "SCRIPT": "sleep 0",
+                "RUNNING": "chunk",
+                "WALLCLOCK": "02:00",
+                "PLATFORM": "TEST_SLURM",
+            },
+        },
+        "WRAPPERS": {
+            "SIMPLE_WRAPPER": {
+                "TYPE": "vertical",
+                "JOBS_IN_WRAPPER": "SLURMJOB",
+                "MAX_WRAPPED_V": 2,
+                "MIN_WRAPPED_V": 2,
+            },
+        },
+    }
+    config_data = general_data | exp_data
+
+    exp = autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
+
+    exp.autosubmit.create(
+        exp.expid,
+        noplot=True,
+        hide=True,
+        check_wrappers=True,
+    )
+
+    mock_gen.assert_called_once()
 
