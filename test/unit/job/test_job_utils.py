@@ -411,3 +411,30 @@ def test_calendar_chunk_section(
     else:
         splits_B = calendar_chunk_section(experiment_data, "B", date, chunk)
         assert splits_B == expected_splits_B
+
+
+def test_calendar_chunk_section_running_not_chunk():
+    """Test that calendar_chunk_section raises AutosubmitCritical when the job is not set to run by chunk."""
+    experiment_data = {
+        "EXPERIMENT": {
+            "DATELIST": "20000101",
+            "MEMBERS": "fc0",
+            "CHUNKSIZEUNIT": "day",
+            "CHUNKSIZE": "1",
+            "NUMCHUNKS": "2",
+            "CALENDAR": "standard",
+        },
+        "JOBS": {
+            "A": {
+                "FILE": "a",
+                "PLATFORM": "test",
+                "RUNNING": "date",  # not 'chunk'
+                "SPLITS": "auto",
+                "SPLITSIZE": 1,
+                "SPLITSIZEUNIT": "hour",
+            },
+        },
+    }
+    date = datetime.strptime("20000101", "%Y%m%d")
+    chunk = 1
+    assert calendar_chunk_section(experiment_data, "A", date, chunk) == 0
