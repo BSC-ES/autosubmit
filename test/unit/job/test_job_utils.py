@@ -181,6 +181,11 @@ def test_get_split_size_unit(data, result):
 
 # TODO: delete comment. Start of the auto split tests
 
+def test_calendar_unitsize_isgreater_raises():
+    """Test that an invalid unit in calendar_unitsize_isgreater raises AutosubmitCritical."""
+    with pytest.raises(AutosubmitCritical):
+        calendar_unitsize_getlowersize("invalid")
+
 
 @pytest.mark.parametrize(
     "date_str, cal, expected_days",
@@ -218,6 +223,7 @@ def test_calendar_unitsize_getlowersize_raises():
     """Test that an invalid unit raises AutosubmitCritical."""
     with pytest.raises(AutosubmitCritical):
         calendar_unitsize_getlowersize("invalid")
+
 
 def test_calendar_unitsize_getlowersize_hour_chunk():
     """Test that with chunk unit hour, the split unit returned is hour."""
