@@ -37,10 +37,6 @@ from autosubmit.log.log import AutosubmitCritical
 
 """Tests for ``autosubmit.job.job_utils``."""
 
-_EXPID = 'a000'
-"""The expid used throughout the tests."""
-
-
 # TODO: maybe these functions could go into conftest later.
 
 def _create_job_mock(job_data: Dict[str, Any], mocker) -> Job:
@@ -178,8 +174,6 @@ def test_get_split_size_unit(data, result):
     """Test the get_split_size_unit function for different combinations of chunk size unit and split size unit."""
     assert get_split_size_unit(data, 'TEST') == result
 
-
-# TODO: delete comment. Start of the auto split tests
 
 def test_calendar_unitsize_isgreater_raises():
     """Test that an invalid unit in calendar_unitsize_isgreater raises AutosubmitCritical."""
@@ -334,16 +328,14 @@ def test_count_years_invalid_unit():
     # for month chunk_size_unit (jan 2000), run_days = 31
     # for year chunk_size_unit (2000), run_days = 366 (leap year)
     # So:
-    # day + hour -> 1 x 24 = 24
-    # day + day -> ceil(1 / 1) = 1
-    # month + hour -> 31 x 24 = 744
-    # month + day -> ceil(31 / 1) = 31
-    # month + month -> ceil(31 / 30) = 2
-    # month + year -> ceil(31 / 366) = 1
-    # year + hour -> 366 x 24 = 8784
-    # year + day -> ceil(366 / 1) = 366
-    # year + month -> ceil(366 / 30) = 13
-    # year + year -> ceil(366 / 366) = 1
+    # chunk day + split hour -> 24 splits
+    # chunk day + split day -> 1 split
+    # chunk month + split hour -> 744 splits (31 days * 24 hours)
+    # chunk month + split day -> 31 splits
+    # chunk year + split hour -> 8784 splits (366 days * 24 hours)
+    # chunk year + split day -> 366 splits
+    # chunk year + split month -> 12 splits
+    # chunk year + split year -> 1 split
     "chunk_size_unit, split_size_unit, expected_splits_A, expected_splits_B",
     [
         ("hour", "hour", None, None),
