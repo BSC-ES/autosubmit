@@ -17,6 +17,7 @@
 
 """Tests that run diverse scenarios for Autosubmit run with a ``slurm`` platform
 and checks the database for expected results."""
+import sqlite3
 import time
 from pathlib import Path
 from textwrap import dedent
@@ -1581,3 +1582,58 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
             run_tmpdir, as_exp.expid, preview=False, expected_wrappers=7, expected_inner_jobs=26
         )
         _assert_wrapper_db_fields(wrapper_db_check)
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+@pytest.mark.parametrize("script, retrials, wrong_data", [
+    pytest.param("echo 'success'", 0, [], id="success_ok"),
+    pytest.param("echo 'success'", 0, [0], id="success_stale"),
+    pytest.param("d_echo 'fail'", 2, [], id="failure_ok"),
+    pytest.param("d_echo 'fail'", 2, [0], id="failure_first"),
+    pytest.param("d_echo 'fail'", 2, [1], id="failure_second"),
+    pytest.param("d_echo 'fail'", 2, [2], id="failure_third"),
+    pytest.param("d_echo 'fail'", 2, [0, 1, 2], id="failure_all"),
+])
+def test_recover_stale_row(
+    autosubmit_exp,
+    slurm_server,
+    general_data,
+    script,
+    retrials,
+    wrong_data,
+):
+    experiment_data = general_data | {
+        "EXPERIMENT": {"MEMBERS": "fc0", "NUMCHUNKS": "1"},
+        "JOBS": {"JOB1": {"SCRIPT": script, "PLATFORM": "TEST_SLURM",
+                          "RUNNING": "once", "wallclock": "00:01", "retrials": retrials}},
+    }
+    as_exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False, create=True)
+    as_exp.as_conf.set_last_as_command('run')
+    as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    db_path = Path(BasicConfig.JOBDATA_DIR) / f"job_data_{as_exp.expid}.db"
+    with sqlite3.connect(db_path) as conn:
+        for fc in wrong_data:
+            conn.execute("UPDATE job_data SET start=0 WHERE fail_count=?", (fc,))
+        conn.commit()
+    as_exp.as_conf.set_last_as_command('run')
+    as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT submit, start, finish, counter, fail_count, status FROM job_data WHERE job_name LIKE '%JOB1%' ORDER BY counter"
+        ).fetchall()
+        expected = retrials + 1
+        assert len(rows) == expected, f"Expected {expected} rows, got {len(rows)}"
+        for r in rows:
+            assert r["submit"] > 0
+            assert r["status"] in ("COMPLETED", "FAILED")
+            assert int(r["counter"]) >= 0
+            assert int(r["fail_count"]) >= 0
+            if int(r["start"]) > 0:
+                assert int(r["start"]) >= int(r["submit"])
+            if int(r["finish"]) > 0:
+                assert int(r["finish"]) >= int(r["submit"])
+                if int(r["start"]) > 0:
+                    assert int(r["finish"]) >= int(r["start"])

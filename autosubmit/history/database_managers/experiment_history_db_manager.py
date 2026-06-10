@@ -518,6 +518,10 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData: ...
 
+    def get_stale_rows(self) -> list: ...
+
+    def update_job_data_values(self, job_name: str, fail_count: int, start: int, finish: int) -> int: ...
+
 
 class SqlAlchemyExperimentHistoryDbManager:
     """A SQLAlchemy experiment history database manager.
@@ -991,6 +995,44 @@ class SqlAlchemyExperimentHistoryDbManager:
             ).fetchall()
         columns = table.c.keys()
         return [tuple(zip(columns, row)) for row in rows]
+
+    def get_stale_rows(self) -> list:
+        """Return all job_data rows with submit>0 and (start=0 or finish=0).
+
+        :return: List of Row objects with job_name, fail_count, platform.
+        :rtype: list
+        """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        query = select(
+            job_data_table.c.job_name,
+            job_data_table.c.fail_count,
+            job_data_table.c.platform
+        ).where(
+            job_data_table.c.submit > 0,
+            (job_data_table.c.start == 0) | (job_data_table.c.finish == 0)
+        ).distinct()
+        with self.engine.connect() as conn:
+            return conn.execute(query).fetchall()
+
+    def update_job_data_values(self, job_name: str, fail_count: int, start: int, finish: int) -> int:
+        """Update start and finish for a specific job_data row.
+
+        :param job_name: Job identifier.
+        :param fail_count: Retry attempt number.
+        :param start: Start epoch timestamp.
+        :param finish: Finish epoch timestamp.
+        :return: Number of rows updated.
+        :rtype: int
+        """
+        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        stmt = update(job_data_table).where(
+            job_data_table.c.job_name == job_name,
+            job_data_table.c.fail_count == fail_count
+        ).values(start=start, finish=finish)
+        with self.engine.connect() as conn:
+            result = conn.execute(stmt)
+            conn.commit()
+            return result.rowcount
 
 
 def create_experiment_history_db_manager(db_engine: str, **options: Any) -> ExperimentHistoryDatabaseManager:

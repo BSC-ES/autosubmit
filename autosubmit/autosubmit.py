@@ -63,7 +63,7 @@ from autosubmit.experiment.experiment_common import (
 )
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, user_yes_no_query
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, recover_stale_job_data, user_yes_no_query
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job import Job
@@ -2221,6 +2221,7 @@ class Autosubmit:
                 while pending_logs:
                     pending_logs = job_list.recover_logs()
                 job_list.save()
+                recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
                 while job_list.get_active():
                     try:
                         if profile is not None:
@@ -2379,6 +2380,7 @@ class Autosubmit:
                         p.log_recovery_process.join(timeout=300)
                         if p.log_recovery_process.is_alive():
                             Log.warning(f"Log recovery process for {p.name} did not terminate within timeout.")
+                    p.clean_log_recovery_process()
 
                 Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
 
@@ -3114,6 +3116,8 @@ class Autosubmit:
 
             if save:
                 job_list.recover_last_data()
+                with suppress(Exception):
+                    recover_stale_job_data(expid, as_conf, platforms)
                 job_list.save()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
@@ -4382,7 +4386,8 @@ class Autosubmit:
                         raise AutosubmitCritical(
                             "There are repeated member names!")
                     rerun = as_conf.get_rerun()
-
+                    with suppress(Exception):
+                        recover_stale_job_data(expid, as_conf)
                     Log.info("\nCreating the jobs list...")
                     job_list = JobList(expid, as_conf, YAMLParserFactory(),
                                        Autosubmit._get_job_list_persistence(expid, as_conf))
@@ -5425,6 +5430,8 @@ class Autosubmit:
                 start = time.time()
                 if save and wrongExpid == 0:
                     job_list.recover_last_data(final_list)
+                    with suppress(Exception):
+                        recover_stale_job_data(expid, as_conf, platforms)
                     job_list.save()
                     end = time.time()
                     Log.info(f"JobList saved in {end - start:.2f} seconds.")

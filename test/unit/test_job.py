@@ -1476,6 +1476,7 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
 
     It ignores what happens to the experiment history object."""
     mocker.patch('autosubmit.job.job.ExperimentHistory')
+    mocker.patch('autosubmit.job.job.Job._get_submit_data_dc_from_db', return_value=None)
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
