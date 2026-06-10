@@ -2739,13 +2739,17 @@ class AutosubmitConfig(object):
         """
         return str(self.get_section(['STORAGE', 'COPY_REMOTE_LOGS'], "true")).lower()
 
-    def get_mails_to(self) -> str:
+    def get_mails_to(self) -> list[str]:
         """
         Returns the address where notifications will be sent from autosubmit's config file
 
-        :return: mail address
+        :return: mail address list
+        :rtype: list[str]
         """
-        return self.get_section(['MAIL', 'TO'], "")
+        mail_to = self.get_section(['MAIL', 'TO'], [])
+        if isinstance(mail_to, str):
+            mail_to = [mail_to]
+        return mail_to
 
     def get_communications_library(self) -> str:
         """
