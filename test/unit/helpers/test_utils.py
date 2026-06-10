@@ -178,13 +178,16 @@ def test_recover_stale_job_data_builds_new_platform(tmp_path, mocker):
     mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
 
 
-@pytest.mark.parametrize("content,start,finish", [
-    pytest.param("1781078007\n1781078010\nCOMPLETED\n", 1781078007, 1781078010, id="realistic_completed"),
-    pytest.param("1781078007\n1781078010\nFAILED\n", 1781078007, 1781078010, id="realistic_failed"),
-    pytest.param("500\n", 500, 0, id="only_start_line"),
-    pytest.param("500\n\n", 500, 0, id="trailing_empty_line"),
+@pytest.mark.parametrize("content,start,finish,expected_update", [
+    pytest.param("1000\n2000\nCOMPLETED\n", 1000, 2000, True, id="typical"),
+    pytest.param("1781078007\n1781078010\nCOMPLETED\n", 1781078007, 1781078010, True, id="realistic_completed"),
+    pytest.param("1781078007\n1781078010\nFAILED\n", 1781078007, 1781078010, True, id="realistic_failed"),
+    pytest.param("500\n", 500, 0, True, id="only_start_line"),
+    pytest.param("500\n\n", 500, 0, True, id="trailing_empty_line"),
+    pytest.param("BAD_DATA\n", 0, 0, False, id="non_integer"),
+    pytest.param("1000\nBAD_DATA\n", 0, 0, False, id="partial_non_integer"),
 ])
-def test_recover_stale_job_data_with_stat(tmp_path, mocker, content, start, finish):
+def test_recover_stale_job_data_with_stat(tmp_path, mocker, content, start, finish, expected_update):
     """recover_stale_job_data fetches STAT file remotely, reads timestamps and updates job_data."""
     mocker.patch('autosubmit.helpers.utils.BasicConfig.JOBDATA_DIR', str(tmp_path))
     mocker.patch('autosubmit.helpers.utils.BasicConfig.LOCAL_ROOT_DIR', str(tmp_path))
@@ -202,5 +205,8 @@ def test_recover_stale_job_data_with_stat(tmp_path, mocker, content, start, fini
     recover_stale_job_data("a000", mocker.MagicMock(), {"TEST": mock_plat})
     mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
     mock_plat.get_file.assert_called_once_with("a000_j1_STAT_0", True)
-    ExperimentHistory.update_job_data_values.assert_called_once_with("a000_j1", 0, start, finish)
+    if expected_update:
+        ExperimentHistory.update_job_data_values.assert_called_once_with("a000_j1", 0, start, finish)
+    else:
+        ExperimentHistory.update_job_data_values.assert_not_called()
 
