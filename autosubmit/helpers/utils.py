@@ -424,5 +424,9 @@ def _fetch_stat_timestamps(
 def _parse_stat_file(path: Path) -> tuple[int, int]:
     """Read a STAT file and return (start, finish) epoch integers."""
     lines = [x.strip() for x in path.read_text().splitlines() if x.strip()]
-    values = [int(x) for x in lines[:2]]
+    try:
+        values = [int(x) for x in lines[:2]]
+    except ValueError:
+        Log.warning(f"STAT file {path} contains non-integer data, skipping")
+        return 0, 0
     return (values[0], values[1]) if len(values) >= 2 else (values[0], 0) if values else (0, 0)

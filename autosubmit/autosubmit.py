@@ -2221,7 +2221,8 @@ class Autosubmit:
                 while pending_logs:
                     pending_logs = job_list.recover_logs()
                 job_list.save()
-                recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
+                with suppress(Exception):
+                    recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
                 while job_list.get_active():
                     try:
                         if profile is not None:
