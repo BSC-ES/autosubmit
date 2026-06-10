@@ -467,14 +467,6 @@ class Autosubmit:
             subparser.add_argument('-ft', '--filter_type', type=str,
                                help='Select the job type to filter the list of jobs')
 
-            # Check
-            subparser = subparsers.add_parser(
-                'check', description="check configuration for specified experiment")
-            subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('-nt', '--notransitive', action='store_true',
-                                   default=False, help='Disable transitive reduction')
-            subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
             # Describe
             subparser = subparsers.add_parser(
                 'describe', description="Show details for specified experiment")
@@ -3175,42 +3167,6 @@ class Autosubmit:
                 f"An error has occurred while generating the detailed view of the jobs after recovery. Trace: {str(e)}")
 
         return True
-
-    @staticmethod
-    def check(experiment_id: str) -> bool:
-        """Checks experiment configuration and warns about any detected error or inconsistency.
-
-        :param experiment_id: experiment identifier:
-        """
-        try:
-            os.path.join(BasicConfig.LOCAL_ROOT_DIR, experiment_id)
-            as_conf = AutosubmitConfig(
-                experiment_id, BasicConfig, YAMLParserFactory())
-            as_conf.check_conf_files(False)
-            as_conf.get_project_type()
-            submitter = ParamikoSubmitter(as_conf=as_conf)
-            if not submitter.platforms:
-                return False
-
-            pkl_dir = os.path.join(
-                BasicConfig.LOCAL_ROOT_DIR, experiment_id, 'pkl')
-            job_list = Autosubmit.load_job_list(experiment_id, as_conf)
-            Log.debug(f"Job list restored from {pkl_dir} files")
-
-            Autosubmit._load_parameters(as_conf, job_list, submitter.platforms)
-
-            hpc_architecture = as_conf.get_platform()
-            for job in job_list.get_job_list():
-                if job.platform_name is None:
-                    job.platform_name = hpc_architecture
-                job.platform = submitter.platforms[job.platform_name]
-
-        except AutosubmitError:
-            raise
-        except BaseException as e:
-            raise AutosubmitCritical("Checking incomplete due an unknown error. Please check the trace", 7070, str(e))
-
-        return job_list.check_scripts(as_conf)
 
     @staticmethod
     def report(expid: str, template_file_path="", show_all_parameters=False, folder_path="",
