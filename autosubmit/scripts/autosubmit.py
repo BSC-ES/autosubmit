@@ -33,32 +33,17 @@ from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError  # noqa:
 # Extend this set if a new lock-acquiring command is added.
 LOCK_OWNING_COMMANDS = frozenset({'run', 'create', 'recovery', 'setstatus', 'pklfix'})
 
-def delete_lock_file(base_path: Optional[Union[str, Path]] = None, lock_file: str = 'autosubmit.lock') -> None:
-    """Delete lock file if it exists. Suppresses permission errors raised.
+def delete_lock_file(base_path: Union[str, Path], lock_file: str = 'autosubmit.lock') -> None:
+    """Delete the autosubmit lock file at ``base_path/lock_file`` if it exists.
 
-    :param base_path: Base path to locate the lock file. Defaults to the experiment ``tmp`` directory.
-    :type base_path: Optional[Union[str, Path]]
-    :param lock_file: The name of the lock file. Defaults to ``autosubmit.lock``.
+    :param base_path: Directory containing the lock file.
+    :type base_path: Union[str, Path]
+    :param lock_file: The lock file name. Defaults to ``autosubmit.lock``.
     :type lock_file: str
     :return: None
     """
-    if base_path is None:
-        base_path = Log.file_path
     with suppress(PermissionError):
         Path(base_path, lock_file).unlink(missing_ok=True)
-
-
-def _get_lock_path(args: Optional[argparse.Namespace]) -> Optional[Path]:
-    """Return the experiment ``tmp`` directory for the expid in ``args``, or ``None`` if no expid.
-
-    :param args: Parsed CLI arguments.
-    :type args: Optional[argparse.Namespace]
-    :return: Path to the experiment ``tmp`` directory, or ``None``.
-    :rtype: Optional[Path]
-    """
-    if args and getattr(args, 'expid', None):
-        return BasicConfig.expid_tmp_dir(args.expid)
-    return None
 
 
 def _owns_lock(args: Optional[argparse.Namespace]) -> bool:
@@ -135,7 +120,7 @@ def main():
         if args:
             return_value = Autosubmit.run_command(args)
         if _owns_lock(args):
-            delete_lock_file(_get_lock_path(args))
+            delete_lock_file(BasicConfig.expid_tmp_dir(args.expid))
     except BaseException as e:
         command = "<no command provided>"
         expid = "<no expid provided>"
@@ -151,7 +136,8 @@ def main():
                     version = f"{as_conf.experiment_data.get('CONFIG', {}).get('AUTOSUBMIT_VERSION', 'unknown')}"
         Log.error(f"Arguments provided: {str(args)}")
         Log.error(f"This is the experiment: {expid} which had an issue with the command: {command} and it is currently using the Autosubmit Version: {version}.")
-        return_value = exit_from_error(e, _get_lock_path(args) if _owns_lock(args) else None)
+        lock_path = BasicConfig.expid_tmp_dir(args.expid) if _owns_lock(args) else None
+        return_value = exit_from_error(e, lock_path)
     # TODO: we need to define whether the function called here will return an int or bool
     if type(return_value) is bool:
         return_value = 0 if return_value else 1
