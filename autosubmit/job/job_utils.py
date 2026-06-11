@@ -241,36 +241,53 @@ def _count_units_between_dates(start_date, end_date, unit, cal) -> float:
     """
     if unit == "hour":
         return float((end_date - start_date).days * 24)
+    
     elif unit == "day":
         return float((end_date - start_date).days)
+    
     elif unit == "month":
         total = 0.0
         current = start_date.replace(day=1)
         while current < end_date:
-            month_start = max(current, start_date)
+            days_in_month = calendar_get_month_days(f"{current.year}{current.month:02d}01", cal)
             next_year = current.year + current.month // 12
-            next_month_num = current.month % 12 + 1
+            next_month_num = (current.month % 12) + 1
             next_month = current.replace(year=next_year, month=next_month_num, day=1)
-            month_end = min(end_date, next_month)
-            days_covered = float((month_end - month_start).days)
+
+            # Compute start and end day within the month
+            # If the current month is the starting month, start day is the day of the start date
+            # Otherwise, start day is 1
+            start_day = start_date.day if current == start_date.replace(day=1) else 1
+            # If the next month is after the end date, end day is the day of the end date
+            # Otherwise, end day is the number of days in the month + 1 (to include the last day)
+            end_day = end_date.day if end_date < next_month else days_in_month + 1
+            days_covered = end_day - start_day
             if days_covered > 0:
-                total += days_covered / calendar_get_month_days(
-                    f"{current.year:04d}{current.month:02d}01", cal
-                )
+                # Add the fraction of the month covered by the days_covered
+                total += days_covered / days_in_month
             current = next_month
         return total
+    
     elif unit == "year":
         total = 0.0
         current = start_date
         while current < end_date:
             next_year = current.replace(year=current.year + 1, month=1, day=1)
             year_end = min(end_date, next_year)
-            days_covered = (year_end - current).days
+
+            # Get number of days in the current year
+            if is_leap_year(current.year) and cal != "noleap":
+                days_in_year = 366
+            else:
+                days_in_year = 365
+            
+            # Use the fraction of the year covered by the days_covered to add to the total
+            start_doy = 1 if current == current.replace(month=1, day=1) else (current - current.replace(month=1, day=1)).days + 1
+            end_doy = (days_in_year + 1) if year_end >= next_year else (year_end - current.replace(month=1, day=1)).days + 1
+            days_covered = end_doy - start_doy
+
             if days_covered > 0:
-                if is_leap_year(current.year) and cal != "noleap":
-                    total += days_covered / 366
-                else:
-                    total += days_covered / 365
+                total += days_covered / days_in_year
             current = next_year
         return total
     else:
