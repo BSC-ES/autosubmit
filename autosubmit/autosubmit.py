@@ -942,8 +942,6 @@ class Autosubmit:
                 args.filter_status,
                 args.filter_type,
             )
-        elif args.command == 'check':
-            return Autosubmit.check(args.expid)
         elif args.command == 'inspect':
             return Autosubmit.inspect(args.expid, args.list, args.filter_chunks, args.filter_status,
                                       args.filter_type, args.force, args.check_wrapper, args.quick)

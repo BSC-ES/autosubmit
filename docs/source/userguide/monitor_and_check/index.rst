@@ -1,28 +1,9 @@
 Monitor and Check Experiments
 =============================
 
-How to check the experiment configuration
------------------------------------------
+.. warning::
 
-To check the configuration of the experiment, use the command:
-::
-
-    autosubmit check EXPID
-
-*EXPID* is the experiment identifier.
-
-It checks experiment configuration and warns about any detected error or inconsistency.
-It is used to check if the script is well-formed.
-If any template has an inconsistency it will replace them for an empty value on the cmd generated.
-Options:
-
-.. runcmd:: autosubmit check -h
-
-
-Example:
-::
-
-    autosubmit check <EXPID>
+   The dedicated ``autosubmit check`` command has been removed. 
 
 How to use check in running time:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
