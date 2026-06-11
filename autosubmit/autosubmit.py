@@ -2221,8 +2221,11 @@ class Autosubmit:
                 while pending_logs:
                     pending_logs = job_list.recover_logs()
                 job_list.save()
-                with suppress(Exception):
+                try:
                     recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
+                except Exception as e:
+                    Log.debug(f"Error while recovering stale job data: {str(e)}")
+
                 while job_list.get_active():
                     try:
                         if profile is not None:
@@ -3117,8 +3120,10 @@ class Autosubmit:
 
             if save:
                 job_list.recover_last_data()
-                with suppress(Exception):
+                try:
                     recover_stale_job_data(expid, as_conf, platforms)
+                except Exception as e:
+                    Log.debug(f"Error while recovering stale job data: {str(e)}")
                 job_list.save()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
@@ -4387,8 +4392,11 @@ class Autosubmit:
                         raise AutosubmitCritical(
                             "There are repeated member names!")
                     rerun = as_conf.get_rerun()
-                    with suppress(Exception):
+                    try:
                         recover_stale_job_data(expid, as_conf)
+                    except Exception as e:
+                        Log.debug(f"Error while recovering stale job data: {str(e)}")
+
                     Log.info("\nCreating the jobs list...")
                     job_list = JobList(expid, as_conf, YAMLParserFactory(),
                                        Autosubmit._get_job_list_persistence(expid, as_conf))
@@ -5431,8 +5439,10 @@ class Autosubmit:
                 start = time.time()
                 if save and wrongExpid == 0:
                     job_list.recover_last_data(final_list)
-                    with suppress(Exception):
+                    try:
                         recover_stale_job_data(expid, as_conf, platforms)
+                    except Exception as e:
+                        Log.debug(f"Error while recovering stale job data: {str(e)}")
                     job_list.save()
                     end = time.time()
                     Log.info(f"JobList saved in {end - start:.2f} seconds.")

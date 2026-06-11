@@ -474,6 +474,12 @@ class ExperimentHistoryDbManager(DatabaseManager):
                 "Error while getting the pragma version. This might be a signal of a deeper problem. Review previous errors.")
         return Models.PragmaVersion(pragma_value).version
 
+    def get_stale_rows(self) -> list:
+        raise NotImplementedError("Not implemented for the non-SQLAlchemy manager.")
+
+    def update_job_data_values(self, job_name: str, fail_count: int, start: int, finish: int) -> int:
+        raise NotImplementedError("Not implemented for the non-SQLAlchemy manager.")
+
 
 class ExperimentHistoryDatabaseManager(Protocol):
     def initialize(self): ...
