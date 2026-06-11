@@ -23,7 +23,6 @@ import sys
 from collections import defaultdict
 from contextlib import suppress
 from itertools import zip_longest
-from pathlib import Path
 from typing import Iterable, Optional, Union, TYPE_CHECKING
 from autosubmit.history.experiment_history import ExperimentHistory
 
