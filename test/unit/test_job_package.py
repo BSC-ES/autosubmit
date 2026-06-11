@@ -90,7 +90,6 @@ def create_job_package_wrapper(jobs, as_conf):
         wrapper_method = options.get('METHOD', 'ASThread')
         jobs_in_wrapper = options.get('JOBS_IN_WRAPPER', 'None')
         extensible_wallclock = options.get('EXTEND_WALLCLOCK', 0)
-        custom_env_setup = options.get('CUSTOM_ENV_SETUP', '')
         return JobPackageVertical(
             jobs,
             configuration=as_conf,
@@ -99,8 +98,7 @@ def create_job_package_wrapper(jobs, as_conf):
                 wrapper_policy,
                 wrapper_method,
                 jobs_in_wrapper,
-                extensible_wallclock,
-                custom_env_setup
+                extensible_wallclock
             ])
 
     return fn

@@ -28,17 +28,6 @@ def job_scripts():
     return ['JOB_1', 'JOB_2', 'JOB_3']
 
 
-@pytest.fixture
-def wrapper_data():
-    WrapperData = collections.namedtuple('WrapperData', ['custom_env_setup'])
-    return WrapperData(custom_env_setup='')
-
-
-@pytest.fixture
-def name():
-    return 'JOB_1_JOB_2_JOB_3'
-
-
 def _create_nodelist(num_cores):
     num_nodes = int(ceil(num_cores / float(48)))
 
@@ -49,7 +38,7 @@ def _create_nodelist(num_cores):
     return node_list
 
 
-def test_job_less_than_48_cores_standard(job_scripts, wrapper_data, name):
+def test_job_less_than_48_cores_standard(job_scripts):
     num_processors = 60
     jobs_resources = {'MACHINEFILES': 'STANDARD', 'JOB': {'PROCESSORS': '20', 'TASKS': '48'},
                       'PROCESSORS_PER_NODE': '48'}
@@ -58,7 +47,7 @@ def test_job_less_than_48_cores_standard(job_scripts, wrapper_data, name):
                                            num_processors=num_processors, expid='a000',
                                            jobs_resources=jobs_resources, threads='1', retrials=0,
                                            wallclock_by_level=None, num_processors_value=num_processors,
-                                           wrapper_data=wrapper_data, name='test_wrapper_less')
+                                           name='test_wrapper_less')
 
     nodes = _create_nodelist(num_processors)
     cores_list = wrapper_builder.build_cores_list()
@@ -94,7 +83,7 @@ def test_job_less_than_48_cores_standard(job_scripts, wrapper_data, name):
         assert count <= int(jobs_resources['PROCESSORS_PER_NODE'])
 
 
-def test_job_more_than_48_cores_standard(job_scripts, wrapper_data, name):
+def test_job_more_than_48_cores_standard(job_scripts):
     num_processors = 150
     jobs_resources = {'MACHINEFILES': 'STANDARD', 'JOB': {'PROCESSORS': '50', 'TASKS': '48'},
                       'PROCESSORS_PER_NODE': '48'}
@@ -103,7 +92,7 @@ def test_job_more_than_48_cores_standard(job_scripts, wrapper_data, name):
                                            num_processors=num_processors, expid='a000',
                                            jobs_resources=jobs_resources, threads='1', retrials=0,
                                            wallclock_by_level=None, num_processors_value=num_processors,
-                                           wrapper_data=wrapper_data, name='test_wrapper_more')
+                                           name='test_wrapper_more')
 
     nodes = _create_nodelist(num_processors)
     cores_list = wrapper_builder.build_cores_list()

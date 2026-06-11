@@ -28,7 +28,7 @@ from contextlib import suppress
 from datetime import timedelta
 from pathlib import Path
 from threading import Thread
-from typing import List, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from bscearth.utils.date import sum_str_hours, date2str
 
@@ -205,16 +205,6 @@ class JobPackageBase(object):
     def send_files(self):
         """ Send local files to the platform. """
 
-    def _assign_wrapper_method_to_jobs(self, jobs: List[Job], wrapper_method: str) -> None:
-        """
-        Assign the wrapper method to each job in the list.
-
-        :param jobs: List of jobs.
-        :param wrapper_method: Wrapper method to be assigned.
-        """
-        for job in jobs:
-            job.wrapper_method = wrapper_method
-
     def process_jobs_to_submit(self, job_id: int) -> None:
         for job in self.jobs:
             job.submit_time_timestamp = date2str(datetime.datetime.now(), 'S')
@@ -237,9 +227,6 @@ class JobPackageSimple(JobPackageBase):
         self._job_scripts = {}
         self.export = jobs[0].export
         self.name = jobs[0].name
-
-        # Simple jobs may have been in a wrapper previously, so we reset the wrapper method.
-        self._assign_wrapper_method_to_jobs(jobs, None)
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
         for job in self.jobs:
@@ -313,7 +300,6 @@ class JobPackageThread(JobPackageBase):
             self.wrapper_method = wrapper_info[2]
             self.jobs_in_wrapper = wrapper_info[3]
             self.extensible_wallclock = wrapper_info[4]
-            self.custom_env_setup = wrapper_info[5]
         else:
             self.wrapper_type = None
             self.wrapper_policy = None
@@ -326,7 +312,8 @@ class JobPackageThread(JobPackageBase):
         self._common_script = None
         self.executable = None
 
-        self._wallclock = '00:00' # depends on the type of wrapper
+        self._wallclock = '00:00'
+        # depends on the type of wrapper
 
         self._jobs_resources = jobs_resources
         self._wrapper_factory = self.platform.wrapper
@@ -426,9 +413,6 @@ class JobPackageThread(JobPackageBase):
         self.parameters["EXECUTABLE"] = self.executable  # have to look
         self.method = method
         self.is_wrapped = True
-
-        # Assign wrapper method to jobs so that they can be assigned their platform or the wrapper engine later
-        self._assign_wrapper_method_to_jobs(jobs, method)
 
     @property
     def _jobs_scripts(self):
@@ -578,11 +562,11 @@ class JobPackageVertical(JobPackageThread):
     :param: dependency:
     """
     def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None, method: str = 'ASThread'):
+                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
         if wrapper_info is None:
             wrapper_info = []
         super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
-                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info, method=method)
+                                                 wrapper_section=wrapper_section, wrapper_info=wrapper_info)
         for job in jobs:
             if int(job.processors) >= int(self._num_processors):
                 self._num_processors = job.processors
@@ -671,9 +655,9 @@ class JobPackageHorizontal(JobPackageThread):
 
     def __init__(self, jobs: list[Job], dependency: Optional[str] = None, jobs_resources: Optional[dict] = None,
                  method: str = 'ASThread', configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section="WRAPPERS", wrapper_info: Optional[list] = None):
+                 wrapper_section="WRAPPERS", wrapper_info: list=None):
         super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources, configuration=configuration,
-                                                   wrapper_section=wrapper_section, wrapper_info=wrapper_info, method=method)
+                                                   wrapper_section=wrapper_section, wrapper_info=wrapper_info)
         self.method = method
         self._queue = self.queue
         for job in jobs:
@@ -704,13 +688,15 @@ class JobPackageHybrid(JobPackageThread):
     """
 
     def __init__(self, jobs: list[list[Job]], num_processors: str, total_wallclock, dependency=None,
-                 jobs_resources: Optional[dict] = None, method: str = "ASThread", configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section="WRAPPERS", wrapper_info: Optional[list] = None):
+                 jobs_resources: Optional[dict] = None, method: str = "ASThread",
+                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS",
+                 wrapper_info: list = None):
         all_jobs = [item for sublist in jobs for item in sublist]  # flatten list
         if jobs_resources is None:
             jobs_resources = {}
-        super(JobPackageHybrid, self).__init__(all_jobs, dependency, jobs_resources, method, configuration=configuration, 
-                                               wrapper_section=wrapper_section, wrapper_info=wrapper_info)
+        super(JobPackageHybrid, self).__init__(all_jobs, dependency, jobs_resources, method,
+                                               configuration=configuration, wrapper_section=wrapper_section,
+                                               wrapper_info=wrapper_info)
         self.jobs_lists = jobs
         self.method = method
         self._num_processors = int(num_processors)
@@ -761,3 +747,72 @@ class JobPackageHorizontalVertical(JobPackageHybrid):
                                                  threads=self._threads, method=self.method.lower(),
                                                  partition=self.partition, wrapper_data=self,
                                                  num_processors_value=self._num_processors)
+
+class JobPackageDelegated(JobPackageThread):
+    """
+    Class to manage adaptative hybrid wrappers handled by external (delegated) scheduling tools.
+    Delegated wrappers default method is Flux.
+
+    :param jobs: List of jobs that constitute the package.
+    :type jobs: list[Job]
+    :param subworkflow: The representation of the package task graph, in JSON string format.
+    :type subworkflow: str
+    :param num_processors: The processor request.
+    :type num_processors: int
+    :param total_wallclock: Total wallclock of the package.
+    :type total_wallclock: str
+    :param dependency: Dependency.
+    :param jobs_resources: Resource dictionary.
+    :type jobs_resources: Optional[dict]
+    :param method: Method to be used to handle the task execution remotely. Defaults to "flux".
+    :type method: str
+    :param configuration: as_config.
+    :type configuration: Optional['AutosubmitConfig']
+    :param wrapper_section: Wrapper section in the configuration, defaults to "WRAPPERS".
+    :type wrapper_section: str
+    :param wrapper_info: Wrapper parameters.
+    :type wrapper_info: Optional[list]
+    """
+
+    def __init__(self, jobs: list[Job], subworkflow: str, num_processors: int, total_wallclock: str, max_height: int,
+                 max_width: int, dependency=None, jobs_resources: Optional[dict] = None, method: str = "flux",
+                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS",
+                 wrapper_info: Optional[list] = None, custom_env_setup=""):
+        super(JobPackageDelegated, self).__init__(jobs, dependency, jobs_resources, method, configuration=configuration, 
+                                            wrapper_section=wrapper_section, wrapper_info=wrapper_info)
+        self.name = f"{self._expid}_WRAPPER_{jobs_in_wrapper_str(configuration, self.current_wrapper_section)}_{str(int(time.time())) + str(random.randint(1, 10000))}_{self._num_processors}_{len(self._jobs)}"
+        self.method = method
+        self.max_height = max_height
+        self.max_width = max_width
+        self._subworkflow = subworkflow
+        self._subworkflow_path = None
+        self._num_processors = num_processors
+        self._threads = 1 # TODO: [ENGINES] Should receive it
+        self._wallclock = total_wallclock
+        self.custom_env_setup = custom_env_setup
+
+    def send_files(self) -> None:
+        super().send_files()
+        if self._subworkflow_path:
+            self.platform.send_file(self._subworkflow_path)
+
+    def _common_script_content(self) -> str:
+        return self._wrapper_factory.get_wrapper(self._wrapper_factory.delegated_wrapper,
+                                                 name=self.name, queue=self._queue, project=self._project,
+                                                 wallclock=self._wallclock, num_processors=self._num_processors,
+                                                 jobs_scripts=self._jobs_scripts, dependency=self._job_dependency,
+                                                 jobs_resources=self._jobs_resources, expid=self._expid,
+                                                 rootdir=self.platform.root_dir, directives=self._custom_directives,
+                                                 threads=self._threads, method=self.method.lower(), type="delegated",
+                                                 partition=self.partition, wrapper_data=self,
+                                                 num_processors_value=self._num_processors)
+    
+    def _create_scripts(self, configuration) -> None:
+        super()._create_scripts(configuration)
+        self._subworkflow_path = self._create_subworkflow_file('_'.join(self.name.split('_')[2:]))
+
+    def _create_subworkflow_file(self, unique_part) -> None:
+        script_file = f'subworkflow_{unique_part}.json'
+        open(os.path.join(self._tmp_path, script_file), 'wb').write(self._subworkflow.encode('UTF-8'))
+        os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
+        return script_file
