@@ -4,6 +4,7 @@ Developers Guide
 
 .. toctree::
    /devguide/platforms/index
+   /devguide/wrapper_engines/index
 
 Command list
 ============
@@ -39,4 +40,5 @@ Tutorials (How to)
 ------------------
 
 * :doc:`platforms/index`
+* :doc:`wrapper_engines/index`
 

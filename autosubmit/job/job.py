@@ -21,6 +21,7 @@ import json
 import locale
 import os
 import re
+import textwrap
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -160,8 +161,8 @@ class Job(object):
         'file', 'additional_files', 'executable', '_local_logs',
         '_remote_logs', 'script_name', 'stat_file', '_status', 'prev_status',
         'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
-        'parameters', '_tmp_path', '_log_path', '_platform', 'check',
-        'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
+        'parameters', '_tmp_path', '_log_path', 'check',
+        'check_warnings', '_packed', 'currently_wrapped', 'hold', 'distance_weight', 'level', '_export',
         '_dependencies', 'running', 'start_time', 'ext_header_path', 'ext_tailer_path',
         'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
         'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
@@ -270,10 +271,10 @@ class Job(object):
         self._tmp_path = os.path.join(
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
-        self._platform = None
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
+        self.currently_wrapped = False
         self.hold = False  # type: bool
         self.distance_weight = 0
         self.level = 0
@@ -355,6 +356,7 @@ class Job(object):
         self.undefined_variables = None
         self.executable = None
         self.packed = False
+        self.currently_wrapped = False
         self.hold = False
         self.export = None
         self.start_time = None
@@ -414,6 +416,7 @@ class Job(object):
         self.dependencies = ""
         self.packed_during_building = False
         self.packed = False
+        self.currently_wrapped = False
         self.finished_time = None
 
     @property  # type: ignore
@@ -1628,6 +1631,7 @@ class Job(object):
                 "min_wrapped_h",
                 "min_wrapped_v",
                 "policy"
+                "custom_env_setup"
             ]:
                 parameters[f"CURRENT_{key.upper()}"] = value
 
@@ -2393,12 +2397,22 @@ class Job(object):
         return self._get_paramiko_template(snippet, template, parameters)
 
     def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
-        current_platform = self._platform
+        if self.currently_wrapped and self.wrapper_type == "delegated":
+            header = self._delegated_header()
+        else:
+            header = self._platform.get_header(self, parameters)
         return ''.join([
-            snippet.as_header(current_platform.get_header(self, parameters), self.executable),
+            snippet.as_header(header, self.executable),
             snippet.as_body(template),
             snippet.as_tailer()
         ])
+    
+    def _delegated_header(self) -> str:
+        return textwrap.dedent(f"""\
+            ###############################################################################
+            # {self.name}
+            ###############################################################################
+           """)
 
     def queuing_reason_cancel(self, reason):
         try:
