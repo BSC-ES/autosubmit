@@ -1322,21 +1322,30 @@ class AutosubmitConfig(object):
         wrappers_info = parser_data.get("WRAPPERS", {})
         if wrappers_info:
             self.check_wrapper_conf(wrappers_info)
-        if parser_data.get("MAIL", "") != "":
-            if str(parser_data["MAIL"].get("NOTIFICATIONS", "false")).lower() == "true":
-                mails = parser_data["MAIL"].get("TO", "")
-                if type(mails) is list:
-                    pass
-                elif "," in mails:
-                    mails = mails.split(',')
+        
+        mail_info = parser_data.get("MAIL", {})
+        if mail_info:
+            mail_notifications = str(mail_info.get('NOTIFICATIONS', "false")).lower()
+            if mail_notifications == "true":
+                if mail_info.get('TO', None) is None:
+                    self.wrong_config["Autosubmit"] += [['mail',
+                                                         "TO parameter not found or empty when NOTIFICATIONS is set to true"]]
                 else:
-                    mails = mails.split(' ')
-                self.experiment_data["MAIL"]["TO"] = mails
+                    mails = mail_info.get('TO', [])
+                    if type(mails) is list:
+                        pass
+                    elif "," in mails:
+                        mails = mails.split(',')
+                    else:
+                        mails = mails.split(' ')
+                    self.experiment_data["MAIL"]["TO"] = mails
 
-                for mail in self.experiment_data["MAIL"]["TO"]:
-                    if not self.is_valid_mail_address(mail):
-                        self.wrong_config["Autosubmit"] += [['mail',
-                                                             "invalid e-mail"]]
+                    for mail in self.experiment_data["MAIL"]["TO"]:
+                        if not self.is_valid_mail_address(mail):
+                            self.wrong_config["Autosubmit"] += [['mail',
+                                                                 "invalid e-mail"]]
+        else:
+            self.wrong_config["Autosubmit"] += [['mail', "MAIL section defined empty"]]
         if "Autosubmit" not in self.wrong_config:
             if not no_log:
                 Log.result('Autosubmit general sections OK')
