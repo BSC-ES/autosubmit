@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from pathlib import Path
 import pwd
 import re
 import sys
@@ -30,8 +31,9 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.platform import Platform
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.paramiko_submitter import _get_platform_by_type, _get_host
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -341,21 +343,55 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
     :param platform_name: Name of the platform in the experiment configuration.
     :param as_conf: Autosubmit config object.
     :param expid: Experiment identifier.
-    :return: Connected ParamikoPlatform instance.
+    :return: Connected platform instance.
     """
-    config = {
-        "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
-        "LOCAL_TMP_DIR": BasicConfig.LOCAL_TMP_DIR,
-    }
-    plat = ParamikoPlatform(expid, platform_name, config=config)
+    if platform_name.upper() == "LOCAL":
+        config = {
+            "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
+            "LOCAL_TMP_DIR": BasicConfig.LOCAL_TMP_DIR,
+        }
+        plat = LocalPlatform(expid, platform_name, config=config)
+    else:
+        platforms_data = as_conf.experiment_data.get('PLATFORMS', {})
+        platform_config = platforms_data.get(platform_name.upper(), {})
+        platform_type = platform_config.get('TYPE', '').lower()
+        platform_version = platform_config.get('VERSION', '')
+
+        plat = _get_platform_by_type(
+            platform_type, expid, platform_name,
+            as_conf.experiment_data, platform_version, None
+        )
+
+        if plat is None:
+            raise AutosubmitCritical(
+                f"PLATFORMS.{platform_name.upper()}.TYPE: {platform_type} is not supported", 7012
+            )
+        plat.type = platform_type
+        plat._version = platform_version
+
+        add_project_to_host = str(platform_config.get('ADD_PROJECT_TO_HOST', False)).lower() != "false"
+        section_project = platform_config.get('PROJECT', "")
+        section_host = platform_config.get('HOST', "")
+        plat.host = _get_host(section_host, add_project_to_host, section_project)
+        plat.user = platform_config.get('USER', "")
+        plat.scratch = platform_config.get('SCRATCH_DIR', "")
+        plat.temp_dir = platform_config.get('TEMP_DIR', "")
+        plat.root_dir = str(Path(plat.scratch) /
+                             (plat.project if hasattr(plat, 'project') and plat.project else section_project) /
+                             (plat.user if hasattr(plat, 'user') and plat.user else "") /
+                             expid)
+
+        with suppress(Exception):
+            plat.update_cmds()
+
     plat.restore_connection(as_conf)
     return plat
 
 
 def recover_stale_job_data(
-    expid: str,
-    as_conf: 'AutosubmitConfig',
-    platforms: Optional[dict[str, Platform]] = None
+        expid: str,
+        as_conf: 'AutosubmitConfig',
+        platforms: Optional[dict[str, Platform]] = None
 ) -> None:
     """Fetch STAT files for rows with submit>0 and (start=0 or finish=0)
     and update job_data directly. Uses existing platform connections when
@@ -399,10 +435,10 @@ def recover_stale_job_data(
 
 
 def _fetch_stat_timestamps(
-    plat: Platform,
-    exp_path: Path,
-    job_name: str,
-    fail_count: int
+        plat: Platform,
+        exp_path: Path,
+        job_name: str,
+        fail_count: int
 ) -> tuple[int, int]:
     """Download STAT file from platform and return (start, finish) timestamps.
 

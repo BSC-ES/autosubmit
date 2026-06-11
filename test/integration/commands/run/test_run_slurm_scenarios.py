@@ -27,6 +27,7 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.helpers.utils import build_and_connect_platform
 from autosubmit.log.log import AutosubmitCritical, Log
 from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
     _assert_db_fields, _assert_files_recovered, run_in_thread, assert_run_results, _check_wrapper_db_fields, \
@@ -1637,3 +1638,18 @@ def test_recover_stale_row(
                 assert int(r["finish"]) >= int(r["submit"])
                 if int(r["start"]) > 0:
                     assert int(r["finish"]) >= int(r["start"])
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
+def test_build_and_connect_platform_slurm(autosubmit_exp, slurm_server, general_data):
+    """build_and_connect_platform creates a connected SlurmPlatform from real config."""
+    experiment_data = general_data | {
+        "EXPERIMENT": {"MEMBERS": "fc0", "NUMCHUNKS": "1"},
+    }
+    as_exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False, create=True)
+    plat = build_and_connect_platform("TEST_SLURM", as_exp.as_conf, as_exp.expid)
+    assert type(plat).__name__ == "SlurmPlatform"
+    assert plat.type == "slurm"
+    assert plat.connected

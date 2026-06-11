@@ -2385,7 +2385,12 @@ class Autosubmit:
                         if p.log_recovery_process.is_alive():
                             Log.warning(f"Log recovery process for {p.name} did not terminate within timeout.")
                     p.clean_log_recovery_process()
-
+                try:
+                    # Note: This is a safeguard, if the run is not stopped this shouldn't be needed, but maybe the log process dies for others reasons like killed by the system
+                    # so it is good to have this call to avoid leaving bad stat data if the recovery process is not working properly.
+                    recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
+                except Exception as e:
+                    Log.debug(f"Error while recovering stale job data: {str(e)}")
                 Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
 
                 for p in platforms_to_test:
