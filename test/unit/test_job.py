@@ -784,6 +784,34 @@ CONFIG:
         assert job_normal._platform.get_header(job_normal, parameters) in job_script
         assert job_normal._delegated_header() not in job_script
 
+    @pytest.mark.parametrize("create_jobs", [[2, 3]], indirect=True)
+    def test_get_paramiko_template(self, create_jobs, mocker):
+        job_delegated = create_jobs[0]
+        job_delegated.executable = Language.get_executable(Language.BASH)
+        snippet: TemplateSnippet = get_template_snippet(Language.BASH)
+        template = "echo 'This is the job script'"
+        parameters = mocker.MagicMock()
+
+        # test job belonging to a delegated wrapper
+        job_delegated.currently_wrapped = True
+        job_delegated.wrapper_type = "delegated"
+
+        job_script = job_delegated._get_paramiko_template(snippet, template, parameters)
+        assert job_delegated.executable in job_script
+        assert template in job_script
+        assert job_delegated._delegated_header() in job_script
+
+        # test normal job
+        job_normal = create_jobs[1]
+        job_normal.executable = Language.get_executable(Language.BASH)
+        job_normal._platform = mocker.MagicMock()
+        job_normal._platform.get_header = mocker.MagicMock(return_value="# This is the platform header")
+        job_script = job_normal._get_paramiko_template(snippet, template, parameters)
+        assert job_normal.executable in job_script
+        assert template in job_script
+        assert job_normal._platform.get_header(job_normal, parameters) in job_script
+        assert job_normal._delegated_header() not in job_script
+
 
 # TODO: remove this and use pytest fixtures.
 class FakeBasicConfig:

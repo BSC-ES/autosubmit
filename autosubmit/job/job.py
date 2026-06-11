@@ -161,7 +161,7 @@ class Job(object):
     """
 
     __slots__ = (
-        'rerun_only', 'delay_end', 'wrapper_type', 'wrapper_method', '_wrapper_queue',
+        'rerun_only', 'delay_end', 'wrapper_type', '_wrapper_queue',
         '_platform', '_queue', '_partition', 'retry_delay', '_section',
         '_wallclock', 'wchunkinc', '_tasks', '_nodes',
         '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
@@ -229,7 +229,6 @@ class Job(object):
         self.delay_end = None
         self.wrapper_type = None
         self.first_wrapped_level = False
-        self.wrapper_method = None
         self._wrapper_queue = None
         self._platform: Optional[ParamikoPlatform] = None
         self._queue = None
@@ -353,7 +352,6 @@ class Job(object):
         self.delay_end = None
         self.wrapper_type = None
         self.first_wrapped_level = False
-        self.wrapper_method = None
         self._wrapper_queue = None
         self._queue = None
         self._partition = None

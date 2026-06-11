@@ -78,7 +78,6 @@
 - Slurm tests in CICD are using a new container by @giovtorres #2871
 - Fixed main-loop iteration message handling singular/plural and reducing number of line breaks #2969
 - Updated `Defining the workflow` documentation section #2954
-<<<<<<< HEAD
 - Improving the handling of leakages that were happening when dealing with queues and processes #2900
 - Added batch canceling to the `setstatus` command #2919
 - verbosity adjusted #2976

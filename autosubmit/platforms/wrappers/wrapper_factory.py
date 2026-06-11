@@ -194,8 +194,6 @@ class SlurmWrapperFactory(WrapperFactory):
             return PythonHorizontalWrapperBuilder(**kwargs)
         elif kwargs["method"] == 'srun':
             return SrunHorizontalWrapperBuilder(**kwargs)
-        elif kwargs["method"] == 'flux':
-            return FluxHorizontalWrapperBuilder(**kwargs)
         else:
             raise NotImplementedError(self.exception_method(kwargs["method"]))  # pragma: no cover
 
@@ -211,7 +209,7 @@ class SlurmWrapperFactory(WrapperFactory):
         elif kwargs["method"] == 'srun':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
         else:
-            return PythonVerticalHorizontalWrapperBuilder(**kwargs)
+            raise NotImplementedError(self.exception_method(kwargs["method"]))  # pragma: no cover
 
     def header_directives(self, **kwargs):
         return self.platform.wrapper_header(**kwargs)
@@ -250,30 +248,20 @@ class SlurmWrapperFactory(WrapperFactory):
 class PJMWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        if kwargs["method"] == 'flux':
-            raise NotImplementedError(self.exception)   # pragma: no cover
-        else:
-            return PythonVerticalWrapperBuilder(**kwargs)
+        return PythonVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
         if kwargs["method"] == 'srun':
             return SrunHorizontalWrapperBuilder(**kwargs)
-        elif kwargs["method"] == 'flux':
-            raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return PythonHorizontalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        if kwargs["method"] == 'flux':
-            raise NotImplementedError(self.exception)   # pragma: no cover
-        else:
-            return PythonHorizontalVerticalWrapperBuilder(**kwargs)
+        return PythonHorizontalVerticalWrapperBuilder(**kwargs)
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
         if kwargs["method"] == 'srun':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
-        elif kwargs["method"] == 'flux':
-            raise NotImplementedError(self.exception)   # pragma: no cover
         else:
             return PythonVerticalHorizontalWrapperBuilder(**kwargs)
 
@@ -309,16 +297,10 @@ class PJMWrapperFactory(WrapperFactory):
 class EcWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        if kwargs["method"] == 'flux':
-            raise NotImplementedError(self.exception)   # pragma: no cover
-        else:
-            return BashVerticalWrapperBuilder(**kwargs)
+        return BashVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
-        if kwargs["method"] == 'flux':
-            raise NotImplementedError(self.exception)   # pragma: no cover
-        else:
-            return BashHorizontalWrapperBuilder(**kwargs)
+        return BashHorizontalWrapperBuilder(**kwargs)
 
     def header_directives(self, **kwargs):
         return self.platform.wrapper_header(**kwargs)
