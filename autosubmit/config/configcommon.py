@@ -432,6 +432,7 @@ class AutosubmitConfig(object):
         self._normalize_default_section(data)
         self._normalize_wrappers_section(data, raise_exception)
         self._normalize_jobs_section(data, must_exists)
+        self._normalize_storage(data)
 
         return data
 
