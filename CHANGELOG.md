@@ -1,4 +1,4 @@
-### 4.1.17: Unreleased
+### 4.1.17: Submission and Job Tracking Overhaul, Bug Fixes, and Enhancements                                                                                                                                                               
 
 **Bug fixes:**
 
