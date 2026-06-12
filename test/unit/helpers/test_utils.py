@@ -20,7 +20,8 @@ from typing import Union
 
 import pytest
 
-from autosubmit.helpers.utils import get_rc_path, strtobool, user_yes_no_query
+from autosubmit.helpers.utils import get_rc_path, recover_stale_job_data, strtobool, user_yes_no_query
+from autosubmit.history.experiment_history import ExperimentHistory
 
 
 @pytest.mark.parametrize(
@@ -107,3 +108,105 @@ def test_user_yes_no_query(answer: str, expected_or_error: Union[bool, Exception
     else:
         mocker.patch('autosubmit.helpers.utils.input', return_value=answer)
         assert expected_or_error == user_yes_no_query('Sure?')
+
+
+def test_recover_stale_job_data_no_db(tmp_path, mocker):
+    """recover_stale_job_data returns early when the job_data DB file does not exist."""
+    mocker.patch('autosubmit.helpers.utils.BasicConfig.JOBDATA_DIR', str(tmp_path))
+    recover_stale_job_data("a000", mocker.MagicMock())
+
+
+@pytest.mark.parametrize("has_stale", [False, True], ids=["no_stale", "with_stale"])
+def test_recover_stale_job_data_stale_variants(tmp_path, mocker, has_stale):
+    """recover_stale_job_data handles empty and non-empty stale results."""
+    mocker.patch('autosubmit.helpers.utils.BasicConfig.JOBDATA_DIR', str(tmp_path))
+    Path(tmp_path / "job_data_a000.db").touch()
+    mocker.patch.object(ExperimentHistory, 'get_stale_rows', return_value=(
+        [mocker.MagicMock(platform="TEST", job_name="a000_j1", fail_count=0)] if has_stale else []
+    ))
+    as_conf = mocker.MagicMock()
+    recover_stale_job_data("a000", as_conf)
+
+
+def test_recover_stale_job_data_uses_existing_platform(tmp_path, mocker):
+    """recover_stale_job_data reuses a connected platform when available."""
+    mocker.patch('autosubmit.helpers.utils.BasicConfig.JOBDATA_DIR', str(tmp_path))
+    Path(tmp_path / "job_data_a000.db").touch()
+    mocker.patch.object(ExperimentHistory, 'get_stale_rows', return_value=[
+        mocker.MagicMock(platform="TEST", job_name="a000_j1", fail_count=0)
+    ])
+    mock_plat = mocker.MagicMock()
+    mock_plat.connected = True
+    mock_plat.check_file_exists.return_value = False
+    recover_stale_job_data("a000", mocker.MagicMock(), {"TEST": mock_plat})
+    mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
+
+
+def test_recover_stale_job_data_builds_when_disconnected(tmp_path, mocker):
+    """recover_stale_job_data builds a new platform when existing one is disconnected."""
+    mocker.patch('autosubmit.helpers.utils.BasicConfig.JOBDATA_DIR', str(tmp_path))
+    Path(tmp_path / "job_data_a000.db").touch()
+    mocker.patch.object(ExperimentHistory, 'get_stale_rows', return_value=[
+        mocker.MagicMock(platform="TEST", job_name="a000_j1", fail_count=0)
+    ])
+    mock_build = mocker.patch('autosubmit.helpers.utils.build_and_connect_platform')
+    mock_new_plat = mocker.MagicMock()
+    mock_new_plat.connected = True
+    mock_build.return_value = mock_new_plat
+    mock_new_plat.check_file_exists.return_value = False
+    as_conf = mocker.MagicMock()
+    recover_stale_job_data("a000", as_conf, {"TEST": mocker.MagicMock(connected=False)})
+    mock_build.assert_called_once_with("TEST", as_conf, "a000")
+    mock_new_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
+
+
+def test_recover_stale_job_data_builds_new_platform(tmp_path, mocker):
+    """recover_stale_job_data calls build_and_connect_platform when no platforms dict is provided."""
+    mocker.patch('autosubmit.helpers.utils.BasicConfig.JOBDATA_DIR', str(tmp_path))
+    Path(tmp_path / "job_data_a000.db").touch()
+    mocker.patch.object(ExperimentHistory, 'get_stale_rows', return_value=[
+        mocker.MagicMock(platform="TEST", job_name="a000_j1", fail_count=0)
+    ])
+    mock_build = mocker.patch('autosubmit.helpers.utils.build_and_connect_platform')
+    mock_plat = mocker.MagicMock()
+    mock_plat.connected = True
+    mock_build.return_value = mock_plat
+    mock_plat.check_file_exists.return_value = False
+    as_conf = mocker.MagicMock()
+    recover_stale_job_data("a000", as_conf)
+    mock_build.assert_called_once_with("TEST", as_conf, "a000")
+    mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
+
+
+@pytest.mark.parametrize("content,start,finish,expected_update", [
+    pytest.param("1000\n2000\nCOMPLETED\n", 1000, 2000, True, id="typical"),
+    pytest.param("1781078007\n1781078010\nCOMPLETED\n", 1781078007, 1781078010, True, id="realistic_completed"),
+    pytest.param("1781078007\n1781078010\nFAILED\n", 1781078007, 1781078010, True, id="realistic_failed"),
+    pytest.param("500\n", 500, 0, True, id="only_start_line"),
+    pytest.param("500\n\n", 500, 0, True, id="trailing_empty_line"),
+    pytest.param("BAD_DATA\n", 0, 0, False, id="non_integer"),
+    pytest.param("1000\nBAD_DATA\n", 0, 0, False, id="partial_non_integer"),
+])
+def test_recover_stale_job_data_with_stat(tmp_path, mocker, content, start, finish, expected_update):
+    """recover_stale_job_data fetches STAT file remotely, reads timestamps and updates job_data."""
+    mocker.patch('autosubmit.helpers.utils.BasicConfig.JOBDATA_DIR', str(tmp_path))
+    mocker.patch('autosubmit.helpers.utils.BasicConfig.LOCAL_ROOT_DIR', str(tmp_path))
+    Path(tmp_path / "job_data_a000.db").touch()
+    mocker.patch.object(ExperimentHistory, 'get_stale_rows', return_value=[
+        mocker.MagicMock(platform="TEST", job_name="a000_j1", fail_count=0)
+    ])
+    mock_plat = mocker.MagicMock()
+    mock_plat.connected = True
+    mock_plat.check_file_exists.return_value = True
+    mock_plat.get_file.return_value = True
+    mocker.patch.object(Path, 'exists', return_value=True)
+    mocker.patch.object(Path, 'read_text', return_value=content)
+    mocker.patch.object(ExperimentHistory, 'update_job_data_values')
+    recover_stale_job_data("a000", mocker.MagicMock(), {"TEST": mock_plat})
+    mock_plat.check_file_exists.assert_called_once_with("a000_j1_STAT_0")
+    mock_plat.get_file.assert_called_once_with("a000_j1_STAT_0", True)
+    if expected_update:
+        ExperimentHistory.update_job_data_values.assert_called_once_with("a000_j1", 0, start, finish)
+    else:
+        ExperimentHistory.update_job_data_values.assert_not_called()
+

@@ -29,6 +29,7 @@
 - Fixed wrapper deadlock when minimum limits are not reached #2469
 - Fixes 1-N grouped split dependencies #2958
 - Fixed inconsistent log paths in status txt output #3040
+- Follow-up fix for #3007: recover job times that were lost when an experiment was interrupted.
 
 **Enhancements:**
 

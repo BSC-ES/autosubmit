@@ -24,7 +24,9 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.helpers.utils import build_and_connect_platform
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.platforms.locplatform import LocalPlatform
 from test.integration.commands.run.conftest import (
     _assert_db_fields,
     _assert_exit_code,
@@ -786,3 +788,15 @@ def test_run_failed_set_to_ready_on_new_run(
     exit_code = as_exp.autosubmit.run_experiment(as_exp.expid)
 
     _assert_exit_code("SUCCESS", exit_code)
+
+
+def test_build_and_connect_platform_local(autosubmit_exp, general_data):
+    """build_and_connect_platform creates a connected LocalPlatform from real config."""
+    experiment_data = general_data | {
+        "EXPERIMENT": {"MEMBERS": "fc0", "NUMCHUNKS": "1"},
+    }
+    as_exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False, create=True)
+    plat = build_and_connect_platform("LOCAL", as_exp.as_conf, as_exp.expid)
+    assert isinstance(plat, LocalPlatform)
+    assert plat.type == "local"
+    assert plat.connected

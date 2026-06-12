@@ -485,3 +485,23 @@ class ExperimentHistory:
                 result[job.status_str] += 1
         result["TOTAL"] = len(job_list)
         return result
+
+    def get_stale_rows(self) -> list:
+        """Return all job_data rows with submit>0 and (start=0 or finish=0).
+
+        :return: List of Row objects with job_name, fail_count, platform.
+        :rtype: list
+        """
+        return self.manager.get_stale_rows()
+
+    def update_job_data_values(self, job_name: str, fail_count: int, start: int, finish: int) -> int:
+        """Update start and finish for a specific job_data row.
+
+        :param job_name: Job identifier.
+        :param fail_count: Retry attempt number.
+        :param start: Start epoch timestamp.
+        :param finish: Finish epoch timestamp.
+        :return: Number of rows updated.
+        :rtype: int
+        """
+        return self.manager.update_job_data_values(job_name, fail_count, start, finish)

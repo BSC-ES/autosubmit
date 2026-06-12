@@ -63,7 +63,7 @@ from autosubmit.experiment.experiment_common import (
 )
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, user_yes_no_query
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, recover_stale_job_data, user_yes_no_query
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job import Job
@@ -2221,6 +2221,11 @@ class Autosubmit:
                 while pending_logs:
                     pending_logs = job_list.recover_logs()
                 job_list.save()
+                try:
+                    recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
+                except Exception as e:
+                    Log.debug(f"Error while recovering stale job data: {str(e)}")
+
                 while job_list.get_active():
                     try:
                         if profile is not None:
@@ -2379,7 +2384,13 @@ class Autosubmit:
                         p.log_recovery_process.join(timeout=300)
                         if p.log_recovery_process.is_alive():
                             Log.warning(f"Log recovery process for {p.name} did not terminate within timeout.")
-
+                    p.clean_log_recovery_process()
+                try:
+                    # Note: This is a safeguard, if the run is not stopped this shouldn't be needed, but maybe the log process dies for others reasons like killed by the system
+                    # so it is good to have this call to avoid leaving bad stat data if the recovery process is not working properly.
+                    recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
+                except Exception as e:
+                    Log.debug(f"Error while recovering stale job data: {str(e)}")
                 Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
 
                 for p in platforms_to_test:
@@ -3114,6 +3125,10 @@ class Autosubmit:
 
             if save:
                 job_list.recover_last_data()
+                try:
+                    recover_stale_job_data(expid, as_conf, platforms)
+                except Exception as e:
+                    Log.debug(f"Error while recovering stale job data: {str(e)}")
                 job_list.save()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
@@ -4382,6 +4397,10 @@ class Autosubmit:
                         raise AutosubmitCritical(
                             "There are repeated member names!")
                     rerun = as_conf.get_rerun()
+                    try:
+                        recover_stale_job_data(expid, as_conf)
+                    except Exception as e:
+                        Log.debug(f"Error while recovering stale job data: {str(e)}")
 
                     Log.info("\nCreating the jobs list...")
                     job_list = JobList(expid, as_conf, YAMLParserFactory(),
@@ -5425,6 +5444,10 @@ class Autosubmit:
                 start = time.time()
                 if save and wrongExpid == 0:
                     job_list.recover_last_data(final_list)
+                    try:
+                        recover_stale_job_data(expid, as_conf, platforms)
+                    except Exception as e:
+                        Log.debug(f"Error while recovering stale job data: {str(e)}")
                     job_list.save()
                     end = time.time()
                     Log.info(f"JobList saved in {end - start:.2f} seconds.")

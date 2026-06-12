@@ -16,18 +16,23 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from pathlib import Path
 import pwd
 import re
 import sys
+from collections import defaultdict
 from contextlib import suppress
 from itertools import zip_longest
-from pathlib import Path
 from typing import Iterable, Optional, Union, TYPE_CHECKING
+from autosubmit.history.experiment_history import ExperimentHistory
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
+from autosubmit.platforms.platform import Platform
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.paramiko_submitter import _get_platform_by_type, _get_host
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -329,3 +334,134 @@ def user_yes_no_query(question: str) -> bool:
             sys.stdout.write('Please respond with \'y\' or \'n\'.\n')
         except Exception as e:
             raise AutosubmitCritical("No input detected, the experiment will not be erased.", 7011, str(e))
+
+
+def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', expid: str) -> Platform:
+    """Build a minimal platform object and connect to it for STAT recovery.
+
+    :param platform_name: Name of the platform in the experiment configuration.
+    :param as_conf: Autosubmit config object.
+    :param expid: Experiment identifier.
+    :return: Connected platform instance.
+    """
+    if platform_name.upper() == "LOCAL":
+        config = {
+            "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
+            "LOCAL_TMP_DIR": BasicConfig.LOCAL_TMP_DIR,
+        }
+        plat = LocalPlatform(expid, platform_name, config=config)
+    else:
+        platforms_data = as_conf.experiment_data.get('PLATFORMS', {})
+        platform_config = platforms_data.get(platform_name.upper(), {})
+        platform_type = platform_config.get('TYPE', '').lower()
+        platform_version = platform_config.get('VERSION', '')
+
+        plat = _get_platform_by_type(
+            platform_type, expid, platform_name,
+            as_conf.experiment_data, platform_version, None
+        )
+
+        if plat is None:
+            raise AutosubmitCritical(
+                f"PLATFORMS.{platform_name.upper()}.TYPE: {platform_type} is not supported", 7012
+            )
+        plat.type = platform_type
+        plat._version = platform_version
+
+        add_project_to_host = str(platform_config.get('ADD_PROJECT_TO_HOST', False)).lower() != "false"
+        section_project = platform_config.get('PROJECT', "")
+        section_host = platform_config.get('HOST', "")
+        plat.host = _get_host(section_host, add_project_to_host, section_project)
+        plat.user = platform_config.get('USER', "")
+        plat.scratch = platform_config.get('SCRATCH_DIR', "")
+        plat.temp_dir = platform_config.get('TEMP_DIR', "")
+        plat.root_dir = str(Path(plat.scratch) /
+                             (plat.project if hasattr(plat, 'project') and plat.project else section_project) /
+                             (plat.user if hasattr(plat, 'user') and plat.user else "") /
+                             expid)
+
+        with suppress(Exception):
+            plat.update_cmds()
+
+    plat.restore_connection(as_conf)
+    return plat
+
+
+def recover_stale_job_data(
+        expid: str,
+        as_conf: 'AutosubmitConfig',
+        platforms: Optional[dict[str, Platform]] = None
+) -> None:
+    """Fetch STAT files for rows with submit>0 and (start=0 or finish=0)
+    and update job_data directly. Uses existing platform connections when
+    available (e.g. during run_experiment).
+
+    :param expid: Experiment identifier.
+    :param as_conf: Autosubmit config object.
+    :param platforms: Optional dict of name -> connected platform to reuse.
+    """
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+    db_path = Path(BasicConfig.JOBDATA_DIR) / f"job_data_{expid}.db"
+    if not db_path.exists():
+        return
+
+    exp_history = ExperimentHistory(expid, force_sql_alchemy=True)
+    stale = exp_history.get_stale_rows()
+    if not stale:
+        return
+
+    Log.info(f"Found {len(stale)} stale job_data rows — connecting to platforms")
+    by_platform = defaultdict(list)
+    for row in stale:
+        by_platform[row.platform].append((row.job_name, int(row.fail_count)))
+
+    for pn, jobs in by_platform.items():
+        plat = platforms.get(pn) if platforms else None
+        if not plat or not getattr(plat, 'connected', False):
+            try:
+                plat = build_and_connect_platform(pn, as_conf, expid)
+            except Exception as e:
+                Log.warning(f"Cannot connect to {pn}: {e}")
+                continue
+
+        for jn, fail_count in jobs:
+            try:
+                start, finish = _fetch_stat_timestamps(plat, exp_path, jn, fail_count)
+                if start or finish:
+                    exp_history.update_job_data_values(jn, fail_count, start, finish)
+            except Exception as e:
+                Log.warning(f"Could not recover {jn} fail_count={fail_count}: {e}")
+
+
+def _fetch_stat_timestamps(
+        plat: Platform,
+        exp_path: Path,
+        job_name: str,
+        fail_count: int
+) -> tuple[int, int]:
+    """Download STAT file from platform and return (start, finish) timestamps.
+
+    :param plat: Connected platform instance.
+    :param exp_path: Experiment root path.
+    :param job_name: Full job name.
+    :param fail_count: Retry attempt number.
+    :return: Tuple of (start, finish) epoch integers.
+    """
+    stat = f"{job_name}_STAT_{fail_count}"
+    local = exp_path / BasicConfig.LOCAL_TMP_DIR / stat
+    if plat.check_file_exists(stat):
+        plat.get_file(stat, True)
+        if local.exists():
+            return _parse_stat_file(local)
+    return 0, 0
+
+
+def _parse_stat_file(path: Path) -> tuple[int, int]:
+    """Read a STAT file and return (start, finish) epoch integers."""
+    lines = [x.strip() for x in path.read_text().splitlines() if x.strip()]
+    try:
+        values = [int(x) for x in lines[:2]]
+    except ValueError:
+        Log.warning(f"STAT file {path} contains non-integer data, skipping")
+        return 0, 0
+    return (values[0], values[1]) if len(values) >= 2 else (values[0], 0) if values else (0, 0)
