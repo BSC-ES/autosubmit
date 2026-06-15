@@ -16,7 +16,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import math
-from typing import Dict, Optional, TYPE_CHECKING
+from datetime import datetime
+from typing import Optional, Any, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date
 from networkx.classes import DiGraph
@@ -38,27 +39,33 @@ VALID_CALENDARS = ["standard", "noleap"]
 SPLIT_POLICIES = ["flexible", "strict"]
 
 
-def is_leap_year(year: int) -> bool:
-    """
-    Determine whether a year is a leap year.
+def is_leap_year(year: int, cal: str = "standard") -> bool:
+    """Determine whether a year is a leap year, respecting the calendar type.
+
+    Under "noleap" calendar, leap years are not considered and the
+    function always returns False. Under "standard", the Gregorian
+    rules apply.
 
     :param year: Year to check
-    :dtype year: int
+    :type year: int
+    :param cal: Calendar type (standard, noleap)
+    :type cal: str
     :return: True if the year is a leap year
     :rtype: bool
     """
+    if cal == "noleap":
+        return False
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
 def calendar_unitsize_isgreater(split_unit: str, chunk_unit: str) -> bool:
-    """
-    Check if the split unit is greater than the chunk unit.
+    """Check if the split unit is greater than the chunk unit.
 
     :param split_unit: Unit of the split
-    :dtype split_unit: str
+    :type split_unit: str
     :param chunk_unit: Unit of the chunk
-    :dtype chunk_unit: str
-    :return: True if the split unit is greater than the chunk unit 
+    :type chunk_unit: str
+    :return: True if the split unit is greater than the chunk unit
     :rtype: bool
     :raises: AutosubmitCritical if any of the units are invalid
     """
@@ -71,13 +78,14 @@ def calendar_unitsize_isgreater(split_unit: str, chunk_unit: str) -> bool:
 
 
 def calendar_unitsize_getlowersize(unitsize: str) -> str:
-    """
-    Given a calendar unit size, return the lower unit size. 
+    """Given a calendar unit size, return the lower unit size.
+
     For example, if the input is "month", the output will be "day".
 
     :param unitsize: Unit size to get the lower unit size for
-    :dtype unitsize: str
-    :return: The lower unit size    :rtype: str
+    :type unitsize: str
+    :return: The lower unit size
+    :rtype: str
     :raises: AutosubmitCritical if the unit size is invalid
     """
     unit_size = unitsize.lower()
@@ -92,20 +100,19 @@ def calendar_unitsize_getlowersize(unitsize: str) -> str:
 
 
 def calendar_get_month_days(date_str: str, cal: str = "standard") -> int:
-    """
-    Get the number of days in a month, respecting the calendar type (leap year or not).
+    """Get the number of days in a month, respecting the calendar type (leap year or not).
 
     :param date_str: Date in string format (YYYYMMDD)
-    :dtype date_str: str
+    :type date_str: str
     :param cal: Calendar type (standard, noleap)
-    :dtype cal: str
+    :type cal: str
     :return: Number of days in the month
     :rtype: int
     """
     year = int(date_str[0:4])
     month = int(date_str[4:6])
     if month == 2:
-        if cal != "noleap" and is_leap_year(year):
+        if is_leap_year(year, cal):
             return 29
         return 28
     elif month in [4, 6, 9, 11]:
@@ -115,21 +122,20 @@ def calendar_get_month_days(date_str: str, cal: str = "standard") -> int:
 
 
 def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int, cal: str = "standard") -> int:
-    """
-    Get the chunk size in hours.
+    """Get the chunk size in hours.
 
     :param date_str: Date in string format (YYYYMMDD)
-    :dtype date_str: str
+    :type date_str: str
     :param chunk_unit: Unit of the chunk
-    :dtype chunk_unit: str
+    :type chunk_unit: str
     :param chunk_length: Length of the chunk
-    :dtype chunk_length: int
+    :type chunk_length: int
     :param cal: Calendar type (standard, noleap)
-    :dtype cal: str
+    :type cal: str
     :return: The chunk size in hours
     :rtype: int
     """
-    if is_leap_year(int(date_str[0:4])):
+    if is_leap_year(int(date_str[0:4]), cal):
         num_days_in_a_year = 366
     else:
         num_days_in_a_year = 365
@@ -146,23 +152,22 @@ def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int, ca
 
 def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
                                 chunk_size_in_hours: int, cal: str = "standard") -> bool:
-    """
-    Check if the split size is valid for the calendar.
+    """Check if the split size is valid for the calendar.
 
     :param date_str: Date in string format (YYYYMMDD)
-    :dtype date_str: str
+    :type date_str: str
     :param split_size: Size of the split
-    :dtype split_size: int
+    :type split_size: int
     :param split_unit: Unit of the split
-    :dtype split_unit: str
+    :type split_unit: str
     :param chunk_size_in_hours: chunk size in hours
-    :dtype chunk_size_in_hours: int
+    :type chunk_size_in_hours: int
     :param cal: Calendar type (standard, noleap)
-    :dtype cal: str
+    :type cal: str
     :return: True if the split size is valid for the calendar
     :rtype: bool
     """
-    if is_leap_year(int(date_str[0:4])):
+    if is_leap_year(int(date_str[0:4]), cal):
         num_days_in_a_year = 366
     else:
         num_days_in_a_year = 365
@@ -187,17 +192,16 @@ def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
 def _validate_calendar_inputs(
     cal: str, chunk_unit: str, split_unit: str, split_policy: str
 ) -> None:
-    """
-    Validate the calendar inputs.
+    """Validate the calendar inputs.
 
     :param cal: Calendar type
-    :dtype cal: str
+    :type cal: str
     :param chunk_unit: Unit of the chunk
-    :dtype chunk_unit: str
+    :type chunk_unit: str
     :param split_unit: Unit of the split
-    :dtype split_unit: str
+    :type split_unit: str
     :param split_policy: Policy for handling split sizes
-    :dtype split_policy: str
+    :type split_policy: str
     :return: None
     :raises: AutosubmitCritical if any of the inputs are invalid
     """
@@ -227,47 +231,41 @@ def _validate_calendar_inputs(
         )
 
 
-def _count_units_between_dates(start_date, end_date, unit, cal) -> float:
-    """
-    Count the number of units between two dates.
+def _count_units_between_dates(start_date: datetime, end_date: datetime, unit: str, cal: str) -> float:
+    """Count the number of units between two dates.
 
     :param start_date: Start date
+    :type start_date: datetime
     :param end_date: End date
+    :type end_date: datetime
     :param unit: Unit to count (hour, day, month, year)
+    :type unit: str
     :param cal: Calendar type (standard, noleap)
+    :type cal: str
     :return: Number of units between the two dates
     :rtype: float
     :raises: AutosubmitCritical if the unit is invalid
     """
     if unit == "hour":
         return float((end_date - start_date).days * 24)
-    
     elif unit == "day":
         return float((end_date - start_date).days)
-    
     elif unit == "month":
         total = 0.0
         current = start_date.replace(day=1)
         while current < end_date:
-            days_in_month = calendar_get_month_days(f"{current.year}{current.month:02d}01", cal)
+            days_in_month = calendar_get_month_days(f"{current.year:04d}{current.month:02d}01", cal)
             next_year = current.year + current.month // 12
             next_month_num = (current.month % 12) + 1
             next_month = current.replace(year=next_year, month=next_month_num, day=1)
 
-            # Compute start and end day within the month
-            # If the current month is the starting month, start day is the day of the start date
-            # Otherwise, start day is 1
             start_day = start_date.day if current == start_date.replace(day=1) else 1
-            # If the next month is after the end date, end day is the day of the end date
-            # Otherwise, end day is the number of days in the month + 1 (to include the last day)
             end_day = end_date.day if end_date < next_month else days_in_month + 1
             days_covered = end_day - start_day
             if days_covered > 0:
-                # Add the fraction of the month covered by the days_covered
                 total += days_covered / days_in_month
             current = next_month
         return total
-    
     elif unit == "year":
         total = 0.0
         current = start_date
@@ -275,13 +273,11 @@ def _count_units_between_dates(start_date, end_date, unit, cal) -> float:
             next_year = current.replace(year=current.year + 1, month=1, day=1)
             year_end = min(end_date, next_year)
 
-            # Get number of days in the current year
-            if is_leap_year(current.year) and cal != "noleap":
+            if is_leap_year(current.year, cal):
                 days_in_year = 366
             else:
                 days_in_year = 365
             
-            # Use the fraction of the year covered by the days_covered to add to the total
             start_doy = 1 if current == current.replace(month=1, day=1) else (current - current.replace(month=1, day=1)).days + 1
             end_doy = (days_in_year + 1) if year_end >= next_year else (year_end - current.replace(month=1, day=1)).days + 1
             days_covered = end_doy - start_doy
@@ -296,29 +292,26 @@ def _count_units_between_dates(start_date, end_date, unit, cal) -> float:
         )
 
 
-def calendar_chunk_section(exp_data: dict, section: str, date: str, chunk: int) -> int:
-    """
-    Calculate the number of splits for a chunk based on the calendar configuration.
+def calendar_chunk_section(exp_data: dict[str, Any], section: str, date: datetime, chunk: int) -> int:
+    """Calculate the number of splits for a chunk based on the calendar configuration.
 
     :param exp_data: Experiment configuration dictionary
-    :dtype exp_data: dict
+    :type exp_data: dict[str, Any]
     :param section: Job section name
-    :dtype section: str
+    :type section: str
     :param date: Start date of the experiment
-    :dtype date: str
+    :type date: datetime
     :param chunk: Chunk number
-    :dtype chunk: int
+    :type chunk: int
     :return: Number of splits for the chunk
     :rtype: int
     :raises AutosubmitCritical: If the calendar configuration is invalid or if the split size doesn't fit in the chunk size.
     """
     jobs_data = exp_data.get("JOBS", {})
 
-    # Return early
     if jobs_data.get(section, {}).get("RUNNING", "once") != "chunk":
         return 0
 
-    # Retrieve all parameters from the config files
     chunk_unit = str(exp_data.get("EXPERIMENT", {}).get("CHUNKSIZEUNIT", "day")).lower()
     split_unit = str(
         exp_data.get("EXPERIMENT", {}).get(
@@ -376,7 +369,21 @@ def calendar_chunk_section(exp_data: dict, section: str, date: str, chunk: int) 
     return splits
 
 
-def get_split_size_unit(data, section) -> str:
+def get_split_size_unit(data: dict[str, Any], section: str) -> str:
+    """Return the split size unit for a given job section.
+
+    Checks ``JOBS.<section>.SPLITSIZEUNIT`` first. If it is set to "none"
+    or is not defined, it falls back to ``EXPERIMENT.CHUNKSIZEUNIT`` and returns
+    the next lower unit size. If ``EXPERIMENT.CHUNKSIZEUNIT`` is also not defined,
+    it defaults to "day".
+
+    :param data: Experiment configuration dictionary.
+    :type data: dict[str, Any]
+    :param section: Job section name.
+    :type section: str
+    :return: The resolved split size unit as a string.
+    :rtype: str
+    """
     split_unit = str(data.get('JOBS', {}).get(section, {}).get('SPLITSIZEUNIT', "none")).lower()
     if split_unit == "none":
         split_unit = str(data.get('EXPERIMENT', {}).get('CHUNKSIZEUNIT', "day")).lower()
@@ -391,15 +398,18 @@ def get_split_size_unit(data, section) -> str:
     return split_unit
 
 
-def get_split_size(as_conf: dict, section: str) -> int:
+def get_split_size(as_conf: dict[str, Any], section: str) -> int:
     """Return the split size for a given job section.
 
     Checks ``JOBS.<section>.SPLITSIZE`` first, then falls back to
     ``EXPERIMENT.SPLITSIZE``, and finally defaults to ``1``.
 
     :param as_conf: Experiment configuration dictionary.
+    :type as_conf: dict[str, Any]
     :param section: Job section name.
+    :type section: str
     :return: The resolved split size as an integer.
+    :rtype: int
     """
     job_split_size = as_conf.get('JOBS', {}).get(section, {}).get('SPLITSIZE')
     experiment_split_size = as_conf.get('EXPERIMENT', {}).get('SPLITSIZE')
@@ -407,9 +417,7 @@ def get_split_size(as_conf: dict, section: str) -> int:
 
 
 def transitive_reduction(graph) -> DiGraph:
-    """
-
-    Returns transitive reduction of a directed graph
+    """Returns transitive reduction of a directed graph
 
     The transitive reduction of G = (V,E) is a graph G- = (V,E-) such that
     for all v,w in V there is an edge (v,w) in E- if and only if (v,w) is
@@ -425,6 +433,7 @@ def transitive_reduction(graph) -> DiGraph:
     for u in graph:
         graph.nodes[u]["job"].add_children([graph.nodes[v]["job"] for v in graph[u]])
     return graph
+
 
 class Dependency(object):
     """
@@ -587,7 +596,7 @@ class SubJobManager(object):
         in the case of jobs that belong to a wrapper. """
         return self.subjobList
 
-    def get_collection_of_fixes_applied(self) -> Dict[str, int]:
+    def get_collection_of_fixes_applied(self) -> dict[str, int]:
         return self.subjobfixes
 
 
