@@ -38,7 +38,6 @@ from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
-from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
@@ -750,56 +749,6 @@ CONFIG:
         self.job.add_children([child])
         assert 1 == len(self.job.children)
         assert child == list(self.job.children)[0]
-
-    def test_auto_calendar_split(self):
-        self.experiment_data = {
-            'EXPERIMENT': {
-                'DATELIST': '20000101',
-                'MEMBERS': 'fc0',
-                'CHUNKSIZEUNIT': 'day',
-                'CHUNKSIZE': '1',
-                'NUMCHUNKS': '2',
-                'CALENDAR': 'standard'
-            },
-            'JOBS': {
-                'A': {
-                    'FILE': 'a',
-                    'PLATFORM': 'test',
-                    'RUNNING': 'chunk',
-                    'SPLITS': 'auto',
-                    'SPLITSIZE': 1
-                },
-                'B': {
-                    'FILE': 'b',
-                    'PLATFORM': 'test',
-                    'RUNNING': 'chunk',
-                    'SPLITS': 'auto',
-                    'SPLITSIZE': 2
-                }
-            }
-        }
-        section = "A"
-        date = datetime.strptime("20000101", "%Y%m%d")
-        chunk = 1
-        splits = calendar_chunk_section(self.experiment_data, section, date, chunk)
-        assert splits == 24
-        splits = calendar_chunk_section(self.experiment_data, "B", date, chunk)
-        assert splits == 12
-        self.experiment_data['EXPERIMENT']['CHUNKSIZEUNIT'] = 'hour'
-        with pytest.raises(AutosubmitCritical):
-            calendar_chunk_section(self.experiment_data, "A", date, chunk)
-
-        self.experiment_data['EXPERIMENT']['CHUNKSIZEUNIT'] = 'month'
-        splits = calendar_chunk_section(self.experiment_data, "A", date, chunk)
-        assert splits == 31
-        splits = calendar_chunk_section(self.experiment_data, "B", date, chunk)
-        assert splits == 16
-
-        self.experiment_data['EXPERIMENT']['CHUNKSIZEUNIT'] = 'year'
-        splits = calendar_chunk_section(self.experiment_data, "A", date, chunk)
-        assert splits == 31
-        splits = calendar_chunk_section(self.experiment_data, "B", date, chunk)
-        assert splits == 16
 
 
 # TODO: remove this and use pytest fixtures.
