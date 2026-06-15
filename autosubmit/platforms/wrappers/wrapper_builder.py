@@ -149,7 +149,8 @@ class DelegatedWrapperBuilder(WrapperBuilder, ABC):
 
     def build_wrapper_stat(self) -> str: # TODO: [ENGINES] This is a copy of the method in the Bash builder
         """Return bash code that records wrapper start/end time and exit status."""
-        return textwrap.dedent(f"""\
+        return textwrap.dedent(os.linesep + f"""\
+        # Wrapper STAT file management
         _wrapper_stat_file="$(pwd)/{self.name}_STAT_{self.fail_count}"
         date +%s > "$_wrapper_stat_file"
         _write_wrapper_stat() {{
@@ -184,12 +185,14 @@ class DelegatedWrapperBuilder(WrapperBuilder, ABC):
                 """
             )
             + self._custom_environmet_setup()
-            + textwrap.dedent(
+            + self._engine_setup()
+            + textwrap.dedent(os.linesep +
                 f"""\
                 # Instantiate the manager within the allocated resources and run the jobs
                 {self.command}
                 """
             )
+            + self._engine_termination()
         )
 
     def _custom_environmet_setup(self) -> str:
@@ -210,6 +213,14 @@ class DelegatedWrapperBuilder(WrapperBuilder, ABC):
 
     @abstractmethod
     def _generate_delegated_script(self) -> str: # TODO: [ENGINES] Would it be better to transfer it once as a file instead of generating it?
+        pass  # pragma: no cover
+
+    @abstractmethod
+    def _engine_setup(self) -> str:
+        pass  # pragma: no cover
+
+    @abstractmethod
+    def _engine_termination(self) -> str:
         pass  # pragma: no cover
 
 class FluxWrapperBuilder(DelegatedWrapperBuilder):
@@ -381,6 +392,12 @@ class FluxWrapperBuilder(DelegatedWrapperBuilder):
             main()
         """)
 
+    def _engine_setup(self) -> str:
+        return ""
+
+    def _engine_termination(self) -> str:
+        return ""
+
 class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
 
     @property
@@ -389,7 +406,7 @@ class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
     
     @property
     def command(self) -> str:
-        return f"srun --cpu-bind=none python {self._delegated_script_name}"
+        return f"srun --ntasks=1 --cpu-bind=none python {self._delegated_script_name}"
     
     def _generate_delegated_script(self) -> str:
         return textwrap.dedent(f"""
@@ -402,7 +419,7 @@ class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
         from typing import Dict, List
         from collections import defaultdict, deque
 
-        from hyperqueue import Client, Job, LocalCluster
+        from hyperqueue import Client, Job
         from hyperqueue.task.task import ResourceRequest
 
 
@@ -417,8 +434,7 @@ class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
                 self.parents: Dict[str, List[str]] = defaultdict(list)   # child -> [parents]
                 self.children: Dict[str, List[str]] = defaultdict(list)  # parent -> [children]
 
-                self.cluster = LocalCluster()
-                self.client: Client = self.cluster.client()
+                self.client: Client = Client(os.environ.get("HQ_SERVER_DIR"))
                 self.job = Job() # a job contains all the tasks of the DAG
                 self.submitted_job = None
 
@@ -432,7 +448,6 @@ class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
                     deps_tasks = [self.hq_tasks[parent_id] for parent_id in self.parents[task_id]]
                     self.hq_tasks[task_id] = self._submit_job(task_id, deps_tasks)
 
-                self.cluster.start_worker()
                 self.submitted_job = self.client.submit(self.job)
 
                 self._release_graph_memory()
@@ -552,6 +567,64 @@ class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
 
         if __name__ == "__main__":
             main()
+        """)
+
+    def _engine_setup(self) -> str:
+        return textwrap.dedent(f"""
+        # Exclusive directory for the server
+        export HQ_SERVER_DIR=.hq-server-${{SLURM_JOB_ID}}
+        mkdir -p "$HQ_SERVER_DIR"
+
+        # Start the HyperQueue server and wait until it is ready
+        hq server start --server-dir "$HQ_SERVER_DIR" &
+        hq server wait --server-dir "$HQ_SERVER_DIR" --timeout=120
+
+        # Get the exclusive flag
+        if scontrol show job "$SLURM_JOB_ID" 2>/dev/null | grep -q "OverSubscribe=NO"; then
+            EXCLUSIVE="true"
+        else
+            EXCLUSIVE="false"
+        fi
+
+        # Compute the number of required CPUs per worker
+        if [ "${{SLURM_NNODES:-0}}" -ge 1 ] || [ "$EXCLUSIVE" = "true" ]; then
+            CORES_PER_WORKER=$SLURM_CPUS_ON_NODE
+        elif [ -n "${{SLURM_CPUS_PER_TASK:-0}}" ]; then
+            CORES_PER_WORKER="${{SLURM_CPUS_PER_TASK}}"
+        else
+            echo "WARNING: --cpus-per-task not defined for the wrapper script. Using 1 core per worker."
+            CORES_PER_WORKER=1
+        fi
+
+        # Start the workers over the nodes
+        if [ "${{SLURM_NNODES:-0}}" -ge 2 ]; then
+            echo "EXCLUSIVE=${{EXCLUSIVE}}"
+            srun --ntasks="${{SLURM_NNODES}}" \\
+                --nodes="${{SLURM_NNODES}}" \\
+                --cpus-per-task="${{CORES_PER_WORKER}}" \\
+                hq worker start \\
+                    --server-dir "$HQ_SERVER_DIR" \\
+                    --detect-resources all \\
+                    --manager slurm &
+        else
+            hq worker start \\
+                --server-dir "$HQ_SERVER_DIR" \\
+                --detect-resources all \\
+                --manager slurm &
+        fi
+
+        # Wait until workers are connected
+        hq worker wait "$SLURM_NNODES"
+        """)
+
+    def _engine_termination(self) -> str:
+        return textwrap.dedent(f"""
+        # Stop workers and the server
+        hq worker stop all --server-dir "$HQ_SERVER_DIR"
+        hq server stop --server-dir "$HQ_SERVER_DIR"
+        rm -rf "$HQ_SERVER_DIR"
+
+        echo "HyperQueue finished successfully."
         """)
 
 class PythonWrapperBuilder(WrapperBuilder):
