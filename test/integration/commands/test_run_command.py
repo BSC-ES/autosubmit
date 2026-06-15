@@ -68,7 +68,6 @@ def set_up_test(
         ['autosubmit', 'monitor', '{expid}', '--hide', '--notransitive'],  # TODO
         ['autosubmit', 'stats', '{expid}'],  # TODO
         ['autosubmit', 'clean', '{expid}'],
-        # ['autosubmit', 'check', '{expid}', '--notransitive'],
         ['autosubmit', 'inspect', '{expid}', '--notransitive'],  # TODO
         ['autosubmit', 'report', '{expid}'],  # TODO
         ['autosubmit', 'describe', '{expid}'],
