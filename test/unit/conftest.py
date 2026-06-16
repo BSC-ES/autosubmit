@@ -156,6 +156,10 @@ def autosubmit_config(
                 config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
 
         config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
+        if 'TOTALJOBS' not in config.experiment_data['CONFIG']:
+            config.experiment_data['CONFIG']['TOTALJOBS'] = 20
+        if 'MAXWAITINGJOBS' not in config.experiment_data['CONFIG']:
+            config.experiment_data['CONFIG']['MAXWAITINGJOBS'] = 20
         # TODO: one test failed while moving things from unit to integration, but this shouldn't be
         #       needed, especially if the disk has the valid value?
         config.experiment_data['DEFAULT']['EXPID'] = expid
