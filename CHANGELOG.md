@@ -31,6 +31,7 @@
 - Fixed inconsistent log paths in status txt output #3040
 - Follow-up fix for #3007: recover job times that were lost when an experiment was interrupted.
 - Fixed `num_max_spits` unit conversion to months when `split_unit` is "month" #2944
+- Fixed migration of pre-v4.1.17 historical databases missing columns (split, fail_count, out, err) #3062
 - Fixed infinite loop when STAT file stays on RUNNING, now falls back to scheduler status after IO_SAFE_WAIT #3059
 
 **Enhancements:**

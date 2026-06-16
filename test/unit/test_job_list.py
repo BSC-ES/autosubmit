@@ -26,6 +26,7 @@ from typing import Callable
 import networkx
 import pytest
 from networkx import DiGraph  # type: ignore
+from sqlalchemy import create_engine
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
@@ -36,6 +37,7 @@ from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.template import Language
 from test.unit.conftest import FakePlatform
+from test._oldschema import old_job_data_table, old_experiment_run_table
 
 _EXPID = 'a000'
 
@@ -1025,3 +1027,19 @@ def test_save_wrapper_info_only_upserts_wrapper_info_not_inner_jobs(
     else:
         persistence_mock.upsert_wrapper_info.assert_called_once()
     persistence_mock.save.assert_not_called()
+
+
+def test_recover_last_data_on_old_schema(tmp_path, as_conf):
+    """recover_last_data migrates and queries an old-schema database without crashing."""
+    db_dir = tmp_path / "metadata" / "data"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    db_file = db_dir / "job_data_a000.db"
+    engine = create_engine(f"sqlite:///{db_file}")
+    old_job_data_table.create(engine)
+    old_experiment_run_table.create(engine)
+    engine.dispose()
+
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list._job_list.append(Job("test_job", "1", Status.COMPLETED, 0))
+
+    job_list.recover_last_data()

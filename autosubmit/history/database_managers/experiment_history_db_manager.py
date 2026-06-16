@@ -47,7 +47,6 @@ DB_VERSION_SCHEMA_CHANGES = 12
 DEFAULT_DB_VERSION = 10
 DEFAULT_MAX_COUNTER = 0
 
-
 class ExperimentHistoryDbManager(DatabaseManager):
     """ Manages actions directly on the database.
     """
@@ -88,7 +87,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
     def _set_table_queries(self):
         """ Sets basic table queries. """
         self.create_table_header_query = textwrap.dedent(
-            '''CREATE TABLE 
+            '''CREATE TABLE
             IF NOT EXISTS experiment_run (
             run_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
             created TEXT NOT NULL,
@@ -148,7 +147,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
             UNIQUE(counter,job_name)
             );
             ''')
-        self.create_index_query = textwrap.dedent(''' 
+        self.create_index_query = textwrap.dedent('''
       CREATE INDEX IF NOT EXISTS ID_JOB_NAME ON job_data(job_name);
       ''')
 
@@ -342,9 +341,9 @@ class ExperimentHistoryDbManager(DatabaseManager):
 
     def _insert_experiment_run(self, experiment_run):
         """ Insert data class ExperimentRun into database """
-        statement = ''' INSERT INTO experiment_run(created, modified, start, finish, 
-                chunk_unit, chunk_size, completed, total, 
-                failed, queuing, running, 
+        statement = ''' INSERT INTO experiment_run(created, modified, start, finish,
+                chunk_unit, chunk_size, completed, total,
+                failed, queuing, running,
                 submitted, suspended, metadata) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
         arguments = (
             HUtils.get_current_datetime(), HUtils.get_current_datetime(), experiment_run.start, experiment_run.finish,
@@ -390,8 +389,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
         Update experiment_run table with data class ExperimentRun.
         Updates by run_id (finish, chunk_unit, chunk_size, completed, total, failed, queuing, running, submitted, suspended)
         """
-        statement = ''' UPDATE experiment_run SET finish=?, chunk_unit=?, chunk_size=?, completed=?, total=?, 
-                failed=?, queuing=?, running=?, submitted=?, 
+        statement = ''' UPDATE experiment_run SET finish=?, chunk_unit=?, chunk_size=?, completed=?, total=?,
+                failed=?, queuing=?, running=?, submitted=?,
                 suspended=?, modified=? WHERE run_id=? '''
         arguments = (experiment_run_dc.finish, experiment_run_dc.chunk_unit, experiment_run_dc.chunk_size,
                      experiment_run_dc.completed, experiment_run_dc.total,
@@ -570,8 +569,47 @@ class SqlAlchemyExperimentHistoryDbManager:
         self.engine = session.create_engine(connection_url=connection_url)
 
     def initialize(self):
-        # There is no update database in SQLAlchemy (yet), so we just create it.
+        """Create the historical database tables if they do not exist, then migrate any missing columns."""
         self.create_historical_database()
+        self._migrate_schema()
+
+    def _migrate_schema(self):
+        """Add missing columns to job_data and experiment_run tables.
+
+        Compares the SQLAlchemy model (JobDataTable, ExperimentRunTable) against
+        the live database schema and runs ALTER TABLE ADD COLUMN for any columns
+        that exist in the model but not in the DB.
+        """
+        inspector = inspect(self.engine)
+        quote = self.engine.dialect.identifier_preparer.quote
+        dialect = self.engine.dialect
+
+        for model_table in (JobDataTable, ExperimentRunTable):
+            if not inspector.has_table(model_table.name, schema=self.schema):
+                continue
+            existing = {c['name'] for c in inspector.get_columns(model_table.name, schema=self.schema)}
+            pending = [c for c in model_table.columns if c.name not in existing]
+            if not pending:
+                continue
+            qualified_name = f"{quote(self.schema)}.{quote(model_table.name)}" if self.schema else quote(model_table.name)
+            with self.engine.connect() as conn:
+                for col in pending:
+                    parts = [col.type.compile(dialect=dialect)]
+                    if not col.nullable:
+                        parts.append("NOT NULL")
+                    if col.default is not None:
+                        raw = col.default.arg
+                        if isinstance(raw, str):
+                            parts.append(f"DEFAULT '{raw}'")
+                        elif isinstance(raw, bool):
+                            parts.append(f"DEFAULT {'TRUE' if raw else 'FALSE'}")
+                        else:
+                            parts.append(f"DEFAULT {raw}")
+                    conn.execute(
+                        text(f"ALTER TABLE {qualified_name} ADD COLUMN {quote(col.name)} {' '.join(parts)}")
+                    )
+                conn.commit()
+
 
     def my_database_exists(self):
         """Return ``True`` if the schema and tables exist in the database. ``False`` otherwise."""

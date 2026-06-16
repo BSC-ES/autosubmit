@@ -23,11 +23,18 @@ from pathlib import Path
 from typing import cast, TYPE_CHECKING
 
 import pytest
+from sqlalchemy import inspect, select, text
+from sqlalchemy.schema import CreateSchema
 
+from autosubmit.database.tables import get_table_with_schema
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers import experiment_history_db_manager
-from autosubmit.history.database_managers.experiment_history_db_manager import create_experiment_history_db_manager
+from autosubmit.history.database_managers.experiment_history_db_manager import (
+    create_experiment_history_db_manager,
+    SqlAlchemyExperimentHistoryDbManager,
+)
+from test._oldschema import old_job_data_table, old_experiment_run_table
 
 if TYPE_CHECKING:
     from autosubmit.history.database_managers.experiment_history_db_manager import (
@@ -522,3 +529,143 @@ def test_sqlite_pragma_version(autosubmit_exp, tmp_path: 'LocalPath'):
         db_manager.is_header_ready_db_version()
 
     assert 'pragma version' in str(cm.value)
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_sqlalchemy_initialize_migration_postgres(as_db):
+    """Migration adds missing columns on PostgreSQL."""
+    if as_db != 'postgres':
+        pytest.skip("Only relevant for the PostgreSQL backend")
+
+    expid = "test_migration_add_cols"
+    options = {"expid": expid}
+
+    db_manager = create_experiment_history_db_manager(as_db, **options)
+    assert isinstance(db_manager, SqlAlchemyExperimentHistoryDbManager)
+    schema = db_manager.schema
+
+    with db_manager.engine.connect() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.execute(CreateSchema(schema, if_not_exists=True))
+        conn.commit()
+
+    old_job = get_table_with_schema(schema, old_job_data_table)
+    old_exp = get_table_with_schema(schema, old_experiment_run_table)
+    old_job.create(db_manager.engine)
+    old_exp.create(db_manager.engine)
+
+    inspector = inspect(db_manager.engine)
+    cols = {c['name'] for c in inspector.get_columns("job_data", schema=schema)}
+    assert "split" not in cols
+    assert "splits" not in cols
+    assert "fail_count" not in cols
+
+    db_manager.initialize()
+
+    inspector = inspect(db_manager.engine)
+    cols = {c['name'] for c in inspector.get_columns("job_data", schema=schema)}
+    assert "split" in cols
+    assert "splits" in cols
+    assert "fail_count" in cols
+    assert "out" in cols
+    assert "err" in cols
+
+    with db_manager.engine.connect() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.commit()
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_sqlalchemy_initialize_migration_twice_postgres(as_db):
+    """Running initialize() twice on an old-schema database does not raise on PostgreSQL."""
+    if as_db != 'postgres':
+        pytest.skip("Only relevant for the PostgreSQL backend")
+
+    expid = "test_migration_twice"
+    options = {"expid": expid}
+
+    db_manager = create_experiment_history_db_manager(as_db, **options)
+    assert isinstance(db_manager, SqlAlchemyExperimentHistoryDbManager)
+    schema = db_manager.schema
+
+    with db_manager.engine.connect() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.execute(CreateSchema(schema, if_not_exists=True))
+        conn.commit()
+
+    old_job = get_table_with_schema(schema, old_job_data_table)
+    old_exp = get_table_with_schema(schema, old_experiment_run_table)
+    old_job.create(db_manager.engine)
+    old_exp.create(db_manager.engine)
+
+    db_manager.initialize()
+
+    inspector = inspect(db_manager.engine)
+    cols = {c['name'] for c in inspector.get_columns("job_data", schema=schema)}
+    assert "split" in cols
+
+    with db_manager.engine.connect() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.commit()
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_sqlalchemy_initialize_migration_preserves_data_postgres(as_db):
+    """Existing data survives migration on PostgreSQL."""
+    if as_db != 'postgres':
+        pytest.skip("Only relevant for the PostgreSQL backend")
+
+    expid = "test_migration_data"
+    options = {"expid": expid}
+
+    db_manager = create_experiment_history_db_manager(as_db, **options)
+    assert isinstance(db_manager, SqlAlchemyExperimentHistoryDbManager)
+    schema = db_manager.schema
+
+    with db_manager.engine.connect() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.execute(CreateSchema(schema, if_not_exists=True))
+        conn.commit()
+
+    old_job = get_table_with_schema(schema, old_job_data_table)
+    old_exp = get_table_with_schema(schema, old_experiment_run_table)
+    old_job.create(db_manager.engine)
+    old_exp.create(db_manager.engine)
+
+    with db_manager.engine.connect() as conn:
+        conn.execute(
+            old_exp.insert().values(
+                run_id=1, created='now', modified='now', start=0,
+                chunk_unit='month', chunk_size=1, completed=0, total=1,
+                failed=0, queuing=0, running=0, submitted=0,
+            )
+        )
+        conn.execute(
+            old_job.insert().values(
+                id=1, counter=1, job_name='test_job', created='now', modified='now',
+                submit=0, start=0, finish=0, status='COMPLETED', rowtype=0,
+                ncpus=0, wallclock='00:00', qos='debug', energy=0, date='20200101',
+                section='SIM', member='fc0', chunk=1, last=1, platform='LOCAL',
+                job_id=1, extra_data='{}', out='', err='',
+            )
+        )
+        conn.commit()
+
+    db_manager.initialize()
+
+    job_data_table = get_table_with_schema(schema, old_job_data_table)
+    with db_manager.engine.connect() as conn:
+        result = conn.execute(
+            select(job_data_table).where(job_data_table.c.job_name == "test_job")
+        ).fetchall()
+    assert len(result) == 1
+    row = result[0]
+    assert row.job_name == "test_job"
+    assert row.last == 1
+
+    with db_manager.engine.connect() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.commit()
