@@ -1305,10 +1305,10 @@ class AutosubmitConfig(object):
                 self.wrong_config["Autosubmit"] += [['config',
                                                      "AUTOSUBMIT_VERSION parameter not found"]]
 
-            if parser_data["CONFIG"].get('MAXWAITINGJOBS', -1) <= 0:
+            if int(parser_data["CONFIG"].get('MAXWAITINGJOBS', -1)) <= 0:
                 self.wrong_config["Autosubmit"] += [['config',
                                                      "MAXWAITINGJOBS parameter not found or not strictly positive"]]
-            if parser_data["CONFIG"].get('TOTALJOBS', -1) <= 0:
+            if int(parser_data["CONFIG"].get('TOTALJOBS', -1)) <= 0:
                 self.wrong_config["Autosubmit"] += [['config',
                                                      "TOTALJOBS parameter not found or not strictly positive"]]
             if type(parser_data["CONFIG"].get('RETRIALS', 0)) is not int:
