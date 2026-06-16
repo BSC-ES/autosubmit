@@ -101,11 +101,11 @@ def _validate_platform_config(platform_name: str, platform: 'ParamikoPlatform') 
     :return: None
     :raises AutosubmitCritical: If any configuration value is invalid.
     """
-    if platform.total_jobs is not None and int(platform.total_jobs) == 0:
+    if platform.total_jobs is not None and int(platform.total_jobs) <= 0:
         raise AutosubmitCritical(
             f"PLATFORMS.{platform_name.upper()}.TOTALJOBS must be greater than 0. "
             f"Current value: {platform.total_jobs}.", 7012)
-    if platform.max_waiting_jobs is not None and int(platform.max_waiting_jobs) == 0:
+    if platform.max_waiting_jobs is not None and int(platform.max_waiting_jobs) <= 0:
         raise AutosubmitCritical(
             f"PLATFORMS.{platform_name.upper()}.MAX_WAITING_JOBS must be greater than 0. "
             f"Current value: {platform.max_waiting_jobs}.", 7012)
