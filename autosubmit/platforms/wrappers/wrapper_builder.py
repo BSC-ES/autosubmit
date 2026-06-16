@@ -149,7 +149,8 @@ class DelegatedWrapperBuilder(WrapperBuilder, ABC):
 
     def build_wrapper_stat(self) -> str: # TODO: [ENGINES] This is a copy of the method in the Bash builder
         """Return bash code that records wrapper start/end time and exit status."""
-        return textwrap.dedent(f"""\
+        return textwrap.dedent(os.linesep + f"""\
+        # Wrapper STAT file management
         _wrapper_stat_file="$(pwd)/{self.name}_STAT_{self.fail_count}"
         date +%s > "$_wrapper_stat_file"
         _write_wrapper_stat() {{
@@ -184,12 +185,14 @@ class DelegatedWrapperBuilder(WrapperBuilder, ABC):
                 """
             )
             + self._custom_environmet_setup()
-            + textwrap.dedent(
+            + self._engine_setup()
+            + textwrap.dedent(os.linesep +
                 f"""\
                 # Instantiate the manager within the allocated resources and run the jobs
                 {self.command}
                 """
             )
+            + self._engine_termination()
         )
 
     def _custom_environmet_setup(self) -> str:
@@ -210,6 +213,14 @@ class DelegatedWrapperBuilder(WrapperBuilder, ABC):
 
     @abstractmethod
     def _generate_delegated_script(self) -> str: # TODO: [ENGINES] Would it be better to transfer it once as a file instead of generating it?
+        pass  # pragma: no cover
+
+    @abstractmethod
+    def _engine_setup(self) -> str:
+        pass  # pragma: no cover
+
+    @abstractmethod
+    def _engine_termination(self) -> str:
         pass  # pragma: no cover
 
 class FluxWrapperBuilder(DelegatedWrapperBuilder):
@@ -379,6 +390,329 @@ class FluxWrapperBuilder(DelegatedWrapperBuilder):
 
         if __name__ == "__main__":
             main()
+        """)
+
+    def _engine_setup(self) -> str:
+        return ""
+
+    def _engine_termination(self) -> str:
+        return ""
+
+class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
+
+    @property
+    def engine_name(self):
+        return "hyperqueue"
+    
+    @property
+    def command(self) -> str:
+        return f"srun --ntasks=1 --cpu-bind=none python {self._delegated_script_name}"
+    
+    def _generate_delegated_script(self) -> str:
+        return textwrap.dedent(f"""
+        #!/usr/bin/env python3
+
+        import datetime
+        import gc
+        import json
+        import os
+        import subprocess
+        import threading
+        import time
+
+        from typing import Dict, List
+        from collections import defaultdict, deque
+
+        from hyperqueue import Client, Job
+        from hyperqueue.job import ExternalProgram, SubmittedJob
+        from hyperqueue.task.task import ResourceRequest
+
+        ACTIVE_STATES = {"waiting", "running"}
+
+
+        class HyperQueueWrapperSubmitter:
+            def __init__(self, dag_json: str):
+                self.dag: Dict = json.loads(dag_json)
+                self.tasks: Dict[str, Dict] = {{n["id"]: n for n in self.dag["tasks"]}}
+                self.dependencies: List[Dict] = self.dag["dependencies"]
+                self.cwd: str = self.dag["graph"]["wrapper_defaults"]["cwd"]
+
+                self.hq_tasks: Dict[str, object] = {{}}
+                self.parents: Dict[str, List[str]] = defaultdict(list)   # child -> [parents]
+                self.children: Dict[str, List[str]] = defaultdict(list)  # parent -> [children]
+
+                self.server_dir: str = os.environ.get("HQ_SERVER_DIR")
+                self.client: Client = Client(self.server_dir)
+                self.job: Job = Job() # a job contains all the tasks of the DAG
+                self.submitted_job: SubmittedJob = None
+
+                self._build_dependency_graph()
+
+            def submit_wrapper(self):
+                # Submit wrapped jobs in topological order respecting dependencies
+                order = self._topological_order()
+
+                for task_id in order:
+                    deps_tasks = [self.hq_tasks[parent_id] for parent_id in self.parents[task_id]]
+                    self.hq_tasks[task_id] = self._submit_job(task_id, deps_tasks)
+
+                self.submitted_job = self.client.submit(self.job)
+
+                print(f"Wrapper submitted.")
+
+                self._release_graph_memory()
+
+            def wait_for_completion(self, wait_timeout: int = 60, safety_time: int = 20, poll_interval: int = 1):
+                '''
+                Wait for the submitted job to complete, with deadlock detection.
+                If all tasks remain in the waiting state for more than wait_timeout + safety_time seconds,
+                a deadlock is assumed and the wrapper will fail.
+                '''
+                # Setup a thread for waiting for the job to complete
+                finished = threading.Event()
+                wait_error = []
+
+                def _waiter():
+                    try:
+                        self.client.wait_for_jobs([self.submitted_job])
+                    except Exception as exc:
+                        wait_error.append(exc)
+                    finally:
+                        finished.set()
+
+                thread = threading.Thread(target=_waiter, daemon=True)
+                thread.start()
+
+                def get_states() -> List[str]:
+                    '''Return the states of all tasks in the submitted job in a list.'''
+                    job_id = str(self.submitted_job.id)
+
+                    result = subprocess.run(
+                        ["hq", "task", "list", job_id, "--output-mode=json", "--server-dir", self.server_dir],
+                        capture_output=True,
+                        text=True,
+                    )
+
+                    if result.returncode != 0:
+                        raise RuntimeError(f"HQ task list failed: {{result.stderr.strip()}}")
+
+                    data = json.loads(result.stdout)
+                    tasks = data.get(job_id, [])
+                    if not tasks:
+                        raise RuntimeError(f"No tasks found for HQ job {{job_id}}")
+
+                    return [task.get("state", "").lower() for task in tasks]
+
+                def wait_interruptible(seconds):
+                    '''Wait for a given number of seconds, but return early if the finished event is set.'''
+                    deadline = time.time() + seconds
+                    while time.time() < deadline:
+                        remaining = deadline - time.time()
+                        if finished.wait(timeout=min(poll_interval, max(remaining, 0))):
+                            return True
+                    return finished.is_set()
+                
+                def all_active_are_waiting(states: List[str]) -> bool:
+                    active_tasks = [s for s in states if s in ACTIVE_STATES]
+                    return bool(active_tasks) and all(s == "waiting" for s in active_tasks)
+
+                states = [None, None]
+
+                while True:
+                    if finished.is_set():
+                        break
+
+                    if wait_interruptible(wait_timeout):
+                        break
+
+                    states[0] = get_states()
+
+                    if all_active_are_waiting(states[0]):
+                        if wait_interruptible(safety_time):
+                            break
+
+                        states[1] = get_states()
+
+                        if states[0] == states[1]:
+                            open("WRAPPER_FAILED", "w").close()
+                            raise RuntimeError(
+                                f"All HQ tasks remained in a non-running state for at least {{wait_timeout + safety_time}} seconds." \\
+                                "This may indicate a deadlock or resource starvation. This seems to be a bug, please report" \\
+                                "it through the Autosubmit's repository."
+                            )
+
+                if wait_error:
+                    open("WRAPPER_FAILED", "w").close()
+                    raise RuntimeError(f"Wrapper wait failed: {{wait_error[0]}}")
+
+                wrapper_failed = False
+                for task_id in self.hq_tasks.keys():
+                    if os.path.exists(task_id + "_COMPLETED"):
+                        print(f"Task completed: {{task_id}}")
+                    else:
+                        print(f"Task failed: {{task_id}}")
+                        open(task_id + "_FAILED", "w").close()
+                        wrapper_failed = True
+
+                if wrapper_failed:
+                    open("WRAPPER_FAILED", "w").close()
+
+            def _build_dependency_graph(self):
+                # Build the dependency graph, with children containing their parents
+                for dependency in self.dependencies:
+                    parent = dependency["from"]
+                    child = dependency["to"]
+                    self.parents[child].append(parent)
+                    self.children[parent].append(child)
+
+            def _topological_order(self) -> List[str]:
+                indegree = {{task: len(self.parents.get(task, [])) for task in self.tasks}}
+
+                queue = deque([task for task, d in indegree.items() if d == 0])
+                order = []
+
+                while queue:
+                    task = queue.popleft()
+                    order.append(task)
+
+                    for child in self.children[task]:
+                        indegree[child] -= 1
+                        if indegree[child] == 0:
+                            queue.append(child)
+
+                return order
+
+            def _submit_job(self, task_id: str, deps_tasks: List[object] | None = None) -> ExternalProgram:
+                task = self.tasks[task_id]
+
+                script_path = os.path.join(self.cwd, f"{{task_id}}.cmd")
+                wallclock = task.get("wallclock")
+
+                command = ["timeout", "-k", "10s", str(wallclock), script_path]
+                print(f"Submitting task {{task_id}} with command: {{' '.join(command)}}")
+
+                task_kwargs = dict(
+                    cwd=self.cwd,
+                    stdout=script_path + ".out.0",
+                    stderr=script_path + ".err.0",
+                    env=os.environ.copy(),
+                    name=task_id,
+                )
+
+                if deps_tasks:
+                    task_kwargs["deps"] = deps_tasks
+
+                processors = task.get("processors")
+                threads = task.get("threads")
+                nodes = task.get("nodes")
+
+                # TODO: [ENGINES] ntasks/nslots management (?)
+
+                cpus = 1
+                if processors is not None and threads is not None:
+                    cpus = processors * threads
+                elif processors is not None:
+                    cpus = processors
+                elif threads is not None:
+                    cpus = threads
+
+                req = None
+                resource_kwargs = {{}}
+                if cpus is not None:
+                    resource_kwargs["cpus"] = cpus
+                if nodes is not None:
+                    resource_kwargs["n_nodes"] = nodes
+                resource_kwargs["min_time"] = datetime.timedelta(seconds=wallclock)
+
+                req = ResourceRequest(**resource_kwargs)
+
+                task_kwargs["resources"] = req
+
+                hq_task = self.job.program(command, **task_kwargs)
+
+                print(f"Task {{task_id}} added to HQ job")
+                return hq_task
+
+            def _release_graph_memory(self):
+                # Release memory used by the graph after submission
+                del self.dag
+                del self.tasks
+                del self.dependencies
+                del self.cwd
+                del self.parents
+                del self.children
+                gc.collect()
+
+
+        def main():
+            with open("subworkflow_{self._unique_part}.json", "r") as f:
+                dag_json = f.read()
+
+            submitter = HyperQueueWrapperSubmitter(dag_json)
+            submitter.submit_wrapper()
+            submitter.wait_for_completion()
+
+
+        if __name__ == "__main__":
+            main()
+        """)
+
+    def _engine_setup(self) -> str:
+        return textwrap.dedent("""
+        # Exclusive directory for the server
+        export HQ_SERVER_DIR=.hq-server-${{SLURM_JOB_ID}}
+        mkdir -p "$HQ_SERVER_DIR"
+
+        # Start the HyperQueue server and wait until it is ready
+        hq server start --server-dir "$HQ_SERVER_DIR" &
+        hq server wait --server-dir "$HQ_SERVER_DIR" --timeout=120
+
+        # Get the exclusive flag
+        if scontrol show job "$SLURM_JOB_ID" 2>/dev/null | grep -q "OverSubscribe=NO"; then
+            EXCLUSIVE="true"
+        else
+            EXCLUSIVE="false"
+        fi
+
+        # Compute the number of required CPUs per worker
+        if [ "${{SLURM_NNODES:-0}}" -ge 1 ] || [ "$EXCLUSIVE" = "true" ]; then
+            CORES_PER_WORKER=$SLURM_CPUS_ON_NODE
+        elif [ -n "${{SLURM_CPUS_PER_TASK:-0}}" ]; then
+            CORES_PER_WORKER="${{SLURM_CPUS_PER_TASK}}"
+        else
+            echo "WARNING: --cpus-per-task not defined for the wrapper script. Using 1 core per worker."
+            CORES_PER_WORKER=1
+        fi
+
+        # Start the workers over the nodes
+        if [ "${{SLURM_NNODES:-0}}" -ge 2 ]; then
+            echo "EXCLUSIVE=${{EXCLUSIVE}}"
+            srun --ntasks="${{SLURM_NNODES}}" \\
+                --nodes="${{SLURM_NNODES}}" \\
+                --cpus-per-task="${{CORES_PER_WORKER}}" \\
+                hq worker start \\
+                    --server-dir "$HQ_SERVER_DIR" \\
+                    --detect-resources all \\
+                    --manager slurm &
+        else
+            hq worker start \\
+                --server-dir "$HQ_SERVER_DIR" \\
+                --detect-resources all \\
+                --manager slurm &
+        fi
+
+        # Wait until workers are connected
+        hq worker wait "$SLURM_NNODES"
+        """)
+
+    def _engine_termination(self) -> str:
+        return textwrap.dedent("""
+        # Stop workers and the server
+        hq worker stop all --server-dir "$HQ_SERVER_DIR"
+        hq server stop --server-dir "$HQ_SERVER_DIR"
+        rm -rf "$HQ_SERVER_DIR"
+
+        echo "The HyperQueue script finished successfully."
         """)
 
 class PythonWrapperBuilder(WrapperBuilder):

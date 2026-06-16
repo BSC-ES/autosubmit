@@ -74,6 +74,7 @@
 - Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
 - Changed JOBS_IN_WRAPPER unknown job from critical error to warning #3006
 - Now Autosubmit supports delegated wrappers. This enables the in situ management of wrappers on HPC platforms. The new 'Flux' wrapping method is now available for delegated wrappers [#2968](https://github.com/BSC-ES/autosubmit/issues/2968)
+- Now Autosubmit supports the HyperQueue engine for delegated wrappers.
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
