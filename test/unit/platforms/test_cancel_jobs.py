@@ -44,7 +44,7 @@ def test_cancel_jobs_empty_list_sends_no_command(
 
 @pytest.mark.parametrize("platform_fixture,job_id,expected_command", [
     ("slurm_platform", "42", "scancel 42"),
-    ("ec_platform", "9001", "ecaccess-job-delete 9001"),
+    ("ec_platform", "9001", "ecaccess-job-delete -retry 100 9001"),
     ("local_platform", "1234", "kill -2 1234"),
     ("ps_platform", "5678", "kill -2 5678"),
     ("pbs_platform", "9876", "qdel 9876"),
@@ -111,5 +111,6 @@ def test_ec_cancel_jobs_multiple_ids_uses_semicolon_join(
 
     assert len(sent) == 1
     for job_id in job_ids:
-        assert f"ecaccess-job-delete {job_id}" in sent[0]
+        assert job_id in sent[0]
+    assert f"ecaccess-job-delete {ec_platform._ec_retry_flag}" in sent[0]
     assert " ; " in sent[0]
