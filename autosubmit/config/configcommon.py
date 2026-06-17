@@ -1305,12 +1305,22 @@ class AutosubmitConfig(object):
                 self.wrong_config["Autosubmit"] += [['config',
                                                      "AUTOSUBMIT_VERSION parameter not found"]]
 
-            if int(parser_data["CONFIG"].get('MAXWAITINGJOBS', -1)) <= 0:
-                self.wrong_config["Autosubmit"] += [['config',
-                                                     "MAXWAITINGJOBS parameter not found or not strictly positive integer"]]
-            if int(parser_data["CONFIG"].get('TOTALJOBS', -1)) <= 0:
-                self.wrong_config["Autosubmit"] += [['config',
-                                                     "TOTALJOBS parameter not found or not strictly positive integer"]]
+            maxwaitingjobs = parser_data["CONFIG"].get("MAXWAITINGJOBS", None)
+            if maxwaitingjobs is None or int(maxwaitingjobs) <= 0:
+                self.wrong_config["Autosubmit"] += [
+                    [
+                        "config",
+                        "MAXWAITINGJOBS parameter not found or not strictly positive integer",
+                    ]
+                ]
+            totaljobs = parser_data["CONFIG"].get("TOTALJOBS", None)
+            if totaljobs is None or int(totaljobs) <= 0:
+                self.wrong_config["Autosubmit"] += [
+                    [
+                        "config",
+                        "TOTALJOBS parameter not found or not strictly positive integer",
+                    ]
+                ]
             if type(parser_data["CONFIG"].get('RETRIALS', 0)) is not int:
                 parser_data["CONFIG"]['RETRIALS'] = int(parser_data["CONFIG"].get('RETRIALS', 0))
 
@@ -2473,13 +2483,15 @@ class AutosubmitConfig(object):
         """
         return str(self.get_section(['CONFIG', 'AUTOSUBMIT_VERSION'], ""))
 
-    def get_total_jobs(self):
-        """Returns max number of running jobs  from autosubmit's config file
+    def get_total_jobs(self) -> Optional[int]:
+        """Returns max number of running jobs from autosubmit's config file.
 
-        :return: max number of running jobs
-        :rtype: int
+        :return: max number of running jobs, or None if not set
+        :rtype: int | None
         """
-        return int(self.get_section(['CONFIG', 'TOTALJOBS'], -1))
+        # get_section crashes if d_value is None, done the conversion after
+        value = self.get_section(['CONFIG', 'TOTALJOBS'], -1)
+        return None if value == -1 else int(value)
 
     def get_output_type(self):
         """Returns default output type, pdf if none
@@ -2513,13 +2525,15 @@ class AutosubmitConfig(object):
         """
         return self.get_section(['CONFIG', 'MAX_PROCESSORS'], -1)
 
-    def get_max_waiting_jobs(self):
-        """Returns max number of waiting jobs from autosubmit's config file
+    def get_max_waiting_jobs(self) -> Optional[int]:
+        """Returns max number of waiting jobs from autosubmit's config file.
 
-        :return: main platforms
-        :rtype: int
+        :return: max number of waiting jobs, or None if not set
+        :rtype: int | None
         """
-        return int(self.get_section(['CONFIG', 'MAXWAITINGJOBS'], -1))
+        # get_section crashes if d_value is None, done the conversion after
+        value = self.get_section(['CONFIG', 'MAXWAITINGJOBS'], -1)
+        return None if value == -1 else int(value)
 
     def get_default_job_type(self):
         """Returns the default job type from experiment's config file.
