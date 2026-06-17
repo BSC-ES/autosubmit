@@ -60,6 +60,24 @@ def test_ec_retry_count_from_config(
     assert platform._ec_retry_flag == f"-retry {expected}"
 
 
+@pytest.mark.parametrize("invalid_value", [
+    "abc",
+    "12.5",
+    [1, 2, 3],
+    {"key": "val"},
+])
+def test_ec_retry_count_fallback(
+    tmp_path: 'LocalPath',
+    invalid_value: object,
+) -> None:
+    """Verify _ec_retry_count falls back to 100 when ECACCESS_RETRIES is invalid."""
+    platforms = {"TEST_ECMWF": {"ECACCESS_RETRIES": invalid_value}}
+    config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp", "PLATFORMS": platforms}
+    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    assert platform._ec_retry_count == 100
+    assert platform._ec_retry_flag == "-retry 100"
+
+
 def test_file_read_size_and_send(ec_platform: EcPlatform, mocker):
     path = ec_platform.config.get("LOCAL_ROOT_DIR")
     assert isinstance(path, str)
