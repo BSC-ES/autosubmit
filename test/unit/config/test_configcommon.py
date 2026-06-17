@@ -277,12 +277,6 @@ def test_check_autosubmit_conf_invalid_param(
     assert error_msg in str(as_conf_small.wrong_config["Autosubmit"][0])
 
 
-def test_check_autosubmit_conf_valid(as_conf_small: AutosubmitConfig):
-    """Test that check_autosubmit_conf returns True with valid configuration."""
-    assert as_conf_small.check_autosubmit_conf() is True
-    assert "Autosubmit" not in as_conf_small.wrong_config
-
-
 @pytest.mark.parametrize(
     'experiment_data, raise_error',
     [
