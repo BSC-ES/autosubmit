@@ -1033,3 +1033,74 @@ def test_change_status_handles_send_command_failure_gracefully(
     for job in jobs:
         assert job.status == Status.FAILED
         assert job.name in changes
+
+
+@pytest.mark.parametrize(
+    "stat_status, scheduler_status, finished_time, io_safe_wait, now, expected_status, expected_finished_time, expect_warning",
+    [
+        (Status.COMPLETED, Status.RUNNING, 100.0, 5, 200.0, Status.COMPLETED, None, False),
+        (Status.FAILED, Status.RUNNING, 100.0, 5, 200.0, Status.FAILED, None, False),
+        (Status.RUNNING, Status.COMPLETED, None, 5, 100.0, Status.RUNNING, 100.0, False),
+        (Status.RUNNING, Status.COMPLETED, 100.0, 5, 102.0, Status.RUNNING, 100.0, False),
+        (Status.RUNNING, Status.COMPLETED, 100.0, 5, 200.0, Status.COMPLETED, None, True),
+        (Status.RUNNING, Status.FAILED, None, 5, 100.0, Status.RUNNING, 100.0, False),
+        (Status.RUNNING, Status.FAILED, 100.0, 5, 102.0, Status.RUNNING, 100.0, False),
+        (Status.RUNNING, Status.FAILED, 100.0, 5, 200.0, Status.FAILED, None, True),
+        (Status.RUNNING, Status.RUNNING, 999.0, 5, 200.0, Status.RUNNING, None, False),
+        (Status.RUNNING, Status.QUEUING, 999.0, 5, 200.0, Status.RUNNING, None, False),
+        (Status.UNKNOWN, Status.COMPLETED, None, 5, 100.0, Status.RUNNING, 100.0, False),
+        (Status.UNKNOWN, Status.COMPLETED, 100.0, 5, 102.0, Status.RUNNING, 100.0, False),
+        (Status.UNKNOWN, Status.COMPLETED, 100.0, 5, 200.0, Status.COMPLETED, None, True),
+        (Status.UNKNOWN, Status.FAILED, None, 5, 100.0, Status.RUNNING, 100.0, False),
+        (Status.UNKNOWN, Status.FAILED, 100.0, 5, 102.0, Status.RUNNING, 100.0, False),
+        (Status.UNKNOWN, Status.FAILED, 100.0, 5, 200.0, Status.FAILED, None, True),
+        (Status.UNKNOWN, Status.RUNNING, 999.0, 5, 200.0, Status.RUNNING, None, False),
+        (Status.QUEUING, Status.COMPLETED, None, 5, 100.0, Status.RUNNING, 100.0, False),
+        (Status.QUEUING, Status.COMPLETED, 100.0, 5, 102.0, Status.RUNNING, 100.0, False),
+        (Status.QUEUING, Status.COMPLETED, 100.0, 5, 200.0, Status.COMPLETED, None, True),
+        (Status.QUEUING, Status.FAILED, None, 5, 100.0, Status.RUNNING, 100.0, False),
+        (Status.QUEUING, Status.FAILED, 100.0, 5, 102.0, Status.RUNNING, 100.0, False),
+        (Status.QUEUING, Status.FAILED, 100.0, 5, 200.0, Status.FAILED, None, True),
+        (Status.QUEUING, Status.RUNNING, 999.0, 5, 200.0, Status.RUNNING, None, False),
+    ],
+    ids=[
+        "stat_COMPLETED_expect_COMPLETED",
+        "stat_FAILED_expect_FAILED",
+        "stuck_RUNNING_sched_COMPLETED_timer_expect_RUNNING",
+        "stuck_RUNNING_sched_COMPLETED_wait_expect_RUNNING",
+        "stuck_RUNNING_sched_COMPLETED_fallback_expect_COMPLETED",
+        "stuck_RUNNING_sched_FAILED_timer_expect_RUNNING",
+        "stuck_RUNNING_sched_FAILED_wait_expect_RUNNING",
+        "stuck_RUNNING_sched_FAILED_fallback_expect_FAILED",
+        "stat_RUNNING_sched_RUNNING_expect_RUNNING",
+        "stat_RUNNING_sched_QUEUING_expect_RUNNING",
+        "no_STAT_sched_COMPLETED_timer_expect_RUNNING",
+        "no_STAT_sched_COMPLETED_wait_expect_RUNNING",
+        "no_STAT_sched_COMPLETED_fallback_expect_COMPLETED",
+        "no_STAT_sched_FAILED_timer_expect_RUNNING",
+        "no_STAT_sched_FAILED_wait_expect_RUNNING",
+        "no_STAT_sched_FAILED_fallback_expect_FAILED",
+        "no_STAT_sched_RUNNING_expect_RUNNING",
+        "stat_QUEUING_sched_COMPLETED_timer_expect_RUNNING",
+        "stat_QUEUING_sched_COMPLETED_wait_expect_RUNNING",
+        "stat_QUEUING_sched_COMPLETED_fallback_expect_COMPLETED",
+        "stat_QUEUING_sched_FAILED_timer_expect_RUNNING",
+        "stat_QUEUING_sched_FAILED_wait_expect_RUNNING",
+        "stat_QUEUING_sched_FAILED_fallback_expect_FAILED",
+        "stat_QUEUING_sched_RUNNING_expect_RUNNING",
+    ],
+)
+def test_resolve_stat_status(
+    stat_status, scheduler_status, finished_time, io_safe_wait, now,
+    expected_status, expected_finished_time, expect_warning, mocker,
+):
+    mock_log = mocker.patch("autosubmit.platforms.paramiko_platform.Log")
+    result_status, result_finished_time = ParamikoPlatform._resolve_stat_status(
+        "test_job", stat_status, scheduler_status, finished_time, io_safe_wait, now,
+    )
+    assert result_status == expected_status
+    assert result_finished_time == expected_finished_time
+    if expect_warning:
+        mock_log.warning.assert_called_once()
+    else:
+        mock_log.warning.assert_not_called()
