@@ -203,8 +203,8 @@ class AutosubmitConfig(object):
                         raise AutosubmitCritical(
                             f"[INDEX ERROR], {section_str} must exists. Check that {str(current_level)} is an section that exists.",
                             7014)
-        if current_level is None or (
-                not isinstance(current_level, numbers.Number) and len(current_level) == 0) and must_exists:
+        if (current_level is None or (
+                not isinstance(current_level, numbers.Number) and len(current_level) == 0)) and must_exists:
             raise AutosubmitCritical(
                 f"{section_str} must exists. Check that subsection {str(current_level)} exists.", 7014)
         if current_level is None or (not isinstance(current_level, numbers.Number) and len(current_level) == 0):
@@ -2490,8 +2490,7 @@ class AutosubmitConfig(object):
         :rtype: int | None
         """
         # get_section crashes if d_value is None, done the conversion after
-        value = self.get_section(['CONFIG', 'TOTALJOBS'], -1)
-        return None if value == -1 else int(value)
+        return self.get_section(['CONFIG', 'TOTALJOBS'], None)
 
     def get_output_type(self):
         """Returns default output type, pdf if none
@@ -2531,9 +2530,7 @@ class AutosubmitConfig(object):
         :return: max number of waiting jobs, or None if not set
         :rtype: int | None
         """
-        # get_section crashes if d_value is None, done the conversion after
-        value = self.get_section(['CONFIG', 'MAXWAITINGJOBS'], -1)
-        return None if value == -1 else int(value)
+        return self.get_section(['CONFIG', 'MAXWAITINGJOBS'], None)
 
     def get_default_job_type(self):
         """Returns the default job type from experiment's config file.
