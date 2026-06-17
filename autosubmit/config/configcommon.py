@@ -1307,10 +1307,10 @@ class AutosubmitConfig(object):
 
             if int(parser_data["CONFIG"].get('MAXWAITINGJOBS', -1)) <= 0:
                 self.wrong_config["Autosubmit"] += [['config',
-                                                     "MAXWAITINGJOBS parameter not found or not strictly positive"]]
+                                                     "MAXWAITINGJOBS parameter not found or not strictly positive integer"]]
             if int(parser_data["CONFIG"].get('TOTALJOBS', -1)) <= 0:
                 self.wrong_config["Autosubmit"] += [['config',
-                                                     "TOTALJOBS parameter not found or not strictly positive"]]
+                                                     "TOTALJOBS parameter not found or not strictly positive integer"]]
             if type(parser_data["CONFIG"].get('RETRIALS', 0)) is not int:
                 parser_data["CONFIG"]['RETRIALS'] = int(parser_data["CONFIG"].get('RETRIALS', 0))
 

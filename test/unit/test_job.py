@@ -461,8 +461,6 @@ CONFIG:
                 experiment_data.write(dedent(f'''\
                             CONFIG:
                               RETRIALS: 0
-                              TOTALJOBS: 20
-                              MAXWAITINGJOBS: 20
                             DEFAULT:
                               EXPID: {expid}
                               HPCARCH: test
@@ -576,8 +574,6 @@ CONFIG:
                     minimal.write(dedent(f'''\
                     CONFIG:
                       RETRIALS: 0
-                      TOTALJOBS: 20
-                      MAXWAITINGJOBS: 20
                     DEFAULT:
                       EXPID: {expid}
                       HPCARCH: test
@@ -1808,8 +1804,6 @@ def test_job_parameters(reservation: Optional[str], tmp_path: Path, autosubmit_c
     conf_path.write_text(dedent(f'''\
         CONFIG:
           RETRIALS: 0
-          TOTALJOBS: 20
-          MAXWAITINGJOBS: 20
         DEFAULT:
           EXPID: {expid}
           HPCARCH: test
@@ -1903,8 +1897,6 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
             "SPLITSIZEUNIT": "day",
         },
         "CONFIG": {
-            "TOTALJOBS": 20,
-            "MAXWAITINGJOBS": 20,
             "SAFE_PLACEHOLDERS": ["keep_format_as_INTRODUCED"]
         },
         "HPCADD_PROJECT_TO_HOST": False,
