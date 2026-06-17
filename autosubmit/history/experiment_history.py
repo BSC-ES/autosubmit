@@ -52,12 +52,14 @@ class ExperimentHistory:
                 'force_sql_alchemy': self.force_sql_alchemy  # tmp, the idea is to move everything to sqlalchemy
             }
             self.manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
+            self.initialize_database()
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
             self.manager = None
 
     def initialize_database(self):
+        """Initialize the database manager, creating tables and running schema migrations."""
         try:
             self.manager.initialize()
         except Exception as exp:

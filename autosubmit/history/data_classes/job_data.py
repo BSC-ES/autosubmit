@@ -69,8 +69,8 @@ class JobData(object):
         # DB VERSION 15 attributes
         self.MaxRSS = MaxRSS
         self.AveRSS = AveRSS
-        self.out = out
-        self.err = err
+        self.out = out if out else ""
+        self.err = err if err else ""
         self.rowstatus = rowstatus
         self.children = children  # DB 17
         self.platform_output = platform_output  # DB 17

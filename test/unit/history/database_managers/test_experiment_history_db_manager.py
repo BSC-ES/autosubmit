@@ -18,7 +18,7 @@
 import sqlite3
 
 import pytest
-from sqlalchemy import and_, insert, select
+from sqlalchemy import and_, create_engine, inspect, insert, select
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import JobDataTable, get_table_with_schema
@@ -27,6 +27,104 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
     create_experiment_history_db_manager,
     SqlAlchemyExperimentHistoryDbManager,
 )
+
+from test._oldschema import old_job_data_table, old_experiment_run_table
+
+
+def _create_old_schema(engine):
+    old_job_data_table.create(engine)
+    old_experiment_run_table.create(engine)
+
+
+def test_sqlalchemy_initialize_migration(tmp_path, mocker):
+    """Migration adds missing columns to an old-schema database."""
+    mocker.patch.object(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
+    db_path = tmp_path / "job_data_old.db"
+
+    engine = create_engine(f"sqlite:///{db_path}")
+    _create_old_schema(engine)
+    engine.dispose()
+
+    engine = create_engine(f"sqlite:///{db_path}")
+    inspector = inspect(engine)
+    cols = {c['name'] for c in inspector.get_columns("job_data")}
+    assert "split" not in cols
+    assert "splits" not in cols
+    assert "fail_count" not in cols
+    engine.dispose()
+
+    db_manager = SqlAlchemyExperimentHistoryDbManager("test", str(tmp_path), "job_data_old.db")
+    db_manager.initialize()
+
+    inspector = inspect(db_manager.engine)
+    cols = {c['name'] for c in inspector.get_columns("job_data")}
+    assert "split" in cols
+    assert "splits" in cols
+    assert "fail_count" in cols
+
+    rows = db_manager.select_jobs_data(get_table_with_schema(None, JobDataTable), ["nonexistent"])
+    assert rows == []
+
+
+def test_sqlalchemy_initialize_migration_multiple_times_works(tmp_path, mocker):
+    """Running initialize() twice on an old-schema database does not raise."""
+    mocker.patch.object(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
+    db_path = tmp_path / "job_data_bla.db"
+
+    engine = create_engine(f"sqlite:///{db_path}")
+    _create_old_schema(engine)
+    engine.dispose()
+
+    db_manager = SqlAlchemyExperimentHistoryDbManager("test", str(tmp_path), "job_data_bla.db")
+    db_manager.initialize()
+    db_manager.initialize()
+
+    inspector = inspect(db_manager.engine)
+    cols = {c['name'] for c in inspector.get_columns("job_data")}
+    assert "split" in cols
+
+
+def test_sqlalchemy_initialize_migration_preserves_data(tmp_path, mocker):
+    """Existing data survives migration and is queryable."""
+    mocker.patch.object(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
+    db_path = tmp_path / "job_data.db"
+
+    engine = create_engine(f"sqlite:///{db_path}")
+    _create_old_schema(engine)
+    with engine.connect() as conn:
+        conn.execute(
+            old_experiment_run_table.insert().values(
+                run_id=1, created='now', modified='now', start=0,
+                chunk_unit='month', chunk_size=1, completed=0, total=1,
+                failed=0, queuing=0, running=0, submitted=0,
+            )
+        )
+        conn.execute(
+            old_job_data_table.insert().values(
+                id=1, counter=1, job_name='test_job', created='now', modified='now',
+                submit=0, start=0, finish=0, status='COMPLETED', rowtype=0,
+                ncpus=0, wallclock='00:00', qos='debug', energy=0, date='20200101',
+                section='SIM', member='fc0', chunk=1, last=1, platform='LOCAL',
+                job_id=1, extra_data='{}', out='', err='',
+            )
+        )
+        conn.commit()
+    engine.dispose()
+
+    db_manager = SqlAlchemyExperimentHistoryDbManager("test", str(tmp_path), "job_data.db")
+    db_manager.initialize()
+
+    job_data_table = get_table_with_schema(None, JobDataTable)
+    with db_manager.engine.connect() as conn:
+        result = conn.execute(
+            select(job_data_table).where(job_data_table.c.job_name == "test_job")
+        ).fetchall()
+    assert len(result) == 1
+    row = result[0]
+    assert row.job_name == "test_job"
+    assert row.last == 1
+    assert row.split is None
+    assert row.fail_count == 0
 
 
 def test_create_experiment_history_db_manager_invalid():

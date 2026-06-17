@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections import namedtuple
+from pathlib import Path
 
 import os
 import re
@@ -24,6 +25,7 @@ import pytest
 import time
 import traceback
 from shutil import copy2
+from sqlalchemy import create_engine
 
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.internal_logging import Logging
@@ -31,6 +33,7 @@ from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
 from autosubmit.history.strategies import StraightWrapperAssociationStrategy, GeneralizedWrapperDistributionStrategy, \
     PlatformInformationHandler
 from autosubmit.config.basicconfig import BasicConfig
+from test._oldschema import old_job_data_table, old_experiment_run_table
 
 EXPID_TT00_SOURCE = "test_database.db~"
 EXPID_TT01_SOURCE = "test_database_no_run.db~"
@@ -356,6 +359,24 @@ class TestLogging:
 
     def test_log(self):
         self.log.log(self.exp_message, self.trace_message)
+
+
+def test_experiment_history_force_sqlalchemy_migrates_old_schema(tmp_path):
+    """ExperimentHistory with force_sql_alchemy=True migrates an old-schema database."""
+    db_dir = Path(tmp_path) / "metadata" / "data"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    db_file = db_dir / "job_data_a000.db"
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    old_job_data_table.create(engine)
+    old_experiment_run_table.create(engine)
+    engine.dispose()
+
+    exp_history = ExperimentHistory("a000", force_sql_alchemy=True)
+    assert exp_history.manager is not None
+
+    result = exp_history.manager.get_jobs_data_last_row(["nonexistent"])
+    assert result == {}
 
 
 def test_get_finish_data_dc(tmp_path, monkeypatch):
