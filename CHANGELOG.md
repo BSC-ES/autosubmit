@@ -77,6 +77,7 @@
 - Jobs now validated individually via STAT files in check_jobs to confirm completion or failure, for both wrapped and non-wrapped jobs #3007
 - Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
 - Changed JOBS_IN_WRAPPER unknown job from critical error to warning #3006
+- Added ``ECACCESS_RETRIES`` platform config key to configure SSL retries for ecaccess platforms. Defaults to 100 #3059
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

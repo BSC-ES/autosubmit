@@ -88,7 +88,7 @@ class EcPlatform(ParamikoPlatform):
         :param jobs_id: Comma-separated job IDs (ignored by ecaccess).
         :return: ``ecaccess-job-list`` command.
         """
-        return "ecaccess-job-list"
+        return f"ecaccess-job-list {self._ec_retry_flag}"
 
     def _check_jobid_in_queue(self, ssh_output: str, job_list_cmd: str) -> bool:
         """Bypass the retry loop for missing job IDs.
@@ -121,6 +121,17 @@ class EcPlatform(ParamikoPlatform):
         self._pathdir = "\\$HOME/LOG_" + self.expid
         self._allow_arrays = False
         self._allow_wrappers = False  # TODO
+        try:
+            self._ec_retry_count = int(
+                self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("ECACCESS_RETRIES", 100)
+            )
+        except (ValueError, TypeError):
+            Log.warning(
+                f"Invalid ECACCESS_RETRIES value for {self.name}, "
+                f"falling back to default 100."
+            )
+            self._ec_retry_count = 100
+        self._ec_retry_flag = f"-retry {self._ec_retry_count}"
         self._allow_python_jobs = False
         self.root_dir = ""
         self.remote_log_dir = ""
@@ -144,30 +155,28 @@ class EcPlatform(ParamikoPlatform):
         self.has_scheduler = False
 
     def update_cmds(self):
-        """
-        Updates commands for platforms
-        """
+        """Updates commands for platforms"""
         self.root_dir = os.path.join(self.scratch, self.project, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
-        self.cancel_cmd = "ecaccess-job-delete"
-        self._checkjob_cmd = "ecaccess-job-list "
-        self._checkhost_cmd = "ecaccess-certificate-list"
-        self._checkvalidcert_cmd = "ecaccess-gateway-connected"
-        self._submit_command_name = "ecaccess-job-submit"
-        self.put_cmd = "ecaccess-file-put"
-        self.get_cmd = "ecaccess-file-get"
-        self.del_cmd = "ecaccess-file-delete"
-        self.mkdir_cmd = ("ecaccess-file-mkdir " + self.host + ":" + self.scratch + "/" + self.project + "/" +
-                          self.user + "/" + self.expid + "; " + "ecaccess-file-mkdir " + self.host + ":" +
+        self.cancel_cmd = f"ecaccess-job-delete {self._ec_retry_flag}"
+        self._checkjob_cmd = f"ecaccess-job-list {self._ec_retry_flag} "
+        self._checkhost_cmd = f"ecaccess-certificate-list {self._ec_retry_flag}"
+        self._checkvalidcert_cmd = f"ecaccess-gateway-connected {self._ec_retry_flag}"
+        self._submit_command_name = f"ecaccess-job-submit {self._ec_retry_flag}"
+        self.put_cmd = f"ecaccess-file-put {self._ec_retry_flag}"
+        self.get_cmd = f"ecaccess-file-get {self._ec_retry_flag}"
+        self.del_cmd = f"ecaccess-file-delete {self._ec_retry_flag}"
+        self.mkdir_cmd = (f"ecaccess-file-mkdir {self._ec_retry_flag} " + self.host + ":" + self.scratch + "/" + self.project + "/" +
+                          self.user + "/" + self.expid + "; " + f"ecaccess-file-mkdir {self._ec_retry_flag} " + self.host + ":" +
                           self.remote_log_dir)
-        self.check_remote_permissions_cmd = "ecaccess-file-mkdir " + self.host + ":" + os.path.join(self.scratch,
-                                                                                                    self.project,
-                                                                                                    self.user,
-                                                                                                    "_permission_checker_azxbyc")
-        self.check_remote_permissions_remove_cmd = "ecaccess-file-rmdir " + self.host + ":" + os.path.join(self.scratch,
-                                                                                                           self.project,
-                                                                                                           self.user,
-                                                                                                           "_permission_checker_azxbyc")
+        self.check_remote_permissions_cmd = f"ecaccess-file-mkdir {self._ec_retry_flag} " + self.host + ":" + os.path.join(self.scratch,
+                                                                                                                          self.project,
+                                                                                                                          self.user,
+                                                                                                                          "_permission_checker_azxbyc")
+        self.check_remote_permissions_remove_cmd = f"ecaccess-file-rmdir {self._ec_retry_flag} " + self.host + ":" + os.path.join(self.scratch,
+                                                                                                                                 self.project,
+                                                                                                                                 self.user,
+                                                                                                                                 "_permission_checker_azxbyc")
 
     def get_remote_log_dir(self):
         return self.remote_log_dir
@@ -191,10 +200,10 @@ class EcPlatform(ParamikoPlatform):
         ]
         for path in levels[:-1]:
             with suppress(Exception):
-                subprocess.check_output(f"ecaccess-file-mkdir {path}", shell=True,
+                subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {path}", shell=True,
                                         stderr=subprocess.DEVNULL)
         try:
-            subprocess.check_output(f"ecaccess-file-mkdir {levels[-1]}", shell=True,
+            subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {levels[-1]}", shell=True,
                                     stderr=subprocess.DEVNULL)
             Log.debug(f"{self.remote_log_dir} has been created on {self.host}.")
         except subprocess.CalledProcessError:
@@ -221,7 +230,7 @@ class EcPlatform(ParamikoPlatform):
 
         # List files in the remote log directory
         try:
-            self.send_command(f"ecaccess-file-dir {self.host}:{self.remote_log_dir}")
+            self.send_command(f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
             dir_output = self.get_ssh_output()
         except Exception:
             return result
@@ -269,7 +278,7 @@ class EcPlatform(ParamikoPlatform):
             return
 
         # List files in the remote log directory
-        self.send_command(f"ecaccess-file-dir {self.host}:{self.remote_log_dir}")
+        self.send_command(f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
         dir_output = self.get_ssh_output()
 
         # ecaccess-file-dir output format: filename|size  NNNN
@@ -311,7 +320,7 @@ class EcPlatform(ParamikoPlatform):
     def _set_submit_cmd(self, ec_queue: str):
         """Set the ecaccess-job-submit command for the given queue.
 
-        The ``-retry 3w0`` flag tells ecaccess to retry the **initial SSL handshake**
+        The ``-retry`` flag tells ecaccess to retry the **initial SSL handshake**
         up to 30 times (one attempt per ~5 s) before giving up. This guards against
         transient SSL failures that occasionally occur when first connecting to the
         ECMWF gateway; without it, a single bad handshake would abort the submission
@@ -322,8 +331,7 @@ class EcPlatform(ParamikoPlatform):
 
         :param ec_queue: Queue to submit the job to.
         """
-        # even with 30 it false failed.. increasing it
-        self._submit_cmd = f"{self._submit_command_name} -retry 100 -distant -queueName {ec_queue} {self.host}:"
+        self._submit_cmd = f"{self._submit_command_name} -distant -queueName {ec_queue} {self.host}:"
 
     def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
         """Gets the command to submit a job, for the current platform, with the given parameters.
@@ -425,15 +433,15 @@ class EcPlatform(ParamikoPlatform):
         with suppress(Exception):
             subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
         with suppress(Exception):
-            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}", shell=True)
+            subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}", shell=True)
         with suppress(Exception):
-            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}", shell=True)
+            subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}/{self.project}", shell=True)
         with suppress(Exception):
-            subprocess.check_output(f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}/{self.user}",
+            subprocess.check_output(f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}/{self.project}/{self.user}",
                                     shell=True)
         with suppress(Exception):
             subprocess.check_output(
-                f"ecaccess-file-mkdir {self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}", shell=True)
+                f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}", shell=True)
         try:
             subprocess.check_output(self.check_remote_permissions_cmd, shell=True)
             subprocess.check_output(self.check_remote_permissions_remove_cmd, shell=True)
@@ -471,7 +479,7 @@ class EcPlatform(ParamikoPlatform):
         return True
 
     def move_file(self, src, dest, must_exist=False):
-        command = (f"ecaccess-file-move {self.host}:{os.path.join(self.remote_log_dir, src)} "
+        command = (f"ecaccess-file-move {self._ec_retry_flag} {self.host}:{os.path.join(self.remote_log_dir, src)} "
                    f"{self.host}:{os.path.join(self.remote_log_dir, dest)}")
         try:
             retries = 0
@@ -587,7 +595,7 @@ class EcPlatform(ParamikoPlatform):
                 else None
             )
 
-            cmd = f"ecaccess-file-dir {self.host}:{self.remote_log_dir}"
+            cmd = f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}"
             self.send_command(cmd)
             output = self.get_ssh_output()
 
@@ -634,7 +642,7 @@ class EcPlatform(ParamikoPlatform):
         if not job_names or self.expid not in str(self.remote_log_dir):
             return
         try:
-            self.send_command(f"ecaccess-file-dir {self.host}:{self.remote_log_dir}")
+            self.send_command(f"ecaccess-file-dir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
             output = self.get_ssh_output()
             name_set = set(job_names)
             # ecaccess-file-dir output format: filename|size  NNNN
@@ -745,7 +753,7 @@ class EcPlatform(ParamikoPlatform):
         """
 
         with suppress(Exception):
-            self.send_command("ecaccess-job-list")
+            self.send_command(f"ecaccess-job-list {self._ec_retry_flag}")
             output = self.get_ssh_output()
             pre: dict[str, set[int]] = {}
             for line in output.splitlines():
@@ -779,7 +787,7 @@ class EcPlatform(ParamikoPlatform):
             Returns an empty list if any script name has no newly submitted job.
         :rtype: list[int]
         """
-        self.send_command("ecaccess-job-list")
+        self.send_command(f"ecaccess-job-list {self._ec_retry_flag}")
         output = self.get_ssh_output()
 
         name_to_ids: dict[str, set[int]] = {}

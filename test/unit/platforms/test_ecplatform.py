@@ -40,6 +40,44 @@ def ec_platform(tmp_path: 'LocalPath'):
     yield EcPlatform(expid='t000', name='pytest-slurm', config=config, scheduler='slurm')
 
 
+@pytest.mark.parametrize("config_retry,expected", [
+    (None, 100),
+    (50, 50),
+    (0, 0),
+])
+def test_ec_retry_count_from_config(
+    tmp_path: 'LocalPath',
+    config_retry: int,
+    expected: int,
+) -> None:
+    """Verify _ec_retry_count reads from PLATFORMS.<NAME>.ECACCESS_RETRIES, defaults to 100."""
+    platforms = {}
+    if config_retry is not None:
+        platforms["TEST_ECMWF"] = {"ECACCESS_RETRIES": config_retry}
+    config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp", "PLATFORMS": platforms}
+    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    assert platform._ec_retry_count == expected
+    assert platform._ec_retry_flag == f"-retry {expected}"
+
+
+@pytest.mark.parametrize("invalid_value", [
+    "abc",
+    "12.5",
+    [1, 2, 3],
+    {"key": "val"},
+])
+def test_ec_retry_count_fallback(
+    tmp_path: 'LocalPath',
+    invalid_value: object,
+) -> None:
+    """Verify _ec_retry_count falls back to 100 when ECACCESS_RETRIES is invalid."""
+    platforms = {"TEST_ECMWF": {"ECACCESS_RETRIES": invalid_value}}
+    config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp", "PLATFORMS": platforms}
+    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    assert platform._ec_retry_count == 100
+    assert platform._ec_retry_flag == "-retry 100"
+
+
 def test_file_read_size_and_send(ec_platform: EcPlatform, mocker):
     path = ec_platform.config.get("LOCAL_ROOT_DIR")
     assert isinstance(path, str)
@@ -155,7 +193,7 @@ def test_get_submitted_jobs_by_name_queries_ecaccess_job_list(
 
     ec_platform.get_submitted_jobs_by_name(["a000_INI.cmd", "a000_SIM.cmd"])
 
-    assert sent_commands == ["ecaccess-job-list"]
+    assert sent_commands == [f"ecaccess-job-list {ec_platform._ec_retry_flag}"]
 
 
 def test_get_submitted_jobs_by_name_filters_pre_existing_job_ids(
@@ -624,6 +662,79 @@ def test_pre_submission_snapshot_called_with_empty_list(
     assert snapshot_calls == [[]]
 
 
+@pytest.mark.parametrize("cmd_attr,command_name", [
+    ("cancel_cmd", "ecaccess-job-delete"),
+    ("_checkjob_cmd", "ecaccess-job-list"),
+    ("_checkhost_cmd", "ecaccess-certificate-list"),
+    ("_checkvalidcert_cmd", "ecaccess-gateway-connected"),
+    ("_submit_command_name", "ecaccess-job-submit"),
+    ("put_cmd", "ecaccess-file-put"),
+    ("get_cmd", "ecaccess-file-get"),
+    ("del_cmd", "ecaccess-file-delete"),
+], ids=[
+    "cancel_cmd",
+    "checkjob_cmd",
+    "checkhost_cmd",
+    "checkvalidcert_cmd",
+    "submit_command_name",
+    "put_cmd",
+    "get_cmd",
+    "del_cmd",
+])
+def test_update_cmds_includes_retry_in_command(
+    ec_platform: EcPlatform,
+    cmd_attr: str,
+    command_name: str,
+) -> None:
+    """Verify each command variable from update_cmds contains the retry flag."""
+    value = getattr(ec_platform, cmd_attr)
+    assert ec_platform._ec_retry_flag in value, (
+        f"{cmd_attr}={value!r} missing {ec_platform._ec_retry_flag!r}"
+    )
+    assert value.startswith(command_name), (
+        f"{cmd_attr}={value!r} should start with {command_name!r}"
+    )
+
+
+@pytest.mark.parametrize("cmd_attr", [
+    "mkdir_cmd",
+    "check_remote_permissions_cmd",
+    "check_remote_permissions_remove_cmd",
+])
+def test_update_cmds_includes_retry_in_path_commands(
+    ec_platform: EcPlatform,
+    cmd_attr: str,
+) -> None:
+    """Verify path-bearing command variables contain the retry flag in every ecaccess call."""
+    value = getattr(ec_platform, cmd_attr)
+    # Count how many separate ecaccess commands are in this string
+    ecaccess_calls = [part for part in value.split(";") if "ecaccess-" in part]
+    for call in ecaccess_calls:
+        assert ec_platform._ec_retry_flag in call, (
+            f"{cmd_attr} call {call!r} missing {ec_platform._ec_retry_flag!r}"
+        )
+
+
+@pytest.mark.parametrize("retry_count,expected_flag", [
+    (30, "-retry 30"),
+    (100, "-retry 100"),
+])
+def test_set_submit_cmd_uses_configured_retry(
+    tmp_path: 'LocalPath',
+    retry_count: int,
+    expected_flag: str,
+) -> None:
+    """Verify _set_submit_cmd includes the configured retry flag via _submit_command_name."""
+    config = {
+        "LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp",
+        "PLATFORMS": {"TEST_ECMWF": {"ECACCESS_RETRIES": retry_count}},
+    }
+    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    platform._set_submit_cmd("hpc")
+    assert expected_flag in platform._submit_cmd
+    assert "-queueName hpc" in platform._submit_cmd
+
+
 # -- Batch checking (check_all_jobs) tests
 
 _JOB_LIST_TABLE = (
@@ -639,7 +750,7 @@ def test_get_check_all_jobs_cmd_returns_ecaccess_job_list(
     ec_platform: EcPlatform,
 ) -> None:
     """Verify get_check_all_jobs_cmd returns the batch ecaccess list command."""
-    assert ec_platform.get_check_all_jobs_cmd("10001,10002") == "ecaccess-job-list"
+    assert ec_platform.get_check_all_jobs_cmd("10001,10002") == f"ecaccess-job-list {ec_platform._ec_retry_flag}"
 
 
 def test_parse_all_jobs_output_finds_status_by_job_id(

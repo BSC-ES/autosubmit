@@ -376,6 +376,7 @@ To add a new platform, open the ``platforms_<EXPID>.yml`` file and add:
             ADD_PROJECT_TO_HOST: False
             MAX_PROCESSORS: <N>
             EC_QUEUE : <ec_queue> # only when type == ecaccess
+            ECACCESS_RETRIES : 100 # optional, only when type == ecaccess
             VERSION: <version>
             2FA: False
             2FA_TIMEOUT: <timeout> # default 300
@@ -413,6 +414,8 @@ This will create a platform named *new_platform*. The options specified are all 
       - Maximum number of processors allowed for a job in the platform.
     * - ``EC_QUEUE``
       - Queue for the ecaccess platform. (hpc, ecs).
+    * - ``ECACCESS_RETRIES``
+      - Number of SSL connection retries for ecaccess commands. Only applies to ecaccess platforms. Defaults to 100.
 
 .. warning:: With some platform types, Autosubmit may also need the version, forcing you to add the parameter
     VERSION. For example, ecaccess (options: pbs, loadleveler, slurm).
