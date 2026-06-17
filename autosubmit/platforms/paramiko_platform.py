@@ -32,7 +32,7 @@ from io import BufferedReader
 from pathlib import Path
 from threading import Thread
 from time import sleep
-from typing import Optional, Union, TYPE_CHECKING, Any
+from typing import Optional, Tuple, Union, TYPE_CHECKING, Any
 
 import Xlib.support.connect as xlib_connect
 import paramiko
@@ -906,6 +906,45 @@ class ParamikoPlatform(Platform):
         else:
             return Status.QUEUING
 
+    @staticmethod
+    def _resolve_stat_status(
+        job_name: str,
+        stat_status: Status,
+        scheduler_job_status: Status,
+        finished_time: Optional[float],
+        io_safe_wait: int,
+        now: float,
+    ) -> Tuple[Status, Optional[float]]:
+        """Resolve final job status from STAT file and scheduler information.
+
+        :param job_name: Job name for logging.
+        :param stat_status: Status from STAT file lookup.
+        :param scheduler_job_status: Status from scheduler.
+        :param finished_time: Current finished_time of the job (timer start).
+        :param io_safe_wait: IO_SAFE_WAIT threshold in seconds.
+        :param now: Current time (epoch seconds) for elapsed calculation.
+        :return: Tuple of (new_status, new_finished_time).
+        """
+        if stat_status in (Status.COMPLETED, Status.FAILED):
+            return stat_status, None
+
+        if scheduler_job_status in (Status.COMPLETED, Status.FAILED):
+            if finished_time is None:
+                finished_time = now
+            elapsed = now - finished_time
+            if elapsed >= io_safe_wait:
+                Log.warning(
+                    f"Couldn't fetch status from STAT file for job {job_name} after waiting {elapsed} seconds since job finished. "
+                    f"Falling back to scheduler status {scheduler_job_status} for final job status."
+                )
+                return scheduler_job_status, None
+            return Status.RUNNING, finished_time
+
+        if stat_status == Status.RUNNING:
+            return Status.RUNNING, None
+
+        return scheduler_job_status, None
+
     def confirm_done_jobs_via_stat(self, job_list: list) -> dict[str, "Status"]:
         """Checks the STAT files for the given jobs to confirm their completion status.
         This method retrieves the last line of each STAT file corresponding to the jobs in the job_list and resolves their status using the _resolve_status method.
@@ -1048,27 +1087,12 @@ class ParamikoPlatform(Platform):
                         scheduler_job_status = Status.UNKNOWN
 
                     stat_status = stat_statuses.get(job.name, Status.UNKNOWN)
-
-                    if stat_status in [Status.COMPLETED, Status.FAILED, Status.RUNNING]:
-                        job_status = stat_status
-                    # Safeguard 1 to avoid infinite loops when there is no STAT file for unknown reasons and the scheduler says that the job is finished.
-                    elif scheduler_job_status in [Status.COMPLETED, Status.FAILED]:
-                        if not job.finished_time:
-                            job.finished_time = time.time()
-                        elapsed = time.time() - job.finished_time
-                        if elapsed >= self.IO_SAFE_WAIT:
-                            job.finished_time = None
-                            job_status = scheduler_job_status
-                            Log.warning(
-                                f"Couldn't fetch status from STAT file for job {job.name} after waiting {elapsed} seconds since job finished. "
-                                f"Falling back to scheduler status {scheduler_job_status} for final job status.")
-                        else:
-                            # safe_wait for IO operations (flushing logs, STAT file creation...)
-                            job_status = Status.RUNNING
-                    else:
-                        job_status = scheduler_job_status
-
-                    job.new_status = job_status
+                    new_status, new_finished_time = self._resolve_stat_status(
+                        job.name, stat_status, scheduler_job_status,
+                        job.finished_time, self.IO_SAFE_WAIT, time.time(),
+                    )
+                    job.finished_time = new_finished_time
+                    job.new_status = new_status
 
             # check and set if there is any_job without timestamp
             self.set_start_time_from_remote_stat_file([job for job in job_list if
