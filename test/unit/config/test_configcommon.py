@@ -268,19 +268,19 @@ def test_set_version(autosubmit_config: 'AutosubmitConfigFactory', experiment_jo
     ],
 )
 def test_check_autosubmit_conf_invalid_param(
-    as_conf: AutosubmitConfig, parameter, value, error_msg
+    as_conf_small: AutosubmitConfig, parameter, value, error_msg
 ):
     """Test that check_autosubmit_conf writes the error in the wrong_config
     dictionary when a parameter is invalid."""
-    as_conf.experiment_data["CONFIG"][parameter] = value
-    assert as_conf.check_autosubmit_conf() == False
-    assert error_msg in str(as_conf.wrong_config["Autosubmit"][0])
+    as_conf_small.experiment_data["CONFIG"][parameter] = value
+    assert as_conf_small.check_autosubmit_conf() == False
+    assert error_msg in str(as_conf_small.wrong_config["Autosubmit"][0])
 
 
-def test_check_autosubmit_conf_valid(as_conf: AutosubmitConfig):
+def test_check_autosubmit_conf_valid(as_conf_small: AutosubmitConfig):
     """Test that check_autosubmit_conf returns True with valid configuration."""
-    assert as_conf.check_autosubmit_conf() is True
-    assert "Autosubmit" not in as_conf.wrong_config
+    assert as_conf_small.check_autosubmit_conf() is True
+    assert "Autosubmit" not in as_conf_small.wrong_config
 
 
 @pytest.mark.parametrize(
