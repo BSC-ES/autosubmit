@@ -2520,7 +2520,6 @@ class AutosubmitConfig(object):
         :return: max number of running jobs, or None if not set
         :rtype: int | None
         """
-        # get_section crashes if d_value is None, done the conversion after
         return self.get_section(['CONFIG', 'TOTALJOBS'], None)
 
     def get_output_type(self):
