@@ -273,7 +273,7 @@ def test_check_autosubmit_conf_invalid_param(
     """Test that check_autosubmit_conf writes the error in the wrong_config
     dictionary when a parameter is invalid."""
     as_conf_small.experiment_data["CONFIG"][parameter] = value
-    assert as_conf_small.check_autosubmit_conf() == False
+    assert not as_conf_small.check_autosubmit_conf()
     assert error_msg in str(as_conf_small.wrong_config["Autosubmit"][0])
 
 
