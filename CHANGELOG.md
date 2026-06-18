@@ -73,10 +73,6 @@
 - Jobs now validated individually via STAT files in check_jobs to confirm completion or failure, for both wrapped and non-wrapped jobs #3007
 - Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
 
-**Removed features:**
-
-- Removal of autosubmit check command #3036
-
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
 This release adds support to Postgres using SQLAlchemy, without removing the

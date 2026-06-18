@@ -3,7 +3,10 @@ Monitor and Check Experiments
 
 .. warning::
 
-   The dedicated ``autosubmit check`` command has been removed. 
+   The ``autosubmit check`` command has been removed. To validate templates
+   without submitting jobs, run ``autosubmit inspect <EXPID> --quick``.
+   Runtime validation during ``autosubmit run`` is still controlled by the
+   ``CHECK:`` job attribute (see below).
 
 How to use check in running time:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
