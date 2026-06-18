@@ -544,8 +544,16 @@ class JobPackager(object):
 
         self.waiting_jobs = submitted_jobs_len + self.queuing_jobs_len
 
-        total_jobs_limit = float('inf') if platform.total_jobs is None or int(platform.total_jobs) < 0 else int(platform.total_jobs)
-        max_waiting_jobs_limit = float('inf') if platform.max_waiting_jobs is None or int(platform.max_waiting_jobs) < 0 else int(platform.max_waiting_jobs)
+        total_jobs_limit = (
+            float("inf")
+            if platform.total_jobs is None or int(platform.total_jobs) < 0
+            else int(platform.total_jobs)
+        )
+        max_waiting_jobs_limit = (
+            float("inf")
+            if platform.max_waiting_jobs is None or int(platform.max_waiting_jobs) < 0
+            else int(platform.max_waiting_jobs)
+        )
 
         # Calculate available space in Platform Queue
         if job is not None and job.max_waiting_jobs and platform.max_waiting_jobs and int(job.max_waiting_jobs) != int(
