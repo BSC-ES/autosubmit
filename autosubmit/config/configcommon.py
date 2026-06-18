@@ -2489,7 +2489,7 @@ class AutosubmitConfig(object):
         :return: max number of running jobs, or None if not set
         :rtype: int | None
         """
-        return self.get_section(['CONFIG', 'TOTALJOBS'], None)
+        return self.get_section(["CONFIG", "TOTALJOBS"], None)
 
     def get_output_type(self):
         """Returns default output type, pdf if none
@@ -2529,7 +2529,7 @@ class AutosubmitConfig(object):
         :return: max number of waiting jobs, or None if not set
         :rtype: int | None
         """
-        return self.get_section(['CONFIG', 'MAXWAITINGJOBS'], None)
+        return self.get_section(["CONFIG", "MAXWAITINGJOBS"], None)
 
     def get_default_job_type(self):
         """Returns the default job type from experiment's config file.
