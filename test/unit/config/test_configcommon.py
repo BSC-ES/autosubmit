@@ -666,3 +666,39 @@ def test_is_section_in_any_wrapper(
     as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data=experiment_data)
     as_conf.experiment_data = experiment_data
     assert as_conf.is_section_in_any_wrapper(section) is expected
+
+
+@pytest.mark.parametrize(
+        "section, d_value, must_exists, expected",
+        [
+            (["CONFIG", "TOTALJOBS"], None, False, None),
+            (["CONFIG", "TOTALJOBS"], 10, False, 10),
+            (["CONFIG", "TOTALJOBS"], None, True, AutosubmitCritical),
+            (["CONFIG", "TOTALJOBS"], 10, True, AutosubmitCritical),
+            (["LOCAL", "PROJECT_PATH"], "", False, ""),
+        ],
+        ids=[
+            "Non-mandatory section missing with None d_value returns None",
+            "Non-mandatory section missing with d_value returns d_value",
+            "Mandatory section missing with None d_value raises AutosubmitCritical",
+            "Mandatory section missing with d_value raises AutosubmitCritical",
+            "Non-mandatory section missing with default d_value returns default d_value",
+        ]
+)
+def test_get_section_missing_returns_d_value(
+    autosubmit_config: 'AutosubmitConfigFactory',
+    section: list[str],
+    d_value: str | None,
+    must_exists: bool,
+    expected: str | type[AutosubmitCritical] | None
+) -> None:
+    """Test that get_section returns the correct value when the section is missing."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={})
+    as_conf.experiment_data.pop(section[0], None)
+    
+    if expected is AutosubmitCritical:
+        with pytest.raises(AutosubmitCritical):
+            as_conf.get_section(section, d_value=d_value, must_exists=must_exists)
+    else:
+        result = as_conf.get_section(section, d_value=d_value, must_exists=must_exists)
+        assert result == expected
