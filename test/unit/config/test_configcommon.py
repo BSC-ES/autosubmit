@@ -836,12 +836,12 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
     ],
 )
 def test_get_section_missing_returns_d_value(
-    autosubmit_config: "AutosubmitConfigFactory",
-    section: list[str],
-    d_value: str | None,
-    must_exists: bool,
-    expected: str | type[AutosubmitCritical] | None,
-) -> None:
+    autosubmit_config,
+    section,
+    d_value,
+    must_exists,
+    expected,
+):
     """Test that get_section returns the correct value when the section is missing."""
     as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
     as_conf.experiment_data.pop(section[0], None)
