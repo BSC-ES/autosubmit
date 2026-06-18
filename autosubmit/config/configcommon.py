@@ -177,7 +177,7 @@ class AutosubmitConfig(object):
     def get_section(self, section: list[str], d_value: Union[str, Any] = "", must_exists=False) -> str:
         """Gets any section.
 
-        If it does not exist in the dictionary it returns ``None``, or and error if it must exist.
+        If it does not exist in the dictionary it returns ``d_value``, or and error if it must exist.
 
         :param section: section to get
         :type section: list
