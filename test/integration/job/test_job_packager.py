@@ -190,3 +190,58 @@ def test_check_if_packages_are_ready_to_build_jobs_to_run_first(create_packager:
 
     assert jobs
     assert flag
+
+
+@pytest.mark.parametrize(
+    "total_jobs, max_jobs_to_submit",
+    [
+        (None, float('inf')),
+        (-10, float('inf')),
+        (-1, float('inf')),
+        (20, 20),
+    ]
+)
+def test_calculate_job_limits_total_jobs_inf(create_packager: CreatePackagerFixture, total_jobs: int, max_jobs_to_submit: float):
+    """Test that the job limits are calculated correctly based on total jobs."""
+    job_packager = create_packager(
+        experiment_data={
+            'JOBS': {
+                'A': {
+                    'running': 'once',
+                    'platform': 'local',
+                    'script': '"sleep 0"',
+                }
+            }
+        },
+        total_jobs=total_jobs
+    )
+    job_packager.calculate_job_limits(job_packager._platform)
+    assert job_packager._max_jobs_to_submit == max_jobs_to_submit
+
+
+@pytest.mark.parametrize(
+    "max_waiting_jobs, expected_max_waiting_jobs",
+    [
+        (None, float('inf')),
+        (-10, float('inf')),
+        (-1, float('inf')),
+        (20, 20),
+    ]
+)
+def test_calculate_job_limits_max_waiting_jobs(create_packager: CreatePackagerFixture, max_waiting_jobs: int, expected_max_waiting_jobs: float):
+    """Test that the job limits are calculated correctly based on max waiting jobs."""
+    job_packager = create_packager(
+        experiment_data={
+            'JOBS': {
+                'A': {
+                    'running': 'once',
+                    'platform': 'local',
+                    'script': '"sleep 0"',
+                }
+            }
+        }
+    )
+    job_packager._platform.max_waiting_jobs = max_waiting_jobs
+    job_packager.calculate_job_limits(job_packager._platform)
+    assert job_packager._max_wait_jobs_to_submit == expected_max_waiting_jobs
+
