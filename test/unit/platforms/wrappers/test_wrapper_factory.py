@@ -178,11 +178,6 @@ def test_wrapper_factory_slurm_hetsize_greater_than_one(slurm_platform: SlurmPla
     wrapper_builder_kwargs['method'] = 'srun'
     wrapper_builder_kwargs['jobs_scripts'] = []
 
-    # FIXME: We have a bug in header_directives, and in the Slurm Header:
-    #        https://github.com/BSC-ES/autosubmit/issues/2660
-    #        Once that's fixed we can remove this mocked object.
-    mocker.patch.object(wrapper_factory, 'header_directives', return_value='')
-
     spy_builder = mocker.MagicMock(wraps=BashVerticalWrapperBuilder)
 
     assert 'nodes' not in wrapper_builder_kwargs
@@ -228,11 +223,6 @@ def test_wrapper_factory_slurm_num_processors(
     wrapper_builder_kwargs['jobs_scripts'] = []
 
     wrapper_builder_kwargs['num_processors_value'] = num_processors_value
-
-    # FIXME: We have a bug in header_directives, and in the Slurm Header:
-    #        https://github.com/BSC-ES/autosubmit/issues/2660
-    #        Once that's fixed we can remove this mocked object.
-    mocker.patch.object(wrapper_factory, 'header_directives', return_value='')
 
     spy_builder = mocker.MagicMock(wraps=BashVerticalWrapperBuilder)
 
@@ -289,3 +279,119 @@ def test_ec_wrapper_factory(slurm_platform: SlurmPlatform, wrapper_builder_kwarg
     assert 'test a\ntest b' == wrapper_factory.get_custom_directives(['test a', 'test b'])
 
     assert '' == wrapper_factory.allocated_nodes()
+
+@pytest.mark.parametrize('config_het,queue_expected', [
+    ({
+        'HETSIZE': 2,
+        'MEMORY': '34k',
+        'PARTITION': 'debug',
+        'CURRENT_PROJ': 'debug',
+        'MEMORY_PER_TASK': '',
+        'NUMTHREADS': '',
+        'NODES': 1,
+        'PROCESSORS': '',
+        'RESERVATION': '',
+        'TASKS': 1,
+        'CUSTOM_DIRECTIVES': '',
+    }, '#SBATCH --qos=' ),
+    ({
+        'HETSIZE': 2,
+        'MEMORY': '34k',
+        'PARTITION': 'debug',
+        'CURRENT_PROJ': 'debug',
+        'MEMORY_PER_TASK': '',
+        'NODES': 2,
+        'PROCESSORS': '',
+        'RESERVATION': '',
+        'TASKS': 2,
+        'CUSTOM_DIRECTIVES': '',
+    }, 'SBATCH --cpus-per-task=' ),
+    ({
+        'HETSIZE': 2,
+        'CURRENT_QUEUE': {
+            1: 'debug-2',
+        },
+        'MEMORY': '34k',
+        'PARTITION': 'debug',
+        'CURRENT_PROJ': 'debug',
+        'MEMORY_PER_TASK': {
+            0: '50',
+        },
+        'NUMTHREADS': {
+            0: '2',
+            1: '2',
+        },
+        'NODES': {
+            1: 3,
+        },
+        'PROCESSORS': '',
+        'RESERVATION': {
+            0: '2',
+        },
+        'TASKS': {
+            0: 3,
+            1: 4,
+        },
+        'CUSTOM_DIRECTIVES': {
+            0: '2',
+            1: '4',
+        },
+    }, '#SBATCH --qos=debug-2'),
+    ({
+        'HETSIZE': 2,
+        'CURRENT_QUEUE': {
+            0: 'debug-0',
+            1: 'debug-1',
+        },
+        'MEMORY': '34k',
+        'PARTITION': 'debug',
+        'CURRENT_PROJ': 'debug',
+        'MEMORY_PER_TASK': {
+            0: '50',
+            1: '100',
+        },
+        'NUMTHREADS': {
+            0: '2',
+            1: '2',
+        },
+        'NODES': {
+            0: 4,
+            1: 5,
+        },
+        'PROCESSORS': '',
+        'RESERVATION': {
+            0: '2',
+            1: '4',
+        },
+        'TASKS': {
+            0: 5,
+            1: 6,
+        },
+        'CUSTOM_DIRECTIVES': {
+            0: '2',
+            1: '4',
+        },
+    }, ['#SBATCH --qos=debug-0', '#SBATCH --qos=debug-1']),
+])
+@pytest.mark.docker
+@pytest.mark.slurm
+def test_get_wrapper(slurm_platform: SlurmPlatform, wrapper_builder_kwargs: dict, mocker, config_het, queue_expected):
+    wrapper_builder_kwargs["method"] = 'srun'
+    wrapper_factory = SlurmWrapperFactory(slurm_platform)
+
+    wrapper_data = mocker.MagicMock()
+    wrapper_data.het = config_het
+    wallclock = '00:30'
+
+    wrapper_builder_kwargs['wrapper_data'] = wrapper_data
+    wrapper_builder_kwargs['wallclock'] = wallclock
+
+    wrapper_cmd = wrapper_factory.get_wrapper(BashVerticalWrapperBuilder, **wrapper_builder_kwargs)
+
+    if isinstance(queue_expected, list):
+        for i in range(len(queue_expected)):
+            assert queue_expected[i] in wrapper_cmd
+    elif 'CURRENT_QUEUE' in config_het:
+        assert wrapper_cmd.find(queue_expected) != -1
+    else:
+        assert wrapper_cmd.find(queue_expected) == -1
