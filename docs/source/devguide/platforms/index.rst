@@ -10,7 +10,7 @@ Platforms
 
 
 Extending an Existing Platform
-------------------------------
+--------------------------------
 
 Platforms are defined under Python classes. The source files for such classes are stored inside
 ``autosubmit/platforms/`` directory. To extend an existing platform we will create a child class from an existing
@@ -38,7 +38,7 @@ platform class, for which first we need to identify which existing platform is t
       Used as the worked example in this guide.
 
 Composing the Extended Platform Class
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this page we will be extending the SLURM
 platform - source file ``autosubmit/platforms/slurmplatform.py``, see in GitHub `slurmplatform.py <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/slurmplatform.py#L35>`_ -, but any platform can be extended by following the same steps.
@@ -256,8 +256,6 @@ You must input the information suitable for your project (e.g.: user, host, plat
 
 .. _TargetPlatform:
 
----------
-
 .. code-block:: yaml
 
     PLATFORMS:
@@ -283,7 +281,7 @@ You must input the information suitable for your project (e.g.: user, host, plat
 .. _platform_connections:
 
 Platform Connections
---------------------
+----------------------
 
 This section documents how Autosubmit opens connections to the configured
 platforms, when it verifies that it has write permissions on the remote
@@ -293,7 +291,7 @@ in production who need to reason about the connection
 footprint that Autosubmit places on a login node.
 
 The permission probe directory
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To verify that Autosubmit can write to the configured ``SCRATCH_DIR``, each
 platform exposes a ``check_remote_permissions`` method.  The method creates a
@@ -330,7 +328,7 @@ type:
     platform probe.
 
 When the permission probe runs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The probe is only created from inside ``Autosubmit.restore_platforms``, which
 is reached from four user-facing commands.  For each call site below, the
@@ -375,7 +373,7 @@ The probe is **not** created by:
 .. _stale_job_data_recovery:
 
 Stale job-data recovery (separate connection path)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The helper :func:`autosubmit.helpers.utils.recover_stale_job_data` is invoked
 during ``autosubmit run`` (before and after the main loop), ``autosubmit
@@ -397,7 +395,7 @@ platform with stale rows.
     platform with outstanding stale rows in the historical database.
 
 Connection lifecycle during a run
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For platforms backed by Paramiko (``slurm``, ``pjm``, ``pbs``, ``ps``), at
 startup of ``autosubmit run`` Autosubmit opens **two SSH sessions per
@@ -440,7 +438,7 @@ SSH command fails with a network exception; that path calls
 opening a new one (see below).
 
 Are connections closed between retries?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Yes.  Whenever Autosubmit needs to re-establish a connection, the previous
 session is explicitly torn down before the new one is opened.  The teardown
@@ -487,7 +485,7 @@ if both internal retries fail.  Adding a startup-time retry loop is
 tracked separately.
 
 Filesystem I/O footprint
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Beyond the permission probe and the SSH connections themselves, Autosubmit
 performs a number of file operations against the remote scratch filesystem
