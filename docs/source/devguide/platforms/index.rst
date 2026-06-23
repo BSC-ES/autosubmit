@@ -289,7 +289,7 @@ This section documents how Autosubmit opens connections to the configured
 platforms, when it verifies that it has write permissions on the remote
 filesystem, and how those connections are torn down when the workflow ends or
 recovers from an error.  The intended audience is operators running Autosubmit
-in production (for example AEMET) who need to reason about the connection
+in production who need to reason about the connection
 footprint that Autosubmit places on a login node.
 
 The permission probe directory
@@ -475,6 +475,92 @@ At the end of a successful run, ``autosubmit.py`` issues an explicit
     but it means operators should not rely on Autosubmit logs alone to detect
     leaked sessions on the gateway.  Spot-checking with ``who`` or ``ss`` on
     the login node is recommended for long-running operational experiments.
+
+The reconnection logic described in this subsection applies to connection
+losses that occur **after** the workflow has started running.  If the very
+first connection attempt to a platform fails at the start of ``autosubmit
+run`` — for example because the HPC login node is briefly unreachable —
+the ``restore_connection`` method inside ``ParamikoPlatform`` retries
+twice internally, but ``Autosubmit.run_experiment`` does not currently
+wrap the initial ``prepare_run`` call in a retry loop, so the run aborts
+if both internal retries fail.  Adding a startup-time retry loop is
+tracked separately.
+
+Filesystem I/O footprint
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Beyond the permission probe and the SSH connections themselves, Autosubmit
+performs a number of file operations against the remote scratch filesystem
+during a run.  Operators concerned with filesystem load can use the table below to map each operation
+to the code path that triggers it and to the cadence at which it runs.
+The frequencies are described qualitatively because the absolute count
+per run depends on the workflow shape — number of jobs, retries, wrapper
+usage, recovery events — rather than on Autosubmit alone.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 22 52
+
+   * - Operation
+     - Code path
+     - When it happens
+   * - Upload ``.cmd`` job scripts
+     - ``Platform.send_file`` (called from ``JobPackageBase.send_files`` inside ``Platform.prepare_submission``)
+     - One SFTP ``put`` per job script per submission cycle.  A submission cycle happens for every main loop iteration that has ``READY`` jobs to dispatch.
+   * - Create remote log directory
+     - ``ParamikoPlatform.check_remote_log_dir`` (called inside ``send_file``)
+     - One ``mkdir -p`` (or equivalent) per ``send_file`` call.  For ``ecaccess`` platforms, one ``ecaccess-file-mkdir`` per path level (no ``mkdir -p``).
+   * - Cancel-script upload
+     - ``Platform.remove_multiple_files``
+     - One SFTP ``put`` of ``multiple_delete_previous_run.sh`` per platform when stale files from a previous run need to be removed at startup.
+   * - Find ``_COMPLETED`` marker files
+     - ``ParamikoPlatform.check_completed_files`` / ``get_completed_job_names``
+     - One ``find`` (SSH) or ``ecaccess-file-dir`` (ecaccess) per platform per check cycle.  Used to detect newly completed jobs.
+   * - Download ``.out`` / ``.err`` log files
+     - ``ParamikoPlatform.get_file`` (called from the log-recovery subprocess via ``recover_job_log`` → ``Job.retrieve_logfiles``)
+     - Two SFTP ``get`` operations per completed job (one for stdout, one for stderr).  These run in the per-platform log-recovery subprocess, asynchronously to the main loop.
+   * - Download ``STAT`` files
+     - ``ParamikoPlatform.get_stat_file`` and ``recover_stale_job_data``
+     - One SFTP ``get`` per job at the end of execution (run-time STAT) plus opportunistic downloads via ``recover_stale_job_data`` when historical rows are incomplete.
+   * - Read ``STAT`` files in place
+     - ``ParamikoPlatform.confirm_done_jobs_via_stat`` and ``ParamikoPlatform.set_start_time_from_remote_stat_file``
+     - One batched ``awk``/``head`` SSH command per ``check_all_jobs`` cycle, reading all relevant STAT files in a single round-trip.
+   * - Delete previous-run marker files
+     - ``ParamikoPlatform.delete_previous_run_files_by_job_names`` and ``delete_previous_stat_files_by_job_names``
+     - One ``find … -delete`` per platform at startup of ``autosubmit run``, scoped to the experiment's log directory.
+   * - Compress remote logs (optional)
+     - ``ParamikoPlatform.compress_file``
+     - One ``xz`` or ``gzip`` SSH command per log file when ``COMPRESS_REMOTE_LOGS`` is enabled on the platform.
+   * - Cleanup probe (write-permission check)
+     - ``Platform.check_remote_permissions``
+     - See :ref:`platform_connections` above — once per platform per ``restore_platforms`` call.
+
+A few patterns worth knowing when reasoning about load:
+
+- **Job submission and log retrieval are decoupled.**  The main loop
+  submits and queries job status; the per-platform log-recovery subprocess
+  performs all log downloads in parallel.  Filesystem activity from the
+  two sources runs concurrently against the same remote directory.
+- **Status queries are batched.**  ``check_all_jobs`` runs a single
+  scheduler query (``squeue``, ``pjstat``, ``qstat``, or an
+  ``ecaccess-job-list`` invocation) per platform per cycle, regardless of
+  how many jobs are in flight.  ``confirm_done_jobs_via_stat`` similarly
+  issues a single batched ``awk`` command rather than one per file.
+- **STAT files are written by the job, not by Autosubmit.**  The remote
+  job script appends a Unix epoch timestamp to its STAT file at start and
+  another at finish; Autosubmit only reads these files.
+- **Wrappers reduce per-job I/O.**  A wrapped package submits one ``.cmd``
+  file for many jobs and produces consolidated log and STAT output, which
+  cuts the per-job upload and download counts roughly in proportion to
+  wrapper size.
+
+.. note::
+    The table above describes **which** operations Autosubmit performs and
+    **when**, but does not give absolute numbers (bytes transferred, IOPS,
+    syscall counts) for a given workflow.  Producing those numbers
+    requires either instrumenting Autosubmit with an I/O tracer or
+    running a representative workflow under ``strace`` / ``iostat``
+    against a controlled HPC.
 
 How to generate a new experiment
 ------------------------------------

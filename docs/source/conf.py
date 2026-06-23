@@ -229,7 +229,8 @@ html_css_files = [
 html_sidebars = {
     "qstartguide/index": [], 
     "installation/index": [],
-    "database/index": [],              
+    "database/index": [], 
+    "devguide/platforms/index": [],             
 }
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
