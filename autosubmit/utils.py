@@ -48,7 +48,7 @@ def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", 
 
                 if 'MAIL' in yaml_data:
                     yaml_data['MAIL']['NOTIFICATIONS'] = False
-                    yaml_data['MAIL']['TO'] = ""
+                    yaml_data['MAIL']['TO'] = []
 
                 if 'DEFAULT' in yaml_data:
                     yaml_data['DEFAULT']['EXPID'] = exp_id
