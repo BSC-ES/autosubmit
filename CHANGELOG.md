@@ -36,6 +36,7 @@
 
 **Enhancements:**
 
+- Added ``CHUNK_END_DATE_LAST`` and ``LDATE`` template variables exposing the experiment's terminal dates to date-aware jobs #2430
 - Autosubmit describe now works on archived experiments, falling back to the last details snapshot stored in the database when the experiment files are not available #2717
 - Moved Autosubmit directory creation from `autosubmit configure` to `autosubmit install` #2640
 - Replaced redundant `list(dict.keys())` and `.keys()` patterns with direct dictionary iteration and membership checks #2477
