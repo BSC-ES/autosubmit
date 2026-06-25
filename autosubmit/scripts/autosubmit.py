@@ -20,24 +20,25 @@
 import argparse
 import traceback
 from contextlib import suppress
-from os import _exit  #noqa
-# noinspection PyProtectedMember
 from pathlib import Path
 from typing import Optional, Union
 
 from portalocker.exceptions import BaseLockException
 
 from autosubmit.autosubmit import Autosubmit  # noqa: E402
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig  # noqa: E402
 from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError  # noqa: E402
 
+# Extend this set if a new lock-acquiring command is added.
+LOCK_OWNING_COMMANDS = frozenset({'run', 'create', 'recovery', 'setstatus', 'pklfix'})
 
-def delete_lock_file(base_path: str = Log.file_path, lock_file: str = 'autosubmit.lock') -> None:
-    """Delete lock file if it exists. Suppresses permission errors raised.
+def delete_lock_file(base_path: Union[str, Path], lock_file: str = 'autosubmit.lock') -> None:
+    """Delete the autosubmit lock file at ``base_path/lock_file`` if it exists.
 
-    :param base_path: Base path to locate the lock file. Defaults to the experiment ``tmp`` directory.
-    :type base_path: str
-    :param lock_file: The name of the lock file. Defaults to ``autosubmit.lock``.
+    :param base_path: Directory containing the lock file.
+    :type base_path: Union[str, Path]
+    :param lock_file: The lock file name. Defaults to ``autosubmit.lock``.
     :type lock_file: str
     :return: None
     """
@@ -45,21 +46,38 @@ def delete_lock_file(base_path: str = Log.file_path, lock_file: str = 'autosubmi
         Path(base_path, lock_file).unlink(missing_ok=True)
 
 
-def exit_from_error(e: BaseException) -> int:
+def _owns_lock(args: Optional[argparse.Namespace]) -> bool:
+    """Return ``True`` if the command in ``args`` acquires the autosubmit lock.
+
+    :param args: Parsed CLI arguments.
+    :type args: Optional[argparse.Namespace]
+    :return: ``True`` if the command is in ``LOCK_OWNING_COMMANDS``.
+    :rtype: bool
+    """
+    return bool(args and getattr(args, 'command', None) in LOCK_OWNING_COMMANDS)
+
+
+def exit_from_error(e: BaseException, lock_path: Optional[Union[str, Path]] = None) -> int:
     """Called by ``Autosubmit`` when an exception is raised during a command execution.
 
     Prints the exception in ``CRITICAL`` if is it an ``AutosubmitCritical`` or an
     ``AutosubmitError`` exception, including any trace attached to the exception.
 
-    Exceptions raised by ``porta-locker` library print a message informing the user
-    about the locked experiment. Other exceptions raised cause the lock to be deleted.
+    Exceptions raised by the ``portalocker`` library print a message informing the
+    user about the locked experiment. For non-lock errors, the lock file is removed
+    only when ``lock_path`` is provided (i.e. only when the failing command was
+    a lock-owning command).
 
-    After printing the exception, this function calls ``os._exit(1)``, which will
-    forcefully exit the executable running.
+    Returns the resulting error code so the caller can use it as the process exit status.
 
     :param e: The exception being raised.
     :type e: BaseException
-    :return: None
+    :param lock_path: Path to the experiment tmp directory holding the lock file.
+        ``None`` when the failing command does not own the lock; in that case no
+        deletion is attempted.
+    :type lock_path: Optional[Union[str, Path]]
+    :return: The error code corresponding to the exception.
+    :rtype: int
     """
     err_code = 1
     trace = traceback.format_exc()
@@ -72,13 +90,13 @@ def exit_from_error(e: BaseException) -> int:
     is_autosubmit_error = isinstance(e, (AutosubmitCritical, AutosubmitError))
 
     if isinstance(e, BaseLockException):
-        Log.warning('Another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are '
-                    'using the experiment or delete autosubmit.lock file located on the /tmp folder.')
-    else:
-        delete_lock_file()
+        lock_file = Path(lock_path, 'autosubmit.lock') if lock_path else 'autosubmit.lock'
+        Log.warning(f'Another Autosubmit instance is using the experiment.\n Stop the other instance(s) '
+                    f'or delete the lock file located at: {lock_file}')
+    elif lock_path is not None:
+        delete_lock_file(lock_path)
 
-    if is_autosubmit_error:
-        e: Union[AutosubmitError, AutosubmitCritical] = e
+    if isinstance(e, (AutosubmitError, AutosubmitCritical)):
         if e.trace:
             Log.critical(f"Trace: {str(e.trace)}")
         Log.critical(f"{e.message} [eCode={e.code}]")
@@ -101,16 +119,16 @@ def main():
         return_value, args = Autosubmit.parse_args()
         if args:
             return_value = Autosubmit.run_command(args)
-        delete_lock_file()
+        if _owns_lock(args):
+            delete_lock_file(BasicConfig.expid_tmp_dir(args.expid))
     except BaseException as e:
-        delete_lock_file()
         command = "<no command provided>"
         expid = "<no expid provided>"
         version = "<no version found>"
         if args:
-            if 'command' in args and args.command:
+            if getattr(args, 'command', None):
                 command = f"<{args.command}>"
-            if 'expid' in args and args.expid:
+            if getattr(args, 'expid', None):
                 expid = f"<{args.expid}>"
                 with suppress(BaseException):
                     as_conf = AutosubmitConfig(args.expid)
@@ -118,7 +136,8 @@ def main():
                     version = f"{as_conf.experiment_data.get('CONFIG', {}).get('AUTOSUBMIT_VERSION', 'unknown')}"
         Log.error(f"Arguments provided: {str(args)}")
         Log.error(f"This is the experiment: {expid} which had an issue with the command: {command} and it is currently using the Autosubmit Version: {version}.")
-        return_value = exit_from_error(e)
+        lock_path = BasicConfig.expid_tmp_dir(args.expid) if _owns_lock(args) else None
+        return_value = exit_from_error(e, lock_path)
     # TODO: we need to define whether the function called here will return an int or bool
     if type(return_value) is bool:
         return_value = 0 if return_value else 1
