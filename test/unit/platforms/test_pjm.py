@@ -332,3 +332,30 @@ def test_cancel_jobs_multiple(
 
     assert len(sent) == 1
     assert sent[0] == expected_command
+
+
+@pytest.mark.parametrize(
+    "script_name,post,x11_options,expected_command",
+    [
+        ("script_test_1.cmd", "", "x11", "pjsub --no-check-directory script_test_1.cmd x11  & echo $!"),
+        ("script_test_1.cmd", "-o stdout.cmd", "x11", "pjsub --no-check-directory script_test_1.cmd x11 -o stdout.cmd & echo $!"),
+        ("script_test_1.cmd", "", "", "pjsub --no-check-directory script_test_1.cmd   & echo $!"),
+        ("script_test_1.cmd", "-e stderr.cmd", "", "pjsub --no-check-directory script_test_1.cmd  -e stderr.cmd & echo $!"),
+    ],
+)
+def test__construct_final_call(
+        pjm_platform: PJMPlatform,
+        script_name: str,
+        post: str,
+        x11_options: str,
+        expected_command: str,
+) -> None:
+    """Build the job submit command to be sent to the platform.
+
+    :param pjm_platform: PJM platform under test.
+    :param script_name: Name of the script to be sent.
+    :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
+    :param x11_options: x11 options to run the script, if any
+    :param expected_command: Expected command string.
+    """
+    assert pjm_platform._construct_final_call(script_name, "", post, x11_options) == expected_command
