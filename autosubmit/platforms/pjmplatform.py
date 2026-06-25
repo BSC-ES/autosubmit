@@ -233,6 +233,22 @@ class PJMPlatform(ParamikoPlatform):
             return reason[0]
         return reason
 
+    def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
+        """Gets the command to submit a job, for the current platform, with the given parameters.
+         This needs to be adapted to each scheduler, the default assumes that is being launched directly.
+
+        :param script_name: name of the script to submit
+        :type script_name: str
+        :param pre: command part to be placed before the script name, e.g. timeout, export, executable
+        :type pre: str
+        :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
+        :type post: str
+        :param x11_options: x11 options to run the script, if any
+        :type x11_options: str
+        :return: command to submit a job
+        """
+        return f"{pre} {x11_options} {script_name} {post}" if x11_options else f"pjsub --no-check-directory {pre} {script_name} {post} & echo $!"
+
     def wrapper_header(self, **kwargs):
         wr_header = textwrap.dedent(f"""
     ###############################################################################
@@ -379,7 +395,7 @@ class PJMPlatform(ParamikoPlatform):
         """
         if not job_ids:
             return
-        ids = "+".join(str(job_id) for job_id in job_ids)
+        ids = " ".join(str(job_id) for job_id in job_ids)
         self.send_command(f"{self.cancel_cmd} {ids}")
 
     def _check_for_unrecoverable_errors(self) -> None:
