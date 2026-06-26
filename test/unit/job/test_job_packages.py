@@ -19,35 +19,45 @@
 import pytest
 from mock import MagicMock
 
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistenceDb
-from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
-from autosubmit.job.job_packages import jobs_in_wrapper_str
-from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.log.log import AutosubmitError, AutosubmitCritical
+from autosubmit.job.job_packages import (
+    JobPackageSimple,
+    JobPackageVertical,
+    jobs_in_wrapper_str,
+)
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.pjmplatform import PJMPlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 
 @pytest.fixture
-def platform(mocker):
-    platform = mocker.MagicMock()
-    platform.queue = "debug"
-    platform.partition = "debug"
-    platform.serial_platform = platform
-    platform.serial_platform.max_wallclock = '24:00'
-    platform.serial_queue = "debug-serial"
-    platform.serial_partition = "debug-serial"
-    platform.max_waiting_jobs = 100
-    platform.total_jobs = 100
-    return platform
+def create_platform(mocker):
+    def _create_platform():
+        platform = mocker.MagicMock()
+        platform.queue = "debug"
+        platform.partition = "debug"
+        platform.serial_platform = platform
+        platform.serial_platform.max_wallclock = '24:00'
+        platform.serial_queue = "debug-serial"
+        platform.serial_partition = "debug-serial"
+        platform.max_waiting_jobs = 100
+        platform.total_jobs = 100
+        return platform
+
+    return _create_platform
 
 
 @pytest.fixture
-def jobs(platform) -> list[Job]:
+def jobs(create_platform, local) -> list[Job]:
     jobs = [Job('dummy1', 0, Status.READY, 0),
             Job('dummy2', 0, Status.READY, 0)]
     for job in jobs:
+        # TODO: Why not call this in the constructor of Job?
         job._init_runtime_parameters()
 
     jobs[0].wallclock = "00:00"
@@ -58,7 +68,6 @@ def jobs(platform) -> list[Job]:
     jobs[0].partition = "debug"
     jobs[0].custom_directives = "dummy_directives"
     jobs[0].processors = "9"
-    jobs[0]._processors = "9"
     jobs[0].retrials = 0
     jobs[1].wallclock = "00:00"
     jobs[1].tasks = "1"
@@ -67,7 +76,7 @@ def jobs(platform) -> list[Job]:
     jobs[1].partition = "debug2"
     jobs[1].custom_directives = "dummy_directives2"
 
-    jobs[0]._platform = jobs[1]._platform = platform
+    jobs[0].platform = jobs[1].platform = local
 
     return jobs
 
@@ -107,6 +116,7 @@ def create_job_package_wrapper(jobs, as_conf):
 @pytest.fixture
 def joblist(tmp_path, as_conf):
     job_list = JobList('a000', as_conf, YAMLParserFactory(), JobListPersistenceDb(as_conf.expid))
+    # TODO: Check why we can't make ordered jobs public, or if there is a better way of setting wrappers as dict
     job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
     return job_list
 
@@ -181,9 +191,10 @@ def test_job_package_jobs_getter(jobs):
     assert jobs == job_package.jobs
 
 
-def test_job_package_platform_getter(jobs, platform):
+def test_job_package_platform_getter(jobs):
     job_package = JobPackageSimple(jobs)
-    assert platform == job_package.platform
+    target_platform = jobs[0].platform
+    assert job_package.platform == target_platform
 
 
 def test_jobs_in_wrapper_str(autosubmit_config):
@@ -229,6 +240,7 @@ def test_job_package_generate_scripts(mocker, local, tmp_path, error, target_fun
         job.file = tmp_path / "fake-file"
         job.custom_directives = []
         job.file.write_text("echo 'Hello World'")
+        job.wallclock = '00:05'
 
     job_package = JobPackageSimple(jobs)
     mock_clean_previous_run = mocker.patch.object(job_package, "_clean_previous_run")
@@ -244,7 +256,7 @@ def test_job_package_generate_scripts(mocker, local, tmp_path, error, target_fun
     if error is not None and target_function is not None:
         method_mocks[target_function].side_effect = error("boom", 7000) if error is AutosubmitError else error("boom", 7000)
 
-        with pytest.raises(error):
+        with pytest.raises(error):  # type: ignore
             job_package.generate_scripts(configuration)
 
         mock_clean_previous_run.assert_called_once()
@@ -260,6 +272,29 @@ def test_job_package_generate_scripts(mocker, local, tmp_path, error, target_fun
         mock_build_scripts.assert_called_once_with(configuration)
 
 
+def test_check_job_files_exists_no_additional_job_skip_check(local, mocker, tmp_path, jobs):
+    """Test that checking a job with invalid additional jobs results in a warning.
+
+    You must check for additional files, but the additional file must not exist or be
+    ``None``. The ``only_generate`` argument of ``.check_job_files_exists`` must be ``True``.
+    """
+    job_package = JobPackageSimple(jobs)
+
+    # Mocking as we only require to mock one attribute -- if you require more, we
+    # are probably better using the ``autosubmit_config`` fixture here.
+    configuration = mocker.MagicMock()
+    empty_tmp_path = tmp_path / "empty-tmp-path"
+    configuration.get_project_dir.return_value = empty_tmp_path
+
+    jobs[0].additional_files = ['extra.inp']
+
+    mocked_log = mocker.patch('autosubmit.job.job_packages.Log')
+    job_package.check_job_files_exists(configuration, True)
+
+    assert mocked_log.warning.called
+    assert 'file: extra.inp does not exist' in mocked_log.warning.call_args[0][0]
+
+
 def test_job_package_send_files_uses_current_public_api(mocker, local, tmp_path) -> None:
     """Send package scripts through the current ``send_files`` method."""
     jobs = [
@@ -268,6 +303,7 @@ def test_job_package_send_files_uses_current_public_api(mocker, local, tmp_path)
     ]
     for job in jobs:
         job.platform = local
+        job.wallclock = '00:05'
         job._tmp_path = tmp_path
         job.additional_files = []
 
@@ -284,3 +320,72 @@ def test_job_package_send_files_uses_current_public_api(mocker, local, tmp_path)
         mocker.call("job1.cmd"),
         mocker.call("job2.cmd"),
     ]
+
+
+def test_build_scripts_with_empty_variables_warning(jobs, mocker):
+    """Test that building scripts that contain empty variables show a warning to users."""
+    jobs = jobs[0:1]
+    jobs[0].script = 'anything.sh'
+    job_package = JobPackageSimple(jobs)
+    mocked_log = mocker.patch('autosubmit.job.job_packages.Log')
+    with (
+        mocker.patch.object(Job, "check_script", return_value=False),
+        mocker.patch.object(job_package, "_create_scripts", return_value=None)
+    ):
+        job_package.build_scripts(mocker.MagicMock())
+
+    assert mocked_log.warning.called
+    assert f'Job {jobs[0].name} script or file has empty variables' in mocked_log.warning.call_args[0][0]
+        
+
+def test_job_package_properties(jobs):
+    """Test basic properties created during the simple package instantiation."""
+    job_package = JobPackageSimple(jobs)
+    assert job_package.num_processors == '0'
+    assert job_package.name == jobs[0].name  # name of the first job...
+
+
+@pytest.mark.parametrize(
+    "platform_class,expected_timeout",
+    [
+        (LocalPlatform, 6),
+        (PJMPlatform, None),
+        (SlurmPlatform, None)
+    ],
+    ids=[
+        "Local triggers the timeout to be set (1 as local will have 1 second in the test)",
+        "PJM manages the wallclock, so timeout in the job is None",
+        "Slurm manages the wallclock, so timeout in the job is None"
+    ]
+)
+def test_job_package_timeout(platform_class , expected_timeout, create_platform):
+    """Test that the ``timeout`` is calculated correctly.
+
+    The ``timeout`` is calculated ONLY in ``ps`` and ``local`` platforms
+    as the ``max`` of ``job.wallclock_in_seconds``. It receives a job
+    list, which is assumed to be non-empty.
+
+    We use a fixed list of four jobs, with wallclocks of 1, 2, 3, and 4
+    seconds. Jobs get assigned a platform from the ``list_of_platforms``.
+
+    This means that if you have one platform that enables timeout, then
+    you will have the ``timeout`` equals 1, if you have two, then the
+    ``timeout`` will be 2, and so on.
+    """
+    jobs = [Job(f"job{i}", f"{i}", Status.READY, 0) for i in range(4)]
+    # job wallclock is a property, that checks and initialises the ``wallclock_in_seconds``
+    platform = create_platform()
+    serial_platform = create_platform()
+    for job in jobs:
+        serial_platform.type = platform_class.TYPE
+        serial_platform.name = platform_class.TYPE
+        platform.serial_platform = serial_platform
+        job.platform = platform
+        # ATTENTION: Internally, Autosubmit increases 30% the wall-time, so we will have 6 seconds (floor).
+        job.wallclock = '00:00:05'
+
+    job_packages = JobPackageSimple(jobs)
+    if expected_timeout is None:
+        assert job_packages.timeout is None
+    else:
+        assert job_packages.timeout == expected_timeout
