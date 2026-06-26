@@ -35,6 +35,7 @@
 - Fixed infinite loop when STAT file stays on RUNNING, now falls back to scheduler status after IO_SAFE_WAIT #3059
 - Fixed `HETSIZE` whenever it had values bigger than 0 without a `CURRENT_QUEUE` or skipping the order of info #2660
 - Fixed `CPU per task` for new version of autosubmit #2897
+- Fix inspect infinite loop when PLATFORMS.TOTALJOBS or PLATFORMS.MAX_WAITING_JOBS is set to 0 #2749
 
 **Enhancements:**
 
