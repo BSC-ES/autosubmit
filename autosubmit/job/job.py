@@ -105,6 +105,8 @@ EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
             'prev': 'Days since start date at the chunk\'s start.',
             'chunk_first': 'True if the current chunk is the first, false otherwise.',
             'chunk_last': 'True if the current chunk is the last, false otherwise.',
+            'chunk_end_date_last': 'End date of the last chunk, i.e. the experiment end boundary. Available to any date-aware job (notably RUNNING: date jobs).',
+            'ldate': 'Last date of the experiment (the run\'s final day, parallel to SDATE).',
             'run_days': 'Chunk length in days.',
             'notify_on': 'Determine the job statuses you want to be notified.'
         },
@@ -2149,6 +2151,15 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'TRUE'
             else:
                 parameters['CHUNK_LAST'] = 'FALSE'
+            last_start = chunk_start_date(self.date, total_chunk, chunk_length, chunk_unit, cal)
+            last_end = chunk_end_date(last_start, chunk_length, chunk_unit, cal)
+            if chunk_unit == 'hour':
+                last_end_1 = last_end - datetime.timedelta(hours=1)
+            else:
+                last_end_1 = previous_day(last_end, cal)
+
+            parameters['CHUNK_END_DATE_LAST'] = date2str(last_end, self.date_format)
+            parameters['LDATE'] = date2str(last_end_1, self.date_format)
         return parameters
 
     def update_job_parameters(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:

@@ -2935,3 +2935,44 @@ def test_check_wrapper_wallclock_and_handle(mocker, inner_over, wrapper_over, in
     else:
         assert result is False
         wrapper.platform.cancel_jobs.assert_not_called()
+
+
+def test_calendar_chunk_exposes_experiment_terminal_dates():
+    """Issue #2430: date-aware jobs see CHUNK_END_DATE_LAST and LDATE
+    pointing at the experiment's end, independent of their own chunk."""
+    job = Job('A', '1', Status.WAITING, 0)
+    job.date = datetime(2000, 1, 1)
+    job.chunk = None
+    job.date_format = ''
+    parameters = {
+        'EXPERIMENT.NUMCHUNKS': 2,
+        'EXPERIMENT.CHUNKSIZE': 4,
+        'EXPERIMENT.CHUNKSIZEUNIT': 'month',
+        'EXPERIMENT.CALENDAR': 'standard',
+    }
+
+    result = job.calendar_chunk(parameters)
+
+    assert result['CHUNK_END_DATE'] == '20000501'
+    assert result['CHUNK_SECOND_TO_LAST_DATE'] == '20000430'
+    assert result['CHUNK_END_DATE_LAST'] == '20000901'
+    assert result['LDATE'] == '20000831'
+
+
+def test_calendar_chunk_last_chunk_consistency():
+    """On the last chunk the new variables equal the per-chunk ones."""
+    job = Job('A', '1', Status.WAITING, 0)
+    job.date = datetime(2000, 1, 1)
+    job.chunk = 2
+    job.date_format = ''
+    parameters = {
+        'EXPERIMENT.NUMCHUNKS': 2,
+        'EXPERIMENT.CHUNKSIZE': 4,
+        'EXPERIMENT.CHUNKSIZEUNIT': 'month',
+        'EXPERIMENT.CALENDAR': 'standard',
+    }
+
+    result = job.calendar_chunk(parameters)
+
+    assert result['CHUNK_END_DATE'] == result['CHUNK_END_DATE_LAST'] == '20000901'
+    assert result['CHUNK_SECOND_TO_LAST_DATE'] == result['LDATE'] == '20000831'
