@@ -64,6 +64,8 @@ _SLURM_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
 class SlurmPlatform(ParamikoPlatform):
     """Class to manage jobs to host using SLURM scheduler."""
 
+    TYPE = 'slurm'
+
     def __init__(self, expid: str, name: str, config: dict,
                  auth_password: Optional[Union[str, list[str]]] = None) -> None:
         """Initialization of the Class SlurmPlatform.
@@ -88,7 +90,7 @@ class SlurmPlatform(ParamikoPlatform):
         self.x11_options = None
         self._submit_cmd_x11 = None
         self.cancel_cmd = None
-        self.type = 'slurm'
+        self.type = self.TYPE
         self._header = SlurmHeader()
         self._wrapper = SlurmWrapperFactory(self)
         self.job_status = dict()

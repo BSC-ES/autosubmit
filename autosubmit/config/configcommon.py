@@ -29,7 +29,7 @@ from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, Union, Iterable
+from typing import Any, Iterable, Optional, Union
 
 from bscearth.utils.date import parse_date
 from configobj import ConfigObj
@@ -37,9 +37,9 @@ from pyparsing import nested_expr
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_common import get_experiment_description
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
+from autosubmit.database.db_common import get_experiment_description
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 
 class AutosubmitConfig(object):
@@ -174,7 +174,12 @@ class AutosubmitConfig(object):
         )
         return str(dir_templates)
 
-    def get_section(self, section: list[str], d_value: Union[str, Any] = "", must_exists=False) -> str:
+    def get_section(
+            self,
+            section: list[str],
+            d_value: Union[str, Any] = "",
+            must_exists=False
+    ) -> Union[str, dict, numbers.Number]:
         """Gets any section.
 
         If it does not exist in the dictionary it returns ``None``, or and error if it must exist.

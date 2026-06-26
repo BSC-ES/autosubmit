@@ -91,7 +91,7 @@ def test_init_raises_on_empty_jobs():
     """Test __init__ raises when no jobs are given."""
     from autosubmit.job.job_packages import JobPackageBase
 
-    with pytest.raises(IndexError):
+    with pytest.raises(ValueError):
         JobPackageBase([])
 
 

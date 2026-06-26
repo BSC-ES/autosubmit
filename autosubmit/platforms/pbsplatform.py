@@ -21,9 +21,9 @@ import os
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from autosubmit.log.log import AutosubmitCritical, Log, AutosubmitError
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.headers.pbs_header import PBSHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
@@ -35,7 +35,10 @@ if TYPE_CHECKING:
 class PBSPlatform(ParamikoPlatform):
     """Class to manage jobs to host using PBS scheduler."""
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: str = None) -> None:
+    # TODO: the remaining platform types are lower case... Not sure why this one is upper?
+    TYPE = 'PBS'
+
+    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[str] = None) -> None:
         """Initialization of the Class PBSPlatform.
 
         :param expid: ID of the experiment which will instantiate the PBSPlatform.
@@ -58,7 +61,7 @@ class PBSPlatform(ParamikoPlatform):
         self.x11_options = None
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
         self.cancel_cmd = None
-        self.type = 'PBS'
+        self.type = self.TYPE
         self._header = PBSHeader()
         self.job_status: dict = {'COMPLETED': ['FINISH'], 'RUNNING': ['RUNNING'],
                                  'QUEUING': ['QUEUED', 'BEGUN', 'HELD'],
