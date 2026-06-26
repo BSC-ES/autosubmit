@@ -25,11 +25,13 @@ import re
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import Any, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
 
 if TYPE_CHECKING:
@@ -64,6 +66,9 @@ _SLURM_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
 class SlurmPlatform(ParamikoPlatform):
     """Class to manage jobs to host using SLURM scheduler."""
 
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.SLURM
+
     def __init__(self, expid: str, name: str, config: dict,
                  auth_password: Optional[Union[str, list[str]]] = None) -> None:
         """Initialization of the Class SlurmPlatform.
@@ -88,7 +93,6 @@ class SlurmPlatform(ParamikoPlatform):
         self.x11_options = None
         self._submit_cmd_x11 = None
         self.cancel_cmd = None
-        self.type = 'slurm'
         self._header = SlurmHeader()
         self._wrapper = SlurmWrapperFactory(self)
         self.job_status = dict()
@@ -178,16 +182,6 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return self.remote_log_dir
 
-    def parse_job_output(self, output: str) -> str:
-        """Parses check job command output, so it can be interpreted by autosubmit.
-
-        :param output: output to parse.
-        :type output: str
-        :return: job status.
-        :rtype: str
-        """
-        return output.strip().split(' ')[0].strip()
-
     def parse_all_jobs_output(self, output: str, job_id: int) -> Union[list[str], str]:
         status = ""
         with suppress(Exception):
@@ -243,14 +237,6 @@ class SlurmPlatform(ParamikoPlatform):
             submitted_job_ids.append(max(matched_ids))
 
         return submitted_job_ids
-
-    def get_check_job_cmd(self, job_id: str) -> str:
-        """Generates sacct command to the job selected.
-
-        :param job_id: ID of a job.
-        :return: Generates the sacct command to be executes.
-        """
-        return f'sacct -n -X --jobs {job_id} -o "State"'
 
     def get_check_all_jobs_cmd(self, jobs_id: str):
         """Generates sacct command to all the jobs passed down.

@@ -29,7 +29,7 @@ from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, Union, Iterable
+from typing import Any, Iterable, Optional, Union
 
 from bscearth.utils.date import parse_date
 from configobj import ConfigObj
@@ -37,10 +37,13 @@ from pyparsing import nested_expr
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.helpers.enums import ChunkUnit
-from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.platform_type import PlatformType
+from autosubmit.platforms.psplatform import PsPlatform
 
 
 class AutosubmitConfig(object):
@@ -99,10 +102,10 @@ class AutosubmitConfig(object):
         try:
             hpcarch = str(
                 self.experiment_data.get("DEFAULT", {}).get("HPCARCH", "")
-            ).upper()
+            ).lower()
             platforms = self.experiment_data.get("PLATFORMS")
             if platforms is None:
-                if hpcarch == "LOCAL":
+                if hpcarch == LocalPlatform.TYPE:
                     # DEFAULT.HPCARCH is LOCAL and no defined platform, return empty dict
                     return {}
                 raise AutosubmitCritical(
@@ -175,7 +178,12 @@ class AutosubmitConfig(object):
         )
         return str(dir_templates)
 
-    def get_section(self, section: list[str], d_value: Union[str, Any] = "", must_exists=False) -> str:
+    def get_section(
+            self,
+            section: list[str],
+            d_value: Union[str, Any] = "",
+            must_exists=False
+    ) -> Union[str, dict, numbers.Number]:
         """Gets any section.
 
         If it does not exist in the dictionary it returns ``d_value``, or and error if it must exist.
@@ -1359,7 +1367,7 @@ class AutosubmitConfig(object):
         """Checks experiment's platforms configuration file."""
         parser_data = self.experiment_data.get("PLATFORMS", {})
         main_platform_found = False
-        if self.hpcarch == "LOCAL":
+        if self.hpcarch.lower() == LocalPlatform.TYPE:
             main_platform_found = True
         elif self.ignore_undefined_platforms:
             main_platform_found = True
@@ -1372,7 +1380,7 @@ class AutosubmitConfig(object):
                     self.wrong_config["Platform"] += [[section, "Mandatory TYPE parameter not found"]]
                 else:
                     platform_type = platform_type.lower()
-                if platform_type != 'ps':
+                if platform_type.lower() != PsPlatform.TYPE:
                     if not section_data.get('PROJECT', ""):
                         self.wrong_config["Platform"] += [[section, "Mandatory PROJECT parameter not found"]]
                     if not section_data.get('USER', ""):
@@ -1582,7 +1590,7 @@ class AutosubmitConfig(object):
                     continue
                 if platform_name == "":
                     platform_name = self.get_platform().upper()
-                if platform_name == 'LOCAL':
+                if platform_name.lower() == PlatformType.LOCAL:
                     raise AutosubmitCritical(
                         'The LOCAL platform does not support wrappers. '
                         f'Please use another platform for your jobs: {str(jobs_in_wrapper)}.')
@@ -1938,7 +1946,7 @@ class AutosubmitConfig(object):
         :param parameters: Dictionary to populate with HPC values. If None, use self.experiment_data.
         """
         platforms = self.experiment_data.get("PLATFORMS", {})
-        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
+        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", LocalPlatform.TYPE)
         hpcarch_data: dict = platforms.get(hpcarch, {})
 
         target = parameters if parameters is not None else self.experiment_data
@@ -1956,7 +1964,7 @@ class AutosubmitConfig(object):
             target["HPCROOTDIR"] = Path(scratch) / project / user / self.expid
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
         # Default local paths.
-        elif hpcarch.upper() == "LOCAL":
+        elif hpcarch.lower() == LocalPlatform.TYPE:
             target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid / BasicConfig.LOCAL_TMP_DIR
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
 
@@ -2156,7 +2164,7 @@ class AutosubmitConfig(object):
             try:
                 job.platform = submitter.platforms[job.platform_name]
             except KeyError:
-                job.platform = submitter.platforms["LOCAL"]
+                job.platform = submitter.platforms[PlatformType.LOCAL.upper()]
 
         for section in list(job_list_by_section.keys()):
             job_list_by_section[section][0].update_parameters(
@@ -2837,11 +2845,17 @@ class AutosubmitConfig(object):
         return True
 
     def is_valid_git_repository(self) -> bool:
-        origin_exists = str(self.experiment_data["GIT"].get('PROJECT_ORIGIN', ""))
+        """Check if the Git project origin exists and is valid."""
+        origin = str(self.experiment_data["GIT"].get('PROJECT_ORIGIN', ""))
         branch = self.get_git_project_branch()
         commit = self.get_git_project_commit()
-        return origin_exists and (
-                (branch is not None and len(str(branch)) > 0) or (commit is not None and len(str(commit)) > 0))
+        return bool(
+            origin
+            and (
+                (branch is not None and len(str(branch)) > 0)
+                or (commit is not None and len(str(commit)) > 0)
+            )
+        )
 
     def parse_githooks(self) -> None:
         """Parse githooks section in the configuration file."""

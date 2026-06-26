@@ -18,12 +18,17 @@
 import os
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.ps_header import PsHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
 
 
 class PsPlatform(ParamikoPlatform):
     """Class to manage jobs to host not using any scheduler."""
+
+    EXECUTION_MODE = ExecutionMode.DIRECT
+    TYPE = PlatformType.PS
 
     def __init__(self, expid: str, name: str, config: dict):
         ParamikoPlatform.__init__(self, expid, name, config)
@@ -33,7 +38,6 @@ class PsPlatform(ParamikoPlatform):
         self.get_cmd = None
         self.put_cmd = None
         self._checkhost_cmd = None
-        self.type = 'ps'
         self.cancel_cmd = None
         self._header = PsHeader()
         self.job_status = dict()
@@ -101,9 +105,6 @@ class PsPlatform(ParamikoPlatform):
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
 
-    def parse_job_output(self, output):
-        return output
-
     def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
 
@@ -112,9 +113,6 @@ class PsPlatform(ParamikoPlatform):
         :return: job ID of the submitted job.
         """
         return [line for line in (line.strip() for line in raw_output.splitlines()) if line.isdigit()]
-
-    def get_check_job_cmd(self, job_id):
-        return self.get_pscall(job_id)
 
     def check_remote_permissions(self) -> bool:
         try:

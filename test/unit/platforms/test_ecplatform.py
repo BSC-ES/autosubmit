@@ -22,7 +22,7 @@
 import datetime
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import pytest
 from _pytest._py.path import LocalPath
@@ -30,14 +30,21 @@ from _pytest._py.path import LocalPath
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.ecplatform import EcPlatform
+from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
+from autosubmit.platforms.headers.ec_header import EcHeader
+from autosubmit.platforms.headers.slurm_header import SlurmHeader
+from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
+from autosubmit.platforms.platform_type import PlatformType
 
+_EXPID = "t000"
+"""Test expid."""
 
 @pytest.fixture
 def ec_platform(tmp_path: 'LocalPath'):
     """Create a minimal EcPlatform for unit tests."""
     config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"}
     from autosubmit.platforms.ecplatform import EcPlatform
-    yield EcPlatform(expid='t000', name='pytest-slurm', config=config, scheduler='slurm')
+    yield EcPlatform(expid=_EXPID, name='pytest-slurm', config=config, scheduler='slurm')
 
 
 @pytest.mark.parametrize("config_retry,expected", [
@@ -55,7 +62,7 @@ def test_ec_retry_count_from_config(
     if config_retry is not None:
         platforms["TEST_ECMWF"] = {"ECACCESS_RETRIES": config_retry}
     config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp", "PLATFORMS": platforms}
-    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    platform = EcPlatform(expid=_EXPID, name='TEST_ECMWF', config=config, scheduler='slurm')
     assert platform._ec_retry_count == expected
     assert platform._ec_retry_flag == f"-retry {expected}"
 
@@ -73,7 +80,7 @@ def test_ec_retry_count_fallback(
     """Verify _ec_retry_count falls back to 100 when ECACCESS_RETRIES is invalid."""
     platforms = {"TEST_ECMWF": {"ECACCESS_RETRIES": invalid_value}}
     config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp", "PLATFORMS": platforms}
-    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    platform = EcPlatform(expid=_EXPID, name='TEST_ECMWF', config=config, scheduler='slurm')
     assert platform._ec_retry_count == 100
     assert platform._ec_retry_flag == "-retry 100"
 
@@ -472,7 +479,7 @@ def test_check_remote_log_dir_creates_all_path_levels(
     ec_platform.scratch = "/scratch"
     ec_platform.project = "proj"
     ec_platform.user = "user1"
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
 
     import subprocess as sp
@@ -512,7 +519,7 @@ def test_check_remote_log_dir_does_not_raise_when_dir_already_exists(
     ec_platform.scratch = "/scratch"
     ec_platform.project = "proj"
     ec_platform.user = "user1"
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
 
     import subprocess as sp
@@ -541,7 +548,7 @@ def test_check_remote_permissions_uses_ecaccess_file_mkdir(
     ec_platform.scratch = "/scratch"
     ec_platform.project = "proj"
     ec_platform.user = "user1"
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.check_remote_permissions_cmd = "ecaccess-file-mkdir hpc:/scratch/proj/user1/_permission_checker_azxbyc"
     ec_platform.check_remote_permissions_remove_cmd = "ecaccess-file-rmdir hpc:/scratch/proj/user1/_permission_checker_azxbyc"
 
@@ -573,7 +580,7 @@ def test_delete_previous_run_files_by_job_names_calls_del_cmd(
     :param ec_platform: EcPlatform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
     ec_platform.host = "hpc"
     ec_platform.del_cmd = "ecaccess-file-delete"
@@ -605,7 +612,7 @@ def test_delete_previous_run_files_by_job_names_skips_when_expid_not_in_log_dir(
     :param ec_platform: EcPlatform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/other/LOG_other"
 
     called: list[str] = []
@@ -626,7 +633,7 @@ def test_delete_previous_stat_files_by_job_names_removes_matching_stat_files(
     :param ec_platform: EcPlatform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
     ec_platform.host = "hpc"
     ec_platform.del_cmd = "ecaccess-file-delete"
@@ -749,7 +756,7 @@ def test_set_submit_cmd_uses_configured_retry(
         "LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp",
         "PLATFORMS": {"TEST_ECMWF": {"ECACCESS_RETRIES": retry_count}},
     }
-    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    platform = EcPlatform(expid=_EXPID, name='TEST_ECMWF', config=config, scheduler='slurm')
     platform._set_submit_cmd("hpc")
     assert expected_flag in platform._submit_cmd
     assert "-queueName hpc" in platform._submit_cmd
@@ -909,3 +916,52 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     assert any("t000_INI_STAT_0" in c for c in downloaded)
     assert any("t000_SIM_STAT_0" in c for c in downloaded)
     assert not any("t000_MISSING_STAT_0" in c for c in downloaded)
+
+
+@pytest.mark.parametrize(
+    'scheduler,expected',
+    [
+        (PlatformType.PBS, EcCcaHeader),
+        (PlatformType.LOAD_LEVELER, EcHeader),
+        (PlatformType.SLURM, SlurmHeader),
+        (PlatformType.LOCAL, ParamikoPlatformException)
+    ]
+)
+def test_ecplatform_header_selected(
+        scheduler: str,
+        expected: type[Union[EcCcaHeader, EcHeader, SlurmHeader, Exception]],
+        ec_platform: EcPlatform,
+        tmp_path: Path
+):
+    """Test that ``EcPlatform`` correctly selects its wrapped platform header."""
+    config = {
+        "LOCAL_ROOT_DIR": str(tmp_path),
+        "LOCAL_TMP_DIR": "tmp",
+        "PLATFORMS": {},
+    }
+    if issubclass(expected, Exception):
+        with pytest.raises(expected):
+            EcPlatform(expid=_EXPID, name="test_select", config=config, scheduler=scheduler)
+    else:
+        platform = EcPlatform(
+            expid=_EXPID, name="test_select", config=config, scheduler=scheduler
+        )
+        assert platform._header
+
+
+def test_get_remote_log_dir(ec_platform):
+    """The remote log dir will have the value specified in the constructor."""
+    assert ec_platform.get_remote_log_dir() == f'{_EXPID}/LOG_{_EXPID}'
+
+
+def test_check_remote_log_dir_failed_mkdir(ec_platform, mocker):
+    """Test that ``ecaccess-file-mkdir`` raised error is captured."""
+    mocker.patch("autosubmit.platforms.ecplatform.subprocess.check_output", side_effect=FileNotFoundError)
+
+    with pytest.raises(AutosubmitError):
+        ec_platform.check_remote_log_dir()
+
+def test_get_mkdir_cmd(ec_platform):
+    """Test the ``mkdir`` command for the ECaccess platform."""
+    assert 'ecaccess-file-mkdir' in ec_platform.get_mkdir_cmd()
+

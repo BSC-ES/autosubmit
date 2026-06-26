@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import sys
-
 from multiprocessing import Process
 from pathlib import Path
 from textwrap import dedent
@@ -27,6 +26,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.utils import build_and_connect_platform
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from test.integration.commands.run.conftest import (
     _assert_db_fields,
     _assert_exit_code,
@@ -35,7 +35,6 @@ from test.integration.commands.run.conftest import (
     _check_files_recovered,
 )
 from test.integration.test_utils.misc import wait_locker
-
 
 # -- Tests
 
@@ -796,7 +795,7 @@ def test_build_and_connect_platform_local(autosubmit_exp, general_data):
         "EXPERIMENT": {"MEMBERS": "fc0", "NUMCHUNKS": "1"},
     }
     as_exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False, create=True)
-    plat = build_and_connect_platform("LOCAL", as_exp.as_conf, as_exp.expid)
+    plat = build_and_connect_platform(PlatformType.LOCAL.value, as_exp.as_conf, as_exp.expid)
     assert isinstance(plat, LocalPlatform)
-    assert plat.type == "local"
+    assert plat.TYPE == PlatformType.LOCAL
     assert plat.connected

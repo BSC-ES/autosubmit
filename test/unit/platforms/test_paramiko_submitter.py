@@ -18,15 +18,20 @@
 """Unit tests for ``ParamikoSubmitter``."""
 
 from getpass import getuser
-from typing import Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from autosubmit.platforms import paramiko_submitter
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.paramiko_submitter import (
+    ParamikoSubmitter,
+    get_platform_by_type,
+)
 from autosubmit.platforms.pjmplatform import PJMPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
@@ -34,6 +39,11 @@ if TYPE_CHECKING:
     from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
 _EXPID = 't000'
+
+
+@pytest.fixture
+def experiment_data():
+    return {"foo": "bar"}
 
 
 def test_load_local_platform(autosubmit_config):
@@ -406,3 +416,176 @@ def test_platform_parameter_zero_raises_error(autosubmit_config, parameter_name)
 
     assert parameter_name in str(cm.value.message)
     assert "greater than 0" in str(cm.value.message)
+
+
+@pytest.mark.parametrize("config", [
+    {
+        "DEFAULT": {
+            "HPCARCH": "PYTEST-UNDEFINED",
+        },
+        "LOCAL_ROOT_DIR": "blabla",
+        "LOCAL_TMP_DIR": 'tmp',
+        "PLATFORMS": {
+            "PYTEST-UNDEFINED": {
+                "host": "",
+                "user": "",
+                "project": "",
+                "scratch_dir": "",
+                "MAX_WALLCLOCK": "",
+                "DISABLE_RECOVERY_THREADS": True
+            }
+        },
+        "JOBS": {
+            "job1": {
+                "PLATFORM": "PYTEST-UNDEFINED",
+                "SCRIPT": "echo 'hello world'",
+            },
+        }
+    },
+    {
+        "DEFAULT": {
+            "HPCARCH": "PYTEST-UNSUPPORTED",
+        },
+        "LOCAL_ROOT_DIR": "blabla",
+        "LOCAL_TMP_DIR": 'tmp',
+        "PLATFORMS": {
+            "PYTEST-UNSUPPORTED": {
+                "TYPE": "unknown",
+                "host": "",
+                "user": "",
+                "project": "",
+                "scratch_dir": "",
+                "MAX_WALLCLOCK": "",
+                "DISABLE_RECOVERY_THREADS": True
+            }
+        },
+        "JOBS": {
+            "job1": {
+                "PLATFORM": "PYTEST-UNSUPPORTED",
+                "SCRIPT": "echo 'hello world'",
+            },
+        }
+    }
+], ids=["Undefined", "Unsupported"])
+def test_load_platforms(autosubmit_config, config):
+    experiment_id = 'random-id'
+    as_conf = autosubmit_config(experiment_id, config)
+    with pytest.raises(AutosubmitCritical):
+        ParamikoSubmitter(as_conf=as_conf)
+
+
+def test_get_platform_ecaccess(mocker, experiment_data):
+    """Test creating an ECaccess platform."""
+    instance = object()
+
+    mocker.patch.dict(
+        paramiko_submitter._PLATFORM_MAPPING,
+        {
+            PlatformType.ECACCESS: mocker.Mock(return_value=instance),
+        },
+    )
+
+    result = get_platform_by_type(
+        PlatformType.ECACCESS,
+        "expid",
+        "platform",
+        experiment_data,
+        "1.2.3",
+        None,
+    )
+
+    assert result is instance
+    paramiko_submitter._PLATFORM_MAPPING[PlatformType.ECACCESS].assert_called_once_with(  # type: ignore
+        "expid",
+        "platform",
+        experiment_data,
+        "1.2.3",
+    )
+
+
+def test_get_platform_slurm(mocker, experiment_data):
+    """Test creating a Slurm platform."""
+    instance = object()
+
+    mocker.patch.dict(
+        paramiko_submitter._PLATFORM_MAPPING,
+        {
+            PlatformType.SLURM: mocker.Mock(return_value=instance),
+        },
+    )
+
+    result = get_platform_by_type(
+        PlatformType.SLURM,
+        "expid",
+        "platform",
+        experiment_data,
+        "ignored",
+        "secret",
+    )
+
+    assert result is instance
+    paramiko_submitter._PLATFORM_MAPPING[PlatformType.SLURM].assert_called_once_with(  # type: ignore
+        "expid",
+        "platform",
+        experiment_data,
+        auth_password="secret",
+    )
+
+
+def test_get_platform_unsupported(mocker):
+    """Test the request to create a platform that is not supported."""
+    mocker.patch.object(
+        paramiko_submitter,
+        "PlatformType",
+        side_effect=ValueError,
+    )
+
+    with pytest.raises(paramiko_submitter.AutosubmitCritical) as exc:
+        get_platform_by_type(
+            "unknown",
+            "expid",
+            "platform",
+            {},
+            "v1",
+            None,
+        )
+
+    assert exc.value.args == (
+        "Platform PLATFORM type unknown is not supported",
+        6003,
+    )
+
+
+@pytest.mark.parametrize(
+    "platform_type",
+    [
+        PlatformType.PS,
+        PlatformType.PJM,
+        PlatformType.PBS,
+    ],
+)
+def test_get_platform_simple(mocker, experiment_data, platform_type):
+    """Test creating platforms with the same constructor."""
+    instance = object()
+    factory = mocker.Mock(return_value=instance)
+
+    mocker.patch.dict(
+        paramiko_submitter._PLATFORM_MAPPING,
+        {platform_type: factory},
+    )
+
+    result = get_platform_by_type(
+        f" {platform_type.value.upper()} ",
+        "expid",
+        "platform",
+        experiment_data,
+        "v1",
+        None,
+    )
+
+    assert result is instance
+    factory.assert_called_once_with(
+        "expid",
+        "platform",
+        experiment_data,
+    )

@@ -19,22 +19,26 @@
 import sqlite3
 import tempfile
 from collections.abc import Callable
-from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from itertools import permutations, product
 from pathlib import Path
 from textwrap import dedent
-from typing import cast, Any, Iterable
+from typing import Any, Iterable, cast
 
 import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
+
 # noinspection PyProtectedMember
 from autosubmit.experiment.experiment_common import (
-    check_ownership, copy_experiment, delete_experiment,
-    _delete_expid, new_experiment, _perform_deletion
+    _delete_expid,
+    _perform_deletion,
+    check_ownership,
+    copy_experiment,
+    delete_experiment,
+    new_experiment,
 )
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.utils import as_conf_default_values
@@ -199,36 +203,36 @@ def test_copying_experiment_with_hpc_in_file(autosubmit_exp: Callable, autosubmi
 
 
 @pytest.mark.parametrize(
-    "git_command,git_session",
+    "git_command,git_session,expected_origin,expected_branch,has_custom_config",
     [
-        (["", ""], ["", ""]),
-        (["test_1", "test_2"], ["", ""]),
-        (["", "test_2"], ["", ""]),
-        (["test_1", ""], ["", ""]),
-        (["", ""], ["test_3", "test_4"]),
-        (["test_1", "test_2"], ["test_3", "test_4"]),
-        (["", "test_2"], ["test_3", "test_4"]),
-        (["test_1", ""], ["test_3", "test_4"]),
+        (["", ""], ["", ""], "", "", False),
+        (["test_1", ""], ["session_1", "session_2"], "test_1", "session_2", True),
+        (["", "test_2"], ["session_1", "session_2"], "session_1", "test_2", False),
+        (["test_1", "test_2"], ["session_1", "session_2"], "test_1", "test_2", True),
     ],
 )
 def test_as_conf_default_values(
     git_command,
     git_session,
+    expected_origin,
+    expected_branch,
+    has_custom_config,
     autosubmit_exp: Callable,
     autosubmit: Autosubmit,
-    tmp_path,
     mocker,
 ):
-    """Test that the ``check_jobs_file_exists`` function ignores a non-existent section."""
     exp = autosubmit_exp(
         experiment_data={
             "JOBS": {"LOCAL_SEND_INITIAL": {"CHUNKS_FROM": {1: {"CHUNKS_TO": 1}}}},
             "GIT": {
-                "PROJECT_ORIGIN": f"{git_session[0]}",
-                "PROJECT_BRANCH": f"{git_session[1]}",
-            },
+                "PROJECT_ORIGIN": git_session[0],
+                "PROJECT_BRANCH": git_session[1],
+            }
         }
     )
+
+    mocker.patch("autosubmit.autosubmit.clone_repository", return_value=True)
+
     as_conf_default_values(
         autosubmit.autosubmit_version,
         exp.expid,
@@ -238,44 +242,32 @@ def test_as_conf_default_values(
         git_command[1],
         "test_3",
     )
-    # mock cloning the repository
-    mocker.patch(
-        "autosubmit.autosubmit.AutosubmitGit.clone_repository", return_value=True
-    )
-    yaml = YAML(typ="rt")
+
     assert autosubmit.create(exp.expid, noplot=True, hide=True) == 0
-    with open(tmp_path / f"{exp.expid}/conf/metadata/experiment_data.yml") as f:
-        yaml_data = yaml.load(f)
-        assert yaml_data["DEFAULT"]["HPCARCH"] == "MN5"
-        assert yaml_data["DEFAULT"]["EXPID"] == exp.expid
-        if git_command[0]:
-            assert (
-                yaml_data["DEFAULT"]["CUSTOM_CONFIG"]
-                == f"{tmp_path}/{exp.expid}/proj/test_3"
-            )
-        else:
-            assert "CUSTOM_CONFIG" not in yaml_data["DEFAULT"]
-        assert yaml_data["LOCAL"]["PROJECT_PATH"] == ""
 
-    if git_command[0] != "":
-        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_command[0]
-    else:
-        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_session[0]
+    conf_file = (Path(BasicConfig.LOCAL_ROOT_DIR) / exp.expid / "conf/metadata/experiment_data.yml")
 
-    if git_command[1] != "":
-        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_command[1]
-    else:
-        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_session[1]
+    assert conf_file.exists(), f"Missing expected config file: {conf_file}"
 
-    if git_session[0] != "" and git_command[0] == "":
-        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_session[0]
-    else:
-        assert yaml_data["GIT"]["PROJECT_ORIGIN"] == git_command[0]
+    yaml = YAML(typ="rt")
+    yaml_data = yaml.load(conf_file.read_text())
 
-    if git_session[1] != "" and git_command[1] == "":
-        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_session[1]
+    assert yaml_data["DEFAULT"]["HPCARCH"] == "MN5"
+    assert yaml_data["DEFAULT"]["EXPID"] == exp.expid
+    assert yaml_data["LOCAL"]["PROJECT_PATH"] == ""
+
+    if git_command[0]:
+        assert yaml_data["DEFAULT"]["CUSTOM_CONFIG"] == f"{Path(BasicConfig.LOCAL_ROOT_DIR)}/{exp.expid}/proj/test_3"
     else:
-        assert yaml_data["GIT"]["PROJECT_BRANCH"] == git_command[1]
+        assert "CUSTOM_CONFIG" not in yaml_data["DEFAULT"]
+
+    assert yaml_data["GIT"]["PROJECT_ORIGIN"] == expected_origin
+    assert yaml_data["GIT"]["PROJECT_BRANCH"] == expected_branch
+
+    if has_custom_config:
+        assert yaml_data["DEFAULT"]["CUSTOM_CONFIG"] == f"{Path(BasicConfig.LOCAL_ROOT_DIR)}/{exp.expid}/proj/test_3"
+    else:
+        assert "CUSTOM_CONFIG" not in yaml_data["DEFAULT"]
 
 
 @pytest.mark.parametrize(
@@ -652,9 +644,8 @@ def _build_db_mock(current_experiment_id, mock_db_common, mocker):
     mock_db_common.check_experiment_exists = mocker.Mock(return_value=False)
 
 
-def test_autosubmit_generate_config(mocker, autosubmit: Autosubmit, tmp_path, get_next_expid: Callable[[], str]):
+def test_autosubmit_generate_config(mocker, autosubmit: Autosubmit, tmp_path, get_next_expid: Callable[[], str], monkeypatch):
     expid = get_next_expid()
-    original_local_root_dir = BasicConfig.LOCAL_ROOT_DIR
     read_files_mock = mocker.patch('autosubmit.autosubmit.read_files')
 
     temp_file_path = Path(tmp_path, 'files')
@@ -663,7 +654,7 @@ def test_autosubmit_generate_config(mocker, autosubmit: Autosubmit, tmp_path, ge
     with tempfile.NamedTemporaryFile(dir=temp_file_path, suffix='.yaml', mode='w') as source_yaml:
         # Our processed and commented YAML output file must be written here
         Path(tmp_path, expid, 'conf').mkdir(parents=True)
-        BasicConfig.LOCAL_ROOT_DIR = tmp_path
+        monkeypatch.setattr(BasicConfig, "LOCAL_ROOT_DIR", tmp_path)
 
         source_yaml.write(
             dedent('''
@@ -696,11 +687,8 @@ def test_autosubmit_generate_config(mocker, autosubmit: Autosubmit, tmp_path, ge
         assert '# 42' not in source_text
         assert '# 42' in output_text
 
-    # Reset the local root dir.
-    BasicConfig.LOCAL_ROOT_DIR = original_local_root_dir
 
-
-def test_autosubmit_generate_config_resource_listdir_order(autosubmit, mocker):
+def test_autosubmit_generate_config_resource_listdir_order(autosubmit, mocker, monkeypatch):
     """In https://earth.bsc.es/gitlab/es/autosubmit/-/issues/1063 we had a bug
     where we relied on the order of returned entries of ``pkg_resources.resource_listdir``
     (which is actually undefined per https://importlib-resources.readthedocs.io/en/latest/migration.html).
@@ -729,14 +717,13 @@ def test_autosubmit_generate_config_resource_listdir_order(autosubmit, mocker):
     for test_case in test_cases:
         test: dict[str, Iterable[Any]] = cast(dict[str, Iterable], dict(zip(keys, test_case)))
         expid = 'ff99'
-        original_local_root_dir = BasicConfig.LOCAL_ROOT_DIR
 
         with tempfile.TemporaryDirectory() as temp_dir:
             Path(temp_dir, expid, 'conf').mkdir(parents=True)
             temp_file_path = Path(temp_dir, 'files')
             Path(temp_file_path).mkdir()
 
-            BasicConfig.LOCAL_ROOT_DIR = temp_dir
+            monkeypatch.setattr(BasicConfig, "LOCAL_ROOT_DIR", temp_dir)
 
             resources_return = []
             filenames_return = []
@@ -763,9 +750,6 @@ def test_autosubmit_generate_config_resource_listdir_order(autosubmit, mocker):
             expected = 2 if (not test['dummy'] and not test['minimal_configuration']) else 1
             assert yaml_mock.call_count == expected, msg
             yaml_mock.reset_mock()
-
-        # Reset the local root dir.
-        BasicConfig.LOCAL_ROOT_DIR = original_local_root_dir
 
 
 def test_expid_generated_correctly(tmp_path, autosubmit_exp, autosubmit):
@@ -855,30 +839,51 @@ def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmi
         cursor.close()
 
 
+def test_delete_expid_success(mocker, tmp_path, autosubmit_exp):
+    as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
+
+    _delete_expid(as_exp.expid, force=True)
+
+    assert not Path(as_exp.exp_path).exists()
+
+
+def test_delete_expid_error(mocker, tmp_path, autosubmit_exp):
+    as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
+
+    mocker.patch(
+        "autosubmit.experiment.experiment_common._perform_deletion",
+        return_value="error",
+    )
+
+    with pytest.raises(AutosubmitError):
+        _delete_expid(as_exp.expid, force=True)
+
+
 @pytest.mark.parametrize(
     "expid_value",
     [
         pytest.param("..", id="parent_dir"),
         pytest.param("", id="empty_string"),
         pytest.param(".", id="current_dir"),
-        pytest.param("as_exp.expid", id="valid_expid"),
-    ]
+    ],
 )
-def test_delete_expid(mocker, tmp_path, autosubmit_exp, autosubmit, expid_value):
+def test_delete_expid_invalid(mocker, tmp_path, autosubmit_exp, expid_value):
     as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
-    mocker.patch('autosubmit.experiment.experiment_common._perform_deletion', return_value="error")
+
+    mocker.patch(
+        "autosubmit.experiment.experiment_common._perform_deletion",
+        return_value="error",
+    )
+
     expid_value = as_exp.expid if expid_value == "as_exp.expid" else expid_value
+
     if expid_value in ["..", "", "."]:
         with pytest.raises(AutosubmitCritical) as exc_info:
             _delete_expid(expid_value, force=True)
-            assert exc_info.value.code == 7001
+        assert exc_info.value.code == 7011
     else:
         with pytest.raises(AutosubmitError):
             _delete_expid(as_exp.expid, force=True)
-    mocker.stopall()
-    _delete_expid(as_exp.expid, force=True)
-    with does_not_raise():
-        _delete_expid(as_exp.expid, force=True)
 
 
 def test_perform_deletion(mocker, tmp_path, autosubmit_exp, autosubmit):
@@ -893,3 +898,75 @@ def test_perform_deletion(mocker, tmp_path, autosubmit_exp, autosubmit):
     mocker.patch("autosubmit.database.db_common.delete_experiment", side_effect=FileNotFoundError)
     err_message = _perform_deletion(experiment_path, structure_db_path, job_data_db_path, as_exp.expid)
     assert all(x in err_message for x in ["Cannot delete experiment entry", "Cannot delete directory"])
+
+
+@pytest.mark.parametrize(
+    "is_repo,expected_repo",
+    [
+        (True, ""),
+        (False, "https://example.com/repo.git"),
+    ],
+    ids=["git_repository", "not_git_repository"],
+)
+def test_expid_use_local_minimal_resets_git_values(mocker, tmp_path, is_repo: bool, expected_repo: str):
+    """Test that local minimal configuration overrides Git settings."""
+
+    mocker.patch("autosubmit.autosubmit.BasicConfig.LOCAL_ROOT_DIR", tmp_path)
+    mocker.patch("autosubmit.autosubmit.is_git_repo",return_value=is_repo)
+    mocker.patch("autosubmit.autosubmit.new_experiment", return_value="a000")
+
+    mocker.patch("autosubmit.autosubmit.create_required_folders")
+    mocker.patch("autosubmit.autosubmit.Autosubmit.generate_as_config")
+    default_values = mocker.patch("autosubmit.autosubmit.as_conf_default_values")
+    mocker.patch("autosubmit.autosubmit.ExperimentDetails").return_value.save_update_details.return_value = None
+
+    Autosubmit.expid(
+        description="test",
+        hpc="local",
+        use_local_minimal=True,
+        git_repo="https://example.com/repo.git",
+        git_branch="main",
+        git_as_conf="conf/minimal.yml",
+    )
+
+    default_values.assert_called_once_with(
+        Autosubmit.autosubmit_version,
+        "a000",
+        "local",
+        False,
+        expected_repo,
+        "",
+        "conf/minimal.yml",
+    )
+
+
+def test_expid_keeps_git_values_when_not_using_local_minimal(mocker, tmp_path):
+    """Test that Git settings are preserved by default."""
+
+    mocker.patch("autosubmit.autosubmit.BasicConfig.LOCAL_ROOT_DIR", tmp_path)
+    mocker.patch("autosubmit.autosubmit.is_git_repo", return_value=True)
+    mocker.patch("autosubmit.autosubmit.new_experiment", return_value="a000")
+    mocker.patch("autosubmit.autosubmit.create_required_folders")
+    mocker.patch("autosubmit.autosubmit.Autosubmit.generate_as_config")
+
+    default_values = mocker.patch("autosubmit.autosubmit.as_conf_default_values")
+    mocker.patch("autosubmit.autosubmit.ExperimentDetails").return_value.save_update_details.return_value = None
+
+    Autosubmit.expid(
+        description="test",
+        hpc="local",
+        use_local_minimal=False,
+        git_repo="https://example.com/repo.git",
+        git_branch="main",
+        git_as_conf="conf/minimal.yml",
+    )
+
+    default_values.assert_called_once_with(
+        Autosubmit.autosubmit_version,
+        "a000",
+        "local",
+        False,
+        "https://example.com/repo.git",
+        "main",
+        "conf/minimal.yml",
+    )

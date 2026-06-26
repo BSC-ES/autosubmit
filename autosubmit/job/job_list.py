@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -25,8 +25,8 @@ from contextlib import suppress
 from itertools import groupby
 from pathlib import Path
 from shutil import move
-from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Optional, Union
+from time import localtime, mktime, strftime
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
@@ -34,20 +34,20 @@ from networkx import DiGraph
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_package_persistence import JobPackagePersistence
-from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.job.job_packages import JobPackageThread
-from autosubmit.job.job_utils import Dependency
-from autosubmit.job.job_utils import transitive_reduction
+from autosubmit.job.job_utils import Dependency, transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.monitor.diagram import JobData
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
+from autosubmit.platforms.platform_type import PlatformType
 
 
 class JobList(object):
@@ -2200,7 +2200,7 @@ class JobList(object):
             return [job for job in waiting_jobs if job.packed is False]
         return waiting_jobs
 
-    def get_waiting_remote_dependencies(self, platform_type='slurm'.lower()):
+    def get_waiting_remote_dependencies(self, platform_type=PlatformType.SLURM.lower()):
         """Returns a list of jobs waiting on slurm scheduler.
 
         :param platform_type: platform type
@@ -2209,7 +2209,7 @@ class JobList(object):
         :rtype: list
         """
         waiting_jobs = [job for job in self._job_list if (
-                job.platform.type == platform_type and job.status == Status.WAITING)]
+                job.platform.TYPE == platform_type and job.status == Status.WAITING)]
         return waiting_jobs
 
     def get_held_jobs(self, platform=None):

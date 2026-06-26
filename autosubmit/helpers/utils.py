@@ -16,23 +16,23 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from pathlib import Path
 import pwd
 import re
 import sys
 from collections import defaultdict
 from contextlib import suppress
 from itertools import zip_longest
-from typing import Iterable, Optional, Union, TYPE_CHECKING
-from autosubmit.history.experiment_history import ExperimentHistory
+from pathlib import Path
+from typing import TYPE_CHECKING, Iterable, Optional, Union
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
-from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.paramiko_submitter import _get_platform_by_type, _get_host
+from autosubmit.platforms.paramiko_submitter import _get_host, get_platform_by_type
+from autosubmit.platforms.platform import Platform
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -344,7 +344,7 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
     :param expid: Experiment identifier.
     :return: Connected platform instance.
     """
-    if platform_name.upper() == "LOCAL":
+    if platform_name.lower() == LocalPlatform.TYPE:
         config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
             "LOCAL_TMP_DIR": BasicConfig.LOCAL_TMP_DIR,
@@ -356,7 +356,7 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
         platform_type = platform_config.get('TYPE', '').lower()
         platform_version = platform_config.get('VERSION', '')
 
-        plat = _get_platform_by_type(
+        plat = get_platform_by_type(
             platform_type, expid, platform_name,
             as_conf.experiment_data, platform_version, None
         )
@@ -365,7 +365,6 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
             raise AutosubmitCritical(
                 f"PLATFORMS.{platform_name.upper()}.TYPE: {platform_type} is not supported", 7012
             )
-        plat.type = platform_type
         plat._version = platform_version
 
         add_project_to_host = str(platform_config.get('ADD_PROJECT_TO_HOST', False)).lower() != "false"

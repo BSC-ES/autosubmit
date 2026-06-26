@@ -166,6 +166,8 @@ def test_rocrate(tmp_path, autosubmit_exp):
     start_time = ''
     end_time = ''
 
+    assert exp.autosubmit.create(exp.expid, noplot=True, hide=True, force=True) == 0
+
     crate = create_rocrate_archive(
         as_conf=as_conf,
         rocrate_json=rocrate_json,
@@ -215,6 +217,8 @@ def test_rocrate_invalid_project(autosubmit_exp, tmp_path, mocker):
 
     mocker.patch('autosubmit.provenance.rocrate._get_project_entity',
                  side_effect=AutosubmitCritical('Failed to read the Autosubmit Project for RO-Crate...'))
+
+    assert exp.autosubmit.create(exp.expid, noplot=True, hide=True, force=True) == 0
 
     with pytest.raises(AutosubmitCritical) as cm:
         create_rocrate_archive(

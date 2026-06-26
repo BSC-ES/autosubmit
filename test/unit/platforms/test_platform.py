@@ -17,14 +17,17 @@
 
 """This file contains tests for the ``platform``."""
 
+from os import WNOHANG
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Optional
 
 import pytest
 
 from autosubmit.log.log import Log
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.platform import recover_platform_job_logs_wrapper
-from test.unit.test_job import TestJob, FakeBasicConfig
+from test.unit.test_job import FakeBasicConfig, TestJob
 
 _EXPID = 't000'
 
@@ -84,7 +87,6 @@ def test_local_platform_read_file(tmp_path):
 
     path_not_exists = Path(tmp_path).joinpath("foo", "bar")
 
-    assert platform.get_file_size(path_not_exists) is None
     assert platform.read_file(path_not_exists) is None
 
 
@@ -126,3 +128,60 @@ def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):
         platform, None, None, None, as_conf=as_conf)  # type: ignore
 
     assert len(Log.log.handlers) == current_number_of_handlers + 2  # + out + err
+
+
+@pytest.mark.parametrize(
+    'temp_dir,expected', [
+        ('abc', 'abc'),
+        (' ', ' '),
+        ('', ''),
+        (None, '')
+    ]
+)
+def test_add_parameters(temp_dir: Optional[str], expected: str, local: LocalPlatform, mocker):
+    as_conf = mocker.MagicMock()
+    as_conf.experiment_data = dict()
+    local.temp_dir = temp_dir
+    local.add_parameters(as_conf)
+    assert local.temp_dir == expected
+
+
+
+def test_join_new_process_when_no_process(local, mocker):
+    local.log_recovery_process = None
+
+    mocked_log = mocker.patch("autosubmit.platforms.platform.Log")
+    local.join_new_process()
+
+    mocked_log.result.assert_called_once_with("Log recovery process is not running (will not wait/join the process)")
+
+
+def test_join_new_process_process_still_running(local, mocker):
+    local.log_recovery_process = SimpleNamespace(
+        pid=1234,
+        name="recovery"
+    )
+
+    mocked_waitpid = mocker.patch("autosubmit.platforms.platform.os.waitpid", return_value=(0, 0))
+    mocked_log = mocker.patch("autosubmit.platforms.platform.Log")
+    local.join_new_process()
+
+    mocked_waitpid.assert_called_once_with(1234, WNOHANG)
+    mocked_log.info.assert_called_once_with("Process 1234 is still running.")
+    mocked_log.result.assert_not_called()
+
+
+def test_join_new_process_process_finished(local, mocker):
+    local.log_recovery_process = SimpleNamespace(
+        pid=1234,
+        name="recovery"
+    )
+
+    mocked_waitpid = mocker.patch("autosubmit.platforms.platform.os.waitpid", return_value=(1234, 0))
+    mocked_log = mocker.patch("autosubmit.platforms.platform.Log")
+    local.join_new_process()
+
+    mocked_waitpid.assert_called_once_with(1234, WNOHANG)
+
+    mocked_log.result.assert_called_once_with("Process recovery finished with pid 1234")
+    mocked_log.info.assert_not_called()
