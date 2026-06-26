@@ -53,6 +53,8 @@ class PJMPlatform(ParamikoPlatform):
     :type expid: str
     """
 
+    TYPE = 'pjm'
+
     def __init__(self, expid, name, config):
         ParamikoPlatform.__init__(self, expid, name, config)
         self.mkdir_cmd = None
@@ -82,7 +84,7 @@ class PJMPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
         self._submit_script_base_name = os.path.join(
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
-        self.type = "pjm"
+        self.type = self.TYPE
 
     def create_a_new_copy(self):
         return PJMPlatform(self.expid, self.name, self.config)

@@ -35,6 +35,8 @@ if TYPE_CHECKING:
 class LocalPlatform(ParamikoPlatform):
     """Class to manage jobs to localhost."""
 
+    TYPE = 'local'
+
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.cancel_cmd = None
@@ -43,7 +45,7 @@ class LocalPlatform(ParamikoPlatform):
         self.get_cmd = None
         self.put_cmd = None
         self._checkhost_cmd = None
-        self.type = 'local'
+        self.type = self.TYPE
         self._header = LocalHeader()
         self.job_status = dict()
         self.job_status['COMPLETED'] = ['1']

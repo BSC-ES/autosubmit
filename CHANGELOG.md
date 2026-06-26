@@ -1,3 +1,9 @@
+### 4.1.18: Unreleased
+
+**Bug fixes:**
+
+- Fix timeout guard is silently disabled for login/local jobs #3081
+
 ### 4.1.17: Unreleased
 
 **Bug fixes:**

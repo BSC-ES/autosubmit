@@ -20,10 +20,10 @@
 
 import os
 from collections import defaultdict
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
@@ -93,15 +93,16 @@ def _get_host(section_host: str, add_project_to_host: bool, project: str) -> str
 
 def _get_platform_by_type(platform_type: str, expid: str, platform_name: str, experiment_data: dict,
                           platform_version: str, auth_password: Optional[str]) -> Optional['ParamikoPlatform']:
-    if platform_type == 'ps':
+    platform_type = platform_type.lower()
+    if platform_type == PsPlatform.TYPE:
         return PsPlatform(expid, platform_name, experiment_data)
-    elif platform_type == 'ecaccess':
+    elif platform_type == EcPlatform.TYPE:
         return EcPlatform(expid, platform_name, experiment_data, platform_version)
-    elif platform_type == 'slurm':
+    elif platform_type == SlurmPlatform.TYPE:
         return SlurmPlatform(expid, platform_name, experiment_data, auth_password=auth_password)
-    elif platform_type == 'pjm':
+    elif platform_type == PJMPlatform.TYPE:
         return PJMPlatform(expid, platform_name, experiment_data)
-    elif platform_type == 'pbs':
+    elif platform_type == PBSPlatform.TYPE:
         return PBSPlatform(expid, platform_name, experiment_data)
 
     return None
@@ -139,8 +140,8 @@ class ParamikoSubmitter:
         local_platform.host = 'localhost'
         # Add an object to entry in dictionary
         self.platforms = {
-            'local': local_platform,
-            'LOCAL': local_platform
+            LocalPlatform.TYPE: local_platform,
+            LocalPlatform.TYPE.upper(): local_platform
         }
 
     def load_platforms(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,

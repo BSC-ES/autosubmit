@@ -91,7 +91,7 @@ def test_init_raises_on_empty_jobs():
     """Test __init__ raises when no jobs are given."""
     from autosubmit.job.job_packages import JobPackageBase
 
-    with pytest.raises(IndexError):
+    with pytest.raises(ValueError):
         JobPackageBase([])
 
 
@@ -207,7 +207,7 @@ def test_check_job_files_exists_missing_job_file(mocker, tmp_path, only_generate
     package = JobPackageSimple([job])
 
     if raises:
-        with pytest.raises(AutosubmitCritical, match="does not exists"):
+        with pytest.raises(AutosubmitCritical, match="does not exist"):
             package.check_job_files_exists(as_conf, only_generate=only_generate)
     else:
         package.check_job_files_exists(as_conf, only_generate=only_generate)
@@ -232,7 +232,7 @@ def test_check_job_files_raises_when_additional_file_missing(mocker, tmp_path):
 
     package = JobPackageSimple([job])
 
-    with pytest.raises(AutosubmitCritical, match="Additional file:.*does not exists"):
+    with pytest.raises(AutosubmitCritical, match="Additional file:.*does not exist"):
         package.check_job_files_exists(as_conf, only_generate=False)
 
 

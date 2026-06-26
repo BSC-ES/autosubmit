@@ -20,13 +20,15 @@ import multiprocessing
 import os
 import time
 import traceback
+from abc import ABC
 from contextlib import suppress
 from multiprocessing.queues import Queue
 from multiprocessing.synchronize import Event
+
 # noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
-from typing import Any, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import setproctitle
 
@@ -35,11 +37,12 @@ from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
+    from multiprocessing.process import BaseProcess
+
     from autosubmit.config.configcommon import AutosubmitConfig
-    from autosubmit.job.job_packages import JobPackageBase
     from autosubmit.job.job import Job
     from autosubmit.job.job_list import JobList
-    from multiprocessing.process import BaseProcess
+    from autosubmit.job.job_packages import JobPackageBase
 
 
 def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
@@ -127,7 +130,7 @@ class CopyQueue(Queue):
         super().put(job.__getstate__(), block, timeout)
 
 
-class Platform:
+class Platform(ABC):
     """
     Class to manage the connections to the different platforms.
     """
@@ -136,6 +139,8 @@ class Platform:
     # Shared lock between the main process and a retrieval log process
     lock = multiprocessing.Lock()
     IO_SAFE_WAIT = 0
+
+    TYPE: str
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         """Initializes the Platform object with the given experiment ID, platform name, configuration,
@@ -738,7 +743,9 @@ class Platform:
         :return: platform's LOG directory
         :rtype: str
         """
-        if self.type == "local":
+        # Circular import -- bad class design, probably can be re-designed.
+        from autosubmit.platforms.locplatform import LocalPlatform
+        if self.type == LocalPlatform.TYPE:
             path = Path(self.root_dir) / self.config.get("LOCAL_TMP_DIR") / f'LOG_{self.expid}'
         else:
             path = Path(self.remote_log_dir)
@@ -1124,7 +1131,6 @@ class Platform:
         """Confirm that jobs marked as done are actually completed by checking their STAT files.
 
         :param job_list: List of jobs to confirm.
-        :param has_internal_retries: Indicates if the jobs have internal retries, which affects the STAT file naming convention.
         :return: List of jobs that are confirmed as completed.
         """
         raise NotImplementedError  # pragma: no cover

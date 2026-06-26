@@ -16,23 +16,23 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from pathlib import Path
 import pwd
 import re
 import sys
 from collections import defaultdict
 from contextlib import suppress
 from itertools import zip_longest
-from typing import Iterable, Optional, Union, TYPE_CHECKING
-from autosubmit.history.experiment_history import ExperimentHistory
+from pathlib import Path
+from typing import TYPE_CHECKING, Iterable, Optional, Union
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
-from autosubmit.platforms.platform import Platform
 from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.paramiko_submitter import _get_platform_by_type, _get_host
+from autosubmit.platforms.paramiko_submitter import _get_host, _get_platform_by_type
+from autosubmit.platforms.platform import Platform
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -344,7 +344,7 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
     :param expid: Experiment identifier.
     :return: Connected platform instance.
     """
-    if platform_name.upper() == "LOCAL":
+    if platform_name.lower() == LocalPlatform.TYPE:
         config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
             "LOCAL_TMP_DIR": BasicConfig.LOCAL_TMP_DIR,

@@ -60,6 +60,8 @@ class EcPlatform(ParamikoPlatform):
     :type scheduler: str (pbs, loadleveler)
     """
 
+    TYPE = 'ecaccess'
+
     def parse_all_jobs_output(self, output, job_id):
         """Parse ecaccess-job-list tabular output for a single job ID.
 
@@ -153,6 +155,7 @@ class EcPlatform(ParamikoPlatform):
         # stale jobs from previous runs.
         self._pre_submission_ids: dict[str, set[int]] = {}
         self.has_scheduler = False
+        self.type = self.TYPE
 
     def update_cmds(self):
         """Updates commands for platforms"""

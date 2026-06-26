@@ -42,6 +42,8 @@ from autosubmit.job.template import get_template_snippet, Language
 from autosubmit.log.log import Log, AutosubmitCritical
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.psplatform import PsPlatform
 
 if TYPE_CHECKING:
     from autosubmit.platforms.platform import Platform
@@ -1851,9 +1853,7 @@ class Job(object):
         if self.het['HETSIZE'] == 1:
             self.het = dict()
         if not self.wallclock:
-            # FIXME: Wouldn't it be better/safer to check the instance type?
-            #        Note, too, that ps and slurm platforms do not have ``.type``?
-            if job_platform.type.lower() in ['ps', 'local']:
+            if job_platform.type.lower() in [PsPlatform.TYPE, LocalPlatform.TYPE]:
                 self.wallclock = "00:00"
             else:
                 self.wallclock = "01:59"
@@ -2334,7 +2334,7 @@ class Job(object):
         if not self.platform:
             submitter = ParamikoSubmitter(as_conf=as_conf)
             if not self.platform_name:
-                self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
+                self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", LocalPlatform.TYPE.upper())
             self.platform = submitter.platforms.get(self.platform_name)
 
     def update_content_extra(self, as_conf: AutosubmitConfig, files: list[str]) -> list[str]:

@@ -21,6 +21,7 @@ from typing import Callable, Optional
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.platforms.locplatform import LocalPlatform
 
 
 def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", minimal_configuration: bool = False,
@@ -55,7 +56,7 @@ def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", 
                     if hpc != "":
                         yaml_data['DEFAULT']['HPCARCH'] = hpc
                     elif not yaml_data['DEFAULT']['HPCARCH']:
-                        yaml_data['DEFAULT']['HPCARCH'] = "local"
+                        yaml_data['DEFAULT']['HPCARCH'] = LocalPlatform.TYPE
 
                 if 'LOCAL' in yaml_data:
                     yaml_data['LOCAL']['PROJECT_PATH'] = ""
