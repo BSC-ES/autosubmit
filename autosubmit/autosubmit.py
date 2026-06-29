@@ -1676,7 +1676,7 @@ class Autosubmit:
         :return: Nothing\n
         :rtype: \n
         """
-        Log.warning("Generating the auxiliary job_list used for the -cw flag.")
+        Log.info("Generating the auxiliary job_list used for the -cw flag.")
         job_list._job_list = jobs_filtered
         job_list._persistence_file = job_list._persistence_file + "_cw_flag"
         as_conf.load_parameters()
@@ -1700,7 +1700,7 @@ class Autosubmit:
             if type(wrapper_data) is not dict:
                 continue
             wrapper_jobs[wrapper_section] = as_conf.get_wrapper_jobs(wrapper_data)
-        Log.warning("Aux Job_list was generated successfully")
+        Log.info("Aux Job_list was generated successfully")
 
         # Load platforms.
         submitter = ParamikoSubmitter(as_conf=as_conf)
