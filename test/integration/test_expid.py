@@ -811,7 +811,7 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosub
 
     delete_experiment(expids=f'{as_exp.expid}', force=True)
     assert mocked_log.error.call_count > 0
-    assert 'Experiment does not exist' in mocked_log.error.call_args_list[0][0][0]
+    assert 'Failed to delete experiment' in mocked_log.error.call_args_list[0][0][0]
 
 
 def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmit: Autosubmit):
