@@ -203,8 +203,8 @@ class AutosubmitConfig(object):
                         raise AutosubmitCritical(
                             f"[INDEX ERROR], {section_str} must exists. Check that {str(current_level)} is an section that exists.",
                             7014)
-        if (current_level is None or (
-                not isinstance(current_level, numbers.Number) and len(current_level) == 0)) and must_exists:
+        if must_exists and (current_level is None or (
+                not isinstance(current_level, numbers.Number) and len(current_level) == 0)):
             raise AutosubmitCritical(
                 f"{section_str} must exists. Check that subsection {str(current_level)} exists.", 7014)
         if current_level is None or (not isinstance(current_level, numbers.Number) and len(current_level) == 0):
