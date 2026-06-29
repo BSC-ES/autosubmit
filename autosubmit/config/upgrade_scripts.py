@@ -177,13 +177,12 @@ def upgrade_scripts(expid: str, files: Optional[list[str]] = None) -> bool:
     Log.info(f"Upgrading AS3 {len(conf_files)} conf files (.conf) to AS 4 YAML (.yml)...")
     yaml_files = []
     for conf_file in conf_files:
-        yaml_file = Path(conf_file.stem + ".yml")
-        Log.debug(f'Upgrading AS3 conf file {conf_file} to AS4 YAML: {yaml_file}')
+        Log.debug(f'Upgrading AS3 conf file {conf_file} to AS4 YAML')
         try:
-            ini_to_yaml(conf_file)
+            yaml_file = ini_to_yaml(conf_file)
             yaml_files.append(yaml_file)
         except Exception as e:
-            Log.warning(f'Failed to upgrade AS3 conf file {conf_file} into {yaml_file}: {e}')
+            Log.warning(f'Failed to upgrade AS3 conf file {conf_file}: {e}')
 
     warnings = []
     substituted = []

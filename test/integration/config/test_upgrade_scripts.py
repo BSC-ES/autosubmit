@@ -282,4 +282,6 @@ def test_upgrade_scripts(autosubmit_exp, tmp_path: 'LocalPath', as3_ini_files: l
 
     assert f'The job name is {as_exp.expid}_LOCAL_SETUP' in inspect_generated_script.read_text()
 
+    as_exp.as_conf.reload(force_load=True)
+
     assert as_exp.as_conf.experiment_data['PLATFORMS']['MARENOSTRUM4-TEST']['USER'] == ['%USER%'], "Not uppercase!"
