@@ -21,6 +21,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
 )
+from autosubmit.log.log import AutosubmitCritical
 
 
 @pytest.mark.parametrize("noplot", [True, False])
@@ -99,3 +100,75 @@ def test_create_cw_calls_generate_scripts_andor_wrappers_without_plt(
     )
 
     mock_gen.assert_called_once()
+
+
+@pytest.mark.parametrize("autosubmit_totaljobs, platforms_totaljobs, raise_error", [
+    (None, None, False),
+    (None, 10, False),
+    (None, -10, False),
+    (None, 0, True)
+], ids=[
+    "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=None logs warning",
+    "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=10 logs warning",
+    "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=-10 logs warning",
+    "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=0 logs error"
+])
+def test_create_cw_totaljobs_cases(autosubmit_exp, general_data, mocker, autosubmit_totaljobs, platforms_totaljobs, raise_error):
+    """Test create -cw command with different combinations of CONFIG.TOTALJOBS and PLATFORMS.TOTALJOBS values."""
+    exp_data = {
+        "EXPERIMENT": {
+            "DATELIST": "20200101",
+            "MEMBERS": "fc0",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": 1,
+            "NUMCHUNKS": 1,
+            "CALENDAR": "standard",
+        },
+        "CONFIG": {
+            "SAFETYSLEEPTIME": 0,
+            "MAXWAITINGJOBS": 20,
+            "TOTALJOBS": autosubmit_totaljobs,
+        },
+        "JOBS": {
+            "SLURMJOB": {
+                "SCRIPT": "sleep 0",
+                "RUNNING": "chunk",
+                "WALLCLOCK": "02:00",
+                "PLATFORM": "TEST_SLURM",
+            },
+        },
+        "WRAPPERS": {
+            "SIMPLE_WRAPPER": {
+                "TYPE": "vertical",
+                "JOBS_IN_WRAPPER": "SLURMJOB",
+                "MAX_WRAPPED_V": 2,
+                "MIN_WRAPPED_V": 2,
+            },
+        },
+    }
+    config_data = general_data | exp_data
+
+    if platforms_totaljobs is not None:
+        config_data["PLATFORMS"] = dict(config_data.get("PLATFORMS", {}))
+        config_data["PLATFORMS"]["TEST_SLURM"] = dict(
+            config_data["PLATFORMS"].get("TEST_SLURM", {})
+        )
+        config_data["PLATFORMS"]["TEST_SLURM"]["TOTALJOBS"] = platforms_totaljobs
+
+    exp = autosubmit_exp(experiment_data=config_data, include_jobs=False, create=False)
+
+    if raise_error:
+        with pytest.raises(AutosubmitCritical):
+            exp.autosubmit.create(
+                exp.expid,
+                noplot=True,
+                hide=True,
+                check_wrappers=True,
+            )
+    else:
+        exp.autosubmit.create(
+            exp.expid,
+            noplot=True,
+            hide=True,
+            check_wrappers=True,
+        )
