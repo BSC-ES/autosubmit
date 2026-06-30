@@ -118,8 +118,8 @@ def test_create_cw_calls_generate_scripts_andor_wrappers_without_plt(
         (-10, -10, False),
         (-10, 0, True),
         (0, None, True),
-        # (0, 10, False),  # inf loop if local platform
-        # (0, -10, False),  # inf loop if local platform
+        (0, 10, False),
+        (0, -10, False),
         (0, 0, True),
     ],
     ids=[
@@ -136,8 +136,8 @@ def test_create_cw_calls_generate_scripts_andor_wrappers_without_plt(
         "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=-10 logs warning",
         "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=0 raises error",
         "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=None raises error",
-        # "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=10 logs warning",
-        # "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=-10 logs warning",
+        "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=10 logs warning",
+        "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=-10 logs warning",
         "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=0 raises error",
     ],
 )
