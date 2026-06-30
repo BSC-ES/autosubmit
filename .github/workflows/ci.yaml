@@ -56,12 +56,12 @@ jobs:
           pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             --verbose --verbosity="2" \
             test/unit -m "not postgres"
 
       - name: Coverage report
         run: |
+          coverage combine
           coverage report
           coverage xml
 
@@ -134,7 +134,6 @@ jobs:
           pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
             -m "${{ matrix.pytest-markers }}"
 
@@ -221,7 +220,6 @@ jobs:
           pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             test/regression \
             -m ''
 
@@ -271,7 +269,6 @@ jobs:
           pytest -x \
             -n 3 \
             --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
             -m 'slurm'
 
@@ -352,8 +349,8 @@ jobs:
       - name: Coverage report
         run: |
           cd docs
-          coverage xml
           coverage report
+          coverage xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
