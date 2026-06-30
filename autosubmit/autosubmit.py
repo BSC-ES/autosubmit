@@ -1650,7 +1650,6 @@ class Autosubmit:
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs_cw, False)
 
-
             Log.info("No more scripts to generate, you can proceed to check them manually")
             Log.result(file_paths)
 
@@ -4418,11 +4417,16 @@ class Autosubmit:
                         noplot = False
                     packages = None
                     if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
-                        job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
-                        Autosubmit.generate_scripts_andor_wrappers(
-                            as_conf, job_list_wr, job_list_wr.get_job_list(), True)
-                        packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
-                        packages += JobPackagePersistence(expid).db_manager.select_all("preview_wrappers_jobs")
+                        if len(as_conf.wrong_config) > 0:
+                            Log.warning(
+                                "There are errors in the configuration files. Wrappers will not be generated. Please fix the errors and run the command again."
+                            )
+                        else:
+                            job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
+                            Autosubmit.generate_scripts_andor_wrappers(
+                                as_conf, job_list_wr, job_list_wr.get_job_list(), True)
+                            packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
+                            packages += JobPackagePersistence(expid).db_manager.select_all("preview_wrappers_jobs")
                     if not noplot:
                         from .monitor.monitor import Monitor
                         if group_by:
