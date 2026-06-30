@@ -144,7 +144,6 @@ def test_create_cw_calls_generate_scripts_andor_wrappers_without_plt(
 def test_create_cw_totaljobs_cases(
     autosubmit_exp,
     general_data,
-    mocker,
     autosubmit_totaljobs,
     platforms_totaljobs,
     raise_error,
