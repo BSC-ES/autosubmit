@@ -284,9 +284,7 @@ Platform Connections
 This section describes how Autosubmit interacts with the platforms it has been
 configured to use: when it opens connections, when it checks that it has
 write access to the remote filesystem, and what it does when a connection has
-to be re-established mid-run. It is written for operators and workflow
-developers who need to understand the footprint Autosubmit places on a remote
-login node, not for Autosubmit developers reading the source.
+to be re-established mid-run.
 
 The write-permission check
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -427,12 +425,7 @@ aborts. Adding a workflow-level startup retry is tracked separately.
 Filesystem operations during a run
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Beyond the write-permission probe and the SSH sessions themselves,
-Autosubmit performs a number of file operations against the remote scratch
-filesystem during a run. The table below describes which operations happen
-and when. The absolute numbers depend on the workflow shape (number of
-jobs, retries, wrapper usage and recovery events), so the descriptions are
-qualitative.
+Beyond handling write-permission probes and SSH sessions, Autosubmit performs several file operations against the remote ``<SCRATCH_DIR>`` during each run. The exact number of these operations can vary based on the workflow's complexity, including factors such as the number of jobs, retries, wrapper usage, and recovery events. The table below outlines the types of operations performed at different stages, with descriptions provided in qualitative terms to reflect this variability.
 
 .. list-table::
    :header-rows: 1
