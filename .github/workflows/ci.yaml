@@ -16,7 +16,7 @@ permissions:
 jobs:
   test-unit:
     env:
-      COVERAGE_PROCESS_START: .coveragerc
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
     # needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -55,13 +55,24 @@ jobs:
         run: |
           pytest \
             -n $(nproc) \
-            --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             --verbose --verbosity="2" \
             test/unit -m "not postgres and not profile and not profilelong"
 
       - name: Coverage report
         run: |
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
           coverage report
           coverage xml
 
@@ -74,7 +85,7 @@ jobs:
 
   test-integration:
     env:
-      COVERAGE_PROCESS_START: .coveragerc
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -133,13 +144,27 @@ jobs:
           
           pytest \
             -n $(nproc) \
-            --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
             -m "${{ matrix.pytest-markers }}"
 
       - name: Coverage report
         run: |
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+              if ! sqlite3 "$f" "PRAGMA integrity_check;" 2>/dev/null | grep -q '^ok$'; then
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
           coverage report
           coverage xml
 
@@ -187,6 +212,8 @@ jobs:
           overwrite: true
 
   test-regression:
+    env:
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -218,12 +245,24 @@ jobs:
         run: |
           pytest \
             -n $(nproc) \
-            --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
-            test/regression
+            test/regression \
+            -m ''
 
       - name: Coverage report
         run: |
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
           coverage report
           coverage xml
 
@@ -235,6 +274,8 @@ jobs:
           retention-days: 7
 
   test-slurm:
+    env:
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
     runs-on: ubuntu-latest
 
     strategy:
@@ -267,13 +308,24 @@ jobs:
         run: |
           pytest -x \
             -n 3 \
-            --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
             -m 'slurm and not profile and not profilelong'
 
       - name: Coverage report
         run: |
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
           coverage report
           coverage xml
 
@@ -349,8 +401,21 @@ jobs:
       - name: Coverage report
         run: |
           cd docs
-          coverage xml
+          # Ref: https://github.com/coveragepy/coveragepy/blob/6b3259abb64a3cb80b4800f58fe1c71b24970110/coverage/sqldata.py#L320-L348
+          for f in .coverage.*; do
+            if [ -f "$f" ]; then
+              if ! sqlite3 "$f" "SELECT version FROM coverage_schema;" >/dev/null 2>&1; then
+                echo "Invalid coverage file: $f"
+                mv "$f" ".ignored_cov_$(basename "$f")"
+              fi
+            fi
+          done
+          # A process terminated via os._exit() can leave an empty parallel data file.
+          if find . -maxdepth 1 -type f -name '.coverage.*' -size +0c -print -quit | grep -q .; then
+            coverage combine --append
+          fi
           coverage report
+          coverage xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
@@ -360,6 +425,8 @@ jobs:
           retention-days: 7
 
   test-misc:
+    env:
+      COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 5
 

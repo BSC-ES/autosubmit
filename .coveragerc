@@ -4,8 +4,10 @@
 [run]
 branch = True
 cover_pylib = False
-concurrency = thread,multiprocessing
-data_file = .coverage
+# multiprocessing is not needed here because we are using spawn, and not fork.
+# So even with multiprocessing, the patched code (from coveragepy) would not
+# be used because of the new interpreter being launched.
+concurrency = thread
 disable_warnings =
     trace-changed
     module-not-python
@@ -15,9 +17,15 @@ disable_warnings =
 omit =
     tests/*
     autosubmit/job/template/common.py
-source = autosubmit
+source =
+    autosubmit
+    */autosubmit
+    /home/runner/work/autosubmit/autosubmit/autosubmit
 timid = False
 sigterm = True
+parallel = True
+patch =
+  _exit
 
 [report]
 exclude_lines =
