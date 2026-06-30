@@ -59,17 +59,6 @@ jobs:
             --verbose --verbosity="2" \
             test/unit -m "not postgres"
 
-      - name: Debug coverage files
-        run: |
-          ls -lah .coverage*
-
-      - name: Versions
-        run: |
-          coverage --version
-          python --version
-          pip --version
-          pytest --version
-
       - name: Coverage report
         run: |
           coverage combine

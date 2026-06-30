@@ -7,7 +7,7 @@ cover_pylib = False
 concurrency = thread,multiprocessing
 patch =
     subprocess
-parallel = True
+# parallel = True
 data_file = .coverage
 disable_warnings =
     trace-changed
