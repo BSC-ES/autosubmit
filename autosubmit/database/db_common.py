@@ -239,18 +239,15 @@ def check_experiment_exists(name, error_on_inexistence=True):
     return result
 
 
-def update_experiment_description_version(name, description=None, version=None):
-    """
-    Updates the experiment's description and/or version. Anti-lock version.  
+def update_experiment_description_version(name: str, description:Optional[str]=None, version:Optional[str]=None) -> bool:
+    """Update the experiment description, version.
+
+    Anti-lock version.
 
     :param name: experiment name (expid)  
-    :rtype name: str  
-    :param description: experiment new description  
-    :rtype description: str  
-    :param version: experiment autosubmit version  
-    :rtype version: str  
-    :return: If description has been update, True; otherwise, False.  
-    :rtype: bool
+    :param description: experiment new description
+    :param version: experiment autosubmit version
+    :return: If description has been updated, True; otherwise, False.
     """
     fn = _update_experiment_description_version
     if BasicConfig.DATABASE_BACKEND == 'postgres':

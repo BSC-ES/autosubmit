@@ -187,6 +187,8 @@ jobs:
           overwrite: true
 
   test-regression:
+    env:
+      COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -236,6 +238,8 @@ jobs:
           retention-days: 7
 
   test-slurm:
+    env:
+      COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
 
     strategy:
@@ -316,6 +320,8 @@ jobs:
   #       without checking or deploying the produced HTML, just to i) verify that
   #       we can build it and ii) collect the coverage of the examples executed.
   test-docs:
+    env:
+      COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

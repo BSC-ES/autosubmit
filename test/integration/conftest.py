@@ -470,7 +470,7 @@ def postgres_server(request: 'FixtureRequest') -> Generator[Optional[PostgresCon
 
 @pytest.fixture(params=['postgres', 'sqlite'])
 def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPath', postgres_server: 'DockerContainer',
-          autosubmit_exp):
+          autosubmit_exp, monkeypatch):
     """A parametrized fixture that creates the autosubmitrc file for databases.
 
     Works with sqlite and postgres.
@@ -490,7 +490,7 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
     if not autosubmitrc_file.exists():
         raise ValueError(f'Missing autosubmitrc file: {autosubmitrc_file}')
 
-    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc_file)
+    monkeypatch.setenv('AUTOSUBMIT_CONFIGURATION', str(autosubmitrc_file))
 
     if backend == 'postgres':
         # Replace the backend with postgres (default is sqlite)

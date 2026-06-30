@@ -66,9 +66,6 @@ def recover_platform_job_logs_wrapper(
     :param worker_event: An event to signal work availability.
     :param cleanup_event: An event to signal cleanup operations.
     :param as_conf: The Autosubmit configuration object containing experiment data.
-    :type as_conf: AutosubmitConfig
-    :return: None
-    :rtype: None
     """
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
@@ -98,17 +95,13 @@ class CopyQueue(Queue):
     A queue that copies the object gathered.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: Optional[float] =None, ctx: Optional[Any]=None) -> None:
         """Initializes the Queue.
 
         :param maxsize: Maximum size of the queue. Defaults to -1 (infinite size).
-        :type maxsize: int
         :param block: Whether to block when the queue is full. Defaults to True.
-        :type block: bool
         :param timeout: Timeout for blocking operations. Defaults to None.
-        :type timeout: float
         :param ctx: Context for the queue. Defaults to None.
-        :type ctx: Context
         """
         self.block = block
         self.timeout = timeout
@@ -923,7 +916,8 @@ class Platform:
             self.log_recovery_process = self.ctx.Process(
                 target=recover_platform_job_logs_wrapper,
                 args=(new_platform, self.recovery_queue, self.work_event, self.cleanup_event, as_conf),
-                name=f"{self.name}_log_recovery")
+                name=f"{self.name}_log_recovery"
+            )
             self.log_recovery_process.daemon = True
             self.log_recovery_process.start()
         except Exception as e:
@@ -1004,7 +998,7 @@ class Platform:
         self.work_event.clear()
         return process_log
 
-    def recover_job_log(self) -> set[Any]:
+    def recover_job_log(self) -> None:
         """Recovers log files for jobs from the recovery queue and retries failed jobs.
 
         :return: Updated set of jobs pending to process.
