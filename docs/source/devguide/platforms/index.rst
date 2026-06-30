@@ -23,16 +23,16 @@ platform class, for which first we need to identify which existing platform is t
       directly on the machine where Autosubmit is running. No SSH, no
       scheduler. Used for local preparation steps in a workflow.
     - :mod:`PS Platform <autosubmit.platforms.psplatform>` — a remote host with
-      no batch scheduler. Connects via SSH and tracks jobs as remote OS
+      no scheduler, as it uses ``PowerShell``. Connects via SSH and tracks jobs as remote OS
       processes (``ps``).
     - :mod:`EC Platform <autosubmit.platforms.ecplatform>` — ECMWF systems
       reached through the ``ecaccess`` toolchain. The underlying scheduler can
       be ``pbs``, ``loadleveler`` or ``slurm``, selected via the platform's
       ``VERSION`` field.
     - :mod:`PJM Platform <autosubmit.platforms.pjmplatform>` — Fujitsu's PJM
-      scheduler, used on Fugaku and similar systems. Connects via SSH.
-    - :mod:`PBS Platform <autosubmit.platforms.pbsplatform>` — PBS Pro /
-      OpenPBS scheduler. Connects via SSH.
+      scheduler, used on Fugaku and others large-scale supercomputers. Connects via SSH.
+    - :mod:`PBS Platform <autosubmit.platforms.pbsplatform>` — Portable Batch System (PBS) / PBS Pro /
+      OpenPBS scheduler used on Miyabi. Connects via SSH.
     - :mod:`Slurm Platform <autosubmit.platforms.slurmplatform>` — the Slurm
       workload manager (MareNostrum, Leonardo, LUMI, etc.). Connects via SSH.
       Used as the worked example in this guide.
@@ -157,7 +157,7 @@ the timestamp to TOTAL_STATS file and jobs_data.db properly.
 
     if job_data_dc and type(self.platform) is not str and (self.platform.type in ["slurm", "example"]):
         thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish, args=(job_data_dc, self.platform))
-        thread_write_finish.name = "JOB_data_{}".format(self.name)
+        thread_write_finish.name = f"JOB_data_{self.name}"
         thread_write_finish.start()
 
 ``autosubmit/job/job.py`` in `line 2817 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2817>`_ add a new validation for the validation of the queue
@@ -284,19 +284,19 @@ Platform Connections
 ----------------------
 
 This section documents how Autosubmit opens connections to the configured
-platforms, when it verifies that it has write permissions on the remote
-filesystem, and how those connections are torn down when the workflow ends or
-recovers from an error.  The intended audience is operators running Autosubmit
-in production who need to reason about the connection
+platforms, when it verifies that it has to write permissions on the remote
+filesystem, and how it cleans up and closes those connections upon completion or
+recovers from an error.  The intended audience are operators running Autosubmit
+in production who need to understand about the connection
 footprint that Autosubmit places on a login node.
 
 The permission probe directory
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To verify that Autosubmit can write to the configured ``SCRATCH_DIR``, each
-platform exposes a ``check_remote_permissions`` method.  The method creates a
+platform exposes a ``check_remote_permissions`` method. The method creates a
 small probe **directory** (not a file) under
-``<scratch_dir>/<project>/<user>/`` and immediately removes it.  The name of
+``<scratch_dir>/<project>/<user>/`` and immediately removes it. The name of
 the probe directory and the mechanism used to create it depend on the platform
 type:
 
@@ -323,7 +323,7 @@ type:
 .. note::
     Operators searching log files or running ``find`` on the remote scratch
     filesystem must check for **all three** directory names depending on which
-    platform types are in use.  A grep that looks only for
+    platform types are in use. A grep that looks only for
     ``permission_checker_azxbyc`` will miss every ``ps`` and ``ecaccess``
     platform probe.
 
@@ -331,7 +331,7 @@ When the permission probe runs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The probe is only created from inside ``Autosubmit.restore_platforms``, which
-is reached from four user-facing commands.  For each call site below, the
+is reached from four user-facing commands. For each call site below, the
 ``check_remote_permissions`` method is invoked once per platform listed in
 ``platforms_to_test``.
 
@@ -344,10 +344,10 @@ is reached from four user-facing commands.  For each call site below, the
      - Conditions and per-run frequency
    * - ``autosubmit run``
      - ``Autosubmit.prepare_run`` (only when ``recover=False``)
-     - Once per platform at the start of the run.  ``prepare_run`` is **not** called recursively on retry, so the probe is not duplicated through this path during recovery.
+     - Once per platform at the start of the run. ``prepare_run`` is **not** called recursively on retry, so the probe is not duplicated through this path during recovery.
    * - ``autosubmit run`` (recovery)
      - ``Autosubmit.run_experiment`` recovery block
-     - Whenever the main loop catches an ``AutosubmitError``, a dedicated reconnection loop calls ``restore_platforms`` once per iteration until reconnection succeeds.  The loop is bounded by ``CONFIG.RECOVERY_RETRIALS`` (default ``3650``).  Under sustained platform outages this is the dominant contributor to the probe count.
+     - Whenever the main loop catches an ``AutosubmitError``, a dedicated reconnection loop calls ``restore_platforms`` once per iteration until reconnection succeeds. The loop is set by ``CONFIG.RECOVERY_RETRIALS`` (default ``3650``). Under sustained platform outages this is the dominant contributor to the probe count.
    * - ``autosubmit setstatus``
      - ``Autosubmit.set_status``
      - Once per platform whose jobs include at least one job in status ``QUEUING``, ``SUBMITTED`` or ``RUNNING``.  If ``setstatus`` is invoked when all jobs are ``WAITING`` or ``READY`` (the typical operational case immediately before ``autosubmit create``), ``platforms_to_test`` is empty and no probe runs.
@@ -357,8 +357,8 @@ is reached from four user-facing commands.  For each call site below, the
 
 The probe is **not** created by:
 
-- The main running loop of ``autosubmit run`` after startup.  Status checks,
-  job submission, file transfers and log retrieval all reuse the existing
+- The main running loop of ``autosubmit run`` after startup. "Status checks",
+  "job submission", "file transfers", and "log retrieval all" reuse the existing
   connection without re-running the probe.
 - Mid-loop SSH reconnections triggered by ``ParamikoPlatform.exec_command``
   when a command fails with a network error.  These call ``restore_connection``
@@ -367,7 +367,7 @@ The probe is **not** created by:
   ``platform.test_connection`` directly, opening the SSH connection but not
   invoking ``restore_platforms``.
 - The stale job-data recovery path (see :ref:`stale_job_data_recovery` below).
-- The log transfer that happens at the end of a run.  Log recovery uses a
+- The log transfer that happens at the end of a run. Log recovery uses a
   separate, already-connected subprocess and does not run the probe.
 
 .. _stale_job_data_recovery:
@@ -377,7 +377,7 @@ Stale job-data recovery (separate connection path)
 
 The helper :func:`autosubmit.helpers.utils.recover_stale_job_data` is invoked
 during ``autosubmit run`` (before and after the main loop), ``autosubmit
-create``, ``autosubmit setstatus`` and ``autosubmit recovery``.  When stale
+create``, ``autosubmit setstatus`` and ``autosubmit recovery``. When stale
 rows are found in the historical job-data database, it builds a fresh
 platform object via ``build_and_connect_platform`` and calls
 ``platform.restore_connection`` to download the missing STAT files.
@@ -401,27 +401,27 @@ For platforms backed by Paramiko (``slurm``, ``pjm``, ``pbs``, ``ps``), at
 startup of ``autosubmit run`` Autosubmit opens **two SSH sessions per
 platform**:
 
-1. The **main session**, owned by the main Autosubmit process.  This is the
+1. The **main session**, owned by the main Autosubmit process. This is the
    ``paramiko.SSHClient`` together with its ``Transport`` and the
    ``SFTPClient`` (``self._ftpChannel``).  It is created by
    ``restore_platforms`` → ``test_connection`` → ``restore_connection`` →
    ``connect``.
 2. A **log-recovery session**, owned by a per-platform background subprocess
-   spawned by ``spawn_log_retrieval_process``.  The subprocess calls its own
+   spawned by ``spawn_log_retrieval_process``. The subprocess calls its own
    ``restore_connection`` against the same platform and is responsible for
    downloading job log files asynchronously while the main loop continues.
 
 .. note::
     The log-recovery subprocess is **only** spawned during ``autosubmit run``.
     The spawn is guarded by ``AS_COMMAND == "run"`` in the experiment misc
-    configuration.  Commands such as ``setstatus``, ``recovery``, ``stop
+    configuration. Commands such as ``setstatus``, ``recovery``, ``stop
     --cancel`` and the stale-job-data path open only the main session per
     platform — no per-platform subprocess.
 
 For ``ecaccess`` platforms, neither ``connect`` nor ``restore_connection``
-opens an SSH session.  They run ``ecaccess-gateway-connected`` locally via
-``subprocess`` and set ``self.connected`` from the output.  All subsequent
-operations are shelled out as local ``ecaccess-*`` commands.  An ``ecaccess``
+opens an SSH session. They run ``ecaccess-gateway-connected`` locally via
+``subprocess`` and set ``self.connected`` from the output. All subsequent
+operations are shelled out as local ``ecaccess-*`` commands. An ``ecaccess``
 platform therefore contributes zero SSH sessions to the login node but does
 contribute gateway traffic.
 
@@ -440,8 +440,8 @@ opening a new one (see below).
 Are connections closed between retries?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Yes.  Whenever Autosubmit needs to re-establish a connection, the previous
-session is explicitly torn down before the new one is opened.  The teardown
+Yes. Whenever Autosubmit needs to re-establish a connection, the previous
+session is explicitly interrupted before the new one is opened. The tear-down
 chain in ``ParamikoPlatform`` is:
 
 ``test_connection`` (when ``self.connected`` is ``False``) →
@@ -451,7 +451,7 @@ both ``Transport`` objects, and the ``SSHClient``) →
 ``with suppress(Exception): self.reset()`` (defensive second close) →
 ``self.connect(...)`` (opens a new ``SSHClient``).
 
-The log-recovery subprocess follows the same discipline on its side.  When the
+The log-recovery subprocess follows the same discipline on its side. When the
 main process calls ``Autosubmit.refresh_log_recovery_process`` (once per main
 loop iteration), the helper invokes ``p.clean_log_recovery_process()`` for
 each platform if its subprocess has died.  ``clean_log_recovery_process``
@@ -467,7 +467,7 @@ At the end of a successful run, ``autosubmit.py`` issues an explicit
 
 .. warning::
     All ``close_connection`` calls are wrapped in ``with suppress(Exception):``
-    blocks.  If the close itself fails silently (for example because the
+    blocks. If the close itself fails silently (for example because the
     transport is already half-dead), the next connection is opened anyway.
     This is by design — it prevents a stuck close from blocking recovery —
     but it means operators should not rely on Autosubmit logs alone to detect
