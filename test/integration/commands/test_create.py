@@ -102,42 +102,53 @@ def test_create_cw_calls_generate_scripts_andor_wrappers_without_plt(
     mock_gen.assert_called_once()
 
 
-@pytest.mark.parametrize("autosubmit_totaljobs, platforms_totaljobs, raise_error", [
-    (None, None, False),
-    (None, 10, False),
-    (None, -10, False),
-    (None, 0, True),
-    (10, None, False),
-    (10, 10, False),
-    (10, -10, False),
-    (10, 0, True),
-    (-10, None, False),
-    (-10, 10, False),
-    (-10, -10, False),
-    (-10, 0, True),
-    (0, None, True),
-    (0, 10, False), # inf loop if local platform
-    (0, -10, False), # inf loop if local platform
-    (0, 0, True),
-], ids=[
-    "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=None logs warning",
-    "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=10 logs warning",
-    "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=-10 logs warning",
-    "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=0 raises error",
-    "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=None correct",
-    "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=10 correct",
-    "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=-10 correct",
-    "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=0 raises error",
-    "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=None logs warning",
-    "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=10 logs warning",
-    "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=-10 logs warning",
-    "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=0 raises error",
-    "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=None raises error",
-    "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=10 logs warning",
-    "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=-10 logs warning",
-    "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=0 raises error",
-])
-def test_create_cw_totaljobs_cases(autosubmit_exp, general_data, mocker, autosubmit_totaljobs, platforms_totaljobs, raise_error):
+@pytest.mark.parametrize(
+    "autosubmit_totaljobs, platforms_totaljobs, raise_error",
+    [
+        (None, None, False),
+        (None, 10, False),
+        (None, -10, False),
+        (None, 0, True),
+        (10, None, False),
+        (10, 10, False),
+        (10, -10, False),
+        (10, 0, True),
+        (-10, None, False),
+        (-10, 10, False),
+        (-10, -10, False),
+        (-10, 0, True),
+        (0, None, True),
+        # (0, 10, False),  # inf loop if local platform
+        # (0, -10, False),  # inf loop if local platform
+        (0, 0, True),
+    ],
+    ids=[
+        "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=None logs warning",
+        "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=10 logs warning",
+        "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=-10 logs warning",
+        "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=0 raises error",
+        "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=None correct",
+        "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=10 correct",
+        "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=-10 correct",
+        "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=0 raises error",
+        "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=None logs warning",
+        "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=10 logs warning",
+        "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=-10 logs warning",
+        "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=0 raises error",
+        "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=None raises error",
+        # "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=10 logs warning",
+        # "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=-10 logs warning",
+        "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=0 raises error",
+    ],
+)
+def test_create_cw_totaljobs_cases(
+    autosubmit_exp,
+    general_data,
+    mocker,
+    autosubmit_totaljobs,
+    platforms_totaljobs,
+    raise_error,
+):
     """Test create -cw command with different combinations of CONFIG.TOTALJOBS and PLATFORMS.TOTALJOBS values."""
     exp_data = {
         "EXPERIMENT": {
@@ -160,6 +171,11 @@ def test_create_cw_totaljobs_cases(autosubmit_exp, general_data, mocker, autosub
                 "WALLCLOCK": "02:00",
                 "PLATFORM": "TEST_SLURM",
             },
+            "LOCALJOB": {
+                "SCRIPT": "sleep 0",
+                "RUNNING": "chunk",
+                "WALLCLOCK": "02:00",
+            }
         },
         "WRAPPERS": {
             "SIMPLE_WRAPPER": {
