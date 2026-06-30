@@ -23,14 +23,11 @@ from typing import Any
 import pytest
 from ruamel.yaml import YAML
 
-from test.integration.test_mail import (  # noqa: F401  (pytest fixture imports)
+from test.integration.test_mail import (
     configured_mail,
     fake_smtp_server,
 )
 from test.integration.test_utils.docker_utils import get_mailhog_messages
-
-
-pytestmark = [pytest.mark.docker, pytest.mark.slurm, pytest.mark.ssh]
 
 # The experiment runs one SIM chunk of exactly one calendar year, so simulated
 # years equals 1.0. Processors is fixed to keep CPU-hour metrics deterministic.
@@ -163,6 +160,9 @@ def _assert_violation_email(email: dict[str, Any], expid: str, job_name: str,
     assert f"Observed value: {expected_core_hours}" in body
 
 
+@pytest.mark.ssh
+@pytest.mark.docker
+@pytest.mark.slurm
 @pytest.mark.parametrize(
     "thresholds, notifications, expected_inbox_count",
     [
