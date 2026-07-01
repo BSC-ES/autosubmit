@@ -652,8 +652,9 @@ def test_immutable_variables_adds_missing_sections(
     parameters = {}
     pinned = as_conf._pin_immutable_variables(parameters)
 
-    # Check that missing DEFAULT section is added with original values
+    # Only EXPID is pinned
     assert pinned["DEFAULT"]["EXPID"] == "a000"
+    assert not pinned["DEFAULT"].get("HPCARCH")
 
 
 def test_load_custom_config(autosubmit_config, tmp_path) -> None:
