@@ -436,6 +436,17 @@ class AutosubmitConfig(object):
 
         return data
 
+    @staticmethod
+    def _normalize_storage(data: dict[str, Any]) -> None:
+        """Normalize the storage section to a consistent lowercase type.
+
+        :param data: Experiment configuration dictionary to normalize in place.
+        """
+        storage = data.get("STORAGE", {})
+        storage_type = storage.get("TYPE", "sqlite").lower()
+        data["STORAGE"] = storage
+        data["STORAGE"]["TYPE"] = storage_type
+
     def _normalize_default_section(self, data_fixed: dict) -> None:
         default_section = data_fixed.get("DEFAULT", {})
         if "HPCARCH" in default_section:
