@@ -2295,6 +2295,81 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
     assert result == expected
 
 
+def _make_blocked_test_jobs(package_job_statuses, remaining_job_specs):
+    """Build ``(package_jobs, remaining_jobs)`` for testing ``_remaining_blocked_by_package``.
+
+    Each entry in ``remaining_job_specs`` is a tuple ``(parent_source, parent_index)``
+    determining where the WAITING job gets its parent from:
+    """
+    package_jobs = [Job(f"p{i}", str(i), status, 0)
+                    for i, status in enumerate(package_job_statuses)]
+    remaining_jobs = []
+    for i, (parent_source, parent_index) in enumerate(remaining_job_specs):
+        job = Job(f"r{i}", str(100 + i), Status.WAITING, 0)
+        if parent_source == "pkg":
+            job.parents = {package_jobs[parent_index]}
+        elif parent_source == "rem":
+            job.parents = {remaining_jobs[parent_index]}
+        else:
+            external = Job(f"ext_{i}", str(200 + i), parent_source, 0)
+            job.parents = {external}
+        remaining_jobs.append(job)
+    return package_jobs, remaining_jobs
+
+
+@pytest.mark.parametrize("desc, pkg_statuses, remaining_specs, expected", [
+    ("direct blocked", [Status.READY], [("pkg", 0)], True),
+    ("external FAILED", [Status.READY], [(Status.FAILED, 0)], False),
+    ("transitive chain", [Status.READY], [("pkg", 0), ("rem", 0)], True),
+    ("COMPLETED parent", [], [(Status.COMPLETED, 0)], True),
+], ids=["direct", "external_failed", "transitive", "completed_parent"])
+def test_remaining_blocked_by_package(desc, pkg_statuses, remaining_specs, expected):
+    pkg, remaining = _make_blocked_test_jobs(pkg_statuses, remaining_specs)
+    assert JobPackager._remaining_blocked_by_package(remaining, pkg) is expected
+
+
+@pytest.mark.parametrize("not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, expected, unparsed_policy, two_remaining", [
+    ([["_", 1, 1, True]], [], 100, 99, "strict", False),
+    ([["_", 1, 1, False]], [], 100, 99, "mixed", False),
+    ([["_", 1, 1, True]], [], 100, 99, "flexible", False),
+    ([["_", 1, 1, True]], [], 100, 99, "strict", True),
+], ids=["strict_policy", "mixed_policy", "flexible_policy", "strict_2_remaining_transitive"])
+def test_process_not_wrappeable_packages_remaining_blocked_by_package(
+        setup, not_wrappeable_package_info, packages_to_submit,
+        max_jobs_to_submit, expected, unparsed_policy, two_remaining):
+    """Remaining WAITING job depends on the unwrappable package → submit individually."""
+    job_packager, vertical_package = setup
+    policy = unparsed_policy
+    job_packager._as_config.experiment_data["WRAPPERS"]["WRAPPERS"]["POLICY"] = policy
+    job_packager.wrapper_policy = {"WRAPPERS": policy}
+    vertical_package.wrapper_policy = policy
+    not_wrappeable_package_info[0][0] = vertical_package
+
+    for job in vertical_package.jobs:
+        job.status = Status.READY
+
+    rem1 = Job("rem1", "3", Status.WAITING, 0)
+    rem1._init_runtime_parameters()
+    rem1.wallclock = "00:20"
+    rem1.section = "SECTION1"
+    rem1.platform = job_packager._platform
+    rem1.parents = {vertical_package.jobs[0]}
+    job_packager._jobs_list._job_list.append(rem1)
+
+    if two_remaining:
+        rem2 = Job("rem2", "4", Status.WAITING, 0)
+        rem2._init_runtime_parameters()
+        rem2.wallclock = "00:20"
+        rem2.section = "SECTION1"
+        rem2.platform = job_packager._platform
+        rem2.parents = {rem1}
+        job_packager._jobs_list._job_list.append(rem2)
+
+    result = job_packager.process_not_wrappeable_packages(
+        not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+    assert result == expected
+
+
 def test_build_imports():
     kwargs: dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
                     'num_processors_value': True, 'expid': True, 'name': 'test_wrapper'}
