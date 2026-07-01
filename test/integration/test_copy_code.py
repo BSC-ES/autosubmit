@@ -61,7 +61,7 @@ def test_copy_code_local_project_destination_is_not_specified(autosubmit_exp):
             }
         })
 
-    assert 'LOCAL.PROJECT_PATH must exists' in str(cm.value.message)
+    assert 'Empty project path! Please change this parameter to a valid one' in str(cm.value.message)
 
 
 def test_copy_code_local_project_destination_is_an_empty_string(autosubmit_exp):
