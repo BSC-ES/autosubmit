@@ -343,4 +343,8 @@ def test_override_immutable_variables_in_custom_config(
 
     # Immutable variables not overridden
     assert as_conf.experiment_data["DEFAULT"]["EXPID"] == "a000"
-
+    # HPCARCH is overriden by POST configuration
+    if custom_section == "POST":
+        assert as_conf.experiment_data["DEFAULT"]["HPCARCH"] == "DIFFERENT_HPC"
+    else:
+        assert as_conf.experiment_data["DEFAULT"]["HPCARCH"] == "LOCAL"
