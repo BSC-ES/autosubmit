@@ -1548,9 +1548,9 @@ class ParamikoPlatform(Platform):
         """
         # Some platforms (right now only ECaccess) has a dual queue system, one to run the job and another to submit the job.
         self._set_submit_cmd(sub_queue)
-        pre = f"timeout {str(timeout)} " if float(timeout) > 0 else ""
-        pre += f"{export} " if export else ""
-        pre += f"{executable} " if executable and not self.has_scheduler else ""
+        pre = f"timeout {str(timeout)}" if float(timeout) > 0 else ""
+        pre += f"{export}" if export else ""
+        pre += f"{executable}" if executable and not self.has_scheduler else ""
         post = f"> {script_name.replace('.cmd', f'.cmd.out.{fail_count}')} 2> {script_name.replace('.cmd', f'.cmd.err.{fail_count}')}" if redirect_out_err else ""
         return self._construct_final_call(script_name, pre.strip(), post.strip(), x11_options).strip(" ;,")
 
