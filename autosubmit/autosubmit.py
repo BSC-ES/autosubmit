@@ -3646,6 +3646,8 @@ class Autosubmit:
         except BaseException as e:
             raise AutosubmitCritical("Error while reading the configuration files", 7064, str(e))
         try:
+            # FIXME: as_conf is not validated, so it never enters the if statement below.
+            # Should be deleted.
             if "Expdef" in as_conf.wrong_config:
                 as_conf.show_messages()
             project_type = as_conf.get_project_type()
