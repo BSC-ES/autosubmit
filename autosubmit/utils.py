@@ -56,7 +56,7 @@ def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", 
                     if hpc != "":
                         yaml_data['DEFAULT']['HPCARCH'] = hpc
                     elif not yaml_data['DEFAULT']['HPCARCH']:
-                        yaml_data['DEFAULT']['HPCARCH'] = LocalPlatform.TYPE
+                        yaml_data['DEFAULT']['HPCARCH'] = LocalPlatform.TYPE.value
 
                 if 'LOCAL' in yaml_data:
                     yaml_data['LOCAL']['PROJECT_PATH'] = ""

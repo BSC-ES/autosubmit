@@ -29,6 +29,7 @@ from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
 from autosubmit.platforms.pbsplatform import PBSPlatform
 from autosubmit.platforms.pjmplatform import PJMPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
@@ -93,7 +94,7 @@ def _get_host(section_host: str, add_project_to_host: bool, project: str) -> str
 
 def _get_platform_by_type(platform_type: str, expid: str, platform_name: str, experiment_data: dict,
                           platform_version: str, auth_password: Optional[str]) -> Optional['ParamikoPlatform']:
-    platform_type = platform_type.lower()
+    platform_type = PlatformType(platform_type.strip().lower())
     if platform_type == PsPlatform.TYPE:
         return PsPlatform(expid, platform_name, experiment_data)
     elif platform_type == EcPlatform.TYPE:
@@ -105,6 +106,8 @@ def _get_platform_by_type(platform_type: str, expid: str, platform_name: str, ex
     elif platform_type == PBSPlatform.TYPE:
         return PBSPlatform(expid, platform_name, experiment_data)
 
+    # TODO: Raise an error here? ``ParamikoSubmitter#load_platforms`` checks if this is ``None``
+    #       to raise an error; why not raise it here instead? It's an invalid platform after all?
     return None
 
 
@@ -183,7 +186,6 @@ class ParamikoSubmitter:
                 return
 
             # Set the type and version of the platform found
-            remote_platform.type = platform_type
             remote_platform._version = platform_version
 
             # Concatenating the host with a project and adding to the object

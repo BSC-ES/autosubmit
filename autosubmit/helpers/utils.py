@@ -344,7 +344,7 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
     :param expid: Experiment identifier.
     :return: Connected platform instance.
     """
-    if platform_name.lower() == LocalPlatform.TYPE:
+    if platform_name.lower() == LocalPlatform.TYPE.value:
         config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
             "LOCAL_TMP_DIR": BasicConfig.LOCAL_TMP_DIR,
@@ -365,7 +365,6 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
             raise AutosubmitCritical(
                 f"PLATFORMS.{platform_name.upper()}.TYPE: {platform_type} is not supported", 7012
             )
-        plat.type = platform_type
         plat._version = platform_version
 
         add_project_to_host = str(platform_config.get('ADD_PROJECT_TO_HOST', False)).lower() != "false"

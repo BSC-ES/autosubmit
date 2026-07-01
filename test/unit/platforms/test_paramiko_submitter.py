@@ -225,7 +225,7 @@ def test_serial_platform(experiment_data: dict, autosubmit_config):
         ['ecaccess', EcPlatform],
         ['slurm', SlurmPlatform],
         ['pjm', PJMPlatform],
-        ['abcd', AutosubmitCritical]
+        ['abcd', ValueError]
     ]
 )
 def test_platform_types(platform_type: str, expected_type_or_error: Union['ParamikoPlatform', Exception],
@@ -250,7 +250,7 @@ def test_platform_types(platform_type: str, expected_type_or_error: Union['Param
             }
         }
     })
-    if expected_type_or_error is AutosubmitCritical:
+    if expected_type_or_error is ValueError:
         with pytest.raises(expected_type_or_error):  # type: ignore
             ParamikoSubmitter(as_conf, None, None)
     else:

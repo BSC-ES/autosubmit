@@ -35,6 +35,8 @@ import setproctitle
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
+from autosubmit.platforms.execution_mode import ExecutionMode
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     from multiprocessing.process import BaseProcess
@@ -134,12 +136,13 @@ class Platform(ABC):
     """Class to manage the connections to the different platforms.
 
     Attributes:
+        EXECUTION_MODE: The execution mode (DIRECT or BATCH).
         TYPE: The platform type.
         expid: The experiment identifier associated with this platform.
         _name: The platform name.
         config: The platform configuration dictionary.
         pw: Optional authentication password (e.g., for 2FA).
-        has_scheduler: defines whether this platform wraps schedulers (e.g., ecaccess has Slurm/PBS/...).
+        has_scheduler: Whether the platform is a scheduler wrapper (e.g. ECACCESS wrapping SLURM/PBS).
     """
     # This is a list of the keep_alive events, used to send the signal outside the main loop of Autosubmit
     worker_events: list[Event] = []
@@ -147,7 +150,8 @@ class Platform(ABC):
     lock = multiprocessing.Lock()
     IO_SAFE_WAIT = 0
 
-    TYPE: str
+    TYPE: PlatformType
+    EXECUTION_MODE: ExecutionMode
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         """Initializes the Platform object with the given experiment ID, platform name, configuration,
@@ -186,6 +190,7 @@ class Platform(ABC):
         self._budget = ''
         self._reservation = ''
         self._exclusivity = ''
+        # TODO: The type can probably be removed later as we have a class-constant now.
         self._type = ''
         self._scratch = ''
         self._project_dir = ''
@@ -358,16 +363,6 @@ class Platform(ABC):
     @hyperthreading.setter
     def hyperthreading(self, value):
         self._hyperthreading = value
-
-    @property
-    @autosubmit_parameter(name='current_type')
-    def type(self):
-        """Platform scheduler type. """
-        return self._type
-
-    @type.setter
-    def type(self, value):
-        self._type = value
 
     @property
     @autosubmit_parameter(name='current_scratch_dir')
@@ -585,7 +580,7 @@ class Platform(ABC):
         as_conf.experiment_data['HPCBUDG'] = self.budget
         as_conf.experiment_data['HPCRESERVATION'] = self.reservation
         as_conf.experiment_data['HPCEXCLUSIVITY'] = self.exclusivity
-        as_conf.experiment_data['HPCTYPE'] = self.type
+        as_conf.experiment_data['HPCTYPE'] = self.TYPE.value
         as_conf.experiment_data['HPCSCRATCH_DIR'] = self.scratch
         as_conf.experiment_data['HPCTEMP_DIR'] = self.temp_dir
         if self.temp_dir is None:
@@ -751,8 +746,7 @@ class Platform(ABC):
         :rtype: str
         """
         # Circular import -- bad class design, probably can be re-designed.
-        from autosubmit.platforms.locplatform import LocalPlatform
-        if self.type == LocalPlatform.TYPE:
+        if self.TYPE == PlatformType.LOCAL:
             path = Path(self.root_dir) / self.config.get("LOCAL_TMP_DIR") / f'LOG_{self.expid}'
         else:
             path = Path(self.remote_log_dir)

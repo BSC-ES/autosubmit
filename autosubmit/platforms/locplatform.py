@@ -20,13 +20,15 @@ import os
 import subprocess
 from pathlib import Path
 from time import sleep
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
+import autosubmit.log.utils as log_utils
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import Log, AutosubmitError
+from autosubmit.log.log import AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
-import autosubmit.log.utils as log_utils
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -35,7 +37,8 @@ if TYPE_CHECKING:
 class LocalPlatform(ParamikoPlatform):
     """Class to manage jobs to localhost."""
 
-    TYPE = 'local'
+    EXECUTION_MODE = ExecutionMode.DIRECT
+    TYPE = PlatformType.LOCAL
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
@@ -45,7 +48,6 @@ class LocalPlatform(ParamikoPlatform):
         self.get_cmd = None
         self.put_cmd = None
         self._checkhost_cmd = None
-        self.type = self.TYPE
         self._header = LocalHeader()
         self.job_status = dict()
         self.job_status['COMPLETED'] = ['1']

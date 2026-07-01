@@ -32,6 +32,7 @@ from autosubmit.job.job_packages import (
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.pjmplatform import PJMPlatform
+from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 
@@ -349,11 +350,13 @@ def test_job_package_properties(jobs):
     "platform_class,expected_timeout",
     [
         (LocalPlatform, 6),
+        (PsPlatform, 6),
         (PJMPlatform, None),
         (SlurmPlatform, None)
     ],
     ids=[
-        "Local triggers the timeout to be set (1 as local will have 1 second in the test)",
+        "Local triggers the timeout to be set (6 as local will have 5 second in the test)",
+        "PS triggers the timeout to be set (6 as local will have 5 second in the test)",
         "PJM manages the wallclock, so timeout in the job is None",
         "Slurm manages the wallclock, so timeout in the job is None"
     ]
@@ -374,14 +377,15 @@ def test_job_package_timeout(platform_class , expected_timeout, create_platform)
     limit -- adjust your expected time accordingly if needed.
     """
     jobs = [Job(f"job{i}", f"{i}", Status.READY, 0) for i in range(4)]
-    # job wallclock is a property, that checks and initialises the ``wallclock_in_seconds``
     platform = create_platform()
     serial_platform = create_platform()
     for job in jobs:
-        serial_platform.type = platform_class.TYPE
+        serial_platform.TYPE = platform_class.TYPE
+        serial_platform.EXECUTION_MODE = platform_class.EXECUTION_MODE
         serial_platform.name = platform_class.TYPE
         platform.serial_platform = serial_platform
         job.platform = platform
+        # job wallclock is a property that checks and initialises the ``wallclock_in_seconds``
         # ATTENTION: Internally, Autosubmit increases 30% the wall-time, so we will have 6 seconds (floor).
         job.wallclock = '00:00:05'
 

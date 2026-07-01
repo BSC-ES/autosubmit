@@ -25,11 +25,13 @@ import re
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import Any, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
 
 if TYPE_CHECKING:
@@ -64,7 +66,8 @@ _SLURM_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
 class SlurmPlatform(ParamikoPlatform):
     """Class to manage jobs to host using SLURM scheduler."""
 
-    TYPE = 'slurm'
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.SLURM
 
     def __init__(self, expid: str, name: str, config: dict,
                  auth_password: Optional[Union[str, list[str]]] = None) -> None:
@@ -90,7 +93,6 @@ class SlurmPlatform(ParamikoPlatform):
         self.x11_options = None
         self._submit_cmd_x11 = None
         self.cancel_cmd = None
-        self.type = self.TYPE
         self._header = SlurmHeader()
         self._wrapper = SlurmWrapperFactory(self)
         self.job_status = dict()

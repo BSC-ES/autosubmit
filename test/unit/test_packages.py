@@ -19,7 +19,13 @@ import pytest
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
+from autosubmit.job.job_packages import (
+    JobPackageHorizontal,
+    JobPackageSimple,
+    JobPackageVertical,
+)
+from autosubmit.platforms.execution_mode import ExecutionMode
+from autosubmit.platforms.platform_type import PlatformType
 
 
 @pytest.fixture
@@ -101,7 +107,7 @@ def test_init_sets_fail_count_from_first_job(mocker):
 
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
 
     job = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job._platform = platform
@@ -119,17 +125,20 @@ def test_init_sets_sections_from_jobs(mocker):
 
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
+    platform.EXECUTION_MODE = ExecutionMode.DIRECT
 
     job1 = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job1._platform = platform
     job1.platform = platform
     job1.section = "section_b"
+    job1.wallclock = "00:10:00"
 
     job2 = Job(name="job2", job_id=2, status=Status.READY, priority=0)
     job2._platform = platform
     job2.platform = platform
     job2.section = "section_a"
+    job2.wallclock = "00:10:00"
 
     package = JobPackageBase([job1, job2])
 
@@ -143,11 +152,12 @@ def test_init_sets_sections_from_jobs(mocker):
 def test_init_ec_queue(mocker, ec_queue_value, expected):
     """Test __init__ sets ec_queue from the job when present, else None."""
     from collections import deque
+
     from autosubmit.job.job_packages import JobPackageBase
 
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
 
     job = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job._platform = platform
@@ -169,7 +179,7 @@ def test_check_job_files_exists_returns_early_for_no_project(mocker, project_typ
     """Test check_job_files_exists returns early when project type is absent."""
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
 
     job = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job._platform = platform
@@ -193,7 +203,7 @@ def test_check_job_files_exists_missing_job_file(mocker, tmp_path, only_generate
 
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
 
     job = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job._platform = platform
@@ -219,7 +229,7 @@ def test_check_job_files_raises_when_additional_file_missing(mocker, tmp_path):
 
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
 
     job = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job._platform = platform
@@ -245,7 +255,7 @@ def test_generate_scripts_clean_behaviour(mocker, only_generate, expect_clean_ca
     """Test generate_scripts calls or skips _delete_previous_run_files based on only_generate."""
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
 
     job = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job._platform = platform
@@ -263,9 +273,9 @@ def test_generate_scripts_clean_behaviour(mocker, only_generate, expect_clean_ca
     package.generate_scripts(as_conf, only_generate=only_generate)
 
     if expect_clean_called:
-        package._delete_previous_run_files.assert_called_once()
+        package._delete_previous_run_files.assert_called_once()  # type: ignore
     else:
-        package._delete_previous_run_files.assert_not_called()
+        package._delete_previous_run_files.assert_not_called()  # type: ignore
 
 
 
@@ -273,17 +283,20 @@ def test_deletes_files_only_for_jobs_with_zero_fail_count(mocker):
     """Test only jobs with fail_count==0 are passed to delete methods."""
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
+    platform.EXECUTION_MODE = ExecutionMode.DIRECT
 
     job1 = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job1._platform = platform
     job1.platform = platform
     job1.fail_count = 0
+    job1.wallclock = '00:10:00'
 
     job2 = Job(name="job2", job_id=2, status=Status.READY, priority=0)
     job2._platform = platform
     job2.platform = platform
     job2.fail_count = 3
+    job2.wallclock = '00:10:00'
 
     package = JobPackageSimple([job1, job2])
     package._delete_previous_run_files()
@@ -297,7 +310,7 @@ def test_create_scripts_populates_job_scripts(mocker):
     """Test _create_scripts calls job.create_script for each job."""
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
 
     job = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job._platform = platform
@@ -320,7 +333,7 @@ def test_simple_wrapped_creates_both_script_types(mocker):
 
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "PS"
+    platform.TYPE = PlatformType.PS
 
     job = Job(name="job1", job_id=1, status=Status.READY, priority=0)
     job._platform = platform
@@ -350,7 +363,7 @@ def test_thread_queue_property(mocker, autosubmit_config, nodes, processors, num
 
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "slurm"
+    platform.TYPE = PlatformType.SLURM
     platform.serial_platform = mocker.MagicMock()
     platform.serial_platform.serial_queue = "serial_q"
     platform.wrapper = mocker.MagicMock()
@@ -392,7 +405,7 @@ def test_thread_wrapped_queue_property(mocker, autosubmit_config, nodes, process
 
     platform = mocker.MagicMock()
     platform.name = "fake"
-    platform.type = "slurm"
+    platform.TYPE = PlatformType.SLURM
     platform.serial_platform = mocker.MagicMock()
     platform.serial_platform.serial_queue = "serial_q"
     platform.queue = "main_q"

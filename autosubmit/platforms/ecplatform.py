@@ -28,11 +28,16 @@ from typing import TYPE_CHECKING, Optional
 from bscearth.utils.date import date2str
 
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
 from autosubmit.platforms.headers.ec_header import EcHeader
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
+from autosubmit.platforms.paramiko_platform import (
+    ParamikoPlatform,
+    ParamikoPlatformException,
+)
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import EcWrapperFactory
 
 if TYPE_CHECKING:
@@ -60,7 +65,8 @@ class EcPlatform(ParamikoPlatform):
     :type scheduler: str (pbs, loadleveler)
     """
 
-    TYPE = 'ecaccess'
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.ECACCESS
 
     def parse_all_jobs_output(self, output, job_id):
         """Parse ecaccess-job-list tabular output for a single job ID.
@@ -155,7 +161,6 @@ class EcPlatform(ParamikoPlatform):
         # stale jobs from previous runs.
         self._pre_submission_ids: dict[str, set[int]] = {}
         self.has_scheduler = False
-        self.type = self.TYPE
 
     def update_cmds(self):
         """Updates commands for platforms"""

@@ -24,8 +24,10 @@ from time import sleep
 from typing import TYPE_CHECKING, Optional
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.pbs_header import PBSHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     # Avoid circular imports
@@ -35,7 +37,8 @@ if TYPE_CHECKING:
 class PBSPlatform(ParamikoPlatform):
     """Class to manage jobs to host using PBS scheduler."""
 
-    TYPE = 'pbs'
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.PBS
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[str] = None) -> None:
         """Initialization of the Class PBSPlatform.
@@ -60,7 +63,6 @@ class PBSPlatform(ParamikoPlatform):
         self.x11_options = None
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
         self.cancel_cmd = None
-        self.type = self.TYPE
         self._header = PBSHeader()
         self.job_status: dict = {'COMPLETED': ['FINISH'], 'RUNNING': ['RUNNING'],
                                  'QUEUING': ['QUEUED', 'BEGUN', 'HELD'],

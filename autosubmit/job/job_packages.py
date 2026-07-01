@@ -34,8 +34,7 @@ from bscearth.utils.date import date2str, sum_str_hours
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, Log
-from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.execution_mode import ExecutionMode
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -94,11 +93,8 @@ class JobPackageBase:
         self.export = first_job.export
         self.executable = first_job.executable
         self.x11_options = first_job.x11_options
-        # Scheduler manages the timeout, this is for platforms without scheduler
-        # Wrappers are only allowed within a scheduler and timeout is calculated differently there
-        ps_local_platforms = [PsPlatform.TYPE, LocalPlatform.TYPE]
-        is_ps_local = first_job.platform.type in ps_local_platforms
-        self.timeout: Optional[int] = None if not is_ps_local else max(job.wallclock_in_seconds for job in jobs)
+        is_batch_platform = first_job.platform.EXECUTION_MODE == ExecutionMode.BATCH
+        self.timeout: Optional[int] = None if is_batch_platform else max(job.wallclock_in_seconds for job in jobs)
         self.x11 = first_job.x11
         self.het = dict()
         self._num_processors = '0'

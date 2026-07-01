@@ -1465,7 +1465,7 @@ class Autosubmit:
             create_required_folders(exp_id, exp_folder)
         except OSError as e:
             with suppress(Exception):
-                Autosubmit._delete_expid(exp_id, True)
+                delete_experiment(exp_id, True)
             raise AutosubmitCritical(f"Error while creating the experiment structure: {str(e)}", 7011)
 
         # Create the experiment configuration
@@ -1478,20 +1478,16 @@ class Autosubmit:
                 # Create a new configuration
                 Autosubmit.generate_as_config(exp_id, dummy, minimal_configuration, use_local_minimal)
         except Exception as e:
-            try:
-                Autosubmit._delete_expid(exp_id, True)
-            except Exception:
-                pass
+            with suppress(Exception):
+                delete_experiment(exp_id, True)
             raise AutosubmitCritical(f"Error while creating the experiment configuration: {str(e)}", 7011)
         # Change template values by default values specified from the commandline
         try:
             as_conf_default_values(Autosubmit.autosubmit_version, exp_id, hpc, minimal_configuration, git_repo,
                                    git_branch, git_as_conf)
         except Exception as e:
-            try:
-                Autosubmit._delete_expid(exp_id, True)
-            except Exception:
-                pass
+            with suppress(Exception):
+                delete_experiment(exp_id, True)
             raise AutosubmitCritical(f"Error while setting the default values: {str(e)}", 7011)
 
         # Try to update the experiment details

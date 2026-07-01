@@ -23,8 +23,10 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.pjm_header import PJMHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import PJMWrapperFactory
 
 if TYPE_CHECKING:
@@ -53,7 +55,8 @@ class PJMPlatform(ParamikoPlatform):
     :type expid: str
     """
 
-    TYPE = 'pjm'
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.PJM
 
     def __init__(self, expid, name, config):
         ParamikoPlatform.__init__(self, expid, name, config)
@@ -84,7 +87,6 @@ class PJMPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
         self._submit_script_base_name = os.path.join(
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
-        self.type = self.TYPE
 
     def create_a_new_copy(self):
         return PJMPlatform(self.expid, self.name, self.config)

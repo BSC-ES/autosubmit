@@ -2209,7 +2209,7 @@ class JobList(object):
         :rtype: list
         """
         waiting_jobs = [job for job in self._job_list if (
-                job.platform.type == platform_type and job.status == Status.WAITING)]
+                job.platform.TYPE.value == platform_type and job.status == Status.WAITING)]
         return waiting_jobs
 
     def get_held_jobs(self, platform=None):

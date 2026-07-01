@@ -27,27 +27,34 @@ from dataclasses import dataclass, field
 from functools import reduce
 from pathlib import Path
 from threading import Thread
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
-from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
+from bscearth.utils.date import (
+    chunk_end_date,
+    chunk_start_date,
+    date2str,
+    parse_date,
+    previous_day,
+    subs_dates,
+)
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
-from autosubmit.job.job_utils import get_split_size_unit, get_split_size
+from autosubmit.job.job_utils import get_split_size, get_split_size_unit
 from autosubmit.job.metrics_processor import UserMetricProcessor
-from autosubmit.job.template import get_template_snippet, Language
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.job.template import Language, get_template_snippet
+from autosubmit.log.log import AutosubmitCritical, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
-    from autosubmit.platforms.platform import Platform
     from autosubmit.job.template import TemplateSnippet
+    from autosubmit.platforms.platform import Platform
 
 Log.get_logger("Autosubmit")
 
@@ -219,7 +226,7 @@ class Job(object):
         self.wrapper_type = None
         self.first_wrapped_level = False
         self._wrapper_queue = None
-        self._platform: 'ParamikoPlatform' = None
+        self._platform: Optional['ParamikoPlatform'] = None
         self._queue = None
         self._partition = None
         self.retry_delay = None
@@ -1567,6 +1574,7 @@ class Job(object):
         """
         # Get the default path that should be the same as HPCROOTDIR
         # Check if the job platform is a subclass of ParamikoPlatform
+        # TODO: Every platform is an instance of Paramiko, no?
         if isinstance(self.platform, ParamikoPlatform):
             base_path = Path(self.platform.remote_log_dir)
         else:
@@ -1608,7 +1616,7 @@ class Job(object):
         parameters['CURRENT_RESERVATION'] = parameters.get('CURRENT_RESERVATION', self.platform.reservation)
         parameters['CURRENT_EXCLUSIVITY'] = parameters.get('CURRENT_EXCLUSIVITY', self.platform.exclusivity)
         parameters['CURRENT_HYPERTHREADING'] = parameters.get('CURRENT_HYPERTHREADING', self.platform.hyperthreading)
-        parameters['CURRENT_TYPE'] = parameters.get('CURRENT_TYPE', self.platform.type)
+        parameters['CURRENT_TYPE'] = parameters.get('CURRENT_TYPE', self.platform.TYPE.value)
         parameters['CURRENT_SCRATCH_DIR'] = parameters.get('CURRENT_SCRATCH_DIR', self.platform.scratch)
         parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', self.platform.project_dir)
         parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', self.platform.root_dir)
@@ -1853,7 +1861,7 @@ class Job(object):
         if self.het['HETSIZE'] == 1:
             self.het = dict()
         if not self.wallclock:
-            if job_platform.type.lower() in [PsPlatform.TYPE, LocalPlatform.TYPE]:
+            if job_platform.EXECUTION_MODE == ExecutionMode.DIRECT:
                 self.wallclock = "00:00"
             else:
                 self.wallclock = "01:59"
@@ -2334,7 +2342,7 @@ class Job(object):
         if not self.platform:
             submitter = ParamikoSubmitter(as_conf=as_conf)
             if not self.platform_name:
-                self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", LocalPlatform.TYPE.upper())
+                self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", PlatformType.LOCAL)
             self.platform = submitter.platforms.get(self.platform_name)
 
     def update_content_extra(self, as_conf: AutosubmitConfig, files: list[str]) -> list[str]:
@@ -2861,7 +2869,7 @@ class Job(object):
                                                     fail_count=count if count >= 0 else self.fail_count)
 
         # Launch second as threaded function only for slurm
-        if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
+        if job_data_dc and type(self.platform) is not str and self.platform.TYPE is PlatformType.SLURM:
             thread_write_finish = Thread(target=ExperimentHistory(self.expid).write_platform_data_after_finish,
                                          args=(job_data_dc, self.platform))
             thread_write_finish.name = "JOB_data_{}".format(self.name)

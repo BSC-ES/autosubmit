@@ -34,8 +34,9 @@ from autosubmit.platforms.paramiko_platform import (
     ParamikoPlatform,
     ParamikoPlatformException,
     _get_user_config_file,
-    _init_poller
+    _init_poller,
 )
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
@@ -564,6 +565,7 @@ def test_get_file_errors(exception_message: bool, must_exist: bool, ignore_log: 
     #       now the test should fail.
 
     paramiko_platform.tmp_path = tmp_path
+    paramiko_platform.TYPE = PlatformType.SLURM
 
     mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
     mocked_ftp_channel = mocker.MagicMock()
