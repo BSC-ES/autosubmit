@@ -134,9 +134,6 @@ class PJMPlatform(ParamikoPlatform):
     def get_remote_log_dir(self):
         return self.remote_log_dir
 
-    def parse_job_output(self, output):
-        return output.strip().split()[1].strip().strip("\n")
-
     def queuing_reason_cancel(self, reason):
         try:
             if len(reason.split('(', 1)) > 1:
@@ -214,11 +211,6 @@ class PJMPlatform(ParamikoPlatform):
         if jobs_id[-1] == ",":
             jobs_id = jobs_id[:-1]  # deletes comma
         return f"pjstat -H -v --choose jid,st,ermsg --filter \"jid={jobs_id}\" > as_checkalljobs.txt ; pjstat -v --choose jid,st,ermsg --filter \"jid={jobs_id}\" >> as_checkalljobs.txt ; cat as_checkalljobs.txt ; rm as_checkalljobs.txt"
-
-    def get_check_job_cmd(self, job_id):
-        return f"pjstat -H -v --choose st --filter \"jid={job_id}\" > as_checkjob.txt ; pjstat -v --choose st --filter \"jid={job_id}\" >> as_checkjob.txt ; cat as_checkjob.txt ; rm as_checkjob.txt"
-        # return 'pjstat -v --choose jid,st,ermsg --filter \"jid={0}\"'.format(job_id)
-
 
     def get_job_id_by_job_name_cmd(self, job_name):
         if job_name[-1] == ",":

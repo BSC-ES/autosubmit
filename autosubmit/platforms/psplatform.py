@@ -103,9 +103,6 @@ class PsPlatform(ParamikoPlatform):
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
 
-    def parse_job_output(self, output):
-        return output
-
     def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
 
@@ -114,9 +111,6 @@ class PsPlatform(ParamikoPlatform):
         :return: job ID of the submitted job.
         """
         return [line for line in (line.strip() for line in raw_output.splitlines()) if line.isdigit()]
-
-    def get_check_job_cmd(self, job_id):
-        return self.get_pscall(job_id)
 
     def check_remote_permissions(self) -> bool:
         try:

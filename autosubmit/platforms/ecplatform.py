@@ -353,14 +353,6 @@ class EcPlatform(ParamikoPlatform):
 
         return f"{pre} {self._submit_cmd}{script_name} {post}"
 
-    def parse_job_output(self, output):
-        job_state = output.split('\n')
-        if len(job_state) > 7:
-            job_state = job_state[7].split()
-            if len(job_state) > 1:
-                return job_state[1]
-        return 'DONE'
-
     def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
 
@@ -370,9 +362,6 @@ class EcPlatform(ParamikoPlatform):
         """
 
         return [out.strip() for out in output.splitlines()]
-
-    def get_check_job_cmd(self, job_id):
-        return self._checkjob_cmd + str(job_id)
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.

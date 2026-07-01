@@ -180,16 +180,6 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return self.remote_log_dir
 
-    def parse_job_output(self, output: str) -> str:
-        """Parses check job command output, so it can be interpreted by autosubmit.
-
-        :param output: output to parse.
-        :type output: str
-        :return: job status.
-        :rtype: str
-        """
-        return output.strip().split(' ')[0].strip()
-
     def parse_all_jobs_output(self, output: str, job_id: int) -> Union[list[str], str]:
         status = ""
         with suppress(Exception):
@@ -245,14 +235,6 @@ class SlurmPlatform(ParamikoPlatform):
             submitted_job_ids.append(max(matched_ids))
 
         return submitted_job_ids
-
-    def get_check_job_cmd(self, job_id: str) -> str:
-        """Generates sacct command to the job selected.
-
-        :param job_id: ID of a job.
-        :return: Generates the sacct command to be executes.
-        """
-        return f'sacct -n -X --jobs {job_id} -o "State"'
 
     def get_check_all_jobs_cmd(self, jobs_id: str):
         """Generates sacct command to all the jobs passed down.

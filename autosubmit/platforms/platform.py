@@ -131,8 +131,15 @@ class CopyQueue(Queue):
 
 
 class Platform(ABC):
-    """
-    Class to manage the connections to the different platforms.
+    """Class to manage the connections to the different platforms.
+
+    Attributes:
+        TYPE: The platform type.
+        expid: The experiment identifier associated with this platform.
+        _name: The platform name.
+        config: The platform configuration dictionary.
+        pw: Optional authentication password (e.g., for 2FA).
+        has_scheduler: defines whether this platform wraps schedulers (e.g., ecaccess has Slurm/PBS/...).
     """
     # This is a list of the keep_alive events, used to send the signal outside the main loop of Autosubmit
     worker_events: list[Event] = []
@@ -952,7 +959,7 @@ class Platform(ABC):
                 Log.result(
                     f"Process {self.log_recovery_process.name} finished with pid {self.log_recovery_process.pid}")
         else:
-            Log.result("Log_Recovery_Process is empty no process joinned")
+            Log.result("Log recovery process is not running (will not wait/join the process)")
 
     def spawn_log_retrieval_process(self, as_conf: Optional['AutosubmitConfig']) -> None:
         """Spawns a process to recover the logs of the jobs that have been completed on this platform.
@@ -1071,13 +1078,6 @@ class Platform(ABC):
         _exit(0)
 
     def create_a_new_copy(self):
-        raise NotImplementedError  # pragma: no cover
-
-    def get_file_size(self, src: str) -> Union[int, None]:
-        """Get file size in bytes.
-
-        :param src: file path
-        """
         raise NotImplementedError  # pragma: no cover
 
     def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:

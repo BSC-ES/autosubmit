@@ -84,7 +84,6 @@ def test_local_platform_read_file(tmp_path):
 
     path_not_exists = Path(tmp_path).joinpath("foo", "bar")
 
-    assert platform.get_file_size(path_not_exists) is None
     assert platform.read_file(path_not_exists) is None
 
 

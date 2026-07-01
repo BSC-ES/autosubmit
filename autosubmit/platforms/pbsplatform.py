@@ -295,16 +295,6 @@ class PBSPlatform(ParamikoPlatform):
         """
         return self.remote_log_dir
 
-    def parse_job_output(self, output: str) -> str:
-        """Parse check job command output so it can be interpreted by autosubmit.
-
-        :param output: output to parse.
-        :type output: str
-        :return: job status.
-        :rtype: str
-        """
-        return output.strip().split(' ')[0].strip()
-
     def parse_all_jobs_output(self, output: str, job_id: str) -> str:  # noqa
         """Filter one or more status of a specific Job ID.
 
@@ -347,18 +337,6 @@ class PBSPlatform(ParamikoPlatform):
             return jobs_id
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
-
-    def get_check_job_cmd(self, job_id: str) -> str:  # noqa
-        """Generate qstat command for the selected job.
-
-        :param job_id: ID of a job.
-        :param job_id: str
-
-        :return: Generates the qstat command to be executed.
-        :rtype: str
-        """
-        job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
-        return f"qstat {job_id} | awk " + "'{print $3}' && " + f"qstat -H {job_id} | awk " + "'{print $3}'"
 
     def get_check_all_jobs_cmd(self, jobs_id: str) -> str:  # noqa
         """Generate qstat command for all the jobs passed down.

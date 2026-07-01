@@ -301,11 +301,11 @@ def test_send_command(
         exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
         if error:
-            assert exp_ps_platform.get_ssh_output_err() == ''
+            assert exp_ps_platform._ssh_output_err == ''
             with pytest.raises(error):  # type: ignore
                 exp_ps_platform.send_command(cmd, ignore_log=False, x11=x11_enabled)
 
-            stderr = exp_ps_platform.get_ssh_output_err()
+            stderr = exp_ps_platform._ssh_output_err
             assert 'command not found' in stderr
         else:
             assert exp_ps_platform.get_ssh_output() == ''
@@ -629,10 +629,10 @@ def test_fs_operations(
         assert contents.decode('UTF-8').strip() == text
         assert exp_ps_platform.read_file(str(file_not_found)) is None
 
-        file_size: Optional[int] = exp_ps_platform.get_file_size(str(remote_file))
+        file_size = exp_ps_platform._ftpChannel.stat(str(remote_file)).st_size
         assert file_size
         assert file_size > 0
-        assert exp_ps_platform.get_file_size(str(file_not_found)) is None
+        assert not file_not_found.exists()
 
         assert exp_ps_platform.check_absolute_file_exists(str(remote_file))
         assert not exp_ps_platform.check_absolute_file_exists(str(file_not_found))
