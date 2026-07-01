@@ -350,7 +350,7 @@ class JobPackager(object):
             if job.section.upper() in all_wrapped:
                 continue
             if job.status in (Status.READY, Status.RUNNING, Status.QUEUING,
-                              Status.SUBMITTED, Status.SUSPENDED):
+                              Status.SUBMITTED):
                 return True
             if job.status == Status.WAITING:
                 for parent in job.parents:
@@ -384,9 +384,11 @@ class JobPackager(object):
             return False
         if len(self._jobs_list.get_in_queue()) > 0:
             return False
+        if len(not_wrappeable_package_info) != len(built_packages_tmp):
+            return False
         if self._has_blocking_non_wrapped_jobs():
             return False
-        return len(not_wrappeable_package_info) == len(built_packages_tmp)
+        return True
 
     def submit_remaining_jobs(self, p: JobPackageBase, packages_to_submit: list, max_jobs_to_submit: int) -> int:
         """
@@ -505,10 +507,6 @@ class JobPackager(object):
                 all(j.status == Status.WAITING for j in remaining)
                 and self._remaining_blocked_by_package(remaining, p.jobs)
             ):
-                remaining_can_progress = []
-            else:
-                remaining_can_progress = remaining
-            if not remaining_can_progress:
                 max_jobs_to_submit = self.submit_remaining_jobs(p, packages_to_submit, max_jobs_to_submit)
             else:
                 if self.wrapper_policy[self.current_wrapper_section] == "strict":
