@@ -94,7 +94,10 @@ def _get_host(section_host: str, add_project_to_host: bool, project: str) -> str
 
 def _get_platform_by_type(platform_type: str, expid: str, platform_name: str, experiment_data: dict,
                           platform_version: str, auth_password: Optional[str]) -> Optional['ParamikoPlatform']:
-    platform_type = PlatformType(platform_type.strip().lower())
+    try:
+        platform_type = PlatformType(platform_type.strip().lower())
+    except ValueError:
+        raise AutosubmitCritical(f"Platform {platform_name.upper()} type {platform_type} is not supported", 6003)
     if platform_type == PsPlatform.TYPE:
         return PsPlatform(expid, platform_name, experiment_data)
     elif platform_type == EcPlatform.TYPE:

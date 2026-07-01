@@ -18,7 +18,7 @@
 """Unit tests for ``ParamikoSubmitter``."""
 
 from getpass import getuser
-from typing import Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import pytest
 
@@ -225,7 +225,7 @@ def test_serial_platform(experiment_data: dict, autosubmit_config):
         ['ecaccess', EcPlatform],
         ['slurm', SlurmPlatform],
         ['pjm', PJMPlatform],
-        ['abcd', ValueError]
+        ['abcd', AutosubmitCritical]
     ]
 )
 def test_platform_types(platform_type: str, expected_type_or_error: Union['ParamikoPlatform', Exception],
@@ -250,7 +250,7 @@ def test_platform_types(platform_type: str, expected_type_or_error: Union['Param
             }
         }
     })
-    if expected_type_or_error is ValueError:
+    if expected_type_or_error is AutosubmitCritical:
         with pytest.raises(expected_type_or_error):  # type: ignore
             ParamikoSubmitter(as_conf, None, None)
     else:
@@ -373,3 +373,59 @@ def test_add_invalid_platform(autosubmit_config):
         ParamikoSubmitter(as_conf=as_conf)
 
     assert 'must be defined' in str(cm.value.message)
+
+
+@pytest.mark.parametrize("config", [
+    {
+        "DEFAULT": {
+            "HPCARCH": "PYTEST-UNDEFINED",
+        },
+        "LOCAL_ROOT_DIR": "blabla",
+        "LOCAL_TMP_DIR": 'tmp',
+        "PLATFORMS": {
+            "PYTEST-UNDEFINED": {
+                "host": "",
+                "user": "",
+                "project": "",
+                "scratch_dir": "",
+                "MAX_WALLCLOCK": "",
+                "DISABLE_RECOVERY_THREADS": True
+            }
+        },
+        "JOBS": {
+            "job1": {
+                "PLATFORM": "PYTEST-UNDEFINED",
+                "SCRIPT": "echo 'hello world'",
+            },
+        }
+    },
+    {
+        "DEFAULT": {
+            "HPCARCH": "PYTEST-UNSUPPORTED",
+        },
+        "LOCAL_ROOT_DIR": "blabla",
+        "LOCAL_TMP_DIR": 'tmp',
+        "PLATFORMS": {
+            "PYTEST-UNSUPPORTED": {
+                "TYPE": "unknown",
+                "host": "",
+                "user": "",
+                "project": "",
+                "scratch_dir": "",
+                "MAX_WALLCLOCK": "",
+                "DISABLE_RECOVERY_THREADS": True
+            }
+        },
+        "JOBS": {
+            "job1": {
+                "PLATFORM": "PYTEST-UNSUPPORTED",
+                "SCRIPT": "echo 'hello world'",
+            },
+        }
+    }
+], ids=["Undefined", "Unsupported"])
+def test_load_platforms(autosubmit_config, config):
+    experiment_id = 'random-id'
+    as_conf = autosubmit_config(experiment_id, config)
+    with pytest.raises(AutosubmitCritical):
+        ParamikoSubmitter(as_conf=as_conf)
