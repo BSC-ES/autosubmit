@@ -88,38 +88,9 @@ $ sudo setfacl --modify user:$USER:rw /var/run/docker.sock
 # $ sudo setfacl --remove user:$USER /var/run/docker.sock
 ```
 
-You can follow the steps below if you would like to have a Slurm container
+You can follow the steps specified at the [Giovtorres Slurm Git Repository](https://github.com/giovtorres/slurm-docker-cluster) if you would like to have a Slurm container
 locally for the tests marked with `slurm`. This step is optional as each test
-launches the container in an isolated manner.
-
-```bash
-$ docker pull autosubmit/slurm-openssh-container:25-05-0-1
-```
-
-```bash
-$ docker run --rm -it --cgroupns=host --privileged --volume /sys/fs/cgroup:/sys/fs/cgroup:rw --hostname slurmctld --name slurm-container -p 2222:2222 autosubmit/slurm-openssh-container:25-05-0-1
-```
-
-```bash
-$ docker cp slurm-container:/root/.ssh/container_root_pubkey $HOME/.ssh/container_root_pubkey || echo "Failed to docker cp SSH key"
-```
-
-```bash
-$ chmod 600 $HOME/.ssh/container_root_pubkey
-```
-
-```bash
-$ cat <<- EOF >> $HOME/.ssh/config
-Host localDocker
-    HostName localhost
-    User root
-    StrictHostKeyChecking no
-    UserKnownHostsFile /dev/null
-    IdentityFile $HOME/.ssh/container_root_pubkey
-    Port 2222
-    ForwardX11 yes
-EOF
-```
+launches the container in an isolated manner by using [testcontainers-python](https://testcontainers-python.readthedocs.io/en/latest/) library with pytest.
 
 Then you can run all the tests, with
 
