@@ -23,9 +23,15 @@ from typing import TYPE_CHECKING
 import pytest
 
 from autosubmit.log.log import (
-    AutosubmitError, AutosubmitCritical, LogFormatter, Log, StatusFilter, StatusFailedFilter
+    AutosubmitCritical,
+    AutosubmitError,
+    Log,
+    LogFormatter,
+    StatusFailedFilter,
+    StatusFilter,
 )
-from autosubmit.log.utils import compress_xz, find_uncompressed_files, is_xz_file
+from autosubmit.log.utils import compress_xz
+from test.unit.test_utils import find_uncompressed_files, is_xz_file
 
 if TYPE_CHECKING:
     from pytest_mock import MockFixture

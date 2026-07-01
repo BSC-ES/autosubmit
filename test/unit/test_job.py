@@ -28,12 +28,15 @@ from typing import Optional
 
 import pytest
 from bscearth.utils.date import date2str
-from mock import Mock, MagicMock  # type: ignore
+from mock import MagicMock, Mock  # type: ignore
 from mock.mock import patch  # type: ignore
 
 from autosubmit.autosubmit import Autosubmit
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
+from autosubmit.config.configcommon import (
+    AutosubmitConfig,
+    BasicConfig,
+    YAMLParserFactory,
+)
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
@@ -41,9 +44,11 @@ from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.unit.conftest import AutosubmitConfigFactory
@@ -2158,7 +2163,10 @@ def test_retrieve_logfiles(local, mocker, output):
         Path(job.platform.get_files_path() + f'/test.out.{i}').touch()
         Path(job.platform.get_files_path() + f'/test.err.{i}').touch()
         Path(job.platform.get_files_path() + f'/t001_STAT_{i}').touch()
-    job.platform.type = 'slurm'
+    # TODO: I think this test was written when we started adding pytest/tests/fixtures.
+    #       Now we should be able to test with a ``local`` and a ``slurm`` platforms.
+    job.platform.TYPE = PlatformType.SLURM
+    job.platform.EXECUTION_MODE = ExecutionMode.BATCH
     job.platform.remote_log_dir = Path(job.platform.root_dir) / job.platform.config.get(
         "LOCAL_TMP_DIR") / f'LOG_{job.platform.expid}'
     job.wrapper_type = 'vertical'

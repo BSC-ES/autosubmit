@@ -132,7 +132,8 @@ def test_submodules_false_disables_submodules(mocker, autosubmit_config):
                 "project": "",
                 "scratch_dir": "",
                 "MAX_WALLCLOCK": "",
-                "DISABLE_RECOVERY_THREADS": True
+                "DISABLE_RECOVERY_THREADS": True,
+                "TYPE": "ps"
             }
         },
         "JOBS": {

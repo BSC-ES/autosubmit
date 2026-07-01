@@ -27,29 +27,20 @@ import time
 from contextlib import suppress
 from datetime import timedelta
 from pathlib import Path
-from threading import Thread
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from bscearth.utils.date import sum_str_hours, date2str
+from bscearth.utils.date import date2str, sum_str_hours
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.platforms.platform import Platform
 
 Log.get_logger("Autosubmit")
-
-
-def threaded(fn):
-    def wrapper(*args, **kwargs):
-        thread = Thread(target=fn, args=args, kwargs=kwargs)
-        thread.name = "data_processing"
-        thread.start()
-        return thread
-
-    return wrapper
 
 
 def jobs_in_wrapper_str(as_conf: 'AutosubmitConfig', current_wrapper: str) -> str:
@@ -57,42 +48,61 @@ def jobs_in_wrapper_str(as_conf: 'AutosubmitConfig', current_wrapper: str) -> st
     return "_".join(as_conf.experiment_data["WRAPPERS"].get(current_wrapper, {}).get("JOBS_IN_WRAPPER", []))
 
 
-class JobPackageBase(object):
-    """
-    Class to manage the package of jobs to be submitted by autosubmit
-    """
+# TODO: make it abstract (lots of tests to update)
+class JobPackageBase:
+    """Class to manage the package of jobs to be submitted by Autosubmit."""
 
     def __init__(self, jobs: list[Job]):
+        """Assumptions made when this object is created (TODO: to be clarified in the future):
+
+        - The list of jobs is never empty
+        - All jobs have the same platform
+        """
+        if not jobs:
+            raise ValueError('No jobs given')
+
+        first_job = jobs[0]
+        # ATTENTION: Do not use ``first_job.platform`` -- that is a property.getter with
+        # a different logic, returning the inner ``platform.serial_platform`` sometimes.
+        # noinspection PyProtectedMember
+        self.platform = first_job._platform
+
+        for job in jobs:
+            if not job.platform:
+                raise ValueError(f'No platform given for job {job.name}')
+            # Look at the ATTENTION above; do not use .platform
+            # noinspection PyProtectedMember
+            if job._platform.name != self.platform.name:
+                raise ValueError('Only one valid platform per package, ')
+
+        # TODO: The way this was designed implies that all jobs given to a package
+        #       have the exact same platform, as this only checks the type of the
+        #       platform of the first job. The class+constructor can be improved to
+        #       make that more explicit, and more defensive against possible errors.
+        #       Errors like this are not caught in static analysis/type checkers/
+        #       most AI agents will oversee this as well! So probably a runtime error...
+
         self.name = None
         self.is_wrapped = False
         self._job_scripts = None
         self.nodes = ""
         self._common_script = None
         self._jobs = jobs
-        self._expid = jobs[0].expid
+        self._expid = first_job.expid
         self.hold = False
-        self.export = jobs[0].export
-        self.executable = jobs[0].executable
-        self.x11_options = jobs[0].x11_options
-        # Scheduler manages the timeout, this is for platforms without scheduler
-        # Wrappers are only allowed within a scheduler and timeout is calculated differently there
-        self.timeout = max(job.wallclock_in_seconds for job in jobs) if jobs[0].platform.type in ["PS",
-                                                                                                  "LOCAL"] else None
-        self.x11 = jobs[0].x11
+        self.export = first_job.export
+        self.executable = first_job.executable
+        self.x11_options = first_job.x11_options
+        is_batch_platform = first_job.platform.EXECUTION_MODE == ExecutionMode.BATCH
+        self.timeout: Optional[int] = None if is_batch_platform else max(job.wallclock_in_seconds for job in jobs)
+        self.x11 = first_job.x11
         self.het = dict()
         self._num_processors = '0'
         self._threads = '0'
-        try:
-            self._tmp_path = jobs[0]._tmp_path
-            self._platform = jobs[0]._platform
-            self._custom_directives: set = set()
-            for job in jobs:
-                if job._platform.name != self._platform.name or job.platform is None:
-                    raise Exception('Only one valid platform per package')
-        except IndexError:
-            raise Exception('No jobs given')
-        self.fail_count = jobs[0].fail_count
-        self.ec_queue = jobs[0].ec_queue if hasattr(jobs[0], "ec_queue") and jobs[0].ec_queue else None
+        self._tmp_path = first_job._tmp_path
+        self._custom_directives = set()
+        self.fail_count = first_job.fail_count
+        self.ec_queue = first_job.ec_queue if hasattr(first_job, "ec_queue") and first_job.ec_queue else None
         self.sections = "&".join(
             sorted(
                 set(job.section for job in jobs if job.section)
@@ -124,14 +134,13 @@ class JobPackageBase(object):
         return self._jobs
 
     @property
-    def platform(self):
-        """
-        Returns the platform
-
-        :return: platform
-        :rtype: Platform
-        """
+    def platform(self) -> 'Platform':
+        """Returns the platform."""
         return self._platform
+
+    @platform.setter
+    def platform(self, value: 'Platform'):
+        self._platform = value
 
     def check_job_files_exists(self, configuration: 'AutosubmitConfig', only_generate: bool) -> None:
         """ Check that all job files exist in the project directory.
@@ -153,16 +162,16 @@ class JobPackageBase(object):
             # When SCRIPT is defined, FILE is ignored.
             if not job.script and job.file and not (project_dir / job.file).exists():
                 if not only_generate:
-                    raise AutosubmitCritical(f"[section:{job.section}]: Job script:{job.file} does not exists", 7014)
-                Log.warning(f"[section:{job.section}]: Job script:{job.file} does not exists, skipping check")
+                    raise AutosubmitCritical(f"[section: {job.section}]: Job script: {job.file} does not exist", 7014)
+                Log.warning(f"[section:{job.section}]: Job script: {job.file} does not exist, skipping check")
 
             for additional_file in job.additional_files:
                 if not additional_file or not (project_dir / additional_file).exists():
                     if not only_generate:
                         raise AutosubmitCritical(
-                            f"[section:{job.section}]: Additional file:{additional_file} does not exists", 7014)
+                            f"[section: {job.section}]: Additional file:{additional_file} does not exist", 7014)
                     Log.warning(
-                        f"[section:{job.section}]: Additional file:{additional_file} does not exists, skipping check")
+                        f"[section: {job.section}]: Additional file: {additional_file} does not exist, skipping check")
 
     def build_scripts(self, configuration: 'AutosubmitConfig') -> None:
         """Submit jobs one by one without using threads.
@@ -174,9 +183,8 @@ class JobPackageBase(object):
         Log.debug("Checking Scripts")
         for job in self.jobs:
             if (job.file or job.script) and not job.check_script(configuration, show_logs=job.check_warnings):
-                Log.warning(
-                    f"Script {job.name} has some empty variables. An empty value has substituted these variables"
-                )
+                Log.warning(f"Job {job.name} script or file has empty variables. "
+                            f"These variables were set to an empty value")
 
             self._custom_directives |= set(getattr(job, "custom_directives", []))
 
@@ -200,10 +208,11 @@ class JobPackageBase(object):
         self.platform.delete_previous_stat_files_by_job_names([job.name for job in self.jobs if job.fail_count == 0])
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
-        raise Exception('Not implemented')
+        raise NotImplementedError  # pragma: no cover
 
     def send_files(self):
         """ Send local files to the platform. """
+        raise NotImplementedError  # pragma: no cover
 
     def process_jobs_to_submit(self, job_id: int) -> None:
         for job in self.jobs:

@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from collections import defaultdict
 import argparse
 import copy
 import datetime
@@ -33,13 +32,14 @@ import tarfile
 import threading
 import time
 import warnings
+from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import suppress
 from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import cast, Generator, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator, Optional, Union, cast
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -53,35 +53,60 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import (
-    create_db, get_experiment_description, get_autosubmit_version, check_experiment_exists,
-    update_experiment_description_version, get_experiment_expids
+    check_experiment_exists,
+    create_db,
+    get_autosubmit_version,
+    get_experiment_description,
+    get_experiment_expids,
+    update_experiment_description_version,
 )
 from autosubmit.database.db_structure import get_structure
 from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.experiment.experiment_common import (
-    check_ownership, copy_experiment, create_required_folders, delete_experiment, new_experiment
+    check_ownership,
+    copy_experiment,
+    create_required_folders,
+    delete_experiment,
+    new_experiment,
 )
-from autosubmit.git.autosubmit_git import AutosubmitGit
-from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, recover_stale_job_data, user_yes_no_query
+from autosubmit.git.autosubmit_git import (
+    AutosubmitGit,
+    check_unpushed_changes,
+    clean_git,
+)
+from autosubmit.helpers.utils import (
+    check_jobs_file_exists,
+    get_rc_path,
+    recover_stale_job_data,
+    user_yes_no_query,
+)
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
-from autosubmit.job.job import Job
-from autosubmit.job.job import WrapperJob
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistence, JobListPersistenceDb, JobListPersistencePkl
+from autosubmit.job.job_list_persistence import (
+    JobListPersistence,
+    JobListPersistenceDb,
+    JobListPersistencePkl,
+)
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_utils import SubJob, SubJobManager
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
+from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform import Platform
-from autosubmit.utils import as_conf_default_values, separate_section_entries, expand_values, apply_job_filters
+from autosubmit.utils import (
+    apply_job_filters,
+    as_conf_default_values,
+    expand_values,
+    separate_section_entries,
+)
 
 if TYPE_CHECKING:
     from rocrate.rocrate import ROCrate
@@ -1440,7 +1465,7 @@ class Autosubmit:
             create_required_folders(exp_id, exp_folder)
         except OSError as e:
             with suppress(Exception):
-                Autosubmit._delete_expid(exp_id, True)
+                delete_experiment(exp_id, True)
             raise AutosubmitCritical(f"Error while creating the experiment structure: {str(e)}", 7011)
 
         # Create the experiment configuration
@@ -1453,20 +1478,16 @@ class Autosubmit:
                 # Create a new configuration
                 Autosubmit.generate_as_config(exp_id, dummy, minimal_configuration, use_local_minimal)
         except Exception as e:
-            try:
-                Autosubmit._delete_expid(exp_id, True)
-            except Exception:
-                pass
+            with suppress(Exception):
+                delete_experiment(exp_id, True)
             raise AutosubmitCritical(f"Error while creating the experiment configuration: {str(e)}", 7011)
         # Change template values by default values specified from the commandline
         try:
             as_conf_default_values(Autosubmit.autosubmit_version, exp_id, hpc, minimal_configuration, git_repo,
                                    git_branch, git_as_conf)
         except Exception as e:
-            try:
-                Autosubmit._delete_expid(exp_id, True)
-            except Exception:
-                pass
+            with suppress(Exception):
+                delete_experiment(exp_id, True)
             raise AutosubmitCritical(f"Error while setting the default values: {str(e)}", 7011)
 
         # Try to update the experiment details
@@ -3976,8 +3997,9 @@ class Autosubmit:
         :param path: path to save the RO-Crate in
         :return: ``True`` if successful, ``False`` otherwise
         """
-        from autosubmit.statistics.statistics import Statistics
         from textwrap import dedent
+
+        from autosubmit.statistics.statistics import Statistics
 
         as_conf = AutosubmitConfig(expid)
         # ``.reload`` will call the function to unify the YAML configuration.
@@ -4513,10 +4535,10 @@ class Autosubmit:
                 hpcarch = submitter.platforms[as_conf.get_platform()]
             except AutosubmitCritical as e:
                 Log.warning(f"{e.message}\nRemote git cloning is disabled")
-                hpcarch = "local"
+                hpcarch = LocalPlatform.TYPE
             except KeyError:
                 Log.warning(f"Platform {as_conf.get_platform()} not found in configuration file")
-                hpcarch = "local"
+                hpcarch = LocalPlatform.TYPE
             return AutosubmitGit.clone_repository(as_conf, force, hpcarch)
         elif project_type == "svn":
             svn_project_url = as_conf.get_svn_project_url()

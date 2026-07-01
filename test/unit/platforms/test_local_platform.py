@@ -29,4 +29,4 @@ def test_file_read_size(local_platform: LocalPlatform):
     assert local_platform.read_file(random_file, 10).decode() == ("a" * 10)
 
     # Test get the file size
-    assert local_platform.get_file_size(random_file) == 100
+    assert Path(random_file).stat().st_size == 100
