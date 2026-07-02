@@ -1650,7 +1650,6 @@ class Autosubmit:
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, jobs_cw, False)
 
-
             Log.info("No more scripts to generate, you can proceed to check them manually")
             Log.result(file_paths)
 
@@ -1676,7 +1675,7 @@ class Autosubmit:
         :return: Nothing\n
         :rtype: \n
         """
-        Log.warning("Generating the auxiliary job_list used for the -cw flag.")
+        Log.info("Generating the auxiliary job_list used for the -cw flag.")
         job_list._job_list = jobs_filtered
         job_list._persistence_file = job_list._persistence_file + "_cw_flag"
         as_conf.load_parameters()
@@ -1700,7 +1699,7 @@ class Autosubmit:
             if type(wrapper_data) is not dict:
                 continue
             wrapper_jobs[wrapper_section] = as_conf.get_wrapper_jobs(wrapper_data)
-        Log.warning("Aux Job_list was generated successfully")
+        Log.info("Aux Job_list was generated successfully")
 
         # Load platforms.
         submitter = ParamikoSubmitter(as_conf=as_conf)
@@ -3647,6 +3646,8 @@ class Autosubmit:
         except BaseException as e:
             raise AutosubmitCritical("Error while reading the configuration files", 7064, str(e))
         try:
+            # FIXME: as_conf is not validated, so it never enters the if statement below.
+            # Should be deleted.
             if "Expdef" in as_conf.wrong_config:
                 as_conf.show_messages()
             project_type = as_conf.get_project_type()
@@ -4418,11 +4419,16 @@ class Autosubmit:
                         noplot = False
                     packages = None
                     if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
-                        job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
-                        Autosubmit.generate_scripts_andor_wrappers(
-                            as_conf, job_list_wr, job_list_wr.get_job_list(), True)
-                        packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
-                        packages += JobPackagePersistence(expid).db_manager.select_all("preview_wrappers_jobs")
+                        if len(as_conf.wrong_config) > 0:
+                            Log.warning(
+                                "There are errors in the configuration files. Wrappers will not be generated. Please fix the errors and run the command again."
+                            )
+                        else:
+                            job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
+                            Autosubmit.generate_scripts_andor_wrappers(
+                                as_conf, job_list_wr, job_list_wr.get_job_list(), True)
+                            packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
+                            packages += JobPackagePersistence(expid).db_manager.select_all("preview_wrappers_jobs")
                     if not noplot:
                         from .monitor.monitor import Monitor
                         if group_by:

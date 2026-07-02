@@ -238,6 +238,47 @@ def test_set_version(autosubmit_config: 'AutosubmitConfigFactory', experiment_jo
 
 
 @pytest.mark.parametrize(
+    "parameter, value, error_msg",
+    [
+        (
+            "TOTALJOBS",
+            0,
+            "TOTALJOBS parameter not found or not strictly positive integer",
+        ),
+        (
+            "TOTALJOBS",
+            -1,
+            "TOTALJOBS parameter not found or not strictly positive integer",
+        ),
+        (
+            "MAXWAITINGJOBS",
+            0,
+            "MAXWAITINGJOBS parameter not found or not strictly positive integer",
+        ),
+        (
+            "MAXWAITINGJOBS",
+            -1,
+            "MAXWAITINGJOBS parameter not found or not strictly positive integer",
+        ),
+    ],
+    ids=[
+        "TOTALJOBS set to zero",
+        "TOTALJOBS set to negative",
+        "MAXWAITINGJOBS set to zero",
+        "MAXWAITINGJOBS set to negative",
+    ],
+)
+def test_check_autosubmit_conf_invalid_param(
+    as_conf_small: AutosubmitConfig, parameter, value, error_msg
+):
+    """Test that check_autosubmit_conf writes the error in the wrong_config
+    dictionary when a parameter is invalid."""
+    as_conf_small.experiment_data["CONFIG"][parameter] = value
+    assert not as_conf_small.check_autosubmit_conf()
+    assert error_msg in str(as_conf_small.wrong_config["Autosubmit"][0])
+
+
+@pytest.mark.parametrize(
     'experiment_data, raise_error',
     [
         [{}, False],
@@ -351,6 +392,7 @@ def test_platforms_not_dict(
     else:
         assert platform_description == as_conf.platforms_data
 
+
 @pytest.mark.parametrize('experiment_data, expected', 
     [
         (
@@ -397,6 +439,7 @@ def test_get_cpmip_thresholds_different_cases(autosubmit_config, experiment_data
     thresholds = as_conf.get_cpmip_thresholds('SIM')
     assert thresholds == expected
 
+
 def test_validate_wallclock(autosubmit_config: 'AutosubmitConfigFactory'):
     """Test should succeed"""
     as_conf: AutosubmitConfig = autosubmit_config(
@@ -422,6 +465,7 @@ def test_validate_wallclock(autosubmit_config: 'AutosubmitConfigFactory'):
 
     res = as_conf.validate_wallclock()
     assert res == ""
+
 
 def test_validate_wallclock_errors(autosubmit_config: 'AutosubmitConfigFactory'):
     """Test should produce an error that the job WALLCLOCK is greater than the platform MAX_WALLCLOCK"""
@@ -772,3 +816,39 @@ def test_load_custom_config(autosubmit_config, tmp_path) -> None:
     assert data_pre["JOBS"]["DO_NOTHING"]["SCRIPT"] == "sleep 20"
 
     assert data_pre is not data_post
+
+
+@pytest.mark.parametrize(
+    "section, d_value, must_exists, expected",
+    [
+        (["CONFIG", "TOTALJOBS"], None, False, None),
+        (["CONFIG", "TOTALJOBS"], 10, False, 10),
+        (["CONFIG", "TOTALJOBS"], None, True, AutosubmitCritical),
+        (["CONFIG", "TOTALJOBS"], 10, True, AutosubmitCritical),
+        (["LOCAL", "PROJECT_PATH"], "", False, ""),
+    ],
+    ids=[
+        "Non-mandatory section missing with None d_value returns None",
+        "Non-mandatory section missing with d_value returns d_value",
+        "Mandatory section missing with None d_value raises AutosubmitCritical",
+        "Mandatory section missing with d_value raises AutosubmitCritical",
+        "Non-mandatory section missing with default d_value returns default d_value",
+    ],
+)
+def test_get_section_missing_returns_d_value(
+    autosubmit_config,
+    section,
+    d_value,
+    must_exists,
+    expected,
+):
+    """Test that get_section returns the correct value when the section is missing."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.experiment_data.pop(section[0], None)
+
+    if expected is AutosubmitCritical:
+        with pytest.raises(AutosubmitCritical):
+            as_conf.get_section(section, d_value=d_value, must_exists=must_exists)
+    else:
+        result = as_conf.get_section(section, d_value=d_value, must_exists=must_exists)
+        assert result == expected
