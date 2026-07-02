@@ -18,7 +18,6 @@ from typing import Any
 
 import networkx
 import pytest
-from networkx import DiGraph  # type: ignore
 from sqlalchemy import create_engine
 
 from autosubmit.config.yamlparser import YAMLParserFactory

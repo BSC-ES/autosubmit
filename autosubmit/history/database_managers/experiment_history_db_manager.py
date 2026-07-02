@@ -436,24 +436,6 @@ class ExperimentHistoryDbManager(DatabaseManager):
         models = [Models.JobDataRow(*row) for row in job_data_rows][-1]
         return JobData.from_model(models)
 
-    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
-        """Get the last JobData for a given job_name and counter.
-
-        :param job_name: The job name.
-        :type job_name: str
-        :param fail_count: The counter value.
-        :type fail_count: int
-        :return: The most recent JobData instance for the given job_name and counter.
-        :rtype: JobData
-        :raises Exception: If no job_data is found for the given job_name and counter.
-        """
-        statement = self.get_built_select_statement("job_data", "job_name=? AND fail_count=? ORDER BY id DESC LIMIT 1")
-        arguments = (str(job_name), int(fail_count),)
-        job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
-        if not job_data_rows:
-            raise Exception(f"No job_data found for job_name='{job_name}' and fail_count={fail_count}.")
-        return JobData.from_model(Models.JobDataRow(*job_data_rows[0]))
-
     def get_last_job_data_dc_by_job_name_and_counter(self, job_name: str, counter: int) -> JobData:
         """Get the last JobData for a given job_name and counter.
 
@@ -1006,7 +988,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         :return: The latest JobData instance.
         :rtype: JobData
         """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table)
             .where(job_data_table.c.job_name == job_name)  # type: ignore
@@ -1031,30 +1013,6 @@ class SqlAlchemyExperimentHistoryDbManager:
         with self.engine.connect() as conn:
             result = conn.execute(query).first()
             return JobData.from_model(result)
-
-    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
-        """Get the last job data by job name and fail_count.
-
-        :param job_name: The job name.
-        :type job_name: str
-        :param fail_count: The counter value.
-        :type fail_count: int
-        :return: The most recent JobData instance for the given job_name and counter.
-        :rtype: JobData
-        :raises Exception: If no job_data is found for the given job_name and counter.
-        """
-        job_data_table = self.table_registry.get(JobDataTable.name)
-        query = (
-            select(job_data_table)
-            .where(job_data_table.c.job_name == job_name)  # type: ignore
-            .where(job_data_table.c.fail_count == fail_count)  # type: ignore
-            .order_by(desc(job_data_table.c.id))
-        )
-        with self.engine.connect() as conn:
-            result = conn.execute(query).first()
-        if result is None:
-            raise Exception(f"No job_data found for job_name='{job_name}' and fail_count={fail_count}.")
-        return JobData.from_model(result)
 
     def get_last_job_data_dc_by_job_name_and_counter(self, job_name: str, counter: int) -> JobData:
         """Get the last JobData for a given job_name and counter.
@@ -1186,7 +1144,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         :return: List of Row objects with job_name, fail_count, platform.
         :rtype: list
         """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = select(
             job_data_table.c.job_name,
             job_data_table.c.fail_count,
@@ -1208,7 +1166,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         :return: Number of rows updated.
         :rtype: int
         """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         stmt = update(job_data_table).where(
             job_data_table.c.job_name == job_name,
             job_data_table.c.fail_count == fail_count

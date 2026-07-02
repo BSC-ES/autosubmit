@@ -16,10 +16,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from functools import cache, cached_property
-from typing import cast, List, Optional
-import datetime
 from typing import Optional
+import datetime
 
 from sqlalchemy import (
     MetaData,
@@ -356,37 +354,4 @@ class TableRegistry:
         return definition_table.to_metadata(metadata)
 
 
-def get_all_tables_by_name() -> dict[str, Table]:
-    """Return a dictionary of all tables, combining general and job-list tables."""
-    return {table.name: table for table in TABLES}
 
-
-# From 4.2.0 , used for wrappers only to keep changes minimal
-class TableRegistry:
-    """Manage SQLAlchemy Table instances keyed by schema and table name.
-
-    Tables are created once per (schema, table_name) pair and reused on
-    subsequent lookups, avoiding redundant MetaData and Table construction.
-    """
-
-    def __init__(self, schema: Optional[str]) -> None:
-        """Initialize the registry with the target schema."""
-        self._schema = schema
-
-    @cached_property
-    def metadata(self) -> MetaData:
-        """Return the MetaData instance for the given schema, creating it once."""
-        return MetaData(schema=self._schema)
-
-    @cache
-    def get(self, table_name: str) -> Table:
-        """Return the Table for the given name and schema, creating it if needed.
-
-        :param table_name: The name of the table.
-        :return: The SQLAlchemy Table instance.
-        :raises KeyError: If no table definition exists for ``table_name``.
-        """
-        all_tables_def = get_all_tables_by_name()
-        if table_name not in all_tables_def:
-            raise KeyError(f"No table definition found for '{table_name}'.")
-        return all_tables_def[table_name].to_metadata(self.metadata)

@@ -30,6 +30,7 @@ from contextlib import suppress
 from io import BufferedReader
 from pathlib import Path
 from threading import Thread
+import time
 from time import sleep
 from typing import Optional, Tuple, Union, TYPE_CHECKING, Any
 

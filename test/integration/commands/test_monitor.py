@@ -25,9 +25,6 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
 
 from pathlib import Path
 
-from autosubmit.config.basicconfig import BasicConfig
-import pytest
-from .conftest import wrapped_jobs
 import sqlite3
 
 def reset(as_exp_, target="WAITING"):

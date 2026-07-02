@@ -36,9 +36,6 @@ from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
-from autosubmit.job.job_utils import SubJob, SubJobManager
-from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical

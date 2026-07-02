@@ -40,7 +40,6 @@ def meta() -> MetaData:
     """Return a fresh SQLAlchemy MetaData instance."""
     return MetaData()
 
-from autosubmit.database.tables import ExperimentTable, TableRegistry
 
 
 def test_get_table():

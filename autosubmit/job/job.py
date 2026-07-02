@@ -28,8 +28,7 @@ from functools import reduce
 from pathlib import Path
 from threading import Thread
 from typing import List, Optional, TYPE_CHECKING
-from time import sleep
-from typing import List, Optional, TYPE_CHECKING, Any, Dict
+from typing import Any, Dict
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 
@@ -3115,8 +3114,7 @@ class WrapperJob(Job):
             hold: bool = False,
             sections=None,
             method=None,
-            wr_type=None,
-            num_processors=None
+            wr_type=None
     ):
         super(WrapperJob, self).__init__(name, job_id, status, priority)
         self.failed = False

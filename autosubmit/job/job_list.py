@@ -24,7 +24,7 @@ import traceback
 from contextlib import suppress
 from pathlib import Path
 from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Optional, Union, Set
+from typing import List, Dict, Tuple, Any, Optional, Union
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
@@ -37,8 +37,6 @@ from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
-from autosubmit.job.job_package_persistence import JobPackagePersistence
-from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -2641,8 +2639,12 @@ class JobList(object):
 
         for name, jobs in list(self.packages_dict.items()):
             new_jobs = []
-            wrapper_id = int(jobs[0].id)
-            if wrapper_id in self.job_package_map:
+            try:
+                wrapper_id = int(jobs[0].id)
+            except Exception:
+                wrapper_id = None
+
+            if wrapper_id and wrapper_id in self.job_package_map:
                 for job in (job for job in jobs):
                     job_ref = self.get_job_by_name(job.name)
                     if job_ref:
@@ -2654,7 +2656,11 @@ class JobList(object):
                     self.packages_dict[name] = new_jobs
                     self.job_package_map[wrapper_id].job_list = new_jobs
             else:
-                raise AutosubmitCritical(f"Wrapper job with id {wrapper_id} not found in job_package_map", 7001)
+                self.packages_dict.pop(name, None)
+                # find by name the package in job_package_map and remove it
+                for package_id, package in list(self.job_package_map.items()):
+                    if package.name == name:
+                        self.job_package_map.pop(package_id, None)
 
     def continue_run(self) -> bool:
         """Loads the next possible jobs and edges from the database.
@@ -2662,7 +2668,6 @@ class JobList(object):
         :rtype : bool
         :return: True if there are active jobs to run, False otherwise.
         """
-        # Updates job_list
         self.recover_logs()
         save_jobs, save_edges = self.update_list(self._as_conf)
         if save_jobs:
@@ -2683,18 +2688,33 @@ class JobList(object):
         return len(self.get_active()) > 0
 
     def unload_finished_jobs(self):
-        """Unloads finished jobs and edges from the memory"""
+        """Unloads finished jobs and edges from the memory."""
         jobs_to_unload = [
             job for job in self.job_list
             if (
                     (job.status == Status.FAILED
                      and job.fail_count >= job.retrials
-                     and job.log_recovery_call_count > job.fail_count)
+                     and job.log_recovery_call_count > job.fail_count
+                     and job.updated_log > job.fail_count
+                     and not self.is_wrapper_still_running(job))
                     or
                     (job.status in (Status.COMPLETED, Status.SKIPPED)
-                     and job.log_recovery_call_count > job.fail_count)
+                     and job.log_recovery_call_count > job.fail_count
+                     and job.updated_log > job.fail_count
+                     and not self.is_wrapper_still_running(job))
             )
         ]
+        # Propagate: also unload jobs whose any parent is being unloaded (cascade down the tree)
+        jobs_to_unload_set = set(jobs_to_unload)
+        changed = True
+        while changed:
+            changed = False
+            for job in [job for job in self.job_list if job.status == Status.WAITING]:
+                if job not in jobs_to_unload_set and any(
+                        parent in jobs_to_unload_set for parent in job.parents if parent.status != Status.COMPLETED):
+                    jobs_to_unload_set.add(job)
+                    changed = True
+        jobs_to_unload = list(jobs_to_unload_set)
         # update edges completion status before removing them
         for job in (job for job in jobs_to_unload):
             job.fail_count = 0
@@ -2930,17 +2950,18 @@ class JobList(object):
                 ).VALUE_TO_KEY[job.status], platform_name, queue)
             except Exception:
                 Log.debug(f"Couldn't print job status for job {job.name}")
-        for job in failed_job_list:
-            if len(job.queue) < 1:
-                queue = "no-scheduler"
-            else:
-                queue = job.queue
-            # safeguard for older experiments
-            job_id = job.id if job.id else "no-id"
-            if not job.id:
-                Log.warning(f"Job {job.name} has {job_id}. This shouldn't happen.")
-            Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
-            ).VALUE_TO_KEY[job.status], job.platform.name, queue)
+        # TODO: Adaptation missing: for 4.2 this should be a db call
+        # for job in failed_job_list:
+        #     if len(job.queue) < 1:
+        #         queue = "no-scheduler"
+        #     else:
+        #         queue = job.queue
+        #     # safeguard for older experiments
+        #     job_id = job.id if job.id else "no-id"
+        #     if not job.id:
+        #         Log.warning(f"Job {job.name} has {job_id}. This shouldn't happen.")
+        #     Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
+        #     ).VALUE_TO_KEY[job.status], job.platform.name, queue)
 
     def update_from_file(self, store_change: bool = True) -> None:
         """Update jobs status  from an external status file.
@@ -3035,7 +3056,8 @@ class JobList(object):
         :rtype: list[Job]
         """
         jobs_to_check: list[Job] = []
-        for current_job in [current_job for current_job in self.job_list if current_job.status == Status.WAITING]:
+        for current_job in [current_job for current_job in self.job_list if
+                            current_job.status == Status.WAITING and not self.is_wrapper_still_running(current_job)]:
             self._check_checkpoint(current_job)
             parents_edge_info = self.get_parents_edges(current_job.name)
             parents_nodes = {parent_name: self.graph.nodes[parent_name]["job"] for parent_name in
@@ -3071,9 +3093,7 @@ class JobList(object):
         :type parents_edge_info: dict
         :param parents_nodes: Dictionary mapping parent job names to Job objects.
         :type parents_nodes: dict
-        :returns: A tuple containing two lists:
-            - non_completed_parents: List of parent jobs that are not completed.
-            - completed_parents: List of parent jobs that are completed.
+        :return A tuple containing two lists: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
         :rtype: Tuple[List[Job], List[Job]]
         """
         non_completed = []
@@ -3093,6 +3113,9 @@ class JobList(object):
                 if edge_status in [Status.COMPLETED, Status.SKIPPED]:
                     completed.append(parent)
                 elif edge_status == Status.FAILED and fail_ok or (job.current_checkpoint_step >= from_step > 0):
+                    completed.append(parent)
+                elif Status.VALUE_TO_KEY.get(edge_status, '') in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW:
+                    # COMPLETED/SKIPPED parent has surpassed any intermediate success-workflow status trigger.
                     completed.append(parent)
                 else:
                     non_completed.append(parent)
@@ -3159,10 +3182,10 @@ class JobList(object):
         :param job: The job object to recover the log for.
         :type job: Job
         """
-        if str(self._config.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
+        if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
                                                                  "false")).lower() == "true":
             job.retrieve_logfiles()
-            job.send_cpmip_notification(self._config)
+            job.send_cpmip_notification(self._as_conf)
         else:
             # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
             job.write_submit_time()
@@ -3180,8 +3203,8 @@ class JobList(object):
         have been recovered.
 
         """
-        jobs_to_recover = [job for job in self._job_list if
-                           job.status in self._FINAL_STATUSES and job.updated_log <= job.fail_count]
+        jobs_to_recover = [job for job in self.job_list if
+                           job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
         for job in jobs_to_recover:
             self._recover_log(job)
         return len(jobs_to_recover) > 0
@@ -3226,7 +3249,7 @@ class JobList(object):
         if not fromSetStatus:
             save_jobs |= self._update_waiting_and_delayed_jobs()
             save_jobs |= self._skip_jobs(as_conf)
-        for job in self.get_ready():
+        for job in [job for job in self.get_ready() if not self.is_wrapper_still_running(job)]:
             save_edges = True
             self._update_db_edges_completion_status(job.parents, [], job)
             job.set_ready_date()
@@ -3236,20 +3259,6 @@ class JobList(object):
 
         Log.debug('Update finished')
         return save_jobs, save_edges
-
-    def is_wrapper_still_running(self, job: Job) -> bool:
-        """
-        Check if the wrapper job for a given job is still running.
-
-        :param job: The job to check.
-        :type job: Job
-        :return: True if the wrapper job is still running, False otherwise.
-        :rtype: bool
-        """
-        job.packed = False
-        if self.job_package_map and int(job.id) in self.job_package_map:
-            job.packed = True
-        return job.packed
 
     def _update_failed_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """
@@ -3261,11 +3270,17 @@ class JobList(object):
         :rtype: bool
         """
         save = False
-        for job in (job for job in self.get_failed() if not self.is_wrapper_still_running(job)):
+        for job in [job for job in self.get_failed() if not self.is_wrapper_still_running(job)]:
             if as_conf.jobs_data[job.section].get("RETRIALS", None) is None:
                 retrials = int(as_conf.get_retrials())
             else:
                 retrials = int(job.retrials)
+            # Vertical wrapper inner jobs were already retried internally by the wrapper.
+            # They must not be retried externally after the wrapper finishes.
+            if job.wrapper_type == "vertical" and job.fail_count > 0:
+                job.status = Status.FAILED
+                save = True
+                continue
             if job.fail_count < retrials:
                 job.inc_fail_count()
                 tmp = [parent for parent in job.parents if parent.status == Status.COMPLETED]
@@ -3453,45 +3468,47 @@ class JobList(object):
 
     def save_wrappers(
             self,
-            submitted_scripts: dict,
-            as_conf: AutosubmitConfig,
-            inspect: bool = False,
+            scripts: Any,
+            as_conf: Any,
+            preview: bool = False
     ) -> None:
         """Save wrapper jobs in the job list and the packages dict.
 
-        :param submitted_scripts: Nested dict ``{section: {name: package}}`` of
-            packages produced by the wrapper packager.
-        :param as_conf: Experiment configuration object.
-        :param inspect: If True, persist to the preview tables (``-cw`` flag).
+        :param scripts: List of job package objects to process.
+        :type scripts: List[Any]
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: Any
+        :param preview: Whether to run in preview mode.
+        :type preview: bool
+        :return: None
+        :rtype: None
         """
+
         wrappers = []
-        initial_status = Status.COMPLETED if inspect else Status.SUBMITTED
-        from ..job.job import WrapperJob
-        for scripts_by_name in submitted_scripts.values():
-            for package in scripts_by_name.values():
-                if not package.is_wrapped:
-                    continue
-                if inspect:
-                    self.assign_unique_fake_id(package)
-                wrapper_job = WrapperJob(
-                    name=package.name,
-                    job_id=package.jobs[0].id,
-                    status=initial_status,
-                    priority=0,
-                    job_list=package.jobs,
-                    total_wallclock=package._wallclock,
-                    platform=package.platform,
-                    as_config=as_conf,
-                    num_processors=int(package.num_processors) if package.num_processors else 0,
-                    sections=package.sections,
-                    method=package.method,
-                    wr_type=package.wrapper_type,
-                )
-                self.job_package_map[int(wrapper_job.id)] = wrapper_job
-                self.packages_dict[package.name] = wrapper_job.job_list
-                wrappers.append(self._wrapper_job_dict(wrapper_job))
+        initial_status = Status.COMPLETED if preview else Status.SUBMITTED
+        for package in [package for package in scripts.values() if package.is_wrapped]:
+            if preview:
+                self.assign_unique_fake_id(package)
+            from ..job.job import WrapperJob
+            wrapper_job = WrapperJob(
+                name=package.name,
+                job_id=package.jobs[0].id,
+                status=initial_status,
+                priority=0,
+                job_list=package.jobs,
+                total_wallclock=package._wallclock,
+                num_processors=int(package.num_processors) if package.num_processors else 0,
+                platform=package.platform,
+                as_config=as_conf,
+                sections=package.sections,
+                method=package.method,
+                wr_type=package.wrapper_type,
+            )
+            self.job_package_map[int(wrapper_job.id)] = wrapper_job
+            self.packages_dict[package.name] = wrapper_job.job_list
+            wrappers.append(self._wrapper_job_dict(wrapper_job))
         if wrappers:
-            self.dbmanager.save_wrappers(wrappers, preview=inspect)
+            self.dbmanager.save_wrappers(wrappers, preview=preview)
 
     def assign_unique_fake_id(self, package: 'JobPackageThread') -> None:
         """Assign a unique negative fake ID to a package's first job for preview use.
@@ -3520,7 +3537,7 @@ class JobList(object):
         }
         # Group inner jobs by package name.
         inner_jobs_by_package: dict[str, list] = {}
-        for job in unmapped_inner_jobs:
+        for job in un_mapped_inner_jobs:
             inner_jobs_by_package.setdefault(job['package_name'], []).append(job['job_name'])
 
         # Attach job objects to each wrapper's job list and update packages_dict.
@@ -3553,92 +3570,13 @@ class JobList(object):
                 total_wallclock=wrapper_info["wallclock"],
                 job_list=wrapper_info["job_list"],
                 platform=wrapper_info["job_list"][0].platform,
-                as_config=self._config,
+                as_config=self._as_conf,
             )
             wrapper_job.platform_name = wrapper_job.job_list[0].platform_name
             self.job_package_map[int(wrapper_job.id)] = wrapper_job
 
     def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Tuple[Dict[str, Any], List[str]]:
-        """Return a dictionary representation of a WrapperJob and its inner jobs for database insertion.
-        unmapped_wrapper_info, unmapped_inner_jobs = self.get_packages_persistence().load(preview, self._job_list)
-
-        # Build a dictionary of wrapper info indexed by wrapper name.
-        wrappers_info: dict[str, dict] = {
-            dict(wrapper)['name']: dict(wrapper) for wrapper in unmapped_wrapper_info
-        }
-        # Group inner jobs by package name.
-        inner_jobs_by_package: dict[str, list] = {}
-        for job in unmapped_inner_jobs:
-            inner_jobs_by_package.setdefault(job['package_name'], []).append(job['job_name'])
-
-        # Attach job objects to each wrapper's job list and update packages_dict.
-        for package_name, job_names in inner_jobs_by_package.items():
-            if package_name not in wrappers_info:
-                continue
-            wrappers_info[package_name].setdefault("job_list", [])
-            for job_name in job_names:
-                job = self.get_job_by_name(job_name)
-                if not job:
-                    continue
-                if job.id == wrappers_info[package_name]["id"]:
-                    wrappers_info[package_name]["job_list"].append(job)
-            if wrappers_info[package_name]["job_list"]:
-                self.packages_dict[package_name] = wrappers_info[package_name]["job_list"]
-
-        # Create WrapperJob objects and populate job_package_map.
-        from ..job.job import WrapperJob
-        for wrapper_info in wrappers_info.values():
-            if not wrapper_info.get("job_list"):  # TODO: horizontal-vertical issue
-                continue
-            wrapper_job = WrapperJob(
-                name=wrapper_info["name"],
-                job_id=wrapper_info["id"],
-                status=wrapper_info["status"],
-                priority=wrapper_info.get("priority", 0),
-                total_wallclock=wrapper_info["wallclock"],
-                job_list=wrapper_info["job_list"],
-                platform=wrapper_info["job_list"][0].platform,
-                as_config=self._config,
-            )
-            wrapper_job.platform_name = wrapper_job.job_list[0].platform_name
-            self.job_package_map[int(wrapper_job.id)] = wrapper_job
-
-    def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Tuple[Dict[str, Any], List[str]]:
-        """
-        Return
-        a
-        dictionary
-        representation
-        of
-        a
-        WrapperJob and its
-        inner
-        jobs
-        for database insertion.
-
-        :param
-        wrapper_job: The
-        wrapper
-        job
-        instance
-        to
-        serialize.
-        :type wrapper_job: WrapperJob
-        :return: Tuple
-        containing
-        a
-        dictionary
-        of
-        wrapper
-        job
-        attributes and a
-        list
-        of
-        inner
-        job
-        names.
-        :rtype: Tuple[Dict[str, Any], List[str]]
-        """
+        """Return a dictionary representation of a WrapperJob and its inner jobs for database insertion."""
         wrapper_info = {
             "name": wrapper_job.name,
             "id": wrapper_job.id,
@@ -3698,39 +3636,6 @@ class JobList(object):
         calls.
         """
         self.get_packages_persistence().reset_table(preview=True)
-
-        :param wrapper_job: The wrapper job instance to serialize.
-        :type wrapper_job: WrapperJob
-        :return: Tuple containing a dictionary of wrapper job attributes and a list of inner job names.
-        :rtype: Tuple[Dict[str, Any], List[str]]
-        """
-        wrapper_info = {
-            "name": wrapper_job.name,
-            "id": wrapper_job.id,
-            "script_name": getattr(wrapper_job, "script_name", None),
-            "status": wrapper_job.status,
-            "local_logs_out": getattr(wrapper_job, "local_logs_out", None),
-            "local_logs_err": getattr(wrapper_job, "local_logs_err", None),
-            "remote_logs_out": getattr(wrapper_job, "remote_logs_out", None),
-            "remote_logs_err": getattr(wrapper_job, "remote_logs_err", None),
-            "updated_log": getattr(wrapper_job, "updated_log", 0),
-            "platform_name": wrapper_job.platform.name if wrapper_job.platform else None,
-            "wallclock": wrapper_job.wallclock,
-            "num_processors": wrapper_job.num_processors,
-            "type": getattr(wrapper_job, "type", None),
-            "sections": getattr(wrapper_job, "sections", None),
-            "method": getattr(wrapper_job, "method", None),
-        }
-        wrapper_inner_jobs = [
-            {
-                'package_id': wrapper_job.id,
-                'package_name': wrapper_job.name,
-                'job_name': job.name,
-                'timestamp': datetime.datetime.now().isoformat()
-            }
-            for job in wrapper_job.job_list
-        ]
-        return wrapper_info, wrapper_inner_jobs
 
     def check_scripts(self, as_conf: AutosubmitConfig) -> bool:
         """When we have created the scripts, all parameters should have been substituted.

@@ -39,7 +39,7 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import Any, Generator, Optional, Union, TYPE_CHECKING, cast
+from typing import Generator, Optional, Union, TYPE_CHECKING, cast
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -64,7 +64,7 @@ from autosubmit.experiment.experiment_common import (
 )
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, recover_stale_job_data, user_yes_no_query
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, recover_stale_job_data
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job import Job
@@ -2149,7 +2149,7 @@ class Autosubmit:
         # Start profiling if the flag has been used
         if profile is not None:
             from .profiler.profiler import Profiler
-            profiler = Profiler(expid, trace_enabled=trace, max_checkpoints=profile_max_iterations)
+            profiler = Profiler(expid, trace_enabled=trace, max_checkpoints=profile if profile else 0)
             profiler.start()
             profiler.iteration_checkpoint(0, 0)
         else:
@@ -2271,10 +2271,12 @@ class Autosubmit:
                         Autosubmit.check_non_wrapped_jobs(platforms_to_test, job_list, as_conf, expid)
                         # Track all jobs change for GUI
                         job_changes_tracker = dict()
-                        for job in [job for job in job_list.get_job_list() if job.prev_status is not None and job.prev_status != job.status]:
+                        for job in [job for job in job_list.get_job_list() if
+                                    job.prev_status is not None and job.prev_status != job.status]:
                             if job.status in [Status.COMPLETED, Status.FAILED]:
                                 gather_logs = True
-                            job_changes_tracker[job.name] = (Status.VALUE_TO_KEY[job.prev_status], Status.VALUE_TO_KEY[job.status])
+                            job_changes_tracker[job.name] = (
+                                Status.VALUE_TO_KEY[job.prev_status], Status.VALUE_TO_KEY[job.status])
                         try:
                             Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
                         except BaseException:
@@ -2588,7 +2590,7 @@ class Autosubmit:
                     job_list.save_jobs()
 
             wrapper_errors.update(packager.wrappers_with_error)
-            job_list.save_wrappers(scripts_to_submit_by_section, as_conf, inspect=inspect)
+            job_list.save_wrappers(scripts_to_submit_by_section, as_conf, preview=inspect)
 
         Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
 
@@ -3125,7 +3127,7 @@ class Autosubmit:
             if save:
                 job_list.recover_last_data()
                 try:
-                    recover_stale_job_data(expid, as_conf, platforms)
+                    recover_stale_job_data(expid, as_conf)
                 except Exception as e:
                     Log.debug(f"Error while recovering stale job data: {str(e)}")
                 job_list.save_jobs()
@@ -4296,7 +4298,6 @@ class Autosubmit:
                         output = 'txt'
                     if output == 'txt':
                         noplot = False
-                    packages = None
                     if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
                         if len(as_conf.wrong_config) > 0:
                             Log.warning(
@@ -4306,8 +4307,6 @@ class Autosubmit:
                             job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
                             Autosubmit.generate_scripts_andor_wrappers(
                                 as_conf, job_list_wr, job_list_wr.get_job_list(), True)
-                            packages = JobPackagePersistence(expid).db_manager.select_all("wrappers_jobs")
-                            packages += JobPackagePersistence(expid).db_manager.select_all("preview_wrappers_jobs")
                     if not noplot:
                         from .monitor.monitor import Monitor
                         if group_by:
@@ -4339,7 +4338,7 @@ class Autosubmit:
                                                             expid,
                                                             BasicConfig.LOCAL_TMP_DIR,
                                                             f"LOG_{expid}",
-                                                        ),
+                                                        )),
                                                     output if output is not None else output_type,
                                                     list(job_list.job_package_map.values()),
                                                     not hide,
@@ -5303,7 +5302,7 @@ class Autosubmit:
                 if save and wrongExpid == 0:
                     job_list.recover_last_data(final_list)
                     try:
-                        recover_stale_job_data(expid, as_conf, platforms)
+                        recover_stale_job_data(expid, as_conf)
                     except Exception as e:
                         Log.debug(f"Error while recovering stale job data: {str(e)}")
                     job_list.save_jobs()

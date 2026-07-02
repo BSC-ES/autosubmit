@@ -1012,6 +1012,7 @@ class Platform:
         :return: Updated set of jobs pending to process.
         """
         from autosubmit.job.job import Job
+        jobs_db_manager = JobsDbManager(schema=self.expid)
 
         while not self.recovery_queue.empty():
             job_data = self.recovery_queue.get(timeout=1)
@@ -1019,7 +1020,7 @@ class Platform:
             job.platform_name = self.name
             job.platform = self
             # Fill cpus etc..
-            job.update_parameters(as_conf, True, False, True)
+            job.update_parameters(self._as_conf, True, False, True)
             for key in job_data:
                 setattr(job, key, job_data[key])
             job.update_local_logs()
@@ -1046,7 +1047,6 @@ class Platform:
         self._as_conf = as_conf
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
-        jobs_db_manager = JobsDbManager(schema=self.expid)
         try:
             Log.info(f"{identifier} Starting...")
             self.connected = False

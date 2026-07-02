@@ -21,10 +21,8 @@
 from contextlib import contextmanager
 
 import pytest
-from pathlib import Path
 
 from autosubmit.autosubmit import Autosubmit
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
 
