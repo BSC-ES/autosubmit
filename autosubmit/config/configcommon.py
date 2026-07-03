@@ -38,6 +38,7 @@ from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.db_common import get_experiment_description
+from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 
@@ -1497,7 +1498,7 @@ class AutosubmitConfig(object):
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory EXPERIMENT.DATELIST parameter is invalid"]]
             if not parser['EXPERIMENT'].get('MEMBERS', ""):
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory EXPERIMENT.MEMBERS parameter is invalid"]]
-            if parser['EXPERIMENT'].get('CHUNKSIZEUNIT', "").lower() not in ['year', 'month', 'day', 'hour']:
+            if parser['EXPERIMENT'].get('CHUNKSIZEUNIT', "").lower() not in [u.value for u in ChunkUnit]:
                 self.wrong_config["Expdef"] += [['experiment', "Mandatory EXPERIMENT.CHUNKSIZEUNIT choice is invalid"]]
             if type(parser['EXPERIMENT'].get('CHUNKSIZE', "-1")) not in [int]:
                 if parser['EXPERIMENT']['CHUNKSIZE'] == "-1":

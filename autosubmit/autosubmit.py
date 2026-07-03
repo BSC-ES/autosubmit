@@ -63,6 +63,7 @@ from autosubmit.experiment.experiment_common import (
 )
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
+from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, recover_stale_job_data, user_yes_no_query
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
@@ -1687,7 +1688,7 @@ class Autosubmit:
         member_list = as_conf.get_member_list()
         as_conf.get_member_list(run_only=True)
         date_format = ''
-        if as_conf.get_chunk_size_unit() == 'hour':
+        if as_conf.get_chunk_size_unit() == ChunkUnit.HOUR:
             date_format = 'H'
         for date in date_list:
             if date.hour > 1:
@@ -4361,7 +4362,7 @@ class Autosubmit:
                     job_list = JobList(expid, as_conf, YAMLParserFactory(),
                                        Autosubmit._get_job_list_persistence(expid, as_conf))
                     date_format = ''
-                    if as_conf.get_chunk_size_unit() == 'hour':
+                    if as_conf.get_chunk_size_unit() == ChunkUnit.HOUR :
                         date_format = 'H'
                     for date in date_list:
                         if date.hour > 1:
@@ -5673,7 +5674,7 @@ class Autosubmit:
         run_only_members = as_conf.get_member_list(run_only=True)
         date_list = as_conf.get_date_list()
         date_format = ''
-        if as_conf.get_chunk_size_unit() == 'hour':
+        if as_conf.get_chunk_size_unit() == ChunkUnit.HOUR:
             date_format = 'H'
         for date in date_list:
             if date.hour > 1:

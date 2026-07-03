@@ -22,6 +22,7 @@ from typing import Optional, Any, TYPE_CHECKING
 from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date
 from networkx.classes import DiGraph
 
+from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log, AutosubmitCritical
 
@@ -94,7 +95,7 @@ def calendar_unitsize_getlowersize(unitsize: str) -> str:
     except KeyError:
         raise AutosubmitCritical("Invalid calendar unit size")
     if unit_value == 0:
-        return "hour"
+        return ChunkUnit.HOUR
     else:
         return list(CALENDAR_UNITSIZE_ENUM.keys())[unit_value - 1]
 
@@ -139,11 +140,11 @@ def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int, ca
         num_days_in_a_year = 366
     else:
         num_days_in_a_year = 365
-    if chunk_unit == "year":
+    if chunk_unit == ChunkUnit.YEAR:
         chunk_size_in_hours = num_days_in_a_year * 24 * chunk_length
-    elif chunk_unit == "month":
+    elif chunk_unit == ChunkUnit.MONTH:
         chunk_size_in_hours = calendar_get_month_days(date_str, cal) * 24 * chunk_length
-    elif chunk_unit == "day":
+    elif chunk_unit == ChunkUnit.DAY:
         chunk_size_in_hours = 24 * chunk_length
     else:
         chunk_size_in_hours = chunk_length
@@ -172,11 +173,11 @@ def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
     else:
         num_days_in_a_year = 365
 
-    if split_unit == "year":
+    if split_unit == ChunkUnit.YEAR:
         split_size_in_hours = num_days_in_a_year * 24 * split_size
-    elif split_unit == "month":
+    elif split_unit == ChunkUnit.MONTH:
         split_size_in_hours = calendar_get_month_days(date_str, cal) * 24 * split_size
-    elif split_unit == "day":
+    elif split_unit == ChunkUnit.DAY:
         split_size_in_hours = 24 * split_size
     else:
         split_size_in_hours = split_size
@@ -205,7 +206,7 @@ def _validate_calendar_inputs(
     :return: None
     :raises: AutosubmitCritical if any of the inputs are invalid
     """
-    if chunk_unit == "hour":
+    if chunk_unit == ChunkUnit.HOUR:
         raise AutosubmitCritical(
             "Chunk unit is hour, Autosubmit doesn't support lower than hour splits. Please change the chunk unit to day or higher. Or don't use calendar splits."
         )
@@ -246,11 +247,11 @@ def _count_units_between_dates(start_date: datetime, end_date: datetime, unit: s
     :rtype: float
     :raises: AutosubmitCritical if the unit is invalid
     """
-    if unit == "hour":
+    if unit == ChunkUnit.HOUR:
         return float((end_date - start_date).days * 24)
-    elif unit == "day":
+    elif unit == ChunkUnit.DAY:
         return float((end_date - start_date).days)
-    elif unit == "month":
+    elif unit == ChunkUnit.MONTH:
         total = 0.0
         current = start_date.replace(day=1)
         while current < end_date:
@@ -266,7 +267,7 @@ def _count_units_between_dates(start_date: datetime, end_date: datetime, unit: s
                 total += days_covered / days_in_month
             current = next_month
         return total
-    elif unit == "year":
+    elif unit == ChunkUnit.YEAR:
         total = 0.0
         current = start_date
         while current < end_date:
@@ -387,14 +388,14 @@ def get_split_size_unit(data: dict[str, Any], section: str) -> str:
     split_unit = str(data.get('JOBS', {}).get(section, {}).get('SPLITSIZEUNIT', "none")).lower()
     if split_unit == "none":
         split_unit = str(data.get('EXPERIMENT', {}).get('CHUNKSIZEUNIT', "day")).lower()
-        if split_unit == "year":
-            return "month"
-        elif split_unit == "month":
-            return "day"
-        elif split_unit == "day":
-            return "hour"
+        if split_unit == ChunkUnit.YEAR:
+            return ChunkUnit.MONTH
+        elif split_unit == ChunkUnit.MONTH:
+            return ChunkUnit.DAY
+        elif split_unit == ChunkUnit.DAY:
+            return ChunkUnit.HOUR
         else:
-            return "day"
+            return ChunkUnit.DAY
     return split_unit
 
 

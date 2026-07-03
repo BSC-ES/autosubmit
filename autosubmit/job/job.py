@@ -33,6 +33,7 @@ from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_da
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
@@ -2048,7 +2049,7 @@ class Job(object):
             else:
                 split_end = chunk_end_date(split_start, split_length, split_unit, cal)
 
-            if split_unit == 'hour':
+            if split_unit == ChunkUnit.HOUR:
                 split_end_1 = split_end - datetime.timedelta(hours=1)
             else:
                 split_end_1 = previous_day(split_end, cal)
@@ -2104,7 +2105,7 @@ class Job(object):
             chunk_end = chunk_end_date(
                 chunk_start, chunk_length, chunk_unit, cal)
 
-            if chunk_unit == 'hour':
+            if chunk_unit == ChunkUnit.HOUR:
                 chunk_end_1 = chunk_end - datetime.timedelta(hours=1)
             else:
                 chunk_end_1 = previous_day(chunk_end, cal)
