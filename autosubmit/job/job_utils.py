@@ -95,7 +95,7 @@ def calendar_unitsize_getlowersize(unitsize: str) -> str:
     except KeyError:
         raise AutosubmitCritical("Invalid calendar unit size")
     if unit_value == 0:
-        return "hour"
+        return ChunkUnit.HOUR
     else:
         return list(CALENDAR_UNITSIZE_ENUM.keys())[unit_value - 1]
 
@@ -389,13 +389,13 @@ def get_split_size_unit(data: dict[str, Any], section: str) -> str:
     if split_unit == "none":
         split_unit = str(data.get('EXPERIMENT', {}).get('CHUNKSIZEUNIT', "day")).lower()
         if split_unit == ChunkUnit.YEAR:
-            return "month"
+            return ChunkUnit.MONTH
         elif split_unit == ChunkUnit.MONTH:
-            return "day"
+            return ChunkUnit.DAY
         elif split_unit == ChunkUnit.DAY:
-            return "hour"
+            return ChunkUnit.HOUR
         else:
-            return "day"
+            return ChunkUnit.DAY
     return split_unit
 
 

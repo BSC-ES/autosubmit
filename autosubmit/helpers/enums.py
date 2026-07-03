@@ -25,3 +25,4 @@ class ChunkUnit(str, Enum):
     MONTH = 'month'
     DAY = 'day'
     HOUR = 'hour'
+    
