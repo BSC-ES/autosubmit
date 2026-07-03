@@ -71,3 +71,4 @@ def test_chunk_unit_invalid_value_raises():
     """Constructing ChunkUnit from an unknown value raises ValueError."""
     with pytest.raises(ValueError):
         ChunkUnit('minute')
+        
