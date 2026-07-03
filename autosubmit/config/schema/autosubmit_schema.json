@@ -105,6 +105,22 @@
                 }
             },
             "additionalProperties": false
+        },
+
+        "experimentSection": {
+            "type": "object",
+            "description": "...",
+            "required": [
+                "DATELIST",
+                "MEMBERS",
+                "CHUNKSIZEUNIT",
+                "NUMCHUNKS",
+                "CALENDAR"
+            ],
+            "properties": {
+                "DATELIST": { "$ref": "#/definitions/nonEmptyString", "description": "Space-separated start dates in YYYYMMDD format."},
+                "MEMBERS": { "$ref": "#/definitions/nonEmptyString", "description": "Space-separated ensemble member names."}
+            }
         }
     },
     "properties": {
