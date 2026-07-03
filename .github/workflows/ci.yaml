@@ -62,6 +62,11 @@ jobs:
 
       - name: Coverage report
         run: |
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
           coverage xml
 
@@ -140,6 +145,11 @@ jobs:
 
       - name: Coverage report
         run: |
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
           coverage xml
 
@@ -187,6 +197,8 @@ jobs:
           overwrite: true
 
   test-regression:
+    env:
+      COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -225,6 +237,11 @@ jobs:
 
       - name: Coverage report
         run: |
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
           coverage xml
 
@@ -236,6 +253,8 @@ jobs:
           retention-days: 7
 
   test-slurm:
+    env:
+      COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
 
     strategy:
@@ -275,6 +294,11 @@ jobs:
 
       - name: Coverage report
         run: |
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
           coverage xml
 
@@ -316,6 +340,8 @@ jobs:
   #       without checking or deploying the produced HTML, just to i) verify that
   #       we can build it and ii) collect the coverage of the examples executed.
   test-docs:
+    env:
+      COVERAGE_PROCESS_START: .coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -350,8 +376,13 @@ jobs:
       - name: Coverage report
         run: |
           cd docs
-          coverage xml
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
+          coverage xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7

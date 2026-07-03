@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import cProfile
-import os
 import pstats
 import re
 import shutil
@@ -202,14 +201,12 @@ def check_differences(data1: dict, data2: dict) -> list:
     return differences
 
 
-def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any) -> None:
-    """
-    Test the destine workflow (a1q2) hardcoded until CI/CD.
-    """
+def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any, monkeypatch) -> None:
+    """Test the Destination Earth workflow (a1q2) hardcoded until CI/CD."""
     profiler = cProfile.Profile()
-    os.environ["AS_ENV_PLATFORMS_PATH"] = "test"
-    os.environ["AS_ENV_SSH_CONFIG_PATH"] = "test2"
-    os.environ["SUDO_USER"] = "dummy"
+    monkeypatch.setenv("AS_ENV_PLATFORMS_PATH", "test")
+    monkeypatch.setenv("AS_ENV_SSH_CONFIG_PATH", "test2")
+    monkeypatch.setenv("SUDO_USER", "dummy")
     expid = "a000"  # TODO parametrize
     mocker.patch.object(BasicConfig, 'read', return_value=True)
     current_script_location = Path(__file__).resolve().parent

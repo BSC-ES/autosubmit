@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 
 import pytest
 
@@ -64,13 +63,13 @@ import pytest
     ],
     ids=["Check environment variables with SUDO", "Check environment variables without SUDO"]
 )
-def test_as_env_variables(autosubmit_config, data, expected_data, sudo_user):
-    os.environ["AS_ENV_PLATFORMS_PATH"] = "test"
+def test_as_env_variables(autosubmit_config, data, expected_data, sudo_user, monkeypatch):
+    monkeypatch.setenv("AS_ENV_PLATFORMS_PATH", "test")
     if sudo_user:
-        os.environ["SUDO_USER"] = "test_user"
+        monkeypatch.setenv("SUDO_USER", "test_user")
     else:
-        os.environ.pop("SUDO_USER", None)
-        os.environ["USER"] = "dummy"
+        monkeypatch.delenv("SUDO_USER", raising=False)
+        monkeypatch.setenv("USER", "dummy")
     as_conf = autosubmit_config(
         expid='a000',
         experiment_data=data)
