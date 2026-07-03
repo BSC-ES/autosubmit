@@ -82,7 +82,7 @@ tests = [
     "pytest>=8.2,<9.2",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.15.19",
+    "ruff==0.15.20",
     "pytest-xdist",
     "testcontainers",
     "pytest-timeout",
@@ -93,7 +93,7 @@ tests = [
 ]
 docs = [
     "livereload",
-    "pydata-sphinx-theme>=0.16.1,<0.17",
+    "pydata-sphinx-theme>=0.16.1,<0.20",
     "sphinx>=5,<10",
     "sphinx-autobuild>=2021.3,<2025.9",
     "sphinx_rtd_theme",
