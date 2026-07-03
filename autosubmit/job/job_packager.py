@@ -283,10 +283,17 @@ class JobPackager(object):
                         break
 
             min_v, min_h, balanced = self.check_real_package_wrapper_limits(p)
-            # if the quantity is enough, make the wrapper
-            if len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and min_h >= \
-                    wrapper_limits["min_h"] and not failed_innerjobs:
-
+            # if the quantity is enough, make the wrapper (or below min but no more jobs can come)
+            if (len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and min_h >=
+                wrapper_limits["min_h"] and not failed_innerjobs) or \
+                (not failed_innerjobs and self._remaining_blocked_by_package(
+                    self._jobs_list.get_jobs_by_section(
+                        self.jobs_in_wrapper[self.current_wrapper_section],
+                        [job.name for job in p.jobs],
+                        True
+                    ),
+                    p.jobs
+                )):
                 for job in p.jobs:
                     job.wrapper_type = p.wrapper_type
 
