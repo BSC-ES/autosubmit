@@ -79,31 +79,39 @@
                     "description": "PRE files load before experiment config, POST files after."
                 }
             ]
+        },
+        "defaultSection": {
+            "type": "object",
+            "description": "Experiment default parameters. EXPID nad HPCARCH are required.",
+            "required": [
+                "EXPID",
+                "HPCARCH"
+            ],
+            "properties": {
+                "EXPID": {
+                    "$ref": "#/definitions/nonEmptyString",
+                    "description": "4 characters experiment ID. (Example: a000)"
+                },
+                "HPCARCH": {
+                    "$ref": "#/definitions/nonEmptyString",
+                    "description": "Default HPC platform name. Must match a PLATFORMS key or be LOCAL."
+                },
+                "CUSTOM_CONFIG": {
+                    "$ref": "#/definitions/customConfigSpec"
+                },
+                "DESCRIPTION": {
+                    "type": "string",
+                    "description": "Experiment description."
+                }
+            },
+            "additionalProperties": false
         }
     },
-    "defaultSection": {
-        "type": "object",
-        "description": "Experiment default parameters. EXPID nad HPCARCH are required.",
-        "required": [
-            "EXPID",
-            "HPCARCH"
-        ],
-        "properties": {
-            "EXPID": {
-                "$ref": "#/definitions/nonEmptyString",
-                "description": "4 characters experiment ID. (Example: a000)"
-            },
-            "HPCARCH": {
-                "$ref": "#/definitions/nonEmptyString",
-                "description": "Default HPC platform name. Must match a PLATFORMS key or be LOCAL."
-            },
-            "CUSTOM_CONFIG": {
-                "$ref": "#/definitions/customConfigSpec"
-            },
-            "DESCRIPTION": {
-                "type": "string",
-                "description": "Experiment description."
-            }
+    "properties": {
+        "DEFAULT": {
+            "$ref": "#/definitions/defaultSection",
+            "description": "Global experiment defaults."
         }
-    }
+    },
+    "additionalProperties": true
 }
