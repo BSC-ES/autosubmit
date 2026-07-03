@@ -333,7 +333,7 @@ class JobPackager(object):
         - A temporary state where non-wrapped jobs are still active and will
           eventually complete, unblocking the wrapper chain.
 
-        A non-wrapped job is considered to block the deadlock declaration if:
+        A non-wrapped job blocks the deadlock detection when:
         - ``READY`` can be submitted immediately.
         - ``RUNNING``, ``QUEUING``, ``SUBMITTED`` actively progressing in the scheduler.
         - ``WAITING`` **and** has at least one non-wrapped parent that is not ``COMPLETED``
@@ -352,7 +352,7 @@ class JobPackager(object):
             if job.status in (Status.READY, Status.RUNNING, Status.QUEUING,
                               Status.SUBMITTED):
                 return True
-            if job.status == Status.WAITING:
+            elif job.status == Status.WAITING:
                 for parent in job.parents:
                     if parent.section.upper() not in all_wrapped and parent.status != Status.COMPLETED:
                         return True

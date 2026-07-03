@@ -6,8 +6,6 @@
   active or could become ready later #3084
 - Fixed leftover wrapper batch stuck on MIN_WRAPPED when remaining
   jobs are blocked by the same package #3084
-
-
 - Fixed autosubmit describe warning about non-experiment directories (e.g. logs, archive folders) by enumerating experiments from the database instead of scanning the root directory #1110
 - Fixed generate_output and generate_output_txt in Monitor to include seconds in the output filename timestamp, preventing files from being overwritten when generated within the same minute #1159 #1368
 - Fix for energy data that was not being stored for the last job of the batch #2657 #2418
