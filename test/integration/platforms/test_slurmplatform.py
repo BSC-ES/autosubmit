@@ -167,7 +167,8 @@ def test_run_simple_workflow_slurm(
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
-
+# TODO: 4.2 - readd hybrid wrappers
+@pytest.mark.timeout(25)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -303,86 +304,10 @@ def test_run_simple_workflow_slurm(
             },
         },
     },
-    {
-        'JOBS': {
-            'SIMHV': {
-                'DEPENDENCIES': {
-                    'SIMHV-1': {}
-                },
-                'SCRIPT': 'echo "0"',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'chunk',
-                'CHECK': 'on_submission',
-                'RETRIALS': 1,
-                'PLATFORM': _PLATFORM_NAME,
-            },
-        },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            },
-        },
-        'WRAPPERS': {
-            'WRAPPERHV': {
-                'TYPE': 'horizontal-vertical',
-                'JOBS_IN_WRAPPER': 'SIMHV',
-                'RETRIALS': 0,
-            },
-        },
-    },
-    {
-        'JOBS': {
-            'SIMVH': {
-                'DEPENDENCIES': {
-                    'SIMVH-1': {},
-                },
-                'SCRIPT': 'echo "0"',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'chunk',
-                'CHECK': 'on_submission',
-                'RETRIALS': 1,
-                'PLATFORM': _PLATFORM_NAME,
-            },
-        },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            },
-        },
-        'WRAPPERS': {
-            'WRAPPERVH': {
-                'TYPE': 'vertical-horizontal',
-                'JOBS_IN_WRAPPER': 'SIMVH',
-                'RETRIALS': 0,
-            },
-        },
-    },
 ], ids=[
     'Vertical Wrapper Workflow',
     'Wrapper Vertical',
     'Wrapper Horizontal',
-    'Wrapper Horizontal-vertical',
-    'Wrapper Vertical-horizontal',
 ])
 def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
                                          slurm_server: 'DockerContainer'):

@@ -20,7 +20,7 @@ import operator
 from contextlib import suppress
 from math import ceil
 from operator import attrgetter
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Union
 
 from bscearth.utils.date import sum_str_hours
 
@@ -283,10 +283,17 @@ class JobPackager(object):
                         break
 
             min_v, min_h, balanced = self.check_real_package_wrapper_limits(p)
-            # if the quantity is enough, make the wrapper
-            if len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and min_h >= \
-                    wrapper_limits["min_h"] and not failed_innerjobs:
-
+            # if the quantity is enough, make the wrapper (or below min but no more jobs can come)
+            if (len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and min_h >=
+                wrapper_limits["min_h"] and not failed_innerjobs) or \
+                (not failed_innerjobs and self._remaining_blocked_by_package(
+                    self._jobs_list.get_jobs_by_section(
+                        self.jobs_in_wrapper[self.current_wrapper_section],
+                        [job.name for job in p.jobs],
+                        True
+                    ),
+                    p.jobs
+                )):
                 for job in p.jobs:
                     job.wrapper_type = p.wrapper_type
 
@@ -305,21 +312,90 @@ class JobPackager(object):
 
         return packages_to_submit, max_jobs_to_submit
 
+    @staticmethod
+    def _get_wrapped_sections(jobs_in_wrapper: Union[dict, str]) -> set[str]:
+        """Build a set of wrapped section names from the raw wrapper config.
+
+        :param jobs_in_wrapper: Raw wrapper sections configuration.
+        :return: Set of uppercase section names that belong to some wrapper.
+        :rtype: set[str]
+        """
+        wrapped = set()
+        if isinstance(jobs_in_wrapper, dict):
+            for sections in jobs_in_wrapper.values():
+                if isinstance(sections, str):
+                    sections = sections.split()
+                for section in sections:
+                    wrapped.add(section.upper())
+        elif isinstance(jobs_in_wrapper, str):
+            for section in jobs_in_wrapper.split():
+                wrapped.add(section.upper())
+        return wrapped
+
+    def _has_blocking_non_wrapped_jobs(self) -> bool:
+        """Check if there are non-wrapped jobs that can still progress, preventing a false deadlock.
+
+        With ``strict`` or ``mixed`` wrapper policies, ``is_deadlock`` must distinguish between:
+        - A genuine deadlock where nothing can ever progress.
+        - A temporary state where non-wrapped jobs are still active and will
+          eventually complete, unblocking the wrapper chain.
+
+        A non-wrapped job blocks the deadlock detection when:
+        - ``READY`` can be submitted immediately.
+        - ``RUNNING``, ``QUEUING``, ``SUBMITTED`` actively progressing in the scheduler.
+        - ``WAITING`` **and** has at least one non-wrapped parent that is not ``COMPLETED``
+          and can become READY once that parent progresses. The parent check is critical:
+          a WAITING job whose ONLY non-COMPLETED parents are wrappable is genuinely
+          blocked by the wrapper deadlock and cannot progress on its own.
+
+        :return: True if there are non-wrapped jobs that block deadlock detection.
+        :rtype: bool
+        """
+        all_wrapped = self._get_wrapped_sections(self.jobs_in_wrapper)
+
+        for job in self._jobs_list._job_list:
+            if job.section.upper() in all_wrapped:
+                continue
+            if job.status in (Status.READY, Status.RUNNING, Status.QUEUING,
+                              Status.SUBMITTED):
+                return True
+            elif job.status == Status.WAITING:
+                for parent in job.parents:
+                    if parent.section.upper() not in all_wrapped and parent.status != Status.COMPLETED:
+                        return True
+        return False
+
     def is_deadlock(self, any_simple_packages: bool, not_wrappeable_package_info: list,
                     built_packages_tmp: list) -> bool:
-        """
-        Check if the current state is a deadlock.
+        """Check if the current state is a deadlock.
+
+        A deadlock is declared when ALL of these hold:
+        1. No non-wrapped jobs are READY in this iteration (``any_simple_packages``).
+        2. No jobs are in the scheduler queue (submitted, running, queuing, held).
+        3. No non-wrapped jobs exist that *could* still progress
+           (``_has_blocking_non_wrapped_jobs``). This catches active non-wrapped chains
+           even when they have no READY jobs *right now*.
+        4. All built packages in this iteration are unwrappable.
+
+        Conditions 2 and 3 together provide a global view: a non-wrapped chain
+        may have a split RUNNING (in queue) while the next split is WAITING (detected
+        by ``_has_blocking_non_wrapped_jobs``). Either is enough to suppress the deadlock
+        and let the wrapper sections accumulate more jobs over successive iterations.
 
         :param any_simple_packages: Flag indicating if there are any simple packages.
         :param not_wrappeable_package_info: List of not wrappable package information.
         :param built_packages_tmp: List of built packages.
         :return: True if it is a deadlock, False otherwise.
         """
-        return (
-                not any_simple_packages
-                and len(self._jobs_list.get_in_queue()) == 0
-                and len(not_wrappeable_package_info) == len(built_packages_tmp)
-        )
+        if any_simple_packages:
+            return False
+        if len(self._jobs_list.get_in_queue()) > 0:
+            return False
+        if len(not_wrappeable_package_info) != len(built_packages_tmp):
+            return False
+        if self._has_blocking_non_wrapped_jobs():
+            return False
+        return True
 
     def submit_remaining_jobs(self, p: JobPackageBase, packages_to_submit: list, max_jobs_to_submit: int) -> int:
         """
@@ -401,10 +477,27 @@ class JobPackager(object):
                 max_jobs_to_submit -= 1
         return max_jobs_to_submit
 
+    @staticmethod
+    def _remaining_blocked_by_package(remaining: list, package_jobs: list) -> bool:
+        """True if all non-COMPLETED parents of WAITING remaining jobs are
+        only within ``package_jobs`` or the ``remaining`` chain itself.
+        Otherwise an external parent could resolve independently,
+        so we should not bypass the policy."""
+        remaining_names = {r.name for r in remaining}
+        return all(
+            j.parents
+            and all(
+                parent.status == Status.COMPLETED
+                or parent in package_jobs
+                or parent.name in remaining_names
+                for parent in j.parents
+            )
+            for j in remaining
+        )
+
     def process_not_wrappeable_packages(self, not_wrappeable_package_info: list, packages_to_submit: list,
                                         max_jobs_to_submit: int, wrapper_limits: dict):
-        """
-        Process the not wrappable packages based on the policy.
+        """Process the not wrappable packages based on the policy.
 
         :param not_wrappeable_package_info: List of not wrappable package information.
         :param packages_to_submit: List of packages to be submitted.
@@ -414,9 +507,13 @@ class JobPackager(object):
         """
         for p, min_v, min_h, balanced in not_wrappeable_package_info:
             err_message = self.error_message_policy(min_h, min_v, wrapper_limits, balanced, p.jobs)
-            if not self._jobs_list.get_jobs_by_section(self.jobs_in_wrapper[self.current_wrapper_section],
-                                                       [job.name for job in p.jobs],
-                                                       True):
+            remaining = self._jobs_list.get_jobs_by_section(self.jobs_in_wrapper[self.current_wrapper_section],
+                                                            [job.name for job in p.jobs],
+                                                            True)
+            if (
+                all(j.status == Status.WAITING for j in remaining)
+                and self._remaining_blocked_by_package(remaining, p.jobs)
+            ):
                 max_jobs_to_submit = self.submit_remaining_jobs(p, packages_to_submit, max_jobs_to_submit)
             else:
                 if self.wrapper_policy[self.current_wrapper_section] == "strict":

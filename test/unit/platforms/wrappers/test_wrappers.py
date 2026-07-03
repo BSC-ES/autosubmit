@@ -2295,6 +2295,81 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
     assert result == expected
 
 
+def _make_blocked_test_jobs(package_job_statuses, remaining_job_specs):
+    """Build ``(package_jobs, remaining_jobs)`` for testing ``_remaining_blocked_by_package``.
+
+    Each entry in ``remaining_job_specs`` is a tuple ``(parent_source, parent_index)``
+    determining where the WAITING job gets its parent from:
+    """
+    package_jobs = [Job(f"p{i}", str(i), status, 0)
+                    for i, status in enumerate(package_job_statuses)]
+    remaining_jobs = []
+    for i, (parent_source, parent_index) in enumerate(remaining_job_specs):
+        job = Job(f"r{i}", str(100 + i), Status.WAITING, 0)
+        if parent_source == "pkg":
+            job.parents = {package_jobs[parent_index]}
+        elif parent_source == "rem":
+            job.parents = {remaining_jobs[parent_index]}
+        else:
+            external = Job(f"ext_{i}", str(200 + i), parent_source, 0)
+            job.parents = {external}
+        remaining_jobs.append(job)
+    return package_jobs, remaining_jobs
+
+
+@pytest.mark.parametrize("desc, pkg_statuses, remaining_specs, expected", [
+    ("direct blocked", [Status.READY], [("pkg", 0)], True),
+    ("external FAILED", [Status.READY], [(Status.FAILED, 0)], False),
+    ("transitive chain", [Status.READY], [("pkg", 0), ("rem", 0)], True),
+    ("COMPLETED parent", [], [(Status.COMPLETED, 0)], True),
+], ids=["direct", "external_failed", "transitive", "completed_parent"])
+def test_remaining_blocked_by_package(desc, pkg_statuses, remaining_specs, expected):
+    pkg, remaining = _make_blocked_test_jobs(pkg_statuses, remaining_specs)
+    assert JobPackager._remaining_blocked_by_package(remaining, pkg) is expected
+
+
+@pytest.mark.parametrize("not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, expected, unparsed_policy, two_remaining", [
+    ([["_", 1, 1, True]], [], 100, 99, "strict", False),
+    ([["_", 1, 1, False]], [], 100, 99, "mixed", False),
+    ([["_", 1, 1, True]], [], 100, 99, "flexible", False),
+    ([["_", 1, 1, True]], [], 100, 99, "strict", True),
+], ids=["strict_policy", "mixed_policy", "flexible_policy", "strict_2_remaining_transitive"])
+def test_process_not_wrappeable_packages_remaining_blocked_by_package(
+        setup, not_wrappeable_package_info, packages_to_submit,
+        max_jobs_to_submit, expected, unparsed_policy, two_remaining):
+    """Remaining WAITING job depends on the unwrappable package → submit individually."""
+    job_packager, vertical_package = setup
+    policy = unparsed_policy
+    job_packager._as_config.experiment_data["WRAPPERS"]["WRAPPERS"]["POLICY"] = policy
+    job_packager.wrapper_policy = {"WRAPPERS": policy}
+    vertical_package.wrapper_policy = policy
+    not_wrappeable_package_info[0][0] = vertical_package
+
+    for job in vertical_package.jobs:
+        job.status = Status.READY
+
+    rem1 = Job("rem1", "3", Status.WAITING, 0)
+    rem1._init_runtime_parameters()
+    rem1.wallclock = "00:20"
+    rem1.section = "SECTION1"
+    rem1.platform = job_packager._platform
+    rem1.parents = {vertical_package.jobs[0]}
+    job_packager._jobs_list._job_list.append(rem1)
+
+    if two_remaining:
+        rem2 = Job("rem2", "4", Status.WAITING, 0)
+        rem2._init_runtime_parameters()
+        rem2.wallclock = "00:20"
+        rem2.section = "SECTION1"
+        rem2.platform = job_packager._platform
+        rem2.parents = {rem1}
+        job_packager._jobs_list._job_list.append(rem2)
+
+    result = job_packager.process_not_wrappeable_packages(
+        not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+    assert result == expected
+
+
 def test_build_imports():
     kwargs: dict = {'header_directive': True, 'jobs_scripts': ["test"], 'threads': 2, 'num_processors': True,
                     'num_processors_value': True, 'expid': True, 'name': 'test_wrapper'}
@@ -2400,3 +2475,68 @@ def test_vertical_job_thread_uses_fail_count(wrapper_builder: PythonVerticalWrap
     thread = wrapper_builder.build_job_thread()
     assert 'fail_count' in thread
     assert 'self.fail_count' in thread
+
+
+@pytest.mark.parametrize("policy", ["strict", "flexible", "mixed"],
+                         ids=["strict", "flexible", "mixed"])
+def test_packages_below_min_section_exhausted(setup, policy):
+    job_packager, _ = setup
+    wrapper_limits = {
+        "real_min": 3, "min_v": 3, "min_h": 1,
+        "min": 3, "max": 99, "max_v": 99, "max_h": 99,
+        "max_by_section": {"SECTION1": 99}
+    }
+    for job in job_packager._jobs_list._job_list:
+        job.status = Status.READY
+    single_package = JobPackageVertical(
+        job_packager._jobs_list._job_list[:], configuration=job_packager._as_config
+    )
+    job_packager.wrapper_policy = {"WRAPPERS": policy}
+    job_packager.retrials = 0
+    pkgs, remaining = job_packager.check_packages_respect_wrapper_policy(
+        [single_package], [], 100, wrapper_limits
+    )
+    assert len(pkgs) == 1
+    assert pkgs[0] == single_package
+    assert remaining == 99
+
+
+@pytest.mark.parametrize("policy, expected_len, expected_remaining", [
+    ("strict", 0, 100), ("mixed", 0, 100), ("flexible", 2, 98),
+], ids=["strict", "mixed", "flexible"])
+def test_packages_below_min_section_not_exhausted(
+        setup, policy, expected_len, expected_remaining):
+    """2 jobs in package, real_min=3, remaining WAITING chain to external FAILED — NOT force-wrap."""
+    job_packager, _ = setup
+    wrapper_limits = {
+        "real_min": 3, "min_v": 3, "min_h": 1,
+        "min": 3, "max": 99, "max_v": 99, "max_h": 99,
+        "max_by_section": {"SECTION1": 99}
+    }
+    for job in job_packager._jobs_list._job_list:
+        job.status = Status.READY
+    single_package = JobPackageVertical(
+        job_packager._jobs_list._job_list[:], configuration=job_packager._as_config
+    )
+    parent_failed = Job("parent_failed", "99", Status.FAILED, 0)
+    parent_failed._init_runtime_parameters()
+    parent_failed.section = "SECTION1"
+    parent_failed.platform = job_packager._platform
+    parent_waiting = Job("rem_waiting", "100", Status.WAITING, 0)
+    parent_waiting._init_runtime_parameters()
+    parent_waiting.section = "SECTION1"
+    parent_waiting.platform = job_packager._platform
+    parent_waiting.parents = {parent_failed}
+    rem1 = Job("rem1", "101", Status.WAITING, 0)
+    rem1._init_runtime_parameters()
+    rem1.section = "SECTION1"
+    rem1.platform = job_packager._platform
+    rem1.parents = {parent_waiting}
+    job_packager._jobs_list._job_list.extend([parent_failed, parent_waiting, rem1])
+    job_packager.wrapper_policy = {"WRAPPERS": policy}
+    job_packager.retrials = 0
+    pkgs, remaining = job_packager.check_packages_respect_wrapper_policy(
+        [single_package], [], 100, wrapper_limits
+    )
+    assert len(pkgs) == expected_len
+    assert remaining == expected_remaining
