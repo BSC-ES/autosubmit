@@ -17,18 +17,19 @@
 
 """Fixtures available to all test files must be created in this file."""
 
-import multiprocessing.spawn as mpspawn
 import os
 import pwd
 from contextlib import suppress
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING, Generator
+from functools import wraps
 
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig, generate_dirs
+import autosubmit.platforms.platform as platform_module
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
@@ -235,16 +236,37 @@ def avoid_long_sleep_time(session_mocker):
     session_mocker.patch('time.sleep', side_effect=my_sleep)
     
 
-_original_main = mpspawn._main
+_original_recover_platform_job_logs_wrapper = platform_module.recover_platform_job_logs_wrapper
+
+_process_coverage = None
 
 
-def _patched_main(fd, parent_sentinel):
+@wraps(_original_recover_platform_job_logs_wrapper)
+def _start_coverage_and_start_processes(*args, **kwargs):
     with suppress(Exception):
         import coverage
-        coverage.process_startup()
+        global _process_coverage
+        _process_coverage = coverage.process_startup()
 
-    return _original_main(fd, parent_sentinel)
+    return _original_recover_platform_job_logs_wrapper(*args, **kwargs)
 
 
-def pytest_configure(config):
-    mpspawn._main = _patched_main
+platform_module.recover_platform_job_logs_wrapper = _start_coverage_and_start_processes
+
+
+def _stop_coverage_and_exit(code):
+    """Stop coverage collection and exit.
+
+    Autosubmit code by default calls _exit(0). We _MUST_ not add
+    testing and coverage code to production, if possible. So, instead,
+    we take the hacky-road and patch the _exit here."""
+    with suppress(Exception):
+        global _process_coverage
+        if _process_coverage is not None:
+            _process_coverage.stop()  #type: ignore
+            _process_coverage.save()  #type: ignore
+
+    raise SystemExit(code)
+
+
+platform_module._exit = _stop_coverage_and_exit

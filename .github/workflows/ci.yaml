@@ -62,6 +62,11 @@ jobs:
 
       - name: Coverage report
         run: |
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
           coverage xml
 
@@ -140,6 +145,11 @@ jobs:
 
       - name: Coverage report
         run: |
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
           coverage xml
 
@@ -227,6 +237,11 @@ jobs:
 
       - name: Coverage report
         run: |
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
           coverage xml
 
@@ -279,6 +294,11 @@ jobs:
 
       - name: Coverage report
         run: |
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
           coverage xml
 
@@ -356,8 +376,13 @@ jobs:
       - name: Coverage report
         run: |
           cd docs
-          coverage xml
+          files=$(find . -maxdepth 1 -name ".coverage*" ! -name ".coveragerc" | wc -l)
+      
+          if [ "$files" -gt 1 ]; then
+            coverage combine || true
+          fi
           coverage report
+          coverage xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
