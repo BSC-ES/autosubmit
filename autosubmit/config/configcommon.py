@@ -2759,7 +2759,14 @@ class AutosubmitConfig(object):
          """
         if wrapper is None:
             wrapper = {}
-        return wrapper.get('METHOD', self.experiment_data.get("WRAPPERS", {}).get("METHOD", 'ASThread'))
+        # TODO: [ENGINES] Double check this. It should be able to return "None" and the job packager would decide the default method based on the type.
+        method = wrapper.get('METHOD', self.experiment_data.get("WRAPPERS", {}).get("METHOD", ''))
+        if not method:
+            if wrapper.get('TYPE', "") == "delegated":
+                method = "flux"
+            else:
+                method = 'ASThread'
+        return method
 
     def get_wrapper_check_time(self):
         """Returns time to check the status of jobs in the wrapper.

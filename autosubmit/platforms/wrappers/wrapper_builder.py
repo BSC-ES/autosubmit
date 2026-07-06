@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -14,12 +14,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import random
 import string
 import textwrap
-import re
-from autosubmit.log.log import AutosubmitCritical
+from abc import ABC, abstractmethod
 
 
 
@@ -65,7 +65,6 @@ class WrapperBuilder(object):
         self.machinefiles_indent = 0
         self.exit_thread = ''
         self.fail_count = kwargs.get('fail_count', 0)
-        self.custom_env_setup = kwargs['wrapper_data'].custom_env_setup
 
         if "wallclock_by_level" in list(kwargs.keys()):
             self.wallclock_by_level = kwargs['wallclock_by_level']
@@ -85,7 +84,8 @@ class WrapperBuilder(object):
         return ""  # pragma: no cover
 
     def build_job_thread(self):
-        pass  # pragma: no cover
+        """Return an empty string by default; subclasses may override."""
+        return ""  # pragma: no cover
 
     # hybrids
     def build_joblist_thread(self, **kwargs):
@@ -134,353 +134,251 @@ class WrapperBuilder(object):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
 
-class FluxWrapperBuilder(WrapperBuilder):
-    # TODO: [ENGINES] Is it necessary to pass the run_id to the inner jobs?
-    # TODO: [ENGINES] Add flux.job.Jobspec.validate_jobspec before submission
-    """
-    The FluxWrapperBuilder is the responsible for generating the wrapper script
-    that will be submitted to Slurm to initialize Flux and submit the inner jobs
-    to the Flux scheduler inside the allocation.
-    
-    This is a special implementation because we use Flux as a wrapper engine inside 
-    Slurm allocations, not as a platform.
-    """
-    def build_imports(self):
-        return ""
-    
-    def build_job_thread(self):
-        return ""
-    
-    def build_main(self):
-        if not self.job_scripts:
-            raise AutosubmitCritical("No job scripts found for building the Flux wrapper.")
+class DelegatedWrapperBuilder(WrapperBuilder, ABC):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        # TODO: [ENGINES] REMOVE. Jobs should come here already sorted
-        # Sort job scripts by their names
-        self.job_scripts = self._sorted_job_scripts(self.job_scripts)
-        
-        # Get an unique identifier for the script name
-        unique_part = '_'.join(self.wrapper_name.split('_')[2:])
+        self._custom_env_setup = kwargs['wrapper_data'].custom_env_setup
 
-        template = textwrap.dedent("""
-            # Flux script generation
-            cat << 'EOF' > {script_name}
-            {flux_script}
-            EOF
+        # Get a unique identifier for the wrapper
+        self._unique_part = '_'.join(kwargs['name'].split('_')[2:])
 
-            # Grant execution permission to the generated script
-            chmod +x {script_name}
+        # Filenames
+        self._delegated_script_name = f"{self.engine_name}_runner_{self._unique_part}.py"
+        self._subworkflow_name = f"subworkflow_{self._unique_part}.json"
 
-            # Load user environment
-            {env_setup}
+    def build_wrapper_stat(self) -> str: # TODO: [ENGINES] This is a copy of the method in the Bash builder
+        """Return bash code that records wrapper start/end time and exit status."""
+        return textwrap.dedent(f"""\
+        _wrapper_stat_file="$(pwd)/{self.name}_STAT_{self.fail_count}"
+        date +%s > "$_wrapper_stat_file"
+        _write_wrapper_stat() {{
+            if [ $? -eq 0 ]; then
+                _wrapper_exit_status="COMPLETED"
+            else
+                _wrapper_exit_status="FAILED"
+            fi
+            date +%s >> "$_wrapper_stat_file"
+            echo "$_wrapper_exit_status" >> "$_wrapper_stat_file"
+        }}
+        trap _write_wrapper_stat EXIT
+        """)
 
-            # Instantiate Flux within the allocated resources and run the jobs
-            srun --cpu-bind=none flux start --verbose=2 python {script_name}
-            """)
+    def build_main(self) -> str:
+        return (
+            textwrap.dedent(os.linesep +
+                f"""\
+                # Delegated script generation
+                cat << 'EOF' > {self._delegated_script_name}
+                """
+            )
+            + self._generate_delegated_script()
+            + textwrap.dedent(
+                f"""\
+                EOF
 
-        return template.format(
-            script_name = f"flux_runner_{unique_part}.py",
-            flux_script = self._generate_flux_script(),
-            env_setup = self._custom_environmet_setup()
+                # Grant execution permission to the generated script
+                chmod +x {self._delegated_script_name}
+
+                # Load user environment
+                """
+            )
+            + self._custom_environmet_setup()
+            + textwrap.dedent(
+                f"""\
+                # Instantiate the manager within the allocated resources and run the jobs
+                {self.command}
+                """
+            )
         )
 
-    # TODO: [ENGINES] REMOVE. Jobs should come here already sorted
-    @staticmethod
-    def _sorted_job_scripts(job_scripts):
-        """Return a deterministically sorted job_scripts.
+    def _custom_environmet_setup(self) -> str:
+        commands = self._custom_env_setup
+        if not commands:
+            commands = "# No commands provided"
+        return str(commands) + os.linesep
 
-        Supports a flat list of strings or a nested list of lists of strings. The objective is to
-        artificially order of the joblist to avoid the hybrid wrapper bug to make the workflow fail.
-        """
-        if not isinstance(job_scripts, list):
-            raise AutosubmitCritical("Invalid job_scripts type for Flux wrapper. Expected list.")
-
-        def _numerical_key(val):
-            """
-            Numerical sorting key which splits digits to compare.
-            
-            Numbers can appear appended to chars (i.e. "fc0"), so we split both numbers and 
-            undercase chars.
-            """
-            s = str(val)
-            parts = re.split(r'(\d+)', s)
-            key = []
-            for p in parts:
-                if p.isdigit():
-                    key.append(int(p))
-                else:
-                    key.append(p.lower())
-            return tuple(key)
-
-        # Nested list case
-        if isinstance(job_scripts[0], (list, tuple)):
-            ordered = []
-            for group in job_scripts:
-                ordered.append(sorted(list(group), key=_numerical_key))
-
-            return ordered
-        
-        # Flat list case
-        return sorted(job_scripts, key=_numerical_key)
-    
-    def _generate_flux_script(self):
-        """
-        Each Flux wrapper type implements its own script given the dependencies
-        of its inner jobs.
-        """
+    @property
+    @abstractmethod
+    def engine_name(self) -> str:
         pass  # pragma: no cover
 
-    def _custom_environmet_setup(self):
-        commands = self.custom_env_setup
-        if commands == '':
-            commands = "# No commands provided"
-        return textwrap.dedent(commands)
+    @property
+    @abstractmethod
+    def command(self) -> str:
+        pass  # pragma: no cover
 
-class FluxVerticalWrapperBuilder(FluxWrapperBuilder):
-    def _generate_flux_script(self):
-        return textwrap.dedent(f"""\
-        import os
-        import flux
-        import flux.job
-        import subprocess
-        from pathlib import Path
+    @abstractmethod
+    def _generate_delegated_script(self) -> str: # TODO: [ENGINES] Would it be better to transfer it once as a file instead of generating it?
+        pass  # pragma: no cover
 
-        handle = flux.Flux()
-        job_scripts={self.job_scripts}
-        max_retries={self.retrials}
+class FluxWrapperBuilder(DelegatedWrapperBuilder):
 
-        # Debug info
-        print(subprocess.check_output(["flux", "resource", "info"], text=True))
-
-        for job_script in job_scripts:
-            fail_count = 0
-            completed = False
-            completed_path = os.path.join(os.getcwd(), job_script.replace('.cmd', '_COMPLETED'))
-            failed_path = os.path.join(os.getcwd(), job_script.replace('.cmd', '_FAILED'))
-            jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
-            jobspec.environment = os.environ.copy()
-
-            while fail_count <= max_retries and not completed:
-                # Submit the job
-                jobspec.stdout = job_script + ".out." + str(fail_count)
-                jobspec.stderr =  job_script + ".err." + str(fail_count)
-                job_id = flux.job.submit(handle, jobspec, waitable=True, debug=True)
-
-                # Debug info
-                for event in flux.job.event_watch(handle, job_id):
-                    print("Event: " + str(event))
-                print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-                print("RESOURCES: " + str(jobspec.resources))
-
-                # Do stuff in the meantime
-                stat_filename = job_script.replace('.cmd', f'_STAT_{{fail_count}}')
-                stat_path_tmp = os.path.join(os.getcwd(),f"{{stat_filename}}.tmp")
-
-                # Wait for the job to finish
-                flux.job.wait(handle, job_id)
-
-                # Create the temporal stat file
-                job_meta = flux.job.get_job(handle, job_id)
-                start_time = int(job_meta.get('t_run', 0))
-                finish_time = int(job_meta.get('t_cleanup', 0))
-                with open(stat_path_tmp, 'w') as stat_file:
-                    stat_file.write(f"{{start_time}}\\n{{finish_time}}")
-
-                # Check if the job completed successfully
-                if os.path.exists(completed_path):
-                    print("The job " + job_script + " has been COMPLETED")
-                    completed = True
-                else:
-                    print("The job " + job_script + " has FAILED")
-                    fail_count += 1
-
-            # Generate definitive stat files for all retries
-            fail_count = 0
-            while fail_count < max_retries:
-                stat_filename = job_script.replace('.cmd', f'_STAT_{{fail_count}}')
-                stat_path = os.path.join(os.getcwd(), stat_filename)
-                stat_path_tmp = os.path.join(os.getcwd(), f"{{stat_filename}}.tmp")
-                if os.path.exists(stat_path_tmp):
-                    try:
-                        Path(stat_path_tmp).replace(stat_path)
-                    except Exception as e:
-                        print(f"Couldn't create the stat file {{stat_path}} from {{stat_path_tmp}}: {{e}}")
-                else:
-                    break
-                fail_count += 1
-
-            if not completed:
-                open(failed_path,'wb').close()
-                open("WRAPPER_FAILED",'wb').close()
-                exit(1)
-
-        exit(0)
-        """)
+    @property
+    def engine_name(self):
+        return "flux"
     
-class FluxHorizontalWrapperBuilder(FluxWrapperBuilder):
-    def _generate_flux_script(self):
+    @property
+    def command(self) -> str:
+        return f"srun --ntasks=1 --cpu-bind=none flux start --verbose=2 python {self._delegated_script_name}"
+    
+    def _generate_delegated_script(self) -> str:
         return textwrap.dedent(f"""
+        #!/usr/bin/env python3
+
+        import gc
+        import json
         import os
         import flux
         import flux.job
-        import subprocess
+        from flux.job import JobspecV1
+        from typing import Dict, List
+        from collections import defaultdict, deque
 
-        handle = flux.Flux()
-        job_scripts={self.job_scripts}
-        job_ids = {{}}
 
-        # Debug info
-        print(subprocess.check_output(["flux", "resource", "info"], text=True))
+        class FluxWrapperSubmitter:
+            def __init__(self, dag_json: str):
+                self.dag = json.loads(dag_json)
+                self.tasks: Dict[str, Dict] = {{n["id"]: n for n in self.dag["tasks"]}}
+                self.dependencies: List[Dict] = self.dag["dependencies"]
+                self.cwd = self.dag["graph"]["wrapper_defaults"]["cwd"]
 
-        # Submit the jobs
-        for job_script in job_scripts:
-            jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
-            jobspec.environment = os.environ.copy()
-            job_ids[job_script] = flux.job.submit(handle, jobspec, waitable=True)
+                self.jobids: Dict[str, str] = {{}}
+                self.parents: Dict[str, List[str]] = defaultdict(list) # child -> [parents]
+                self.children = defaultdict(list) # parent -> [children]
+                self.pending_jobs = int()
+                self.wrapper_failed = False
 
-            # Debug info
-            print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-            print("RESOURCES: " + str(jobspec.resources))
-
-        # Wait for the jobs to finish
-        wrapper_failed = False
-        for job_script in job_scripts:
-            completed_path = job_script.replace('.cmd', '_COMPLETED')
-            failed_path = job_script.replace('.cmd', '_FAILED')
-            flux.job.wait(handle, job_ids[job_script])
-            
-            # Check if the job completed successfully
-            if os.path.exists(completed_path):
-                print("The job " + job_script + " has been COMPLETED")
-            else:
-                print("The job " + job_script + " has FAILED")
-                open(failed_path,'w').close()
-                wrapper_failed = True        
-
-        if wrapper_failed:
-            open("WRAPPER_FAILED",'w').close()
-            exit(1)
-
-        exit(0)
-        """)
-
-class FluxVerticalHorizontalWrapperBuilder(FluxWrapperBuilder):
-    def _generate_flux_script(self):
-        return textwrap.dedent(f"""
-        import os
-        import flux
-        import flux.job
-        import subprocess
-        from threading import Thread
-
-        job_scripts={self.job_scripts}
-
-        # Debug info
-        print(subprocess.check_output(["flux", "resource", "info"], text=True))
-
-        class VerticalWrapperThread(Thread):
-            def __init__ (self, jobs_list):
-                Thread.__init__(self)
-                self.jobs_list = jobs_list
                 self.handle = flux.Flux()
 
-            def run(self):
-                for job_script in self.jobs_list:
-                    # Submit the job
-                    jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
-                    jobspec.environment = os.environ.copy()
-                    job_id = flux.job.submit(self.handle, jobspec, waitable=True)
+                self._build_dependency_graph()
+            
+            def submit_wrapper(self):
+                # Submit wrapped jobs in topological order respecting dependencies
+                order = self._topological_order()
+                
+                for task_id in order:
+                    deps_jobids = []
+                    for parent_id in self.parents[task_id]:
+                        deps_jobids.append(self.jobids[parent_id])
+                    
+                    self.jobids[task_id] = self._submit_job(task_id, deps_jobids)
 
-                    # Do stuff in the meantime
-                    completed_path = job_script.replace('.cmd', '_COMPLETED')
-                    failed_path = job_script.replace('.cmd', '_FAILED')
+                self._release_graph_memory()
+                
+                print("Wrapper submitted.")
 
-                    # Debug info
-                    print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-                    print("RESOURCES: " + str(jobspec.resources))
+            def wait_for_completion(self):
+                self.pending_jobs = len(self.jobids)
+                
+                for task_id, jobid in self.jobids.items():
+                    future = flux.job.wait_async(self.handle, jobid)
+                    future.then(self._on_job_done, task_id)
 
-                    # Wait for the job to finish
-                    flux.job.wait(self.handle, job_id)
+                self.handle.reactor_run()
 
-                    # Check if the job completed successfully
-                    if os.path.exists(completed_path):
-                        print("The job " + job_script + " has been COMPLETED")
-                    else:
-                        print("The job " + job_script + " has FAILED")
-                        open(failed_path,'w').close()
-                        open("WRAPPER_FAILED",'w').close()
-                        exit(1)
+                if self.wrapper_failed:
+                    open("{self.name}_WRAPPER_FAILED",'w').close()
+            
+            def _build_dependency_graph(self):
+                # Build the dependency graph, with children containing their parents
+                for dependency in self.dependencies:
+                    parent = dependency["from"]
+                    child = dependency["to"]
+                    self.parents[child].append(parent)
+                    self.children[parent].append(child)
 
-                exit(0)
+            def _topological_order(self) -> List[str]:
+                indegree = {{task: len(self.parents.get(task, [])) for task in self.tasks}}
+                
+                queue = deque([task for task, d in indegree.items() if d == 0])
+                order = []
 
-        # Execute vertical wrappers in parallel
-        threads = []
-        for jobs_list in job_scripts:
-            thread = VerticalWrapperThread(jobs_list)
-            threads.append(thread)
-            thread.start()
+                while queue:
+                    task = queue.popleft()
+                    order.append(task)
+                    
+                    for child in self.children[task]:
+                        indegree[child] -= 1
+                        if indegree[child] == 0:
+                            queue.append(child)
+                
+                return order
+            
+            def _submit_job(self, task_id: str, deps_jobids: list[str] | None = None) -> str:
+                task = self.tasks[task_id]
 
-        # Wait for all vertical wrappers to finish
-        for thread in threads:
-            thread.join()
+                script_path = self.cwd + "/" + task_id + ".cmd"
 
-        exit(0)
-        """)
+                specs = dict(
+                    script=script_path,
+                    name=task_id,
+                    cwd=self.cwd,
+                    output=script_path + ".out.0",
+                    error=script_path + ".err.0",
+                    env=os.environ.copy(),
+                    time_limit=task.get("wallclock", None)
+                )
 
-class FluxHorizontalVerticalWrapperBuilder(FluxWrapperBuilder):
-    def _generate_flux_script(self):
-        return textwrap.dedent(f"""
-        import os
-        import flux
-        import flux.job
-        import subprocess
+                nodes = task.get("nodes")
+                nslots = task.get("processors")
+                cores_per_slot = task.get("threads")
+                            
+                if nodes is not None:
+                    specs["nodes"] = nodes
+                    specs["exclusive"] = task.get("exclusive", False)
+                if nslots is not None:
+                    specs["nslots"] = nslots
+                if cores_per_slot is not None:
+                    specs["cores_per_slot"] = cores_per_slot
+                if deps_jobids is not None and len(deps_jobids) > 0:
+                    specs["dependency"] = [f"afterok:{{str(jobid)}}" for jobid in deps_jobids]
 
-        handle = flux.Flux()
-        job_scripts={self.job_scripts}
-        job_ids = {{}}
+                jobspec = JobspecV1.from_batch(**specs)
 
-        # Debug info
-        print(subprocess.check_output(["flux", "resource", "info"], text=True))
+                jobid = flux.job.submit(self.handle, jobspec, waitable=True)
+                print(f"Task {{task_id}} submitted ({{str(jobid)}})")
 
-        def run_horizontal_wrapper(jobs_list):
-            # Submit the jobs
-            for job_script in jobs_list:
-                jobspec = flux.job.JobspecV1.from_yaml_file(job_script)
-                jobspec.environment = os.environ.copy()
-                job_ids[job_script] = flux.job.submit(handle, jobspec, waitable=True)
+                return jobid
 
-                # Debug info
-                print("RESOURCE COUNTS :" + str(jobspec.resource_counts()))
-                print("RESOURCES: " + str(jobspec.resources))
+            def _on_job_done(self, future, task_id):
+                _, success, err = flux.job.wait_get_status(future)
 
-            # Wait for the jobs to finish
-            wrapper_failed = False
-            for job_script in jobs_list:
-                completed_path = job_script.replace('.cmd', '_COMPLETED')
-                failed_path = job_script.replace('.cmd', '_FAILED')
-                flux.job.wait(handle, job_ids[job_script])
-
-                # Check if the job completed successfully
-                if os.path.exists(completed_path):
-                    print("The job " + job_script + " has been COMPLETED")
+                if os.path.exists(task_id + "_COMPLETED"):
+                    print(f"Task completed: {{task_id}}")
                 else:
-                    print("The job " + job_script + " has FAILED")
-                    open(failed_path,'w').close()
-                    wrapper_failed = True        
+                    if not success:
+                        print(f"Task failed: {{task_id}} -> {{err}}")
+                    else:
+                        print(f"Task failed: {{task_id}} -> error log not available")
+                    open(task_id + "_FAILED",'w').close()
+                    self.wrapper_failed = True
 
-            if wrapper_failed:
-                open("WRAPPER_FAILED",'w').close()
+                self.pending_jobs -= 1
+                if self.pending_jobs == 0:
+                    self.handle.reactor_stop()
+            
+            def _release_graph_memory(self):
+                # Release memory used by the graph after submission
+                del self.dag
+                del self.tasks
+                del self.dependencies
+                del self.cwd
+                del self.parents
+                del self.children
+                gc.collect()
 
-            return
 
-        # Execute horizontal wrappers
-        for jobs_list in job_scripts:
-            run_horizontal_wrapper(jobs_list)
-                               
-            if os.path.exists("WRAPPER_FAILED"):
-                exit(1)
+        def main():
+            with open(f"subworkflow_{self._unique_part}.json", "r") as f:
+                dag_json = f.read()
+            submitter = FluxWrapperSubmitter(dag_json)
+            submitter.submit_wrapper()
+            submitter.wait_for_completion()
 
-        exit(0)
+
+        if __name__ == "__main__":
+            main()
         """)
 
 class PythonWrapperBuilder(WrapperBuilder):

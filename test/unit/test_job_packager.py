@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -19,6 +19,7 @@ import time
 from dataclasses import dataclass
 
 import pytest
+import json
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -152,3 +153,135 @@ def test_is_deadlock(packager, mocker, any_simple, queue_len, jobs_config, not_w
         not_wrappeable_package_info=not_wrappable,
         built_packages_tmp=built,
     ) is expected
+
+@pytest.fixture
+def delegated_package(slurm_platform, autosubmit_config, mocker):
+    """
+    Returns a delegated package with a complex dependency graph, including an external uncompleted
+    parent and a multi-level dependency. Also returns the packager instance for further testing.
+    """
+    wrapper_jobs = list()
+
+    for i in range(1, 4):
+        job = Job(f"job{i}", 1, Status.READY, 0)
+        job.section = "SECTION1"
+        wrapper_jobs.append(job)
+    
+    for i in range(4, 7):
+        job = Job(f"job{i}", 1, Status.READY, 0)
+        job.section = "SECTION2"
+        job.parents = [wrapper_jobs[1], wrapper_jobs[2]]
+        wrapper_jobs.append(job)
+
+    wrapper_jobs[1].children = wrapper_jobs[3:6]
+    wrapper_jobs[2].children = wrapper_jobs[3:6]
+
+    # Attempt to add an external uncompleted parent to the package. Later on, tests will check it
+    external_uncompleted_parent = Job("job_external", 1, Status.READY, 0)
+    external_uncompleted_parent.section = "SECTION3"
+    child_external = Job("child_external", 1, Status.READY, 0)
+    child_external.section = "SECTION2"
+
+    child_external.parents = [wrapper_jobs[4], wrapper_jobs[5], external_uncompleted_parent]
+    wrapper_jobs[1].children.append(child_external)
+    wrapper_jobs[4].children = [child_external]
+    wrapper_jobs[5].children = [child_external]
+    external_uncompleted_parent.children = [child_external]
+    external_uncompleted_parent.parents = [wrapper_jobs[0]]
+    wrapper_jobs[0].children = [external_uncompleted_parent]
+
+    # A complex case with a multi-level dependency, which also does not fit in the package
+    multi_level_job = Job("multi_level_job", 1, Status.READY, 0)
+    multi_level_job.section = "SECTION2"
+    multi_level_job.parents = [wrapper_jobs[1], wrapper_jobs[5]]
+    wrapper_jobs[1].children.append(multi_level_job)
+    wrapper_jobs[5].children.append(multi_level_job)
+
+    # A last job depending on job6
+    last_job = Job("last_job", 1, Status.READY, 0)
+    last_job.section = "SECTION2"
+    last_job.parents = [wrapper_jobs[5]]
+    wrapper_jobs[5].children.append(last_job)
+
+    custom_config = {
+        "JOBS": {
+            "SECTION1": {
+                "WALLCLOCK": "00:01",
+                "PROCESSORS": 1,
+            },
+            "SECTION2": {
+                "WALLCLOCK": "00:01",
+                "PROCESSORS": 1,
+            },
+            "SECTION3": {
+                "WALLCLOCK": "00:01",
+                "PROCESSORS": 1,
+            }
+        },
+        "WRAPPERS": {
+            "WRAPPER": {
+                "POLICY": "flexible",
+                "TYPE": "delegated",
+                "MIN_WRAPPED": 1,
+                "MAX_WRAPPED": 6,
+                "JOBS_IN_WRAPPER": "SECTION1 SECTION2",
+            },
+            "CUSTOM_ENV_SETUP": "echo 'Hello World'",
+            "METHOD": "flux"
+        }
+    }
+
+    as_conf = autosubmit_config(expid="a000", experiment_data=custom_config)
+    section_list = ['SECTION1', 'SECTION2']
+    wrapper_limits = {'min': 1, 'max': 6, 'min_v': 1, 'max_v': 2, 'min_h': 1, 'max_h': 3, 'max_by_section': {'SECTION1': 3, 'SECTION2': 3}, 'real_min': 1}
+    wrapper_info = ['delegated', 'flexible', 'flux', section_list, 0, as_conf]
+    slurm_platform.max_processors = 50
+
+    packager = JobPackager(as_conf, slurm_platform, mocker.MagicMock())
+    packager.current_wrapper_section = 'WRAPPER'
+    package = packager._build_delegated_package(jobs_list=wrapper_jobs[:3], wrapper_limits=wrapper_limits, section_list=section_list, wrapper_info=wrapper_info)
+    return packager, package[0]
+
+def test_check_real_package_wrapper_limits_delegated(delegated_package: tuple[JobPackager, JobPackageDelegated]):
+    packager, package = delegated_package
+    min_v, min_h, balanced = packager.check_real_package_wrapper_limits(package)
+    assert min_v == 2
+    assert min_h == 3
+    assert balanced
+
+def test_build_delegated_package(delegated_package: tuple[JobPackager, JobPackageDelegated]):
+    _, package = delegated_package
+    assert package.max_height == 2
+    assert package.max_width == 3
+    assert len(package.jobs) == 6
+
+def test_serialize_delegated_package(delegated_package: tuple[JobPackager, JobPackageDelegated]):
+    """Ensure interface consistency"""
+    _, package = delegated_package
+    serialized: dict = json.loads(package._subworkflow)
+    assert serialized.get('directed')
+    assert not serialized.get('multigraph')
+
+    tasks: list[dict] = serialized.get('tasks')
+    assert len(tasks) == 6
+
+    dependencies: list[dict] = serialized.get('dependencies')
+    assert len(dependencies) == 6
+
+    graph = serialized.get('graph')
+    assert graph is not None
+
+    wrapper_defaults = graph.get('wrapper_defaults')
+    assert wrapper_defaults is not None
+
+    assert wrapper_defaults.get('cwd') is not None
+
+    assert "id" in tasks[0]
+    assert "nodes" in tasks[0]
+    assert "threads" in tasks[0]
+    assert "processors" in tasks[0]
+    assert "wallclock" in tasks[0]
+    assert "exclusive" in tasks[0]
+    assert "weight" in dependencies[0]
+    assert "from" in dependencies[0]
+    assert "to" in dependencies[0]

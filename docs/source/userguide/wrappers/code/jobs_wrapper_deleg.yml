@@ -1,0 +1,36 @@
+JOBS:
+  SIM:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: SIM-1
+    RUNNING: chunk
+    WALLCLOCK: 00:01
+  POST1:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: SIM POST1-1
+    RUNNING: chunk
+    WALLCLOCK: 00:01
+  POST2:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: SIM POST2-1
+    RUNNING: chunk
+    WALLCLOCK: 00:01
+  POST3:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: POST2 POST3-1
+    RUNNING: chunk
+    WALLCLOCK: 00:10
+  POST4:
+    SCRIPT: 'sleep 0'
+    DEPENDENCIES: POST1 POST3 POST4-1
+    RUNNING: chunk
+    WALLCLOCK: 00:10
+
+WRAPPERS:
+  WRAPPER_POST:
+    POLICY: flexible
+    TYPE: delegated
+    JOBS_IN_WRAPPER: POST1 POST2 POST3 POST4
+  METHOD: flux
+  CUSTOM_ENV_SETUP: |
+    module load miniconda
+    conda activate flux-0.84-0.50

@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -17,17 +17,21 @@
 
 import collections
 import operator
+import json
+import networkx as nx
+from collections import deque
 from contextlib import suppress
 from math import ceil
 from operator import attrgetter
 from typing import List, TYPE_CHECKING, Union
 
-from bscearth.utils.date import sum_str_hours
+from bscearth.utils.date import sum_str_hours, split_str_hours
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal, \
-    JobPackageSimpleWrapped, JobPackageHorizontalVertical, JobPackageVerticalHorizontal, JobPackageBase
+    JobPackageSimpleWrapped, JobPackageHorizontalVertical, JobPackageVerticalHorizontal, JobPackageDelegated, \
+    JobPackageBase
 from autosubmit.job.template import Language
 from autosubmit.log.log import Log
 
@@ -81,7 +85,7 @@ class JobPackager(object):
                 self.wrapper_type[wrapper_section] = self._as_config.get_wrapper_type(wrapper_data)
                 self.wrapper_policy[wrapper_section] = self._as_config.get_wrapper_policy(wrapper_data)
                 if self._as_config.get_wrapper_method(wrapper_data) is None:
-                    self.wrapper_method[wrapper_section] = "asthread"
+                    self.wrapper_method[wrapper_section] = "asthread" # TODO: [ENGINES] Unreachable
                 else:
                     self.wrapper_method[wrapper_section] = self._as_config.get_wrapper_method(wrapper_data).lower()
                 self.jobs_in_wrapper[wrapper_section] = self._as_config.get_wrapper_jobs(wrapper_data)
@@ -213,7 +217,8 @@ class JobPackager(object):
 
     def check_real_package_wrapper_limits(self, package):
         balanced = True
-        if self.wrapper_type[self.current_wrapper_section] == 'vertical-horizontal':
+        current_type = self.wrapper_type[self.current_wrapper_section]
+        if current_type == 'vertical-horizontal':
             i = 0
             min_h = len(package.jobs_lists)
             min_v = len(package.jobs_lists[0])
@@ -223,7 +228,7 @@ class JobPackager(object):
                 i = i + 1
                 if min_v != len(list_of_jobs) and i < len(package.jobs_lists):
                     balanced = False
-        elif self.wrapper_type[self.current_wrapper_section] == 'horizontal-vertical':
+        elif current_type == 'horizontal-vertical':
             min_v = len(package.jobs_lists)
             min_h = len(package.jobs_lists[0])
             i = 0
@@ -233,12 +238,15 @@ class JobPackager(object):
                 i = i + 1
                 if min_h != len(list_of_jobs) and i < len(package.jobs_lists):
                     balanced = False
-        elif self.wrapper_type[self.current_wrapper_section] == 'horizontal':
+        elif current_type == 'horizontal':
             min_h = len(package.jobs)
             min_v = 1
-        elif self.wrapper_type[self.current_wrapper_section] == 'vertical':
+        elif current_type == 'vertical':
             min_v = len(package.jobs)
             min_h = 1
+        elif current_type == 'delegated': # TODO: [ENGINES] Balanced?
+            min_v = package.max_height
+            min_h = package.max_width
         else:
             min_v = len(package.jobs)
             min_h = len(package.jobs)
@@ -298,6 +306,7 @@ class JobPackager(object):
                 )):
                 for job in p.jobs:
                     job.wrapper_type = p.wrapper_type
+                    job.currently_wrapped = True
 
                 packages_to_submit.append(p)
                 max_jobs_to_submit = max_jobs_to_submit - 1
@@ -411,11 +420,9 @@ class JobPackager(object):
         Log.warning("There are no more jobs of this section to form a wrapper, submitting the remaining jobs")
         if len(p.jobs) == 1:
             p.jobs[0].wrapper_type = "Simple"
-            # TODO: Here I could insert the code to reverse the wrapper method to None
-            # p.jobs[0].wrapper_method = self.wrapper_method
             packages_to_submit.append(JobPackageSimple([p.jobs[0]]))
         else:
-            packages_to_submit.append(p)
+            packages_to_submit.append(p) # TODO: [ENGINES] Why is it submitted as a wrapper if it does not respect the wrapper limits?
         return max_jobs_to_submit - 1
 
     def handle_strict_policy(self, p: JobPackageBase, err_message: str) -> None:
@@ -721,13 +728,10 @@ class JobPackager(object):
             if max_jobs_to_submit == 0:
                 break
             self.current_wrapper_section = wrapper_name
-            section_list = self._as_config.experiment_data.get("WRAPPERS", {}).get(self.current_wrapper_section,
-                                                                                   {}).get(
-                "JOBS_IN_WRAPPER", "")
-            if not self._platform.allow_wrappers and self.wrapper_type[self.current_wrapper_section] in ['horizontal',
-                                                                                                         'vertical',
-                                                                                                         'vertical-horizontal',
-                                                                                                         'horizontal-vertical']:
+            section_list = self._as_config.experiment_data.get("WRAPPERS", {}).get(self.current_wrapper_section, 
+                                                                                   {}).get("JOBS_IN_WRAPPER", "")
+            if not self._platform.allow_wrappers and self.wrapper_type[self.current_wrapper_section] \
+                in ['horizontal', 'vertical', 'vertical-horizontal', 'horizontal-vertical', 'delegated']:
                 Log.warning(
                     f"Platform {self._platform.name} does not allow wrappers, submitting jobs individually")
                 for job in jobs:
@@ -747,7 +751,11 @@ class JobPackager(object):
             elif self.wrapper_type[self.current_wrapper_section] in ['vertical-horizontal', 'horizontal-vertical']:
                 built_packages_tmp = self._build_hybrid_package(jobs, wrapper_limits, section_list,
                                                                 wrapper_info=current_info)
+            elif self.wrapper_type[self.current_wrapper_section] == 'delegated':
+                built_packages_tmp = self._build_delegated_package(jobs, wrapper_limits, section_list,
+                                                                   wrapper_info=current_info)
             else:
+                # Non-recognized wrapper type, assumes vertical by default
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
             self._propagate_inner_jobs_ready_date(built_packages_tmp)
             # Reset packed_during_building
@@ -768,6 +776,7 @@ class JobPackager(object):
         # Now, prepare the packages for non-wrapper jobs
         for job in non_wrapped_jobs:
             job.wrapper_type = "Simple"
+            job.currently_wrapped = False
             if job.section in section_jobs_to_submit:
                 if section_jobs_to_submit[job.section] <= 0:
                     continue
@@ -884,8 +893,7 @@ class JobPackager(object):
                     jobs_list = job_vertical_packager.build_vertical_package(job, wrapper_info)
                     packages.append(JobPackageVertical(jobs_list, configuration=self._as_config,
                                                        wrapper_section=self.current_wrapper_section,
-                                                       wrapper_info=wrapper_info,
-                                                       method=self.wrapper_method[self.current_wrapper_section]))
+                                                       wrapper_info=wrapper_info))
             else:
                 break
         return packages
@@ -970,10 +978,35 @@ class JobPackager(object):
                 for job in current_package[level]:
                     job.level = level
         return JobPackageVerticalHorizontal(current_package, total_processors, total_wallclock,
-                                            jobs_resources=jobs_resources,
-                                            method=self.wrapper_method[self.current_wrapper_section],
-                                            configuration=self._as_config, wrapper_section=self.current_wrapper_section,
-                                            wrapper_info=wrapper_info)
+                                            jobs_resources=jobs_resources, method=self.wrapper_method[self.current_wrapper_section], 
+                                            configuration=self._as_config, wrapper_section=self.current_wrapper_section, wrapper_info=wrapper_info)
+
+    def _build_delegated_package(self, jobs_list: list[Job], wrapper_limits: dict, section_list: list[str], wrapper_info: dict) -> List[JobPackageDelegated]:
+        """
+        Builds a "delegated" type package, composed by jobs that are not necessarily structured
+        in a vertical or horizontal way, and can contain jobs from different sections with interdependencies.
+
+        :param job_list: List of the root jobs of the package.
+        :type job_list: list[Job]
+        :param wrapper_limits: The limits for the wrapper.
+        :type wrapper_limits: dict
+        :param section_list: Sections to be considered for packaging.
+        :type section_list: list[str]
+        :param wrapper_info: Wrapper parameters.
+        :type wrapper_info: list
+
+        :return: The delegated package.
+        :rtype: List[JobPackageDelegated]
+        """
+        packager = JobPackagerDelegated(jobs_list, wrapper_limits, self._platform.max_processors,
+                                        self._platform.max_wallclock, section_list, wrapper_info)
+        jobs_in_package = packager.build_delegated_package()
+        return [JobPackageDelegated(jobs=list(jobs_in_package), subworkflow=packager.serialize(), 
+                                   num_processors=packager.processors, total_wallclock=packager.wallclock,
+                                   max_height=packager.height, max_width=packager.width, configuration=self._as_config,
+                                   wrapper_section=self.current_wrapper_section, wrapper_info=wrapper_info,
+                                   method=self.wrapper_method[self.current_wrapper_section], 
+                                   custom_env_setup=self.custom_env_setup[self.current_wrapper_section])]
 
 
 # TODO: Rename and unite JobPackerVerticalMixed to JobPackerVertical since
@@ -1323,3 +1356,310 @@ class JobPackagerHorizontal(object):
                 self._components_dict[job.section]['COMPONENTS'] = {parameter: job.parameters[parameter]
                                                                     for parameter in list(parameters.keys())
                                                                     if '_NUMPROC' in parameter}
+
+class JobPackagerDelegated(object):
+    """
+    Class for the "delegated" package type. These packages are composed by a subworkflow that can be 
+    composed by tasks from different sections with interdependencies.
+
+    :param job_list: List of the root jobs of the package.
+    :type job_list: list[Job]
+    :param wrapper_limits: The limits for the wrapper.
+    :type wrapper_limits: dict
+    :param max_processors: Maximum number of parallel processors allowed for the package.
+    :type max_processors: int
+    :param max_wallclock: Maximum wallclock allowed for the package, in format "HH:MM".
+    :type max_wallclock: str
+    :param job_sections: Sections to be considered for packaging.
+    :type job_sections: list[str]
+    :param wrapper_info: Wrapper parameters.
+    :type wrapper_info: list
+    """
+    def __init__(self, job_list: list[Job], wrapper_limits: dict, max_processors: int, max_wallclock: str, job_sections: list[str], wrapper_info: list) -> None:
+        self.job_list = job_list
+        self.wrapper_limits = wrapper_limits
+        self.max_processors = max_processors
+        self.max_wallclock = self._parse_wallclock(max_wallclock)
+        self.job_sections = job_sections
+        self.wrapper_info = wrapper_info
+
+        self._package = nx.DiGraph()
+        self._jobs_in_package = set()
+        self._discarded_jobs = set()
+
+        self._num_tasks_per_section = {section: 0 for section in job_sections}
+    
+    @property
+    def processors(self) -> int:
+        """
+        Returns the total number of processors in the wider level of the package graph.
+        
+        :return: Maximum number of parallel processors in package.
+        :rtype: int
+        """
+        if self._package.number_of_nodes() == 0:
+            return 0
+        
+        return max(
+            (
+                sum(self._package.nodes[node]["processors"] for node in level)
+                for level in nx.topological_generations(self._package)
+            ),
+            default = 0,
+        )
+    
+    @property
+    def height(self) -> int:
+        """
+        Returns the length of the critical path of the package graph (number of levels in the graph).
+        
+        :return: Height of the package in tasks.
+        :rtype: int
+        """
+        if self._package.number_of_nodes() == 0:
+            return 0
+        
+        return len(list(nx.topological_generations(self._package)))
+    
+    @property
+    def width(self) -> int:
+        """
+        Returns the maximum number of parallel tasks in the package graph (width of the wider level).
+        
+        :return: Width of the package in tasks.
+        :rtype: int
+        """
+        if self._package.number_of_nodes() == 0:
+            return 0
+        
+        return max(
+            (len(level) for level in nx.topological_generations(self._package)),
+            default=0,
+        )
+    
+    @property
+    def wallclock(self) -> str:
+        """
+        Returns the wallclock of the critical path of the package graph, in format "HH:MM".
+
+        :return: Total wallclock of the package.
+        :rtype: str
+        """
+        if self._package.number_of_nodes() == 0:
+            return "00:00"
+        
+        path = nx.dag_longest_path(self._package, weight='weight')
+        length = nx.dag_longest_path_length(self._package, weight='weight')
+        length += self._package.nodes[path[-1]]["wallclock"]
+
+        hours = length // 3600
+        minutes = (length % 3600) // 60
+        return f"{hours:02d}:{minutes:02d}"
+    
+    def serialize(self) -> str:
+        """
+        Serializes the package graph to a transferable string format.
+
+        :return: String representation of the package graph.
+        :rtype: str
+        """
+        # TODO: Consider using the following method to serialize after ensuring networkx version is always > 3.4
+        # data = json_graph.node_link_data(self._package, nodes="tasks", edges="dependencies", source="from", target="to")
+
+        nodes = [{"id": n, **attrs} for n, attrs in self._package.nodes(data=True)]
+        edges = [
+            {"from": u, "to": v, **attrs}
+            for u, v, attrs in self._package.edges(data=True)
+        ]
+        data = {
+            "directed": self._package.is_directed(),
+            "multigraph": self._package.is_multigraph(),
+            "graph": dict(self._package.graph),
+            "tasks": nodes,
+            "dependencies": edges,
+        }
+        
+        return json.dumps(data)
+
+    def build_delegated_package(self) -> set[Job]:
+        """
+        Builds the delegated package. It explores all the children of the jobs in the package and 
+        add those that are packagable, until reaching the wrapper limits.
+        
+        :return: Set of jobs included in the package.
+        :rtype: set[Job]
+        """
+        for job in self.job_list:
+            # Temporarily add the first level job to the package
+            resources = self._get_parsed_job_resources(job, self.wrapper_info[-1])
+            self._package.add_node(job.name, **resources)
+            
+            # Check validity of adding the job to the package
+            if not self._complies_with_wrapper_limits(job.section) or job.status not in [Status.READY]:
+                self._discarded_jobs.add(job)
+                continue
+
+            # Definitively accept the job into the package
+            self._jobs_in_package.add(job)
+            job.packed_during_building = True
+            self._num_tasks_per_section[job.section] += 1
+
+        # Search for packagable children and add them
+        self._package_children()
+
+        # Store redundant data (optimize storage)
+        self._package.graph['wrapper_defaults'] = {
+            "cwd": next(iter(self._jobs_in_package)).platform.remote_log_dir
+        }
+            
+        return self._jobs_in_package
+    
+    def _package_children(self) -> None:
+        """
+        Explore candidate children breadth-first, prioritizing horizontal growth.
+        The purpose is to optimize the wallclock and the resource request of the package.
+        """
+        queue = deque()
+        queued = set()
+
+        # Feed the algorithm with the children of the current package tasks
+        for root in self._jobs_in_package:
+            for child in root.children:
+                if child not in queued and child not in self._jobs_in_package and child not in self._discarded_jobs:
+                    queue.append(child)
+                    queued.add(child)
+
+        # Explore the horizontal levels of the package graph until reaching the limits
+        while queue:
+            task = queue.popleft()
+            queued.discard(task)
+            task.update_parameters(self.wrapper_info[-1], set_attributes=True)
+
+            # Check if the task or any of its uncompleted parents do not belong to any wrapper section
+            any_parent_outside_wrapper = any(
+                parent.section not in self.job_sections and parent.status != Status.COMPLETED
+                for parent in task.parents
+            )
+            if (task.section not in self.job_sections or any_parent_outside_wrapper or
+                task.status not in [Status.READY, Status.WAITING]):
+                self._discarded_jobs.add(task)
+                continue
+
+            # Determine if there is any uncompleted parent outside the package (which might be present later)
+            all_parents_satisfied = all(
+                parent.status == Status.COMPLETED or parent in self._jobs_in_package
+                for parent in task.parents
+            )
+            if not all_parents_satisfied:
+                continue
+
+            # Individual validity tests passed. Now, check if it fits in the package
+            # Temporarily add it to the package graph
+            self._add_node_to_package(task, self._get_parsed_job_resources(task, self.wrapper_info[-1]))
+
+            # Validate the tmp graph
+            if not self._complies_with_wrapper_limits(task.section):
+                self._package.remove_node(task.name)
+                self._discarded_jobs.add(task)
+                continue
+
+            # Definitely accept child into the package
+            self._jobs_in_package.add(task)
+            task.packed_during_building = True
+            self._num_tasks_per_section[task.section] += 1
+
+            # Enqueue new task children for exploration
+            for child in task.children:
+                if child not in queued and child not in self._jobs_in_package and child not in self._discarded_jobs:
+                    queue.append(child)
+                    queued.add(child)
+
+    def _get_parsed_job_resources(self, job: Job, as_conf: 'AutosubmitConfig') -> dict:
+        """
+        Return a dictionary with the resources of the job, properly parsed to be added to the package graph.
+        
+        :param job: Job whose resources are to be parsed.
+        :type job: Job
+        :param as_conf: Autosubmit configuration, used to update the job parameters.
+        :type as_conf: AutosubmitConfig
+
+        :return: Dictionary with the resources of the job.
+        :rtype: dict
+        """
+        job.update_parameters(as_conf, set_attributes=True)
+
+        resources = dict()
+
+        resources["nodes"] = int(job.nodes) if str(job.nodes).isdigit() else None
+        resources["threads"] = int(job.threads) if str(job.threads).isdigit() else None
+        resources["processors"] = int(job.total_processors) if str(job.total_processors).isdigit() else None
+        resources["wallclock"] = self._parse_wallclock(job.wallclock)
+        if isinstance(job.exclusive, bool):
+            resources["exclusive"] = job.exclusive
+        elif isinstance(job.exclusive, str) and job.exclusive.lower() in {"true", "false"}:
+            resources["exclusive"] = job.exclusive.lower() == "true"
+        else:
+            resources["exclusive"] = None
+
+        return resources
+
+    def _add_node_to_package(self, node: Job, resources: dict) -> None:
+        """
+        Add a node to the package graph, connecting it with the parents and children that 
+        are already in the package.
+
+        :param node: Job to be added to the package graph.
+        :type node: Job
+        :param resources: Dictionary with the resources of the job.
+        :type resources: dict
+        """
+        self._package.add_node(node.name, **resources)
+
+        # Link with parents and children already in the package
+        for parent in node.parents:
+            if parent in self._jobs_in_package:
+                self._package.add_edge(parent.name, node.name, weight=self._parse_wallclock(parent.wallclock))
+        for existing_child in node.children:
+            if existing_child in self._jobs_in_package:
+                self._package.add_edge(node.name, existing_child.name, weight=self._parse_wallclock(node.wallclock))
+
+    def _complies_with_wrapper_limits(self, section: str) -> bool:
+        """
+        Check if adding a job to the package is possible according to the wrapper limits (vertical,
+        horizontal and global).
+
+        :param section: Section of the job that was added.
+        :type section: str
+
+        :return: True if the package complies with the wrapper limits, False otherwise.
+        :rtype: bool
+        """
+        # Check if the max number of tasks in the package can be exceeded
+        if self._package.number_of_nodes() > self.wrapper_limits["max"]:
+            return False
+        if self._num_tasks_per_section[section] >= self.wrapper_limits["max_by_section"][section]:
+            return False
+        
+        # Check if the wallclock of the critical path of the package graph can be exceeded
+        if nx.dag_longest_path_length(self._package, weight='weight') > self.max_wallclock:
+            return False
+        # Check if the number of vertical levels of the package graph can be exceeded
+        if len(list(nx.topological_generations(self._package))) > self.wrapper_limits["max_v"]:
+            return False
+
+        # Check the horizontal constraints
+        if self.processors > self.max_processors or self.width > self.wrapper_limits["max_h"]:
+            return False
+
+        return True
+
+    @staticmethod
+    def _parse_wallclock(wallclock: str) -> int:
+        """
+        Convert a wallclock string in format "HH:MM" to the total number of seconds.
+
+        :return: Total wallclock in seconds.
+        :rtype: int
+        """
+        hours, minutes = split_str_hours(wallclock)
+        return hours * 3600 + minutes * 60

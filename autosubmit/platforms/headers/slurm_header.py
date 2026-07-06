@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2017-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2017-2026 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
 
@@ -335,7 +335,7 @@ class SlurmHeader(object):
 
         language = kwargs["executable"]
 
-        if kwargs["method"] == 'srun' or kwargs["method"] == 'flux':
+        if kwargs["method"] == 'srun' or kwargs['wrapper_data'].wrapper_type.lower() == 'delegated':
             if language is None or len(language) == 0:
                 language = "#!/bin/bash"
             return language + wr_header

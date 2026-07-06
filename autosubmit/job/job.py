@@ -21,6 +21,7 @@ import json
 import locale
 import os
 import re
+import textwrap
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -49,10 +50,8 @@ from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import Language, get_template_snippet
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
-from autosubmit.platforms.fluxoverslurm import FluxOverSlurmPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from autosubmit.platforms.wrappers.flux_yaml_generator import FluxYAMLGenerator
 from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
@@ -162,7 +161,7 @@ class Job(object):
     """
 
     __slots__ = (
-        'rerun_only', 'delay_end', 'wrapper_type', 'wrapper_method', '_wrapper_queue',
+        'rerun_only', 'delay_end', 'wrapper_type', '_wrapper_queue',
         '_platform', '_queue', '_partition', 'retry_delay', '_section',
         '_wallclock', 'wchunkinc', '_tasks', '_nodes',
         '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
@@ -174,7 +173,7 @@ class Job(object):
         '_remote_logs', 'script_name', 'stat_file', '_status', 'prev_status',
         'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
         'parameters', '_tmp_path', '_log_path', 'check',
-        'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
+        'check_warnings', '_packed', 'currently_wrapped', 'hold', 'distance_weight', 'level', '_export',
         '_dependencies', 'running', 'start_time', 'ext_header_path', 'ext_tailer_path',
         'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
         'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
@@ -230,7 +229,6 @@ class Job(object):
         self.delay_end = None
         self.wrapper_type = None
         self.first_wrapped_level = False
-        self.wrapper_method = None
         self._wrapper_queue = None
         self._platform: Optional[ParamikoPlatform] = None
         self._queue = None
@@ -287,6 +285,7 @@ class Job(object):
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
+        self.currently_wrapped = False
         self.hold = False  # type: bool
         self.distance_weight = 0
         self.level = 0
@@ -353,7 +352,6 @@ class Job(object):
         self.delay_end = None
         self.wrapper_type = None
         self.first_wrapped_level = False
-        self.wrapper_method = None
         self._wrapper_queue = None
         self._queue = None
         self._partition = None
@@ -369,6 +367,7 @@ class Job(object):
         self.undefined_variables = None
         self.executable = None
         self.packed = False
+        self.currently_wrapped = False
         self.hold = False
         self.export = None
         self.start_time = None
@@ -428,6 +427,7 @@ class Job(object):
         self.dependencies = ""
         self.packed_during_building = False
         self.packed = False
+        self.currently_wrapped = False
         self.finished_time = None
 
     @property  # type: ignore
@@ -2415,20 +2415,22 @@ class Job(object):
         return self._get_paramiko_template(snippet, template, parameters)
 
     def _get_paramiko_template(self, snippet: 'TemplateSnippet', template, parameters) -> str:
-        if self.wrapper_method == 'flux':
-            current_platform = FluxOverSlurmPlatform()
-            yaml_generator = FluxYAMLGenerator(parameters)
-            full_template = self._compose_template_from_snippet(snippet, template, parameters, current_platform)
-            return yaml_generator.generate_template(full_template)
+        if self.currently_wrapped and self.wrapper_type == "delegated":
+            header = self._delegated_header()
         else:
-            return self._compose_template_from_snippet(snippet, template, parameters, self._platform)
-
-    def _compose_template_from_snippet(self, snippet: 'TemplateSnippet', template, parameters, current_platform) -> str:
+            header = self._platform.get_header(self, parameters)
         return ''.join([
-                snippet.as_header(current_platform.get_header(self, parameters), self.executable),
-                snippet.as_body(template),
-                snippet.as_tailer()
-            ])
+            snippet.as_header(header, self.executable),
+            snippet.as_body(template),
+            snippet.as_tailer()
+        ])
+    
+    def _delegated_header(self) -> str:
+        return textwrap.dedent(f"""\
+            ###############################################################################
+            # {self.name}
+            ###############################################################################
+           """)
 
     def queuing_reason_cancel(self, reason):
         try:
