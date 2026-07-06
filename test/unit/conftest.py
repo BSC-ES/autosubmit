@@ -18,9 +18,9 @@
 """Fixtures for unit tests."""
 
 from datetime import datetime
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from random import seed, randint, choice, randrange
+from random import choice, randint, randrange, seed
 from time import time
 from typing import Any, Callable, Optional, Protocol
 
@@ -41,28 +41,24 @@ from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
-
-_EXPID = 'a000'
+_EXPID = "a000"
 
 
 # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 class AutosubmitConfigFactory(Protocol):
-
     def __call__(
-            self,
-            expid: str,
-            experiment_data: Optional[dict] = None,
-            include_basic_config: bool = True,
-            *args: Any,
-            **kwargs: Any
+        self,
+        expid: str,
+        experiment_data: Optional[dict] = None,
+        include_basic_config: bool = True,
+        *args: Any,
+        **kwargs: Any,
     ) -> AutosubmitConfig: ...
 
 
 @pytest.fixture(scope="function")
 def autosubmit_config(
-        request: pytest.FixtureRequest,
-        tmp_path: Path,
-        autosubmit: Autosubmit
+    request: pytest.FixtureRequest, tmp_path: Path, autosubmit: Autosubmit
 ) -> AutosubmitConfigFactory:
     """Return a factory for ``AutosubmitConfig`` objects.
 
@@ -76,11 +72,11 @@ def autosubmit_config(
     """
 
     def _create_autosubmit_config(
-            expid: str,
-            experiment_data: dict = None,
-            include_basic_config: bool = True,
-            *_,
-            **kwargs
+        expid: str,
+        experiment_data: dict = None,
+        include_basic_config: bool = True,
+        *_,
+        **kwargs,
     ) -> AutosubmitConfig:
         """Create an Autosubmit configuration object.
 
@@ -102,7 +98,10 @@ def autosubmit_config(
             experiment_data = {}
 
         # FIXME: (BRUNO) Do we really need postgres here in the unit tests conftest?
-        is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
+        is_postgres = (
+            hasattr(BasicConfig, "DATABASE_BACKEND")
+            and BasicConfig.DATABASE_BACKEND == "postgres"
+        )
         if is_postgres or not Path(BasicConfig.DB_PATH).exists():
             autosubmit.install()
 
@@ -112,7 +111,7 @@ def autosubmit_config(
         # <expid>/tmp/ASLOGS
         aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
         # <expid>/tmp/LOG_<expid>
-        expid_logs_dir = exp_tmp_dir / f'LOG_{expid}'
+        expid_logs_dir = exp_tmp_dir / f"LOG_{expid}"
         Path(expid_logs_dir).mkdir(parents=True, exist_ok=True)
         # <expid>/conf
         conf_dir = exp_path / "conf"
@@ -122,7 +121,10 @@ def autosubmit_config(
         pkl_dir = exp_path / "pkl"
         Path(pkl_dir).mkdir(exist_ok=True)
         # ~/autosubmit/autosubmit.db
-        is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
+        is_postgres = (
+            hasattr(BasicConfig, "DATABASE_BACKEND")
+            and BasicConfig.DATABASE_BACKEND == "postgres"
+        )
         db_path = Path(BasicConfig.DB_PATH)
         if not is_postgres:
             db_path.touch()
@@ -132,62 +134,58 @@ def autosubmit_config(
         job_data_dir = Path(BasicConfig.JOBDATA_DIR)
         job_data_dir.mkdir(parents=True, exist_ok=True)
 
-        config = AutosubmitConfig(
-            expid=expid,
-            basic_config=BasicConfig
-        )
+        config = AutosubmitConfig(expid=expid, basic_config=BasicConfig)
 
         config.experiment_data = {**config.experiment_data, **experiment_data}
         # Populate the configuration object's ``experiment_data`` dictionary with the values
         # in ``BasicConfig``. For some reason, some platforms use variables like ``LOCAL_ROOT_DIR``
         # from the configuration object, instead of using ``BasicConfig``.
         if include_basic_config:
-            for k, v in {k: v for k, v in BasicConfig.__dict__.items() if not k.startswith('__')}.items():
+            for k, v in {
+                k: v for k, v in BasicConfig.__dict__.items() if not k.startswith("__")
+            }.items():
                 config.experiment_data[k] = v
 
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
-        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
+        must_exists = ["DEFAULT", "JOBS", "PLATFORMS", "CONFIG"]
         for must_exist in must_exists:
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
 
-        if not config.experiment_data.get('CONFIG').get('AUTOSUBMIT_VERSION', ''):
+        if not config.experiment_data.get("CONFIG").get("AUTOSUBMIT_VERSION", ""):
             try:
-                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
+                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = version(
+                    "autosubmit"
+                )
             except PackageNotFoundError:
-                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
+                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = ""
 
-        config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
+        config.experiment_data["CONFIG"]["SAFETYSLEEPTIME"] = 0
         # TODO: one test failed while moving things from unit to integration, but this shouldn't be
         #       needed, especially if the disk has the valid value?
-        config.experiment_data['DEFAULT']['EXPID'] = expid
+        config.experiment_data["DEFAULT"]["EXPID"] = expid
 
-        if 'HPCARCH' not in config.experiment_data['DEFAULT']:
-            config.experiment_data['DEFAULT']['HPCARCH'] = 'LOCAL'
+        if "HPCARCH" not in config.experiment_data["DEFAULT"]:
+            config.experiment_data["DEFAULT"]["HPCARCH"] = "LOCAL"
 
         for arg, value in kwargs.items():
             setattr(config, arg, value)
-        config.current_loaded_files[str(conf_dir / 'dummy-so-it-doesnt-force-reload.yml')] = time()
+        config.current_loaded_files[
+            str(conf_dir / "dummy-so-it-doesnt-force-reload.yml")
+        ] = time()
         return config
 
     return _create_autosubmit_config
 
 
 @pytest.fixture(scope="function")
-def create_jobs(
-        mocker,
-        request
-) -> list[Job]:
+def create_jobs(mocker, request) -> list[Job]:
     """
     :return: Jobs with random attributes and retrials.
     """
 
-    def _create_jobs(
-            mock,
-            num_jobs,
-            max_num_retrials_per_job
-    ) -> list[Job]:
+    def _create_jobs(mock, num_jobs, max_num_retrials_per_job) -> list[Job]:
         jobs = []
         seed(time())
         submit_time = datetime(2023, 1, 1, 10, 0, 0)
@@ -198,7 +196,7 @@ def create_jobs(
             [submit_time, start_time, end_time, ""],
             [submit_time, start_time, ""],
             [submit_time, ""],
-            [""]
+            [""],
         ]
         job_statuses = Status.LOGICAL_ORDER
         for i in range(num_jobs):
@@ -207,12 +205,12 @@ def create_jobs(
                 name="example_name_" + str(i),
                 job_id="example_id_" + str(i),
                 status=status,
-                priority=i
+                priority=i,
             )
 
             # Custom values for job attributes
             job_aux.processors = str(i)
-            job_aux.wallclock = '00:05'
+            job_aux.wallclock = "00:05"
             job_aux.section = "example_section_" + str(i)
             job_aux.member = "example_member_" + str(i)
             job_aux.chunk = "example_chunk_" + str(i)
@@ -221,7 +219,9 @@ def create_jobs(
             job_aux.nodes = str(i)
             job_aux.exclusive = "example_exclusive_" + str(i)
 
-            num_retrials = randint(1, max_num_retrials_per_job)  # random number of retrials, grater than 0
+            num_retrials = randint(
+                1, max_num_retrials_per_job
+            )  # random number of retrials, grater than 0
             retrials = []
 
             for j in range(num_retrials):
@@ -241,7 +241,9 @@ def create_jobs(
                         else:
                             retrial[3] = job_aux.status
                 retrials.append(retrial)
-            mock.patch("autosubmit.job.job.Job.get_last_retrials", return_value=retrials)
+            mock.patch(
+                "autosubmit.job.job.Job.get_last_retrials", return_value=retrials
+            )
             jobs.append(job_aux)
 
         return jobs
@@ -271,13 +273,13 @@ def next_job_id() -> Callable[[], int]:
     return _next_job_id
 
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def experiment_config_fixture(session_mocker):
     # TODO: There are unit tests that fail without this fixture. Those unit tests are good candidates
     #       to be rewritten or made into integration tests without mocks.
     session_mocker.patch(
-        'autosubmit.config.configcommon.get_experiment_description',
-        return_value=[['test experiment']]
+        "autosubmit.config.configcommon.get_experiment_description",
+        return_value=[["test experiment"]],
     )
 
 
@@ -390,12 +392,12 @@ class FakePlatform:
     """Minimal platform stub for testing wrapper and job-check logic."""
 
     def __init__(self):
-        self.name = 'fake_platform'
+        self.name = "fake_platform"
         # serial_platform is accessed by get_in_queue for platform matching.
         self.serial_platform = self
         # serial_queue / queue accessed when job queue property is evaluated.
-        self.serial_queue = ''
-        self.queue = ''
+        self.serial_queue = ""
+        self.queue = ""
         self.log_recovery_process = None
         self.cleanup_event = None
         # Replaced by mocker.MagicMock() in fixtures that need them:
@@ -425,21 +427,18 @@ def fake_job_list(mocker) -> JobList:
     """
     as_conf = mocker.MagicMock()
     as_conf.experiment_data = {}
-    job_list = JobList('a000', as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), JobListPersistencePkl())
     job_list._packages_persistence = mocker.MagicMock()
     return job_list
 
 
 @pytest.fixture
 def as_conf(autosubmit_config):
-    return autosubmit_config(_EXPID, experiment_data={
-        'JOBS': {},
-        'PLATFORMS': {}
-    })
+    return autosubmit_config(_EXPID, experiment_data={"JOBS": {}, "PLATFORMS": {}})
 
 
 def _create_dummy_job_with_status(job_id: int, status: int) -> Job:
-    job_name = f'job_{job_id}'
+    job_name = f"job_{job_id}"
     job = Job(job_name, job_id, status, 0)
     job.type = randrange(0, 2)
     return job
@@ -452,45 +451,40 @@ def jobs_as_dict(next_job_id):
             _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
             _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
             _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
-            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED)
+            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
         ],
         Status.SUBMITTED: [
             _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
             _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
-            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED)
+            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
         ],
         Status.RUNNING: [
             _create_dummy_job_with_status(next_job_id(), Status.RUNNING),
-            _create_dummy_job_with_status(next_job_id(), Status.RUNNING)
+            _create_dummy_job_with_status(next_job_id(), Status.RUNNING),
         ],
-        Status.QUEUING: [
-            _create_dummy_job_with_status(next_job_id(), Status.QUEUING)
-        ],
+        Status.QUEUING: [_create_dummy_job_with_status(next_job_id(), Status.QUEUING)],
         Status.FAILED: [
             _create_dummy_job_with_status(next_job_id(), Status.FAILED),
             _create_dummy_job_with_status(next_job_id(), Status.FAILED),
             _create_dummy_job_with_status(next_job_id(), Status.FAILED),
-            _create_dummy_job_with_status(next_job_id(), Status.FAILED)
+            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
         ],
         Status.READY: [
             _create_dummy_job_with_status(next_job_id(), Status.READY),
             _create_dummy_job_with_status(next_job_id(), Status.READY),
-            _create_dummy_job_with_status(next_job_id(), Status.READY)
+            _create_dummy_job_with_status(next_job_id(), Status.READY),
         ],
         Status.WAITING: [
             _create_dummy_job_with_status(next_job_id(), Status.WAITING),
-            _create_dummy_job_with_status(next_job_id(), Status.WAITING)
+            _create_dummy_job_with_status(next_job_id(), Status.WAITING),
         ],
-        Status.UNKNOWN: [
-            _create_dummy_job_with_status(next_job_id(), Status.UNKNOWN)
-        ]
+        Status.UNKNOWN: [_create_dummy_job_with_status(next_job_id(), Status.UNKNOWN)],
     }
 
 
 @pytest.fixture
 def job_list(as_conf, mocker, jobs_as_dict):
-    parameters = {'fake-key': 'fake-value',
-                  'fake-key2': 'fake-value2'}
+    parameters = {"fake-key": "fake-value", "fake-key2": "fake-value2"}
     as_conf.load_parameters = mocker.Mock(return_value=parameters)
     as_conf.default_parameters = {}
     joblist_persistence = JobListPersistencePkl()

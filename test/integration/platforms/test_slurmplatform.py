@@ -49,45 +49,49 @@ if TYPE_CHECKING:
     from docker.models.containers import Container
     from testcontainers.core.container import DockerContainer
 
-_PLATFORM_NAME = 'TEST_SLURM'
+_PLATFORM_NAME = "TEST_SLURM"
 
 
 def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
-    return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
+    return SlurmPlatform(
+        expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None
+    )
 
 
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
 def test_create_platform_slurm(
-        autosubmit_exp,
-        slurm_server: 'DockerContainer',
+    autosubmit_exp,
+    slurm_server: "DockerContainer",
 ):
     """Test the Slurm platform object creation."""
-    exp = autosubmit_exp(experiment_data={
-        'JOBS': {
-            'SIM': {
-                'PLATFORM': _PLATFORM_NAME,
-                'RUNNING': 'once',
-                'SCRIPT': 'echo "This is job ${SLURM_JOB_ID} EOM"',
-            }
-        },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            }
+    exp = autosubmit_exp(
+        experiment_data={
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'echo "This is job ${SLURM_JOB_ID} EOM"',
+                }
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 1,
+                    "PROCESSORS_PER_NODE": 1,
+                }
+            },
         }
-    })
+    )
     platform = _create_slurm_platform(exp.expid, exp.as_conf)
     assert platform.name == _PLATFORM_NAME
     # TODO: add more assertion statements...
@@ -96,537 +100,553 @@ def test_create_platform_slurm(
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
-@pytest.mark.parametrize('experiment_data', [
-    {
-        'JOBS': {
-            'SIM': {
-                'PLATFORM': _PLATFORM_NAME,
-                'RUNNING': 'once',
-                'SCRIPT': 'echo "This is job ${SLURM_JOB_ID} EOM"',
+@pytest.mark.parametrize(
+    "experiment_data",
+    [
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "once",
+                    "SCRIPT": 'echo "This is job ${SLURM_JOB_ID} EOM"',
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 1,
+                    "PROCESSORS_PER_NODE": 1,
+                },
             },
         },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
+        {
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "chunk",
+                    "SCRIPT": 'echo "0"',
+                },
+                "SIM_2": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "chunk",
+                    "SCRIPT": 'echo "0"',
+                    "DEPENDENCIES": "SIM",
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 1,
+                    "PROCESSORS_PER_NODE": 1,
+                },
             },
         },
-    },
-    {
-        'JOBS': {
-            'SIM': {
-                'PLATFORM': _PLATFORM_NAME,
-                'RUNNING': 'chunk',
-                'SCRIPT': 'echo "0"',
-            },
-            'SIM_2': {
-                'PLATFORM': _PLATFORM_NAME,
-                'RUNNING': 'chunk',
-                'SCRIPT': 'echo "0"',
-                'DEPENDENCIES': 'SIM',
-            },
-        },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            },
-        },
-    },
-], ids=[
-    'Simple Workflow',
-    'Dependency Workflow',
-])
+    ],
+    ids=[
+        "Simple Workflow",
+        "Dependency Workflow",
+    ],
+)
 def test_run_simple_workflow_slurm(
-        autosubmit_exp: AutosubmitExperimentFixture,
-        experiment_data: dict,
-        slurm_server: 'DockerContainer'
+    autosubmit_exp: AutosubmitExperimentFixture,
+    experiment_data: dict,
+    slurm_server: "DockerContainer",
 ):
     """Runs a simple Bash script using Slurm."""
     exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
+    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
+
 
 # TODO: 4.2 - readd hybrid wrappers
 @pytest.mark.timeout(25)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
-@pytest.mark.parametrize('experiment_data', [
-    {
-        'JOBS': {
-            'SIM': {
-                'DEPENDENCIES': {
-                    'SIM-1': {}
+@pytest.mark.parametrize(
+    "experiment_data",
+    [
+        {
+            "JOBS": {
+                "SIM": {
+                    "DEPENDENCIES": {"SIM-1": {}},
+                    "SCRIPT": 'echo "0"',
+                    "WALLCLOCK": "00:03",
+                    "RUNNING": "chunk",
+                    "CHECK": "on_submission",
+                    "PLATFORM": _PLATFORM_NAME,
                 },
-                'SCRIPT': 'echo "0"',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'chunk',
-                'CHECK': 'on_submission',
-                'PLATFORM': _PLATFORM_NAME,
-            },
-            'POST': {
-                'DEPENDENCIES': {
-                    'SIM',
+                "POST": {
+                    "DEPENDENCIES": {
+                        "SIM",
+                    },
+                    "SCRIPT": 'echo "0"',
+                    "WALLCLOCK": "00:03",
+                    "RUNNING": "chunk",
+                    "CHECK": "on_submission",
+                    "PLATFORM": _PLATFORM_NAME,
                 },
-                'SCRIPT': 'echo "0"',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'chunk',
-                'CHECK': 'on_submission',
-                'PLATFORM': _PLATFORM_NAME,
-            },
-            'TA': {
-                'DEPENDENCIES': {
-                    'SIM',
-                    'POST',
+                "TA": {
+                    "DEPENDENCIES": {
+                        "SIM",
+                        "POST",
+                    },
+                    "SCRIPT": 'echo "0"',
+                    "WALLCLOCK": "00:03",
+                    "RUNNING": "once",
+                    "CHECK": "on_submission",
+                    "PLATFORM": _PLATFORM_NAME,
                 },
-                'SCRIPT': 'echo "0"',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'once',
-                'CHECK': 'on_submission',
-                'PLATFORM': _PLATFORM_NAME,
             },
-        },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            },
-        },
-        'WRAPPERS': {
-            'WRAPPER': {
-                'TYPE': 'vertical',
-                'JOBS_IN_WRAPPER': 'SIM',
-                'RETRIALS': 0,
-            }
-        },
-    },
-    {
-        'JOBS': {
-            'SIMV': {
-                'DEPENDENCIES': {
-                    'SIMV-1': {}
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 1,
+                    "PROCESSORS_PER_NODE": 1,
                 },
-                'SCRIPT': 'echo "0"',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'chunk',
-                'CHECK': 'on_submission',
-                'RETRIALS': 1,
-                'PLATFORM': _PLATFORM_NAME,
+            },
+            "WRAPPERS": {
+                "WRAPPER": {
+                    "TYPE": "vertical",
+                    "JOBS_IN_WRAPPER": "SIM",
+                    "RETRIALS": 0,
+                }
             },
         },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            },
-        },
-        'WRAPPERS': {
-            'WRAPPERV': {
-                'TYPE': 'vertical',
-                'JOBS_IN_WRAPPER': 'SIMV',
-                'RETRIALS': 0,
-            },
-        },
-    },
-    {
-        'JOBS': {
-            'SIMH': {
-                'DEPENDENCIES': {
-                    'SIMH-1': {}
+        {
+            "JOBS": {
+                "SIMV": {
+                    "DEPENDENCIES": {"SIMV-1": {}},
+                    "SCRIPT": 'echo "0"',
+                    "WALLCLOCK": "00:03",
+                    "RUNNING": "chunk",
+                    "CHECK": "on_submission",
+                    "RETRIALS": 1,
+                    "PLATFORM": _PLATFORM_NAME,
                 },
-                'SCRIPT': 'echo "0"',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'chunk',
-                'CHECK': 'on_submission',
-                'RETRIALS': 1,
-                'PLATFORM': _PLATFORM_NAME,
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 1,
+                    "PROCESSORS_PER_NODE": 1,
+                },
+            },
+            "WRAPPERS": {
+                "WRAPPERV": {
+                    "TYPE": "vertical",
+                    "JOBS_IN_WRAPPER": "SIMV",
+                    "RETRIALS": 0,
+                },
             },
         },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
+        {
+            "JOBS": {
+                "SIMH": {
+                    "DEPENDENCIES": {"SIMH-1": {}},
+                    "SCRIPT": 'echo "0"',
+                    "WALLCLOCK": "00:03",
+                    "RUNNING": "chunk",
+                    "CHECK": "on_submission",
+                    "RETRIALS": 1,
+                    "PLATFORM": _PLATFORM_NAME,
+                },
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 1,
+                    "PROCESSORS_PER_NODE": 1,
+                },
+            },
+            "WRAPPERS": {
+                "WRAPPERH": {
+                    "TYPE": "horizontal",
+                    "JOBS_IN_WRAPPER": "SIMH",
+                    "RETRIALS": 0,
+                },
             },
         },
-        'WRAPPERS': {
-            'WRAPPERH': {
-                'TYPE': 'horizontal',
-                'JOBS_IN_WRAPPER': 'SIMH',
-                'RETRIALS': 0,
-            },
-        },
-    },
-], ids=[
-    'Vertical Wrapper Workflow',
-    'Wrapper Vertical',
-    'Wrapper Horizontal',
-])
-def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
-                                         slurm_server: 'DockerContainer'):
+    ],
+    ids=[
+        "Vertical Wrapper Workflow",
+        "Wrapper Vertical",
+        "Wrapper Horizontal",
+    ],
+)
+def test_run_all_wrappers_workflow_slurm(
+    experiment_data: dict,
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    slurm_server: "DockerContainer",
+):
     """Runs a simple Bash script using Slurm."""
     exp = autosubmit_exp(experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.as_conf.experiment_data = {
-        'EXPERIMENT': {
-            'DATELIST': '20000101',
-            'MEMBERS': 'fc0 fc1',
-            'CHUNKSIZEUNIT': 'day',
-            'CHUNKSIZE': 1,
-            'NUMCHUNKS': '2',
-            'CHUNKINI': '',
-            'CALENDAR': 'standard',
+        "EXPERIMENT": {
+            "DATELIST": "20000101",
+            "MEMBERS": "fc0 fc1",
+            "CHUNKSIZEUNIT": "day",
+            "CHUNKSIZE": 1,
+            "NUMCHUNKS": "2",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
         }
     }
 
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
+    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
-@pytest.mark.parametrize('experiment_data', [
-    {
-        'JOBS': {
-            'LOCAL_SETUP': {
-                'SCRIPT': 'sleep 0',
-                'RUNNING': 'once',
-                'NOTIFY_ON': 'COMPLETED',
-                'PLATFORM': _PLATFORM_NAME,
-            },
-            'LOCAL_SEND_SOURCE': {
-                'SCRIPT': 'sleep 0',
-                'PLATFORM': _PLATFORM_NAME,
-                'DEPENDENCIES': 'LOCAL_SETUP',
-                'RUNNING': 'once',
-                'NOTIFY_ON': 'FAILED',
-            },
-            'LOCAL_SEND_STATIC': {
-                'SCRIPT': 'sleep 0',
-                'PLATFORM': _PLATFORM_NAME,
-                'DEPENDENCIES': 'LOCAL_SETUP',
-                'RUNNING': 'once',
-                'NOTIFY_ON': 'FAILED',
-            },
-            'REMOTE_COMPILE': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': 'LOCAL_SEND_SOURCE',
-                'RUNNING': 'once',
-                'PROCESSORS': '1',
-                'WALLCLOCK': '00:01',
-                'NOTIFY_ON': 'COMPLETED',
-            },
-            'SIM': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': {
-                    'LOCAL_SEND_STATIC': {},
-                    'REMOTE_COMPILE': {},
-                    'SIM-1': {},
-                    'DA-1': {},
+@pytest.mark.parametrize(
+    "experiment_data",
+    [
+        {
+            "JOBS": {
+                "LOCAL_SETUP": {
+                    "SCRIPT": "sleep 0",
+                    "RUNNING": "once",
+                    "NOTIFY_ON": "COMPLETED",
+                    "PLATFORM": _PLATFORM_NAME,
                 },
-                'RUNNING': 'once',
-                'PROCESSORS': '1',
-                'WALLCLOCK': '00:01',
-                'NOTIFY_ON': 'FAILED',
-                'PLATFORM': _PLATFORM_NAME,
-            },
-            'LOCAL_SEND_INITIAL_DA': {
-                'SCRIPT': 'sleep 0',
-                'PLATFORM': _PLATFORM_NAME,
-                'DEPENDENCIES': 'LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1',
-                'RUNNING': 'chunk',
-                'SYNCHRONIZE': 'member',
-                'DELAY': '0',
-            },
-            'COMPILE_DA': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': 'LOCAL_SEND_SOURCE',
-                'RUNNING': 'once',
-                'WALLCLOCK': '00:01',
-                'NOTIFY_ON': 'FAILED',
-            },
-            'DA': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': {
-                    'SIM': {},
-                    'LOCAL_SEND_INITIAL_DA': {
-                        'CHUNKS_TO': 'all',
-                        'DATES_TO': 'all',
-                        'MEMBERS_TO': 'all',
+                "LOCAL_SEND_SOURCE": {
+                    "SCRIPT": "sleep 0",
+                    "PLATFORM": _PLATFORM_NAME,
+                    "DEPENDENCIES": "LOCAL_SETUP",
+                    "RUNNING": "once",
+                    "NOTIFY_ON": "FAILED",
+                },
+                "LOCAL_SEND_STATIC": {
+                    "SCRIPT": "sleep 0",
+                    "PLATFORM": _PLATFORM_NAME,
+                    "DEPENDENCIES": "LOCAL_SETUP",
+                    "RUNNING": "once",
+                    "NOTIFY_ON": "FAILED",
+                },
+                "REMOTE_COMPILE": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": "LOCAL_SEND_SOURCE",
+                    "RUNNING": "once",
+                    "PROCESSORS": "1",
+                    "WALLCLOCK": "00:01",
+                    "NOTIFY_ON": "COMPLETED",
+                },
+                "SIM": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": {
+                        "LOCAL_SEND_STATIC": {},
+                        "REMOTE_COMPILE": {},
+                        "SIM-1": {},
+                        "DA-1": {},
                     },
-                    'COMPILE_DA': {},
-                    'DA': {
-                        'DATES_FROM': {
-                            '20120201': {
-                                'CHUNKS_FROM': {
-                                    '1': {
-                                        'DATES_TO': '20120101',
+                    "RUNNING": "once",
+                    "PROCESSORS": "1",
+                    "WALLCLOCK": "00:01",
+                    "NOTIFY_ON": "FAILED",
+                    "PLATFORM": _PLATFORM_NAME,
+                },
+                "LOCAL_SEND_INITIAL_DA": {
+                    "SCRIPT": "sleep 0",
+                    "PLATFORM": _PLATFORM_NAME,
+                    "DEPENDENCIES": "LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1",
+                    "RUNNING": "chunk",
+                    "SYNCHRONIZE": "member",
+                    "DELAY": "0",
+                },
+                "COMPILE_DA": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": "LOCAL_SEND_SOURCE",
+                    "RUNNING": "once",
+                    "WALLCLOCK": "00:01",
+                    "NOTIFY_ON": "FAILED",
+                },
+                "DA": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": {
+                        "SIM": {},
+                        "LOCAL_SEND_INITIAL_DA": {
+                            "CHUNKS_TO": "all",
+                            "DATES_TO": "all",
+                            "MEMBERS_TO": "all",
+                        },
+                        "COMPILE_DA": {},
+                        "DA": {
+                            "DATES_FROM": {
+                                "20120201": {
+                                    "CHUNKS_FROM": {
+                                        "1": {
+                                            "DATES_TO": "20120101",
+                                        },
                                     },
                                 },
                             },
                         },
                     },
+                    "RUNNING": "chunk",
+                    "SYNCHRONIZE": "member",
+                    "DELAY": "0",
+                    "WALLCLOCK": "00:01",
+                    "PROCESSORS": "1",
+                    "NOTIFY_ON": "FAILED",
+                    "PLATFORM": _PLATFORM_NAME,
                 },
-                'RUNNING': 'chunk',
-                'SYNCHRONIZE': 'member',
-                'DELAY': '0',
-                'WALLCLOCK': '00:01',
-                'PROCESSORS': '1',
-                'NOTIFY_ON': 'FAILED',
-                'PLATFORM': _PLATFORM_NAME,
             },
-        },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            },
-        },
-        'WRAPPERS': {
-            'WRAPPER_SIMDA': {
-                'TYPE': 'vertical-horizontal',
-                'JOBS_IN_WRAPPER': 'SIM DA',
-                'RETRIALS': '0',
-            }
-        },
-    },
-    {
-        'JOBS': {
-            'LOCAL_SETUP': {
-                'SCRIPT': 'sleep 0',
-                'RUNNING': 'once',
-                'WALLCLOCK': '00:01',
-                'NOTIFY_ON': 'COMPLETED',
-                'PLATFORM': _PLATFORM_NAME,
-            },
-            'LOCAL_SEND_SOURCE': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': 'LOCAL_SETUP',
-                'RUNNING': 'once',
-                'WALLCLOCK': '00:01',
-                'NOTIFY_ON': 'FAILED',
-                'PLATFORM': _PLATFORM_NAME,
-            },
-            'LOCAL_SEND_STATIC': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': 'LOCAL_SETUP',
-                'RUNNING': 'once',
-                'WALLCLOCK': '00:01',
-                'NOTIFY_ON': 'FAILED',
-                'PLATFORM': _PLATFORM_NAME,
-            },
-            'REMOTE_COMPILE': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': 'LOCAL_SEND_SOURCE',
-                'RUNNING': 'once',
-                'PROCESSORS': '1',
-                'WALLCLOCK': '00:01',
-                'NOTIFY_ON': 'COMPLETED',
-            },
-            'SIM': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': {
-                    'LOCAL_SEND_STATIC': {},
-                    'REMOTE_COMPILE': {},
-                    'SIM-1': {},
-                    'DA-1': {},
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 1,
+                    "PROCESSORS_PER_NODE": 1,
                 },
-                'RUNNING': 'once',
-                'PROCESSORS': '1',
-                'WALLCLOCK': '00:01',
-                'NOTIFY_ON': 'FAILED',
-                'PLATFORM': _PLATFORM_NAME,
             },
-            'LOCAL_SEND_INITIAL_DA': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': 'LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1',
-                'RUNNING': 'chunk',
-                'WALLCLOCK': '00:01',
-                'SYNCHRONIZE': 'member',
-                'DELAY': '0',
-                'PLATFORM': _PLATFORM_NAME,
+            "WRAPPERS": {
+                "WRAPPER_SIMDA": {
+                    "TYPE": "vertical-horizontal",
+                    "JOBS_IN_WRAPPER": "SIM DA",
+                    "RETRIALS": "0",
+                }
             },
-            'COMPILE_DA': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': 'LOCAL_SEND_SOURCE',
-                'RUNNING': 'once',
-                'WALLCLOCK': '00:01',
-                'NOTIFY_ON': 'FAILED',
-            },
-            'DA': {
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': {
-                    'SIM': {},
-                    'LOCAL_SEND_INITIAL_DA': {
-                        'CHUNKS_TO': 'all',
-                        'DATES_TO': 'all',
-                        'MEMBERS_TO': 'all',
+        },
+        {
+            "JOBS": {
+                "LOCAL_SETUP": {
+                    "SCRIPT": "sleep 0",
+                    "RUNNING": "once",
+                    "WALLCLOCK": "00:01",
+                    "NOTIFY_ON": "COMPLETED",
+                    "PLATFORM": _PLATFORM_NAME,
+                },
+                "LOCAL_SEND_SOURCE": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": "LOCAL_SETUP",
+                    "RUNNING": "once",
+                    "WALLCLOCK": "00:01",
+                    "NOTIFY_ON": "FAILED",
+                    "PLATFORM": _PLATFORM_NAME,
+                },
+                "LOCAL_SEND_STATIC": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": "LOCAL_SETUP",
+                    "RUNNING": "once",
+                    "WALLCLOCK": "00:01",
+                    "NOTIFY_ON": "FAILED",
+                    "PLATFORM": _PLATFORM_NAME,
+                },
+                "REMOTE_COMPILE": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": "LOCAL_SEND_SOURCE",
+                    "RUNNING": "once",
+                    "PROCESSORS": "1",
+                    "WALLCLOCK": "00:01",
+                    "NOTIFY_ON": "COMPLETED",
+                },
+                "SIM": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": {
+                        "LOCAL_SEND_STATIC": {},
+                        "REMOTE_COMPILE": {},
+                        "SIM-1": {},
+                        "DA-1": {},
                     },
-                    'COMPILE_DA': {},
-                    'DA': {
-                        'DATES_FROM': {
-                            '20120201': {
-                                'CHUNKS_FROM': {
-                                    '1': {
-                                        'DATES_TO': '20120101',
-                                        'CHUNKS_TO': '1',
+                    "RUNNING": "once",
+                    "PROCESSORS": "1",
+                    "WALLCLOCK": "00:01",
+                    "NOTIFY_ON": "FAILED",
+                    "PLATFORM": _PLATFORM_NAME,
+                },
+                "LOCAL_SEND_INITIAL_DA": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": "LOCAL_SETUP LOCAL_SEND_INITIAL_DA-1",
+                    "RUNNING": "chunk",
+                    "WALLCLOCK": "00:01",
+                    "SYNCHRONIZE": "member",
+                    "DELAY": "0",
+                    "PLATFORM": _PLATFORM_NAME,
+                },
+                "COMPILE_DA": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": "LOCAL_SEND_SOURCE",
+                    "RUNNING": "once",
+                    "WALLCLOCK": "00:01",
+                    "NOTIFY_ON": "FAILED",
+                },
+                "DA": {
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": {
+                        "SIM": {},
+                        "LOCAL_SEND_INITIAL_DA": {
+                            "CHUNKS_TO": "all",
+                            "DATES_TO": "all",
+                            "MEMBERS_TO": "all",
+                        },
+                        "COMPILE_DA": {},
+                        "DA": {
+                            "DATES_FROM": {
+                                "20120201": {
+                                    "CHUNKS_FROM": {
+                                        "1": {
+                                            "DATES_TO": "20120101",
+                                            "CHUNKS_TO": "1",
+                                        },
                                     },
                                 },
                             },
                         },
                     },
+                    "RUNNING": "chunk",
+                    "SYNCHRONIZE": "member",
+                    "DELAY": "0",
+                    "WALLCLOCK": "00:01",
+                    "PROCESSORS": "1",
+                    "NOTIFY_ON": "FAILED",
+                    "PLATFORM": _PLATFORM_NAME,
                 },
-                'RUNNING': 'chunk',
-                'SYNCHRONIZE': 'member',
-                'DELAY': '0',
-                'WALLCLOCK': '00:01',
-                'PROCESSORS': '1',
-                'NOTIFY_ON': 'FAILED',
-                'PLATFORM': _PLATFORM_NAME,
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 1,
+                    "PROCESSORS_PER_NODE": 1,
+                },
+            },
+            "WRAPPERS": {
+                "WRAPPER_SIMDA": {
+                    "TYPE": "horizontal-vertical",
+                    "JOBS_IN_WRAPPER": "SIM&DA",
+                    "RETRIALS": "0",
+                }
             },
         },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            },
-        },
-        'WRAPPERS': {
-            'WRAPPER_SIMDA': {
-                'TYPE': 'horizontal-vertical',
-                'JOBS_IN_WRAPPER': 'SIM&DA',
-                'RETRIALS': '0',
-            }
-        },
-    }
-], ids=[
-    'Complex Wrapper vertical-horizontal',
-    'Complex Wrapper horizontal-vertical',
-])
-def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
-                                                 slurm_server: 'DockerContainer'):
+    ],
+    ids=[
+        "Complex Wrapper vertical-horizontal",
+        "Complex Wrapper horizontal-vertical",
+    ],
+)
+def test_run_all_wrappers_workflow_slurm_complex(
+    experiment_data: dict,
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    slurm_server: "DockerContainer",
+):
     """Runs a simple Bash script using Slurm."""
 
     exp = autosubmit_exp(experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.as_conf.experiment_data = {
-        'EXPERIMENT': {
-            'DATELIST': '20000101',
-            'MEMBERS': 'fc0 fc1',
-            'CHUNKSIZEUNIT': 'day',
-            'CHUNKSIZE': 1,
-            'NUMCHUNKS': '2',
-            'CHUNKINI': '',
-            'CALENDAR': 'standard',
+        "EXPERIMENT": {
+            "DATELIST": "20000101",
+            "MEMBERS": "fc0 fc1",
+            "CHUNKSIZEUNIT": "day",
+            "CHUNKSIZE": 1,
+            "NUMCHUNKS": "2",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
         }
     }
 
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
+    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
-def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer'):
-    exp = autosubmit_exp(experiment_data={
-        'JOBS': {
-            'SIM_V_H': {
-                'DEPENDENCIES': {
-                    'SIM_V_H-1': {},
+def test_check_remote_permissions(autosubmit_exp, slurm_server: "DockerContainer"):
+    exp = autosubmit_exp(
+        experiment_data={
+            "JOBS": {
+                "SIM_V_H": {
+                    "DEPENDENCIES": {
+                        "SIM_V_H-1": {},
+                    },
+                    "SCRIPT": "sleep 0",
+                    "WALLCLOCK": "00:03",
+                    "RUNNING": "chunk",
+                    "CHECK": "on_submission",
+                    "RETRIALS": 1,
+                    "PLATFORM": _PLATFORM_NAME,
                 },
-                'SCRIPT': 'sleep 0',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'chunk',
-                'CHECK': 'on_submission',
-                'RETRIALS': 1,
-                'PLATFORM': _PLATFORM_NAME,
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:03",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 10,
+                    "PROCESSORS_PER_NODE": 10,
+                },
             },
         },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 10,
-                'PROCESSORS_PER_NODE': 10,
-            },
-        }
-    }, wrapper=True)
+        wrapper=True,
+    )
     submitter = ParamikoSubmitter(as_conf=exp.as_conf)
 
     slurm_platform: SlurmPlatform = submitter.platforms[_PLATFORM_NAME]
@@ -755,7 +775,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
                     "POLICY": "flexible",
                 }
             },
-        }
+        },
     ],
     ids=[
         "Compress logs with default gzip",
@@ -765,14 +785,16 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
     ],
 )
 def test_simple_workflow_compress_logs_slurm(
-        autosubmit_exp: "AutosubmitExperimentFixture",
-        experiment_data: dict,
-        slurm_server: "DockerContainer",
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    experiment_data: dict,
+    slurm_server: "DockerContainer",
 ):
     """Test compressing remote logs in a simple workflow using Slurm."""
     with_wrapper = "WRAPPERS" in experiment_data
 
-    exp = autosubmit_exp(experiment_data=experiment_data, wrapper=with_wrapper, include_jobs=False)
+    exp = autosubmit_exp(
+        experiment_data=experiment_data, wrapper=with_wrapper, include_jobs=False
+    )
     _create_slurm_platform(exp.expid, exp.as_conf)
 
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
@@ -860,10 +882,10 @@ def test_simple_workflow_compress_logs_slurm(
     ],
 )
 def test_compress_log_missing_tool(
-        experiment_data: dict,
-        autosubmit_exp: "AutosubmitExperimentFixture",
-        slurm_server: "DockerContainer",
-        mocker,
+    experiment_data: dict,
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    slurm_server: "DockerContainer",
+    mocker,
 ):
     exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False)
     _create_slurm_platform(exp.expid, exp.as_conf)
@@ -945,10 +967,10 @@ def test_compress_log_missing_tool(
     ],
 )
 def test_compress_log_fail_command(
-        experiment_data: dict,
-        autosubmit_exp: "AutosubmitExperimentFixture",
-        slurm_server: "DockerContainer",
-        mocker,
+    experiment_data: dict,
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    slurm_server: "DockerContainer",
+    mocker,
 ):
     exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
@@ -1022,9 +1044,9 @@ def test_compress_log_fail_command(
     ],
 )
 def test_remove_files_on_transfer_slurm(
-        experiment_data: dict,
-        autosubmit_exp: "AutosubmitExperimentFixture",
-        slurm_server: "Container",
+    experiment_data: dict,
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    slurm_server: "Container",
 ):
     exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
@@ -1051,12 +1073,14 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     exp = autosubmit_exp(experiment_data={})
     platform_config = {
         "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
-        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'exp_tmp_dir'),
-        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'aslogs_dir')
+        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + "exp_tmp_dir"),
+        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + "aslogs_dir"),
     }
     platform = SlurmPlatform(exp.expid, "wrappers_test", platform_config)
 
-    job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list = JobList(
+        exp.expid, exp.as_conf, YAMLParserFactory(), JobListPersistencePkl()
+    )
     for i in range(3):
         job = Job(f"job{i}", i, Status.READY, 0)
         job.section = f"SECTION{i}"
@@ -1066,18 +1090,18 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     packager = JobPackager(exp.as_conf, platform, job_list)
     packager.wallclock = "01:00"
     packager.het = {
-        'HETSIZE': {'CURRENT_QUEUE': ''},
-        'CURRENT_QUEUE': '',
-        'NODES': [2],
-        'PARTITION': [''],
-        'CURRENT_PROJ': '',
-        'EXCLUSIVE': 'false',
-        'MEMORY': '',
-        'MEMORY_PER_TASK': 2,
-        'NUMTHREADS': '',
-        'RESERVATION': '',
-        'CUSTOM_DIRECTIVES': '',
-        'TASKS': ''
+        "HETSIZE": {"CURRENT_QUEUE": ""},
+        "CURRENT_QUEUE": "",
+        "NODES": [2],
+        "PARTITION": [""],
+        "CURRENT_PROJ": "",
+        "EXCLUSIVE": "false",
+        "MEMORY": "",
+        "MEMORY_PER_TASK": 2,
+        "NUMTHREADS": "",
+        "RESERVATION": "",
+        "CUSTOM_DIRECTIVES": "",
+        "TASKS": "",
     }
 
     job_result, check = packager.check_if_packages_are_ready_to_build()
@@ -1088,9 +1112,9 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
 @pytest.mark.slurm
 @pytest.mark.ssh
 def test_run_bug_save_wrapper_crashes(
-        autosubmit_exp: 'AutosubmitExperimentFixture',
-        mocker,
-        slurm_server: 'DockerContainer'
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    mocker,
+    slurm_server: "DockerContainer",
 ):
     """In issue 2463, JIRA 794 of DestinE, users reported getting an exception
     ``'list' object has no attribute 'status'``.
@@ -1115,53 +1139,52 @@ def test_run_bug_save_wrapper_crashes(
     * https://github.com/BSC-ES/autosubmit/issues/2463
     * https://jira.eduuni.fi/browse/CSCDESTINCLIMADT-794
     """
-    exp = autosubmit_exp(experiment_data={
-        'JOBS': {
-            'SIM': {
-                'PLATFORM': _PLATFORM_NAME,
-                'RUNNING': 'chunk',
-                'SCRIPT': 'sleep 0',
-                'DEPENDENCIES': {
-                    'SIM-1': {}
-                },
-                'WALLCLOCK': '00:05',
-                'RETRIALS': 5,
-            }
-        },
-        'WRAPPERS': {
-            'WRAPPER_V': {
-                'TYPE': 'vertical',
-                'JOBS_IN_WRAPPER': 'SIM',
-                'RETRIALS': 1
-            }
-        },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:30',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            }
+    exp = autosubmit_exp(
+        experiment_data={
+            "JOBS": {
+                "SIM": {
+                    "PLATFORM": _PLATFORM_NAME,
+                    "RUNNING": "chunk",
+                    "SCRIPT": "sleep 0",
+                    "DEPENDENCIES": {"SIM-1": {}},
+                    "WALLCLOCK": "00:05",
+                    "RETRIALS": 5,
+                }
+            },
+            "WRAPPERS": {
+                "WRAPPER_V": {
+                    "TYPE": "vertical",
+                    "JOBS_IN_WRAPPER": "SIM",
+                    "RETRIALS": 1,
+                }
+            },
+            "PLATFORMS": {
+                _PLATFORM_NAME: {
+                    "ADD_PROJECT_TO_HOST": False,
+                    "HOST": "localhost",
+                    "MAX_WALLCLOCK": "00:30",
+                    "PROJECT": "group",
+                    "QUEUE": "gp_debug",
+                    "SCRATCH_DIR": "/tmp/scratch/",
+                    "TEMP_DIR": "",
+                    "TYPE": "slurm",
+                    "USER": "root",
+                    "MAX_PROCESSORS": 1,
+                    "PROCESSORS_PER_NODE": 1,
+                }
+            },
         }
-    })
+    )
 
     # Mock to simulate a situation where save_wrappers fails for whatever reason.
     # When that happened, under certain conditions, running save_wrappers twice
     # could result in an ``AttributeError``.
     real_save_wrappers = JobList.save_wrappers
-    mocker.patch.object(JobList, 'save_wrappers', side_effect=[ValueError, real_save_wrappers])
+    mocker.patch.object(
+        JobList, "save_wrappers", side_effect=[ValueError, real_save_wrappers]
+    )
 
-    exp.autosubmit._check_ownership_and_set_last_command(
-        exp.as_conf,
-        exp.expid,
-        'run')
+    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
 
     # Here we just confirm that the exception is raised for whatever mysterious
     # reason (I/O error, out of memory, etc.).
