@@ -26,7 +26,7 @@ platform class, for which first we need to identify which existing platform is t
       current Atos systems; ``pbs`` is also supported for older
       configurations).
     - :mod:`PJM Platform <autosubmit.platforms.pjmplatform>` — Fujitsu's PJM
-      scheduler, used on Fugaku and other large-scale supercomputers.
+      scheduler, used on Fugaku and other large-scale supercomputers. (also known as TCM Technical Computing Suite)
       Connects via SSH.
     - :mod:`PBS Platform <autosubmit.platforms.pbsplatform>` — Portable Batch
       System (PBS) / PBS Pro / OpenPBS scheduler, used on systems such as
@@ -281,17 +281,16 @@ You must input the information suitable for your project (e.g.: user, host, plat
 Platform Connections
 --------------------
 
-This section describes how Autosubmit interacts with the platforms it has been
-configured to use: when it opens connections, when it checks that it has
-write access to the remote filesystem, and what it does when a connection has
+This section describes how Autosubmit interacts with the platforms it is
+configured to use: when a connections is opened, Autosubmit checks if it has the
+write access to the remote filesystem, and what to be done when a connection has
 to be re-established mid-run.
 
 The write-permission check
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Before relying on a remote platform, Autosubmit verifies that it can create
-and delete entries under the configured ``SCRATCH_DIR``. It does this by
-creating a small probe directory under
+Before relying on a remote platform, Autosubmit verifies that entries can be created
+and deleted under the configured ``SCRATCH_DIR``. It is done by creating a small probe directory under
 ``<scratch_dir>/<project>/<user>/`` and immediately removing it. The probe is
 a directory, not a file; the name it uses depends on the platform type:
 
@@ -334,7 +333,7 @@ frequency depends on the command:
    * - Command
      - When the probe runs
    * - ``autosubmit run``
-     - Once per configured platform at the start of the run, before the main loop begins. If the run later encounters a connection error and recovers, the probe runs again once per reconnection attempt against each platform, until reconnection succeeds. The number of reconnection attempts is bounded by ``CONFIG.RECOVERY_RETRIALS`` (default ``3650``), so a prolonged outage can produce many probe entries in the logs.
+     - Once per configured platform at the start of the run, before the main loop begins. If the run later encounters a connection error and it is recovered, the probe runs again for each new attempt on each of the platforms. The number of retries is bounded by ``CONFIG.RECOVERY_RETRIALS`` (default ``3650``), so a prolonged outage can produce many probe entries in the logs.
    * - ``autosubmit setstatus``
      - Once per platform that currently has jobs in ``QUEUING``, ``SUBMITTED`` or ``RUNNING`` state. When ``setstatus`` is run before ``autosubmit create`` (the typical operational case, where all jobs are still ``WAITING`` or ``READY``) no probe is created.
    * - ``autosubmit stop --cancel``
@@ -376,7 +375,7 @@ platform** for every platform of type ``slurm``, ``pjm``, ``pbs`` or
    on with other work.
 
 The log-recovery session is only created during ``autosubmit run``. Other
-commands (``setstatus``, ``recovery``, ``stop --cancel``, ``create``)
+commands (``setstatus``, ``recovery``, ``stop``, ``create``)
 open at most the main session per platform.
 
 For ``ecaccess`` platforms, no SSH session is opened at all. Every
