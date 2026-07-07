@@ -697,7 +697,7 @@ def _get_sqlalchemy_conn() -> Connection:
     can use a context-manager and keep the previous behaviour
     intact.
     """
-    return session.create_engine(BasicConfig.DATABASE_CONN_URL).connect()
+    return session.get_engine(db_path=Path(BasicConfig.DB_PATH)).connect()
 
 
 def _create_db_pg() -> bool:
@@ -902,28 +902,6 @@ def _get_experiment_id_sqlalchemy(name: str) -> int:
         raise AutosubmitCritical(f'The experiment "{name}" does not exist', 7005)
 
     return int(row[0])
-
-
-def get_connection_url(db_path: Union['Path', str] | None = None) -> str:
-    """Return a SQLAlchemy connection URL."""
-    if isinstance(db_path, str):
-        Log.warning("The 'db_path' parameter should be a Path object, not a string. Converting it to Path.")
-        db_path = Path(db_path)
-
-    if BasicConfig.DATABASE_BACKEND == "postgres":
-        return BasicConfig.DATABASE_CONN_URL
-
-    if not db_path:
-        raise ValueError('For SQLite databases you MUST provide a database file.')
-
-    if not db_path.exists():
-        if not db_path.parent.exists():
-            db_path.parent.mkdir(parents=True, exist_ok=True)
-            db_path.parent.chmod(0o770)
-        db_path.touch()
-        db_path.chmod(0o770)
-
-    return f'sqlite:///{str(db_path.resolve())}'
 
 
 def check_db_path(db_path: Path | None, must_exists: bool = True) -> bool:

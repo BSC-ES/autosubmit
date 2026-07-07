@@ -25,10 +25,11 @@ import pytest
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.db_common import get_autosubmit_version, _get_autosubmit_version, \
     _update_experiment_description_version, _get_autosubmit_version_sqlalchemy, _last_name_used_sqlalchemy, check_db_path
-from autosubmit.database.db_common import get_connection_url, DbException, create_db, open_conn
+from autosubmit.database.db_common import DbException, create_db, open_conn
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import DBVersionTable, ExperimentTable
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.database.session import get_engine
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
@@ -36,8 +37,7 @@ if TYPE_CHECKING:
 
 
 def _create_db_manager(db_path: Path):
-    connection_url = get_connection_url(db_path=db_path)
-    return DbManager(connection_url=connection_url)
+    return DbManager(db_path=db_path)
 
 
 def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath") -> None:

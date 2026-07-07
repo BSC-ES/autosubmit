@@ -44,29 +44,41 @@ def test_create_experiment_status_db_manager_invalid_value():
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, get_next_expid):
+def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, use_sqlalchemy: bool, get_next_expid):
+    if as_db == "postgres" and not use_sqlalchemy:
+        pytest.skip("Postgres only supports SQLAlchemy")
+
     expid = get_next_expid()
     options = {"expid": expid}
     tmp_test_dir = tmp_path / "test_status"
     tmp_test_dir.mkdir()
 
-    clazz = SqlAlchemyExperimentStatusDbManager
-
-    is_sqlalchemy = as_db == "sqlite"
-    if is_sqlalchemy:
-        clazz = ExperimentStatusDbManager
-
+    if as_db == "sqlite":
         options["db_dir_path"] = tmp_test_dir
         options["local_root_dir_path"] = tmp_test_dir
         options["main_db_name"] = "tests.db"
 
+    if as_db == "sqlite" and use_sqlalchemy:
+        database_manager = SqlAlchemyExperimentStatusDbManager()
+        clazz = SqlAlchemyExperimentStatusDbManager
+    else:
+        database_manager = create_experiment_status_db_manager(as_db, **options)
+        clazz = (
+            ExperimentStatusDbManager
+            if as_db == "sqlite"
+            else SqlAlchemyExperimentStatusDbManager
+        )
+
     # Assert type of database manager
-    database_manager = create_experiment_status_db_manager(as_db, **options)  # type: clazz
     assert isinstance(database_manager, clazz)
 
-    # Test initialization of the table (is possible is created by some previous test)
-    if is_sqlalchemy:
-        assert Path(cast(ExperimentStatusDbManager, database_manager)._as_times_file_path).exists()
+    if as_db == "sqlite" and not use_sqlalchemy:
+        assert Path(
+            cast(ExperimentStatusDbManager, database_manager)._as_times_file_path
+        ).exists()
+    elif as_db == "sqlite" and use_sqlalchemy:
+        inspector = inspect(database_manager.engine)
+        assert inspector.has_table(ExperimentStatusTable.name)
     else:
         inspector = inspect(database_manager.engine)
         assert inspector.has_table(ExperimentStatusTable.name, schema="public")
@@ -113,7 +125,12 @@ def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, a
     experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
     assert experiment_status_row is None
 
-    experiment_db_id = 1
+    # Get the experiment row
+    experiment_row = database_manager.get_experiment_row_by_expid(exp.expid)
+    experiment_db_id = experiment_row.id if experiment_row else None
+    assert experiment_db_id is not None
+
+    # Create the experiment status row and assert it is created
     last_row_id = database_manager.create_exp_status(experiment_db_id, exp.expid, Status.SUBMITTED)
     assert last_row_id > 0
 

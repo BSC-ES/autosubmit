@@ -24,7 +24,6 @@ from sqlalchemy import and_, or_, not_, func, select, exists, update
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
 from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJobsTable, WrapperJobsTable, \
     PreviewWrapperInfoTable, WrapperInfoTable, SectionsStructureTable
@@ -95,7 +94,7 @@ class JobsDbManager(DbManager):
             persistence_full_path = Path(Path(BasicConfig.LOCAL_ROOT_DIR, schema, "db"), Path("job_list.db"))
         else:
             persistence_full_path = None
-        super().__init__(get_connection_url(persistence_full_path), schema)
+        super().__init__(persistence_full_path, schema)
         self._ACTIVE_STATUSES = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
         self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'

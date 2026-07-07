@@ -28,7 +28,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.tables import TableRegistry, GENERALTABLES, Table
 
-
 class DbManager:
     """A database manager using SQLAlchemy.
 
@@ -36,24 +35,17 @@ class DbManager:
     as Postgres, Mongo, MySQL, etc.
     """
 
-    def __init__(self, connection_url: str, schema: str | None = None, historical: bool | None = False) -> None:
+    def __init__(self, db_path: str, schema: str | None = None, historical: bool | None = False) -> None:
         self.engine = None
         self.engine_historical = None
         if BasicConfig.DATABASE_BACKEND == "sqlite":
             if historical:
-                self.engine_historical = session.create_engine(connection_url)
-                if self.engine_historical.url.database and not Path(self.engine_historical.url.database).exists():
-                    Path(self.engine_historical.url.database).touch()
-                    Path(self.engine_historical.url.database).chmod(0o775)
+                self.engine_historical = session.get_engine(db_path)
             else:
-                self.engine = session.create_engine(connection_url)
-                # make file
-                if self.engine.url.database and not Path(self.engine.url.database).exists():
-                    Path(self.engine.url.database).touch()
-                    Path(self.engine.url.database).chmod(0o775)
+                self.engine = session.get_engine(db_path)
         else:
             # Postgres is unified
-            self.engine: Engine = session.create_engine(connection_url)
+            self.engine: Engine = session.get_engine(db_path)
             self.engine_historical = self.engine
 
         self.schema = schema if BasicConfig.DATABASE_BACKEND != "sqlite" else None
