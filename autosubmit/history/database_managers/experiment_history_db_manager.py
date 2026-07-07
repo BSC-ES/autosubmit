@@ -28,7 +28,6 @@ from sqlalchemy.schema import CreateTable, CreateSchema
 import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.tables import (
     ExperimentRunTable,
     JobDataTable,
@@ -540,7 +539,7 @@ class SqlAlchemyExperimentHistoryDbManager:
     def __init__(
             self,
             schema: str,
-            jobdata_path: str,
+            jobdata_path: Optional[str],
             jobdata_file: Optional[str] = None,
     ) -> None:
         """Initialize the SQLAlchemy experiment-history manager.
@@ -549,24 +548,18 @@ class SqlAlchemyExperimentHistoryDbManager:
         :param jobdata_path: Directory (sqlite) or URL Path (postgres).
         :param jobdata_file: Optional DB filename (used for sqlite; ignored for Postgres).
         """
-        if BasicConfig.DATABASE_BACKEND == "postgres":
-            default_base = BasicConfig.DATABASE_CONN_URL
-        else:
-            default_base = BasicConfig.JOBDATA_DIR
+        base = jobdata_path if jobdata_path else BasicConfig.JOBDATA_DIR
+        file_name = jobdata_file if jobdata_file else f"job_data_{schema}.db"
+        db_path = Path(base) / file_name
 
-        base = jobdata_path if jobdata_path is not None else default_base
-
-        # For sqlite we expect a filesystem path; for postgres we expect a connection URL.
+        # Decide whether to use a schema based on the database backend
+        # Postgres supports schemas, while SQLite does not.
         if BasicConfig.DATABASE_BACKEND == "postgres":
-            connection_url = get_connection_url(base)
             self.schema = schema
         else:
-            file_name = jobdata_file if jobdata_file is not None else f"job_data_{schema}.db"
-            db_path = Path(base) / file_name
-            connection_url = get_connection_url(db_path)
             self.schema = None
 
-        self.engine = session.create_engine(connection_url=connection_url)
+        self.engine = session.get_engine(db_path=db_path)
 
     def initialize(self):
         """Create the historical database tables if they do not exist, then migrate any missing columns."""
@@ -613,9 +606,7 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def my_database_exists(self):
         """Return ``True`` if the schema and tables exist in the database. ``False`` otherwise."""
-        connection_url = get_connection_url(Path(BasicConfig.DATABASE_CONN_URL))
-        engine = session.create_engine(connection_url=connection_url)
-        inspector = inspect(engine)
+        inspector = inspect(self.engine)
         return (
                 (self.schema in inspector.get_schema_names())
                 and inspector.has_table(ExperimentRunTable.name, schema=self.schema)

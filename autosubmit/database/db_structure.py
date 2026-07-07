@@ -27,8 +27,8 @@ from typing import Optional
 from networkx import DiGraph
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
+from autosubmit.database.session import get_engine
 from autosubmit.database.tables import ExperimentStructureTable
 from autosubmit.log.log import Log
 
@@ -40,12 +40,12 @@ def _check_structures_path(db_path: Path):
 
 def _get_db_manager(expid: str, sqlite_db_file: Optional[Path]) -> DbManager:
     """Create a ``db_manager`` with the given parameters."""
-    connection_url = get_connection_url(db_path=sqlite_db_file)
+    engine = get_engine(db_path=sqlite_db_file)
     if BasicConfig.DATABASE_BACKEND == "postgres":
         _schema = expid
     else:
         _schema = None
-    return DbManager(connection_url=connection_url, schema=_schema)
+    return DbManager(engine=engine, schema=_schema)
 
 
 def get_structure(expid: str, structures_path: Path) -> Optional[dict[str, list[str]]]:

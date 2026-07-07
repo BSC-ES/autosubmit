@@ -118,22 +118,21 @@ class UserMetricRepository:
     def __init__(self, expid: str):
         self.expid = expid
 
+        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
+        tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
+        db_path = tmp_path.joinpath(f"metrics_{expid}.db")
+
         if BasicConfig.DATABASE_BACKEND == "postgres":
             # Postgres backend
-            self.connection_url = BasicConfig.DATABASE_CONN_URL
             self.schema = self.expid
         else:
             # SQLite backend
-            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
-            tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
-            db_path = tmp_path.joinpath(f"metrics_{expid}.db")
-            self.connection_url = f"sqlite:///{db_path}"
             self.schema = None
 
         self.table = tables.get_table_from_name(
             schema=self.schema, table_name="user_metrics"
         )
-        self.engine = session.create_engine(self.connection_url)
+        self.engine = session.get_engine(db_path=db_path)
 
         with self.engine.connect() as conn:
             if self.schema:

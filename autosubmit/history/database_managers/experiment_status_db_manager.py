@@ -26,7 +26,6 @@ from sqlalchemy.schema import CreateTable
 import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.tables import ExperimentStatusTable, ExperimentTable
 from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.database_manager import DatabaseManager, DEFAULT_LOCAL_ROOT_DIR
@@ -142,8 +141,9 @@ class SqlAlchemyExperimentStatusDbManager:
     """
 
     def __init__(self) -> None:
-        connection_url = get_connection_url(Path(BasicConfig.DATABASE_CONN_URL))
-        self.engine = session.create_engine(connection_url=connection_url)
+        self.engine = session.get_engine(
+            db_path=Path(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)
+        )
         with self.engine.connect() as conn:
             conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
             conn.commit()

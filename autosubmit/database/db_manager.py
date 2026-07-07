@@ -22,7 +22,6 @@ from typing import cast, Any, Optional
 from sqlalchemy import Engine, delete, func, insert, select
 from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
 
-from autosubmit.database import session
 from autosubmit.database.tables import get_table_from_name
 
 
@@ -33,8 +32,8 @@ class DbManager:
     as Postgres, Mongo, MySQL, etc.
     """
 
-    def __init__(self, connection_url: str, schema: Optional[str] = None) -> None:
-        self.engine: Engine = session.create_engine(connection_url)
+    def __init__(self, engine: Engine, schema: Optional[str] = None) -> None:
+        self.engine: Engine = engine
         self.schema = schema
 
     def create_table(self, table_name: str) -> None:

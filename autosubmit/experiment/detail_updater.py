@@ -25,12 +25,12 @@ import sqlite3
 from typing import Any, Dict, Union
 
 from sqlalchemy import Table
-from autosubmit.database.db_common import get_connection_url, get_experiment_id
+from autosubmit.database.db_common import get_experiment_id
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 
-from autosubmit.database.session import create_engine
+from autosubmit.database.session import get_engine
 from autosubmit.database.tables import get_table_from_name
 
 
@@ -175,8 +175,7 @@ class ExperimentDetailsSQLAlchemyRepository(ExperimentDetailsRepository):
 
     def __init__(self):
         self.table: Table = get_table_from_name(schema=None, table_name='details')
-        connection_url = get_connection_url(BasicConfig.DB_PATH)
-        self.engine = create_engine(connection_url=connection_url)
+        self.engine = get_engine(db_path=BasicConfig.DB_PATH)
 
     def get_details(self, exp_id: int):
         with self.engine.connect() as conn:

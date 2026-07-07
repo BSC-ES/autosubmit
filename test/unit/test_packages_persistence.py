@@ -18,6 +18,7 @@
 """Tests for autosubmit/job/job_package_persistence.py."""
 
 import pytest
+from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.job.job import Job
@@ -34,8 +35,8 @@ def mock_db_manager(mocker):
         return_value=mock_manager,
     )
     mocker.patch(
-        "autosubmit.job.job_package_persistence.get_connection_url",
-        return_value="sqlite:///:memory:",
+        "autosubmit.job.job_package_persistence.get_engine",
+        return_value=create_engine("sqlite:///:memory:"),
     )
     return mock_manager
 
@@ -93,8 +94,8 @@ def test_init_creates_parent_directory(mocker, tmp_path):
     mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
     mocker.patch("autosubmit.job.job_package_persistence.DbManager")
     mocker.patch(
-        "autosubmit.job.job_package_persistence.get_connection_url",
-        return_value="sqlite:///:memory:",
+        "autosubmit.job.job_package_persistence.get_engine",
+        return_value=create_engine("sqlite:///:memory:"),
     )
 
     JobPackagePersistence("a000")

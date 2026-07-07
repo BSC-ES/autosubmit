@@ -19,7 +19,7 @@ from typing import Union
 
 import pytest
 
-from autosubmit.database.session import create_engine
+from autosubmit.database.session import _resolve_engine
 
 
 @pytest.mark.parametrize(
@@ -33,7 +33,7 @@ from autosubmit.database.session import create_engine
 def test_create_engine(url: str, expected: Union[str, Exception]):
     if type(expected) is not str:
         with pytest.raises(expected):  # type: ignore
-            create_engine(connection_url=url)
+            _resolve_engine(connection_url=url)
     else:
-        engine = create_engine(connection_url=url)
+        engine = _resolve_engine(connection_url=url)
         assert engine.name == expected
