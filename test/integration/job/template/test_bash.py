@@ -17,13 +17,15 @@
 
 """Integration tests for Autosubmit script templates written in Bash Shell."""
 
-from multiprocessing import Process
-from os import kill
+import ctypes
+
+from multiprocessing import Process, Value
+from os import kill, killpg
 from pathlib import Path
 from signal import SIGKILL, SIGTERM
-from subprocess import run
+from subprocess import run, Popen, PIPE
 from time import time, sleep
-from typing import cast, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from autosubmit.job.template import bash
 
@@ -58,8 +60,10 @@ def test_successful_script(tmp_path: 'LocalPath'):
     assert r.stdout == b'OK!\n', r.stderr
 
     assert Path(tmp_path, 'OK').exists()
+    stat_file = Path(tmp_path, 'test_job_STAT_1')
+    assert stat_file.exists()
+    assert stat_file.read_text().strip().splitlines()[-1] == 'COMPLETED'
     assert Path(tmp_path, 'test_job_COMPLETED').exists()
-    assert Path(tmp_path, 'test_job_STAT_1').exists()
 
 
 def test_command_err_script(tmp_path: 'LocalPath'):
@@ -79,8 +83,10 @@ def test_command_err_script(tmp_path: 'LocalPath'):
     assert r.returncode == 1
 
     assert Path(tmp_path, 'ERR').exists()
+    stat_file = Path(tmp_path, 'test_job_STAT_1')
+    assert stat_file.exists()
+    assert stat_file.read_text().strip().splitlines()[-1] == 'FAILED'
     assert not Path(tmp_path, 'test_job_COMPLETED').exists()
-    assert Path(tmp_path, 'test_job_STAT_1').exists()
 
 
 def test_killed_script(tmp_path: 'LocalPath'):
@@ -103,7 +109,7 @@ def test_killed_script(tmp_path: 'LocalPath'):
     p = Process(target=_run)
     p.start()
 
-    kill(cast(int, p.pid), SIGKILL)
+    kill(p.pid, SIGKILL)
 
     p.join(timeout=5)
 
@@ -125,9 +131,20 @@ def test_signalled_script(tmp_path: 'LocalPath'):
 
     bash_script.chmod(0o755)
 
-    def _run():
-        r = run([str(bash_script)], shell=True, capture_output=True, cwd=str(tmp_path))
-        assert r.returncode == 1
+    # Shared value so the child process can expose the bash script's process group ID.
+    # With start_new_session=True, proc.pid == pgid of the new session.
+    bash_pgid: Value = Value(ctypes.c_int, 0)
+
+    def _run() -> None:
+        proc = Popen(
+            [str(bash_script)],  # No shell=True: proc.pid IS the bash process (via shebang).
+            stdout=PIPE,
+            stderr=PIPE,
+            cwd=str(tmp_path),
+            start_new_session=True,  # Puts the bash script in its own process group.
+        )
+        bash_pgid.value = proc.pid
+        proc.wait()
 
     p = Process(target=_run)
     p.start()
@@ -139,10 +156,20 @@ def test_signalled_script(tmp_path: 'LocalPath'):
     while time() < must_end and not signalled_file.exists():
         sleep(0.1)
 
-    # ... and now we kill it in while it's sleeping! ARGH!
-    kill(cast(int, p.pid), SIGTERM)
+    # Ensure bash_pgid is populated (set right after Popen, so it arrives before SIGNALLED).
+    must_end = time() + 5
+    while time() < must_end and bash_pgid.value == 0:
+        sleep(0.05)
+
+    # ... and now we kill it while it's sleeping! ARGH!
+    # We send SIGTERM to the bash process group so the script's trap handler fires,
+    # writing the end time and FAILED status to the STAT file before it exits.
+    killpg(bash_pgid.value, SIGTERM)
     p.join()
 
     assert signalled_file.exists()
+    stat_file = Path(tmp_path, 'test_job_STAT_1')
+    assert stat_file.exists(), "STAT file not created upon SIGTERM!"
+    assert len(stat_file.read_text().strip().splitlines()) == 3, "STAT file should contain 3 lines (start time, end time, status)!"
+    assert stat_file.read_text().strip().splitlines()[-1] == 'FAILED'
     assert not Path(tmp_path, 'test_job_COMPLETED').exists()
-    assert Path(tmp_path, 'test_job_STAT_1').exists(), "STAT file not created upon SIGTERM!"

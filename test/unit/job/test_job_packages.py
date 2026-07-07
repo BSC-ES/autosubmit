@@ -23,19 +23,10 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistenceDb
-from autosubmit.job.job_packages import (
-    JobPackageSimple,
-    JobPackageVertical,
-    jobs_in_wrapper_str,
-)
-from autosubmit.log.log import AutosubmitCritical, AutosubmitError
-from autosubmit.platforms.execution_mode import ExecutionMode
-from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
-from autosubmit.platforms.pjmplatform import PJMPlatform
-from autosubmit.platforms.psplatform import PsPlatform
-from autosubmit.platforms.slurmplatform import SlurmPlatform
+from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
+from autosubmit.job.job_packages import jobs_in_wrapper_str
+from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.log.log import AutosubmitError, AutosubmitCritical
 
 
 @pytest.fixture
@@ -56,12 +47,11 @@ def create_platform(mocker):
 
 
 @pytest.fixture
-def jobs(create_platform, local) -> list[Job]:
+def jobs(platform, as_conf) -> list[Job]:
     jobs = [Job('dummy1', 0, Status.READY, 0),
             Job('dummy2', 0, Status.READY, 0)]
     for job in jobs:
-        # TODO: Why not call this in the constructor of Job?
-        job._init_runtime_parameters()
+        job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
 
     jobs[0].wallclock = "00:00"
     jobs[0]._threads = "1"
@@ -118,8 +108,7 @@ def create_job_package_wrapper(jobs, as_conf):
 
 @pytest.fixture
 def joblist(tmp_path, as_conf):
-    job_list = JobList('a000', as_conf, YAMLParserFactory(), JobListPersistenceDb(as_conf.expid))
-    # TODO: Check why we can't make ordered jobs public, or if there is a better way of setting wrappers as dict
+    job_list = JobList('a000', as_conf, YAMLParserFactory())
     job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
     return job_list
 
