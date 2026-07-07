@@ -2105,11 +2105,17 @@ class Job(object):
                 self.date, chunk, chunk_length, chunk_unit, cal)
             chunk_end = chunk_end_date(
                 chunk_start, chunk_length, chunk_unit, cal)
+            last_chunk_start = chunk_start_date(
+                self.date, total_chunk, chunk_length, chunk_unit, cal)
+            last_chunk_end = chunk_end_date(
+                last_chunk_start, chunk_length, chunk_unit, cal)
 
             if chunk_unit == 'hour':
                 chunk_end_1 = chunk_end - datetime.timedelta(hours=1)
+                last_day_chunk = last_chunk_end - datetime.timedelta(hours=1)
             else:
                 chunk_end_1 = previous_day(chunk_end, cal)
+                last_day_chunk = previous_day(last_chunk_end, cal)
 
             parameters['DAY_BEFORE'] = date2str(
                 previous_day(self.date, cal), self.date_format)
@@ -2151,15 +2157,8 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'TRUE'
             else:
                 parameters['CHUNK_LAST'] = 'FALSE'
-            last_start = chunk_start_date(self.date, total_chunk, chunk_length, chunk_unit, cal)
-            last_end = chunk_end_date(last_start, chunk_length, chunk_unit, cal)
-            if chunk_unit == 'hour':
-                last_end_1 = last_end - datetime.timedelta(hours=1)
-            else:
-                last_end_1 = previous_day(last_end, cal)
-
-            parameters['CHUNK_END_DATE_LAST'] = date2str(last_end, self.date_format)
-            parameters['LDATE'] = date2str(last_end_1, self.date_format)
+            parameters['CHUNK_END_DATE_LAST'] = date2str(last_chunk_end, self.date_format)
+            parameters['LDATE'] = date2str(last_day_chunk, self.date_format)
         return parameters
 
     def update_job_parameters(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:

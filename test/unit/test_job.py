@@ -2937,29 +2937,41 @@ def test_check_wrapper_wallclock_and_handle(mocker, inner_over, wrapper_over, in
         wrapper.platform.cancel_jobs.assert_not_called()
 
 
-def test_calendar_chunk_exposes_experiment_terminal_dates():
+@pytest.mark.parametrize("chunk_unit,chunk_size,date_format,expected_end,expected_ldate", [
+    ("month", 4,  "",  "20000901",     "20000831"),
+    ("day",   30, "",  "20000301",     "20000229"),
+    ("year",  1,  "",  "20020101",     "20011231"),
+    ("hour",  12, "H", "2000010200",   "2000010123"),
+])
+def test_calendar_chunk_exposes_experiment_terminal_dates(
+    chunk_unit, chunk_size, date_format, expected_end, expected_ldate
+):
     """Issue #2430: date-aware jobs see CHUNK_END_DATE_LAST and LDATE
     pointing at the experiment's end, independent of their own chunk."""
     job = Job('A', '1', Status.WAITING, 0)
     job.date = datetime(2000, 1, 1)
     job.chunk = None
-    job.date_format = ''
+    job.date_format = date_format
     parameters = {
         'EXPERIMENT.NUMCHUNKS': 2,
-        'EXPERIMENT.CHUNKSIZE': 4,
-        'EXPERIMENT.CHUNKSIZEUNIT': 'month',
+        'EXPERIMENT.CHUNKSIZE': chunk_size,
+        'EXPERIMENT.CHUNKSIZEUNIT': chunk_unit,
         'EXPERIMENT.CALENDAR': 'standard',
     }
 
     result = job.calendar_chunk(parameters)
 
-    assert result['CHUNK_END_DATE'] == '20000501'
-    assert result['CHUNK_SECOND_TO_LAST_DATE'] == '20000430'
-    assert result['CHUNK_END_DATE_LAST'] == '20000901'
-    assert result['LDATE'] == '20000831'
+    assert result['CHUNK_END_DATE_LAST'] == expected_end
+    assert result['LDATE'] == expected_ldate
 
 
-def test_calendar_chunk_last_chunk_consistency():
+@pytest.mark.parametrize("chunk_unit,chunk_size", [
+    ("month", 4),
+    ("day",   30),
+    ("year",  1),
+    ("hour",  12),
+])
+def test_calendar_chunk_last_chunk_consistency(chunk_unit, chunk_size):
     """On the last chunk the new variables equal the per-chunk ones."""
     job = Job('A', '1', Status.WAITING, 0)
     job.date = datetime(2000, 1, 1)
@@ -2967,12 +2979,12 @@ def test_calendar_chunk_last_chunk_consistency():
     job.date_format = ''
     parameters = {
         'EXPERIMENT.NUMCHUNKS': 2,
-        'EXPERIMENT.CHUNKSIZE': 4,
-        'EXPERIMENT.CHUNKSIZEUNIT': 'month',
+        'EXPERIMENT.CHUNKSIZE': chunk_size,
+        'EXPERIMENT.CHUNKSIZEUNIT': chunk_unit,
         'EXPERIMENT.CALENDAR': 'standard',
     }
 
     result = job.calendar_chunk(parameters)
 
-    assert result['CHUNK_END_DATE'] == result['CHUNK_END_DATE_LAST'] == '20000901'
-    assert result['CHUNK_SECOND_TO_LAST_DATE'] == result['LDATE'] == '20000831'
+    assert result['CHUNK_END_DATE'] == result['CHUNK_END_DATE_LAST']
+    assert result['CHUNK_SECOND_TO_LAST_DATE'] == result['LDATE']
