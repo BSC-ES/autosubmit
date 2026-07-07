@@ -20,7 +20,9 @@ import textwrap
 from pathlib import Path
 from typing import Optional, Protocol, cast
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable
 
 import autosubmit.history.utils as HUtils
@@ -28,7 +30,10 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.tables import ExperimentStatusTable, ExperimentTable
 from autosubmit.history.database_managers import database_models as Models
-from autosubmit.history.database_managers.database_manager import DatabaseManager, DEFAULT_LOCAL_ROOT_DIR
+from autosubmit.history.database_managers.database_manager import (
+    DEFAULT_LOCAL_ROOT_DIR,
+    DatabaseManager,
+)
 
 
 class ExperimentStatusDbManager(DatabaseManager):
@@ -181,14 +186,29 @@ class SqlAlchemyExperimentStatusDbManager:
         return Models.ExperimentStatusRow(*row)
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int:
+        """
+        Upsert a new experiment status row in the database. If the row already exists, it will be updated.
+        """
+        if BasicConfig.DATABASE_BACKEND == "postgres":
+            _insert_fn = pg_insert
+        else:
+            _insert_fn = sqlite_insert
         query = (
-            insert(ExperimentStatusTable).
+            _insert_fn(ExperimentStatusTable).
             values(
                 exp_id=exp_id,
                 name=expid,
                 status=status,
                 seconds_diff=0,
                 modified=HUtils.get_current_datetime()
+            ).on_conflict_do_update(
+                index_elements=[ExperimentStatusTable.c.exp_id],  # type: ignore
+                set_={
+                    "name": expid,
+                    "status": status,
+                    "seconds_diff": 0,
+                    "modified": HUtils.get_current_datetime()
+                }
             )
         )
         with self.engine.connect() as conn:
