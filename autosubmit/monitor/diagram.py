@@ -31,9 +31,9 @@ from matplotlib.patches import Rectangle
 from typing_extensions import LiteralString
 
 from autosubmit.job.job import Job
+from autosubmit.log.log import Log
 from autosubmit.statistics.jobs_stat import JobStat
 from autosubmit.statistics.statistics import Statistics
-from autosubmit.log.log import Log
 
 """Diagram generator."""
 
