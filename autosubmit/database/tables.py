@@ -16,8 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import datetime
+from typing import List, Optional, cast
 from functools import cache, cached_property
-from typing import cast, List, Optional
 
 from sqlalchemy import (
     MetaData,
@@ -26,10 +27,9 @@ from sqlalchemy import (
     Table,
     Text,
     Float,
-    LargeBinary,
     UniqueConstraint,
-    Column, ForeignKey,
-)
+    Column,
+    Boolean, ForeignKey)
 
 metadata_obj = MetaData()
 
@@ -50,15 +50,6 @@ DBVersionTable = Table(
     metadata_obj,
     Column("version", Integer, nullable=False, primary_key=True),
 )
-
-ExperimentStructureTable = Table(
-    "experiment_structure",
-    metadata_obj,
-    Column("e_from", Text, nullable=False, primary_key=True),
-    Column("e_to", Text, nullable=False, primary_key=True),
-    UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
-)
-"""Table that holds the structure of the experiment jobs."""
 
 ExperimentStatusTable = Table(
     "experiment_status",
@@ -96,6 +87,18 @@ ExperimentRunTable = Table(
     Column("metadata", Text),
 )
 
+DetailsTable = Table(
+    "details",
+    metadata_obj,
+    Column("exp_id", Integer, primary_key=True),
+    Column("user", Text, nullable=False),
+    Column("created", Text, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("branch", Text, nullable=False),
+    Column("hpc", Text, nullable=False),
+)
+
+"""Table that holds the structure of the experiment jobs."""
 JobDataTable = Table(
     "job_data",
     metadata_obj,
@@ -137,52 +140,94 @@ JobDataTable = Table(
     UniqueConstraint("counter", "job_name", name="unique_counter_and_job_name"),
 )
 
-JobListTable = Table(
-    "job_list",
+"""Table that holds the Historical structure of the experiment jobs."""
+
+# TODO this doesn't work in POSTGRESQL
+# JobStatusEnum = Enum(
+#     "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING",
+#     "SKIPPED", "FAILED", "UNKNOWN", "COMPLETED", "SUSPENDED",
+#     name="job_status_enum"
+# )
+
+"""All these tables will go inside the $expid/db/job_list.db."""
+# Jobs table
+"""Table that holds the minium neccesary info about the experiment jobs."""
+JobsTable = Table(
+    "jobs",
     metadata_obj,
-    Column("name", String, primary_key=True),
+    Column("name", String, nullable=False, primary_key=True),
     Column("id", Integer),
-    Column("status", Integer),
+    Column("script_name", String),
     Column("priority", Integer),
+    Column("status", Text, nullable=False, index=True),  # Should be job_status_enum
+    Column("frequency", String),  # TODO move to Section table ?
+    Column("synchronize", Boolean),  # TODO move to Section table ?
     Column("section", String),
-    Column("date", String),
-    Column("member", String),
     Column("chunk", Integer),
+    Column("member", Text),
+    Column("splits", Integer),
     Column("split", Integer),
-    Column("local_out", String),
-    Column("local_err", String),
-    Column("remote_out", String),
-    Column("remote_err", String),
+    Column("date", String),
+    Column("date_split", String),
+    Column("max_checkpoint_step", Integer, nullable=False, default=0),
+    Column("start_time", String),
+    Column("start_time_timestamp", Integer),
+    Column("submit_time_timestamp", Integer),
+    Column("finish_time_timestamp", Integer),
+    Column("ready_date", String),
+    Column("local_logs_out", String),  # tuple, to modify double value in two
+    Column("local_logs_err", String),  # tuple, to modify double value in two
+    Column("remote_logs_out", String),
+    Column("remote_logs_err", String),
+    Column("updated_log", Integer),
+    Column("fail_count", Integer, nullable=False, default=0),
+    Column("packed", Boolean),
+    Column("current_checkpoint_step", Integer, nullable=False, default=0),
+    Column("platform_name", String),
+    Column("created", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
+    Column("modified", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
 )
 
-JobPklTable = Table(
-    "job_pkl",
+"""Table that holds the structure of the experiment jobs."""
+ExperimentStructureTable = Table(
+    "experiment_structure",
     metadata_obj,
-    Column("expid", String, primary_key=True),
-    Column("pkl", LargeBinary),
-    Column("modified", String),
+    Column("e_from", String, nullable=False, primary_key=True, index=True),
+    Column("e_to", String, nullable=False, primary_key=True, index=True),
+    Column("min_trigger_status", String),
+    Column("completion_status", String),
+    Column("from_step", Integer),
+    Column("fail_ok", Boolean),
+    UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
 )
 
-DetailsTable = Table(
-    "details",
+# TODO: This should have
+# Column("e_from", String, ForeignKey("experiment_structure.e_to"), nullable=False, primary_key=True, index=True),
+# Column("e_to", String, ForeignKey("experiment_structure.e_from"), nullable=False, primary_key=True, index=True),
+# But in sqlite the table is in another file
+StructureDataTable = Table(
+    "structure_data",
     metadata_obj,
-    Column("exp_id", Integer, primary_key=True),
-    Column("user", Text, nullable=False),
-    Column("created", Text, nullable=False),
-    Column("model", Text, nullable=False),
-    Column("branch", Text, nullable=False),
-    Column("hpc", Text, nullable=False),
+    Column("run_id", Integer, ForeignKey("experiment_run.run_id"), nullable=False, primary_key=True, index=True),
+    Column("e_from", String, nullable=False, primary_key=True, index=True),
+    Column("e_to", String, nullable=False, primary_key=True, index=True),
+    Column("min_trigger_status", String),
+    Column("completion_status", String),
+    Column("from_step", Integer),
+    Column("fail_ok", Boolean),
+    UniqueConstraint("run_id", "e_from", "e_to", name="unique_structure_data_run_id_e_from_and_e_to"),
 )
 
-UserMetricsTable = Table(
-    "user_metrics",
+SectionsStructureTable = Table(
+    "sections",
     metadata_obj,
-    Column("user_metric_id", Integer, primary_key=True),
-    Column("run_id", Integer),
-    Column("job_name", Text),
-    Column("metric_name", Text),
-    Column("metric_value", Text),
-    Column("modified", Text),
+    Column("name", String, nullable=False, primary_key=True),
+    Column("splits", Integer, nullable=True),
+    Column("dependencies", String, nullable=True),
+    Column("datelist", String, nullable=True),
+    Column("members", String, nullable=True),
+    Column("numchunks", Integer, nullable=True),
+    Column("expid", String, nullable=True),
 )
 
 
@@ -215,8 +260,7 @@ def create_wrapper_tables(name, metadata_obj_):
         Column("package_name", String, nullable=False, primary_key=True),
         Column("job_name", String, ForeignKey("jobs.name"), nullable=False, primary_key=True),
         Column("timestamp", String, nullable=True),
-        UniqueConstraint("package_id", "package_name", "job_name",
-                         name=f"unique_{name}_jobs_package_id_package_name_job_name"),
+        UniqueConstraint("package_id", "package_name", "job_name", name=f"unique_{name}_jobs_package_id_package_name_job_name"),
 
     )
     return table_package_info, table_jobs_inside_wrapper
@@ -225,31 +269,49 @@ def create_wrapper_tables(name, metadata_obj_):
 WrapperInfoTable, WrapperJobsTable = create_wrapper_tables("wrappers", metadata_obj)
 PreviewWrapperInfoTable, PreviewWrapperJobsTable = create_wrapper_tables("preview_wrappers", metadata_obj)
 
-TABLES = (
-    ExperimentTable,
-    ExperimentStatusTable,
-    ExperimentStructureTable,
-    ExperimentRunTable,
-    DBVersionTable,
-    WrapperInfoTable,
-    WrapperJobsTable,
-    PreviewWrapperInfoTable,
-    PreviewWrapperJobsTable,
-    JobDataTable,
-    JobListTable,
-    JobPklTable,
-    DetailsTable,
-    UserMetricsTable,
+UserMetricsTable = Table(
+    "user_metrics",
+    metadata_obj,
+    Column("user_metric_id", Integer, primary_key=True),
+    Column("run_id", Integer),
+    Column("job_name", Text),
+    Column("metric_name", Text),
+    Column("metric_value", Text),
+    Column("modified", Text),
 )
-"""The tables available in the Autosubmit databases."""
+
+GENERALTABLES = {
+    ExperimentTable.name: ExperimentTable,
+    ExperimentStatusTable.name: ExperimentStatusTable,
+    ExperimentRunTable.name: ExperimentRunTable,
+    DBVersionTable.name: DBVersionTable,
+    JobDataTable.name: JobDataTable,
+    StructureDataTable.name: StructureDataTable,
+    DetailsTable.name: DetailsTable,
+    UserMetricsTable.name: UserMetricsTable,
+}
+
+JOBLISTTABLES = {
+    JobsTable.name: JobsTable,
+    ExperimentStructureTable.name: ExperimentStructureTable,
+    WrapperInfoTable.name: WrapperInfoTable,
+    WrapperJobsTable.name: WrapperJobsTable,
+    PreviewWrapperInfoTable.name: PreviewWrapperInfoTable,
+    PreviewWrapperJobsTable.name: PreviewWrapperJobsTable,
+    SectionsStructureTable.name: SectionsStructureTable,
+}
+
+JobListTable = JobsTable
 
 
 def get_table_with_schema(schema: Optional[str], table: Optional[Table]) -> Table:
     """Get the ``Table`` instance with the metadata modified.
+
     The metadata will use the given container. This means you can
     have table ``A`` with no schema, then call this function with
     ``schema=a000``, and then a new table ``A`` with ``schema=a000``
     will be returned.
+
     :param schema: The target schema for the table metadata.
     :param table: The SQLAlchemy Table.
     :return: The same table, but with the given schema set as metadata.
@@ -260,7 +322,6 @@ def get_table_with_schema(schema: Optional[str], table: Optional[Table]) -> Tabl
     metadata = MetaData(schema=schema)
     dest_table = Table(table.name, metadata)
 
-    # TODO: .copy is deprecated, https://github.com/sqlalchemy/sqlalchemy/discussions/8213
     for col in cast(List, table.columns):
         dest_table.append_column(col.copy())
 
@@ -268,25 +329,18 @@ def get_table_with_schema(schema: Optional[str], table: Optional[Table]) -> Tabl
 
 
 def get_table_from_name(*, schema: Optional[str], table_name: str) -> Table:
-    """Get the table from a given table name.
-    :param schema: The schema name.
-    :param table_name: The table name.
-    :return: The table if found, ``None`` otherwise.
-    :raises ValueError: If the table name is not provided.
+    """Get a new Table instance with the given schema and table name from the registry.
+
+    :param schema: Optional schema name.
+    :param table_name: Name of the table to retrieve.
+    :return: A new SQLAlchemy Table instance.
     """
-    if not table_name:
-        raise ValueError(f"Missing table name: {table_name}")
-
-    def predicate(t: Table) -> bool:
-        return t.name.lower() == table_name.lower()
-
-    table = next(filter(predicate, TABLES), None)
-    return get_table_with_schema(schema, table)
+    return get_table_with_schema(schema, get_all_tables_by_name()[table_name])
 
 
 def get_all_tables_by_name() -> dict[str, Table]:
     """Return a dictionary of all tables, combining general and job-list tables."""
-    return {table.name: table for table in TABLES}
+    return {**GENERALTABLES, **JOBLISTTABLES}
 
 
 # From 4.2.0 , used for wrappers only to keep changes minimal

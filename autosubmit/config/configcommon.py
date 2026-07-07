@@ -14,7 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
 import collections
 import copy
 import json
@@ -188,6 +187,7 @@ class AutosubmitConfig(object):
         :type must_exists: bool
         :return: section value
         :rtype: str
+
         """
         section = [s.upper() for s in section]
         # For text readability
@@ -433,8 +433,20 @@ class AutosubmitConfig(object):
         self._normalize_default_section(data)
         self._normalize_wrappers_section(data, raise_exception)
         self._normalize_jobs_section(data, must_exists)
+        self._normalize_storage(data)
 
         return data
+
+    @staticmethod
+    def _normalize_storage(data: dict[str, Any]) -> None:
+        """Normalize the storage section to a consistent lowercase type.
+
+        :param data: Experiment configuration dictionary to normalize in place.
+        """
+        storage = data.get("STORAGE", {})
+        storage_type = storage.get("TYPE", "sqlite").lower()
+        data["STORAGE"] = storage
+        data["STORAGE"]["TYPE"] = storage_type
 
     def _normalize_default_section(self, data_fixed: dict) -> None:
         default_section = data_fixed.get("DEFAULT", {})
@@ -531,9 +543,7 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def _normalize_notify_on(data_fixed: dict, job_section) -> None:
-        """
-        Normalize the NOTIFY_ON section to a consistent format.
-        """
+        """Normalize the NOTIFY_ON section to a consistent format."""
         notify_on = data_fixed["JOBS"][job_section].get("NOTIFY_ON", "")
         if notify_on:
             if type(notify_on) is str:
@@ -569,6 +579,9 @@ class AutosubmitConfig(object):
             if "WALLCLOCK" in job_data:
                 self._normalize_wallclock(data_fixed)
 
+            if "PLATFORM" in job_data:
+                data_fixed["JOBS"][job]["PLATFORM"] = job_data["PLATFORM"].upper()
+
             self._normalize_notify_on(data_fixed, job)
 
     @staticmethod
@@ -592,8 +605,7 @@ class AutosubmitConfig(object):
 
     @staticmethod
     def _normalize_dependencies(dependencies: Union[str, dict]) -> dict:
-        """
-        Normalize the dependencies to a consistent format.
+        """Normalize the dependencies to a consistent format.
 
         This function takes a string or dictionary of dependencies and normalizes them to a dictionary format.
         If the input is a string, it splits the string by spaces and converts each dependency to uppercase.
@@ -613,17 +625,17 @@ class AutosubmitConfig(object):
         elif isinstance(dependencies, dict):
             for dependency, dependency_data in dependencies.items():
                 aux_dependencies[dependency.upper()] = dependency_data
-                if type(dependency_data) is dict and dependency_data.get("STATUS", None):
-                    dependency_data["STATUS"] = dependency_data["STATUS"].upper()
-                    if not dependency_data.get("ANY_FINAL_STATUS_IS_VALID", False):
-                        if dependency_data["STATUS"][-1] == "?":
-                            dependency_data["STATUS"] = dependency_data["STATUS"][:-1]
-                            dependency_data["ANY_FINAL_STATUS_IS_VALID"] = True
-                        elif dependency_data["STATUS"] not in ["READY", "DELAYED", "PREPARED", "SKIPPED", "FAILED",
-                                                               "COMPLETED"]:  # May change in future issues.
-                            dependency_data["ANY_FINAL_STATUS_IS_VALID"] = True
-                        else:
-                            dependency_data["ANY_FINAL_STATUS_IS_VALID"] = False
+                if type(dependency_data) is dict:
+                    # Backwards compatibility
+                    user_set_status = dependency_data.pop("MIN_TRIGGER_STATUS", dependency_data.pop("STATUS", None))
+                    if user_set_status:
+                        dependency_data["MIN_TRIGGER_STATUS"] = user_set_status.upper()
+                        # Backwards compatibility
+                        fail_ok = dependency_data.get("FAIL_OK", dependency_data.get("OPTIONAL", False))
+                        dependency_data["FAIL_OK"] = fail_ok
+                        if dependency_data["MIN_TRIGGER_STATUS"][-1] == "?":
+                            dependency_data["MIN_TRIGGER_STATUS"] = dependency_data["MIN_TRIGGER_STATUS"][:-1]
+                            dependency_data["FAIL_OK"] = True
 
         return aux_dependencies
 
@@ -651,8 +663,7 @@ class AutosubmitConfig(object):
         return d
 
     def convert_list_to_string(self, data):
-        """Convert a list to a string
-        """
+        """Convert a list to a string"""
         if type(data) is dict:
             for key, val in data.items():
                 if isinstance(val, list):
@@ -689,7 +700,8 @@ class AutosubmitConfig(object):
 
     # noinspection PyMethodMayBeStatic
     def get_yaml_filenames_to_load(self, yaml_folder, ignore_minimal=False):
-        """Get all yaml files in a folder and return a list with the filenames
+        """
+        Get all yaml files in a folder and return a list with the filenames
         :param yaml_folder: folder to search for yaml files
         :param ignore_minimal: ignore minimal files
         :return: list of filenames
@@ -707,7 +719,8 @@ class AutosubmitConfig(object):
         return filenames_to_load
 
     def load_config_folder(self, current_data, yaml_folder, ignore_minimal=False):
-        """Load a config folder and return pre and post config
+        """
+        Load a config folder and return pre and post config
         :param current_data: current data to be updated
         :param yaml_folder: folder to load config
         :param ignore_minimal: ignore minimal config files
@@ -765,7 +778,8 @@ class AutosubmitConfig(object):
         return current_data
 
     def parse_data_loops(self, experiment_data):
-        """This function, looks for the FOR keyword, to generates N amount of subsections of the same section.
+        """
+        This function, looks for the FOR keyword, to generates N amount of subsections of the same section.
         Looks for the "NAME" keyword, inside this FOR keyword to determine the name of the new sections
         Experiment_data is the dictionary that contains all the sections, a subsection could be located at the root but also in a nested section
         :param experiment_data: dictionary with all the sections
@@ -816,7 +830,8 @@ class AutosubmitConfig(object):
 
     # noinspection PyMethodMayBeStatic
     def check_dict_keys_type(self, parameters):
-        """Check the type of keys in the parameters dictionary.
+        """
+        Check the type of keys in the parameters dictionary.
         :param parameters: Dictionary containing the parameters of the experiment.
         :return: Type of keys in the parameters dictionary, either "long" or "short".
         """
@@ -1178,7 +1193,8 @@ class AutosubmitConfig(object):
         self.check_autosubmit_conf(no_log)
 
     def check_conf_files(self, running_time=False, force_load=True, no_log=False):
-        """Checks configuration files (autosubmit, experiment jobs and platforms), looking for invalid values, missing
+        """
+        Checks configuration files (autosubmit, experiment jobs and platforms), looking for invalid values, missing
         required options. Print results in log
         :param running_time: True if the function is called during the execution of the program
         :type running_time: bool
@@ -1328,7 +1344,13 @@ class AutosubmitConfig(object):
 
         if parser_data.get("STORAGE", None) is None:
             parser_data["STORAGE"] = {}
-        if parser_data["STORAGE"].get('TYPE', "pkl") not in ['pkl', 'db']:
+
+        # Retrocompatibility
+        if parser_data["STORAGE"].get('TYPE', "sqlite") in ['pkl', 'db']:
+            parser_data["STORAGE"] = {}
+            parser_data["STORAGE"]['TYPE'] = 'sqlite'
+
+        if parser_data["STORAGE"].get('TYPE', "sqlite") not in ['sqlite', 'postgres']:
             self.wrong_config["Autosubmit"] += [['storage',
                                                  "TYPE parameter not found"]]
         wrappers_info = parser_data.get("WRAPPERS", {})
@@ -1757,22 +1779,6 @@ class AutosubmitConfig(object):
         # Think of it as a tree with two branches that needs to be unified at each level
         return self.unify_conf(self.unify_conf(current_data_pre, current_data), current_data_post)
 
-    def load_list_parameter(self, parameter):
-        """Loads a list parameter
-        :param parameter:
-        :return: list
-        """
-        if type(self.starter_conf[parameter]) is str:
-            if "," in self.starter_conf[parameter]:
-                list_parameters = self.starter_conf[parameter].split(",")
-            else:
-                list_parameters = [self.starter_conf[parameter]]
-        elif type(self.starter_conf[parameter]) is list:
-            list_parameters = self.starter_conf[parameter]
-        else:
-            list_parameters = list(self.starter_conf[parameter])
-        return [parameter.strip(" ") for parameter in list_parameters]
-
     @property
     def is_current_real_user_owner(self) -> bool:
         """
@@ -1783,11 +1789,12 @@ class AutosubmitConfig(object):
 
     @property
     def is_current_logged_user_owner(self) -> bool:
-        """
-        Check if the current user is the owner of the experiment folder
-        :return: bool
-        """
-        return Path(self.experiment_data["ROOTDIR"]).owner() == os.environ.get("USER", None)
+        """Check if the current user is the owner of the experiment folder."""
+        if self.experiment_data.get("ROOTDIR", None):
+            rootdir_path = Path(self.experiment_data["ROOTDIR"])
+            return rootdir_path.exists() and rootdir_path.owner() == os.environ.get("USER", None)
+        else:
+            return False
 
     @staticmethod
     def load_as_env_variables(parameters: dict[str, Any]) -> dict[str, Any]:
@@ -1818,6 +1825,11 @@ class AutosubmitConfig(object):
                     if mod_time > self.current_loaded_files[file]:
                         return True
         return False
+
+    def load_starter_conf(self):
+        """Loads the expid/conf folder"""
+        for filename in self.get_yaml_filenames_to_load(self.conf_folder_yaml):
+            self.experiment_data = self.unify_conf(self.experiment_data, self.load_config_file(self.experiment_data, Path(filename)))
 
     def reload(self, force_load=False, only_experiment_data=False):
         """Reloads the configuration files
@@ -1880,7 +1892,6 @@ class AutosubmitConfig(object):
                 self.misc_data = self.unify_conf(self.misc_data,
                                                  self.load_config_file(self.misc_data, Path(filename), load_misc=True))
             self.load_current_hpcarch_parameters()
-
             self.load_workflow_commit()
             self.dynamic_variables = {}
             self.set_default_parameters()
@@ -2065,7 +2076,8 @@ class AutosubmitConfig(object):
         return changed
 
     def deep_add_missing_starter_conf(self, experiment_data, starter_conf):
-        """Add the missing keys from starter_conf to experiment_data
+        """
+        Add the missing keys from starter_conf to experiment_data
         :param experiment_data:
         :param starter_conf:
         :return:
@@ -2310,16 +2322,21 @@ class AutosubmitConfig(object):
         """
         return self.get_section(['SVN', 'PROJECT_REVISION'])
 
-    def get_local_project_path(self):
+    def get_local_project_path(self) -> Path:
         """Gets path to origin for local project
 
         :return: path to local project
-        :rtype: str
+        :rtype: Path
         """
-        return self.get_section(['LOCAL', 'PROJECT_PATH'])
+        path = self.get_section(['LOCAL', 'PROJECT_PATH'])
+        if not path:
+            raise AutosubmitCritical(
+                "Empty project path! Please change this parameter to a valid one.", 7014)
+        return Path(path)
 
     def get_date_list(self):
-        """Returns startdates list from experiment's config file
+        """
+        Returns startdates list from experiment's config file
 
         :return: experiment's startdates
         :rtype: list
@@ -2798,11 +2815,11 @@ class AutosubmitConfig(object):
         return self.get_section(['COMMUNICATIONS', 'API'], 'paramiko')
 
     def get_storage_type(self) -> str:
-        """Returns the storage system from autosubmit's config file. Pkl by default.
+        """Returns the storage system from autosubmit's config file. Sqlite by default.
 
         :return: communications library
         """
-        return self.get_section(['STORAGE', 'TYPE'], 'pkl')
+        return self.get_section(['STORAGE', 'TYPE'], 'sqlite')
 
     @staticmethod
     def is_valid_mail_address(mail_address: str) -> bool:
@@ -2823,7 +2840,7 @@ class AutosubmitConfig(object):
 
     def is_valid_storage_type(self) -> bool:
         storage_type = self.get_storage_type()
-        return storage_type in ['pkl', 'db']
+        return storage_type in ['sqlite', 'postgres']
 
     def is_valid_jobs_in_wrapper(self, wrapper=None) -> bool:
         if wrapper is None:
@@ -2911,6 +2928,37 @@ class AutosubmitConfig(object):
                     "{}\n This file and the correctness of its content are necessary.".format(str(exp)))
         return parser
 
+    def get_wrapped_jobs(self) -> list[str]:
+        """Return the jobs that should be wrapped.
+
+        Read the `WRAPPERS.JOBS_IN_WRAPPER` value from `self.experiment_data` and
+        normalize it to a list of job names.
+
+        :return: Normalized list of job names.
+        :rtype: list[str].
+        """
+        jobs_in_wrapper = self.experiment_data.get("WRAPPERS", {}).get("JOBS_IN_WRAPPER", [])
+        if isinstance(jobs_in_wrapper, str):
+            jobs_in_wrapper = jobs_in_wrapper.split("&") if "&" in jobs_in_wrapper else jobs_in_wrapper.split()
+
+        return [job.strip() for job in jobs_in_wrapper if job.strip()]
+
+    def check_files_loaded(self) -> str:
+        """
+        Returns the contents of all loaded configuration files, with a header indicating the file name.
+        :return: contents of all loaded configuration files
+        :rtype: str
+        """
+        self.reload(True)
+        file_contents = ""
+        for fi in self.current_loaded_files:
+            path = Path(fi)
+            file_contents += f"header:{path}\n"
+            if path.is_file():
+                with path.open("r") as file:
+                    file_contents += file.read()
+        return file_contents
+
     def get_current_wrapper(self, section: str) -> dict:
         """Returns the wrapper configuration for a given job section.
 
@@ -2919,9 +2967,10 @@ class AutosubmitConfig(object):
         :return: wrapper configuration
         :rtype: dict
         """
-        for wrapper in self.experiment_data.get("WRAPPERS", {}).values():
-            if isinstance(wrapper, dict) and section in wrapper.get("JOBS_IN_WRAPPER", []):
-                return wrapper
+        if isinstance(self.experiment_data.get("WRAPPERS", {}), dict):
+            for wrapper in self.experiment_data.get("WRAPPERS", {}).values():
+                if isinstance(wrapper, dict) and section in wrapper.get("JOBS_IN_WRAPPER", []):
+                    return wrapper
         return {}
 
     def get_cpmip_thresholds(self, job_section: str) -> dict:

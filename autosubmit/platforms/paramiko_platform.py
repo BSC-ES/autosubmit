@@ -1437,6 +1437,8 @@ class ParamikoPlatform(Platform):
 
             self._ssh_output = ''.join([s.decode(lang) for s in stdout_chunks if s.decode(lang) != ''])
             self._ssh_output_err = ''.join([s.decode(lang) for s in stderr_readlines if s.decode(lang) != ''])
+            Log.debug(f"send_command() output: {self._ssh_output}")
+            Log.debug(f"send_command() error output: {self._ssh_output_err}")
             self._check_for_unrecoverable_errors()
 
             if not ignore_log and self._ssh_output_err:

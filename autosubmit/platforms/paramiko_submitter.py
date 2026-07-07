@@ -22,6 +22,7 @@ from collections import defaultdict
 from typing import Optional, TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
+from .platform import Platform
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
@@ -135,6 +136,15 @@ class ParamikoSubmitter:
         self.platforms: dict[str, 'ParamikoPlatform'] = {}
         self.load_platforms(as_conf=as_conf, auth_password=auth_password, local_auth_password=local_auth_password)
 
+    @property
+    def platforms_object(self) -> list[Platform]:
+        """Returns a list of all the platforms objects used by the experiment.
+
+        :return: List of platform objects
+        :rtype: list[Platform]
+        """
+        return list(self.platforms.values())
+
     def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: Optional[dict] = None,
                             auth_password: Optional[str] = None) -> None:
         """Create the local platform.
@@ -236,8 +246,6 @@ class ParamikoSubmitter:
 
             remote_platform.processors_per_node = section_platform.get('PROCESSORS_PER_NODE', "1")
             remote_platform.custom_directives = section_platform.get('CUSTOM_DIRECTIVES', "")
-            if len(remote_platform.custom_directives) > 0:
-                Log.debug(f'Custom directives for {platform_used}: {remote_platform.custom_directives}')
             remote_platform.scratch_free_space = str(section_platform.get('SCRATCH_FREE_SPACE', False)).lower()
             _validate_platform_config(platform_used, remote_platform)
             try:

@@ -15,4 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Integration tests for the ``autosubmit inspect`` command."""
+"""Log recovery tests
+
+This module contains unit tests for the log recovery functionality of the Autosubmit system.
+
+"""

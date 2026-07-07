@@ -266,7 +266,7 @@ class LocalPlatform(ParamikoPlatform):
 
     # Moves .err .out
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 1,
-                          max_retries: int = 1) -> bool:
+                          max_retries: int = 1, show_logs: bool = True) -> bool:
         """Checks if a file exists in the platform.
 
         :param src: source name.
@@ -286,7 +286,8 @@ class LocalPlatform(ParamikoPlatform):
             if Path(self.get_files_path(), src).is_file():
                 return True
             sleep(sleeptime)
-        Log.warning(f"File {src} does not exist")
+        if show_logs:
+            Log.warning(f"File {src} does not exist")
         return False
 
     def delete_file(self, filename, del_cmd=False):

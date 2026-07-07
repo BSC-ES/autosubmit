@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from functools import reduce
 from pathlib import Path
 from threading import Thread
-from typing import List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from bscearth.utils.date import date2str, parse_date, previous_day, chunk_end_date, chunk_start_date, subs_dates
 
@@ -73,6 +73,32 @@ class RecoveryReport:
 
 
 EXCLUDED = ["_platform", "_children", "_parents", "submitter"]
+PERSISTENT_ATTRIBUTES = (
+    "name",
+    "id",
+    "script_name",
+    "priority",
+    "status",
+    "frequency",
+    "synchronize",
+    "section",
+    "chunk",
+    "member",
+    "splits",
+    "split",
+    "date",
+    "date_split",
+    "max_checkpoint_step",
+    "start_time_timestamp",
+    "submit_time_timestamp",
+    "finish_time_timestamp",
+    "ready_date",
+    "local_logs",
+    "remote_logs",
+    "updated_log",
+    "fail_count",
+    "packed",
+)
 
 
 # This decorator contains groups of parameters, with each
@@ -164,11 +190,11 @@ class Job(object):
         'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
         'parameters', '_tmp_path', '_log_path', '_platform', 'check',
         'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
-        '_dependencies', 'running', 'start_time', 'ext_header_path', 'ext_tailer_path',
-        'edge_info', 'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
+        '_dependencies', 'running', 'ext_header_path', 'ext_tailer_path',
+        'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
         'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
-        'delete_when_edgeless', 'het', 'updated_log',
-        'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
+        'delete_when_edgeless', 'het', 'updated_log', 'updated', 'log_recovery_call_count',
+        'start_time', 'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
         '_script', '_log_recovery_retries', 'ready_date', 'wrapper_name',
         'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_cpmip_thresholds', '_chunk_size', '_chunk_size_unit',
         '_processors_per_node',
@@ -178,164 +204,11 @@ class Job(object):
         'packed_during_building', 'workflow_commit', '_validate_template', 'first_wrapped_level', 'finished_time'
     )
 
-    def __setstate__(self, state):
-        for slot, value in state.items():
-            if slot in self.__slots__:
-                setattr(self, slot, value)
-        # Initialize timestamp fields if missing from old pickles or None
-        for attr in ('submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp'):
-            if not hasattr(self, attr) or getattr(self, attr) is None:
-                setattr(self, attr, 0)
-
-    def __getstate__(self):
-        return dict([(k, getattr(self, k, None)) for k in self.__slots__ if k not in EXCLUDED])
-
-    CHECK_ON_SUBMISSION = 'on_submission'
-
-    # TODO
-    # This is crashing the code
-    # I added it for the assertions of unit testing... since job obj != job obj when it was saved & load
-    # since it points to another section of the memory.
-    # Unfortunately, this is crashing the code everywhere else
-
-    # def __eq__(self, other):
-    #     return self.name == other.name and self.id == other.id
-
-    def __str__(self):
-        return f"{self.name} STATUS: {self.status}"
-
-    def __repr__(self):
-        return f"{self.name} STATUS: {self.status}"
-
-    def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
-
-        if loaded_data:
-            name = loaded_data['_name']
-            job_id = loaded_data['id']
-            status = loaded_data['_status']
-            priority = loaded_data['priority']
-
-        self.rerun_only = False
-        self.delay_end = None
-        self.wrapper_type = None
-        self.first_wrapped_level = False
-        self._wrapper_queue = None
-        self._platform: 'ParamikoPlatform' = None
-        self._queue = None
-        self._partition = None
-        self.retry_delay = None
-        #: (str): Type of the job, as given on job configuration file. (job: TASKTYPE)
-        self._section: Optional[str] = None
-        self._wallclock: Optional[str] = None
-        self.wchunkinc = None
-        self._tasks = None
-        self._nodes = None
-        self._threads = None
-        self._processors = None
-        self._memory = None
-        self._memory_per_task = None
-        self._chunk = None
-        self._member = None
-        self.date = None
-        self.date_split = None
-        self._splits = None
-        self._split = None
-        self._delay = None
-        self._frequency = None
-        self._synchronize = None
-        self.skippable = False
-        self.repacked = 0
-        self._name = name
-        self._long_name = None
-        self.date_format = ''
-        self.type = Language.BASH
-        self.undefined_variables = None
-        self.log_retries = 5
-        self.id = job_id
-        self.file = None
-        self.additional_files = []
-        self.executable = None
-        self._local_logs = ('', '')
-        self._remote_logs = ('', '')
-        self.script_name = self.name + ".cmd"
-        self.stat_file = f"{self.script_name[:-4]}_STAT_"
-        self._status = None
-        self.status = status
-        self.prev_status = status
-        self.new_status = status
-        self.priority = priority
-        self._parents = set()
-        self._children = set()
-        self._fail_count = 0
-        """Number of failed attempts to run this job. (FAIL_COUNT)"""
-        self.expid: str = name.split('_')[0]
-        self._tmp_path = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
-        self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
-        self._platform = None
-        self.check = 'true'
-        self.check_warnings = False
-        self.packed = False
-        self.hold = False  # type: bool
-        self.distance_weight = 0
-        self.level = 0
-        self._export = "none"
-        self._dependencies = []
-        self.running = None
-        self.start_time = None
-        self.ext_header_path = None
-        self.ext_tailer_path = None
-        self.edge_info = dict()
-        self.total_jobs = None
-        self.max_waiting_jobs = None
-        self.exclusive = ""
-        self._retrials = 0
-        # internal
-        self.current_checkpoint_step = 0
-        self.max_checkpoint_step = 0
-        self.reservation = ""
-        self.delete_when_edgeless = False
-        # hetjobs
-        self.het = None
-        self.updated_log = 0
-        self.submit_time_timestamp = None  # for wrappers, all jobs inside a wrapper are submitted at the same time
-        self.start_time_timestamp = None
-        self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
-        self._script = None  # Inline code to be executed
-        self.ready_date = None
-        self.wrapper_name = None
-        self.is_wrapper = False
-        self._wallclock_in_seconds = None
-        self._notify_on = None
-        # The three variables under this message are related to the #PR2918 that is a development
-        # focused on adding the key information for computing the simulated years for the CPMIPS metrics.
-        self._cpmip_thresholds = {}
-        self._chunk_size = None
-        self._chunk_size_unit = None
-        self._processors_per_node = None
-        self.ec_queue = None
-        self.platform_name = None
-        self._serial_platform = None
-        self.submitter = None
-        self._shape = None
-        self._x11 = None
-        self._x11_options = None
-        self._hyperthreading = None
-        self._scratch_free_space = None
-        self._delay_retrials = None
-        self._custom_directives = None
-        self.packed_during_building = False
-        self.workflow_commit = None
-        if loaded_data:
-            self.__setstate__(loaded_data)
-            self.status = Status.WAITING if self.status in [Status.DELAYED,
-                                                            Status.PREPARED,
-                                                            Status.READY] else \
-                self.status
-        self.validate_template = False
-        self.finished_time = None
-
     def clean_attributes(self):
+        """Reset ephemeral job attributes, keeping only persistent state.
+
+        :return: None if the job is a terminal failure, otherwise None after resetting.
+        """
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
             return None
         self.rerun_only = False
@@ -366,7 +239,7 @@ class Job(object):
         self.current_checkpoint_step = None
         self.max_checkpoint_step = None
         self.reservation = None
-        self.het = None
+        self.het = {'HETSIZE': 0}
         self.updated_log = 0
         self._script = None
         self._log_recovery_retries = None
@@ -385,16 +258,214 @@ class Job(object):
         self._scratch_free_space = None
         self._delay_retrials = None
         self._custom_directives = None
-        self.packed_during_building = False
-        # Tentative
-        self.dependencies = None
-        self.local_logs = None
-        self.remote_logs = None
-        self.script_name = None
-        self.stat_file = None
 
-    def _init_runtime_parameters(self):
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """Restore the job state from persisted metadata.
+
+        :param state: Serialized job attributes collected from storage.
+        :raises KeyError: If required status information is missing.
+        """
+        for slot, value in state.items():
+            if slot in ['local_logs_out', 'remote_logs_err',
+                        'remote_logs_out', 'local_logs_err',
+                        'status', 'date']:
+                continue
+
+            if slot in self.__slots__:
+                setattr(self, slot, value)
+            else:
+                slot = self.internal_slot_name(slot)
+                if slot in self.__slots__:
+                    setattr(self, slot, value)
+
+        self.local_logs = (state.get('_local_logs_out', state.get('local_logs_out', '')),
+                           state.get('_local_logs_err', state.get('local_logs_err', '')))
+        self.remote_logs = (state.get('_remote_logs_out', state.get('remote_logs_out', '')),
+                            state.get('_remote_logs_err', state.get('remote_logs_err', '')))
+
+        self.status = Status.KEY_TO_VALUE[state['status']]
+
+        if date_str := state.get('date'):
+            self.date = datetime.datetime.fromisoformat(date_str)
+        else:
+            self.date = None
+
+    def internal_slot_name(self, slot) -> str:
+        """Normalize the slot name to match the expected format.
+
+        This is useful for ensuring that the slot names are consistent
+        when loading the job state from the DB which doesn't have the "_" prefix.
+        """
+        if not slot.startswith('_'):
+            return f"_{slot}"
+        return slot
+
+    def __getstate__(self):
+        """Serialize the job state for persistence."""
+        job_data = dict([(k, getattr(self, k, None)) for k in PERSISTENT_ATTRIBUTES])
+        job_data["status"] = Status.VALUE_TO_KEY[self.status]
+        # TODO why this is needed in the recovery test?
+        if not isinstance(self.local_logs, tuple):
+            self.local_logs = ('', '')
+        if not isinstance(self.remote_logs, tuple):
+            self.remote_logs = ('', '')
+        job_data["local_logs_out"] = self.local_logs[0] if self.local_logs[0] else None
+        job_data["local_logs_err"] = self.local_logs[1] if self.local_logs[1] else None
+        job_data["remote_logs_out"] = self.remote_logs[0] if self.remote_logs[0] else ""
+        job_data["remote_logs_err"] = self.remote_logs[1] if self.remote_logs[1] else ""
+        if job_data["date"]:
+            job_data["date"] = job_data["date"].isoformat()
+        job_data["modified"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+        del job_data["local_logs"]
+        del job_data["remote_logs"]
+        return job_data
+
+    CHECK_ON_SUBMISSION = 'on_submission'
+
+    def __str__(self):
+        return f"{self.name} STATUS: {self.status}"
+
+    def __repr__(self):
+        return f"{self.name} STATUS: {self.status}"
+
+    def __init__(self, name=None, job_id=None, status=None, priority=None, loaded_data=None):
+        if not name:
+            name = ""
+        self.rerun_only = False
+        self.delay_end = None
+        self.wrapper_type = None
+        self._wrapper_queue = None
+        self._platform: 'ParamikoPlatform' = None
+        self._queue = None
+        self._partition = None
+        self.retry_delay = None
+        #: (str): Type of the job, as given on job configuration file. (job: TASKTYPE)
+        self._section: Optional[str] = None
+        self._wallclock: Optional[str] = None
+        self.wchunkinc = None
+        self._tasks = None
+        self._nodes = None
+        self._threads = None
+        self._processors = None
+        self._memory = None
+        self._memory_per_task = None
+        self._chunk = None
+        self._member = None
+        self.date = None
+        self.date_split = None
+        self._splits = None
+        self._split = None
+        self._delay = None
+        self._frequency = None
+        self._synchronize = None
+        self.skippable = False
+        self.repacked = 0
+        self._long_name = None
+        self.date_format = ''
+        self.type = Language.BASH
+        self.undefined_variables = None
+        self.log_retries = 5
+        self.id = job_id
+        self.file = None
+        self.additional_files = []
+        self.executable = None
+        self._local_logs = ('', '')
+        self._remote_logs = ('', '')
+        self._status = None
+        self.status = status
+        self.prev_status = status
+        self.new_status = status
+        self.priority = priority
+        self._parents = set()
+        self._children = set()
+        self._fail_count = 0
+        self._platform = None
+        self.check = 'true'
+        self.check_warnings = False
+        self.packed = False
+        self.hold = False  # type: bool
+        self.distance_weight = 0
+        self.level = 0
+        self._export = "none"
+        self._dependencies = []
+        self.running = None
+        self.ext_header_path = None
+        self.ext_tailer_path = None
+        self.total_jobs = None
+        self.max_waiting_jobs = None
+        self.exclusive = ""
+        self._retrials = 0
+        # internal
+        self.current_checkpoint_step = 0
+        self.max_checkpoint_step = 0
+        self.reservation = ""
+        self.delete_when_edgeless = False
         # hetjobs
+        self.het = None
+        self.updated_log = 0
+        self.submit_time_timestamp = None  # for wrappers, all jobs inside a wrapper are submitted at the same time
+        self.start_time_timestamp = None
+        self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
+        self._script = None  # Inline code to be executed
+        self.ready_date = None
+        self.wrapper_name = None
+        self.is_wrapper = False
+        self._wallclock_in_seconds = None
+        self._notify_on = None
+        # The three variables under this message are related to the #PR2918 that is a development
+        # focused on adding the key information for computing the simulated years for the CPMIPS metrics.
+        self._cpmip_thresholds = {}
+        self._chunk_size = None
+        self._chunk_size_unit = None
+        self._validate_template = False
+        self._processors_per_node = None
+        self.ec_queue = None
+        self.platform_name = None
+        self._serial_platform = None
+        self.submitter = None
+        self._shape = None
+        self._x11 = None
+        self._x11_options = None
+        self._hyperthreading = None
+        self._scratch_free_space = None
+        self._delay_retrials = None
+        self._custom_directives = None
+        self.packed_during_building = False
+        self.workflow_commit = None
+        self._name = name
+        self.name = name
+        if loaded_data:
+            self.__setstate__(loaded_data)
+        self.script_name = self.name + ".cmd"
+        self.stat_file = f"{self.script_name[:-4]}_STAT_"
+        """Number of failed attempts to run this job. (FAIL_COUNT)"""
+        self.expid: str = self.name.split('_')[0]
+        BasicConfig.read()
+        self._tmp_path = os.path.join(
+            BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
+        self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
+        self.updated = False
+        self.log_recovery_call_count = copy.copy(self.updated_log)
+        self.finished_time = None
+        self.validate_template = False
+        self.finished_time = None
+
+    def init_runtime_parameters(self, as_conf: AutosubmitConfig, reset_logs: bool,
+                                called_from_log_recovery: bool) -> None:
+        """Initialize runtime parameters for the job.
+
+        Sets default values for job execution parameters including tasks, nodes,
+        threads, processors, memory, reservations, and checkpoint steps. Optionally
+        resets log-related attributes if requested.
+
+        :param as_conf: Autosubmit configuration object containing job settings.
+        :type as_conf: AutosubmitConfig
+        :param reset_logs: Whether to reset log-related attributes.
+        :type reset_logs: bool
+        :param called_from_log_recovery: Whether this initialization is called during log recovery.
+        :type called_from_log_recovery: bool
+        """
         self.het = {'HETSIZE': 0}
         self._tasks = '0'
         self._nodes = ""
@@ -402,7 +473,6 @@ class Job(object):
         self._processors = '1'
         self._memory = ''
         self._memory_per_task = ''
-        self.start_time_timestamp = 0
         self.processors_per_node = ""
         self.script_name = self.name + ".cmd"
         self.stat_file = f"{self.script_name[:-4]}_STAT_"
@@ -411,16 +481,48 @@ class Job(object):
         self.max_checkpoint_step = 0
         self.exclusive = ""
         self.export = ""
-        self.local_logs = ('', '')
-        self.remote_logs = ('', '')
         self.dependencies = ""
         self.packed_during_building = False
         self.packed = False
         self.finished_time = None
+        if not self.id:
+            self.id = 0
+        if not called_from_log_recovery and self.status == Status.READY:
+            self.start_time_timestamp = date2str(datetime.datetime.now(), 'S')
+
+        self.workflow_commit = as_conf.experiment_data.get("AUTOSUBMIT", {}).get("WORKFLOW_COMMIT", "")
+        if reset_logs:
+            self.reset_logs()
+        if self.status not in [Status.COMPLETED, Status.FAILED]:
+            self.finished_time = None
 
     @property  # type: ignore
     def wallclock_in_seconds(self):
         return self._wallclock_in_seconds
+
+    def _init_runtime_parameters(self):
+        """Initialize runtime job parameters from scratch."""
+        self.het = {'HETSIZE': 0}
+        self._tasks = '0'
+        self._nodes = ""
+        self._threads = '1'
+        self._processors = '1'
+        self._memory = ''
+        self._memory_per_task = ''
+        self.start_time_timestamp = 0
+        self.script_name = self.name + ".cmd"
+        self.stat_file = f"{self.script_name[:-4]}_STAT_"
+        self.processors_per_node = ""
+        self.reservation = ""
+        self.current_checkpoint_step = 0
+        self.max_checkpoint_step = 0
+        self.exclusive = ""
+        self.export = ""
+        self.local_logs = ('', '')
+        self.remote_logs = ('', '')
+        self.packed_during_building = False
+        self.packed = False
+        self.finished_time = None
 
     @property  # type: ignore
     @autosubmit_parameter(name='x11')
@@ -1076,6 +1178,7 @@ class Job(object):
 
     def set_ready_date(self) -> None:
         """Sets the ready start date for the job"""
+        self.updated_log = 0
         self.ready_date = int(time.strftime("%Y%m%d%H%M%S"))
 
     def inc_fail_count(self):
@@ -1121,20 +1224,6 @@ class Job(object):
         """
         self.children.add(new_child)
 
-    def add_edge_info(self, parent, special_conditions):
-        """
-        Adds edge information to the job
-
-        :param parent: parent job
-        :type parent: Job
-        :param special_conditions: special variables
-        :type special_conditions: dict
-        """
-        if special_conditions["STATUS"] not in self.edge_info:
-            self.edge_info[special_conditions["STATUS"]] = {}
-
-        self.edge_info[special_conditions["STATUS"]][parent.name] = (parent, special_conditions.get("FROM_STEP", 0))
-
     def delete_parent(self, parent):
         """
         Remove a parent from the job
@@ -1179,7 +1268,8 @@ class Job(object):
             fail_count = fail_count
             logname = os.path.join(self._tmp_path, f"{self.stat_file}{fail_count}")
         if os.path.exists(logname):
-            lines = open(logname).readlines()
+            with open(logname) as f:
+                lines = f.readlines()
             if len(lines) >= index + 1:
                 return int(lines[index])
             else:
@@ -1259,7 +1349,9 @@ class Job(object):
         if os.path.exists(log_name):
             already_completed = False
             # Read lines of the TOTAL_STATS file starting from last
-            for retrial in reversed(open(log_name).readlines()):
+            with open(log_name) as f:
+                lines = f.readlines()
+            for retrial in reversed(lines):
                 retrial_fields: list = retrial.split()
                 if Job.is_a_completed_retrial(retrial_fields):
                     # It's a COMPLETED run
@@ -1285,14 +1377,23 @@ class Job(object):
             Log.printlog(f"Trace {e} \n Failed to retrieve log file for job {self.name}", 6000)
         return remote_logs
 
-    def check_remote_log_exists(self):
+    def check_remote_log_exists(self, show_logs: bool = False) -> bool:
+        """Checks if remote log file exists on remote host
+
+        :param show_logs: Whether to show logs during the check
+        :type show_logs: bool
+        :return: True if remote log file exists, False otherwise
+        :rtype: bool
+        """
         try:
-            out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1)
+            out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1,
+                                                        show_logs=show_logs)
         except IOError:
             Log.debug(f'Output log {self.remote_logs[0]} still does not exist')
             out_exist = False
         try:
-            err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1)
+            err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1,
+                                                        show_logs=show_logs)
         except IOError:
             Log.debug(f'Error log {self.remote_logs[1]} still does not exist')
             err_exist = False
@@ -1461,7 +1562,7 @@ class Job(object):
         total_platform = self._max_possible_wallclock()
         if not total_platform:
             total_platform = total
-        if total > total_platform:
+        if total > (total_platform * 1.30):
             Log.warning(
                 f"Job {self.name} has a wallclock time '{total} seconds' higher than the maximum allowed by the platform '{total_platform} seconds' "
                 f"Setting wallclock time to the maximum allowed by the platform.")
@@ -1758,7 +1859,8 @@ class Job(object):
                     self.het['RESERVATION'].append(str(x))
             self.reservation = str(self.het['RESERVATION'][0])
         else:
-            self.reservation = str(self.reservation)
+            self.reservation = self.reservation if isinstance(self.reservation,
+                                                              str) and self.reservation.strip() else ""
         if type(self.exclusive) is list:
             # Get the exclusive, each element can be only be bool
             self.het['EXCLUSIVE'] = list()
@@ -1975,12 +2077,16 @@ class Job(object):
                 self.retrials = wrapper_data.get("RETRIALS", self.retrials)
         if not self.splits:
             self.splits = as_conf.jobs_data.get(self.section, {}).get("SPLITS", None)
+        # TODO: Will this work with splits without chunks????
+        # ADD QOL
+        if isinstance(self.splits, dict):
+            self.splits = self.splits[date2str(self.date, "%Y%m%d")][self.chunk - 1]
         self.delete_when_edgeless = as_conf.jobs_data.get(self.section, {}).get("DELETE_WHEN_EDGELESS", True)
         self.dependencies = str(as_conf.jobs_data.get(self.section, {}).get("DEPENDENCIES", ""))
         self.running = str(as_conf.jobs_data.get(self.section, {}).get("RUNNING", "once")).lower()
         self.platform_name = as_conf.jobs_data.get(self.section, {}).get("PLATFORM",
                                                                          as_conf.experiment_data.get("DEFAULT", {}).get(
-                                                                             "HPCARCH", None))
+                                                                             "HPCARCH", "LOCAL"))
         self.file = as_conf.jobs_data.get(self.section, {}).get("FILE", None)
         self.additional_files = as_conf.jobs_data.get(self.section, {}).get("ADDITIONAL_FILES", [])
 
@@ -1998,8 +2104,11 @@ class Job(object):
         self._chunk_size_unit = as_conf.get_chunk_size_unit().lower()
 
     def update_check_variables(self, as_conf: AutosubmitConfig) -> None:
+        """Update job check variables from Autosubmit configuration.
+        :param as_conf: The Autosubmit configuration object."""
+
         job_data = as_conf.jobs_data.get(self.section, {})
-        job_platform_name = job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", None))
+        job_platform_name = job_data.get("PLATFORM", as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL"))
         job_platform = job_data.get("PLATFORMS", {}).get(job_platform_name, {})
         self.check = job_data.get("CHECK", True)
         self.check_warnings = job_data.get("CHECK_WARNINGS", False)
@@ -2162,7 +2271,23 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'FALSE'
         return parameters
 
-    def update_job_parameters(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
+    def update_job_parameters(
+            self,
+            as_conf: Any,
+            parameters: Dict[str, Any],
+            set_attributes: bool
+    ) -> Dict[str, Any]:
+        """Update job parameters and optionally set job attributes.
+
+        :param as_conf: Autosubmit configuration object.
+        :type as_conf: Any
+        :param parameters: Dictionary of parameters to update.
+        :type parameters: Dict[str, Any]
+        :param set_attributes: Whether to set job attributes from parameters.
+        :type set_attributes: bool
+        :return: Updated parameters dictionary.
+        :rtype: Dict[str, Any]
+        """
         if set_attributes:
             if self.splits == "auto":
                 self.splits = parameters.get("CURRENT_SPLITS", None)
@@ -2296,9 +2421,8 @@ class Job(object):
         return parameters
 
     def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False,
-                          reset_logs: bool = False) -> dict:
-        """
-        Refresh the job's parameters value.
+                          reset_logs: bool = False, called_from_log_recovery: bool = False) -> dict:
+        """Refresh the job's parameters value.
 
         This method reloads the Autosubmit configuration and updates the job's parameters
         based on the configuration and the current state of the job.
@@ -2309,11 +2433,13 @@ class Job(object):
         :type set_attributes: bool
         :param reset_logs: Flag indicating whether to reset logs, defaults to False.
         :type reset_logs: bool
+        :param called_from_log_recovery: Flag indicating if called from log recovery, defaults to False.
+        :type called_from_log_recovery: bool
         :return: None
         """
-
         if not set_attributes and as_conf.needs_reload():
             set_attributes = True
+            as_conf.save()
 
         if set_attributes:
             as_conf.reload()
@@ -2339,14 +2465,23 @@ class Job(object):
         for event in self.platform.worker_events:  # keep alive log retrieval workers.
             if not event.is_set():
                 event.set()
+        self.updated = True
         return parameters
 
     def init_platform(self, as_conf: AutosubmitConfig) -> None:
+        """Initialize the job's platform.
+
+        The submitter comes from the job_list.submitter during an autosubmit run/inspect, but if not, it is created here.
+
+        :param as_conf: Autosubmit configuration.
+        """
+        if not self.submitter:
+            self.submitter = ParamikoSubmitter(as_conf=as_conf)
+
         if not self.platform:
-            submitter = ParamikoSubmitter(as_conf=as_conf)
             if not self.platform_name:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
-            self.platform = submitter.platforms.get(self.platform_name)
+            self.platform = self.submitter.platforms.get(self.platform_name)
 
     def update_content_extra(self, as_conf: AutosubmitConfig, files: list[str]) -> list[str]:
         additional_templates = []
@@ -2354,7 +2489,11 @@ class Job(object):
             if as_conf.get_project_type().lower() == "none":
                 template = "%DEFAULT.EXPID%"
             else:
-                template = open(os.path.join(as_conf.get_project_dir(), file), 'r').read()
+                if (Path(as_conf.get_project_dir()) / file).exists():
+                    with open(Path(as_conf.get_project_dir()) / file, 'r') as f:
+                        template = f.read()
+                else:
+                    raise AutosubmitCritical(f"Additional file {file} not found in the project directory.", 6001)
             additional_templates += [template]
         return additional_templates
 
@@ -2637,8 +2776,8 @@ class Job(object):
                 '%(?<!%%)' + variable + '%(?!%%)', '', template_content, flags=re.I)
         template_content = template_content.replace("%%", "%")
         script_name = f'{self.name}.{wrapper_tag}.cmd'
-        open(os.path.join(self._tmp_path, script_name),
-             'w').write(template_content)
+        with open(Path(self._tmp_path) / script_name, 'w', encoding='utf-8') as f:
+            f.write(template_content)
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
         return script_name
 
@@ -3018,6 +3157,18 @@ class Job(object):
             except Exception as error:
                 Log.error(f"Error sending CPMIP notification for {self.name}: {error}")
 
+    def assign_platform(self, submitter: ParamikoSubmitter, create: bool, new: bool) -> None:
+        """Assigns the platform to the job.
+        :param submitter: Submitter object containing platform information.
+        :param create: Flag indicating if the job is being created.
+        :param new: Flag indicating if the job is new.
+        """
+        self.submitter = submitter
+        if create or new:
+            self.reset_logs()
+        if self.submitter and self.platform_name and self.platform_name in self.submitter.platforms:
+            self.platform = self.submitter.platforms[self.platform_name]
+
 
 class WrapperJob(Job):
     """Defines a wrapper from a package.
@@ -3043,13 +3194,13 @@ class WrapperJob(Job):
             priority: int,
             job_list: List[Job],
             total_wallclock: str,
+            num_processors: int,
             platform: 'ParamikoPlatform',
             as_config: AutosubmitConfig,
             hold: bool = False,
             sections=None,
             method=None,
-            wr_type=None,
-            num_processors=None
+            wr_type=None
     ):
         super(WrapperJob, self).__init__(name, job_id, status, priority)
         self.failed = False
@@ -3057,13 +3208,15 @@ class WrapperJob(Job):
         # divide jobs in dictionary by state?
         self.wallclock = total_wallclock  # Now it is reloaded after a run -> stop -> run
         self.running_jobs_start: OrderedDict = OrderedDict()
-        self.hold = hold
         self._platform: 'ParamikoPlatform' = platform
+        self.num_processors = num_processors
         self.as_config = as_config
         # save start time, wallclock and processors?!
         self.checked_time = datetime.datetime.now()
         self.inner_jobs_running: list = list()
         self.is_wrapper = True
+        self._safe_wait = 60  # seconds to wait before considering a wrapper stuck in RUNNING when all the inner jobs are finished
+        self._finished_time = None
         self.sections = sections
         self.type = wr_type
         self.method = method

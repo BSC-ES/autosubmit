@@ -281,7 +281,7 @@ class PJMPlatform(ParamikoPlatform):
     def allocated_nodes():
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
-    def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
+    def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3, show_logs: bool = True):
         file_exist = False
         retries = 0
 
