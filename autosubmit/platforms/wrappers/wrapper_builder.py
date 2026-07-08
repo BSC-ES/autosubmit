@@ -177,15 +177,29 @@ class PythonWrapperBuilder(WrapperBuilder):
         """Return a code snippet that records wrapper start time and registers an atexit handler."""
         # TODO: move atexit to def build_import
         return textwrap.dedent(f"""\
+        _as_job_id = next((os.environ[v] for v in ('SLURM_JOBID', 'PBS_JOBID', 'JOB_ID', 'LSB_JOBID', 'LOADL_STEP_ID', 'PJM_JOBID') if v in os.environ), str(os.getpid()))
+        sys.stdout.write('[INFO] JOBID=' + _as_job_id + '\\n')
+        sys.stderr.write('[INFO] JOBID=' + _as_job_id + '\\n')
+        from pathlib import Path
         import atexit
-        stat_file = os.path.join(os.getcwd(), f"{self.name}_STAT_{self.fail_count}")
+        prev_count = {self.fail_count} - 1
+        stat_file = Path.cwd() / f"{self.name}_STAT_{self.fail_count}"
+        prev_stat = Path.cwd() / f"{self.name}_STAT_{{prev_count}}"
+        try:
+            with open(prev_stat) as f:
+                lines = f.readlines()
+            submit_time = int(lines[2].strip())
+        except (FileNotFoundError, IndexError, ValueError):
+            submit_time = int(time.time())
         with open(stat_file, 'w') as stat:
+            stat.write(f"{{submit_time}}\\n")
+        with open(stat_file, 'a') as stat:
             stat.write(f"{{int(time.time())}}\\n")
 
         def _write_end_stat() -> None:
-            wrapper_failed_file = os.path.join(os.getcwd(), "{self.name}_WRAPPER_FAILED")
-            status = "FAILED" if os.path.exists(wrapper_failed_file) else "COMPLETED"
-            stat_file = os.path.join(os.getcwd(), f"{self.name}_STAT_{self.fail_count}")
+            wrapper_failed_file = Path.cwd() / "{self.name}_WRAPPER_FAILED"
+            status = "FAILED" if wrapper_failed_file.exists() else "COMPLETED"
+            stat_file = Path.cwd() / f"{self.name}_STAT_{self.fail_count}"
             with open(stat_file, 'a') as stat:
                 stat.write(f"{{int(time.time())}}\\n")
                 stat.write(f"{{status}}\\n")
@@ -718,10 +732,30 @@ class BashWrapperBuilder(WrapperBuilder):
         return ""
 
     def build_wrapper_stat(self) -> str:
-        """Return bash code that records wrapper start/end time and exit status."""
+        """Generated Bash code: records submit_time, start_time, end_time, and status in the STAT file.
+
+        STAT file format: submit_time (L0), start_time (L1), end_time (L2), status (L3).
+        For retries (fail_count > 0) the submit_time is taken from the previous
+        attempt's end_time (line 2 of the previous STAT via ``awk NR==3``).
+        """
         return textwrap.dedent(f"""\
+        for _as_var in SLURM_JOBID PBS_JOBID JOB_ID LSB_JOBID LOADL_STEP_ID PJM_JOBID; do
+            _as_val=$(printenv "$_as_var" 2>/dev/null) || continue
+            echo "[INFO] JOBID=$_as_val"
+            echo "[INFO] JOBID=$_as_val" >&2
+            _as_jobid_set=1
+            break
+        done
+        [ -z "${{_as_jobid_set:-}}" ] && echo "[INFO] JOBID=$$" && echo "[INFO] JOBID=$$" >&2
         _wrapper_stat_file="$(pwd)/{self.name}_STAT_{self.fail_count}"
-        date +%s > "$_wrapper_stat_file"
+        if [ {self.fail_count} -gt 0 ]; then
+            prev_stat="$(pwd)/{self.name}_STAT_$(({self.fail_count} - 1))"
+            prev_finish=$(awk 'NR==3 {{print; exit}}' "$prev_stat" 2>/dev/null)
+            echo "${{prev_finish:-$(date +%s)}}" > "$_wrapper_stat_file"
+        else
+            date +%s > "$_wrapper_stat_file"
+        fi
+        date +%s >> "$_wrapper_stat_file"
         _write_wrapper_stat() {{
             if [ $? -eq 0 ]; then
                 _wrapper_exit_status="COMPLETED"

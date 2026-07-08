@@ -21,7 +21,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
 )
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import Log
 
 
 @pytest.mark.parametrize("noplot", [True, False])
@@ -103,42 +103,42 @@ def test_create_cw_calls_generate_scripts_andor_wrappers_without_plt(
 
 
 @pytest.mark.parametrize(
-    "autosubmit_totaljobs, platforms_totaljobs, raise_error",
+    "autosubmit_totaljobs, platforms_totaljobs",
     [
-        (None, None, False),
-        (None, 10, False),
-        (None, -10, False),
-        (None, 0, True),
-        (10, None, False),
-        (10, 10, False),
-        (10, -10, False),
-        (10, 0, True),
-        (-10, None, False),
-        (-10, 10, False),
-        (-10, -10, False),
-        (-10, 0, True),
-        (0, None, True),
-        (0, 10, False),
-        (0, -10, False),
-        (0, 0, True),
+        (None, None),
+        (None, 10),
+        (None, -10),
+        (None, 0),
+        (10, None),
+        (10, 10),
+        (10, -10),
+        (10, 0),
+        (-10, None),
+        (-10, 10),
+        (-10, -10),
+        (-10, 0),
+        (0, None),
+        (0, 10),
+        (0, -10),
+        (0, 0),
     ],
     ids=[
         "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=None logs warning",
         "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=10 logs warning",
         "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=-10 logs warning",
-        "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=0 raises error",
+        "CONFIG.TOTALJOBS=None, PLATFORMS.TOTALJOBS=0 logs warning",
         "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=None correct",
         "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=10 correct",
         "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=-10 correct",
-        "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=0 raises error",
+        "CONFIG.TOTALJOBS=10, PLATFORMS.TOTALJOBS=0 logs warning",
         "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=None logs warning",
         "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=10 logs warning",
         "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=-10 logs warning",
-        "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=0 raises error",
-        "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=None raises error",
+        "CONFIG.TOTALJOBS=-10, PLATFORMS.TOTALJOBS=0 logs warning",
+        "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=None logs warning",
         "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=10 logs warning",
         "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=-10 logs warning",
-        "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=0 raises error",
+        "CONFIG.TOTALJOBS=0, PLATFORMS.TOTALJOBS=0 logs warning",
     ],
 )
 def test_create_cw_totaljobs_cases(
@@ -146,7 +146,7 @@ def test_create_cw_totaljobs_cases(
     general_data,
     autosubmit_totaljobs,
     platforms_totaljobs,
-    raise_error,
+    mocker,
 ):
     """Test create -cw command with different combinations of CONFIG.TOTALJOBS and PLATFORMS.TOTALJOBS values."""
     exp_data = {
@@ -196,18 +196,21 @@ def test_create_cw_totaljobs_cases(
 
     exp = autosubmit_exp(experiment_data=config_data, include_jobs=False, create=False)
 
-    if raise_error:
-        with pytest.raises(AutosubmitCritical):
-            exp.autosubmit.create(
-                exp.expid,
-                noplot=True,
-                hide=True,
-                check_wrappers=True,
-            )
-    else:
-        exp.autosubmit.create(
-            exp.expid,
-            noplot=True,
-            hide=True,
-            check_wrappers=True,
-        )
+    spy_warning = mocker.spy(Log, "warning")
+    exp.autosubmit.create(
+        exp.expid,
+        noplot=True,
+        hide=True,
+        check_wrappers=True,
+    )
+
+    expect_config_warning = autosubmit_totaljobs is None or (
+        autosubmit_totaljobs is not None and autosubmit_totaljobs <= 0
+    )
+    expect_platform_warning = platforms_totaljobs is not None and platforms_totaljobs == 0
+
+    warning_text = " ".join(str(call) for call in spy_warning.call_args_list)
+    if expect_config_warning:
+        assert "TOTALJOBS parameter not found or not strictly positive integer" in warning_text
+    if expect_platform_warning:
+        assert "PLATFORMS.TEST_SLURM.TOTALJOBS must be greater than 0" in warning_text

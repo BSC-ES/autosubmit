@@ -56,7 +56,6 @@ def test_local_platform_copy():
 def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file_exists: bool,
                        autosubmit_config, mocker):
     """Test that ``get_stat_file`` uses the correct file name."""
-    mocked_os_remove = mocker.patch('os.remove')
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
@@ -66,9 +65,8 @@ def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file
     job = Job('job', '1', Status.WAITING, None, None)
     job.fail_count = job_fail_count
 
-    # TODO: this is from ``job.py``; we can probably find an easier way to fetch the file name,
-    #       so we can re-use it in tests (e.g. move the logic to a small function/property/etc.).
     filename = f'{job.name}_STAT_{str(job.fail_count)}'
+    local_stat_path = Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, filename)
 
     if remote_file_exists:
         # Create fake remote stat file transferred.
@@ -76,10 +74,15 @@ def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file
 
     if stats_file_exists:
         # Create fake local stat file, to be deleted before copying the remote file (created above).
-        Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, filename).touch()
+        local_stat_path.touch()
 
-    assert remote_file_exists == local.get_stat_file(job=job, count=job.fail_count)
-    assert mocked_os_remove.called == stats_file_exists
+    assert remote_file_exists == local.get_stat_file(job=job, attempt=job.fail_count)
+    if stats_file_exists and not remote_file_exists:
+        # Local stat file deleted and not recreated (no remote file to copy).
+        assert not local_stat_path.exists()
+    elif not stats_file_exists and remote_file_exists:
+        # Remote stat file copied to local path.
+        assert local_stat_path.exists()
 
 
 def test_get_job_names_cmd_contains_expected_jobs() -> None:
@@ -157,7 +160,7 @@ def test_check_all_jobs_stat_confirmation(
 
     if stat_line:
         (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text(
-            f'1000\n1060\n{stat_line}\n'
+            f'900\n1000\n1060\n{stat_line}\n'
         )
 
     as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
@@ -183,7 +186,7 @@ def test_check_all_jobs_save_flag_set_when_status_changes(
     platform.connected = True
 
     job = _make_simple_job('t001_INI', status=Status.RUNNING)
-    (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text('1000\n1060\nCOMPLETED\n')
+    (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text('900\n1000\n1060\nCOMPLETED\n')
 
     as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
 
@@ -215,3 +218,23 @@ def test_check_all_jobs_no_change_returns_false(
     platform.check_all_jobs([job], as_conf)
 
     assert job.new_status == Status.RUNNING
+
+
+@pytest.mark.parametrize("content,expected", [
+    ("[INFO] JOBID=42\nline2\n", 42),
+    ("[INFO] JOBID=99999\n", 99999),
+    ("line without jobid\n", None),
+    ("", None),
+])
+def test_read_jobid_from_remote_log(tmp_path, content, expected):
+    platform = LocalPlatform(_EXPID, 'local', {}, auth_password=None)
+    log_file = tmp_path / 'job.out'
+    log_file.write_text(content)
+    result = platform.read_jobid_from_remote_log(str(log_file))
+    assert result == expected
+
+
+def test_read_jobid_from_remote_log_not_exists(tmp_path):
+    platform = LocalPlatform(_EXPID, 'local', {}, auth_password=None)
+    result = platform.read_jobid_from_remote_log(str(tmp_path / 'noexist.out'))
+    assert result is None

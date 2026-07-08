@@ -985,6 +985,26 @@ def test_test_connection(
 
 @pytest.mark.ssh
 @pytest.mark.docker
+def test_read_jobid_from_remote_log(
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        request: 'FixtureRequest',
+        ssh_server
+):
+    import time
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+    try:
+        platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
+        remote_path = f'/tmp/test_jobid_{int(time.time())}.out'
+        platform.send_command(f"echo '[INFO] JOBID=42' > {remote_path}")
+        result = platform.read_jobid_from_remote_log(remote_path)
+        assert result == 42
+    finally:
+        platform.close_connection()
+
+
+@pytest.mark.ssh
+@pytest.mark.docker
 def test_failed_connection_raises_as_error(
         autosubmit_exp,
         tmp_path,

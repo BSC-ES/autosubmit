@@ -197,13 +197,7 @@ class TestWrappers:
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.as_conf.experiment_data["WRAPPERS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
-        # TODO: The ``MagicMock`` argument is replacing this old call:
-        #       ``JobListPersistenceDb(self.experiment_id)``. The reason is that we need the pytest
-        #       fixtures to mock the DB_PATH/DB_DIR/etc., but the ones we have are function-scoped.
-        #       Once this code gets ported to function-based, instead of class-based, we can use
-        #       those fixtures, removing that mock (we have plenty of other places testing already
-        #       ``JobList``, but less mocking is always better.
-        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(), MagicMock())
+        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory())
 
         self.parser_mock = MagicMock(spec='SafeConfigParser')
 
@@ -2020,22 +2014,26 @@ class TestWrappers:
                               }
             self.job_packager.jobs_in_wrapper = {self.job_packager.current_wrapper_section: {'S2': 2, 'S3': 2}}
             packages_to_submit = []
-            packages_to_submit2, max_jobs_to_submit2 = self.job_packager.check_packages_respect_wrapper_policy(
-                packages_h, packages_to_submit,
-                max_jobs_to_submit, wrapper_limits)
-            assert max_jobs_to_submit2 == 0
-            assert len(packages_to_submit2) == 2
-            for p in packages_to_submit2:
-                assert isinstance(p, JobPackageSimple)
+            with mock.patch.object(self.job_packager._jobs_list, 'get_jobs_by_section_db',
+                                   return_value={"remaining_s2"}), \
+                 mock.patch.object(self.job_packager._jobs_list.dbmanager,
+                                   'remaining_blocked_by_package', return_value=False):
+                packages_to_submit2, max_jobs_to_submit2 = self.job_packager.check_packages_respect_wrapper_policy(
+                    packages_h, packages_to_submit,
+                    max_jobs_to_submit, wrapper_limits)
+                assert max_jobs_to_submit2 == 0
+                assert len(packages_to_submit2) == 2
+                for p in packages_to_submit2:
+                    assert isinstance(p, JobPackageSimple)
 
-            self.job_packager.wrapper_policy["WRAPPER_V"] = "mixed"
-            packages_to_submit = []
-            self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit, max_jobs_to_submit, wrapper_limits)
-            assert len(self.job_packager.wrappers_with_error) > 0
-            self.job_packager.wrapper_policy["WRAPPER_V"] = "strict"
-            packages_to_submit = []
-            self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit,max_jobs_to_submit, wrapper_limits)
-            assert len(self.job_packager.wrappers_with_error) > 0
+                self.job_packager.wrapper_policy["WRAPPER_V"] = "mixed"
+                packages_to_submit = []
+                self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+                assert len(self.job_packager.wrappers_with_error) > 0
+                self.job_packager.wrapper_policy["WRAPPER_V"] = "strict"
+                packages_to_submit = []
+                self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+                assert len(self.job_packager.wrappers_with_error) > 0
     # def test_build_packages(self):
     # want to test self.job_packager.build_packages()
     # TODO: implement this test in the future
@@ -2325,46 +2323,19 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
     job.platform = job_packager._platform
     job_packager._jobs_list.add_job(job)
     job_packager._jobs_list._add_edge_and_parent({"e_from": "job3", "e_to": "job2"})
-    result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+    is_blocked = unparsed_policy == "mixed_failed"
+    with mock.patch.object(job_packager._jobs_list, 'get_jobs_by_section_db',
+                           return_value={"job3"}), \
+         mock.patch.object(job_packager._jobs_list.dbmanager,
+                           'remaining_blocked_by_package', return_value=is_blocked):
+        result = job_packager.process_not_wrappeable_packages(
+            not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
     if unparsed_policy in ["strict", "mixed", "strict_one_job", "mixed_one_job"]:
         with pytest.raises(AutosubmitCritical):
             autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
     else:
         autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
     assert result == expected
-
-
-def _make_blocked_test_jobs(package_job_statuses, remaining_job_specs):
-    """Build ``(package_jobs, remaining_jobs)`` for testing ``_remaining_blocked_by_package``.
-
-    Each entry in ``remaining_job_specs`` is a tuple ``(parent_source, parent_index)``
-    determining where the WAITING job gets its parent from:
-    """
-    package_jobs = [Job(f"p{i}", str(i), status, 0)
-                    for i, status in enumerate(package_job_statuses)]
-    remaining_jobs = []
-    for i, (parent_source, parent_index) in enumerate(remaining_job_specs):
-        job = Job(f"r{i}", str(100 + i), Status.WAITING, 0)
-        if parent_source == "pkg":
-            job.parents = {package_jobs[parent_index]}
-        elif parent_source == "rem":
-            job.parents = {remaining_jobs[parent_index]}
-        else:
-            external = Job(f"ext_{i}", str(200 + i), parent_source, 0)
-            job.parents = {external}
-        remaining_jobs.append(job)
-    return package_jobs, remaining_jobs
-
-
-@pytest.mark.parametrize("desc, pkg_statuses, remaining_specs, expected", [
-    ("direct blocked", [Status.READY], [("pkg", 0)], True),
-    ("external FAILED", [Status.READY], [(Status.FAILED, 0)], False),
-    ("transitive chain", [Status.READY], [("pkg", 0), ("rem", 0)], True),
-    ("COMPLETED parent", [], [(Status.COMPLETED, 0)], True),
-], ids=["direct", "external_failed", "transitive", "completed_parent"])
-def test_remaining_blocked_by_package(desc, pkg_statuses, remaining_specs, expected):
-    pkg, remaining = _make_blocked_test_jobs(pkg_statuses, remaining_specs)
-    assert JobPackager._remaining_blocked_by_package(remaining, pkg) is expected
 
 
 @pytest.mark.parametrize("not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, expected, unparsed_policy, two_remaining", [
@@ -2395,6 +2366,7 @@ def test_process_not_wrappeable_packages_remaining_blocked_by_package(
     rem1.parents = {vertical_package.jobs[0]}
     job_packager._jobs_list.add_job(rem1)
 
+    remaining_names = {"rem1"}
     if two_remaining:
         rem2 = Job("rem2", "4", Status.WAITING, 0)
         rem2._init_runtime_parameters()
@@ -2403,10 +2375,56 @@ def test_process_not_wrappeable_packages_remaining_blocked_by_package(
         rem2.platform = job_packager._platform
         rem2.parents = {rem1}
         job_packager._jobs_list.add_job(rem2)
+        remaining_names = {"rem1", "rem2"}
 
-    result = job_packager.process_not_wrappeable_packages(
-        not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+    with mock.patch.object(job_packager._jobs_list, 'get_jobs_by_section_db',
+                           return_value=remaining_names), \
+         mock.patch.object(job_packager._jobs_list.dbmanager,
+                           'count_non_completed_parents_not_in_memory', return_value=0), \
+         mock.patch.object(job_packager._jobs_list.dbmanager,
+                           'remaining_blocked_by_package', return_value=True):
+        result = job_packager.process_not_wrappeable_packages(
+            not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
     assert result == expected
+
+
+@pytest.mark.parametrize("policy, expected_pkgs, expected_remaining", [
+    ("strict", 1, 99), ("mixed", 1, 99), ("flexible", 1, 99),
+], ids=["strict", "mixed", "flexible"])
+def test_packages_below_min_db_has_remaining(setup, policy, expected_pkgs, expected_remaining):
+    job_packager, _ = setup
+    wrapper_limits = {
+        "real_min": 3, "min_v": 3, "min_h": 1,
+        "min": 3, "max": 99, "max_v": 99, "max_h": 99,
+        "max_by_section": {"SECTION1": 99}
+    }
+    for job in job_packager._jobs_list.job_list:
+        job.status = Status.READY
+    single_package = JobPackageVertical(
+        job_packager._jobs_list.job_list[:], configuration=job_packager._as_config
+    )
+    job_packager.wrapper_policy = {"WRAPPERS": policy}
+    job_packager.retrials = 0
+    pkgs, remaining = job_packager.check_packages_respect_wrapper_policy(
+        [single_package], [], 100, wrapper_limits
+    )
+    assert len(pkgs) == expected_pkgs
+    assert remaining == expected_remaining
+
+
+def test_process_not_wrappeable_db_has_remaining_causes_deadlock(setup):
+    job_packager, vertical_package = setup
+    job_packager._as_config.experiment_data["WRAPPERS"]["WRAPPERS"]["POLICY"] = "strict"
+    job_packager.wrapper_policy = {"WRAPPERS": "strict"}
+    vertical_package.wrapper_policy = "strict"
+    for job in vertical_package.jobs:
+        job.status = Status.READY
+    not_wrappeable_package_info = [[vertical_package, 1, 1, True]]
+    result = job_packager.process_not_wrappeable_packages(
+        not_wrappeable_package_info, [], 100, wrapper_limits
+    )
+    assert result == 99
+    assert len(job_packager.wrappers_with_error) == 0
 
 
 def test_build_imports():
@@ -2575,8 +2593,13 @@ def test_packages_below_min_section_not_exhausted(
         job_packager._jobs_list.add_job(j)
     job_packager.wrapper_policy = {"WRAPPERS": policy}
     job_packager.retrials = 0
-    pkgs, remaining = job_packager.check_packages_respect_wrapper_policy(
-        [single_package], [], 100, wrapper_limits
-    )
+    remaining_names = {"parent_failed", "parent_waiting", "rem1"}
+    with mock.patch.object(job_packager._jobs_list, 'get_jobs_by_section_db',
+                           return_value=remaining_names), \
+         mock.patch.object(job_packager._jobs_list.dbmanager,
+                           'remaining_blocked_by_package', return_value=False):
+        pkgs, remaining = job_packager.check_packages_respect_wrapper_policy(
+            [single_package], [], 100, wrapper_limits
+        )
     assert len(pkgs) == expected_len
     assert remaining == expected_remaining

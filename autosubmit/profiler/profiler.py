@@ -431,7 +431,7 @@ def _get_fd_connection_map(proc: Process) -> dict:
     """
     fd_to_conn: dict = {}
     with suppress(Exception):
-        for conn in proc.connections(kind='all'):
+        for conn in proc.net_connections(kind='all'):
             if conn.fd < 0:
                 continue
             if conn.family == _socket.AF_UNIX:

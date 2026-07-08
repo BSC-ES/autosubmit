@@ -29,8 +29,6 @@ from autosubmit.database.tables import (
     ExperimentTable,
     JobDataTable,
     JobsTable,
-    WrapperInfoTable,
-    WrapperJobsTable,
 )
 
 JobListTable = JobsTable
@@ -84,8 +82,8 @@ def test_create_wrapper_tables_info_columns(meta):
         'name', 'id', 'script_name', 'status',
         'local_logs_out', 'local_logs_err',
         'remote_logs_out', 'remote_logs_err',
-        'updated_log', 'platform_name', 'wallclock',
-        'num_processors', 'type', 'sections', 'method',
+        'updated_log', 'updated_stats', 'platform_name', 'wallclock',
+        'num_processors', 'type', 'sections', 'method', 'run_id',
     }
     assert col_names == expected
 
@@ -93,7 +91,7 @@ def test_create_wrapper_tables_info_columns(meta):
 def test_create_wrapper_tables_jobs_columns(meta):
     _, jobs_table = create_wrapper_tables('my_wrapper', meta)
     col_names = {c.name for c in jobs_table.columns}
-    expected = {'package_id', 'package_name', 'job_name', 'timestamp'}
+    expected = {'package_id', 'package_name', 'job_name', 'timestamp', 'run_id'}
     assert col_names == expected
 
 

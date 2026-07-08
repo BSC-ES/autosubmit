@@ -20,7 +20,7 @@ import operator
 from contextlib import suppress
 from math import ceil
 from operator import attrgetter
-from typing import List, TYPE_CHECKING, Union
+from typing import List, TYPE_CHECKING, Set, Union
 
 from bscearth.utils.date import sum_str_hours
 
@@ -286,13 +286,14 @@ class JobPackager(object):
             # if the quantity is enough, make the wrapper (or below min but no more jobs can come)
             if (len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and min_h >=
                 wrapper_limits["min_h"] and not failed_innerjobs) or \
-                (not failed_innerjobs and self._remaining_blocked_by_package(
-                    self._jobs_list.get_jobs_by_section(
+                (not failed_innerjobs and
+                 self._jobs_list.dbmanager.remaining_blocked_by_package(
+                    {j.name for j in self._jobs_list.get_jobs_by_section(
                         self.jobs_in_wrapper[self.current_wrapper_section],
                         [job.name for job in p.jobs],
                         True
-                    ),
-                    p.jobs
+                    )},
+                    {job.name for job in p.jobs}
                 )):
                 for job in p.jobs:
                     job.wrapper_type = p.wrapper_type
@@ -477,24 +478,6 @@ class JobPackager(object):
                 max_jobs_to_submit -= 1
         return max_jobs_to_submit
 
-    @staticmethod
-    def _remaining_blocked_by_package(remaining: list, package_jobs: list) -> bool:
-        """True if all non-COMPLETED parents of WAITING remaining jobs are
-        only within ``package_jobs`` or the ``remaining`` chain itself.
-        Otherwise an external parent could resolve independently,
-        so we should not bypass the policy."""
-        remaining_names = {r.name for r in remaining}
-        return all(
-            j.parents
-            and all(
-                parent.status == Status.COMPLETED
-                or parent in package_jobs
-                or parent.name in remaining_names
-                for parent in j.parents
-            )
-            for j in remaining
-        )
-
     def process_not_wrappeable_packages(self, not_wrappeable_package_info: list, packages_to_submit: list,
                                         max_jobs_to_submit: int, wrapper_limits: dict):
         """Process the not wrappable packages based on the policy.
@@ -507,12 +490,23 @@ class JobPackager(object):
         """
         for p, min_v, min_h, balanced in not_wrappeable_package_info:
             err_message = self.error_message_policy(min_h, min_v, wrapper_limits, balanced, p.jobs)
-            remaining = self._jobs_list.get_jobs_by_section(self.jobs_in_wrapper[self.current_wrapper_section],
-                                                            [job.name for job in p.jobs],
-                                                            True)
+            sections = self.jobs_in_wrapper[self.current_wrapper_section]
+            package_names = {job.name for job in p.jobs}
+            remaining = self._jobs_list.get_jobs_by_section(
+                sections, list(package_names), get_only_non_completed=True,
+            )
+            if remaining and not self._jobs_list.disable_save:
+                loaded_names = set(self._jobs_list.graph.nodes)
+                if self._jobs_list.dbmanager.count_non_completed_parents_not_in_memory(
+                        {j.name for j in remaining}, loaded_names) > 0:
+                    remaining = None
             if (
-                all(j.status == Status.WAITING for j in remaining)
-                and self._remaining_blocked_by_package(remaining, p.jobs)
+                remaining is not None
+                and all(j.status == Status.WAITING for j in remaining)
+                and self._jobs_list.dbmanager.remaining_blocked_by_package(
+                    {j.name for j in remaining}, package_names,
+                )
+                and len(p.jobs) >= wrapper_limits.get("min", 1)
             ):
                 max_jobs_to_submit = self.submit_remaining_jobs(p, packages_to_submit, max_jobs_to_submit)
             else:
@@ -560,6 +554,17 @@ class JobPackager(object):
         message += "\nThis message is activated when only jobs_in_wrappers are in active(Ready+) status.\n"
         return message
 
+    def _is_inner_job_of_any_wrapper(self, job: Job) -> bool:
+        """Check if a job is an inner job of an existing wrapper package.
+
+        :param job: The job to check.
+        :return: True if the job belongs to any wrapper package.
+        """
+        for package_jobs in self._jobs_list.packages_dict.values():
+            if any(ij.name == job.name for ij in package_jobs):
+                return True
+        return False
+
     def check_if_packages_are_ready_to_build(self) -> tuple[list[Job], bool]:
         """Check if the packages are ready to be built.
 
@@ -582,6 +587,11 @@ class JobPackager(object):
                 jobs_ready = self._jobs_list.get_prepared(self._platform)
             else:
                 jobs_ready = self._jobs_list.get_ready(self._platform)
+
+        jobs_ready = [
+            job for job in jobs_ready
+            if not self._is_inner_job_of_any_wrapper(job)
+        ]
 
         if self.hold and jobs_ready:
             self.compute_weight(jobs_ready)
@@ -713,17 +723,20 @@ class JobPackager(object):
         # Prepare packages for wrapped jobs
         for wrapper_name, jobs in jobs_to_wrap.items():
             Log.info(f"Building packages for {wrapper_name}")
+            self.current_wrapper_section = wrapper_name
+            loaded_for_wrapping: Set[str] = set()
+            for inner_sec in self.jobs_in_wrapper[self.current_wrapper_section]:
+                self._jobs_list.load_wrappable_jobs_by_section(inner_sec, loaded_for_wrapping)
             self._jobs_list.process_wrapper_jobs(wrapper_name, self.jobs_in_wrapper[wrapper_name])
             if max_jobs_to_submit == 0:
                 break
-            self.current_wrapper_section = wrapper_name
             section_list = self._as_config.experiment_data.get("WRAPPERS", {}).get(self.current_wrapper_section,
-                                                                                   {}).get(
+                                                                                    {}).get(
                 "JOBS_IN_WRAPPER", "")
             if not self._platform.allow_wrappers and self.wrapper_type[self.current_wrapper_section] in ['horizontal',
-                                                                                                         'vertical',
-                                                                                                         'vertical-horizontal',
-                                                                                                         'horizontal-vertical']:
+                                                                                                          'vertical',
+                                                                                                          'vertical-horizontal',
+                                                                                                          'horizontal-vertical']:
                 Log.warning(
                     f"Platform {self._platform.name} does not allow wrappers, submitting jobs individually")
                 for job in jobs:
@@ -745,17 +758,28 @@ class JobPackager(object):
                                                                 wrapper_info=current_info)
             else:
                 built_packages_tmp = self._build_vertical_packages(jobs, wrapper_limits, wrapper_info=current_info)
+            packaged_names = {j.name for p in built_packages_tmp for j in p.jobs}
+            for name in loaded_for_wrapping:
+                if name not in packaged_names:
+                    self._jobs_list._remove_job_from_graph(name)
+            if not self._jobs_list.disable_save:
+                for p in built_packages_tmp:
+                    for job in p.jobs:
+                        self._jobs_list.ensure_parents_loaded(job)
             self._propagate_inner_jobs_ready_date(built_packages_tmp)
-            # Reset packed_during_building
-            for p in built_packages_tmp:
-                for job in p.jobs:
-                    job.packed_during_building = False
             prev_max_jobs_to_submit = max_jobs_to_submit
             packages_to_submit, max_jobs_to_submit = self.check_packages_respect_wrapper_policy(built_packages_tmp,
                                                                                                 packages_to_submit,
                                                                                                 max_jobs_to_submit,
                                                                                                 wrapper_limits,
                                                                                                 any_simple_packages)
+            submitted_names = {j.name for p in packages_to_submit for j in p.jobs}
+            for p in built_packages_tmp:
+                for job in p.jobs:
+                    if job.name in submitted_names:
+                        job.packed_during_building = True
+                    else:
+                        job.packed_during_building = False
 
             if prev_max_jobs_to_submit > max_jobs_to_submit:
                 for inner_job in packages_to_submit[-1].jobs:
@@ -1054,23 +1078,25 @@ class JobPackagerVertical(object):
         return child, index + 1
 
     def _is_wrappable(self, job):
-        """
-        Determines if a job is wrappable. Basically, the job shouldn't have been packed already and the status must be READY or WAITING,
-        Its parents should be COMPLETED.
+        """Check if a job can be added to the current vertical wrapper chain.
 
-        :param job: job to be evaluated. \n
-        :type job: Job Object \n
-        :return: True if wrappable, False otherwise. \n
-        :rtype: Boolean
+        A job is wrappable when it is not COMPLETED, not already packed,
+        and its parents are either already in the chain or COMPLETED.
+        Jobs from a different chunk are only allowed when a parent is in the chain.
+
+        :param job: The job to check.
+        :return: True if the job is wrappable.
         """
+        if job.status == Status.COMPLETED:
+            return False
         if not job.packed_during_building and job.status in [Status.WAITING, Status.READY, Status.PREPARED,
-                                                             Status.DELAYED]:
+                                                              Status.DELAYED]:
             for parent in job.parents:
-                # First part of this conditional is true only if the parent is already on the wrapper package ( job_lists == current_wrapped jobs there )
-                # Second part is actually relevant, parents of a wrapper should be COMPLETED
-                parent_is_being_wrapped_with_current_job = parent in self.jobs_list
-                if parent_is_being_wrapped_with_current_job and parent.status != Status.COMPLETED:
+                if parent not in self.jobs_list and parent.status != Status.COMPLETED:
                     return False
+            seed_chunk = self.jobs_list[0].chunk
+            if job.chunk != seed_chunk and not any(p in self.jobs_list for p in job.parents):
+                return False
             return True
         return False
 
@@ -1128,31 +1154,31 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         index = level
         for index in range(level, len(sorted_jobs)):
             child_ = sorted_jobs[index]
-            if child_.name != job.name and self._is_wrappable(child_):
-                child = child_
-                break
+            if child_.name != job.name:
+                if self._is_wrappable(child_):
+                    child = child_
+                    break
         return child, index + 1
 
     def _is_wrappable(self, job):
-        """
-        Determines if a job is wrappable. Basically, the job shouldn't have been packed already and the status must be READY or WAITING,
-        Its parents should be COMPLETED.
+        """Check if a job can be added to the current mixed wrapper chain.
 
-        :param job: job to be evaluated. \n
-        :type job: Job Object \n
-        :return: True if wrappable, False otherwise. \n
-        :rtype: Boolean
+        Unlike the parent class version, this does not enforce chunk boundaries
+        since mixed wrappers intentionally cross section and chunk scopes.
+
+        :param job: The job to check.
+        :return: True if the job is wrappable.
         """
+        if job.status == Status.COMPLETED:
+            return False
         if not job.packed_during_building and job.status in [Status.WAITING, Status.READY, Status.PREPARED,
-                                                             Status.DELAYED]:
+                                                               Status.DELAYED]:
             for parent in job.parents:
-                # First part of this conditional is true only if the parent is already on the wrapper package ( job_lists == current_wrapped jobs there )
-                # Second part is actually relevant, parents of a wrapper should be COMPLETED
-                parent_is_being_wrapped_with_current_job = parent in self.jobs_list
-                if not parent_is_being_wrapped_with_current_job and parent.status != Status.COMPLETED:
+                if parent not in self.jobs_list and parent.status != Status.COMPLETED:
                     return False
             return True
         return False
+
 
 
 class JobPackagerHorizontal(object):

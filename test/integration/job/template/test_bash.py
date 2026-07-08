@@ -57,7 +57,7 @@ def test_successful_script(tmp_path: 'LocalPath'):
     bash_script.chmod(0o755)
 
     r = run([str(bash_script)], shell=True, capture_output=True, cwd=str(tmp_path))
-    assert r.stdout == b'OK!\n', r.stderr
+    assert b'OK!\n' in r.stdout, r.stderr
 
     assert Path(tmp_path, 'OK').exists()
     stat_file = Path(tmp_path, 'test_job_STAT_1')
@@ -170,6 +170,6 @@ def test_signalled_script(tmp_path: 'LocalPath'):
     assert signalled_file.exists()
     stat_file = Path(tmp_path, 'test_job_STAT_1')
     assert stat_file.exists(), "STAT file not created upon SIGTERM!"
-    assert len(stat_file.read_text().strip().splitlines()) == 3, "STAT file should contain 3 lines (start time, end time, status)!"
+    assert len(stat_file.read_text().strip().splitlines()) == 4, "STAT file should contain 4 lines (submit time, start time, end time, status)!"
     assert stat_file.read_text().strip().splitlines()[-1] == 'FAILED'
     assert not Path(tmp_path, 'test_job_COMPLETED').exists()
