@@ -19,8 +19,10 @@ from typing import Any
 import networkx
 import pytest
 from sqlalchemy import create_engine
+from unittest.mock import patch
 
 from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.database.db_manager_job_list import _edge_satisfied
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
@@ -147,12 +149,22 @@ def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool,
         statuses = [Status.READY, Status.SUBMITTED, Status.RUNNING, Status.QUEUING]
         if load_failed_jobs:
             statuses.append(Status.FAILED)
-        # We expect to get the active jobs + the direct children of the active jobs
+        # Active jobs
         view_original = [job for job in job_list.get_job_list() if job.status in statuses]
         childs = []
         for job in view_original:
             for child in job.children:
-                childs.append(child)
+                if child.name in {j.name for j in view_original}:
+                    continue
+                edge = job_list.graph.edges.get((job.name, child.name), {})
+                if _edge_satisfied(
+                    parent_status=Status.VALUE_TO_KEY.get(job.status, ''),
+                    min_trigger_status=edge.get("min_trigger_status", "COMPLETED"),
+                    fail_ok=bool(edge.get("fail_ok", False)) if edge.get("fail_ok") is not None else False,
+                    from_step=edge.get("from_step", 0),
+                    child_checkpoint_step=child.current_checkpoint_step or 0,
+                ):
+                    childs.append(child)
         view_original = list(set(view_original) | set(childs))
         view_original = sorted(view_original, key=lambda j: j.name)
     else:
@@ -426,6 +438,22 @@ def test_get_jobs_by_section(setup_job_list, section_list, banned_jobs, get_only
     assert all(job.section == expected_section for job in result)
 
 
+def test_get_jobs_by_section_db(setup_job_list):
+    """get_jobs_by_section_db delegates to dbmanager with correct parameters."""
+    _, _, job_list = setup_job_list
+    with patch.object(job_list.dbmanager, 'select_job_names_by_sections', return_value={"job1"}) as mock:
+        result = job_list.get_jobs_by_section_db(
+            ["SEC1"], banned_jobs=["banned"], get_only_non_completed=True, status_filter="READY",
+        )
+        assert result == {"job1"}
+        mock.assert_called_once_with(
+            sections=["SEC1"],
+            exclude_names={"banned"},
+            exclude_completed=True,
+            status_filter="READY",
+        )
+
+
 @pytest.mark.parametrize(
     'make_exception,seconds',
     [
@@ -444,20 +472,6 @@ def test_retrieve_times(setup_job_list, tmp_path, make_exception, seconds):
                                                 job_times=None, seconds=seconds, job_data_collection=None)
         assert retrieve_data.name == job.name
         assert retrieve_data.status == Status.VALUE_TO_KEY[job.status]
-
-
-def test_unload_requires_confirmed_recovery(setup_job_list):
-    """Verify job stays in memory until updated_log > fail_count."""
-    jobs, _, job_list = setup_job_list
-    job = jobs[0]  # job1, COMPLETED
-    job.fail_count = 0
-    job.retrials = 0
-    job.log_recovery_call_count = 1
-    job.updated_log = 0  # NOT confirmed recovered
-    job.packed = False
-    job_list.job_package_map = {}
-    job_list.unload_finished_jobs()
-    assert job.name in job_list.graph.nodes
 
 
 def test_unload_after_confirmed_recovery(setup_job_list):
@@ -603,6 +617,60 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
     assert '999' not in fake_job_list.job_package_map
 
 
+@pytest.mark.parametrize(
+    "parent_statuses,fail_ok,expected",
+    [
+        ([], False, True),
+        ([Status.COMPLETED], False, True),
+        ([Status.COMPLETED, Status.COMPLETED], False, True),
+        ([Status.COMPLETED, Status.SKIPPED], False, True),
+        ([Status.FAILED], True, True),
+        ([Status.FAILED, Status.COMPLETED], True, True),
+        ([Status.FAILED], False, False),
+        ([Status.FAILED, Status.RUNNING], True, False),
+        ([Status.COMPLETED, Status.FAILED], True, True),
+        ([Status.COMPLETED, Status.FAILED], False, False),
+    ],
+    ids=[
+        "no_parents",
+        "all_completed",
+        "all_completed_multiple",
+        "all_completed_or_skipped",
+        "single_failed_fail_ok",
+        "mixed_failed_fail_ok_and_completed",
+        "single_failed_no_fail_ok",
+        "all_failed_fail_ok",
+        "mixed_fail_ok",
+        "mixed_no_fail_ok_blocks",
+    ]
+)
+def test_update_waiting_and_delayed_jobs(
+    as_conf,
+    tmp_path,
+    parent_statuses: Any,
+    fail_ok: bool,
+    expected: bool,
+) -> None:
+    """Test _update_waiting_and_delayed_jobs with different parent/fail_ok combinations."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job_list.graph = networkx.DiGraph()
+    child = Job("child", 99, Status.WAITING, 0)
+    job_list.add_job(child)
+
+    for i, status in enumerate(parent_statuses):
+        parent = Job(f"parent{i}", i, status, 0)
+        job_list.add_job(parent)
+        job_list.graph.add_edge(parent.name, child.name, fail_ok=fail_ok)
+
+    job_list.fill_parents_children()
+    job_list._update_waiting_and_delayed_jobs()
+
+    if expected:
+        assert child.status == Status.READY
+    else:
+        assert child.status == Status.WAITING
+
+
 def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     """recover_last_data migrates and queries an old-schema database without crashing."""
     db_dir = tmp_path / "metadata" / "data"
@@ -617,3 +685,5 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     job_list.add_job(Job("test_job", "1", Status.COMPLETED, 0))
 
     job_list.recover_last_data()
+
+

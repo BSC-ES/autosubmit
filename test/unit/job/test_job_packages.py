@@ -25,8 +25,13 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
 from autosubmit.job.job_packages import jobs_in_wrapper_str
-from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical
+from autosubmit.platforms.execution_mode import ExecutionMode
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.pjmplatform import PJMPlatform
+from autosubmit.platforms.psplatform import PsPlatform
+from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 
 @pytest.fixture
@@ -47,7 +52,7 @@ def create_platform(mocker):
 
 
 @pytest.fixture
-def jobs(platform, as_conf) -> list[Job]:
+def jobs(local, as_conf) -> list[Job]:
     jobs = [Job('dummy1', 0, Status.READY, 0),
             Job('dummy2', 0, Status.READY, 0)]
     for job in jobs:

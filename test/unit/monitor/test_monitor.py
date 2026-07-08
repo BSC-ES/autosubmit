@@ -688,7 +688,7 @@ def test_create_tree_list_grouped_jobs():
     hide_groups = False
 
     jobs = []
-    job_list = JobList(expid, None, None, None)
+    job_list = JobList(expid, None, None)
     for i in range(3):
         job = Job(f'job{i}', f'job{i}', Status.WAITING, None, None)
         job.date = datetime.strptime('20240101', '%Y%M%d')
@@ -785,7 +785,7 @@ def test_generate_output_txt(jobs: list[Job], classictxt: bool, status_dir_exist
 
     job_list_object = None
     if has_joblist:
-        job_list_object = JobList(_EXPID, as_conf, YAMLParserFactory(), None)
+        job_list_object = JobList(_EXPID, as_conf, YAMLParserFactory())
 
     monitor = Monitor()
     monitor.generate_output_txt(_EXPID, joblist=jobs, path=str(tmp_path), classictxt=classictxt,

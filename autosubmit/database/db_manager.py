@@ -16,11 +16,10 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Contains code to manage a database via SQLAlchemy."""
-import os
 from pathlib import Path
 from typing import Any, Optional, cast, List, Dict, Union
 
-from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc
+from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc, inspect, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
@@ -73,34 +72,39 @@ class DbManager:
 
     def create_table(self, table_name: str) -> None:
         table = self.table_registry.get(table_name)
-        with self._get_engine(table_name).connect() as conn:
-            with conn.begin():
-                if self.schema:
-                    conn.execute(CreateSchema(self.schema, if_not_exists=True))
-                conn.execute(CreateTable(table, if_not_exists=True))
+        with self._get_engine(table_name).begin() as conn:
+            if self.schema:
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            conn.execute(CreateTable(table, if_not_exists=True))
+            # Auto-add missing columns for schema evolution
+            schema_arg = {"schema": self.schema} if self.schema else {}
+            existing = {col['name'] for col in inspect(conn).get_columns(table_name, **schema_arg)}
+            for column in table.columns:
+                if column.name not in existing:
+                    qualified_name = f"{self.schema}.{table_name}" if self.schema else table_name
+                    conn.execute(
+                        text(f"ALTER TABLE {qualified_name} ADD COLUMN {column.name} {column.type}")
+                    )
 
     def drop_table(self, table_name: str) -> None:
         table = self.table_registry.get(table_name)
-        with self._get_engine(table_name).connect() as conn:
-            with conn.begin():
-                conn.execute(DropTable(table, if_exists=True))
+        with self._get_engine(table_name).begin() as conn:
+            conn.execute(DropTable(table, if_exists=True))
 
     def insert(self, table_name: str, data: dict[str, Any]) -> None:
         if not data:
             return
         table = self.table_registry.get(table_name)
-        with self._get_engine(table_name).connect() as conn:
-            with conn.begin():
-                conn.execute(insert(table), data)
+        with self._get_engine(table_name).begin() as conn:
+            conn.execute(insert(table), data)
 
     def insert_many(self, table_name: str, data: list[dict[str, Any]]) -> int:
         if not data:
             return 0
         table = self.table_registry.get(table_name)
-        with self._get_engine(table_name).connect() as conn:
-            with conn.begin():
-                result = conn.execute(insert(table), data)
-                return cast(int, result.rowcount)
+        with self._get_engine(table_name).begin() as conn:
+            result = conn.execute(insert(table), data)
+            return cast(int, result.rowcount)
 
     def select_first_where(self, table_name: str, where: Optional[dict[str, str]]) -> Optional[Any]:
         table = self.table_registry.get(table_name)
@@ -150,7 +154,7 @@ class DbManager:
         else:
             query = query.where(where)
 
-        with self._get_engine(table.name).connect() as conn:
+        with self._get_engine(table.name).begin() as conn:
             rows = conn.execute(query).fetchall()
 
         return [tuple(zip(columns, row)) for row in rows]
@@ -163,10 +167,9 @@ class DbManager:
 
     def delete_all(self, table_name: str) -> int:
         table = self.table_registry.get(table_name)
-        with self._get_engine(table_name).connect() as conn:
-            with conn.begin():
-                result = conn.execute(delete(table))
-                return result.rowcount
+        with self._get_engine(table_name).begin() as conn:
+            result = conn.execute(delete(table))
+            return result.rowcount
 
     def delete_where(self, table_name: str, where: Optional[Union[dict[str, Any], ClauseElement]]) -> int:
         """Delete rows from a table where the specified conditions are met.
@@ -194,12 +197,12 @@ class DbManager:
             raise ValueError(
                 "The 'where' parameter must be a non-empty dictionary. Multiple-table criteria within Delete are not supported.")
 
-        with self._get_engine(table_name).connect() as conn:
-            with conn.begin():
-                result = conn.execute(query)
+        with self._get_engine(table_name).begin() as conn:
+            result = conn.execute(query)
         return result.rowcount
 
-    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str], batch_size: int = 1000) -> int:
+    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str],
+                     exclude_cols: Optional[List[str]] = None, batch_size: int = 1000) -> int:
         """Perform an upsert (update or insert) operation.
         First delete the affected rows
         then insert the new data.
@@ -207,6 +210,8 @@ class DbManager:
         :param table_name: Name of the table.
         :param data: List of dictionaries containing the data to upsert.
         :param conflict_cols: List of columns to check for conflicts. ( unique keys and primary keys )
+        :param exclude_cols: Optional list of columns to exclude from the UPDATE SET clause,
+            preserving their existing values on conflict.
         :return: Number of rows affected.
         :raises ValueError: If data is empty or unsupported dialect.
         """
@@ -214,7 +219,8 @@ class DbManager:
             return 0
 
         table: Table = self.table_registry.get(table_name)
-        update_cols = [col for col in data[0].keys() if col not in conflict_cols]
+        update_cols = [col for col in data[0].keys()
+                       if col not in conflict_cols and col not in (exclude_cols or [])]
 
         # NOTE general insert doesn't have on_conflict
         if self._get_engine(table_name).dialect.name == "postgresql":
@@ -231,12 +237,11 @@ class DbManager:
         )
 
         total_rows = 0
-        with self._get_engine(table_name).connect() as conn:
-            with conn.begin():
-                for i in range(0, len(data), batch_size):
-                    batch = data[i:i + batch_size]
-                    result = conn.execute(update_stmt, batch)
-                    total_rows += result.rowcount
+        with self._get_engine(table_name).begin() as conn:
+            for i in range(0, len(data), batch_size):
+                batch = data[i:i + batch_size]
+                result = conn.execute(update_stmt, batch)
+                total_rows += result.rowcount
 
         return total_rows
 
@@ -272,9 +277,8 @@ class DbManager:
             else:
                 query = query.where(column == value)
 
-        with self._get_engine(table_name).connect() as conn:
-            with conn.begin():
-                result = conn.execute(query)
+        with self._get_engine(table_name).begin() as conn:
+            result = conn.execute(query)
 
         return result.rowcount
 

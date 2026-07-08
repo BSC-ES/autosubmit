@@ -41,7 +41,7 @@ def test_save(autosubmit_config, tmpdir, mocker, data: dict, owner: str, monkeyp
     if owner:
         monkeypatch.setenv("USER", Path(tmpdir).owner())
     else:
-        os.environ["USER"] = 'whatever'
+        monkeypatch.setenv("USER", 'whatever')
     as_conf = autosubmit_config(expid='t000', experiment_data=data, include_basic_config=True)
     data['ROOTDIR'] = str(Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_conf.expid)
     # TODO: figure why some autosubmit_config conf_test( I hope ) is adding functions to experiment_data

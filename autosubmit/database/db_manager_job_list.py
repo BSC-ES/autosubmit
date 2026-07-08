@@ -20,7 +20,7 @@ import datetime
 from pathlib import Path
 from typing import Any, Optional, List, Dict, TYPE_CHECKING, Union, Tuple, Set
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, not_, func, select, exists, update
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -32,6 +32,52 @@ from autosubmit.database.tables import JobsTable, Table
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
 
+def _edge_satisfied(
+    parent_status: str,
+    min_trigger_status: Optional[str],
+    fail_ok: bool,
+    from_step: Optional[int],
+    child_checkpoint_step: int,
+) -> bool:
+    """Check if a parent edge status satisfies the trigger requirements.
+
+    :param parent_status: Current status of the parent job.
+    :param min_trigger_status: Minimum status required to trigger.
+    :param fail_ok: Whether a FAILED parent is acceptable.
+    :param from_step: Step threshold for checkpoint-based satisfaction.
+    :param child_checkpoint_step: Checkpoint step of the child job.
+    :return: True if the edge is satisfied, False otherwise.
+    """
+    from_step = int(from_step) if from_step is not None else 0
+    child_checkpoint_step = int(child_checkpoint_step) if child_checkpoint_step is not None else 0
+    min_trigger_status = min_trigger_status or "COMPLETED"
+
+    if parent_status == 'SUSPENDED':
+        return False
+    elif parent_status in ('COMPLETED', 'SKIPPED'):
+         return True
+    elif parent_status == 'FAILED':
+        if min_trigger_status == 'FAILED' or (min_trigger_status in ('COMPLETED', 'SKIPPED') and (fail_ok or child_checkpoint_step >= from_step > 0)):
+            return True
+        return False
+    elif parent_status == 'RUNNING':
+        if min_trigger_status == 'RUNNING' and child_checkpoint_step >= from_step > 0:
+            return True
+        elif min_trigger_status in ('COMPLETED', 'SKIPPED', 'FAILED'):
+            return True
+    elif parent_status == min_trigger_status:
+        return True
+    elif parent_status in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW and min_trigger_status in Status.LOGICAL_ORDER:
+        idx_parent = Status.LOGICAL_ORDER.index(parent_status)
+        idx_edge = Status.LOGICAL_ORDER.index(min_trigger_status)
+        if idx_parent >= idx_edge:
+            return True
+    return False
+
+
+_LOG_EXCLUDE_KEYS = {
+    'updated_log', 'updated_stats'
+}
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
@@ -54,11 +100,16 @@ class JobsDbManager(DbManager):
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
         self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
-    def save_jobs(self, job_list: List["Job"]) -> None:
+    def save_jobs(self, job_list: List["Job"], reset_log_counters: bool = False) -> None:
         """Save the job list to the database.
+
+        Log columns are excluded from the upsert to preserve data written by
+        :meth:`save_job_log`.
 
         :param job_list: List of Job objects to save to the database.
         :type job_list: List[Job]
+        :param reset_log_counters: Whether to reset log counters.
+        :type reset_log_counters: bool
 
         :return: None
         :raises: May raise database-related exceptions during upsert operations.
@@ -66,8 +117,16 @@ class JobsDbManager(DbManager):
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)
         persistent_data = [job.__getstate__() for job in job_list]
-        pkeys = ['name']
-        self.upsert_many(table.name, persistent_data, pkeys)
+
+        preserve_data: list = []
+        for d in persistent_data:
+            if reset_log_counters:
+                for k in _LOG_EXCLUDE_KEYS:
+                    d[k] = 0
+                d['log_recovery_call_count'] = 0
+            preserve_data.append(d)
+        if preserve_data:
+            self.upsert_many(table.name, preserve_data, ['name'], exclude_cols=list(_LOG_EXCLUDE_KEYS) if not reset_log_counters else None)
 
     def save_job_log(self, job: "Job") -> None:
         """Save only the log information of a single job to the database.
@@ -82,7 +141,7 @@ class JobsDbManager(DbManager):
         self.create_table(table.name)
         job_data: dict = job.__getstate__()
         where: dict = {'name': job.name}
-        log_keys = {'name', 'log', 'updated_log', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err'}
+        log_keys = {'name', 'log', 'updated_log', 'updated_stats', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err'}
         job_data = {k: v for k, v in job_data.items() if k in log_keys}
 
         self.update_where(table.name, job_data, where)
@@ -137,6 +196,119 @@ class JobsDbManager(DbManager):
         failed_job_list_size = self.count_where(table.name, {'status': "FAILED"})
         return job_list_size, complete_job_list_size, failed_job_list_size
 
+    def select_job_names_by_sections(
+            self,
+            sections: List[str],
+            exclude_names: Optional[Set[str]] = None,
+            exclude_completed: bool = False,
+            status_filter: Optional[str] = None,
+    ) -> Set[str]:
+        """Return job names from DB filtered by section, status and exclusion.
+
+        :param sections: List of section names to filter by.
+        :param exclude_names: Optional set of job names to exclude.
+        :param exclude_completed: Whether to exclude COMPLETED jobs.
+        :param status_filter: Optional status to filter by.
+        :return: Set of job names matching the criteria.
+        """
+        table: Table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        conditions = [table.c.section.in_(sections)]
+        if exclude_names:
+            conditions.append(not_(table.c.name.in_(exclude_names)))
+        if exclude_completed:
+            conditions.append(table.c.status != 'COMPLETED')
+        if status_filter is not None:
+            conditions.append(table.c.status == status_filter)
+        condition = and_(*conditions)
+        with self._get_engine(table.name).connect() as conn:
+            rows = conn.execute(select(table.c.name).select_from(table).where(condition))
+            return {row[0] for row in rows.fetchall()}
+
+    def count_remaining_jobs_in_sections(self, sections: List[str], exclude_names: List[str]) -> int:
+        """Count non-completed jobs in sections, excluding given names.
+
+        :param sections: List of section names.
+        :param exclude_names: List of job names to exclude.
+        :return: Count of remaining non-completed jobs.
+        """
+        table: Table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        condition = and_(
+            table.c.section.in_(sections),
+            table.c.status != 'COMPLETED',
+            not_(table.c.name.in_(exclude_names))
+        )
+        with self._get_engine(table.name).connect() as conn:
+            row = conn.execute(select(func.count()).select_from(table).where(condition))
+            return row.scalar()
+
+    def count_non_completed_parents_not_in_memory(
+            self, remaining_names: Set[str], loaded_names: Set[str]) -> int:
+        """Count non-completed parents of remaining jobs that are not in memory.
+
+        :param remaining_names: Set of remaining job names.
+        :param loaded_names: Set of job names already in memory.
+        :return: Count of non-completed parents not in memory.
+        """
+        jobs_table: Table = self.table_registry.get(JobsTable.name)
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
+        self.create_table(jobs_table.name)
+        self.create_table(structure_table.name)
+        with self._get_engine(jobs_table.name).connect() as conn:
+            row = conn.execute(
+                select(func.count())
+                .select_from(
+                    structure_table.join(
+                        jobs_table,
+                        structure_table.c.e_from == jobs_table.c.name
+                    )
+                )
+                .where(
+                    and_(
+                        structure_table.c.e_to.in_(remaining_names),
+                        jobs_table.c.status != 'COMPLETED',
+                        not_(structure_table.c.e_from.in_(loaded_names))
+                    )
+                )
+            )
+            return row.scalar()
+
+    def remaining_blocked_by_package(
+            self, remaining_names: Set[str], package_names: Set[str]) -> bool:
+        """Check if remaining jobs are blocked by having unsatisfied parents.
+
+        Returns True only when all non-COMPLETED parents of remaining jobs
+        are within the package or the remaining chain itself.
+
+        :param remaining_names: Set of remaining job names.
+        :param package_names: Set of job names in the current package.
+        :return: True if remaining jobs are blocked by package dependencies.
+        """
+        jobs_table: Table = self.table_registry.get(JobsTable.name)
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
+        self.create_table(jobs_table.name)
+        self.create_table(structure_table.name)
+        allowed_names = package_names | remaining_names
+        with self._get_engine(jobs_table.name).connect() as conn:
+            row = conn.execute(
+                select(func.count())
+                .select_from(
+                    structure_table.join(
+                        jobs_table,
+                        structure_table.c.e_from == jobs_table.c.name
+                    )
+                )
+                .where(
+                    and_(
+                        structure_table.c.e_to.in_(remaining_names),
+                        jobs_table.c.status != 'COMPLETED',
+                        not_(structure_table.c.e_from.in_(allowed_names))
+                    )
+                )
+            )
+            return row.scalar() == 0
+
     def select_all_jobs(self) -> List[dict[str, Any]]:
         """
         Return the whole job list from the database (without edges).
@@ -156,35 +328,96 @@ class JobsDbManager(DbManager):
         job_list = self.select_where_with_columns(table, {'section': section})
         return [dict(job) for job in job_list]
 
+    def select_loadable_inner_jobs(
+            self,
+            sections: List[str],
+            already_loaded_names: Set[str],
+    ) -> List[tuple[tuple[str, Any]]]:
+        """Return non-completed jobs in sections whose cross-section parents are all COMPLETED.
+
+        Uses a single SQL query with NOT EXISTS to find jobs whose
+        parents from other sections all have completion_status = COMPLETED.
+
+        :param sections: List of section names to search.
+        :param already_loaded_names: Set of job names already in memory.
+        :return: List of hashable tuples for loadable jobs.
+        """
+        jobs_table: Table = self.table_registry.get(JobsTable.name)
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
+        parent_alias = jobs_table.alias('p')
+        self.create_table(jobs_table.name)
+        self.create_table(structure_table.name)
+
+        condition = and_(
+            jobs_table.c.section.in_(sections),
+            jobs_table.c.status != 'COMPLETED',
+            ~jobs_table.c.name.in_(already_loaded_names),
+            ~exists(
+                select(structure_table.c.e_to)
+                .select_from(
+                    structure_table.join(
+                        parent_alias,
+                        parent_alias.c.name == structure_table.c.e_from
+                    )
+                )
+                .where(and_(
+                    structure_table.c.e_to == jobs_table.c.name,
+                    parent_alias.c.section.notin_(sections),
+                    structure_table.c.completion_status != 'COMPLETED'
+                ))
+            )
+        )
+
+        with self._get_engine(jobs_table.name).begin() as conn:
+            rows = conn.execute(select(jobs_table).where(condition)).fetchall()
+            columns = jobs_table.c.keys()
+            return [tuple(zip(columns, row)) for row in rows]
+
     def select_active_jobs(
             self,
             include_failed: bool = False,
             members: Optional[List[Any]] = None
     ) -> List[Union[str, Any]]:
-        """
-        Return the active jobs from the database (without edges), optionally filtered by members.
-
-        :param include_failed: Whether to include failed jobs.
-        :type include_failed: bool
-        :param members: List of member identifiers to filter jobs.
-        :type members: Optional[List[Any]]
-        :return: List of jobs matching the criteria.
-        :rtype: List[Union[str, Any]]
-        """
         table: Table = self.table_registry.get(JobsTable.name)
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
         self.create_table(table.name)
+        self.create_table(structure_table.name)
+
         statuses = self._ACTIVE_STATUSES + (['FAILED'] if include_failed else [])
+
+        condition = or_(
+            table.c.status.in_(statuses),
+            and_(
+                table.c.status == 'WAITING',
+                ~exists(
+                    select(structure_table.c.e_to)
+                    .where(and_(
+                        structure_table.c.e_to == table.c.name,
+                        structure_table.c.completion_status != 'COMPLETED'
+                    ))
+                )
+            )
+        )
         if members is not None:
             condition = and_(
-                table.c.status.in_(statuses),
+                condition,
                 or_(table.c.member.in_(members), table.c.member.is_(None))
             )
-            job_list = self.select_where_with_columns(table, condition)
-        else:
-            condition = table.c.status.in_(statuses)
-            job_list = self.select_where_with_columns(table, condition)
-        return job_list
 
+        with self._get_engine(table.name).begin() as conn:
+            rows = conn.execute(select(table).where(condition)).fetchall()
+            columns = table.c.keys()
+            return [tuple(zip(columns, row)) for row in rows]
+
+    def select_finished_jobs_needing_log_recovery(self) -> List[Dict[str, Any]]:
+        """Return COMPLETED/FAILED jobs whose updated_log <= fail_count."""
+        table: Table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        condition = and_(
+            table.c.status.in_(self._FINAL_STATUSES),
+            table.c.updated_log <= table.c.fail_count
+        )
+        return [dict(job) for job in self.select_where_with_columns(table, condition)]
     def select_children_jobs(
             self,
             job_list: List[Union[str, Any]],
@@ -208,11 +441,70 @@ class JobsDbManager(DbManager):
         self.create_table(experiment_structure_table.name)
         children_names = set()
         job_list_tmp = [dict(job) for job in job_list]
+        names_in_memory = {job['name'] for job in job_list_tmp}
         for job in job_list_tmp:
             child_rows = [dict(child) for child in
                           self.select_where_with_columns(experiment_structure_table, {'e_from': job['name']})]
             for row in child_rows:
                 children_names.add(row['e_to'])
+
+        if children_names:
+            with self._get_engine(experiment_structure_table.name).begin() as conn:
+                rows = conn.execute(
+                    select(
+                        experiment_structure_table.c.e_from,
+                        experiment_structure_table.c.e_to,
+                        experiment_structure_table.c.min_trigger_status,
+                        experiment_structure_table.c.fail_ok,
+                        experiment_structure_table.c.from_step,
+                        jobs_table.c.status.label("parent_status"),
+                    ).select_from(
+                        experiment_structure_table.join(
+                            jobs_table,
+                            experiment_structure_table.c.e_from == jobs_table.c.name
+                        )
+                    ).where(
+                        experiment_structure_table.c.e_to.in_(children_names)
+                    )
+                )
+
+                cp_rows = conn.execute(
+                    select(
+                        jobs_table.c.name,
+                        jobs_table.c.current_checkpoint_step,
+                    ).where(
+                        jobs_table.c.name.in_(children_names)
+                    )
+                )
+                child_checkpoint = {r.name: (r.current_checkpoint_step or 0) for r in cp_rows}
+
+                all_edges: Dict[str, list] = {}
+                for row in rows:
+                    all_edges.setdefault(row.e_to, []).append(row)
+
+                keep = set()
+                for child_name, edges in all_edges.items():
+                    cp = child_checkpoint.get(child_name, 0)
+                    blocked = False
+                    for e in edges:
+                        parent_status = e.parent_status
+                        if e.e_from in names_in_memory:
+                            p_job = next((j for j in job_list_tmp if j['name'] == e.e_from), None)
+                            if p_job:
+                                parent_status = p_job.get('status', parent_status)
+                        if not _edge_satisfied(
+                            parent_status=parent_status,
+                            min_trigger_status=e.min_trigger_status or "COMPLETED",
+                            fail_ok=bool(e.fail_ok) if e.fail_ok is not None else False,
+                            from_step=e.from_step,
+                            child_checkpoint_step=cp,
+                        ):
+                            blocked = True
+                            break
+                    if not blocked:
+                        keep.add(child_name)
+
+                children_names = keep
 
         for child_name in children_names:
             if not any(child_name == job.get("child_name") for job in job_list_tmp):
@@ -239,6 +531,57 @@ class JobsDbManager(DbManager):
         self.create_table(table.name)
         pkeys = ['e_from', 'e_to']
         self.upsert_many(table.name, graph, pkeys)
+
+    def update_outgoing_edges_completion(self, job_name: str, job_status: str) -> bool:
+        """Update completion_status to COMPLETED for all satisfied outgoing edges of a job.
+
+        Queries experiment_structure directly and updates matching edges in DB.
+
+        :param job_name: Name of the parent job.
+        :param job_status: String representation of the parent job's status.
+        :return: True if at least one edge was updated.
+        """
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
+        jobs_table: Table = self.table_registry.get(JobsTable.name)
+        self.create_table(structure_table.name)
+        self.create_table(jobs_table.name)
+
+        with self._get_engine(structure_table.name).begin() as conn:
+            rows = conn.execute(
+                select(
+                    structure_table.c.e_to,
+                    structure_table.c.min_trigger_status,
+                    structure_table.c.fail_ok,
+                    structure_table.c.from_step,
+                    jobs_table.c.current_checkpoint_step,
+                ).select_from(
+                    structure_table.join(
+                        jobs_table,
+                        structure_table.c.e_to == jobs_table.c.name,
+                        isouter=True
+                    )
+                ).where(structure_table.c.e_from == job_name)
+            ).fetchall()
+
+            updated = False
+            for row in rows:
+                if _edge_satisfied(
+                    parent_status=job_status,
+                    min_trigger_status=row.min_trigger_status or "COMPLETED",
+                    fail_ok=bool(row.fail_ok) if row.fail_ok is not None else False,
+                    from_step=row.from_step or 0,
+                    child_checkpoint_step=row.current_checkpoint_step or 0,
+                ):
+                    conn.execute(
+                        update(structure_table)
+                        .where(and_(
+                            structure_table.c.e_from == job_name,
+                            structure_table.c.e_to == row.e_to
+                        ))
+                        .values(completion_status="COMPLETED")
+                    )
+                    updated = True
+        return updated
 
     def load_edges(self, job_list: List[dict[str, Any]] = None, full_load: bool = True, remove_unused_edges: bool = True) -> List[dict[str, Any]]:
         table: Table = self.table_registry.get(ExperimentStructureTable.name)
@@ -303,7 +646,8 @@ class JobsDbManager(DbManager):
     def save_wrappers(
             self,
             wrappers: Tuple[List[Dict[str, Any]], List[Dict[str, Any]]],
-            preview: bool = False
+            preview: bool = False,
+            run_id: Optional[int] = None
     ) -> None:
         """
         Save the wrapper jobs and their associated information to the database.
@@ -312,6 +656,8 @@ class JobsDbManager(DbManager):
         :type wrappers: Tuple[Dict[str, Any], List[Dict[str, Any]]]
         :param preview: If True, use preview tables; otherwise, use production tables.
         :type preview: bool
+        :param run_id: Current experiment run ID to associate with these wrappers.
+        :type run_id: Optional[int]
         """
         if preview:
             innerjobs_table: Table = self.table_registry.get(PreviewWrapperJobsTable.name)
@@ -325,25 +671,28 @@ class JobsDbManager(DbManager):
         for wrapper_info, inner_jobs in wrappers:
             if isinstance(wrapper_info, list):
                 updated_wrappers = [
-                    {**wrapper, 'status': Status.VALUE_TO_KEY[int(wrapper['status'])]}
+                    {**wrapper, 'status': Status.VALUE_TO_KEY[int(wrapper['status'])], 'run_id': run_id}
                     for wrapper in wrapper_info
                 ]
                 self.upsert_many(wrapper_info_table.name, updated_wrappers, ['name'])
             else:
-                updated_wrapper = [{**wrapper_info, 'status': Status.VALUE_TO_KEY[int(wrapper_info['status'])]}]
+                updated_wrapper = [{**wrapper_info, 'status': Status.VALUE_TO_KEY[int(wrapper_info['status'])], 'run_id': run_id}]
                 self.upsert_many(wrapper_info_table.name, updated_wrapper, ['name'])
+            inner_jobs_with_run_id = [{**j, 'run_id': run_id} for j in inner_jobs]
             try:
-                self.insert_many(innerjobs_table.name, inner_jobs)
+                self.insert_many(innerjobs_table.name, inner_jobs_with_run_id)
             except IntegrityError as e:
                 Log.warning(f"Unique constraint failed when inserting inner jobs: {e}")
 
-    def load_wrappers(self, preview: bool = False, job_list: Any = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def load_wrappers(self, preview: bool = False, job_list: Any = None, run_id: Optional[int] = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Load the wrapper jobs and their associated information from the database.
 
         :param preview: If True, use preview tables; otherwise, use production tables.
         :type preview: bool
-        job_list: Optional list of jobs to filter the loaded wrappers.
         :param job_list: Optional list of jobs to filter the loaded wrappers.
+        :type job_list: Optional[list]
+        :param run_id: Optional run ID to filter wrappers by experiment run.
+        :type run_id: Optional[int]
         :return: Tuple containing a list of dictionaries with wrapper job info and inner jobs.
         :rtype: Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]
 
@@ -359,16 +708,18 @@ class JobsDbManager(DbManager):
 
         self.create_table(innerjobs_table.name)
         self.create_table(wrapper_info_table.name)
+        wrappers_info_filter = {'run_id': run_id} if run_id is not None else {}
         if full_load:
             # Load wrapper jobs
             wrappers_inner_jobs = self.select_latest_inner_jobs(innerjobs_table)
-            wrappers_info = self.select_all_with_columns(wrapper_info_table.name)
+            wrappers_info = self.select_where_with_columns(wrapper_info_table, wrappers_info_filter) if wrappers_info_filter else self.select_all_with_columns(wrapper_info_table.name)
         else:
             # Load only active wrapper jobs
             job_names = [job.name for job in job_list] if job_list else []
             wrappers_inner_jobs = self.select_latest_inner_jobs(innerjobs_table, job_names)
             packages_names = list(set([job['package_name'] for job in wrappers_inner_jobs]))
-            wrappers_info = self.select_where_with_columns(wrapper_info_table, {'name': packages_names})
+            wrappers_info_filter_with_names = {**wrappers_info_filter, 'name': packages_names}
+            wrappers_info = self.select_where_with_columns(wrapper_info_table, wrappers_info_filter_with_names)
         # change status to the proper value
         for i, wrapper in enumerate(wrappers_info):
             wrapper = dict(wrapper)
@@ -385,12 +736,12 @@ class JobsDbManager(DbManager):
         preview_wrapper_info_table: Table = self.table_registry.get(PreviewWrapperInfoTable.name)
         wrapper_info_table: Table = self.table_registry.get(WrapperInfoTable.name)
 
-        self.drop_table(jobs_table.name)
-        self.drop_table(experiment_structure_table.name)
         self.drop_table(preview_wrapper_jobs_table.name)
         self.drop_table(wrapper_jobs_table.name)
         self.drop_table(preview_wrapper_info_table.name)
         self.drop_table(wrapper_info_table.name)
+        self.drop_table(jobs_table.name)
+        self.drop_table(experiment_structure_table.name)
 
     def save_sections_data(self, sections_data: List[Dict[str, Any]]) -> None:
         """
@@ -534,6 +885,16 @@ class JobsDbManager(DbManager):
         wrappers = self.select_all_with_columns(wrapper_info_table.name)
         return [wrapper[1] for wrapper in wrappers]
 
+
+    def reset_updated_logs(self) -> None:
+        """Reset updated_log and updated_stats to 0 for all jobs with fail_count == 0."""
+        table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        self.update_where(
+            table.name,
+            {'updated_log': 0, 'updated_stats': 0},
+            {'fail_count': 0}
+        )
 
     def get_failed_job_data(self) -> list[dict[str, Any]]:
         """Get the names of jobs that have failed.

@@ -23,8 +23,9 @@ import re
 import traceback
 from contextlib import suppress
 from pathlib import Path
+import time
 from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Optional, Union
+from typing import List, Dict, Tuple, Any, Optional, Set, Union
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
@@ -85,6 +86,7 @@ class JobList(object):
         self.disable_save = disable_save
         self.submitter = submitter
         self.check_wrapper_fake_ids = set()
+        self.run_id: Optional[int] = None
         self._set_status_path = Path(BasicConfig.LOCAL_ROOT_DIR / Path(self.expid) / "status")
         self._update_file_path = self._set_status_path / self._update_file
 
@@ -285,6 +287,10 @@ class JobList(object):
         """
         self.dbmanager.clear_wrappers(preview=preview)
 
+    def reset_updated_logs(self) -> None:
+        """Reset updated_log and updated_stats to 0 for all jobs with fail_count == 0."""
+        self.dbmanager.reset_updated_logs()
+
     def _reset_workflow_graph(self) -> None:
         """Resets the workflow graph to a zero state by clearing the graph and resetting the database."""
         Log.debug("Resetting the workflow graph to a zero state")
@@ -365,10 +371,10 @@ class JobList(object):
             'completion_status': edge.get('completion_status', "WAITING"),
             'fail_ok': edge.get('fail_ok', False)
         }
+        if edge['e_from'] not in self.graph.nodes or edge['e_to'] not in self.graph.nodes:
+            raise ValueError(f"Cannot add edge from {edge['e_from']} to {edge['e_to']}: "
+                             f"one of the nodes does not exist in the graph.")
         if not self.graph.has_edge(edge["e_from"], edge["e_to"]):
-            if edge['e_from'] not in self.graph.nodes or edge['e_to'] not in self.graph.nodes:
-                raise ValueError(f"Cannot add edge from {edge['e_from']} to {edge['e_to']}: "
-                                 f"one of the nodes does not exist in the graph.")
             self.graph.add_edge(
                 edge["e_from"],
                 edge["e_to"],
@@ -377,8 +383,14 @@ class JobList(object):
                 from_step=edge["from_step"],
                 fail_ok=edge["fail_ok"]
             )
-            # Update the parent job
-            self.graph.nodes[edge["e_to"]]["job"].add_parent(self.graph.nodes[edge["e_from"]]["job"])
+        else:
+            self.graph.edges[edge["e_from"], edge["e_to"]].update({
+                "min_trigger_status": edge["min_trigger_status"],
+                "completion_status": edge["completion_status"],
+                "from_step": edge["from_step"],
+                "fail_ok": edge["fail_ok"],
+            })
+        self.graph.nodes[edge["e_to"]]["job"].add_parent(self.graph.nodes[edge["e_from"]]["job"])
 
     def _add_job_node_with_platform(
             self,
@@ -534,6 +546,10 @@ class JobList(object):
         for job in self.job_list:
             if not self.run_mode and new:
                 job.fail_count = 0
+                job.updated_log = 0
+                job.updated_stats = 0
+                job.log_recovery_call_count = 0
+                job.wrapper_type = None
             if new:
                 job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
             else:
@@ -581,7 +597,7 @@ class JobList(object):
         :param create: If True, creates new entries in the database.
         :param new: If True, saves the state of new jobs.
         """
-        self.save_jobs()
+        self.save_jobs(reset_log_counters=new)
         self.save_edges()
         self.save_sections()
         for job in self.job_list:
@@ -628,46 +644,14 @@ class JobList(object):
         self.dbmanager.save_sections_data(self.build_sections_data_to_store())
 
     def load_inner_jobs_by_section(self, inner_sections: list[str]) -> List[Job]:
-        """
-        Loads jobs from the database for the specified inner sections. ( if applicable )
-        :param inner_sections: List of section names to load jobs from.
-        :return: List of Job objects loaded from the database.
-        :rtype: List[Job]
-        """
-        for section in inner_sections:
-            # Temporally shallow load all jobs of this section
-            # This is the basic working version, but it can be optimized
-            # TODO (another PR): This can (temporally) potentially load a lot of jobs, consider optimizing
-            # TODO (another PR): use MIN/MAX, WALLCLOCK SUM, etc to load only the necessary jobs
-            # TODO (another PR): Another alternative is to store the "vertical level" of the database and do calculations based on that
-            current_section_jobs = self.dbmanager.select_jobs_by_section(section)
-            # Temporally load their parents
-            parents = self.dbmanager.select_edges(current_section_jobs)
-
-            # Group the parents by their names
-            group_by_parent_name = {}
-            for parent in parents:
-                parent_name = parent.get("e_to", "")
-                if parent_name not in group_by_parent_name:
-                    group_by_parent_name[parent_name] = []
-                group_by_parent_name[parent_name].append(parent)
-
-            # See if a inner_job is loadable or not ( dependencies fulfilled )
-            for wrappable_job, parents in group_by_parent_name.items():
-                # if not loaded already...
-                if not self.get_job_by_name(wrappable_job):
-                    can_be_loaded = True
-                    for edge in parents:
-                        p_job = self.get_job_by_name(edge["e_from"])
-                        if not p_job:
-                            p_job = self.load_job_by_name(edge["e_from"])
-                        if p_job and p_job.section != section and edge["COMPLETION_STATUS"] != "COMPLETED":
-                            # If the job is not in the current section and is not completed, it cannot be loaded
-                            can_be_loaded = False
-                            break
-
-                    if can_be_loaded:
-                        self.add_job(self.load_job_by_name(wrappable_job))
+        if not self.disable_save:
+            already_loaded = {n for n in self.graph.nodes
+                             if self.graph.nodes[n]['job'].status != Status.COMPLETED}
+            candidates = self.dbmanager.select_loadable_inner_jobs(inner_sections, already_loaded)
+            for candidate in candidates:
+                candidate_dict = dict(candidate)
+                self.add_job(self.load_job_by_name(candidate_dict['name']))
+        return []
 
     def process_wrapper_jobs(self, wrapper_section: str, inner_sections: list[str]) -> None:
         """
@@ -689,6 +673,93 @@ class JobList(object):
                 7014,
                 str(e),
             )
+
+    def load_wrappable_jobs_by_section(self, section: str, loaded_tracker: Set[str]) -> None:
+        """Load non-completed jobs from a section whose cross-section parents are all COMPLETED.
+
+        Skips jobs already in memory or tracked. Tracks newly loaded names
+        in ``loaded_tracker`` for later cleanup.
+
+        :param section: Section name to load jobs from.
+        :param loaded_tracker: Set to which newly loaded job names are added.
+        """
+        if self.disable_save:
+            return
+        current_section_jobs = self.dbmanager.select_jobs_by_section(section)
+        candidates = [j for j in current_section_jobs if j.get('status') != 'COMPLETED']
+        if not candidates:
+            return
+        all_edges = self.dbmanager.select_edges(candidates)
+        parents_by_child = {}
+        for edge in all_edges:
+            child_name = edge['e_to']
+            if child_name not in parents_by_child:
+                parents_by_child[child_name] = []
+            parents_by_child[child_name].append(edge)
+        for candidate in candidates:
+            name = candidate['name']
+            if self.get_job_by_name(name) or name in loaded_tracker:
+                continue
+            can_be_loaded = True
+            if name in parents_by_child:
+                for edge in parents_by_child[name]:
+                    p_job = self.get_job_by_name(edge['e_from'])
+                    if not p_job and edge['e_from'] not in loaded_tracker:
+                        p_job = self.load_job_by_name(edge['e_from'])
+                        if p_job:
+                            loaded_tracker.add(edge['e_from'])
+                    if p_job and p_job.section != section and edge.get("completion_status", "WAITING") != "COMPLETED":
+                        can_be_loaded = False
+                        break
+            if can_be_loaded:
+                loaded = self.load_job_by_name(name)
+                if loaded:
+                    loaded_tracker.add(name)
+
+    def ensure_parents_loaded(self, job: Job) -> None:
+        """Load parent Job objects for a job from the database if not already set.
+
+        Creates lightweight Job objects for parents without adding them to the graph.
+        No-op if the job already has parents or no dbmanager is available.
+
+        :param job: The job whose parents need to be loaded.
+        """
+        if job.parents or not self.dbmanager:
+            return
+        from sqlalchemy import select
+        from autosubmit.database.tables import ExperimentStructureTable
+        structure_table = self.dbmanager.table_registry.get(ExperimentStructureTable.name)
+        self.dbmanager.create_table(structure_table.name)
+        with self.dbmanager._get_engine(structure_table.name).connect() as conn:
+            rows = conn.execute(
+                select(structure_table.c.e_from)
+                .where(structure_table.c.e_to == job.name)
+            )
+            parent_names = {row[0] for row in rows}
+        for parent_name in parent_names:
+            parent_obj = next((j for j in self.job_list if j.name == parent_name), None)
+            if not parent_obj:
+                parent_data = self.dbmanager.load_job_by_name(parent_name)
+                if parent_data:
+                    parent_obj = Job(parent_data['name'], parent_data['id'], parent_data['status'], 0)
+                    parent_obj.chunk = parent_data.get('chunk')
+            if parent_obj:
+                job.add_parent(parent_obj)
+
+    def _remove_job_from_graph(self, job_name: str) -> None:
+        """Remove a job node and its edges from the graph, cleaning up parent references.
+
+        :param job_name: Name of the job to remove.
+        """
+        if job_name not in self.graph.nodes:
+            return
+        job = self.graph.nodes[job_name]['job']
+        for parent in list(job.parents):
+            if self.graph.has_edge(parent.name, job_name):
+                self.graph.remove_edge(parent.name, job_name)
+        job.parents.clear()
+        job.platform = None
+        self.graph.remove_node(job_name)
 
     def clear_generate(self):
         self.dependency_map = {}
@@ -1628,28 +1699,9 @@ class JobList(object):
         :return: A dictionary of filters to apply for the job based on the dependency relationships.
         """
         filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
-        filters_to_apply.pop("MIN_TRIGGER_STATUS", "COMPLETED")
-        # Don't do perform special filter if only "FROM_STEP" is applied
-        if "FROM_STEP" in filters_to_apply:
-            if (filters_to_apply.get("CHUNKS_TO", "none") == "none" and filters_to_apply.
-                    get("MEMBERS_TO", "none") == "none" and filters_to_apply.get("DATES_TO", "none")
-                    == "none" and filters_to_apply.get("SPLITS_TO", "none") == "none"):
-                filters_to_apply = {}
-        filters_to_apply.pop("FROM_STEP", 0)
-        filters_to_apply.pop("FAIL_OK", False)
-
-        # BACKWARDS COMPATIBILITY, at the end the filters_to_apply should only contain filters and discard the rest
-        filters_to_apply.pop("OPTIONAL", False)
-
-        # If the selected filter is "natural" for all filters_to, trigger the natural dependency
-        # calculation
-        all_natural = True
-        for f_value in filters_to_apply.values():
-            if f_value.lower() != "natural":
-                all_natural = False
-                break
-        if all_natural:
-            filters_to_apply = {}
+        filters_to_apply = {k: v for k, v in filters_to_apply.items() if k.endswith("_TO")}
+        if filters_to_apply and all(v.lower() == "natural" for v in filters_to_apply.values()):
+            return {}
         return filters_to_apply
 
     def _normalize_auto_keyword(self, job: Job, dependency: Dependency) -> Dependency:
@@ -2648,6 +2700,7 @@ class JobList(object):
                     if package.name == name:
                         self.job_package_map.pop(package_id, None)
 
+
     def continue_run(self) -> bool:
         """Loads the next possible jobs and edges from the database.
 
@@ -2655,13 +2708,13 @@ class JobList(object):
         :return: True if there are active jobs to run, False otherwise.
         """
         self.recover_logs()
-        save_jobs, save_edges = self.update_list(self._as_conf)
+        save_jobs = self.update_list(self._as_conf)
         if save_jobs:
             self.save_jobs()
-        if save_edges:
-            self.save_edges()
-
         self._load_graph(full_load=False)
+        save_jobs = self.update_list(self._as_conf)
+        if save_jobs:
+            self.save_jobs()
         self.unload_finished_jobs()
         for job in self.job_list:
             if not job.updated:
@@ -2669,7 +2722,11 @@ class JobList(object):
                 job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
                         self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
         Log.debug(f"Jobs loaded: {len(self.job_list)}")
+        for j in sorted(self.job_list, key=lambda j: j.name):
+            Log.debug(f"  {j.name:50s} status={Status().VALUE_TO_KEY.get(j.status, j.status):12s} sec={j.section:15s} chunk={j.chunk} mem={j.member} date={j.date}")
         Log.debug(f"Edges loaded: {len(self.graph_dict)}")
+        for edge in sorted(self.graph_dict, key=lambda e: (e['e_from'], e['e_to'])):
+            Log.debug(f"  {edge['e_from']:50s} -> {edge['e_to']:50s} trigger={edge.get('min_trigger_status','?'):12s} completion={edge.get('completion_status','?')}")
         self.update_wrappers_references()
         return len(self.get_active()) > 0
 
@@ -2679,14 +2736,10 @@ class JobList(object):
             job for job in self.job_list
             if (
                     (job.status == Status.FAILED
-                     and job.fail_count >= job.retrials
-                     and job.log_recovery_call_count > job.fail_count
-                     and job.updated_log > job.fail_count
+                     and not job.can_retry
                      and not self.is_wrapper_still_running(job))
                     or
                     (job.status in (Status.COMPLETED, Status.SKIPPED)
-                     and job.log_recovery_call_count > job.fail_count
-                     and job.updated_log > job.fail_count
                      and not self.is_wrapper_still_running(job))
             )
         ]
@@ -2701,27 +2754,19 @@ class JobList(object):
                     jobs_to_unload_set.add(job)
                     changed = True
         jobs_to_unload = list(jobs_to_unload_set)
-        # update edges completion status before removing them
         for job in (job for job in jobs_to_unload):
-            job.fail_count = 0
-            for child in job.children:
-                self.graph.edges[job.name, child.name]['completion_status'] = "COMPLETED"
-            for parent in job.parents:
-                if self.graph.has_edge(parent.name, job.name):
-                    self.graph.edges[parent.name, job.name]['completion_status'] = "COMPLETED"
-        if jobs_to_unload:
-            self.save_edges()
-        for job in (job for job in jobs_to_unload):
-            for child in job.children:
-                if self.graph.has_edge(job.name, child.name):
-                    self.graph.remove_edge(job.name, child.name)
-                child.parents.discard(job)
+            child_edges = self.dbmanager.select_edges([{'name': job.name}], only_parents=True)
+            for edge in child_edges:
+                child_name = edge.get('e_to', '')
+                if self.graph.has_edge(job.name, child_name):
+                    self.graph.remove_edge(job.name, child_name)
+                child_job = self.get_job_by_name(child_name)
+                if child_job:
+                    child_job.parents = {p for p in child_job.parents if p.name != job.name}
 
             for parent in list(job.parents):
                 if self.graph.has_edge(parent.name, job.name):
                     self.graph.remove_edge(parent.name, job.name)
-                parent.children.discard(job)
-            job.children.clear()
             job.parents.clear()
             job.platform = None
             self.graph.remove_node(job.name)
@@ -2785,6 +2830,9 @@ class JobList(object):
         if banned_jobs is None:
             banned_jobs = []
 
+        if isinstance(section_list, str):
+            section_list = [section_list.upper()]
+
         jobs = []
         for job in self.job_list:
             if job.section.upper() in section_list and job.name not in banned_jobs:
@@ -2794,6 +2842,42 @@ class JobList(object):
                 else:
                     jobs.append(job)
         return jobs
+
+    def get_jobs_by_section_db(
+            self,
+            section_list: list,
+            banned_jobs: Optional[list] = None,
+            get_only_non_completed: bool = False,
+            status_filter: Optional[str] = None,
+    ) -> set[str]:
+        """Get job names by section from the database.
+
+        Mirrors :meth:`get_jobs_by_section` but queries the database directly
+        instead of iterating the in-memory job list.
+
+        Parameters:
+        section_list (list): List of sections to filter jobs by.
+        banned_jobs (list, optional): List of job names to exclude from the result.
+            Defaults to an empty list.
+        get_only_non_completed (bool, optional): If True, only non-completed jobs are included.
+            Defaults to False.
+        status_filter (str, optional): If set, only jobs with this status are included.
+
+        Returns:
+        set[str]: Set of job names matching the criteria.
+        """
+        if banned_jobs is None:
+            banned_jobs = []
+
+        if isinstance(section_list, str):
+            section_list = [section_list.upper()]
+
+        return self.dbmanager.select_job_names_by_sections(
+            sections=section_list,
+            exclude_names=set(banned_jobs),
+            exclude_completed=get_only_non_completed,
+            status_filter=status_filter,
+        )
 
     def sort_by_name(self):
         """Returns a list of jobs sorted by name.
@@ -2827,16 +2911,24 @@ class JobList(object):
         """
         return sorted(self.job_list, key=lambda k: k.status)
 
-    def save_jobs(self, jobs_to_save: Optional[List[Job]] = None):
-        """Persists the job list"""
+    def save_jobs(self, jobs_to_save: Optional[List[Job]] = None, reset_log_counters: bool = False):
+        """Persists the job list
+        :param jobs_to_save: Optional list of jobs to save. If None, saves all jobs in the job list.
+        :type jobs_to_save: Optional[List[Job]]
+        :param reset_log_counters: If True, resets the log counters for the jobs being saved. Defaults to False.
+        :type reset_log_counters: bool
+        :return: None
+        :rtype: None
+        :raises Exception: If a database access error occurs while saving jobs.
+        """
 
         if not self.disable_save:
             Log.info("Saving jobs to the database...")
             if not jobs_to_save:
                 self.update_status_log()
-                self.dbmanager.save_jobs(self.job_list)
+                self.dbmanager.save_jobs(self.job_list, reset_log_counters=reset_log_counters)
             else:
-                self.dbmanager.save_jobs(jobs_to_save)
+                self.dbmanager.save_jobs(jobs_to_save, reset_log_counters=reset_log_counters)
             Log.info("Jobs saved.")
 
     def load_jobs(self, full_load: bool = False, load_failed_jobs: bool = False) -> list[Job]:
@@ -2873,7 +2965,8 @@ class JobList(object):
                          edge.get("e_from", "") in self.graph.nodes and edge.get("e_to", "") in self.graph.nodes):
                 self._add_edge_and_parent(edge)
         # get node from the graph
-        return self.graph.nodes.get(job_name, None)['job']
+        node_data = self.graph.nodes.get(job_name)
+        return node_data['job'] if node_data else None
 
     def save_edges(self):
         """
@@ -3073,7 +3166,7 @@ class JobList(object):
         for parent_name, edge_info in parents_edge_info.items():
             parent = parents_nodes[parent_name]
             p_status = parent.status
-            edge_status = Status.KEY_TO_VALUE[edge_info["min_trigger_status"].upper()]
+            edge_status = Status.KEY_TO_VALUE.get(edge_info.get("min_trigger_status", "COMPLETED").upper(), Status.COMPLETED)
             fail_ok = edge_info.get("fail_ok", False)
             from_step = edge_info.get("from_step", 0)
 
@@ -3129,33 +3222,35 @@ class JobList(object):
 
         return non_completed, completed
 
-    def _recover_log(self, job: Job) -> None:
-        """Recover the log for a given job.
-        :param job: The job object to recover the log for.
-        :type job: Job
-        """
-        if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                  "false")).lower() == "true":
-            job.retrieve_logfiles()
-            job.send_cpmip_notification(self._as_conf)
-        else:
-            # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
-            job.write_submit_time()
-            job.platform.add_job_to_log_recover(job)
 
-        job.updated_log += 1
-
-    def recover_logs(self) -> bool:
+    def recover_logs(self, from_db: bool = False) -> bool:
         """Update jobs' log recovered status.
-
-        Iterate over the current job list and mark jobs whose stdout/stderr logs
-        have been recovered.
-
+        Loads finished jobs from DB that need recovery.
         """
-        jobs_to_recover = [job for job in self.job_list if
-                           job.status in self._FINAL_STATUSES and job.updated_log <= job.fail_count]
-        for job in jobs_to_recover:
-            self._recover_log(job)
+
+        jobs_to_recover = []
+        if from_db:
+            for data in self.dbmanager.select_finished_jobs_needing_log_recovery():
+                self._add_job_node_with_platform(data, connect_to_platform=self.submitter is not None)
+                jobs_to_recover.append(self.graph.nodes[data["name"]]["job"])
+        else:
+            jobs_to_recover = [job for job in self.job_list if job.status in [Status.COMPLETED, Status.FAILED]]
+
+        if jobs_to_recover:
+            for job in jobs_to_recover:
+                job.recover_log(self._as_conf)
+            self.save_jobs(jobs_to_recover)
+
+            if from_db:
+                used_platforms = {job.platform for job in jobs_to_recover if self._as_conf.experiment_data.get(job.platform_name, {}).get('DISABLE_RECOVERY_THREADS', "false").lower() == "true"}
+                for p in used_platforms:
+                    if p.work_event is not None:
+                        p.work_event.set()
+                        start = time.time()
+                        while (time.time() - start) < min(60,p.keep_alive_timeout):
+                            if not p.recovery_queue.empty() or p.work_event.is_set():
+                                break
+                            time.sleep(1)
         return len(jobs_to_recover) > 0
 
     def _update_db_edges_completion_status(self, finished_parents: List[Job], non_finished_parents: List[Job],
@@ -3184,6 +3279,11 @@ class JobList(object):
             if any(parent.status == Status.WAITING for parent in job.parents):
                 job.status = Status.WAITING
                 job.id = None
+                job.fail_count = 0
+                job.updated_log = 0
+                job.updated_stats = 0
+                job.log_recovery_call_count = 0
+                job.wrapper_type = None
                 Log.info(f"Job {job.name} was marked as COMPLETED but has WAITING parents. Resetting to WAITING.")
 
     def update_list(
@@ -3213,22 +3313,22 @@ class JobList(object):
             save_jobs = store_change
         Log.debug('Updating FAILED jobs')
         save_jobs |= self._update_failed_jobs(as_conf)
-        save_jobs_, save_edges = self._handle_special_checkpoint_jobs()
-        save_jobs |= save_jobs_
         save_jobs |= self._sync_completed_jobs()
         if not fromSetStatus:
             save_jobs |= self._update_waiting_and_delayed_jobs()
             save_jobs |= self._skip_jobs(as_conf)
         for job in [job for job in self.get_ready() if not self.is_wrapper_still_running(job)]:
-            save_edges = True
-            self._update_db_edges_completion_status(job.parents, [], job)
             job.set_ready_date()
-            job.updated_log = 0
 
         self.update_two_step_jobs()
 
+        if not self.disable_save:
+            for job in self.job_list:
+                if job.status in (Status.COMPLETED, Status.FAILED, Status.SKIPPED):
+                        self.dbmanager.update_outgoing_edges_completion(job.name, Status.VALUE_TO_KEY.get(job.status, ''))
+
         Log.debug('Update finished')
-        return save_jobs, save_edges
+        return save_jobs
 
     def is_wrapper_still_running(self, job: Job) -> bool:
         """
@@ -3244,6 +3344,13 @@ class JobList(object):
             wrapper_job = self.job_package_map[int(job.id)]
             if wrapper_job.status not in (Status.COMPLETED, Status.FAILED):
                 job.packed = True
+                return job.packed
+        for wrapper_job in self.job_package_map.values():
+            if wrapper_job.status not in (Status.COMPLETED, Status.FAILED):
+                for inner_job in wrapper_job.job_list:
+                    if inner_job.name == job.name:
+                        job.packed = True
+                        return job.packed
         return job.packed
 
     def _update_failed_jobs(self, as_conf: AutosubmitConfig) -> bool:
@@ -3322,7 +3429,7 @@ class JobList(object):
                 job.wrapper_type = None
                 save_all = True
                 Log.result(f"JOB: {job.name} was set to READY all parents are in the desired status.")
-        return save_all, save_all
+        return save_all
 
     def _sync_completed_jobs(self) -> bool:
         """Synchronize jobs with parents' completion status. If
@@ -3364,40 +3471,34 @@ class JobList(object):
         for job in self.get_delayed():
             if datetime.datetime.now() >= job.delay_end:
                 job.status = Status.READY
-
-        # At this point, we already computed jobs with STATUS != COMPLETED.
+                save = True
 
         for job in self.get_waiting():
-            tmp = [parent for parent in job.parents if
-                   parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
-
-            if not job.parents or (len(tmp) == len(job.parents) and self.check_all_edges_fail_ok(job)):
+            if not job.parents:
+                job.status = Status.READY
+                job.hold = False
+                save = True
+                Log.debug(f"Setting job: {job.name} status to: READY (no parents)...")
+                continue
+            parents_edge_info = self.get_parents_edges(job.name)
+            parents_nodes = {}
+            for parent_name in parents_edge_info.keys():
+                parent_job = self.graph.nodes[parent_name]["job"]
+                if not self.disable_save and parent_job.id and int(parent_job.id) in self.job_package_map:
+                    parent_data = self.dbmanager.load_job_by_name(parent_name)
+                    if parent_data:
+                        db_status = Status.KEY_TO_VALUE.get(parent_data.get('status'))
+                        if db_status is not None:
+                            parent_job.status = db_status
+                parents_nodes[parent_name] = parent_job
+            non_completed, completed = self._count_parents_status(job, parents_edge_info, parents_nodes)
+            if len(non_completed) == 0 and len(completed) > 0:
                 Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
                 job.status = Status.READY
                 job.hold = False
+                save = True
 
         return save
-
-    def check_all_edges_fail_ok(self, current_job: Job) -> bool:
-        """Check if all edges have fail_ok set to True for a given job.
-
-        Jobs:
-          Job:
-            DEPENDENCIES:
-             JOB-1:
-               STATUS: FAILED? -> ok
-               STATUS: FAILED -> not ok
-
-        :param current_job: The job to check.
-        :type current_job: Job
-        :return: True if all edges have fail_ok set to True, False otherwise.
-        :rtype: bool
-        """
-        for parent in current_job.parents:
-            edge_info = self.graph.edges.get((parent.name, current_job.name), {})
-            if not edge_info.get("fail_ok", False):
-                return False
-        return True
 
     def _skip_jobs(self, as_conf: AutosubmitConfig) -> bool:
         """Skip jobs that meet the skipping criteria.
@@ -3471,7 +3572,7 @@ class JobList(object):
         import secrets
         retries = max_retries
         while retries > 0:
-            new_id = secrets.randbelow(100000)
+            new_id = -secrets.randbelow(100000)
             if new_id not in self.check_wrapper_fake_ids:
                 for job in package.jobs:
                     job.id = int(new_id)
@@ -3488,6 +3589,7 @@ class JobList(object):
             preview: bool = False
     ) -> None:
         """Save wrapper jobs for job packages that are not in the failed set.
+        Each wrapper is tagged with the current ``run_id`` for run-level isolation.
 
         :param scripts: List of job package objects to process.
         :type scripts: List[Any]
@@ -3519,16 +3621,20 @@ class JobList(object):
                 num_processors=package._num_processors,
                 platform=package.platform,
                 as_config=as_conf,
+                sections=package.sections,
+                method=package.method,
+                wr_type=package.wrapper_type,
             )
             self.job_package_map[int(wrapper_job.id)] = wrapper_job
             self.packages_dict[package.name] = wrapper_job.job_list
 
             wrappers.append(self._wrapper_job_dict(wrapper_job))
         if wrappers:
-            self.dbmanager.save_wrappers(wrappers, preview=preview)
+            self.dbmanager.save_wrappers(wrappers, preview=preview, run_id=self.run_id)
 
     def load_wrappers(self, preview: bool = False) -> None:
-        """ Load wrapper jobs and their inner jobs from the database, and populate the job package map.
+        """Load wrapper jobs and their inner jobs from the database, and populate the job package map.
+        Only wrappers matching the current ``run_id`` are loaded.
 
         :param preview: If True, load wrappers in preview mode.
         :type preview: bool
@@ -3536,7 +3642,7 @@ class JobList(object):
         :return: None
         :rtype: None
         """
-        un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, self.job_list)
+        un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, self.job_list, run_id=self.run_id)
 
         # Build a dictionary of wrapper info indexed by wrapper name
         wrappers_info: Dict[str, dict] = {
@@ -3558,6 +3664,8 @@ class JobList(object):
                     job = self.get_job_by_name(job_name)
                     if not job:
                         job = self.load_job_by_name(job_name)
+                    if not job:
+                        continue
                     if job.id == wrappers_info[package_name]["id"]:
                         wrappers_info[package_name]["job_list"].append(job)
                 if wrappers_info[package_name]["job_list"]:
@@ -3588,8 +3696,8 @@ class JobList(object):
 
         :param wrapper_job: The wrapper job instance to serialize.
         :type wrapper_job: WrapperJob
-        :return: Tuple containing a dictionary of wrapper job attributes and a list of inner job names.
-        :rtype: Tuple[Dict[str, Any], List[str]]
+        :return: Tuple containing a dictionary of wrapper job attributes (including run_id) and a list of inner job dicts (each with run_id).
+        :rtype: Tuple[Dict[str, Any], List[Dict[str, Any]]]
         """
         wrapper_info = {
             "name": wrapper_job.name,
@@ -3607,13 +3715,15 @@ class JobList(object):
             "type": getattr(wrapper_job, "type", None),
             "sections": getattr(wrapper_job, "sections", None),
             "method": getattr(wrapper_job, "method", None),
+            "run_id": self.run_id,
         }
         wrapper_inner_jobs = [
             {
                 'package_id': wrapper_job.id,
                 'package_name': wrapper_job.name,
                 'job_name': job.name,
-                'timestamp': datetime.datetime.now().isoformat()
+                'timestamp': datetime.datetime.now().isoformat(),
+                'run_id': self.run_id,
             }
             for job in wrapper_job.job_list
         ]
@@ -4131,7 +4241,8 @@ class JobList(object):
                 job.id = int(jobs_data[job.name]["job_id"])
                 job.local_logs = jobs_data[job.name]["out"]
                 job.remote_logs = jobs_data[job.name]["err"]
-                job.updated_log = True
+                # TODO: rebase is fixed
+                job.updated_log = jobs_data[job.name]["fail_count"]
 
         for job in finished_jobs:
             # TODO: Another fix will come in 4.2. Currently, if the job has no id, the log will not be recovered properly.
@@ -4139,7 +4250,8 @@ class JobList(object):
                 job.id = 1
             # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
             if not jobs_ran_atleast_once:
-                job.updated_log = True
+                # TODO: rebase is fixed
+                job.updated_log = job.fail_count
 
     def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None,
                           return_only_names=False) -> Union[List[str], List["Job"]]:

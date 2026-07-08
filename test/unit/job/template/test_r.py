@@ -159,7 +159,7 @@ def test_stat_file_written_on_success(tmp_path: 'Path'):
     stat_file = tmp_path / f'{_JOBNAME}_STAT_{_FAIL_COUNT}'
     assert stat_file.exists()
     lines = [line for line in stat_file.read_text().strip().splitlines() if line.strip()]
-    assert len(lines) == 3  # start + end timestamps + status
+    assert len(lines) == 4  # submit + start + end timestamps + status
 
 
 def test_stat_file_has_failed_status_on_failure(tmp_path: 'Path'):

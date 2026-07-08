@@ -21,7 +21,7 @@ import pytest
 
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
-from test.integration.test_utils.docker import (
+from test.integration.test_utils.docker_utils import (
     get_mail_container,
     get_mailhog_messages,
     prepare_and_test_mail_container,

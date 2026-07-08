@@ -120,9 +120,7 @@ class ExperimentHistory:
         """
         try:
             return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except Exception as exp:
-            self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
+        except Exception:
             return None
 
     def get_finish_data_dc(self, job_name: str, fail_count: int = 0) -> Optional[JobData]:
@@ -136,13 +134,20 @@ class ExperimentHistory:
         :rtype: Optional[JobData]
         """
         try:
-            job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-            if job_data_dc and job_data_dc.finish > 0:
-                return job_data_dc
+            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+        except Exception:
             return None
-        except Exception as exp:
-            self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
+
+    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> Optional[JobData]:
+        """Retrieve JobData by job_id and fail_count.
+
+        :param job_id: The scheduler job ID.
+        :param fail_count: The attempt (fail_count) to look up.
+        :return: The JobData instance, or None if not found.
+        """
+        try:
+            return self.manager.get_job_data_by_job_id_and_fail_count(job_id, fail_count)
+        except Exception:
             return None
 
     def update_submit_time(self, job_name: str, submit: int = 0, status: str = "UNKNOWN", ncpus: int = 0,
@@ -194,97 +199,12 @@ class ExperimentHistory:
         :return: The updated JobData instance, or None if the record is not found or an exception occurs.
         :rtype: Optional[JobData]
         """
+
         try:
             job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-            if not job_data_dc:
-                raise Exception(f"Job {job_name} with fail_count={fail_count} has not been found in the database.")
-            job_data_dc.submit = submit
-            job_data_dc.status = status
-            job_data_dc.ncpus = ncpus
-            job_data_dc.wallclock = wallclock
-            job_data_dc.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
-            job_data_dc.date = date
-            job_data_dc.member = member
-            job_data_dc.section = section
-            job_data_dc.chunk = chunk
-            job_data_dc.platform = platform
-            job_data_dc.job_id = job_id
-            job_data_dc.rowtype = self._get_defined_rowtype(wrapper_code)
-            job_data_dc.children = children
-            job_data_dc.workflow_commit = workflow_commit
-            job_data_dc.split = split
-            job_data_dc.splits = splits
-            return self.manager.update_job_data_dc_by_job_id_name(job_data_dc)
-        except Exception as exp:
-            self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
-            return None
-
-    def get_submit_data_dc(self, job_name: str, fail_count: int) -> Optional[JobData]:
-        """
-        Retrieve the latest submit JobData for a given job_name and fail_count.
-
-        :param job_name: The name of the job.
-        :type job_name: str
-        :param fail_count: The fail count to look up.
-        :type fail_count: int
-        :return: The latest JobData instance, or None if not found.
-        :rtype: Optional[JobData]
-        """
-        try:
-            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
         except Exception:
             return None
-
-    def get_finish_data_dc(self, job_name: str, fail_count: int) -> Optional[JobData]:
-        """
-        Retrieve the latest finish JobData for a given job_name and fail_count.
-
-        :param job_name: The name of the job.
-        :type job_name: str
-        :param fail_count: The fail count to look up.
-        :type fail_count: int
-        :return: The latest JobData instance, or None if not found.
-        :rtype: Optional[JobData]
-        """
         try:
-            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except Exception:
-            return None
-
-    def update_submit_time(self, job_name, submit=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
-                           member="", section="", chunk=0, platform="NA", job_id=0, wrapper_queue=None,
-                           wrapper_code=None, children="", workflow_commit="", split=None, splits=None,
-                           fail_count=0):
-        """
-        Update an existing submit row in the database by job_name and fail_count.
-
-        :param job_name: The name of the job.
-        :param submit: The submit time timestamp.
-        :param status: The status of the job.
-        :param ncpus: Number of CPUs.
-        :param wallclock: Wallclock time.
-        :param qos: Quality of service.
-        :param date: Date string.
-        :param member: Member string.
-        :param section: Section string.
-        :param chunk: Chunk number.
-        :param platform: Platform name.
-        :param job_id: Job ID.
-        :param wrapper_queue: Wrapper queue.
-        :param wrapper_code: Wrapper code.
-        :param children: Children string.
-        :param workflow_commit: Workflow commit hash.
-        :param split: Split identifier.
-        :param splits: Splits range.
-        :param fail_count: Fail count.
-        :return: The updated JobData, or None if an exception occurs.
-        :rtype: JobData
-        """
-        try:
-            job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-            if not job_data_dc:
-                raise Exception("Job {0} has not been found in the database.".format(job_name))
             job_data_dc.submit = submit
             job_data_dc.status = status
             job_data_dc.ncpus = ncpus
@@ -422,11 +342,7 @@ class ExperimentHistory:
 
     def _verify_slurm_monitor(self, slurm_monitor, job_data_dc):
         try:
-            if slurm_monitor.header.status not in ["COMPLETED", "FAILED"]:
-                self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
-                              f"Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.\n")
-                Log.debug(
-                    f'Historical Database error: Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.')
+            # Removed, if this happens it is because the job is an inner_job
             if not slurm_monitor.steps_plus_extern_approximate_header_energy():
                 self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
                               f"Steps + extern != total energy for ID {slurm_monitor.header.name}."

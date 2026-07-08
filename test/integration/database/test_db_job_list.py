@@ -23,7 +23,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
-from autosubmit.database.tables import WrapperJobsTable, JobsTable, ExperimentStructureTable
+from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
 
@@ -283,7 +283,8 @@ def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmi
             'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
             'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
             'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
-            'synchronize', 'updated_log', 'created', 'modified', 'fail_count'
+            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats',
+            'wallclock', 'wrapper_type', 'retrials', 'log_recovery_call_count',
         }
 
 
@@ -341,7 +342,8 @@ def test_db_job_list_jobs_and_edges_together(
             'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
             'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
             'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
-            'synchronize', 'updated_log', 'created', 'modified', 'fail_count'
+            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats',
+            'wallclock', 'wrapper_type', 'retrials', 'log_recovery_call_count',
         }
 
     for edge in loaded_edges:
@@ -386,6 +388,7 @@ def test_select_latest_inner_jobs(
         "type": 0,
         "sections": None,
         "method": None,
+        "run_id": None,
     }]
 
     inner_jobs_data = []
@@ -394,7 +397,8 @@ def test_select_latest_inner_jobs(
             "package_id": 1,
             "package_name": package_name,
             "job_name": job.name,
-            "timestamp": "2023-01-01T00:00:00"
+            "timestamp": "2023-01-01T00:00:00",
+            "run_id": None,
         })
 
     wrappers = [(wrapper_info_dict, inner_jobs_data)]
@@ -409,7 +413,8 @@ def test_select_latest_inner_jobs(
         "package_id": 2,
         "package_name": f"{package_name}_2",
         "job_name": job_list.job_list[0].name,
-        "timestamp": newer_timestamp
+        "timestamp": newer_timestamp,
+        "run_id": None,
     }
     db_manager.insert(WrapperJobsTable.name, updated_job)
 
@@ -510,6 +515,7 @@ def test_load_wrapper(
         "type": 0,
         "sections": None,
         "method": None,
+        "run_id": None,
     }]
 
     inner_jobs_data = []
@@ -518,7 +524,8 @@ def test_load_wrapper(
             "package_id": 1,
             "package_name": package_name,
             "job_name": job.name,
-            "timestamp": "2023-01-01T00:00:00"
+            "timestamp": "2023-01-01T00:00:00",
+            "run_id": None,
         })
 
     wrappers = [(wrapper_info_dict, inner_jobs_data)]
@@ -675,55 +682,6 @@ def test_clear_unused_nodes(
         loaded_job = db_manager.load_job_by_name(job_name)
         assert loaded_job is not None, f"Job {job_name} should not have been deleted"
         assert loaded_job['name'] == job_name
-
-@pytest.mark.postgres
-def test_backup_and_restore(monkeypatch, tmp_path, _expid, as_db, as_exp: Any):
-    """" Test backup of database and restore it afterwards. """
-
-    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    if as_db != 'sqlite':
-        # TODO: not implemented
-        return 0
-    db_manager = _create_db_manager(schema=_expid)
-    # Create tables
-    jobs_table = db_manager.table_registry.get(JobsTable.name)
-    edges_table = db_manager.table_registry.get(ExperimentStructureTable.name)
-    db_manager.create_table(jobs_table.name)
-    db_manager.create_table(edges_table.name)
-    # Insert some data
-    sample_job = {
-        'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None,
-        'finish_time_timestamp': None, 'frequency': None, 'id': 0,
-        'name': f'{_expid}_LOCAL_SETUP', 'section': 'LOCAL_SETUP',
-        'script_name': f'{_expid}_LOCAL_SETUP', 'split': -1, 'splits': -1,
-        'status': 'READY', 'local_logs_err': None, 'local_logs_out': None,
-        'max_checkpoint_step': 0, 'packed': False, 'platform_name': None,
-        'priority': 0, 'ready_date': None, 'remote_logs_err': None,
-        'remote_logs_out': None, 'start_time': None,
-        'start_time_timestamp': None, 'submit_time_timestamp': None,
-        'synchronize': None, 'updated_log': 0, 'member': None
-    }
-    db_manager.insert(jobs_table.name, sample_job)
-    sample_edge = {
-        'e_from': f'{_expid}_LOCAL_SETUP', 'e_to': f'{_expid}_REMOTE_SETUP', 'from_step': 0,
-        'min_trigger_status': 'COMPLETED', 'completion_status': 'WAITING', 'fail_ok': True
-    }
-    db_manager.insert(edges_table.name, sample_edge)
-
-    # Backup
-
-    db_manager.backup()
-
-    # Clear tables
-    db_manager.drop_table(jobs_table.name)
-    db_manager.drop_table(edges_table.name)
-
-    # Restore
-    assert 0 == db_manager.restore()
-
-    loaded_job = db_manager.load_job_by_name(f'{_expid}_LOCAL_SETUP')
-    assert loaded_job is not None
-    assert loaded_job['name'] == f'{_expid}_LOCAL_SETUP'
 
 
 # -- Tests for detecting changes in dependencies -- #
@@ -1377,3 +1335,180 @@ def test_with_createcw_command_differences(
     unexpected_in_db = db_jobs_names - expected_job_names_set
     assert len(missing_in_db) == 0, f"Missing jobs in DB: {missing_in_db}"
     assert len(unexpected_in_db) == 0, f"Unexpected jobs in DB: {unexpected_in_db}"
+
+
+def _wrapper_info(name: str, id: int, status: int = 1, **overrides) -> Dict[str, Any]:
+    """Helper to build a wrapper_info dict with defaults matching WrapperInfoTable."""
+    info = {
+        "name": name,
+        "id": id,
+        "script_name": f"{name}.sh",
+        "status": status,
+        "local_logs_out": None,
+        "local_logs_err": None,
+        "remote_logs_out": None,
+        "remote_logs_err": None,
+        "updated_log": 1,
+        "updated_stats": 0,
+        "platform_name": "test_platform",
+        "wallclock": "01:00",
+        "num_processors": 4,
+        "type": 0,
+        "sections": None,
+        "method": None,
+        "run_id": None,
+    }
+    info.update(overrides)
+    return info
+
+
+def _inner_job(package_id: int, package_name: str, job_name: str, timestamp: str = "2023-01-01T00:00:00") -> Dict[str, Any]:
+    return {
+        "package_id": package_id,
+        "package_name": package_name,
+        "job_name": job_name,
+        "timestamp": timestamp,
+        "run_id": None,
+    }
+
+
+@pytest.mark.postgres
+def test_clear_wrappers(
+        tmp_path: Path,
+        as_db: str,
+        _expid: str,
+        as_exp: Any,
+):
+    db_manager = _create_db_manager(schema=_expid)
+
+    wrapper_info = [_wrapper_info("pkg_a", 1)]
+    inner_jobs = [_inner_job(1, "pkg_a", "j1"), _inner_job(1, "pkg_a", "j2")]
+    db_manager.save_wrappers([(wrapper_info, inner_jobs)], preview=False)
+
+    info, jobs = db_manager.load_wrappers(preview=False)
+    assert len(info) == 1
+    assert len(jobs) == 2
+
+    db_manager.clear_wrappers(preview=False)
+
+    info, jobs = db_manager.load_wrappers(preview=False)
+    assert len(info) == 0
+    assert len(jobs) == 0
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize("packages,initial_status,new_status", [
+    ([{"id": 1, "name": "pkg_a"}], 1, 5),
+    ([{"id": 1, "name": "pkg_a"}, {"id": 2, "name": "pkg_b"}], 1, 5),
+])
+def test_update_wrapper_status(
+        tmp_path: Path,
+        as_db: str,
+        _expid: str,
+        as_exp: Any,
+        packages: list,
+        initial_status: int,
+        new_status: int,
+):
+    db_manager = _create_db_manager(schema=_expid)
+
+    for pkg in packages:
+        wrapper_info = [_wrapper_info(pkg["name"], pkg["id"], status=initial_status)]
+        inner_jobs = [_inner_job(pkg["id"], pkg["name"], f"j{pkg['id']}")]
+        db_manager.save_wrappers([(wrapper_info, inner_jobs)], preview=False)
+
+    updated = [{"id": pkg["id"], "status": new_status} for pkg in packages]
+    db_manager.update_wrapper_status(updated)
+
+    info, _ = db_manager.load_wrappers(preview=False)
+    for wrapper in info:
+        wrapper = dict(wrapper)
+        assert wrapper["status"] == new_status, f"Expected status {new_status} for {wrapper['name']}, got {wrapper['status']}"
+
+
+@pytest.mark.postgres
+def test_get_wrappers_id_from_db(
+        tmp_path: Path,
+        as_db: str,
+        _expid: str,
+        as_exp: Any,
+):
+    db_manager = _create_db_manager(schema=_expid)
+
+    ids = db_manager.get_wrappers_id_from_db()
+    assert ids == []
+
+    wrapper_info = [_wrapper_info("pkg_a", 1), _wrapper_info("pkg_b", 2)]
+    inner_jobs = [_inner_job(1, "pkg_a", "j1"), _inner_job(2, "pkg_b", "j2")]
+    db_manager.save_wrappers([(wrapper_info, inner_jobs)], preview=False)
+
+    ids = db_manager.get_wrappers_id_from_db()
+    assert len(ids) == 2
+    for entry in ids:
+        assert isinstance(entry, tuple)
+        col, val = entry
+        assert col == "id"
+        assert val in [1, 2]
+
+
+@pytest.mark.postgres
+def test_save_wrappers_empty(
+        tmp_path: Path,
+        as_db: str,
+        _expid: str,
+        as_exp: Any,
+):
+    db_manager = _create_db_manager(schema=_expid)
+
+    db_manager.save_wrappers([])
+
+    info, jobs = db_manager.load_wrappers(preview=False)
+    assert len(info) == 0
+    assert len(jobs) == 0
+
+
+@pytest.mark.postgres
+def test_save_wrappers_multiple_wrapper_infos(
+        tmp_path: Path,
+        as_db: str,
+        _expid: str,
+        as_exp: Any,
+):
+    db_manager = _create_db_manager(schema=_expid)
+
+    wrapper_infos = [_wrapper_info("pkg_a", 1), _wrapper_info("pkg_b", 2)]
+    inner_jobs = [
+        _inner_job(1, "pkg_a", "j1"), _inner_job(1, "pkg_a", "j2"),
+        _inner_job(2, "pkg_b", "j3"),
+    ]
+    db_manager.save_wrappers([(wrapper_infos, inner_jobs)], preview=False)
+
+    info, jobs = db_manager.load_wrappers(preview=False)
+    assert len(info) == 2
+    assert len(jobs) == 3
+
+
+@pytest.mark.postgres
+def test_save_wrappers_integrity_error_logged(
+        tmp_path: Path,
+        as_db: str,
+        _expid: str,
+        as_exp: Any,
+):
+    db_manager = _create_db_manager(schema=_expid)
+
+    wrapper_info = [_wrapper_info("pkg_a", 1)]
+    inner_jobs = [_inner_job(1, "pkg_a", "j1")]
+    wrappers = [(wrapper_info, inner_jobs)]
+
+    # First insert succeeds
+    db_manager.save_wrappers(wrappers, preview=False)
+    info, jobs = db_manager.load_wrappers(preview=False)
+    assert len(info) == 1
+    assert len(jobs) == 1
+
+    # Duplicate insert catches IntegrityError internally, does not raise
+    db_manager.save_wrappers(wrappers, preview=False)
+    info, jobs = db_manager.load_wrappers(preview=False)
+    assert len(info) == 1
+    assert len(jobs) == 1

@@ -180,7 +180,12 @@ JobsTable = Table(
     Column("remote_logs_out", String),
     Column("remote_logs_err", String),
     Column("updated_log", Integer),
+    Column("updated_stats", Integer),
     Column("fail_count", Integer, nullable=False, default=0),
+    Column("retrials", Integer, nullable=False, default=0),
+    Column("log_recovery_call_count", Integer, nullable=False, default=0),
+    Column("wrapper_type", Text, nullable=True, default=None),
+    Column("wallclock", String),
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
     Column("platform_name", String),
@@ -245,12 +250,14 @@ def create_wrapper_tables(name, metadata_obj_):
         Column("remote_logs_out", String),  # TODO: We should recover the log from the remote at some point
         Column("remote_logs_err", String),  # TODO: We should recover the log from the remote at some point
         Column("updated_log", Integer),  # TODO: We should recover the log from the remote at some point
+        Column("updated_stats", Integer),
         Column("platform_name", String),
         Column("wallclock", String),
         Column("num_processors", Integer),
         Column("type", Text),
         Column("sections", Text),
         Column("method", Text),
+        Column("run_id", Integer, nullable=True),
     )
 
     table_jobs_inside_wrapper = Table(
@@ -258,8 +265,9 @@ def create_wrapper_tables(name, metadata_obj_):
         metadata_obj_,
         Column("package_id", Integer, nullable=False, primary_key=True),
         Column("package_name", String, nullable=False, primary_key=True),
-        Column("job_name", String, ForeignKey("jobs.name"), nullable=False, primary_key=True),
+        Column("job_name", String, nullable=False, primary_key=True),
         Column("timestamp", String, nullable=True),
+        Column("run_id", Integer, nullable=True),
         UniqueConstraint("package_id", "package_name", "job_name", name=f"unique_{name}_jobs_package_id_package_name_job_name"),
 
     )
