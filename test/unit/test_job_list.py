@@ -587,7 +587,7 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
     package.sections = "bla"
     package.method = "bla"
     package.wrapper_type = "bla"
-    package.num_processors = 1
+    package._num_processors = 1
 
 
 
@@ -603,7 +603,6 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
     assert '999' not in fake_job_list.job_package_map
 
 
-@pytest.mark.parametrize("wrapper_job_is_none", [False, True])
 def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     """recover_last_data migrates and queries an old-schema database without crashing."""
     db_dir = tmp_path / "metadata" / "data"

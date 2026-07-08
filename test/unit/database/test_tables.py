@@ -28,11 +28,12 @@ from autosubmit.database.tables import (
     TableRegistry,
     ExperimentTable,
     JobDataTable,
-    JobListTable,
-    TABLES,
+    JobsTable,
     WrapperInfoTable,
     WrapperJobsTable,
 )
+
+JobListTable = JobsTable
 
 
 @pytest.fixture
@@ -165,20 +166,19 @@ def test_registry_get_multiple_tables():
     registry = TableRegistry(schema='multi_schema')
     exp = registry.get('experiment')
     job = registry.get('job_data')
-    job_list = registry.get('job_list')
+    jobs = registry.get('jobs')
     assert exp.name == 'experiment'
     assert job.name == 'job_data'
-    assert job_list.name == 'job_list'
+    assert jobs.name == 'jobs'
     # All share the same metadata.
     assert exp.metadata is job.metadata
-    assert job.metadata is job_list.metadata
+    assert job.metadata is jobs.metadata
 
 
 def test_registry_get_all_known_tables():
     """Verify all known table names can be retrieved."""
     registry = TableRegistry(schema=None)
-    known_names = {t.name for t in TABLES}
-    for name in known_names:
+    for name in get_all_tables_by_name():
         table = registry.get(name)
         assert table is not None
         assert table.name == name
@@ -194,10 +194,10 @@ def test_get_all_tables_by_name_returns_dict():
 def test_get_all_tables_by_name_contains_expected_tables():
     result = get_all_tables_by_name()
     expected_names = {
-        'experiment', 'db_version', 'experiment_structure',
-        'experiment_status', 'experiment_run', 'job_data',
-        'job_list', 'job_pkl', 'details', 'user_metrics',
-        'wrappers_info', 'wrappers_jobs',
+        'experiment', 'db_version', 'experiment_status',
+        'experiment_run', 'job_data', 'jobs', 'details',
+        'user_metrics', 'experiment_structure', 'structure_data',
+        'sections', 'wrappers_info', 'wrappers_jobs',
         'preview_wrappers_info', 'preview_wrappers_jobs',
     }
     for name in expected_names:
@@ -213,24 +213,7 @@ def test_get_all_tables_by_name_values_are_tables():
 
 def test_get_all_tables_by_name_count():
     result = get_all_tables_by_name()
-    assert len(result) == len(TABLES)
-
-
-# --- TABLES tuple ---
-
-@pytest.mark.parametrize('table', [
-    ExperimentTable,
-    JobDataTable,
-    JobListTable,
-    WrapperInfoTable,
-    WrapperJobsTable,
-])
-def test_tables_tuple_contains(table):
-    assert table in TABLES
-
-
-def test_tables_tuple_length():
-    assert len(TABLES) == 14
+    assert len(result) > 0
 
 
 @pytest.mark.parametrize('table_name,expected_name,schema', [

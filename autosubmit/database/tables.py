@@ -332,10 +332,17 @@ def get_table_from_name(*, schema: Optional[str], table_name: str) -> Table:
     """Get a new Table instance with the given schema and table name from the registry.
 
     :param schema: Optional schema name.
-    :param table_name: Name of the table to retrieve.
+    :param table_name: Name of the table to retrieve (case-insensitive).
     :return: A new SQLAlchemy Table instance.
     """
-    return get_table_with_schema(schema, get_all_tables_by_name()[table_name])
+    all_tables = get_all_tables_by_name()
+    if table_name not in all_tables:
+        lower_map = {k.lower(): k for k in all_tables}
+        if table_name.lower() in lower_map:
+            table_name = lower_map[table_name.lower()]
+        else:
+            raise KeyError(f"No table definition found for '{table_name}'.")
+    return get_table_with_schema(schema, all_tables[table_name])
 
 
 def get_all_tables_by_name() -> dict[str, Table]:

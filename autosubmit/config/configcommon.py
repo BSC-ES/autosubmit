@@ -39,6 +39,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
 
 
@@ -1893,6 +1894,7 @@ class AutosubmitConfig(object):
                                                  self.load_config_file(self.misc_data, Path(filename), load_misc=True))
             self.load_current_hpcarch_parameters()
             self.load_workflow_commit()
+            self.calculate_auto_splits()
             self.dynamic_variables = {}
             self.set_default_parameters()
 
@@ -2596,6 +2598,16 @@ class AutosubmitConfig(object):
         """
         return int(self.get_section(['CONFIG', 'SAFETYSLEEPTIME'], 10))
 
+    def set_safetysleeptime(self, sleep_time: int):
+        """Sets the safety sleep time in the config file.
+
+        :param sleep_time: value to set
+        :type sleep_time: int
+        """
+        content = open(self._conf_parser_file).read()
+        content = content.replace(re.search('SAFETYSLEEPTIME:.*', content).group(0), "SAFETYSLEEPTIME: %d" % sleep_time)
+        open(self._conf_parser_file, 'w').write(content)
+
     def get_retrials(self):
         """Returns max number of retrials for job from autosubmit's config file.
 
@@ -2768,9 +2780,7 @@ class AutosubmitConfig(object):
          :return: wrapper check time
          :rtype: int
          """
-        wrapper = self.experiment_data.get("WRAPPERS", {})
-
-        return wrapper.get("CHECK_TIME_WRAPPER", self.get_safetysleeptime())
+        return self.experiment_data.get("WRAPPERS", {}).get("CHECK_TIME_WRAPPER", 0)
 
     def get_wrapper_machinefiles(self, wrapper=None) -> str:
         """Returns the strategy for creating the machinefiles in wrapper jobs.
@@ -2927,6 +2937,33 @@ class AutosubmitConfig(object):
                 raise Exception(
                     "{}\n This file and the correctness of its content are necessary.".format(str(exp)))
         return parser
+
+    def calculate_auto_splits(self):
+        """Calculate automatic splits for chunked jobs.
+        Takes the "auto" value in the "SPLITS" key of chunked jobs and replaces it by a dict containing the number of splits by each month
+        """
+        datelist = self.experiment_data.get("EXPERIMENT", {}).get("DATELIST", "")
+        chunks = int(self.experiment_data.get("EXPERIMENT", {}).get("NUMCHUNKS", 1))
+        if not datelist or not chunks:
+            return
+
+        if isinstance(datelist, str) or isinstance(datelist, int):
+            datelist = str(datelist).split()
+
+        for section_name, section_data in self.jobs_data.items():
+            if section_data.get("RUNNING", "once") != "chunk":
+                continue
+
+            if section_data.get("SPLITS", None) == "auto":
+                splits = {}
+                for date_str in datelist:
+                    splits[date_str] = []
+                    date = datetime.strptime(date_str, '%Y%m%d')
+                    Log.debug(f"Calculating splits for {section_name} on date {date_str} with {chunks} chunks...This may take a while")
+                    for chunk in range(1, chunks + 1):
+                        splits[date_str].append(calendar_chunk_section(self.experiment_data, section_name, date, chunk))
+
+                self.experiment_data["JOBS"][section_name]["SPLITS"] = splits
 
     def get_wrapped_jobs(self) -> list[str]:
         """Return the jobs that should be wrapped.

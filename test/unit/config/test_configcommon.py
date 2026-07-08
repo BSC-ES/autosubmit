@@ -661,6 +661,26 @@ def test_check_autosubmit_conf(autosubmit_config, exp_data, invalid_settings):
 
 
 
+def test_set_safetysleeptime_updates_file(autosubmit_config, tmp_path: Path) -> None:
+    """Ensure set_safetysleeptime replaces the existing SAFETYSLEEPTIME line."""
+    as_conf = autosubmit_config(expid='a000', experiment_data={})
+    as_conf._conf_parser_file = tmp_path / "config.txt"
+    initial = (
+        "SOME_SETTING: whatever\n"
+        "SAFETYSLEEPTIME: 10\n"
+        "OTHER: value\n"
+    )
+    as_conf._conf_parser_file.write_text(initial)
+    as_conf.set_safetysleeptime(25)
+    content = as_conf._conf_parser_file.read_text()
+    expected = (
+        "SOME_SETTING: whatever\n"
+        "SAFETYSLEEPTIME: 25\n"
+        "OTHER: value\n"
+    )
+    assert content == expected
+
+
 @pytest.mark.parametrize(
     "storage_type,expected",
     [
