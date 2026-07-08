@@ -23,11 +23,11 @@ from shutil import copy2
 import pytest
 
 import autosubmit.history.utils as HUtils
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers.experiment_history_db_manager import ExperimentHistoryDbManager
 from autosubmit.history.database_managers.experiment_status_db_manager import ExperimentStatusDbManager
-from autosubmit.config.basicconfig import BasicConfig
 
 EXPID_TT00_SOURCE = "test_database.db~"
 EXPID_TT01_SOURCE = "test_database_no_run.db~"
@@ -250,3 +250,14 @@ class TestExperimentHistoryDbManager:
     def test_if_database_exists(self):
         exp_manager = ExperimentHistoryDbManager("0000")
         assert exp_manager.my_database_exists() is False
+
+
+def test_create_path_if_not_exists(tmp_path):
+    new_path = tmp_path / 'new_dir'
+    assert not new_path.exists()
+    created = HUtils.create_path_if_not_exists(str(new_path))
+    assert created
+    assert new_path.exists()
+    created = HUtils.create_path_if_not_exists(str(new_path))
+    assert not created
+    assert new_path.exists()

@@ -55,6 +55,7 @@ from autosubmit.database.db_common import (
     create_db, get_experiment_description, get_autosubmit_version, check_experiment_exists,
     update_experiment_description_version, get_experiment_expids
 )
+from autosubmit.database.db_manager_historical import HistoricalDbManager
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.experiment.experiment_common import (
@@ -2387,7 +2388,13 @@ class Autosubmit:
 
     @staticmethod
     def save_historical_edges(expid):
-        """Function to save the historical edges to a separate historical database (PR II)."""
+        """Function to save the historical edges to a separate historical database.
+
+        :param expid: a string with the experiment id
+        :return: None
+        """
+        exp_history = HistoricalDbManager(schema=expid, job_manager=JobsDbManager(schema=expid))
+        exp_history.save_historical_edges()
 
     @staticmethod
     def finish_current_experiment_run(expid):
