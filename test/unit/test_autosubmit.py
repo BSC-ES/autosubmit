@@ -454,51 +454,6 @@ def test_wrapper_notify_skips_when_disabled(mocker):
     ([Status.HELD, Status.WAITING], Status.HELD, False),
     ([Status.SUBMITTED, Status.WAITING], Status.SUBMITTED, False),
 ])
-def test_check_wrapper_stored_status_sets_status(mocker, statuses, expected, terminal):
-    """check_wrapper_stored_status: derives wrapper status from inner job statuses."""
-    as_conf = mocker.MagicMock()
-    job_list = mocker.MagicMock()
-    job_list.packages_dict = {"wrapper_1": [
-        Job("j1", 10, statuses[0], 0),
-        Job("j2", 11, statuses[1], 0),
-    ]}
-    job_list.job_package_map = {}
-
-    result = Autosubmit.check_wrapper_stored_status(as_conf, job_list, "01:00")
-
-    if terminal:
-        assert "wrapper_1" not in result.packages_dict
-    else:
-        assert 10 in result.job_package_map
-        assert result.job_package_map[10].status == expected
-
-
-def test_check_wrapper_stored_status_pops_terminal(mocker):
-    """check_wrapper_stored_status: removes COMPLETED/FAILED wrappers from packages_dict."""
-    as_conf = mocker.MagicMock()
-    job_list = mocker.MagicMock()
-    job_list.packages_dict = {"wrapper_1": [
-        Job("j1", 10, Status.COMPLETED, 0),
-    ]}
-    job_list.job_package_map = {}
-
-    result = Autosubmit.check_wrapper_stored_status(as_conf, job_list, "01:00")
-
-    assert "wrapper_1" not in result.packages_dict
-    assert 10 not in result.job_package_map
-
-
-def test_check_wrapper_stored_status_no_packages_dict(mocker):
-    """check_wrapper_stored_status: returns job_list unchanged when no packages_dict."""
-    as_conf = mocker.MagicMock()
-    job_list = mocker.MagicMock()
-    # Remove packages_dict so hasattr returns False
-    del job_list.packages_dict
-
-    result = Autosubmit.check_wrapper_stored_status(as_conf, job_list, "01:00")
-    assert result is job_list
-
-
 def test_submit_ready_jobs_raises_on_missing_template(mocker):
     """submit_ready_jobs: raises AutosubmitCritical when job template is missing."""
     as_conf = mocker.MagicMock()

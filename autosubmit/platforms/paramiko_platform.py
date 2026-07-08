@@ -864,6 +864,27 @@ class ParamikoPlatform(Platform):
             final_job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
         return final_job_names
 
+    def get_failed_job_names(self, job_names_provided: Optional[list[str]] = None) -> list[str]:
+        """Retrieve the names of all files ending with '_FAILED' from the remote log directory using SSH.
+
+        :param job_names_provided: If provided, filters the results to include only these job names.
+        :type job_names_provided: Optional[List[str]]
+        :return: List of job names with FAILED files.
+        :rtype: List[str]
+        """
+        job_names = []
+        if self.expid in str(self.remote_log_dir):
+            if not job_names_provided:
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_FAILED' -type f"
+            else:
+                patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names_provided])
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+            self.send_command(cmd)
+            output = self.get_ssh_output()
+            completed_files = output.strip().split('\n') if output else []
+            job_names = [Path(file).name.replace('_FAILED', '') for file in completed_files]
+        return job_names
+
     def delete_previous_run_files_by_job_names(self, job_names: list[str]) -> None:
         """Deletes the COMPLETED, FAILED for the given job names.
 

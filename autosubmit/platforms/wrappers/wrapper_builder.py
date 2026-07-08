@@ -20,7 +20,6 @@ import string
 import textwrap
 
 
-
 class WrapperDirector:
     """
     Construct an object using the Builder interface.

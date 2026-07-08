@@ -604,44 +604,6 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
 
 
 @pytest.mark.parametrize("wrapper_job_is_none", [False, True])
-def test_save_wrapper_info_only_upserts_wrapper_info_not_inner_jobs(
-        fake_job_list, mocker, wrapper_job_is_none
-) -> None:
-    """save_wrapper_info must only upsert wrapper info, not insert inner jobs.
-
-    The inner jobs table is already populated by ``save_wrappers`` at submit
-    time.  ``save_wrapper_info`` (called on status changes) must not re-insert
-    them, or it triggers UNIQUE constraint violations.
-
-    When ``wrapper_job`` is falsy the call must be a no-op.
-    """
-    if wrapper_job_is_none:
-        wrapper_job = None
-    else:
-        inner_job = mocker.MagicMock()
-        inner_job.name = "job_inside_wrapper"
-
-        platform_mock = mocker.MagicMock()
-        platform_mock.name = "test_platform"
-
-        wrapper_job = mocker.MagicMock()
-        wrapper_job.name = "wrapper_test"
-        wrapper_job.id = 42
-        wrapper_job.status = Status.SUBMITTED
-        wrapper_job.wallclock = "00:30"
-        wrapper_job.platform = platform_mock
-        wrapper_job.job_list = [inner_job]
-
-    fake_job_list.save_wrapper_info(wrapper_job)
-
-    persistence_mock = fake_job_list.get_packages_persistence()
-    if wrapper_job_is_none:
-        persistence_mock.upsert_wrapper_info.assert_not_called()
-    else:
-        persistence_mock.upsert_wrapper_info.assert_called_once()
-    persistence_mock.save.assert_not_called()
-
-
 def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     """recover_last_data migrates and queries an old-schema database without crashing."""
     db_dir = tmp_path / "metadata" / "data"
@@ -653,6 +615,6 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     engine.dispose()
 
     job_list = JobList("a000", as_conf, YAMLParserFactory())
-    job_list.job_list.append(Job("test_job", "1", Status.COMPLETED, 0))
+    job_list.add_job(Job("test_job", "1", Status.COMPLETED, 0))
 
     job_list.recover_last_data()

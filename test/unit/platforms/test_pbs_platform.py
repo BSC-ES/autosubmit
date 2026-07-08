@@ -98,7 +98,6 @@ def create_packages(as_conf, pbs_platform):
         job.platform_name = pbs_platform.name
         job.processors = 2
         job.section = "dummysection"
-        job._init_runtime_parameters()
         job.wallclock = "00:01"
     packages = [
         JobPackageSimple(simple_jobs_1),

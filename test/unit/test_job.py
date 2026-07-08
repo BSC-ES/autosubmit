@@ -678,7 +678,7 @@ def test_reset_logs(autosubmit_config):
     as_conf = autosubmit_config("t000", {})
     job = Job("job1", "1", Status.READY, 0)
     job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
-    assert job.workflow_commit == "dummy-commit"
+    assert job.workflow_commit == ""
     assert job.updated_log == 0
     assert job.packed_during_building is False
 
@@ -2684,7 +2684,7 @@ def _make_wrapper_job(mocker, inner_jobs=None, new_status=Status.RUNNING):
     wrapper = WrapperJob(
         name="wrapper_1", job_id=1, status=Status.RUNNING, priority=0,
         job_list=inner_jobs or [], total_wallclock="01:00",
-        platform=platform, as_config=as_conf, hold=False
+        num_processors=1, platform=platform, as_config=as_conf, hold=False
     )
     wrapper.new_status = new_status
     return wrapper

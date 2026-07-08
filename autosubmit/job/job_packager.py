@@ -353,7 +353,7 @@ class JobPackager(object):
         """
         all_wrapped = self._get_wrapped_sections(self.jobs_in_wrapper)
 
-        for job in self._jobs_list._job_list:
+        for job in self._jobs_list.job_list:
             if job.section.upper() in all_wrapped:
                 continue
             if job.status in (Status.READY, Status.RUNNING, Status.QUEUING,
