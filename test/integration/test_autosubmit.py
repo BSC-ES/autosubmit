@@ -461,7 +461,7 @@ def test_monitor_with_check_wrapper(autosubmit_exp):
     as_conf = AutosubmitConfig(exp.expid, BasicConfig, YAMLParserFactory())
     as_conf.check_conf_files(True)
     job_list = Autosubmit.load_job_list(exp.expid, as_conf, monitor=True, new=False)
-    job_list.save()
+    job_list.save_jobs()
 
     result = Autosubmit.monitor(exp.expid, file_format='pdf', lst='', filter_chunks='',
                                 filter_status='', filter_section='', hide=True,
@@ -477,7 +477,7 @@ def test_set_status_with_detail(autosubmit_exp):
     as_conf.check_conf_files(True)
     job_list = Autosubmit.load_job_list(exp.expid, as_conf, monitor=True, new=False)
     job_name = job_list.get_job_list()[0].name
-    job_list.save()
+    job_list.save_jobs()
 
     result = Autosubmit.set_status(
         exp.expid, noplot=True, save=True, final='WAITING',

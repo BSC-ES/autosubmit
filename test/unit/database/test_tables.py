@@ -29,8 +29,6 @@ from autosubmit.database.tables import (
     ExperimentTable,
     JobDataTable,
     JobsTable,
-    WrapperInfoTable,
-    WrapperJobsTable,
 )
 
 JobListTable = JobsTable

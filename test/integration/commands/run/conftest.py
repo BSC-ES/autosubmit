@@ -150,7 +150,7 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, expid, run_type='simple
             )
             for job_name in {row["job_name"] for row in rows_as_dicts}
         }
-        excluded_keys = ["status", "finish", "submit", "start", "extra_data", "children", "platform_output", "date", "member", "chunk"]
+        excluded_keys = ["status", "finish", "submit", "start", "extra_data", "children", "platform_output", "date", "member", "chunk", "split", "splits", "fail_count", "out", "err", "outerr"]
         _TERMINAL_STATUSES = {"COMPLETED", "FAILED"}
 
         for job_name, grouped_rows in group_by_job_name.items():

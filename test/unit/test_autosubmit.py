@@ -237,9 +237,7 @@ def test_check_non_wrapped_jobs_calls_platform_and_updates_status(
         return Status.COMPLETED
 
     mocker.patch.object(JobClass, 'update_status', mock_update_status)
-    # Avoid hitting the filesystem – save() would try to pickle to a tmp path.
-    mocker.patch.object(fake_job_list, 'save')
-    # Simulate new_status differing so update_status is called.
+    mocker.patch.object(fake_job_list, 'save_jobs')
     job1.new_status = Status.COMPLETED
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, 'a000')
@@ -300,10 +298,10 @@ def test_check_non_wrapped_jobs_empty_platform_jobs(mocker, fake_job_list, fake_
     """check_non_wrapped_jobs: skips platform when no non-wrapped jobs exist."""
     as_conf = mocker.MagicMock()
     fake_job_list.job_package_map = {10: "wrapper"}
+    mocker.patch.object(fake_job_list, 'get_wrappers_id_from_db', return_value=[10])
     job = Job("a000_20000101_fc0_1_SIM", 10, Status.RUNNING, 0)
     job.platform = fake_platform
     fake_job_list.add_job(job)
-    # job.id (10) is in job_package_map, so platform_jobs will be empty
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")
 
@@ -326,7 +324,7 @@ def test_check_non_wrapped_jobs_notifies_on_change(mocker, fake_job_list, fake_p
         return Status.COMPLETED
 
     mocker.patch.object(Job, "update_status", mock_update_status)
-    mocker.patch.object(fake_job_list, "save")
+    mocker.patch.object(fake_job_list, "save_jobs")
     mock_notify = mocker.patch.object(Autosubmit, "job_notify")
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")
@@ -388,7 +386,7 @@ def test_check_non_wrapped_jobs_no_status_change(mocker, fake_job_list, fake_pla
     job.new_status = Status.RUNNING  # same as status
     fake_job_list.add_job(job)
 
-    mocker.patch.object(fake_job_list, "save")
+    mocker.patch.object(fake_job_list, "save_jobs")
     mock_notify = mocker.patch.object(Autosubmit, "job_notify")
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")

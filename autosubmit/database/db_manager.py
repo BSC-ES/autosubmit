@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Contains code to manage a database via SQLAlchemy."""
-import os
 from pathlib import Path
 from typing import Any, Optional, cast, List, Dict, Union
 

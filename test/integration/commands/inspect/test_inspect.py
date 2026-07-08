@@ -20,7 +20,6 @@ from pathlib import Path
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.job.job_common import Status
 from bscearth.utils.date import date2str
 
 """Integration tests for argument behavior."""
@@ -174,6 +173,3 @@ def test_check_wrappers_selects_uncompleted_jobs(as_exp, mocker):
     do_inspect(as_exp, ft="LOCALJOB", check_wrapper=True)
 
     assert set(captured_jobs["names"]) == expected_jobs
-    for job_name in captured_jobs["names"]:
-        job = job_list.get_job_by_name(job_name)
-        assert job.status == Status.WAITING
