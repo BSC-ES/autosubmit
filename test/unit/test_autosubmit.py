@@ -230,7 +230,7 @@ def test_check_non_wrapped_jobs_calls_platform_and_updates_status(
 
     job1 = Job('a000_20000101_fc0_1_SIM', 10, Status.RUNNING, 0)
     job1.platform = fake_platform
-    fake_job_list._job_list.append(job1)
+    fake_job_list.add_job(job1)
 
     def mock_update_status(self, conf):
         self.status = Status.COMPLETED
@@ -245,7 +245,7 @@ def test_check_non_wrapped_jobs_calls_platform_and_updates_status(
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, 'a000')
 
     fake_platform.check_all_jobs.assert_called_once()
-    fake_job_list.save.assert_called_once()
+    fake_job_list.save_jobs.assert_called_once()
 
 
 @pytest.mark.parametrize("status,elapsed,should_check", [
@@ -293,7 +293,7 @@ def test_manage_wrapper_job_saves_on_change(mocker):
 
     Autosubmit.manage_wrapper_job(as_conf, job_list, wrapper_job)
 
-    job_list.save.assert_called_once()
+    job_list.save_jobs.assert_called_once()
 
 
 def test_check_non_wrapped_jobs_empty_platform_jobs(mocker, fake_job_list, fake_platform):
@@ -302,7 +302,7 @@ def test_check_non_wrapped_jobs_empty_platform_jobs(mocker, fake_job_list, fake_
     fake_job_list.job_package_map = {10: "wrapper"}
     job = Job("a000_20000101_fc0_1_SIM", 10, Status.RUNNING, 0)
     job.platform = fake_platform
-    fake_job_list._job_list.append(job)
+    fake_job_list.add_job(job)
     # job.id (10) is in job_package_map, so platform_jobs will be empty
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")
@@ -319,7 +319,7 @@ def test_check_non_wrapped_jobs_notifies_on_change(mocker, fake_job_list, fake_p
     job.platform = fake_platform
     job.new_status = Status.COMPLETED
     job.prev_status = Status.QUEUING  # differs from current status
-    fake_job_list._job_list.append(job)
+    fake_job_list.add_job(job)
 
     def mock_update_status(self, conf):
         self.status = Status.COMPLETED
@@ -336,6 +336,7 @@ def test_check_non_wrapped_jobs_notifies_on_change(mocker, fake_job_list, fake_p
 
 def test_finish_current_experiment_run(mocker):
     """finish_current_experiment_run: delegates to ExperimentHistory."""
+    mocker.patch("autosubmit.autosubmit.Autosubmit.save_historical_edges")
     mock_exp_hist = mocker.patch("autosubmit.autosubmit.ExperimentHistory")
     Autosubmit.finish_current_experiment_run("a000")
     mock_exp_hist.return_value.finish_current_experiment_run.assert_called_once()
@@ -385,14 +386,14 @@ def test_check_non_wrapped_jobs_no_status_change(mocker, fake_job_list, fake_pla
     job = Job("a000_20000101_fc0_1_SIM", 10, Status.RUNNING, 0)
     job.platform = fake_platform
     job.new_status = Status.RUNNING  # same as status
-    fake_job_list._job_list.append(job)
+    fake_job_list.add_job(job)
 
     mocker.patch.object(fake_job_list, "save")
     mock_notify = mocker.patch.object(Autosubmit, "job_notify")
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")
 
-    fake_job_list.save.assert_not_called()
+    fake_job_list.save_jobs.assert_not_called()
     mock_notify.assert_not_called()
 
 
@@ -446,14 +447,6 @@ def test_wrapper_notify_skips_when_disabled(mocker):
     mock_job_notify.assert_not_called()
 
 
-@pytest.mark.parametrize("statuses,expected,terminal", [
-    ([Status.COMPLETED, Status.COMPLETED], Status.COMPLETED, True),
-    ([Status.RUNNING, Status.WAITING], Status.RUNNING, False),
-    ([Status.FAILED, Status.WAITING], Status.FAILED, True),
-    ([Status.QUEUING, Status.WAITING], Status.QUEUING, False),
-    ([Status.HELD, Status.WAITING], Status.HELD, False),
-    ([Status.SUBMITTED, Status.WAITING], Status.SUBMITTED, False),
-])
 def test_submit_ready_jobs_raises_on_missing_template(mocker):
     """submit_ready_jobs: raises AutosubmitCritical when job template is missing."""
     as_conf = mocker.MagicMock()

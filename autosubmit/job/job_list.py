@@ -3241,7 +3241,9 @@ class JobList(object):
         """
         job.packed = False
         if job.id and self.job_package_map and int(job.id) in self.job_package_map:
-            job.packed = True
+            wrapper_job = self.job_package_map[int(job.id)]
+            if wrapper_job.status not in (Status.COMPLETED, Status.FAILED):
+                job.packed = True
         return job.packed
 
     def _update_failed_jobs(self, as_conf: AutosubmitConfig) -> bool:
