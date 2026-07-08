@@ -1241,3 +1241,44 @@ def test_apply_splits_filter(as_conf, filter_value, split_values, child_split, e
     result = dictionary._apply_splits_filter(parents, child, filter_value, {})
     assert child.name not in {j.name for j in result}
     assert {j.split for j in result} == expected_splits
+
+
+@pytest.mark.parametrize("relationships_input,expected", [
+    pytest.param(
+        {"DATES_TO": "20220101", "MEMBERS_TO": "fc0"},
+        {"DATES_TO": "20220101", "MEMBERS_TO": "fc0"},
+        id="keeps_to_keys",
+    ),
+    pytest.param(
+        {
+            "STATUS": "COMPLETED", "FAIL_OK": False, "OPTIONAL": True,
+            "FROM_STEP": 0, "MIN_TRIGGER_STATUS": "COMPLETED",
+            "ANY_FINAL_STATUS_IS_VALID": True,
+            "DATES_TO": "20220101",
+        },
+        {"DATES_TO": "20220101"},
+        id="filters_out_non_to_keys",
+    ),
+    pytest.param(
+        {"FAIL_OK": True, "OPTIONAL": False, "FROM_STEP": 5},
+        {},
+        id="only_non_to_keys_returns_empty",
+    ),
+    pytest.param({}, {}, id="empty_input_returns_empty"),
+    pytest.param(
+        {"DATES_TO": "natural", "MEMBERS_TO": "natural",
+         "CHUNKS_TO": "natural", "SPLITS_TO": "natural"},
+        {},
+        id="all_natural_returns_empty",
+    ),
+    pytest.param(
+        {"DATES_TO": "natural", "MEMBERS_TO": "fc0"},
+        {"DATES_TO": "natural", "MEMBERS_TO": "fc0"},
+        id="mixed_natural_and_non_natural",
+    ),
+])
+def test_get_filters_to_apply(joblist, mocker, relationships_input, expected):
+    mocker.patch.object(joblist, "_filter_current_job", return_value=relationships_input)
+    dependency = Dependency(section="test")
+    result = joblist.get_filters_to_apply(mocker.Mock(), dependency)
+    assert result == expected

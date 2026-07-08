@@ -36,9 +36,7 @@ def setup_job_list(autosubmit_exp, tmpdir, mocker):
     as_conf.experiment_data["JOBS"] = dict()
     as_conf.experiment_data["PLATFORMS"] = dict()
 
-    basic_config = as_conf.basic_config
-
-    job_list = JobList(as_exp.expid, basic_config, YAMLParserFactory())
+    job_list = JobList(as_exp.expid, as_conf, YAMLParserFactory())
 
     dummy_serial_platform = mocker.MagicMock()
     dummy_serial_platform.name = 'serial'

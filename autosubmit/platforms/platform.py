@@ -726,21 +726,18 @@ class Platform:
     def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
         return True
 
-    def get_stat_file(self, job, count=-1):
-        if count == -1:  # No internal retrials
-            filename = f"{job.stat_file}{job.fail_count}"
-        else:
-            filename = f'{job.name}_STAT_{str(count)}'
+    def get_stat_file(self, job, attempt: int):
+        filename = f"{job.stat_file}{attempt}"
         stat_local_path = (Path(
             self.config.get("LOCAL_ROOT_DIR", ""),self.expid,
             self.config.get("LOCAL_TMP_DIR", ""), filename))
         if stat_local_path.exists():
-            os.remove(stat_local_path)
+            stat_local_path.unlink()
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
+                Log.debug(f'{job.name}_STAT_{str(attempt)} file have been transferred')
                 return True
-        Log.warning(f'{job.name}_STAT_{str(count)} file not found')
+        Log.warning(f'{job.name}_STAT_{str(attempt)} file not found')
         return False
 
     @autosubmit_parameter(name='current_logdir')
@@ -780,6 +777,14 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+        """Reads the JOBID from the first line of a remote log file.
+
+        :param remote_path: full remote path to the log file
+        :return: job ID if found, None otherwise
+        """
+        return None
+
     def add_job_to_log_recover(self, job):
         if job.id and int(job.id) != 0:
             if self.recovery_queue is None:
@@ -795,6 +800,8 @@ class Platform:
                         f"Skipping log recovery for {job.name}.")
                     return
                 self.recovery_queue.put(job, timeout=30)
+                if self.work_event is not None:
+                    self.work_event.set()
                 Log.debug(
                     f"Added job {job.name} and retry number:{job.fail_count} to the log recovery queue.")
             except Exception as e:
@@ -803,7 +810,6 @@ class Platform:
         else:
             Log.warning(
                 f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry. This shouldn't happen!")
-            job.updated_log += 1
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
@@ -834,7 +840,7 @@ class Platform:
         if self.ctx is None:
             self.ctx = self.get_mp_context()
 
-        if self.cleanup_event:
+        if self.cleanup_event is not None:
             self.cleanup_event.set()
 
         if self.log_recovery_process:
@@ -1022,31 +1028,38 @@ class Platform:
     def recover_job_log(self, jobs_db_manager: 'JobsDbManager', as_conf: 'AutosubmitConfig') -> None:
         """Recovers log files for jobs from the recovery queue and retries failed jobs.
         """
+        from autosubmit.job.job import Job
         if self.recovery_queue is None:
             raise AutosubmitCritical("As the recovery job was initialized some of"
                                      "the variable were not properly initialized")
         while not self.recovery_queue.empty():
-            from autosubmit.job.job import Job
-            job_data = self.recovery_queue.get(timeout=1)
+            job_data = self.recovery_queue.get(timeout=5)
             job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_data["name"]))
             job.platform_name = self.name  # Change the original platform to this process platform.
             job.platform = self
+            # TODO: handle missing job IDs (id=0). During an Autosubmit run, a job's log
+            # may fail to be retrieved. When recovery or setstatus or while running, later, it  tries to recover
+            # it, the job id is 0 because it was never persisted.
+            job.id = job_data["id"]
             report = job.retrieve_logfiles()
             job.send_cpmip_notification(self._as_conf)
 
             if not report.all_succeeded:
-                failed = [a for a in report.attempts if not a.success]
-                Log.warning(
-                    f"{self.name}(log_recovery): Job {job.name} had "
-                    f"{len(failed)} failed recovery attempt(s): "
-                    f"{[a.error for a in failed]}"
-                )
+                failed = [a for a in report.attempts if a.error and "Remote logs not found" not in a.error]
+                if len(failed) > 0:
+                    Log.warning(
+                        f"{self.name}(log_recovery): Job {job.name} had "
+                        f"{len(failed)} failed recovery attempt(s): "
+                        f"{[a.error for a in failed]}"
+                    )
+                attempts = len(report.attempts) - len(failed) - 1
             else:
+                attempts = len(report.attempts)
+            if attempts > 0:
                 Log.result(
                     f"{self.name}(log_recovery): Job {job.name} recovered "
                     f"{len(report.attempts)} attempt(s)."
                 )
-                Log.debug(repr(report))
             jobs_db_manager.save_job_log(job)
 
     def recover_platform_job_logs(self, as_conf: 'AutosubmitConfig') -> None:

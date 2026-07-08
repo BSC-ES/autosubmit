@@ -32,6 +32,9 @@ from autosubmit.database.tables import JobsTable, Table
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
 
+_LOG_EXCLUDE_KEYS = {
+    'updated_log', 'updated_stats'
+}
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
@@ -54,11 +57,16 @@ class JobsDbManager(DbManager):
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
         self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
-    def save_jobs(self, job_list: List["Job"]) -> None:
+    def save_jobs(self, job_list: List["Job"], reset_log_counters: bool = False) -> None:
         """Save the job list to the database.
 
+        Log columns are excluded from the upsert to preserve data written by
+        :meth:`save_job_log`.
+        
         :param job_list: List of Job objects to save to the database.
         :type job_list: List[Job]
+        :param reset_log_counters: Whether to reset log counters.
+        :type reset_log_counters: bool
 
         :return: None
         :raises: May raise database-related exceptions during upsert operations.
@@ -66,8 +74,16 @@ class JobsDbManager(DbManager):
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)
         persistent_data = [job.__getstate__() for job in job_list]
-        pkeys = ['name']
-        self.upsert_many(table.name, persistent_data, pkeys)
+
+        preserve_data: list = []
+        for d in persistent_data:
+            if reset_log_counters:
+                for k in _LOG_EXCLUDE_KEYS:
+                    d[k] = 0
+                d['log_recovery_call_count'] = 0
+            preserve_data.append(d)
+        if preserve_data:
+            self.upsert_many(table.name, preserve_data, ['name'], exclude_cols=list(_LOG_EXCLUDE_KEYS) if not reset_log_counters else None)
 
     def save_job_log(self, job: "Job") -> None:
         """Save only the log information of a single job to the database.
@@ -82,7 +98,7 @@ class JobsDbManager(DbManager):
         self.create_table(table.name)
         job_data: dict = job.__getstate__()
         where: dict = {'name': job.name}
-        log_keys = {'name', 'log', 'updated_log', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err'}
+        log_keys = {'name', 'log', 'updated_log', 'updated_stats', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err'}
         job_data = {k: v for k, v in job_data.items() if k in log_keys}
 
         self.update_where(table.name, job_data, where)
@@ -185,6 +201,15 @@ class JobsDbManager(DbManager):
             job_list = self.select_where_with_columns(table, condition)
         return job_list
 
+    def select_finished_jobs_needing_log_recovery(self) -> List[Dict[str, Any]]:
+        """Return COMPLETED/FAILED jobs whose updated_log <= fail_count."""
+        table: Table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        condition = and_(
+            table.c.status.in_(self._FINAL_STATUSES),
+            table.c.updated_log <= table.c.fail_count
+        )
+        return [dict(job) for job in self.select_where_with_columns(table, condition)]
     def select_children_jobs(
             self,
             job_list: List[Union[str, Any]],
@@ -385,12 +410,12 @@ class JobsDbManager(DbManager):
         preview_wrapper_info_table: Table = self.table_registry.get(PreviewWrapperInfoTable.name)
         wrapper_info_table: Table = self.table_registry.get(WrapperInfoTable.name)
 
-        self.drop_table(jobs_table.name)
-        self.drop_table(experiment_structure_table.name)
         self.drop_table(preview_wrapper_jobs_table.name)
         self.drop_table(wrapper_jobs_table.name)
         self.drop_table(preview_wrapper_info_table.name)
         self.drop_table(wrapper_info_table.name)
+        self.drop_table(jobs_table.name)
+        self.drop_table(experiment_structure_table.name)
 
     def save_sections_data(self, sections_data: List[Dict[str, Any]]) -> None:
         """
@@ -534,6 +559,16 @@ class JobsDbManager(DbManager):
         wrappers = self.select_all_with_columns(wrapper_info_table.name)
         return [wrapper[1] for wrapper in wrappers]
 
+
+    def reset_updated_logs(self) -> None:
+        """Reset updated_log and updated_stats to 0 for all jobs with fail_count == 0."""
+        table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        self.update_where(
+            table.name,
+            {'updated_log': 0, 'updated_stats': 0},
+            {'fail_count': 0}
+        )
 
     def get_failed_job_data(self) -> list[dict[str, Any]]:
         """Get the names of jobs that have failed.

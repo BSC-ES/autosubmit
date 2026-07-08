@@ -27,7 +27,7 @@ from test.integration.test_mail import (  # noqa: F401  (pytest fixture imports)
     configured_mail,
     fake_smtp_server,
 )
-from test.integration.test_utils.docker import get_mailhog_messages
+from test.integration.test_utils.docker_utils import get_mailhog_messages
 
 
 pytestmark = [pytest.mark.docker, pytest.mark.slurm, pytest.mark.ssh]

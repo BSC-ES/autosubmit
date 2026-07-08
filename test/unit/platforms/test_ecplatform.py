@@ -826,14 +826,12 @@ def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
 
     def _check_output(cmd: str, **_) -> bytes:
         downloaded.append(cmd)
-        # Create the local file with STAT content
         local_file = cmd.split()[-1]
-        Path(local_file).write_text("COMPLETED\n")
+        Path(local_file).write_text("1715769600\n1715769601\nCOMPLETED\n")
         return b""
 
     monkeypatch.setattr(subprocess, "check_output", _check_output)
 
-    # Create mock jobs
     class MockJob:
         def __init__(self, name: str, fail_count: int):
             self.name = name
@@ -842,12 +840,10 @@ def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
     job_list = [MockJob("t000_INI", 0), MockJob("t000_SIM", 0), MockJob("t000_MISSING", 0)]
     result = ec_platform.confirm_done_jobs_via_stat(job_list)
 
-    # Only the first two jobs have STAT files
     assert result["t000_INI"] == Status.COMPLETED
     assert result["t000_SIM"] == Status.COMPLETED
     assert "t000_MISSING" not in result
 
-    # Verify ecaccess-file-get was called for the existing STAT files
     assert any("t000_INI_STAT_0" in c for c in downloaded)
     assert any("t000_SIM_STAT_0" in c for c in downloaded)
     assert not any("t000_MISSING_STAT_0" in c for c in downloaded)
@@ -881,13 +877,11 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     def _check_output(cmd: str, **_) -> bytes:
         downloaded.append(cmd)
         local_file = cmd.split()[-1]
-        # Write an epoch timestamp as the first line
-        Path(local_file).write_text("1715769600\n")
+        Path(local_file).write_text("1715769500\n1715769600\n")
         return b""
 
     monkeypatch.setattr(subprocess, "check_output", _check_output)
 
-    # Create mock jobs
     class MockJob:
         def __init__(self, name: str, fail_count: int):
             self.name = name
@@ -899,13 +893,12 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     job_missing = MockJob("t000_MISSING", 0)
     ec_platform.set_start_time_from_remote_stat_file([job_ini, job_sim, job_missing])
 
-    # start_time_timestamp should be set for jobs that have STAT files
+    # start_time_timestamp comes from line 1 (L1) = 1715769600
     expected_timestamp = datetime.datetime.fromtimestamp(1715769600).strftime("%Y%m%d%H%M%S")
     assert job_ini.start_time_timestamp == expected_timestamp
     assert job_sim.start_time_timestamp == expected_timestamp
     assert job_missing.start_time_timestamp is None
 
-    # Verify ecaccess-file-get was called for the existing STAT files
     assert any("t000_INI_STAT_0" in c for c in downloaded)
     assert any("t000_SIM_STAT_0" in c for c in downloaded)
     assert not any("t000_MISSING_STAT_0" in c for c in downloaded)

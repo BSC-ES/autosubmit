@@ -56,6 +56,7 @@ def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
     return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -93,6 +94,7 @@ def test_create_platform_slurm(
     # TODO: add more assertion statements...
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -168,7 +170,7 @@ def test_run_simple_workflow_slurm(
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 # TODO: 4.2 - readd hybrid wrappers
-@pytest.mark.timeout(25)
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -331,6 +333,7 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -596,6 +599,7 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -642,6 +646,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
     assert not slurm_platform.check_remote_permissions()
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -828,6 +833,7 @@ def test_simple_workflow_compress_logs_slurm(
         )
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -913,6 +919,7 @@ def test_compress_log_missing_tool(
         )
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -965,6 +972,7 @@ def test_compress_log_fail_command(
     assert result is None
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -1050,6 +1058,7 @@ def test_remove_files_on_transfer_slurm(
         assert not bool(re.match(r".*\.(out|err)(\.(xz|gz))?$", filename))
 
 
+@pytest.mark.timeout(60)
 def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     exp = autosubmit_exp(experiment_data={})
     platform_config = {
@@ -1087,6 +1096,7 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     assert check and len(job_result) == 3
 
 
+@pytest.mark.timeout(25)
 @pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm

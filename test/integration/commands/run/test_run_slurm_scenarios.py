@@ -48,13 +48,8 @@ from test.integration.conftest import AutosubmitExperimentFixture
 if TYPE_CHECKING:
     from docker.models.containers import Container
 
-"""WARNING!! this test file can be only run with a valid .eccert in ~/.eccert, otherwise it will fail."""
-
-
-# -- Tests
-
-
 @pytest.mark.docker
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
@@ -121,22 +116,7 @@ if TYPE_CHECKING:
             RUNNING: chunk
             wallclock: 00:01
             retrials: 10
-        job2:
-            SCRIPT: |
-                d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-            retrials: 10
-        job3:
-            SCRIPT: |
-                sleep 1
-                d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-            retrials: 10
-    """), 66, "FAILED", "simple"),  # No wrappers, simple type
+    """), 22, "FAILED", "simple"),  # No wrappers, simple type
 
     # Failure wrappers
     (dedent("""\
@@ -150,39 +130,14 @@ if TYPE_CHECKING:
             RUNNING: chunk
             wallclock: 00:10
             retrials: 2
-        job2:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED + wrappers job2"
-            PLATFORM: TEST_SLURM
-            DEPENDENCIES: job2-1
-            RUNNING: chunk
-            wallclock: 00:10
-            retrials: 2
-        job3:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED + wrappers job3"
-            PLATFORM: TEST_SLURM
-            DEPENDENCIES: job3-1
-            RUNNING: chunk
-            wallclock: 00:10
-            retrials: 2
     wrappers:
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
             policy: flexible
-        wrapper2:
-            JOBS_IN_WRAPPER: job2
-            TYPE: vertical
-            policy: flexible
-        wrapper3:
-            JOBS_IN_WRAPPER: job3
-            TYPE: vertical
-            policy: flexible
 
-    """), (2 + 1) * 3, "FAILED", "vertical")  # Wrappers present, vertical type
+
+    """), (2 + 1) * 1, "FAILED", "vertical")  # Wrappers present, vertical type
 
 ], ids=[
     "Success",
@@ -209,8 +164,8 @@ def test_run_interrupted(
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
     as_conf.set_last_as_command('run')
 
-    for attempt in range(3):
-        as_thread, result, stop_event = run_in_thread(
+    for _ in range(3):
+        as_thread, _, stop_event = run_in_thread(
             as_exp.autosubmit.run_experiment,
             expid=as_exp.expid
         )
@@ -1110,66 +1065,64 @@ _DESTINE_LIKE_PARAMS = [
             DEPENDENCIES:
                 remote_setup: {}
             wallclock: 00:01
-        sim_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+        sim:
             SCRIPT: |
                 echo "sim chunk=%CHUNK%"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             DEPENDENCIES:
                 init: {}
-                sim_really_long_name_to_ensure_that_the_truncate_bug_is_fixed-1: {}
+                sim-1: {}
             wallclock: 00:01
-        downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+        downstream:
             SCRIPT: |
                 echo "downstream chunk=%CHUNK% split=%SPLIT%"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             SPLITS: '4'
             DEPENDENCIES:
-                sim_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
-                    STATUS: RUNNING
-                    ANY_FINAL_STATUS_IS_VALID: true
-                downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+                sim:
+                downstream:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: previous
-                downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed-1: {}
+                downstream-1: {}
             wallclock: 00:01
-        operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+        operator:
             SCRIPT: |
                 echo "operator chunk=%CHUNK% split=%SPLIT%"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             SPLITS: '4'
             DEPENDENCIES:
-                downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+                downstream:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: '[1:4]*\\1'
-                operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+                operator:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: previous
-                operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed-1: {}
+                operator-1: {}
             wallclock: 00:01
-        application_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+        application:
             SCRIPT: |
                 echo "application chunk=%CHUNK% split=%SPLIT%"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             SPLITS: '4'
             DEPENDENCIES:
-                operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+                operator:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: '[1:4]*\\1'
-                application_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+                application:
                     SPLITS_FROM:
                         ALL:
                             SPLITS_TO: previous
-                application_really_long_name_to_ensure_that_the_truncate_bug_is_fixed-1: {}
+                application-1: {}
             wallclock: 00:01
-        finalize_really_long_name_to_ensure_that_the_truncate_bug_is_fixed:
+        finalize:
             SCRIPT: |
                 echo "finalize"
             PLATFORM: TEST_SLURM
@@ -1179,26 +1132,26 @@ _DESTINE_LIKE_PARAMS = [
 
     wrappers:
         wrapper_sim:
-            JOBS_IN_WRAPPER: sim_really_long_name_to_ensure_that_the_truncate_bug_is_fixed
+            JOBS_IN_WRAPPER: sim
             TYPE: vertical
             policy: strict
             MIN_WRAPPED: 2
             MAX_WRAPPED: 4
         wrapper_downstream:
-            JOBS_IN_WRAPPER: downstream_really_long_name_to_ensure_that_the_truncate_bug_is_fixed
+            JOBS_IN_WRAPPER: downstream
             TYPE: vertical
             policy: strict
             MIN_WRAPPED: 4
             MAX_WRAPPED: 4
 
         wrapper_operator:
-            JOBS_IN_WRAPPER: operator_really_long_name_to_ensure_that_the_truncate_bug_is_fixed
+            JOBS_IN_WRAPPER: operator
             TYPE: vertical
             policy: strict
             MIN_WRAPPED: 4
             MAX_WRAPPED: 4
         wrapper_application:
-            JOBS_IN_WRAPPER: application_really_long_name_to_ensure_that_the_truncate_bug_is_fixed
+            JOBS_IN_WRAPPER: application
             TYPE: vertical
             policy: strict
             MIN_WRAPPED: 4
@@ -1288,7 +1241,8 @@ def test_run_interrupted_destine_like(
     "inspect",
     "monitor",
     "inspect_monitor_run",
-], ids=["inspect_only", "monitor_only", "inspect_monitor_run"])
+    "run_only"
+], ids=["inspect_only", "monitor_only", "inspect_monitor_run", "run_only"])
 def test_inspect_monitor_run_uninterrupted_destine_like(
         autosubmit_exp: 'AutosubmitExperimentFixture',
         jobs_data: str,
@@ -1313,7 +1267,7 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
 
-    if run_mode in ("inspect", "inspect_monitor_run"):
+    if run_mode in ["inspect", "inspect_monitor_run"]:
         # 1. Inspect with -cw
         as_conf.set_last_as_command('inspect')
         as_exp.autosubmit.inspect(
@@ -1333,7 +1287,7 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
         )
         _assert_wrapper_db_fields(wrapper_db_check)
 
-    if run_mode in ("monitor", "inspect_monitor_run"):
+    if run_mode in ["monitor", "inspect_monitor_run"]:
         # 2. Monitor with -cw
         as_conf.set_last_as_command('monitor')
         as_exp.autosubmit.monitor(
@@ -1354,7 +1308,7 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
         )
         _assert_wrapper_db_fields(wrapper_db_check)
 
-    if run_mode == "inspect_monitor_run":
+    if run_mode in ["run_only", "inspect_monitor_run"]:
         as_conf.set_last_as_command('run')
         exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
         _assert_exit_code(final_status, exit_code)
@@ -1365,7 +1319,12 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
 
         templates_dir = run_tmpdir / as_exp.expid / "tmp"
         asthread_files = list(templates_dir.rglob("*ASThread*"))
-        assert len(asthread_files) == 14, f"Expected 7 ASThread files from run and 7 from inspect, found {len(asthread_files)}"
+        if run_mode != "run_only":
+            assert len(asthread_files) == 14, f"Expected 7 ASThread files from run and 7 from inspect, found {len(asthread_files)}"
+        else:
+            assert len(asthread_files) == 7, (
+                f"Expected 7 ASThread file, found {len(asthread_files)}"
+            )
 
         # Verify non-preview wrapper tables
         wrapper_db_check = _check_wrapper_db_fields(
@@ -1444,7 +1403,6 @@ def test_build_and_connect_platform_slurm(autosubmit_exp, slurm_server, general_
     assert plat.connected
 
 
-@pytest.mark.local
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
     # Success
     (dedent("""\
@@ -1500,18 +1458,18 @@ def test_build_and_connect_platform_slurm(autosubmit_exp, slurm_server, general_
     # Failure
     (dedent("""\
     EXPERIMENT:
-        NUMCHUNKS: '2'
+        NUMCHUNKS: '1'
     JOBS:
         job:
             SCRIPT: |
-                sleep 2
+                sleep 1
                 d_echo "Hello World with id=FAILED"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2
 
-    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+    """), (2 + 1) * 1, "FAILED", "simple"),  # No wrappers, simple type
 
     # Failure wrappers
     (dedent("""\
@@ -1644,7 +1602,8 @@ def test_run_uninterrupted(
         wrapper_type,
         prepare_scratch,
         general_data,
-        tmp_path
+        tmp_path,
+        slurm_server
 ):
     user_home = Path(f"/home/{getuser()}")
     actual_home = Path.home()

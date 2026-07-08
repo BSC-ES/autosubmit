@@ -16,11 +16,10 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Contains code to manage a database via SQLAlchemy."""
-import os
 from pathlib import Path
 from typing import Any, Optional, cast, List, Dict, Union
 
-from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc
+from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc, inspect, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
@@ -78,6 +77,15 @@ class DbManager:
                 if self.schema:
                     conn.execute(CreateSchema(self.schema, if_not_exists=True))
                 conn.execute(CreateTable(table, if_not_exists=True))
+                # Auto-add missing columns for schema evolution
+                schema_arg = {"schema": self.schema} if self.schema else {}
+                existing = {col['name'] for col in inspect(conn).get_columns(table_name, **schema_arg)}
+                for column in table.columns:
+                    if column.name not in existing:
+                        qualified_name = f"{self.schema}.{table_name}" if self.schema else table_name
+                        conn.execute(
+                            text(f"ALTER TABLE {qualified_name} ADD COLUMN {column.name} {column.type}")
+                        )
 
     def drop_table(self, table_name: str) -> None:
         table = self.table_registry.get(table_name)
@@ -199,7 +207,8 @@ class DbManager:
                 result = conn.execute(query)
         return result.rowcount
 
-    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str], batch_size: int = 1000) -> int:
+    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str],
+                     exclude_cols: Optional[List[str]] = None, batch_size: int = 1000) -> int:
         """Perform an upsert (update or insert) operation.
         First delete the affected rows
         then insert the new data.
@@ -207,6 +216,8 @@ class DbManager:
         :param table_name: Name of the table.
         :param data: List of dictionaries containing the data to upsert.
         :param conflict_cols: List of columns to check for conflicts. ( unique keys and primary keys )
+        :param exclude_cols: Optional list of columns to exclude from the UPDATE SET clause,
+            preserving their existing values on conflict.
         :return: Number of rows affected.
         :raises ValueError: If data is empty or unsupported dialect.
         """
@@ -214,7 +225,8 @@ class DbManager:
             return 0
 
         table: Table = self.table_registry.get(table_name)
-        update_cols = [col for col in data[0].keys() if col not in conflict_cols]
+        update_cols = [col for col in data[0].keys()
+                       if col not in conflict_cols and col not in (exclude_cols or [])]
 
         # NOTE general insert doesn't have on_conflict
         if self._get_engine(table_name).dialect.name == "postgresql":

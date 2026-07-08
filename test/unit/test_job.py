@@ -1245,7 +1245,7 @@ def test_get_from_stat(tmpdir, file_exists, index_timestamp, fail_count, expecte
             stat_file.write("29704923\n29704924\n")
 
     if fail_count is None:
-        result = job._get_from_stat(index_timestamp)
+        result = job._get_from_stat(index_timestamp, 0)
     else:
         result = job._get_from_stat(index_timestamp, fail_count)
 
@@ -1278,7 +1278,7 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
         total_stats.touch()
         total_stats.write_text('First line')
 
-    job.write_submit_time()
+    job.write_submit_time(0)
 
     # It will exist regardless of the argument ``total_stats_exists``, as ``write_submit_time()``
     # must have created it.
@@ -1325,7 +1325,7 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
         total_stats.touch()
         total_stats.write_text(existing_lines)
 
-    job.write_end_time(completed=completed, count=count)
+    job.write_end_time(completed=completed, attempt=count)
 
     # The file must exist after write_end_time regardless of whether it existed before.
     assert total_stats.exists()
@@ -1823,7 +1823,7 @@ def test_update_job_parameters(autosubmit_config, experiment_data):
     job.member = "fc00"
     job.date = datetime.fromisoformat("2023-08-15T00:00:00")
     parameters = {}
-    expected = {'AS_CHECKPOINT': 'as_checkpoint', 'CHUNK': 1, 'CHUNK_END_DATE': '20230816', 'CHUNK_END_DAY': '16',
+    expected = {'AS_CHECKPOINT': 'as_checkpoint', 'CHUNK': 1, 'CHUNK_END_DATE': '20230816', 'CHUNK_END_DATE_LAST': '20230816', 'CHUNK_END_DAY': '16',
                 'CHUNK_END_HOUR': '00', 'CHUNK_END_IN_DAYS': '1', 'CHUNK_END_MONTH': '08', 'CHUNK_END_YEAR': '2023',
                 'CHUNK_FIRST': 'TRUE', 'CHUNK_LAST': 'TRUE', 'CHUNK_SECOND_TO_LAST_DATE': '20230815',
                 'CHUNK_SECOND_TO_LAST_DAY': '15', 'CHUNK_SECOND_TO_LAST_HOUR': '00', 'CHUNK_SECOND_TO_LAST_MONTH': '08',
@@ -1832,7 +1832,8 @@ def test_update_job_parameters(autosubmit_config, experiment_data):
                 'DAY_BEFORE': '20230814',
                 'DELAY': None, 'DELAY_RETRIALS': None, 'DELETE_WHEN_EDGELESS': True, 'EXPORT': 'none',
                 'FAIL_COUNT': '0',
-                'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'MEMBER': 'fc00', 'NUMMEMBERS': 0,
+                'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'LDATE': '20230815',
+                'MEMBER': 'fc00', 'NUMMEMBERS': 0,
                 'PACKED': False, 'PREV': '0', 'PROJECT_TYPE': 'none', 'RETRIALS': 0, 'RUN_DAYS': '1',
                 'SDATE': '20230815',
                 'SHAPE': '', 'SPLIT': None, 'SPLITS': None, 'SYNCHRONIZE': None, 'WORKFLOW_COMMIT': 'dummy',
@@ -2144,7 +2145,7 @@ def test_write_time(tmp_path, local):
     ]
 )
 def test_update_status(create_jobs: list[Job], status: Status,
-                       autosubmit_config: 'AutosubmitConfigFactory', local: 'LocalPlatform'):
+                       autosubmit_config: 'AutosubmitConfigFactory', local: 'LocalPlatform', mocker):
     as_conf = autosubmit_config('t000', experiment_data={
         'PLATFORMS': {
             local.name: {
@@ -2157,6 +2158,7 @@ def test_update_status(create_jobs: list[Job], status: Status,
     job.platform = local
     job.platform_name = local.name
     job.new_status = status
+    mocker.patch.object(local, 'get_completed_job_names', return_value=[])
 
     assert job.status != status
     job.update_status(as_conf=as_conf)
@@ -2226,7 +2228,7 @@ def test_update_and_write_time(count, with_stat_file, tmp_path):
         stat_file.write("19704924\n19704925")
     job.update_start_time(count)
     assert job.start_time_timestamp
-    job.write_start_time()
+    job.write_start_time(count)
     assert (job._tmp_path / f'{job.name}_TOTAL_STATS').exists()
     if with_stat_file:
         job.write_end_time(True, count)
@@ -2234,57 +2236,53 @@ def test_update_and_write_time(count, with_stat_file, tmp_path):
         job.write_end_time(False, count)
 
 
-@pytest.mark.parametrize(
-    'output',
-    [
-        '''15994954        COMPLETED 448 2 2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      3486K
-                        15994954.batch  COMPLETED 224 1 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 497.36K 18111K    18111K
-                        15994954.extern COMPLETED 448 2 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      421K
-                        15994954.0      COMPLETED 224 1 2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52 0       3486K     3486K
-                        15994954.1      COMPLETED 448 2 2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22 820.90K 29740154K 27008625.50K
-        ''',
-        '''15994954        COMPLETED 448 2 2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      3486K
-                    15994954.batch  COMPLETED 224 1 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 497.36K 18111K    18111K
-                    15994954.extern COMPLETED 448 2 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      421K
-                    15994954.0      COMPLETED 224 1 2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52 0       3486K     3486K
-                    15994954.1      COMPLETED 448 2 2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22 82.09 29740154K 27008625.50K
-        '''
-    ],
-    ids=["Energy + External is Lower", "Energy + External is Higher"]
-)
-def test_retrieve_logfiles(local, mocker, output):
-    """This test replicates the behavior of retrieving data from the SSH output and processing it to ensure that the
-    returned data is properly handled and stored.
-    The first input returns a lower absolute energy value, causing the validation to fail.
-    The second input returns a higher absolute energy value, causing the validation to succeed.
-    These tests replicate the behavior of getting the data from the SSH output and handle it to make sure that
-    """
-    mocker.patch("autosubmit.history.database_managers.experiment_history_db_manager.ExperimentHistoryDbManager",
-                 return_value=mocker.MagicMock())
-    mocker.patch("autosubmit.history.experiment_history.ExperimentHistory", return_value=mocker.MagicMock())
-    mocker.patch("autosubmit.platforms.paramiko_platform.ParamikoPlatform.check_job_energy", return_value=output)
-    job = Job(_EXPID, '1', 'WAITING', 0, None)
+@pytest.mark.parametrize("updated_log,updated_stats,fail_count,mock_log_exists,mock_compressed,mock_stats_throws,expected_log,expected_stats,expected_all_succeeded", [
+    (0, 0, 1, True, False, False, 2, 2, True),   # logs + stats same call
+    (0, 0, 1, True, False, True,  2, 0, False),  # logs ok, stats fail
+    (0, 0, 1, False, False, False, 0, 0, False),  # logs fail; no stats
+    (1, 0, 1, False, True,  False, 2, 2, True),   # log via compressed; stats for attempt 1 only
+    (2, 1, 2, False, False, False, 2, 1, False),  # log fails for 2; no stats for attempt 2
+    (2, 3, 2, False, False, False, 2, 3, False),  # stats > updated_log → no stats loop
+])
+def test_retrieve_logfiles_two_phase(
+    updated_log, updated_stats, fail_count,
+    mock_log_exists, mock_compressed, mock_stats_throws,
+    expected_log, expected_stats, expected_all_succeeded,
+    mocker,
+):
+    job = Job("dummy", 1, Status.WAITING, 0)
+    job.updated_log = updated_log
+    job.updated_stats = updated_stats
+    job.fail_count = fail_count
+    job.retrials = fail_count
+    job.local_logs = ("out", "err")
+    job.remote_logs = ("rout", "rerr")
+    job.submit_time_timestamp = "0"
+    job.id = "1"
 
-    job.platform = local
+    job.platform = mocker.MagicMock()
+    job.platform.get_stat_file.return_value = True
+    job.platform.read_jobid_from_remote_log.return_value = None
 
-    Path(job._tmp_path + "/" + job.name).mkdir(parents=True)
-    for i in range(2):
-        Path(job.platform.get_files_path() + f'/test.out.{i}').touch()
-        Path(job.platform.get_files_path() + f'/test.err.{i}').touch()
-        Path(job.platform.get_files_path() + f'/t001_STAT_{i}').touch()
-    job.platform.type = 'slurm'
-    job.platform.remote_log_dir = Path(job.platform.root_dir) / job.platform.config.get(
-        "LOCAL_TMP_DIR") / f'LOG_{job.platform.expid}'
-    job.wrapper_type = 'vertical'
-    job.retrials = 1
-    job.script_name = 'test'
-    job.local_logs = 'test_local'
-    job.submit_time_timestamp = '0'
-    job.start_time_timestamp = '19700101000000'
-    job.platform.check_file_exists = mocker.MagicMock(return_value=True)
+    mocker.patch('autosubmit.job.job.Job.stat_file_is_completed', return_value=True)
+    mocker.patch('autosubmit.job.job.Job.stat_registered', return_value=False)
+    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
+    mocker.patch('autosubmit.job.job.Job.update_local_logs')
+    mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
+    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=mock_log_exists)
+    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=mock_compressed)
+    mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
+    if mock_stats_throws:
+        mocker.patch('autosubmit.job.job.Job.write_stats', side_effect=RuntimeError("stats fail"))
+    else:
+        mocker.patch('autosubmit.job.job.Job.write_stats')
+
     report = job.retrieve_logfiles()
-    assert report.all_succeeded
-    assert len(report.attempts) == 1
+    assert job.updated_log == expected_log, f"expected updated_log={expected_log}, got {job.updated_log}"
+    assert job.updated_stats == expected_stats, f"expected updated_stats={expected_stats}, got {job.updated_stats}"
+    assert report.final_updated_log == expected_log
+    assert report.final_updated_stats == expected_stats
+    assert report.all_succeeded == expected_all_succeeded
 
 
 def test_case_insensitive_running_parameter(autosubmit_config):
@@ -2336,7 +2334,7 @@ def test_write_start_time(mocker, tmp_path):
     job.splits = "2"
     mocker.patch('autosubmit.job.job.Job._write_time')
     mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    job.write_start_time()
+    job.write_start_time(attempt=2)
     job._write_time.assert_called_once_with("start")
     mock_exp_hist.return_value.write_start_time.assert_called_once()
     call_kwargs = mock_exp_hist.return_value.write_start_time.call_args.kwargs
@@ -2346,29 +2344,28 @@ def test_write_start_time(mocker, tmp_path):
 
 def test_write_stats(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
-    job.platform = mocker.MagicMock()
-    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs')
+    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
+    mocker.patch('autosubmit.job.job.Job.write_submit_time')
     mocker.patch('autosubmit.job.job.Job.update_start_time')
     mocker.patch('autosubmit.job.job.Job.write_start_time')
     mocker.patch('autosubmit.job.job.Job.write_end_time')
     job.write_stats(attempt=1)
-    job.check_compressed_local_logs.assert_called_once()
-    job.platform.get_stat_file.assert_called_once_with(job, 1)
+    job._update_submit_time_from_stat.assert_called_once_with(1)
+    job.write_submit_time.assert_called_once_with(1)
     job.update_start_time.assert_called_once_with(1)
-    job.write_start_time.assert_called_once_with(fail_count=1)
+    job.write_start_time.assert_called_once_with(1)
     job.write_end_time.assert_called_once_with(job.status == Status.COMPLETED, 1)
 
 
-@pytest.mark.parametrize("fail_count,expected_out,expected_err", [
+@pytest.mark.parametrize("attempt,expected_out,expected_err", [
     (0, "dummy.0.out", "dummy.0.err"),
     (1, "dummy.0.out_attempt_1", "dummy.0.err_attempt_1"),
     (2, "dummy.0.out_attempt_2", "dummy.0.err_attempt_2"),
 ])
-def test_update_local_logs(fail_count, expected_out, expected_err):
+def test_update_local_logs(attempt, expected_out, expected_err):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.submit_time_timestamp = 0
-    job.fail_count = fail_count
-    job.update_local_logs()
+    job.update_local_logs(attempt=attempt)
     assert job.local_logs == (expected_out, expected_err)
 
 
@@ -2379,69 +2376,7 @@ def test_datestr_to_epoch():
 
 
 
-def test_update_submit_time_on_db(mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.submit_time_timestamp = "20250101120000"
-    job.status = Status.SUBMITTED
-    job.queue = "debug"
-    job.date = datetime(2025, 1, 1)
-    job.member = "fc0"
-    job.section = "A"
-    job.chunk = 1
-    job.platform_name = "local"
-    job.id = "123"
-    job._wrapper_queue = "wq"
-    job.packed = False
-    job.workflow_commit = "abc"
-    job.split = "1"
-    job.splits = "2"
-    job.fail_count = 3
-    mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    job.update_submit_time_on_db()
-    mock_exp_hist.return_value.update_submit_time.assert_called_once()
-    call_kwargs = mock_exp_hist.return_value.update_submit_time.call_args.kwargs
-    assert call_kwargs['submit'] == job._datestr_to_epoch(str(job.submit_time_timestamp))
-    assert call_kwargs['fail_count'] == 3
-    assert call_kwargs['split'] == "1"
-    assert call_kwargs['splits'] == "2"
 
-
-@pytest.mark.parametrize("scenario,fail_count,wrapper_type,prev_finish", [
-    ("no_data", 0, None, None),
-    ("vertical_with_prev", 1, "vertical", datetime(2025, 1, 1, 11, 0, 0)),
-    ("vertical_no_prev", 1, "vertical", None),
-    ("non_vertical", 0, None, None),
-])
-def test_update_submit_time_and_job_id(scenario, fail_count, wrapper_type, prev_finish, mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.fail_count = fail_count
-    job.wrapper_type = wrapper_type
-    mock_job_data = mocker.MagicMock()
-    mock_job_data.submit_datetime = datetime(2025, 1, 1, 10, 0, 0)
-    mock_job_data.job_id = "999"
-    mock_prev = mocker.MagicMock()
-    mock_prev.finish_datetime = prev_finish
-
-    def _get_submit(attempt):
-        return None if scenario == "no_data" else mock_job_data
-
-    def _get_finish(attempt):
-        return mock_prev if scenario in ("vertical_with_prev", "vertical_no_prev") else None
-
-    mocker.patch('autosubmit.job.job.Job._get_submit_data_dc_from_db', side_effect=_get_submit)
-    mocker.patch('autosubmit.job.job.Job._get_finish_time_from_db', side_effect=_get_finish)
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_on_db')
-    job.update_submit_time_and_job_id(0)
-    if scenario == "no_data":
-        assert job.submit_time_timestamp is None
-    elif scenario == "vertical_with_prev":
-        assert job.submit_time_timestamp == "20250101110000"
-        job.update_submit_time_on_db.assert_called_once()
-    elif scenario == "vertical_no_prev":
-        assert job.submit_time_timestamp == "20250101100000"
-    elif scenario == "non_vertical":
-        assert job.submit_time_timestamp == "20250101100000"
-        assert job.id == "999"
 
 
 def test_get_submit_data_dc_from_db(mocker):
@@ -2466,60 +2401,70 @@ def test_get_finish_time_from_db(mocker):
     mock_exp_hist.return_value.get_finish_data_dc.assert_called_once_with("dummy", 2)
 
 
-def test_recover_attempt_success(mocker):
+@pytest.mark.parametrize(
+    "remote_exists, compressed_exists, remote_raises, expected_success, expected_updated_log, expected_error_contains, expect_restored, expected_job_id",
+    [
+        (True,  False, False, True,  1, None,              False, 1),
+        (False, False, False, False, 0, "Remote logs not found", True, 1),
+        (False, False, True,  False, 0, "boom",            True, 1),
+        (False, True,  False, True,  1, None,              False, 1),
+        (True,  False, False, True,  1, None,              False, 12345),
+    ],
+    ids=[
+        "remote_logs_found",
+        "no_remote_no_local",
+        "check_remote_raises",
+        "no_remote_with_compressed_local",
+        "remote_logs_found_with_jobid_parse",
+    ]
+)
+def test_recover_log_attempt(mocker, remote_exists, compressed_exists, remote_raises,
+                              expected_success, expected_updated_log, expected_error_contains, expect_restored,
+                              expected_job_id):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.updated_log = 0
+    job.updated_stats = 0
     job.fail_count = 0
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id')
+    job.id = 1
+
+    job.platform = mocker.MagicMock()
+    if expected_job_id != 1:
+        job.platform.read_jobid_from_remote_log.return_value = expected_job_id
+    else:
+        job.platform.read_jobid_from_remote_log.return_value = None
+
     mocker.patch('autosubmit.job.job.Job.update_local_logs')
     mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
-    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=True)
-    mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
-    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs')
-    mocker.patch('autosubmit.job.job.Job.write_stats')
-    result = job._recover_attempt(0)
-    assert result.success is True
+
+    if remote_raises:
+        mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', side_effect=RuntimeError("boom"))
+    else:
+        mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=remote_exists)
+
+    if remote_exists:
+        mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
+
+    if compressed_exists is not None:
+        mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=compressed_exists)
+
+    result = job._recover_log_attempt(0)
     assert result.attempt == 0
-    assert result.error is None
+    assert result.success is expected_success
+    assert job.updated_stats == 0
+    assert job.id == expected_job_id
+    if expected_error_contains:
+        assert expected_error_contains in result.error
+    else:
+        assert result.error is None
 
+    if expect_restored:
+        assert job.local_logs == ("out", "err")
+        assert job.remote_logs == ("rout", "rerr")
 
-def test_recover_attempt_no_remote_no_local(mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.updated_log = 0
-    job.fail_count = 0
-    job.local_logs = ("out", "err")
-    job.remote_logs = ("rout", "rerr")
-    job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id')
-    mocker.patch('autosubmit.job.job.Job.update_local_logs')
-    mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
-    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=False)
-    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=False)
-    result = job._recover_attempt(0)
-    assert result.success is False
-    assert "Remote logs not found" in result.error
-    assert job.local_logs == ("out", "err")
-    assert job.remote_logs == ("rout", "rerr")
-
-
-def test_recover_attempt_exception(mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.updated_log = 0
-    job.fail_count = 0
-    job.local_logs = ("out", "err")
-    job.remote_logs = ("rout", "rerr")
-    job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id', side_effect=RuntimeError("boom"))
-    result = job._recover_attempt(0)
-    assert result.success is False
-    assert result.error == "boom"
-    assert job.local_logs == ("out", "err")
+    assert job.updated_log == expected_updated_log
 
 
 def test_restore_previous_state(mocker):
@@ -2690,17 +2635,6 @@ def _make_wrapper_job(mocker, inner_jobs=None, new_status=Status.RUNNING):
     return wrapper
 
 
-@pytest.mark.parametrize("eligible", [True, False])
-def test_handle_vertical_retries(eligible, mocker):
-    inner = Job("inner", 2, Status.FAILED, 0)
-    inner.wrapper_type = "vertical" if eligible else "horizontal"
-    inner.updated_log = 2
-    inner.fail_count = 0
-    inner.retrials = 3
-    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
-    wrapper._handle_vertical_retries()
-    assert inner.fail_count == (1 if eligible else 0)
-
 
 @pytest.mark.parametrize("has_finished_time,elapsed,expected,keep_alive", [
     (False, 2, Status.RUNNING, None),          # fresh timer, not elapsed
@@ -2759,16 +2693,30 @@ def test_apply_io_safe_wait_resets_finished_time(mocker):
     assert inner.finished_time is None
 
 
-@pytest.mark.parametrize("can_run,stat_status,wrapper_done,inner_status,expected", [
-    (False, Status.RUNNING, True, Status.RUNNING, Status.SUBMITTED),
-    (True, Status.RUNNING, True, Status.RUNNING, Status.RUNNING),
-    (True, Status.RUNNING, False, Status.RUNNING, Status.RUNNING),
-    (True, Status.FAILED, True, Status.RUNNING, Status.FAILED),
-    (True, Status.QUEUING, True, Status.RUNNING, Status.RUNNING),
-    (True, Status.QUEUING, False, Status.RUNNING, Status.QUEUING),
-    (True, Status.COMPLETED, True, Status.RUNNING, Status.COMPLETED),
+@pytest.mark.parametrize("can_run,wrapper_done,stat_status,inner_status,expected", [
+    (False, True,  Status.FAILED,    Status.RUNNING, Status.FAILED),
+    (False, False, Status.COMPLETED, Status.RUNNING, Status.COMPLETED),
+    (False, False, Status.QUEUING,   Status.RUNNING, Status.SUBMITTED),
+    (False, True,  Status.QUEUING,   Status.RUNNING, Status.WAITING),
+    (True,  True,  Status.RUNNING,   Status.RUNNING, Status.RUNNING),
+    (True,  False, Status.RUNNING,   Status.RUNNING, Status.RUNNING),
+    (True,  True,  Status.FAILED,    Status.RUNNING, Status.FAILED),
+    (True,  False, Status.COMPLETED, Status.RUNNING, Status.COMPLETED),
+    (True,  True,  Status.QUEUING,   Status.QUEUING, Status.QUEUING),
+    (True,  False, Status.QUEUING,   Status.WAITING, Status.WAITING),
+], ids=[
+    "cannot_run_stat_failed",
+    "cannot_run_stat_completed",
+    "cannot_run_stat_queuing",
+    "cannot_run_stat_queuing_wrapper_done",
+    "can_run_stat_running",
+    "can_run_stat_running_wrapper_not_done",
+    "can_run_stat_failed",
+    "can_run_stat_completed",
+    "can_run_stat_queuing_returns_inner",
+    "can_run_stat_queuing_returns_inner_wrapper_not_done",
 ])
-def test_compute_inner_job_status(can_run, stat_status, wrapper_done, inner_status, expected, mocker):
+def test_compute_inner_job_status(can_run, wrapper_done, stat_status, inner_status, expected, mocker):
     inner = Job("inner", 2, inner_status, 0)
     wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
 
@@ -2797,11 +2745,11 @@ def test_sync_inner_job_statuses(mocker):
 
 
 @pytest.mark.parametrize("inner_statuses,wrapper_status,expected_save", [
-    ([Status.RUNNING], Status.COMPLETED, False),     # guard: still RUNNING
-    ([Status.QUEUING], Status.COMPLETED, True),      # reset to WAITING + log
-    ([Status.SUBMITTED], Status.FAILED, True),       # reset to WAITING + log
-    ([Status.COMPLETED], Status.COMPLETED, True),    # no pending, just log
-    ([Status.FAILED], Status.FAILED, True),          # no pending, just log
+    ([Status.RUNNING], Status.COMPLETED, False),
+    ([Status.QUEUING], Status.COMPLETED, True),
+    ([Status.SUBMITTED], Status.FAILED, True),
+    ([Status.COMPLETED], Status.COMPLETED, True),
+    ([Status.FAILED], Status.FAILED, True)
 ])
 def test_finalize_wrapper_completion(inner_statuses, wrapper_status, expected_save, mocker):
     inners = [Job(f"inner_{i}", i + 2, st, 0) for i, st in enumerate(inner_statuses)]
@@ -2810,7 +2758,7 @@ def test_finalize_wrapper_completion(inner_statuses, wrapper_status, expected_sa
     mocker.patch("autosubmit.job.job.Job.update_status")
     mock_log = mocker.patch("autosubmit.job.job.Log.warning")
 
-    result = wrapper._finalize_wrapper_completion(wrapper.as_config)
+    result = wrapper._finalize_wrapper_completion()
     assert result == expected_save
     if wrapper_status == Status.FAILED:
         mock_log.assert_called_once()
@@ -2849,33 +2797,42 @@ def test_setstate_initializes_missing_timestamps():
     assert job.finish_time_timestamp is None
 
 
-def test_clean_attributes_sets_updated_log_to_zero():
+def test_clean_attributes_resets_both_counters():
     job = Job("t000_test", 1, Status.WAITING, 0)
     job.updated_log = 99
+    job.updated_stats = 42
     job.fail_count = 0
     job.retrials = 5
     job.clean_attributes()
     assert job.updated_log == 0
+    assert job.updated_stats == 0
 
 
-def test_recover_attempt_no_remote_with_compressed_local(mocker):
-    """_recover_attempt: remote missing but compressed local logs -> success."""
+def test_write_stat_attempt_success(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
-    job.updated_log = 0
-    job.fail_count = 0
+    job.updated_log = 2
+    job.updated_stats = 0
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
-    job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch("autosubmit.job.job.Job.update_submit_time_and_job_id")
-    mocker.patch("autosubmit.job.job.Job.update_local_logs")
-    mocker.patch("autosubmit.job.job.Job.get_new_remotelog_name", return_value=("new_out", "new_err"))
-    mocker.patch("autosubmit.job.job.Job.check_remote_log_exists", return_value=False)
-    mocker.patch("autosubmit.job.job.Job.check_compressed_local_logs", return_value=True)
-    result = job._recover_attempt(0)
+    mocker.patch('autosubmit.job.job.Job.write_stats')
+    result = job._write_stat_attempt(1)
     assert result.success is True
-    assert result.local_logs == job.local_logs
-    assert result.remote_logs == job.remote_logs
+    assert result.attempt == 1
+    assert job.updated_stats == 2
+    job.write_stats.assert_called_once_with(1)
+
+
+def test_write_stat_attempt_failure(mocker):
+    job = Job("dummy", 1, Status.WAITING, 0)
+    job.updated_log = 2
+    job.updated_stats = 0
+    job.local_logs = ("out", "err")
+    job.remote_logs = ("rout", "rerr")
+    mocker.patch('autosubmit.job.job.Job.write_stats', side_effect=RuntimeError("stat fail"))
+    result = job._write_stat_attempt(1)
+    assert result.success is False
+    assert result.error == "stat fail"
+    assert job.updated_stats == 0
 
 
 @pytest.mark.parametrize("start_time_timestamp,effective_wallclock,expected", [
@@ -2981,7 +2938,7 @@ def test_write_end_time_with_positive_end_time(mocker, tmp_path):
     mocker.patch("autosubmit.job.job.Job.check_end_time", return_value=epoch)
     mocker.patch("autosubmit.job.job.Job._write_time")
     mocker.patch("autosubmit.job.job.ExperimentHistory")
-    job.write_end_time(completed=True)
+    job.write_end_time(True, attempt=0)
     expected = datetime.fromtimestamp(epoch).strftime("%Y%m%d%H%M%S")
     assert job.finish_time_timestamp == expected
 
@@ -3103,3 +3060,36 @@ def test_calendar_chunk_last_chunk_consistency(chunk_unit, chunk_size):
 
     assert result['CHUNK_END_DATE'] == result['CHUNK_END_DATE_LAST']
     assert result['CHUNK_SECOND_TO_LAST_DATE'] == result['LDATE']
+
+
+def test_recover_log_disabled_threads(mocker):
+    job = Job("test", 1, Status.COMPLETED, 0)
+    as_conf = mocker.MagicMock()
+    as_conf.platforms_data.get.return_value = {"DISABLE_RECOVERY_THREADS": "true"}
+    mock_retrieve = mocker.patch("autosubmit.job.job.Job.retrieve_logfiles")
+    mock_notify = mocker.patch("autosubmit.job.job.Job.send_cpmip_notification")
+    job.recover_log(as_conf)
+    mock_retrieve.assert_called_once()
+    mock_notify.assert_called_once_with(as_conf)
+    assert job.log_recovery_call_count == 1
+
+
+def test_recover_log_queues_recovery(mocker):
+    job = Job("test", 1, Status.COMPLETED, 0)
+    as_conf = mocker.MagicMock()
+    as_conf.platforms_data.get.return_value = {}
+    job.platform = mocker.MagicMock()
+    job.recover_log(as_conf)
+    job.platform.add_job_to_log_recover.assert_called_once_with(job)
+    assert job.log_recovery_call_count == 1
+
+
+def test_compute_inner_job_status_returns_stat_when_done(mocker):
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner._retrials = 3
+    inner.wrapper_type = "vertical"
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
+
+    result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
+
+    assert result == Status.FAILED

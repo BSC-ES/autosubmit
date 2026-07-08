@@ -298,15 +298,14 @@ class PJMPlatform(ParamikoPlatform):
                     retries = retries + 1
                 else:
                     retries = 9999
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
+            except Exception as e:
+                if "garbage" in str(e).lower():
                     if not wrapper_failed:
                         sleep(sleeptime)
                         sleeptime = sleeptime + 5
                         retries = retries + 1
                 else:
-                    file_exist = False  # won't exist
-                    retries = 999  # no more retries
+                    raise
         return file_exist
 
     def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:

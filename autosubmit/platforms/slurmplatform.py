@@ -363,13 +363,12 @@ class SlurmPlatform(ParamikoPlatform):
                 else:
                     sleep(2)
                     retries = retries + 1
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
+            except Exception as e:
+                if "garbage" in str(e).lower():
                     sleep(2)
                     retries = retries + 1
                 else:
-                    file_exist = False  # won't exist
-                    retries = 999  # no more retries
+                    raise
         if not file_exist and show_logs:
             Log.warning(f"File {src} couldn't be found")
         return file_exist

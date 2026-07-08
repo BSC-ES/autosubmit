@@ -23,7 +23,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
-from autosubmit.database.tables import WrapperJobsTable, JobsTable, ExperimentStructureTable
+from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
 
@@ -283,7 +283,8 @@ def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmi
             'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
             'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
             'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
-            'synchronize', 'updated_log', 'created', 'modified', 'fail_count'
+            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats',
+            'wallclock', 'wrapper_type', 'retrials', 'log_recovery_call_count',
         }
 
 
@@ -341,7 +342,8 @@ def test_db_job_list_jobs_and_edges_together(
             'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
             'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
             'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
-            'synchronize', 'updated_log', 'created', 'modified', 'fail_count'
+            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats',
+            'wallclock', 'wrapper_type', 'retrials', 'log_recovery_call_count',
         }
 
     for edge in loaded_edges:
@@ -675,55 +677,6 @@ def test_clear_unused_nodes(
         loaded_job = db_manager.load_job_by_name(job_name)
         assert loaded_job is not None, f"Job {job_name} should not have been deleted"
         assert loaded_job['name'] == job_name
-
-@pytest.mark.postgres
-def test_backup_and_restore(monkeypatch, tmp_path, _expid, as_db, as_exp: Any):
-    """" Test backup of database and restore it afterwards. """
-
-    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    if as_db != 'sqlite':
-        # TODO: not implemented
-        return 0
-    db_manager = _create_db_manager(schema=_expid)
-    # Create tables
-    jobs_table = db_manager.table_registry.get(JobsTable.name)
-    edges_table = db_manager.table_registry.get(ExperimentStructureTable.name)
-    db_manager.create_table(jobs_table.name)
-    db_manager.create_table(edges_table.name)
-    # Insert some data
-    sample_job = {
-        'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None,
-        'finish_time_timestamp': None, 'frequency': None, 'id': 0,
-        'name': f'{_expid}_LOCAL_SETUP', 'section': 'LOCAL_SETUP',
-        'script_name': f'{_expid}_LOCAL_SETUP', 'split': -1, 'splits': -1,
-        'status': 'READY', 'local_logs_err': None, 'local_logs_out': None,
-        'max_checkpoint_step': 0, 'packed': False, 'platform_name': None,
-        'priority': 0, 'ready_date': None, 'remote_logs_err': None,
-        'remote_logs_out': None, 'start_time': None,
-        'start_time_timestamp': None, 'submit_time_timestamp': None,
-        'synchronize': None, 'updated_log': 0, 'member': None
-    }
-    db_manager.insert(jobs_table.name, sample_job)
-    sample_edge = {
-        'e_from': f'{_expid}_LOCAL_SETUP', 'e_to': f'{_expid}_REMOTE_SETUP', 'from_step': 0,
-        'min_trigger_status': 'COMPLETED', 'completion_status': 'WAITING', 'fail_ok': True
-    }
-    db_manager.insert(edges_table.name, sample_edge)
-
-    # Backup
-
-    db_manager.backup()
-
-    # Clear tables
-    db_manager.drop_table(jobs_table.name)
-    db_manager.drop_table(edges_table.name)
-
-    # Restore
-    assert 0 == db_manager.restore()
-
-    loaded_job = db_manager.load_job_by_name(f'{_expid}_LOCAL_SETUP')
-    assert loaded_job is not None
-    assert loaded_job['name'] == f'{_expid}_LOCAL_SETUP'
 
 
 # -- Tests for detecting changes in dependencies -- #

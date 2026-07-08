@@ -88,7 +88,7 @@ class LocalPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Updates commands for platforms."""
-        self.root_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
+        self.root_dir = os.path.join(self.config.get("LOCAL_ROOT_DIR", BasicConfig.LOCAL_ROOT_DIR), self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "tmp", 'LOG_' + self.expid)
         self.cancel_cmd = "kill -2"
         self._checkhost_cmd = "echo 1"
@@ -142,6 +142,17 @@ class LocalPlatform(ParamikoPlatform):
         except Exception as exc:
             Log.error("Writing Job Id Failed : " + str(exc))
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+        try:
+            if os.path.exists(remote_path):
+                with open(remote_path) as f:
+                    first_line = f.readline()
+                if first_line.startswith('[INFO] JOBID='):
+                    return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, IndexError):
+            pass
+        return None
+
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
 
@@ -151,7 +162,7 @@ class LocalPlatform(ParamikoPlatform):
         :return: None
         """
         self.connected = True
-        if log_recovery_process:
+        if not log_recovery_process:
             self.spawn_log_retrieval_process(as_conf)
 
     def test_connection(self, as_conf: 'AutosubmitConfig') -> None:

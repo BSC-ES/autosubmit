@@ -64,7 +64,7 @@ from autosubmit.experiment.experiment_common import (
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.helpers.enums import ChunkUnit
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, recover_stale_job_data
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job import Job
@@ -1680,14 +1680,13 @@ class Autosubmit:
                     job.status = Status.WAITING
 
                 Autosubmit.generate_scripts_andor_wrappers(
-                    as_conf, job_list, jobs, False)
+                    as_conf, job_list, only_wrappers=False, jobs=jobs)
             if len(jobs_cw) > 0:
                 for job in jobs_cw:
                     file_paths += f"{str(tmp_path / (job.name + '.cmd'))}\n"
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, False)
-            job_list.clear_wrappers_db(preview=True)
             Log.info("No more scripts to generate, you can proceed to check them manually")
             Log.result(file_paths)
 
@@ -1832,10 +1831,9 @@ class Autosubmit:
                 job_list.job_package_map.pop(active_wrapper.id, None)
                 job_list.packages_dict.pop(active_wrapper.name, None)
 
-        if not Autosubmit.exit:
-            for job in job_list.get_job_list():
-                if job.id not in job_list.job_package_map and job.status != Status.FAILED:
-                    jobs_to_check[job.platform_name].append([job, job.status])
+        for job in job_list.get_job_list():
+            if job.id not in job_list.job_package_map and job.status != Status.FAILED:
+                jobs_to_check[job.platform_name].append([job, job.status])
 
         return jobs_to_check, job_changes_tracker
 
@@ -1988,13 +1986,10 @@ class Autosubmit:
 
         # Check if the user wants to continue using wrappers and loads the appropriate info.
         if as_conf.experiment_data.get("WRAPPERS", None) is not None:
-            if BasicConfig.DATABASE_BACKEND == 'sqlite':
-                os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
-                                      expid, "pkl", "job_packages_" + expid + ".db"), 0o644)
             try:
                 job_list.load_wrappers()
             except IOError as e:
-                raise AutosubmitError("job_packages not found", 6016, str(e))
+                raise AutosubmitError("wrappers not found in job_list database", 6016, str(e))
         if recover:
             Log.info("Recovering wrappers... Done")
 
@@ -2097,7 +2092,7 @@ class Autosubmit:
 
     @staticmethod
     def run_experiment(expid: str, start_time: Optional[str] = None, start_after: Optional[str] = None,
-                       run_only_members: Optional[str] = None, profile: Optional[int] = None,
+                       run_only_members: Optional[str] = None, profile: bool = False,
                        trace: bool = False, profile_max_iterations: int = 0, stop_event=None) -> int:
         """Runs and experiment (submitting all the jobs properly and repeating its execution in case of failure).
 
@@ -2173,7 +2168,7 @@ class Autosubmit:
                 # 3650 = (72h - 122h)
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get("RECOVERY_RETRIALS", 3650)
                 recovery_retrials = 0
-                if profile is not None:
+                if profiler is not None:
                     loaded_jobs = len(job_list.get_job_list())
                     loaded_edges = 0
                     for job in job_list.get_job_list():
@@ -2183,19 +2178,13 @@ class Autosubmit:
                 as_conf.save()
                 job_changes_tracker = dict()
                 Autosubmit.save_historical_edges(expid)
-                pending_logs = job_list.recover_logs()
-                while pending_logs:
-                    pending_logs = job_list.recover_logs()
-                job_list.save_jobs()
-                try:
-                    recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
-                except Exception as e:
-                    Log.debug(f"Error while recovering stale job data: {str(e)}")
-
+                job_list.recover_logs(from_db=True)
+                job_list.reset_updated_logs()
+                job_list.load_wrappers()
                 while job_list.continue_run():
                     try:
 
-                        if profile is not None:
+                        if profiler is not None:
                             Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
 
                         if stop_event and stop_event.is_set():
@@ -2238,8 +2227,11 @@ class Autosubmit:
                             Log.warning(
                                 "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                         if Autosubmit.exit:
+                            job_list.update_db_wrappers()
+                            job_list.save_edges()
                             job_list.save_jobs()
                             as_conf.save()
+                            break
                         else:
                             safetysleeptime = as_conf.get_safetysleeptime()
                             time.sleep(safetysleeptime)
@@ -2328,26 +2320,9 @@ class Autosubmit:
 
                 Log.result("No more jobs to run.")
                 # search hint - finished run
-                pending_logs = job_list.recover_logs()
-                while pending_logs:
-                    pending_logs = job_list.recover_logs()
-                job_list.save_jobs()
-
                 Log.info("Waiting for all logs to be updated")
                 for p in platforms_to_test:
-                    if (p.log_recovery_process is not None and p.log_recovery_process.is_alive()
-                            and p.cleanup_event is not None):
-                        p.cleanup_event.set()  # Send cleanup event
-                        p.log_recovery_process.join(timeout=300)
-                        if p.log_recovery_process.is_alive():
-                            Log.warning(f"Log recovery process for {p.name} did not terminate within timeout.")
                     p.clean_log_recovery_process()
-                try:
-                    # Note: This is a safeguard, if the run is not stopped this shouldn't be needed, but maybe the log process dies for others reasons like killed by the system
-                    # so it is good to have this call to avoid leaving bad stat data if the recovery process is not working properly.
-                    recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
-                except Exception as e:
-                    Log.debug(f"Error while recovering stale job data: {str(e)}")
                 Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
 
                 for p in platforms_to_test:
@@ -2356,7 +2331,7 @@ class Autosubmit:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
                     Log.result("Run successful")
-                    if profile:
+                    if profiler:
                         profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))
                     # Updating finish time for job data header
                     try:
@@ -2375,7 +2350,7 @@ class Autosubmit:
         except BaseException:
             raise
         finally:
-            if profile:
+            if profiler:
                 profiler.stop()
 
         # Suppress in case ``job_list`` was not defined yet...
@@ -2546,7 +2521,7 @@ class Autosubmit:
 
             wrapper_errors.update(packager.wrappers_with_error)
             job_list.save_wrappers(scripts_to_submit_by_section, as_conf, preview=inspect)
-        
+
         Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
 
     @staticmethod
@@ -2671,6 +2646,7 @@ class Autosubmit:
         # WRAPPERS
         try:
             if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrapper:
+                job_list.clear_wrappers_db(preview=True)
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, True)
                 job_list.load_wrappers(preview=check_wrapper)
@@ -3070,7 +3046,11 @@ class Autosubmit:
 
                 elif job.status != Status.SUSPENDED:
                     job.status = Status.WAITING
-                    job._fail_count = 0
+                    job.fail_count = 0
+                    job.updated_log = 0
+                    job.updated_stats = 0
+                    job.log_recovery_call_count = 0
+                    job.wrapper_type = None
                     Log.info(f"CHANGED job '{job.name}' status to WAITING")
 
             job_list.check_completed_jobs_after_recovery()
@@ -3080,13 +3060,8 @@ class Autosubmit:
 
             if save:
                 job_list.recover_last_data()
-                job_list.save_jobs()
+                job_list.save_jobs(reset_log_counters=True)
                 job_list.save_edges()
-                try:
-                    recover_stale_job_data(expid, as_conf, platforms_to_test)
-                except Exception as e:
-                    Log.debug(f"Error while recovering stale job data: {str(e)}")
-                job_list.save_jobs()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
 
@@ -4190,10 +4165,6 @@ class Autosubmit:
                         raise AutosubmitCritical(
                             "There are repeated member names!")
                     rerun = as_conf.get_rerun()
-                    try:
-                        recover_stale_job_data(expid, as_conf)
-                    except Exception as e:
-                        Log.debug(f"Error while recovering stale job data: {str(e)}")
 
                     Log.info("\nCreating the jobs list...")
                     job_list = JobList(expid, as_conf, YAMLParserFactory())
@@ -4205,13 +4176,6 @@ class Autosubmit:
                             date_format = 'H'
                         if date.minute > 1:
                             date_format = 'M'
-                    wrapper_jobs = dict()
-
-                    for wrapper_name, wrapper_parameters in as_conf.get_wrappers().items():
-                        # continue if it is a global option (non-dict)
-                        if type(wrapper_parameters) is not dict:
-                            continue
-                        wrapper_jobs[wrapper_name] = as_conf.get_wrapper_jobs(wrapper_parameters)
 
                     job_list.generate(as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format,
                                       as_conf.get_retrials(),
@@ -4249,15 +4213,23 @@ class Autosubmit:
                         output = 'txt'
                     if output == 'txt':
                         noplot = False
-                    if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
-                        if len(as_conf.wrong_config) > 0:
-                            Log.warning(
-                                "There are errors in the configuration files. Wrappers will not be generated. Please fix the errors and run the command again."
+                    try:
+                        Log.info("\nPlotting the jobs list...")
+                        if (
+                            len(as_conf.experiment_data.get("WRAPPERS", {})) > 0
+                            and check_wrappers
+                        ):
+                            as_conf.check_conf_files(
+                                running_time=True, force_load=True, no_log=False
                             )
-                        else:
-                            job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
                             Autosubmit.generate_scripts_andor_wrappers(
-                                as_conf, job_list_wr, job_list_wr.get_job_list(), True)
+                                as_conf, job_list, True
+                            )
+                            job_list.load_wrappers(preview=check_wrappers)
+                    except AutosubmitCritical as e:
+                        Log.warning(
+                            f"Couldn't generate a preview of the wrappers due: {e}"
+                        )
 
                     if not noplot:
                         from .monitor.monitor import Monitor
@@ -4271,16 +4243,6 @@ class Autosubmit:
                             job_grouping = JobGrouping(group_by, copy.deepcopy(job_list.get_job_list()), job_list,
                                                        expand_list=expand, expanded_status=status)
                             groups_dict = job_grouping.group_jobs()
-
-                        if (
-                            len(as_conf.experiment_data.get("WRAPPERS", {})) > 0
-                            and check_wrappers
-                        ):
-                            Autosubmit.generate_scripts_andor_wrappers(
-                                as_conf, job_list, True
-                            )
-                        job_list.load_wrappers(preview=check_wrappers)
-                        Log.info("\nPlotting the jobs list...")
                         monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
                         # if output is set, use output
                         monitor_exp.generate_output(
@@ -5250,11 +5212,12 @@ class Autosubmit:
                 start = time.time()
                 if save and wrongExpid == 0:
                     job_list.recover_last_data(final_list)
-                    try:
-                        recover_stale_job_data(expid, as_conf, platforms_to_test)
-                    except Exception as e:
-                        Log.debug(f"Error while recovering stale job data: {str(e)}")
-                    job_list.save_jobs()
+                    for job in final_list:
+                        job.fail_count = 0
+                        job.log_recovery_call_count = 0
+                        job.wrapper_type = None
+                        job.id = None
+                    job_list.save_jobs(reset_log_counters=True)
                     end = time.time()
                     Log.info(f"JobList saved in {end - start:.2f} seconds.")
                     exp_history = ExperimentHistory(expid)

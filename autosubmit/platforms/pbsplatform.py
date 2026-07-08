@@ -448,13 +448,12 @@ class PBSPlatform(ParamikoPlatform):
             except IOError:  # File doesn't exist, retry in sleeptime
                 sleep(sleeptime)
                 retries = retries + 1
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
+            except Exception as e:
+                if "garbage" in str(e).lower():
                     sleep(2)
                     retries = retries + 1
                 else:
-                    file_exist = False  # won't exist
-                    retries = 999  # no more retries
+                    raise
         if not file_exist:
             Log.warning(f"File {src} couldn't be found")
         return file_exist

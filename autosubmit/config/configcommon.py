@@ -612,7 +612,7 @@ class AutosubmitConfig(object):
         If the input is a string, it splits the string by spaces and converts each dependency to uppercase.
         If the input is a dictionary, it converts each dependency key to uppercase and processes the status.
 
-        Additionally, it checks if any final status is allowed, and if so, it sets the flag "ANY_FINAL_STATUS_IS_VALID".
+        Additionally, it checks for a ``?`` suffix in ``MIN_TRIGGER_STATUS``/``STATUS`` to set ``FAIL_OK``.
 
         :param dependencies: The dependencies to normalize, either as a string or a dictionary.
         :type dependencies: Union[str, dict]
@@ -1340,6 +1340,15 @@ class AutosubmitConfig(object):
                         "TOTALJOBS parameter not found or not strictly positive integer",
                     ]
                 ]
+            for platform_name, platform_data in parser_data.get("PLATFORMS", {}).items():
+                platform_totaljobs = platform_data.get("TOTALJOBS", None) if isinstance(platform_data, dict) else None
+                if platform_totaljobs is not None and int(platform_totaljobs) == 0:
+                    self.wrong_config["Autosubmit"] += [
+                        [
+                            "platforms",
+                            f"PLATFORMS.{platform_name.upper()}.TOTALJOBS must be greater than 0. Current value: {platform_totaljobs}.",
+                        ]
+                    ]
             if type(parser_data["CONFIG"].get('RETRIALS', 0)) is not int:
                 parser_data["CONFIG"]['RETRIALS'] = int(parser_data["CONFIG"].get('RETRIALS', 0))
 
