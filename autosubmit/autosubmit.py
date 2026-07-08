@@ -40,7 +40,6 @@ from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
 from typing import Generator, Optional, Union, TYPE_CHECKING, cast
-
 from bscearth.utils.date import date2str
 from portalocker import Lock
 from portalocker.exceptions import BaseLockException
@@ -1607,7 +1606,7 @@ class Autosubmit:
 
             if not isinstance(job_list, type([])):
                 if check_wrapper and (not locked or (force and locked)):
-                    job_list.get_packages_persistence().reset_table(preview=True)
+                    job_list.clear_wrappers_db(preview=True)
                     Log.info("Generating all cmd script adapted for wrappers")
                     jobs = job_list.get_uncompleted()
                     if force:
@@ -1650,7 +1649,7 @@ class Autosubmit:
             if quick:
                 wrapped_sections = list()
                 if check_wrapper:
-                    job_list.get_packages_persistence().reset_table(preview=True)
+                    job_list.clear_wrappers_db(preview=True)
                     for wrapper_data in as_conf.experiment_data.get("WRAPPERS", {}).values():
                         if isinstance(wrapper_data, dict):
                             jobs_in_wrapper = wrapper_data.get("JOBS_IN_WRAPPER", [])
@@ -1700,7 +1699,7 @@ class Autosubmit:
         return 1
 
     @staticmethod
-    def generate_scripts_andor_wrappers(as_conf, job_list, only_wrappers=False):
+    def generate_scripts_andor_wrappers(as_conf, job_list, only_wrappers=False, jobs=None):
         """
         :param as_conf: Class that handles basic configuration parameters of Autosubmit. \n
         :type as_conf: AutosubmitConfig() Object \n
@@ -1708,6 +1707,8 @@ class Autosubmit:
         :type job_list: JobList() Object \n
         :param only_wrappers: True when coming from Autosubmit.create(). False when coming from Autosubmit.inspect(), \n
         :type only_wrappers: Boolean \n
+        :param jobs: Optional list of jobs to process.\n
+        :type jobs: list\n
         :return: Nothing\n
         :rtype: \n
         """
@@ -2184,7 +2185,7 @@ class Autosubmit:
                 pending_logs = job_list.recover_logs()
                 while pending_logs:
                     pending_logs = job_list.recover_logs()
-                job_list.save()
+                job_list.save_jobs()
                 try:
                     recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
                 except Exception as e:
@@ -2329,7 +2330,7 @@ class Autosubmit:
                 pending_logs = job_list.recover_logs()
                 while pending_logs:
                     pending_logs = job_list.recover_logs()
-                job_list.save()
+                job_list.save_jobs()
 
                 Log.info("Waiting for all logs to be updated")
                 for p in platforms_to_test:
@@ -2519,9 +2520,9 @@ class Autosubmit:
                             platform_interface.process_ready_jobs(scripts_to_submit_by_name)
                             any_job_submitted = True
                         except Exception:
-                            job_list.save()
+                            job_list.save_jobs()
                             raise
-                    job_list.save()
+                    job_list.save_jobs()
 
                 if x11_scripts_to_submit_by_section:
                     for section, x11_scripts in x11_scripts_to_submit_by_section.items():
@@ -2532,12 +2533,12 @@ class Autosubmit:
                                 any_job_submitted = True
                             except Exception:
                                 if not inspect:
-                                    job_list.save()
+                                    job_list.save_jobs()
                                 raise
-                    job_list.save()
+                    job_list.save_jobs()
 
             wrapper_errors.update(packager.wrappers_with_error)
-            job_list.save_wrappers(scripts_to_submit_by_section, as_conf, inspect=inspect)
+            job_list.save_wrappers(scripts_to_submit_by_section, as_conf, preview=inspect)
         
         Autosubmit.check_deadlock(wrapper_errors, any_job_submitted, job_list)
 
@@ -3078,7 +3079,7 @@ class Autosubmit:
                     recover_stale_job_data(expid, as_conf, platforms_to_test)
                 except Exception as e:
                     Log.debug(f"Error while recovering stale job data: {str(e)}")
-                job_list.save()
+                job_list.save_jobs()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
 

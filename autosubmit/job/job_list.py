@@ -3134,10 +3134,10 @@ class JobList(object):
         :param job: The job object to recover the log for.
         :type job: Job
         """
-        if str(self._config.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                 "false")).lower() == "true":
+        if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
+                                                                  "false")).lower() == "true":
             job.retrieve_logfiles()
-            job.send_cpmip_notification(self._config)
+            job.send_cpmip_notification(self._as_conf)
         else:
             # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
             job.write_submit_time()
@@ -3152,7 +3152,7 @@ class JobList(object):
         have been recovered.
 
         """
-        jobs_to_recover = [job for job in self._job_list if
+        jobs_to_recover = [job for job in self.job_list if
                            job.status in self._FINAL_STATUSES and job.updated_log <= job.fail_count]
         for job in jobs_to_recover:
             self._recover_log(job)
@@ -3499,7 +3499,8 @@ class JobList(object):
 
         wrappers = []
         initial_status = Status.SUBMITTED if not preview else Status.COMPLETED
-        for package in [package for package in scripts.values() if package.is_wrapped]:
+        all_packages = [p for section_packages in scripts.values() for p in section_packages.values()]
+        for package in [package for package in all_packages if package.is_wrapped]:
             # Add a fake id while using inspect -cw, create -cw or monitor -cw
             if preview:
                 self.assign_unique_fake_id(package)
