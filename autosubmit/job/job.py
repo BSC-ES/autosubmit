@@ -2145,6 +2145,8 @@ class Job(object):
             parameters['CHUNK_END_MONTH'] = str(chunk_end.month).zfill(2)
             parameters['CHUNK_END_DAY'] = str(chunk_end.day).zfill(2)
             parameters['CHUNK_END_HOUR'] = str(chunk_end.hour).zfill(2)
+            parameters['CHUNK_END_DATE_LAST'] = date2str(last_chunk_end, self.date_format)
+            parameters['LDATE'] = date2str(last_day_chunk, self.date_format)
 
             parameters['PREV'] = str(subs_dates(self.date, chunk_start, cal))
 
@@ -2157,8 +2159,6 @@ class Job(object):
                 parameters['CHUNK_LAST'] = 'TRUE'
             else:
                 parameters['CHUNK_LAST'] = 'FALSE'
-            parameters['CHUNK_END_DATE_LAST'] = date2str(last_chunk_end, self.date_format)
-            parameters['LDATE'] = date2str(last_day_chunk, self.date_format)
         return parameters
 
     def update_job_parameters(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
