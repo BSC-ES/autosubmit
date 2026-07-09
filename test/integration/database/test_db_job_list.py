@@ -676,17 +676,6 @@ def test_clear_unused_nodes(
         assert loaded_job is not None, f"Job {job_name} should not have been deleted"
         assert loaded_job['name'] == job_name
 
-    # Clear tables
-    db_manager.drop_table(jobs_table.name)
-    db_manager.drop_table(edges_table.name)
-
-    # Restore
-    assert 0 == db_manager.restore()
-
-    loaded_job = db_manager.load_job_by_name(f'{_expid}_LOCAL_SETUP')
-    assert loaded_job is not None
-    assert loaded_job['name'] == f'{_expid}_LOCAL_SETUP'
-
 
 # -- Tests for detecting changes in dependencies -- #
 

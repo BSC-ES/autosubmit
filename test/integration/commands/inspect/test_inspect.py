@@ -111,9 +111,9 @@ def test_inspect_combined_filters(as_exp, mocker, templates_dir):
     captured_jobs = {}
 
     def capture_generate_scripts(
-        as_conf, job_list_obj, jobs_filtered, packages_persistence, only_wrappers=False
+        as_conf, job_list_obj, only_wrappers=False, jobs=None
     ):
-        captured_jobs["names"] = [job.name for job in jobs_filtered]
+        captured_jobs["names"] = [job.name for job in jobs] if jobs else []
 
     mocker.patch(
         "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers",
@@ -139,9 +139,9 @@ def test_inpect_no_filters_selects_all_jobs(as_exp, mocker):
     captured_jobs = {}
 
     def capture_generate_scripts(
-        as_conf, job_list_obj, jobs_filtered, packages_persistence, only_wrappers=False
+        as_conf, job_list_obj, only_wrappers=False, jobs=None
     ):
-        captured_jobs["names"] = [job.name for job in jobs_filtered]
+        captured_jobs["names"] = [job.name for job in jobs] if jobs else []
 
     mocker.patch(
         "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers",
@@ -161,9 +161,9 @@ def test_check_wrappers_selects_uncompleted_jobs(as_exp, mocker):
     captured_jobs = {}
 
     def capture_generate_scripts(
-        as_conf, job_list_obj, jobs_filtered, packages_persistence, only_wrappers=False
+        as_conf, job_list_obj, only_wrappers=False, jobs=None
     ):
-        captured_jobs["names"] = [job.name for job in jobs_filtered]
+        captured_jobs["names"] = [job.name for job in jobs] if jobs else []
 
     mocker.patch(
         "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers",

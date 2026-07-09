@@ -1680,7 +1680,7 @@ class Autosubmit:
                     job.status = Status.WAITING
 
                 Autosubmit.generate_scripts_andor_wrappers(
-                    as_conf, job_list, jobs, False)
+                    as_conf, job_list, only_wrappers=False, jobs=jobs)
             if len(jobs_cw) > 0:
                 for job in jobs_cw:
                     file_paths += f"{str(tmp_path / (job.name + '.cmd'))}\n"
@@ -2173,7 +2173,7 @@ class Autosubmit:
                 # 3650 = (72h - 122h)
                 max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get("RECOVERY_RETRIALS", 3650)
                 recovery_retrials = 0
-                if profile is not None:
+                if profiler is not None:
                     loaded_jobs = len(job_list.get_job_list())
                     loaded_edges = 0
                     for job in job_list.get_job_list():
@@ -2195,7 +2195,7 @@ class Autosubmit:
                 while job_list.continue_run():
                     try:
 
-                        if profile is not None:
+                        if profiler is not None:
                             Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
 
                         if stop_event and stop_event.is_set():
@@ -2356,7 +2356,7 @@ class Autosubmit:
                     Log.info("Some jobs have failed and reached maximum retrials")
                 else:
                     Log.result("Run successful")
-                    if profile:
+                    if profiler:
                         profiler.iteration_checkpoint(len(job_list.graph.nodes()), len(job_list.graph_dict))
                     # Updating finish time for job data header
                     try:
@@ -2375,7 +2375,7 @@ class Autosubmit:
         except BaseException:
             raise
         finally:
-            if profile:
+            if profiler:
                 profiler.stop()
 
         # Suppress in case ``job_list`` was not defined yet...

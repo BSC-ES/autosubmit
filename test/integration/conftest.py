@@ -44,7 +44,7 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from test.integration.test_utils.docker import (
+from test.integration.test_utils.docker_utils import (
     get_git_container, get_slurm_container, get_ssh_container,
     prepare_and_test_slurm_container, prepare_and_test_ssh_container,
     prepare_and_test_git_container, get_svn_container, prepare_and_test_svn_container
