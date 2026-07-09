@@ -171,7 +171,7 @@ class PBSPlatform(ParamikoPlatform):
     def _check_for_unrecoverable_errors(self) -> None:
         """Check PBS command output for transient and permanent errors."""
 
-        err = self._ssh_output_err or ""
+        err = self._ssh_output_err
         err_lower = err.lower()
         if not err_lower.strip():
             return
