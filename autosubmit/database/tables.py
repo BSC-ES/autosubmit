@@ -258,7 +258,7 @@ def create_wrapper_tables(name, metadata_obj_):
         metadata_obj_,
         Column("package_id", Integer, nullable=False, primary_key=True),
         Column("package_name", String, nullable=False, primary_key=True),
-        Column("job_name", String, ForeignKey("jobs.name"), nullable=False, primary_key=True),
+        Column("job_name", String, nullable=False, primary_key=True),
         Column("timestamp", String, nullable=True),
         UniqueConstraint("package_id", "package_name", "job_name", name=f"unique_{name}_jobs_package_id_package_name_job_name"),
 

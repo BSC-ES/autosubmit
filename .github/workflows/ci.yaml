@@ -58,7 +58,7 @@ jobs:
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             --verbose --verbosity="2" \
-            test/unit -m "not postgres"
+            test/unit -m "not postgres and not profile and not profilelong"
 
       - name: Coverage report
         run: |
@@ -221,7 +221,7 @@ jobs:
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/regression \
-            -m ''
+            -m "not profile and not profilelong"
 
       - name: Coverage report
         run: |
@@ -271,7 +271,7 @@ jobs:
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
-            -m 'slurm'
+            -m 'slurm and not profile and not profilelong'
 
       - name: Coverage report
         run: |

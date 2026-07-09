@@ -385,12 +385,12 @@ class JobsDbManager(DbManager):
         preview_wrapper_info_table: Table = self.table_registry.get(PreviewWrapperInfoTable.name)
         wrapper_info_table: Table = self.table_registry.get(WrapperInfoTable.name)
 
-        self.drop_table(jobs_table.name)
-        self.drop_table(experiment_structure_table.name)
         self.drop_table(preview_wrapper_jobs_table.name)
         self.drop_table(wrapper_jobs_table.name)
         self.drop_table(preview_wrapper_info_table.name)
         self.drop_table(wrapper_info_table.name)
+        self.drop_table(jobs_table.name)
+        self.drop_table(experiment_structure_table.name)
 
     def save_sections_data(self, sections_data: List[Dict[str, Any]]) -> None:
         """

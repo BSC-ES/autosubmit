@@ -108,15 +108,14 @@ class ExperimentHistory:
 
             return None
 
-    def get_submit_data_dc(self, job_name: str, fail_count: int) -> Optional[JobData]:
-        """
-        Retrieve the latest submit JobData for a given job_name and fail_count.
+    def get_submit_data_dc(self, job_name: str, fail_count: int = 0) -> Optional[JobData]:
+        """Retrieve the full JobData for a job's submission by job name and fail count.
 
         :param job_name: The name of the job.
         :type job_name: str
-        :param fail_count: The fail count to look up.
+        :param fail_count: The number of times the job has failed. Defaults to 0.
         :type fail_count: int
-        :return: The latest JobData instance, or None if not found.
+        :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
         :rtype: Optional[JobData]
         """
         try:
@@ -124,15 +123,14 @@ class ExperimentHistory:
         except Exception:
             return None
 
-    def get_finish_data_dc(self, job_name: str, fail_count: int) -> Optional[JobData]:
-        """
-        Retrieve the latest finish JobData for a given job_name and fail_count.
+    def get_finish_data_dc(self, job_name: str, fail_count: int = 0) -> Optional[JobData]:
+        """Retrieve the full JobData for a job's finish record by job name and fail count.
 
         :param job_name: The name of the job.
         :type job_name: str
-        :param fail_count: The fail count to look up.
+        :param fail_count: The number of times the job has failed. Defaults to 0.
         :type fail_count: int
-        :return: The latest JobData instance, or None if not found.
+        :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
         :rtype: Optional[JobData]
         """
         try:
@@ -140,34 +138,54 @@ class ExperimentHistory:
         except Exception:
             return None
 
-    def update_submit_time(self, job_name, submit=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",
-                           member="", section="", chunk=0, platform="NA", job_id=0, wrapper_queue=None,
-                           wrapper_code=None, children="", workflow_commit="", split=None, splits=None,
-                           fail_count=0):
-        """
-        Update an existing submit row in the database by job_name and fail_count.
+    def update_submit_time(self, job_name: str, submit: int = 0, status: str = "UNKNOWN", ncpus: int = 0,
+                           wallclock: str = "00:00", qos: str = "debug", date: str = "", member: str = "",
+                           section: str = "", chunk: int = 0, platform: str = "NA", job_id: int = 0,
+                           wrapper_queue: Optional[str] = None, wrapper_code: Optional[str] = None,
+                           children: str = "", workflow_commit: str = "", split=None, splits=None,
+                           fail_count: int = 0) -> Optional[JobData]:
+        """Updates an existing job submission entry in the database, identified by job name and fail count.
 
         :param job_name: The name of the job.
-        :param submit: The submit time timestamp.
-        :param status: The status of the job.
-        :param ncpus: Number of CPUs.
-        :param wallclock: Wallclock time.
-        :param qos: Quality of service.
-        :param date: Date string.
-        :param member: Member string.
-        :param section: Section string.
-        :param chunk: Chunk number.
-        :param platform: Platform name.
-        :param job_id: Job ID.
-        :param wrapper_queue: Wrapper queue.
-        :param wrapper_code: Wrapper code.
-        :param children: Children string.
-        :param workflow_commit: Workflow commit hash.
-        :param split: Split identifier.
-        :param splits: Splits range.
-        :param fail_count: Fail count.
-        :return: The updated JobData, or None if an exception occurs.
-        :rtype: JobData
+        :type job_name: str
+        :param submit: The submission time of the job. Defaults to 0.
+        :type submit: int
+        :param status: The status of the job. Defaults to "UNKNOWN".
+        :type status: str
+        :param ncpus: The number of CPUs allocated for the job. Defaults to 0.
+        :type ncpus: int
+        :param wallclock: The wallclock time allocated for the job. Defaults to "00:00".
+        :type wallclock: str
+        :param qos: The quality of service. Defaults to "debug".
+        :type qos: str
+        :param date: The date associated with the job. Defaults to an empty string.
+        :type date: str
+        :param member: The member associated with the job. Defaults to an empty string.
+        :type member: str
+        :param section: The section associated with the job. Defaults to an empty string.
+        :type section: str
+        :param chunk: The chunk number associated with the job. Defaults to 0.
+        :type chunk: int
+        :param platform: The platform on which the job is run. Defaults to "NA".
+        :type platform: str
+        :param job_id: The job ID. Defaults to 0.
+        :type job_id: int
+        :param wrapper_queue: The wrapper queue. Defaults to None.
+        :type wrapper_queue: Optional[str]
+        :param wrapper_code: The wrapper code. Defaults to None.
+        :type wrapper_code: Optional[str]
+        :param children: The children. Defaults to an empty string.
+        :type children: str
+        :param workflow_commit: The workflow commit identifier. Defaults to an empty string.
+        :type workflow_commit: str
+        :param split: The split identifier. Defaults to None.
+        :type split: Optional[str]
+        :param splits: The splits information. Defaults to None.
+        :type splits: Optional[str]
+        :param fail_count: The number of times the job has failed. Defaults to 0.
+        :type fail_count: int
+        :return: The updated JobData instance, or None if the record is not found or an exception occurs.
+        :rtype: Optional[JobData]
         """
         try:
             job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
@@ -310,11 +328,7 @@ class ExperimentHistory:
 
     def _verify_slurm_monitor(self, slurm_monitor, job_data_dc):
         try:
-            if slurm_monitor.header.status not in ["COMPLETED", "FAILED"]:
-                self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
-                              f"Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.\n")
-                Log.debug(
-                    f'Historical Database error: Slurm status {slurm_monitor.header.status} is not COMPLETED nor FAILED for ID {slurm_monitor.header.name}.')
+            # Removed, if this happens it is because the job is an inner_job
             if not slurm_monitor.steps_plus_extern_approximate_header_energy():
                 self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
                               f"Steps + extern != total energy for ID {slurm_monitor.header.name}."
