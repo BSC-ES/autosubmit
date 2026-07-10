@@ -852,3 +852,34 @@ def test_get_section_missing_returns_d_value(
     else:
         result = as_conf.get_section(section, d_value=d_value, must_exists=must_exists)
         assert result == expected
+
+
+def test_get_project_submodules_depth_invalid_returns_default(autosubmit_config: 'AutosubmitConfigFactory'):
+    """When PROJECT_SUBMODULES_DEPTH is not a valid integer, return the default [-1]."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={
+        'GIT': {
+            'PROJECT_SUBMODULES_DEPTH': 'not_a_number'
+        }
+    })
+    depth = as_conf.get_project_submodules_depth()
+    assert depth == [-1]
+
+
+def test_get_project_submodules_depth_valid_integer(autosubmit_config: 'AutosubmitConfigFactory'):
+    """When PROJECT_SUBMODULES_DEPTH is a valid integer, return it as a list."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={
+        'GIT': {
+            'PROJECT_SUBMODULES_DEPTH': '5'
+        }
+    })
+    depth = as_conf.get_project_submodules_depth()
+    assert depth == [5]
+
+
+def test_get_project_submodules_depth_default(autosubmit_config: 'AutosubmitConfigFactory'):
+    """When PROJECT_SUBMODULES_DEPTH is not provided, return the default [-1]."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={
+        'GIT': {}
+    })
+    depth = as_conf.get_project_submodules_depth()
+    assert depth == [-1]
