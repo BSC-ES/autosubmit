@@ -36,6 +36,7 @@ from autosubmit.history.strategies import (
     StraightWrapperAssociationStrategy,
 )
 from autosubmit.history.utils import get_current_datetime
+from autosubmit.log.log import AutosubmitCritical
 from test._oldschema import old_experiment_run_table, old_job_data_table
 
 EXPID_TT00_SOURCE = "test_database.db~"
@@ -725,12 +726,22 @@ def test_process_status_changes_exception(mocker, job_list, manager):
     CURRENT_CONFIG = "CURRENT CONFIG"
 
     mocked_exp_history.manager.get_experiment_run_dc_with_max_id.side_effect = None
-    exp_history.process_status_changes(
-        job_list=job_list,
-        chunk_unit=CHUNK_UNIT,
-        chunk_size=CHUNK_SIZE,
-        current_config=CURRENT_CONFIG,
-    )  # Generates new run
 
-    assert mocked_log.debug.call_count > 0
-    assert "Historical Database error:" in mocked_log.debug.call_args.args[0]
+    if manager:
+        with pytest.raises(AutosubmitCritical) as cm:
+            exp_history.process_status_changes(
+                job_list=job_list,
+                chunk_unit=CHUNK_UNIT,
+                chunk_size=CHUNK_SIZE,
+                current_config=CURRENT_CONFIG,
+            )  # Generates new run
+        assert "The DB Manager couldn't be properly initialized" in cm.value.message
+    else:
+        exp_history.process_status_changes(
+            job_list=job_list,
+            chunk_unit=CHUNK_UNIT,
+            chunk_size=CHUNK_SIZE,
+            current_config=CURRENT_CONFIG,
+        )  # Generates new run
+        assert mocked_log.debug.call_count > 0
+        assert "Historical Database error:" in mocked_log.debug.call_args.args[0]
