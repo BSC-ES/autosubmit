@@ -146,7 +146,7 @@ class AutosubmitConfig(object):
                 depth = [int(unparsed_depth)]
             except TypeError:
                 Log.warning("PROJECT_SUBMODULES_DEPTH is not an integer neither a int. Using default value -1")
-                depth = []
+                depth = [-1]
         return depth
 
     def get_full_config_as_json(self):
