@@ -2074,10 +2074,10 @@ class AutosubmitConfig(object):
                 experiment_data[key] = starter_conf[key]
             elif isinstance(starter_conf[key], collections.abc.Mapping):
                 experiment_data[key] = self.deep_add_missing_starter_conf(experiment_data[key], starter_conf[key])
-            # This validation checks whether a `Dynamic Variable ` references itself, which would create an infinite loop.
+            # This validation checks whether a `dynamic variable` references itself, which would create an infinite loop.
             # During validation, all variable names are prefixed with `current_` hence the [8:].
             # However, special variables start with `^` that can break this logic since
-            # becomes part of the generated reference name.
+            # it becomes part of the generated reference name.
             if isinstance(experiment_data[key], str) and "%" in experiment_data[key]:
                 check_value = experiment_data[key].split("%")[1]
                 special_var = check_value[0] == "^"
