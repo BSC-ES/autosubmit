@@ -499,5 +499,15 @@ def general_data(tmp_path: Path) -> dict[str, Any]:
                 'MAX_PROCESSORS': '4',
                 'CUSTOM_DIRECTIVES': ['#SBATCH --hint=nomultithread'],
             },
-        }
+        },
+        'JOBS': {
+            'LOCAL_SETUP': {
+                'FILE': 'LOCAL_SETUP.sh',
+                'PLATFORM': 'LOCAL',
+                'SCRIPT': {
+                    'echo "OK!"',
+                    'echo "SCRIPT: %current_script%"',
+                },
+            },
+        },
     }
