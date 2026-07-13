@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
 
 
-def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: str | None = None):
+def check_jobs_file_exists(as_conf: "AutosubmitConfig", current_section_name: str | None = None):
     """Raise an error if the jobs file does not exist.
 
     By default, it will search all jobs sections. Alternatively, callers can pass
@@ -435,3 +435,111 @@ def build_and_connect_platform(
 
     plat.restore_connection(as_conf)
     return plat
+
+
+def recover_stale_job_data(
+    expid: str,
+    as_conf: "AutosubmitConfig",
+    platforms: Optional[dict[str, Platform]] = None,
+) -> None:
+    """Fetch STAT files for rows with submit>0 and (start=0 or finish=0)
+    and update job_data directly. Uses existing platform connections when
+    available (e.g. during run_experiment).
+
+    :param expid: Experiment identifier.
+    :param as_conf: Autosubmit config object.
+    :param platforms: Optional dict of name -> connected platform to reuse.
+    """
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
+    db_path = Path(BasicConfig.JOBDATA_DIR) / f"job_data_{expid}.db"
+    if not db_path.exists():
+        return
+
+    exp_history = ExperimentHistory(expid, force_sql_alchemy=True)
+    stale = exp_history.get_stale_rows()
+    if not stale:
+        return
+
+    Log.info(f"Found {len(stale)} stale job_data rows — connecting to platforms")
+    by_platform = defaultdict(list)
+    for row in stale:
+        by_platform[row.platform].append((row.job_name, int(row.fail_count)))
+
+    for pn, jobs in by_platform.items():
+        plat = platforms.get(pn) if platforms else None
+        if not plat or not getattr(plat, "connected", False):
+            try:
+                plat = build_and_connect_platform(pn, as_conf, expid)
+            except Exception as e:
+                Log.warning(f"Cannot connect to {pn}: {e}")
+                continue
+
+        for jn, fail_count in jobs:
+            try:
+                start, finish = _fetch_stat_timestamps(plat, exp_path, jn, fail_count)
+                if start or finish:
+                    exp_history.update_job_data_values(jn, fail_count, start, finish)
+            except Exception as e:
+                Log.warning(f"Could not recover {jn} fail_count={fail_count}: {e}")
+
+
+def _fetch_stat_timestamps(
+    plat: Platform, exp_path: Path, job_name: str, fail_count: int
+) -> tuple[int, int]:
+    """Download STAT file from platform and return (start, finish) timestamps.
+
+    :param plat: Connected platform instance.
+    :param exp_path: Experiment root path.
+    :param job_name: Full job name.
+    :param fail_count: Retry attempt number.
+    :return: Tuple of (start, finish) epoch integers.
+    """
+    stat = f"{job_name}_STAT_{fail_count}"
+    local = exp_path / BasicConfig.LOCAL_TMP_DIR / stat
+    if plat.check_file_exists(stat):
+        plat.get_file(stat, True)
+        if local.exists():
+            return _parse_stat_file(local)
+    return 0, 0
+
+
+def _parse_stat_file(path: Path) -> tuple[int, int]:
+    """Read a STAT file and return (start, finish) epoch integers."""
+    lines = [x.strip() for x in path.read_text().splitlines() if x.strip()]
+    try:
+        values = [int(x) for x in lines[:2]]
+    except ValueError:
+        Log.warning(f"STAT file {path} contains non-integer data, skipping")
+        return 0, 0
+    return (
+        (values[0], values[1])
+        if len(values) >= 2 else (values[0], 0)
+        if values else (0, 0)
+    )
+
+
+def describe_command_details(args) -> None:
+    descriptor = "\n"
+    if "autosubmit" in sys.argv[0]:
+        descriptor += f"CLI_PATH : {sys.argv[0]}\n"
+        cli_args = ["autosubmit"] + sys.argv[1:]
+        command = " ".join(shlex.quote(arg) for arg in cli_args)
+        descriptor += f"COMMAND : {command}\n"
+        if hasattr(args, "expid") and args.expid and args.expid != "*":
+            descriptor += f"EXPID : {args.expid}\n"
+            current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, args.expid).stat().st_uid
+            try:
+                current_owner = pwd.getpwuid(current_owner_id).pw_name
+            except (TypeError, KeyError) as e:
+                Log.warning(
+                    f"Current owner of experiment {args.expid} could not be retrieved. "
+                    f"The owner is no longer in the system database: {str(e)}"
+                )
+            user_descriptor = (
+                current_owner if current_owner is not None else current_owner_id
+            )
+            descriptor += f"USER: {user_descriptor}"
+    else:
+        command = " ".join(shlex.quote(arg) for arg in sys.argv)
+        descriptor += f"There was an issue with the command executed: {command}"
+    Log.info(f"{descriptor}")
