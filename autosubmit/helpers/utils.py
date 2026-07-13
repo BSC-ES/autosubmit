@@ -531,22 +531,23 @@ def describe_command_details(args) -> None:
     if "autosubmit" in sys.argv[0]:
         descriptor += f"CLI_PATH : {sys.argv[0]}\n"
         cli_args = ["autosubmit"] + sys.argv[1:]
-    else:
-        cli_args = sys.argv
-    command = " ".join(shlex.quote(arg) for arg in cli_args)
-    descriptor += f"COMMAND : {command}\n"
-    if hasattr(args, "expid") and args.expid and args.expid != "*":
-        descriptor += f"EXPID : {args.expid}\n"
-        current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, args.expid).stat().st_uid
-        try:
-            current_owner = pwd.getpwuid(current_owner_id).pw_name
-        except (TypeError, KeyError) as e:
-            Log.warning(
-                f"Current owner of experiment {args.expid} could not be retrieved. "
-                f"The owner is no longer in the system database: {str(e)}"
+        command = " ".join(shlex.quote(arg) for arg in cli_args)
+        descriptor += f"COMMAND : {command}\n"
+        if hasattr(args, "expid") and args.expid and args.expid != "*":
+            descriptor += f"EXPID : {args.expid}\n"
+            current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, args.expid).stat().st_uid
+            try:
+                current_owner = pwd.getpwuid(current_owner_id).pw_name
+            except (TypeError, KeyError) as e:
+                Log.warning(
+                    f"Current owner of experiment {args.expid} could not be retrieved. "
+                    f"The owner is no longer in the system database: {str(e)}"
+                )
+            user_descriptor = (
+                current_owner if current_owner is not None else current_owner_id
             )
-        user_descriptor = (
-            current_owner if current_owner is not None else current_owner_id
-        )
-        descriptor += f"USER: {user_descriptor}"
+            descriptor += f"USER: {user_descriptor}"
+    else:
+        command = " ".join(shlex.quote(arg) for arg in sys.argv)
+        descriptor += f"There was an issue with the command executed: {command}"
     Log.info(f"{descriptor}")
