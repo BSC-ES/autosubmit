@@ -78,7 +78,7 @@ def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file
         # Create fake local stat file, to be deleted before copying the remote file (created above).
         Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, filename).touch()
 
-    assert remote_file_exists == local.get_stat_file(job=job, count=job.fail_count)
+    assert remote_file_exists == local.get_stat_file(job=job, attempt=job.fail_count)
     assert mocked_os_remove.called == stats_file_exists
 
 

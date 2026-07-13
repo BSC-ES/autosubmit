@@ -1823,7 +1823,7 @@ def test_update_job_parameters(autosubmit_config, experiment_data):
     job.member = "fc00"
     job.date = datetime.fromisoformat("2023-08-15T00:00:00")
     parameters = {}
-    expected = {'AS_CHECKPOINT': 'as_checkpoint', 'CHUNK': 1, 'CHUNK_END_DATE': '20230816', 'CHUNK_END_DAY': '16',
+    expected = {'AS_CHECKPOINT': 'as_checkpoint', 'CHUNK': 1, 'CHUNK_END_DATE': '20230816', 'CHUNK_END_DATE_LAST': '20230816', 'CHUNK_END_DAY': '16',
                 'CHUNK_END_HOUR': '00', 'CHUNK_END_IN_DAYS': '1', 'CHUNK_END_MONTH': '08', 'CHUNK_END_YEAR': '2023',
                 'CHUNK_FIRST': 'TRUE', 'CHUNK_LAST': 'TRUE', 'CHUNK_SECOND_TO_LAST_DATE': '20230815',
                 'CHUNK_SECOND_TO_LAST_DAY': '15', 'CHUNK_SECOND_TO_LAST_HOUR': '00', 'CHUNK_SECOND_TO_LAST_MONTH': '08',
@@ -1832,7 +1832,8 @@ def test_update_job_parameters(autosubmit_config, experiment_data):
                 'DAY_BEFORE': '20230814',
                 'DELAY': None, 'DELAY_RETRIALS': None, 'DELETE_WHEN_EDGELESS': True, 'EXPORT': 'none',
                 'FAIL_COUNT': '0',
-                'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'MEMBER': 'fc00', 'NUMMEMBERS': 0,
+                'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'LDATE': '20230815',
+                'MEMBER': 'fc00', 'NUMMEMBERS': 0,
                 'PACKED': False, 'PREV': '0', 'PROJECT_TYPE': 'none', 'RETRIALS': 0, 'RUN_DAYS': '1',
                 'SDATE': '20230815',
                 'SHAPE': '', 'SPLIT': None, 'SPLITS': None, 'SYNCHRONIZE': None, 'WORKFLOW_COMMIT': 'dummy',

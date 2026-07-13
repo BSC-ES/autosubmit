@@ -1988,13 +1988,10 @@ class Autosubmit:
 
         # Check if the user wants to continue using wrappers and loads the appropriate info.
         if as_conf.experiment_data.get("WRAPPERS", None) is not None:
-            if BasicConfig.DATABASE_BACKEND == 'sqlite':
-                os.chmod(os.path.join(BasicConfig.LOCAL_ROOT_DIR,
-                                      expid, "pkl", "job_packages_" + expid + ".db"), 0o644)
             try:
                 job_list.load_wrappers()
             except IOError as e:
-                raise AutosubmitError("job_packages not found", 6016, str(e))
+                raise AutosubmitError("wrappers not found in job_list database", 6016, str(e))
         if recover:
             Log.info("Recovering wrappers... Done")
 
