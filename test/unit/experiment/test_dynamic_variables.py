@@ -19,7 +19,9 @@ import pytest
 
 from autosubmit.log.log import AutosubmitCritical
 
-@pytest.mark.parametrize('experiment_data', [
+@pytest.mark.parametrize(
+    "experiment_data",
+    [
         {
             'TEST_SLURM': {
                 'FDB_COPY_BIN': '%"CURRENT_FDB_COPY_BIN%/fdb-copy',
@@ -46,8 +48,24 @@ from autosubmit.log.log import AutosubmitCritical
                 'FDB_COPY_BIN': 'TEST/%CURRENT_FDB_COPY_BIN%/fdb-copy',
                 'FDB_LIST_BIN': 'TEST/%CURRENT_FDB_LIST_BIN%/fdb-list',
             },
-        }
-], ids=["Special Dynamic Variable", "Dynamic Variable", "Multiple Dynamic Variable", "Special Dynamic Variable With Reference", "Dynamic Variable With Reference"])
+        }, {
+            'TEST_SLURM': {
+                'FDB_LIST_BIN': 'TEST/%current_FDB_LIST_BIN%/fdb-list',
+            }
+        }, {
+            'TEST_SLURM': {
+                'fdb_list_bin': 'TEST/%current_FDB_LIST_BIN%/fdb-list',
+            }
+        },
+        {
+            'SCRIPT': '%current_script%'
+        },
+    ],
+    ids=["Special Dynamic Variable", "Dynamic Variable", "Multiple Dynamic Variable",
+         "Special Dynamic Variable With Reference", "Dynamic Variable With Reference",
+         "Oneliner Dynamic Variable With Reference", "Scripts lower/upper", "Scripts upper/lower"
+    ],
+)
 def test_infinite_loop_dynamic_variable(autosubmit_config, general_data, experiment_data):
     as_conf = autosubmit_config('t000', {
             'PLATFORMS': experiment_data,
