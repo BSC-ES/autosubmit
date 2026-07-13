@@ -15,11 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import threading
 from pathlib import Path
 from typing import Union
 
 from autosubmit.config.basicconfig import BasicConfig
 from sqlalchemy import Engine, NullPool, create_engine as sqlalchemy_create_engine
+
+__all__ = ["_resolve_engine", "get_engine"]
 
 
 def _resolve_engine(connection_url: str) -> Engine:
@@ -39,17 +42,15 @@ class PostgreSQLEngineSingleton:
     """Singleton class to manage a single instance of the PostgreSQL engine."""
 
     _instance: Engine = None
+    _lock: threading.Lock = threading.Lock()
 
     @classmethod
     def get_instance(cls) -> Engine:
         """Get the singleton instance of the PostgreSQL engine."""
-        if cls._instance is None:
-            connection_url = BasicConfig.DATABASE_CONN_URL
-            if not connection_url:
-                raise ValueError(
-                    "PostgreSQL connection URL is not set in the configuration."
-                )
-            cls._instance = _resolve_engine(connection_url)
+        with cls._lock:
+            if cls._instance is None:
+                connection_url = BasicConfig.DATABASE_CONN_URL
+                cls._instance = _resolve_engine(connection_url)
         return cls._instance
 
 
@@ -77,6 +78,3 @@ def get_engine(db_path: Union[str, Path]) -> Engine:
         return PostgreSQLEngineSingleton.get_instance()
     else:
         raise ValueError(f"Unsupported database backend: {db_backend}")
-
-
-__all__ = ["_resolve_engine", "get_engine"]
