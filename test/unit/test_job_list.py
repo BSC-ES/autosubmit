@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 from typing import Any
-from unittest.mock import MagicMock
 
 import networkx
 import pytest

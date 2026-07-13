@@ -23,7 +23,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
-from autosubmit.database.tables import WrapperJobsTable, JobsTable, ExperimentStructureTable
+from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
 

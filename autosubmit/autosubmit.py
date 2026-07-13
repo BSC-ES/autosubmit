@@ -4180,13 +4180,6 @@ class Autosubmit:
                             date_format = 'H'
                         if date.minute > 1:
                             date_format = 'M'
-                    wrapper_jobs = dict()
-
-                    for wrapper_name, wrapper_parameters in as_conf.get_wrappers().items():
-                        # continue if it is a global option (non-dict)
-                        if type(wrapper_parameters) is not dict:
-                            continue
-                        wrapper_jobs[wrapper_name] = as_conf.get_wrapper_jobs(wrapper_parameters)
 
                     job_list.generate(as_conf, date_list, member_list, num_chunks, chunk_ini, parameters, date_format,
                                       as_conf.get_retrials(),
@@ -4224,15 +4217,23 @@ class Autosubmit:
                         output = 'txt'
                     if output == 'txt':
                         noplot = False
-                    if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
-                        if len(as_conf.wrong_config) > 0:
-                            Log.warning(
-                                "There are errors in the configuration files. Wrappers will not be generated. Please fix the errors and run the command again."
+                    try:
+                        Log.info("\nPlotting the jobs list...")
+                        if (
+                            len(as_conf.experiment_data.get("WRAPPERS", {})) > 0
+                            and check_wrappers
+                        ):
+                            as_conf.check_conf_files(
+                                running_time=True, force_load=True, no_log=False
                             )
-                        else:
-                            job_list_wr = Autosubmit.load_job_list(expid, as_conf, monitor=True, new=False)
                             Autosubmit.generate_scripts_andor_wrappers(
-                                as_conf, job_list_wr, job_list_wr.get_job_list(), True)
+                                as_conf, job_list, True
+                            )
+                            job_list.load_wrappers(preview=check_wrappers)
+                    except AutosubmitCritical as e:
+                        Log.warning(
+                            f"Couldn't generate a preview of the wrappers due: {e}"
+                        )
 
                     if not noplot:
                         from .monitor.monitor import Monitor
@@ -4246,16 +4247,6 @@ class Autosubmit:
                             job_grouping = JobGrouping(group_by, copy.deepcopy(job_list.get_job_list()), job_list,
                                                        expand_list=expand, expanded_status=status)
                             groups_dict = job_grouping.group_jobs()
-
-                        if (
-                            len(as_conf.experiment_data.get("WRAPPERS", {})) > 0
-                            and check_wrappers
-                        ):
-                            Autosubmit.generate_scripts_andor_wrappers(
-                                as_conf, job_list, True
-                            )
-                        job_list.load_wrappers(preview=check_wrappers)
-                        Log.info("\nPlotting the jobs list...")
                         monitor_exp = Monitor(edge_info=job_list.graph_dict_by_job_name)
                         # if output is set, use output
                         monitor_exp.generate_output(

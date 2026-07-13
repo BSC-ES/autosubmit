@@ -23,7 +23,7 @@ import pytest
 
 from autosubmit.log.log import Log
 from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.platform import Platform, recover_platform_job_logs_wrapper
+from autosubmit.platforms.platform import recover_platform_job_logs_wrapper
 from autosubmit.job.job import Job
 from test.unit.test_job import TestJob, FakeBasicConfig
 
