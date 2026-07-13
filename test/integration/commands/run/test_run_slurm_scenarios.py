@@ -22,7 +22,7 @@ import sqlite3
 import time
 from getpass import getuser
 from pathlib import Path
-from shutil import copy (Fixing test.. also readding test_run_slurm_scenarios)
+from shutil import copy
 from textwrap import dedent
 from typing import TYPE_CHECKING
 
@@ -42,7 +42,7 @@ from test.integration.commands.run.conftest import (
     _check_wrapper_db_fields,
     assert_run_results,
     run_in_thread,
-) (Fixing test.. also readding test_run_slurm_scenarios)
+)
 from test.integration.conftest import AutosubmitExperimentFixture
 
 if TYPE_CHECKING:
