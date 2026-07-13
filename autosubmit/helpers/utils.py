@@ -15,16 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import os
 import pwd
 import re
-import shlex
 import sys
 from collections import defaultdict
+from collections.abc import Iterable
 from contextlib import suppress
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, Optional, Union
+from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -41,7 +43,7 @@ if TYPE_CHECKING:
 
 
 def check_jobs_file_exists(
-    as_conf: "AutosubmitConfig", current_section_name: Optional[str] = None
+    as_conf: AutosubmitConfig, current_section_name: str | None = None
 ):
     """Raise an error if the jobs file does not exist.
 
@@ -93,7 +95,7 @@ def check_experiment_ownership(
     expid: str,
     basic_config: BasicConfig,
     raise_error=False,
-    logger: Optional[Log] = None,
+    logger: Log | None = None,
 ) -> tuple[bool, bool, str]:
     # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available
     my_user_id = os.getuid()
@@ -109,7 +111,7 @@ def check_experiment_ownership(
     except Exception as e:
         if logger:
             logger.info(
-                f"Error while trying to get the experiment's owner information: {str(e)}"
+                f"Error while trying to get the experiment's owner information: {e!s}"
             )
     finally:
         if current_owner_id <= 0 and logger:
@@ -175,7 +177,7 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
             )
             issues += platform_issues
             Log.warning(
-                f"Error restoring platform [{platform.name}] host [{platform.host}]: {str(e)}"
+                f"Error restoring platform [{platform.name}] host [{platform.host}]: {e!s}"
             )
             continue
         if platform.check_remote_permissions():
@@ -328,7 +330,7 @@ def strtobool(val: str) -> bool:
     elif val in ("n", "no", "f", "false", "off", "0"):
         return False
     else:
-        raise ValueError("invalid truth value %r" % (val,))
+        raise ValueError(f"invalid truth value {val}")
 
 
 def get_rc_path(machine: bool, local: bool) -> Path:
@@ -348,7 +350,7 @@ def get_rc_path(machine: bool, local: bool) -> Path:
     if "AUTOSUBMIT_CONFIGURATION" in os.environ:
         return Path(os.environ["AUTOSUBMIT_CONFIGURATION"])
 
-    rc_path: Union[str, Path]
+    rc_path: str | Path
     if machine:
         return Path("/etc/autosubmitrc")  # Higher priority than /etc/.autosubmitrc
     elif local:
@@ -379,7 +381,7 @@ def user_yes_no_query(question: str) -> bool:
 
 
 def build_and_connect_platform(
-    platform_name: str, as_conf: "AutosubmitConfig", expid: str
+    platform_name: str, as_conf: AutosubmitConfig, expid: str
 ) -> Platform:
     """Build a minimal platform object and connect to it for STAT recovery.
 
@@ -445,8 +447,8 @@ def build_and_connect_platform(
 
 def recover_stale_job_data(
     expid: str,
-    as_conf: "AutosubmitConfig",
-    platforms: Optional[dict[str, Platform]] = None,
+    as_conf: AutosubmitConfig,
+    platforms: dict[str, Platform] | None = None,
 ) -> None:
     """Fetch STAT files for rows with submit>0 and (start=0 or finish=0)
     and update job_data directly. Uses existing platform connections when
@@ -525,27 +527,47 @@ def _parse_stat_file(path: Path) -> tuple[int, int]:
 
 
 def describe_command_details(args) -> None:
-    descriptor = "\n"
-    if "autosubmit" in sys.argv[0]:
-        descriptor += f"CLI_PATH : {sys.argv[0]}\n"
-        cli_args = ["autosubmit"] + sys.argv[1:]
-        command = " ".join(shlex.quote(arg) for arg in cli_args)
-        descriptor += f"COMMAND : {command}\n"
+    try:
+        descriptor = "\n"
+        descriptor = "".join(f"{descriptor}executable: {sys.argv[0]}\n")
+        descriptor = "".join(f"{descriptor}command: autosubmit {sys.argv[1]}\n")
+        args_print = ""
+        for key, value in args.__dict__.items():
+            if value is None or value == "" or not value:
+                continue
+            if key in [
+                "version",
+                "logfile",
+                "logconsole",
+                "command",
+                "advanced",
+                "database_backend",
+                "database_conn_url",
+                "databasepath",
+                "databasefilename",
+                "localrootpath",
+                "platformsconfpath",
+                "jobsconfpath",
+                "smtphostname",
+            ]:
+                continue
+            args_print = "".join(f"{args_print} {key}={value}")
+
+        descriptor = "".join(f"{descriptor}args:{args_print}\n")
         if hasattr(args, "expid") and args.expid and args.expid != "*":
-            descriptor += f"EXPID : {args.expid}\n"
+            descriptor = "".join(f"{descriptor}expid: {args.expid}\n")
             current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, args.expid).stat().st_uid
             try:
                 current_owner = pwd.getpwuid(current_owner_id).pw_name
             except (TypeError, KeyError) as e:
                 Log.warning(
                     f"Current owner of experiment {args.expid} could not be retrieved. "
-                    f"The owner is no longer in the system database: {str(e)}"
+                    f"The owner is no longer in the system database: {e!s}"
                 )
             user_descriptor = (
                 current_owner if current_owner is not None else current_owner_id
             )
-            descriptor += f"USER: {user_descriptor}"
-    else:
-        command = " ".join(shlex.quote(arg) for arg in sys.argv)
-        descriptor += f"There was an issue with the command executed: {command}"
-    Log.info(f"{descriptor}")
+            descriptor = "".join(f"{descriptor}user: {user_descriptor}\n")
+        Log.info(f"{descriptor}")
+    except Exception as e:
+        Log.error(f"An error occurred as the command Log tried to be generated {e}")

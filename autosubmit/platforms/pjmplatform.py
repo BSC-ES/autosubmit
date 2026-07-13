@@ -71,7 +71,7 @@ class PJMPlatform(ParamikoPlatform):
         self._header = PJMHeader()
         self._wrapper = PJMWrapperFactory(self)
         # https://software.fujitsu.com/jp/manual/manualfiles/m220008/j2ul2452/02enz007/j2ul-2452-02enz0.pdf page 16
-        self.job_status = dict()
+        self.job_status = {}
         self.job_status['COMPLETED'] = ['EXT']
         self.job_status['RUNNING'] = ['RNO', 'RNE', 'RUN']
         self.job_status['QUEUING'] = ['ACC', 'QUE', 'RNA', 'RNP', 'HLD']  # TODO NOT SURE ABOUT HOLD HLD
@@ -105,7 +105,7 @@ class PJMPlatform(ParamikoPlatform):
         try:
             # Test if remote_path exists
             self._ftpChannel.chdir(self.remote_log_dir)
-        except IOError:
+        except OSError:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
                     Log.debug(f'{self.remote_log_dir} has been created on {self.host} .')
@@ -287,7 +287,7 @@ class PJMPlatform(ParamikoPlatform):
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), filename))
                 file_exist = True
-            except IOError:  # File doesn't exist, retry in sleeptime
+            except OSError:  # File doesn't exist, retry in sleeptime
                 if not wrapper_failed:
                     sleep(sleeptime)
                     sleeptime = sleeptime + 5
