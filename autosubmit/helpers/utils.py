@@ -18,7 +18,6 @@
 import os
 import pwd
 import re
-import shlex
 import sys
 from collections import defaultdict
 from contextlib import suppress
@@ -527,14 +526,35 @@ def _parse_stat_file(path: Path) -> tuple[int, int]:
 
 
 def describe_command_details(args) -> None:
-    descriptor = "\n"
-    if "autosubmit" in sys.argv[0]:
-        descriptor += f"CLI_PATH : {sys.argv[0]}\n"
-        cli_args = ["autosubmit"] + sys.argv[1:]
-        command = " ".join(shlex.quote(arg) for arg in cli_args)
-        descriptor += f"COMMAND : {command}\n"
+    try:
+        descriptor = "\n"
+        descriptor = "".join(f"{descriptor}executable: {sys.argv[0]}\n")
+        descriptor = "".join(f"{descriptor}command: autosubmit {sys.argv[1]}\n")
+        args_print = ""
+        for key, value in args.__dict__.items():
+            if value is None or value == "" or not value:
+                continue
+            if key in [
+                "version",
+                "logfile",
+                "logconsole",
+                "command",
+                "advanced",
+                "database_backend",
+                "database_conn_url",
+                "databasepath",
+                "databasefilename",
+                "localrootpath",
+                "platformsconfpath",
+                "jobsconfpath",
+                "smtphostname",
+            ]:
+                continue
+            args_print = "".join(f"{args_print} {key}={value}")
+
+        descriptor = "".join(f"{descriptor}args:{args_print}\n")
         if hasattr(args, "expid") and args.expid and args.expid != "*":
-            descriptor += f"EXPID : {args.expid}\n"
+            descriptor = "".join(f"{descriptor}expid: {args.expid}\n")
             current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, args.expid).stat().st_uid
             try:
                 current_owner = pwd.getpwuid(current_owner_id).pw_name
@@ -546,8 +566,7 @@ def describe_command_details(args) -> None:
             user_descriptor = (
                 current_owner if current_owner is not None else current_owner_id
             )
-            descriptor += f"USER: {user_descriptor}"
-    else:
-        command = " ".join(shlex.quote(arg) for arg in sys.argv)
-        descriptor += f"There was an issue with the command executed: {command}"
-    Log.info(f"{descriptor}")
+            descriptor = "".join(f"{descriptor}user: {user_descriptor}\n")
+        Log.info(f"{descriptor}")
+    except Exception as e:
+        Log.error(f"An error occurred as the command Log tried to be generated {e}")

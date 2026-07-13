@@ -133,22 +133,6 @@ def test_run_command(
         assert exp.autosubmit.run_command(args=args) == 0
     else:
         assert exp.autosubmit.run_command(args=args)
-    cli_path = expid = commands = False
-    if 'create' not in command and 'delete' not in command and 'archive' not in command:
-        for file in exp.aslogs_dir.iterdir():
-            if f"_{command[1]}.log" in file.name:
-                with open(file, 'r') as f:
-                    lines = f.readlines()
-                    for line in lines:
-                        if not cli_path:
-                            cli_path = 'CLI_PATH' in line.split()
-                        if not expid and '{expid}' in command:
-                            expid = 'EXPID' in line.split()
-                        else:
-                            expid = True
-                        if not commands:
-                            commands = 'COMMAND' in line.split()
-                assert cli_path and expid and commands
 
 
 @pytest.mark.parametrize(

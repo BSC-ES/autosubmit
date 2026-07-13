@@ -560,21 +560,21 @@ def test_submit_ready_jobs_raises_on_missing_template(mocker):
 @pytest.mark.parametrize(
     "command,command_log",
     [
-        (["autosubmit", "configure"], "COMMAND : autosubmit configure"),
+        (["autosubmit", "configure"], "command: autosubmit configure\nargs:\n"),
         (
             ["autosubmit", "expid", "-dm", "-H", "local", "-d", "Tutorial"],
-            "COMMAND : autosubmit expid -dm -H local -d Tutorial",
+            "command: autosubmit expid\nargs: dummy=True HPC=local description=Tutorial",
         ),
-        (["autosubmit", "delete", "a000"], "COMMAND : autosubmit delete a000"),
+        (["autosubmit", "delete", "a000"], "command: autosubmit delete\nargs: expid=a000"),
         (
             ["autosubmit", "monitor", "a000", "--hide", "--notransitive"],
-            "COMMAND : autosubmit monitor a000 --hide --notransitive",
+            "command: autosubmit monitor\nargs: expid=a000 hide=True notransitive=True",
         ),
-        (["autosubmit", "stats", "a000"], "COMMAND : autosubmit stats a000"),
-        (["autosubmit", "clean", "a000"], "COMMAND : autosubmit clean a000"),
+        (["autosubmit", "stats", "a000"], "command: autosubmit stats\nargs: expid=a000 output=pdf"),
+        (["autosubmit", "clean", "a000"], "command: autosubmit clean\nargs: expid=a000"),
         (
             ["autosubmit", "inspect", "a000", "--notransitive"],
-            "COMMAND : autosubmit inspect a000 --notransitive",
+            "command: autosubmit inspect\nargs: expid=a000 notransitive=True",
         ),
         (
             [
@@ -587,16 +587,12 @@ def test_submit_ready_jobs_raises_on_missing_template(mocker):
                 "WAITING",
                 "--hide",
             ],
-            "COMMAND : autosubmit setstatus a000 -t READY -fs WAITING --hide",
+            "command: autosubmit setstatus\nargs: expid=a000 noplot=True status_final=READY filter_status=WAITING hide=True",
         ),
         (
-            ["autosubmit", "updatedescrip", "a000", '"description"'],
-            "COMMAND : autosubmit updatedescrip a000 '\"description\"'",
+            ["autosubmit", "updatedescrip", "a000", "'description'"],
+            "command: autosubmit updatedescrip\nargs: expid=a000 description='description'",
         ),
-        (
-            ["install", "autosubmit"],
-            "There was an issue with the command executed",
-        ),  # command doesn't exist but the idea is to test the possibility and behavior
     ],
 )
 def test_describe_command_details(mocker, command, command_log):
