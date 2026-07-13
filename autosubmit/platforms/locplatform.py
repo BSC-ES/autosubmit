@@ -151,7 +151,7 @@ class LocalPlatform(ParamikoPlatform):
         :return: None
         """
         self.connected = True
-        if log_recovery_process:
+        if not log_recovery_process:
             self.spawn_log_retrieval_process(as_conf)
 
     def test_connection(self, as_conf: 'AutosubmitConfig') -> None:

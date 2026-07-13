@@ -18,6 +18,7 @@
 import os
 import textwrap
 import time
+import traceback
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Generator, Optional, Protocol, cast
@@ -39,6 +40,7 @@ from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
 )
+from autosubmit.log.log import Log
 
 CURRENT_DB_VERSION = 21  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
@@ -207,6 +209,13 @@ class ExperimentHistoryDbManager(DatabaseManager):
     def get_experiment_run_dc_with_max_id(self):
         """ Get Current (latest) ExperimentRun data class. """
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
+
+    def get_experiment_run_dc_with_max_id_or_none(self) -> Optional[ExperimentRun]:
+        """Get Current (latest) ExperimentRun data class, or None if not available."""
+        try:
+            return self.get_experiment_run_dc_with_max_id()
+        except Exception:
+            return None
 
     def register_experiment_run_dc(self, experiment_run_dc):
         self._insert_experiment_run(experiment_run_dc)
@@ -530,6 +539,8 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_experiment_run_dc_with_max_id(self) -> ExperimentRun: ...
 
+    def get_experiment_run_dc_with_max_id_or_none(self) -> Optional[ExperimentRun]: ...
+
     def register_experiment_run_dc(self, experiment_run_dc): ...
 
     def update_experiment_run_dc_by_id(self, experiment_run_dc): ...
@@ -679,6 +690,13 @@ class SqlAlchemyExperimentHistoryDbManager:
     def get_experiment_run_dc_with_max_id(self):
         run = self._get_experiment_run_with_max_id()
         return ExperimentRun.from_model(run)
+
+    def get_experiment_run_dc_with_max_id_or_none(self) -> Optional[ExperimentRun]:
+        """Get Current (latest) ExperimentRun data class, or None if not available."""
+        try:
+            return self.get_experiment_run_dc_with_max_id()
+        except Exception:
+            return None
 
     def register_experiment_run_dc(self, experiment_run_dc):
         query = (
@@ -1169,6 +1187,27 @@ class SqlAlchemyExperimentHistoryDbManager:
             result = conn.execute(stmt)
             conn.commit()
             return result.rowcount
+
+
+def get_last_run_id(expid: str) -> Optional[int]:
+    """Get the last experiment run ID, or None if not available.
+    Bypasses ExperimentHistory.__init__ to avoid silent failure on manager creation.
+    """
+    try:
+        BasicConfig.read()
+        force_sql_alchemy = BasicConfig.DATABASE_BACKEND == "postgres"
+        manager = create_experiment_history_db_manager(
+            BasicConfig.DATABASE_BACKEND,
+            expid=expid,
+            force_sql_alchemy=force_sql_alchemy,
+        )
+        manager.initialize()
+        run = manager.get_experiment_run_dc_with_max_id_or_none()
+        return run.run_id if run else None
+    except Exception as exp:
+        Log.warning(f"Could not get last experiment run ID for {expid}: {exp}")
+        Log.debug(traceback.format_exc())
+        return None
 
 
 def create_experiment_history_db_manager(db_engine: str, **options: Any) -> ExperimentHistoryDatabaseManager:

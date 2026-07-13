@@ -3143,7 +3143,7 @@ class JobList(object):
             job.write_submit_time()
             job.platform.add_job_to_log_recover(job)
 
-        job.updated_log += 1
+        job.log_recovery_call_count += 1
 
     def recover_logs(self) -> bool:
         """Update jobs' log recovered status.
@@ -3153,7 +3153,7 @@ class JobList(object):
 
         """
         jobs_to_recover = [job for job in self.job_list if
-                           job.status in self._FINAL_STATUSES and job.updated_log <= job.fail_count]
+                           job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
         for job in jobs_to_recover:
             self._recover_log(job)
         return len(jobs_to_recover) > 0
@@ -4132,7 +4132,8 @@ class JobList(object):
                 job.id = int(jobs_data[job.name]["job_id"])
                 job.local_logs = jobs_data[job.name]["out"]
                 job.remote_logs = jobs_data[job.name]["err"]
-                job.updated_log = True
+                # TODO: rebase is fixed
+                job.updated_log = jobs_data[job.name]["fail_count"]
 
         for job in finished_jobs:
             # TODO: Another fix will come in 4.2. Currently, if the job has no id, the log will not be recovered properly.
@@ -4140,7 +4141,8 @@ class JobList(object):
                 job.id = 1
             # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
             if not jobs_ran_atleast_once:
-                job.updated_log = True
+                # TODO: rebase is fixed
+                job.updated_log = job.fail_count
 
     def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None,
                           return_only_names=False) -> Union[List[str], List["Job"]]:

@@ -795,6 +795,8 @@ class Platform:
                         f"Skipping log recovery for {job.name}.")
                     return
                 self.recovery_queue.put(job, timeout=30)
+                if self.work_event is not None:
+                    self.work_event.set()
                 Log.debug(
                     f"Added job {job.name} and retry number:{job.fail_count} to the log recovery queue.")
             except Exception as e:
@@ -1022,11 +1024,11 @@ class Platform:
     def recover_job_log(self, jobs_db_manager: 'JobsDbManager', as_conf: 'AutosubmitConfig') -> None:
         """Recovers log files for jobs from the recovery queue and retries failed jobs.
         """
+        from autosubmit.job.job import Job
         if self.recovery_queue is None:
             raise AutosubmitCritical("As the recovery job was initialized some of"
                                      "the variable were not properly initialized")
         while not self.recovery_queue.empty():
-            from autosubmit.job.job import Job
             job_data = self.recovery_queue.get(timeout=1)
             job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_data["name"]))
             job.platform_name = self.name  # Change the original platform to this process platform.
@@ -1041,12 +1043,11 @@ class Platform:
                     f"{len(failed)} failed recovery attempt(s): "
                     f"{[a.error for a in failed]}"
                 )
-            else:
+            elif report.attempts:
                 Log.result(
                     f"{self.name}(log_recovery): Job {job.name} recovered "
                     f"{len(report.attempts)} attempt(s)."
                 )
-                Log.debug(repr(report))
             jobs_db_manager.save_job_log(job)
 
     def recover_platform_job_logs(self, as_conf: 'AutosubmitConfig') -> None:

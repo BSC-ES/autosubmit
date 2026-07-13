@@ -35,6 +35,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
+from autosubmit.history.database_managers.experiment_history_db_manager import get_last_run_id
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_split_size_unit, get_split_size
@@ -69,6 +70,7 @@ class RecoveryReport:
     job_name: str
     attempts: list[RecoveryAttempt] = field(default_factory=list)
     final_updated_log: int = 0
+    final_updated_stats: int = 0
     all_succeeded: bool = False
 
 
@@ -96,6 +98,7 @@ PERSISTENT_ATTRIBUTES = (
     "local_logs",
     "remote_logs",
     "updated_log",
+    "updated_stats",
     "fail_count",
     "packed",
 )
@@ -193,7 +196,7 @@ class Job(object):
         '_dependencies', 'running', 'ext_header_path', 'ext_tailer_path',
         'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
         'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
-        'delete_when_edgeless', 'het', 'updated_log', 'updated', 'log_recovery_call_count',
+        'delete_when_edgeless', 'het', 'updated_log', 'updated_stats', 'updated', 'log_recovery_call_count',
         'start_time', 'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
         '_script', '_log_recovery_retries', 'ready_date', 'wrapper_name',
         'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_cpmip_thresholds', '_chunk_size', '_chunk_size_unit',
@@ -241,6 +244,7 @@ class Job(object):
         self.reservation = None
         self.het = {'HETSIZE': 0}
         self.updated_log = 0
+        self.updated_stats = 0
         self._script = None
         self._log_recovery_retries = None
         self.wrapper_name = None
@@ -404,6 +408,7 @@ class Job(object):
         # hetjobs
         self.het = None
         self.updated_log = 0
+        self.updated_stats = 0
         self.submit_time_timestamp = None  # for wrappers, all jobs inside a wrapper are submitted at the same time
         self.start_time_timestamp = None
         self.finish_time_timestamp = None  # for wrappers, with inner_retrials, the submission time should be the last finish_time of the previous retrial
@@ -1179,6 +1184,7 @@ class Job(object):
     def set_ready_date(self) -> None:
         """Sets the ready start date for the job"""
         self.updated_log = 0
+        self.updated_stats = 0
         self.ready_date = int(time.strftime("%Y%m%d%H%M%S"))
 
     def inc_fail_count(self):
@@ -1434,7 +1440,6 @@ class Job(object):
         remote_logs = tuple(remote_logs)
 
         # Retrieve remote logs
-        Log.debug(f"Retrieving log files {remote_logs[0]} and .err")
         self.platform.get_logs_files(self.expid, remote_logs)
 
         # Update local logs
@@ -1459,21 +1464,21 @@ class Job(object):
 
 
     def retrieve_logfiles(self) -> RecoveryReport:
-        """Retrieves log files from the remote host for all pending attempts.
+        log_attempts = []
 
-        :return: A structured report of what was attempted and what succeeded.
-        :rtype: RecoveryReport
-        """
-        attempts = []
         for attempt in range(self.updated_log, int(self.fail_count + 1)):
-            result = self._recover_attempt(attempt)
-            attempts.append(result)
+            result = self._recover_log_attempt(attempt)
+            log_attempts.append(result)
+
+        for attempt in range(self.updated_stats, self.updated_log):
+            self._write_stat_attempt(attempt)
 
         return RecoveryReport(
             job_name=self.name,
-            attempts=attempts,
+            attempts=log_attempts,
             final_updated_log=self.updated_log,
-            all_succeeded=all(a.success for a in attempts) if attempts else True
+            final_updated_stats=self.updated_stats,
+            all_succeeded=all(a.success for a in log_attempts) if log_attempts else True
         )
 
     def _restore_previous_state(self, backup_log_local, backup_log_remote, backup_submit_time, backup_id):
@@ -1489,7 +1494,7 @@ class Job(object):
         self.submit_time_timestamp = backup_submit_time
         self.id = backup_id
 
-    def _recover_attempt(self, attempt: int) -> RecoveryAttempt:
+    def _recover_log_attempt(self, attempt: int) -> RecoveryAttempt:
         """Recover logs for a single attempt.
 
         :param attempt: The attempt number to recover.
@@ -1507,7 +1512,7 @@ class Job(object):
 
         try:
             self.update_submit_time_and_job_id(attempt)
-            self.update_local_logs()
+            self.update_local_logs(attempt)
             self.remote_logs = self.get_new_remotelog_name(attempt)
 
             if not self.check_remote_log_exists():
@@ -1521,7 +1526,6 @@ class Job(object):
             else:
                 self._sync_retrieve_logfiles()
                 self.check_compressed_local_logs()
-                self.write_stats(attempt)
                 success = True
                 result_local = self.local_logs
                 result_remote = self.remote_logs
@@ -1529,12 +1533,39 @@ class Job(object):
         except Exception as exc:
             self._restore_previous_state(backup_log_local, backup_log_remote, backup_submit_time, backup_id)
             error = str(exc)
+        if success:
+            self.updated_log = attempt + 1
 
         return RecoveryAttempt(
             attempt=attempt,
             success=success,
             local_logs=result_local,
             remote_logs=result_remote,
+            error=error,
+        )
+
+    def _write_stat_attempt(self, attempt: int) -> RecoveryAttempt:
+        """Write stats for a single attempt whose logs are already local.
+
+        :param attempt: The attempt number to write stats for.
+        :return: Result of the stat-writing attempt.
+        """
+        error: Optional[str] = None
+        success = False
+
+        try:
+            self.write_stats(attempt)
+            success = True
+        except Exception as exc:
+            error = str(exc)
+        if success:
+            self.updated_stats = attempt + 1
+
+        return RecoveryAttempt(
+            attempt=attempt,
+            success=success,
+            local_logs=self.local_logs,
+            remote_logs=self.remote_logs,
             error=error,
         )
 
@@ -1618,22 +1649,19 @@ class Job(object):
             Log.status(f"Job {self.name} and id: {self.id} is {self.status_str}")
 
             # Read and store metrics here
-            try:
-                exp_history = ExperimentHistory(
-                    self.expid
-                )
-                last_run_id = (
-                    exp_history.manager.get_experiment_run_dc_with_max_id().run_id
-                )
-                metric_processor = UserMetricProcessor(as_conf, self, last_run_id)
-                metric_processor.process_metrics()
-            except Exception as exc:
-                # Warn if metrics are not processed
-                Log.printlog(
-                    f"Error processing metrics for job {self.name}: {exc}.\n"
-                    + "Try reviewing your configuration file and template, then re-run the job.",
-                    code=6017,
-                )
+            last_run_id = get_last_run_id(self.expid)
+            if last_run_id is not None:
+                try:
+                    metric_processor = UserMetricProcessor(as_conf, self, last_run_id)
+                    metric_processor.process_metrics()
+                except Exception as exc:
+                    Log.printlog(
+                        f"Error processing metrics for job {self.name}: {exc}.\n"
+                        + "Try reviewing your configuration file and template, then re-run the job.",
+                        code=6017,
+                    )
+            else:
+                Log.debug(f"Metrics collection skipped for {self.name}: no experiment run found in database.")
 
         return self.status
 
@@ -2814,12 +2842,15 @@ class Job(object):
 
         return out
 
-    def update_local_logs(self) -> None:
-        """Updates the local log filenames based on the fail count."""
+    def update_local_logs(self, attempt: int = 0) -> None:
+        """Updates the local log filenames based on the fail count.
+        :param attempt: The current attempt number.
+        :type attempt: int
+        """
 
-        if self.fail_count > 0:
-            self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out_attempt_{self.fail_count}",
-                               f"{self.name}.{self.submit_time_timestamp}.err_attempt_{self.fail_count}")
+        if attempt > 0:
+            self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out_attempt_{attempt}",
+                               f"{self.name}.{self.submit_time_timestamp}.err_attempt_{attempt}")
         else:
             self.local_logs = (f"{self.name}.{self.submit_time_timestamp}.out",
                                f"{self.name}.{self.submit_time_timestamp}.err")

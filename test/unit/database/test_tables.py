@@ -82,7 +82,7 @@ def test_create_wrapper_tables_info_columns(meta):
         'name', 'id', 'script_name', 'status',
         'local_logs_out', 'local_logs_err',
         'remote_logs_out', 'remote_logs_err',
-        'updated_log', 'platform_name', 'wallclock',
+        'updated_log', 'updated_stats', 'platform_name', 'wallclock',
         'num_processors', 'type', 'sections', 'method',
     }
     assert col_names == expected

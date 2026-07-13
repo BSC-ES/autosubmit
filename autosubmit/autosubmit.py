@@ -64,7 +64,7 @@ from autosubmit.experiment.experiment_common import (
 from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.helpers.enums import ChunkUnit
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path, recover_stale_job_data
+from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job import Job
@@ -2183,15 +2183,6 @@ class Autosubmit:
                 as_conf.save()
                 job_changes_tracker = dict()
                 Autosubmit.save_historical_edges(expid)
-                pending_logs = job_list.recover_logs()
-                while pending_logs:
-                    pending_logs = job_list.recover_logs()
-                job_list.save_jobs()
-                try:
-                    recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
-                except Exception as e:
-                    Log.debug(f"Error while recovering stale job data: {str(e)}")
-
                 while job_list.continue_run():
                     try:
 
@@ -2328,11 +2319,6 @@ class Autosubmit:
 
                 Log.result("No more jobs to run.")
                 # search hint - finished run
-                pending_logs = job_list.recover_logs()
-                while pending_logs:
-                    pending_logs = job_list.recover_logs()
-                job_list.save_jobs()
-
                 Log.info("Waiting for all logs to be updated")
                 for p in platforms_to_test:
                     if (p.log_recovery_process is not None and p.log_recovery_process.is_alive()
@@ -2342,12 +2328,6 @@ class Autosubmit:
                         if p.log_recovery_process.is_alive():
                             Log.warning(f"Log recovery process for {p.name} did not terminate within timeout.")
                     p.clean_log_recovery_process()
-                try:
-                    # Note: This is a safeguard, if the run is not stopped this shouldn't be needed, but maybe the log process dies for others reasons like killed by the system
-                    # so it is good to have this call to avoid leaving bad stat data if the recovery process is not working properly.
-                    recover_stale_job_data(expid, as_conf, {p.name: p for p in platforms_to_test})
-                except Exception as e:
-                    Log.debug(f"Error while recovering stale job data: {str(e)}")
                 Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
 
                 for p in platforms_to_test:
@@ -3082,11 +3062,6 @@ class Autosubmit:
                 job_list.recover_last_data()
                 job_list.save_jobs()
                 job_list.save_edges()
-                try:
-                    recover_stale_job_data(expid, as_conf, platforms_to_test)
-                except Exception as e:
-                    Log.debug(f"Error while recovering stale job data: {str(e)}")
-                job_list.save_jobs()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
 
@@ -4190,10 +4165,6 @@ class Autosubmit:
                         raise AutosubmitCritical(
                             "There are repeated member names!")
                     rerun = as_conf.get_rerun()
-                    try:
-                        recover_stale_job_data(expid, as_conf)
-                    except Exception as e:
-                        Log.debug(f"Error while recovering stale job data: {str(e)}")
 
                     Log.info("\nCreating the jobs list...")
                     job_list = JobList(expid, as_conf, YAMLParserFactory())
@@ -5250,10 +5221,9 @@ class Autosubmit:
                 start = time.time()
                 if save and wrongExpid == 0:
                     job_list.recover_last_data(final_list)
-                    try:
-                        recover_stale_job_data(expid, as_conf, platforms_to_test)
-                    except Exception as e:
-                        Log.debug(f"Error while recovering stale job data: {str(e)}")
+                    for job in final_list:
+                        job.updated_log = job.fail_count + 1
+                        job.updated_stats = job.fail_count + 1
                     job_list.save_jobs()
                     end = time.time()
                     Log.info(f"JobList saved in {end - start:.2f} seconds.")

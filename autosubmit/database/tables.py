@@ -180,6 +180,7 @@ JobsTable = Table(
     Column("remote_logs_out", String),
     Column("remote_logs_err", String),
     Column("updated_log", Integer),
+    Column("updated_stats", Integer),
     Column("fail_count", Integer, nullable=False, default=0),
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
@@ -245,6 +246,7 @@ def create_wrapper_tables(name, metadata_obj_):
         Column("remote_logs_out", String),  # TODO: We should recover the log from the remote at some point
         Column("remote_logs_err", String),  # TODO: We should recover the log from the remote at some point
         Column("updated_log", Integer),  # TODO: We should recover the log from the remote at some point
+        Column("updated_stats", Integer),
         Column("platform_name", String),
         Column("wallclock", String),
         Column("num_processors", Integer),

@@ -82,7 +82,7 @@ class JobsDbManager(DbManager):
         self.create_table(table.name)
         job_data: dict = job.__getstate__()
         where: dict = {'name': job.name}
-        log_keys = {'name', 'log', 'updated_log', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err'}
+        log_keys = {'name', 'log', 'updated_log', 'updated_stats', 'local_logs_out', 'local_logs_err', 'remote_logs_out', 'remote_logs_err'}
         job_data = {k: v for k, v in job_data.items() if k in log_keys}
 
         self.update_where(table.name, job_data, where)

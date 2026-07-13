@@ -2234,57 +2234,46 @@ def test_update_and_write_time(count, with_stat_file, tmp_path):
         job.write_end_time(False, count)
 
 
-@pytest.mark.parametrize(
-    'output',
-    [
-        '''15994954        COMPLETED 448 2 2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      3486K
-                        15994954.batch  COMPLETED 224 1 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 497.36K 18111K    18111K
-                        15994954.extern COMPLETED 448 2 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      421K
-                        15994954.0      COMPLETED 224 1 2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52 0       3486K     3486K
-                        15994954.1      COMPLETED 448 2 2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22 820.90K 29740154K 27008625.50K
-        ''',
-        '''15994954        COMPLETED 448 2 2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      3486K
-                    15994954.batch  COMPLETED 224 1 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 497.36K 18111K    18111K
-                    15994954.extern COMPLETED 448 2 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      421K
-                    15994954.0      COMPLETED 224 1 2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52 0       3486K     3486K
-                    15994954.1      COMPLETED 448 2 2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22 82.09 29740154K 27008625.50K
-        '''
-    ],
-    ids=["Energy + External is Lower", "Energy + External is Higher"]
-)
-def test_retrieve_logfiles(local, mocker, output):
-    """This test replicates the behavior of retrieving data from the SSH output and processing it to ensure that the
-    returned data is properly handled and stored.
-    The first input returns a lower absolute energy value, causing the validation to fail.
-    The second input returns a higher absolute energy value, causing the validation to succeed.
-    These tests replicate the behavior of getting the data from the SSH output and handle it to make sure that
-    """
-    mocker.patch("autosubmit.history.database_managers.experiment_history_db_manager.ExperimentHistoryDbManager",
-                 return_value=mocker.MagicMock())
-    mocker.patch("autosubmit.history.experiment_history.ExperimentHistory", return_value=mocker.MagicMock())
-    mocker.patch("autosubmit.platforms.paramiko_platform.ParamikoPlatform.check_job_energy", return_value=output)
-    job = Job(_EXPID, '1', 'WAITING', 0, None)
+@pytest.mark.parametrize("updated_log,updated_stats,fail_count,mock_log_exists,mock_compressed,mock_stats_throws,expected_log,expected_stats,expected_all_succeeded", [
+    (0, 0, 1, True, False, False, 2, 2, True),   # logs + stats same call
+    (0, 0, 1, True, False, True,  2, 0, True),   # logs ok, stats fail: report ignores stats
+    (0, 0, 1, False, False, False, 0, 0, False),  # logs fail, stats not tried
+    (1, 0, 1, False, True,  False, 2, 2, True),   # log via compressed; stats for 0 and 1
+    (2, 1, 2, False, False, False, 2, 2, False),  # log fails for 2; stats catch up for 1
+    (2, 3, 2, False, False, False, 2, 3, False),  # stats > updated_log → no stats loop
+])
+def test_retrieve_logfiles_two_phase(
+    updated_log, updated_stats, fail_count,
+    mock_log_exists, mock_compressed, mock_stats_throws,
+    expected_log, expected_stats, expected_all_succeeded,
+    mocker,
+):
+    job = Job("dummy", 1, Status.WAITING, 0)
+    job.updated_log = updated_log
+    job.updated_stats = updated_stats
+    job.fail_count = fail_count
+    job.local_logs = ("out", "err")
+    job.remote_logs = ("rout", "rerr")
+    job.submit_time_timestamp = "0"
+    job.id = "1"
 
-    job.platform = local
+    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id')
+    mocker.patch('autosubmit.job.job.Job.update_local_logs')
+    mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
+    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=mock_log_exists)
+    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=mock_compressed)
+    mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
+    if mock_stats_throws:
+        mocker.patch('autosubmit.job.job.Job.write_stats', side_effect=RuntimeError("stats fail"))
+    else:
+        mocker.patch('autosubmit.job.job.Job.write_stats')
 
-    Path(job._tmp_path + "/" + job.name).mkdir(parents=True)
-    for i in range(2):
-        Path(job.platform.get_files_path() + f'/test.out.{i}').touch()
-        Path(job.platform.get_files_path() + f'/test.err.{i}').touch()
-        Path(job.platform.get_files_path() + f'/t001_STAT_{i}').touch()
-    job.platform.type = 'slurm'
-    job.platform.remote_log_dir = Path(job.platform.root_dir) / job.platform.config.get(
-        "LOCAL_TMP_DIR") / f'LOG_{job.platform.expid}'
-    job.wrapper_type = 'vertical'
-    job.retrials = 1
-    job.script_name = 'test'
-    job.local_logs = 'test_local'
-    job.submit_time_timestamp = '0'
-    job.start_time_timestamp = '19700101000000'
-    job.platform.check_file_exists = mocker.MagicMock(return_value=True)
     report = job.retrieve_logfiles()
-    assert report.all_succeeded
-    assert len(report.attempts) == 1
+    assert job.updated_log == expected_log, f"expected updated_log={expected_log}, got {job.updated_log}"
+    assert job.updated_stats == expected_stats, f"expected updated_stats={expected_stats}, got {job.updated_stats}"
+    assert report.final_updated_log == expected_log
+    assert report.final_updated_stats == expected_stats
+    assert report.all_succeeded == expected_all_succeeded
 
 
 def test_case_insensitive_running_parameter(autosubmit_config):
@@ -2359,16 +2348,15 @@ def test_write_stats(mocker):
     job.write_end_time.assert_called_once_with(job.status == Status.COMPLETED, 1)
 
 
-@pytest.mark.parametrize("fail_count,expected_out,expected_err", [
+@pytest.mark.parametrize("attempt,expected_out,expected_err", [
     (0, "dummy.0.out", "dummy.0.err"),
     (1, "dummy.0.out_attempt_1", "dummy.0.err_attempt_1"),
     (2, "dummy.0.out_attempt_2", "dummy.0.err_attempt_2"),
 ])
-def test_update_local_logs(fail_count, expected_out, expected_err):
+def test_update_local_logs(attempt, expected_out, expected_err):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.submit_time_timestamp = 0
-    job.fail_count = fail_count
-    job.update_local_logs()
+    job.update_local_logs(attempt=attempt)
     assert job.local_logs == (expected_out, expected_err)
 
 
@@ -2466,9 +2454,10 @@ def test_get_finish_time_from_db(mocker):
     mock_exp_hist.return_value.get_finish_data_dc.assert_called_once_with("dummy", 2)
 
 
-def test_recover_attempt_success(mocker):
+def test_recover_log_attempt_success(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.updated_log = 0
+    job.updated_stats = 0
     job.fail_count = 0
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
@@ -2480,16 +2469,18 @@ def test_recover_attempt_success(mocker):
     mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=True)
     mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
     mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs')
-    mocker.patch('autosubmit.job.job.Job.write_stats')
-    result = job._recover_attempt(0)
+    result = job._recover_log_attempt(0)
     assert result.success is True
     assert result.attempt == 0
     assert result.error is None
+    assert job.updated_log == 1
+    assert job.updated_stats == 0
 
 
-def test_recover_attempt_no_remote_no_local(mocker):
+def test_recover_log_attempt_no_remote_no_local(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.updated_log = 0
+    job.updated_stats = 0
     job.fail_count = 0
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
@@ -2500,26 +2491,31 @@ def test_recover_attempt_no_remote_no_local(mocker):
     mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
     mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=False)
     mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=False)
-    result = job._recover_attempt(0)
+    result = job._recover_log_attempt(0)
     assert result.success is False
     assert "Remote logs not found" in result.error
     assert job.local_logs == ("out", "err")
     assert job.remote_logs == ("rout", "rerr")
+    assert job.updated_log == 0
+    assert job.updated_stats == 0
 
 
-def test_recover_attempt_exception(mocker):
+def test_recover_log_attempt_exception(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.updated_log = 0
+    job.updated_stats = 0
     job.fail_count = 0
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
     job.id = "1"
     mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id', side_effect=RuntimeError("boom"))
-    result = job._recover_attempt(0)
+    result = job._recover_log_attempt(0)
     assert result.success is False
     assert result.error == "boom"
     assert job.local_logs == ("out", "err")
+    assert job.updated_log == 0
+    assert job.updated_stats == 0
 
 
 def test_restore_previous_state(mocker):
@@ -2849,19 +2845,22 @@ def test_setstate_initializes_missing_timestamps():
     assert job.finish_time_timestamp is None
 
 
-def test_clean_attributes_sets_updated_log_to_zero():
+def test_clean_attributes_resets_both_counters():
     job = Job("t000_test", 1, Status.WAITING, 0)
     job.updated_log = 99
+    job.updated_stats = 42
     job.fail_count = 0
     job.retrials = 5
     job.clean_attributes()
     assert job.updated_log == 0
+    assert job.updated_stats == 0
 
 
-def test_recover_attempt_no_remote_with_compressed_local(mocker):
-    """_recover_attempt: remote missing but compressed local logs -> success."""
+def test_recover_log_attempt_no_remote_with_compressed_local(mocker):
+    """_recover_log_attempt: remote missing but compressed local logs -> success."""
     job = Job("dummy", 1, Status.WAITING, 0)
     job.updated_log = 0
+    job.updated_stats = 0
     job.fail_count = 0
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
@@ -2872,10 +2871,39 @@ def test_recover_attempt_no_remote_with_compressed_local(mocker):
     mocker.patch("autosubmit.job.job.Job.get_new_remotelog_name", return_value=("new_out", "new_err"))
     mocker.patch("autosubmit.job.job.Job.check_remote_log_exists", return_value=False)
     mocker.patch("autosubmit.job.job.Job.check_compressed_local_logs", return_value=True)
-    result = job._recover_attempt(0)
+    result = job._recover_log_attempt(0)
     assert result.success is True
     assert result.local_logs == job.local_logs
     assert result.remote_logs == job.remote_logs
+    assert job.updated_log == 1
+    assert job.updated_stats == 0
+
+
+def test_write_stat_attempt_success(mocker):
+    job = Job("dummy", 1, Status.WAITING, 0)
+    job.updated_log = 2
+    job.updated_stats = 0
+    job.local_logs = ("out", "err")
+    job.remote_logs = ("rout", "rerr")
+    mocker.patch('autosubmit.job.job.Job.write_stats')
+    result = job._write_stat_attempt(1)
+    assert result.success is True
+    assert result.attempt == 1
+    assert job.updated_stats == 2
+    job.write_stats.assert_called_once_with(1)
+
+
+def test_write_stat_attempt_failure(mocker):
+    job = Job("dummy", 1, Status.WAITING, 0)
+    job.updated_log = 2
+    job.updated_stats = 0
+    job.local_logs = ("out", "err")
+    job.remote_logs = ("rout", "rerr")
+    mocker.patch('autosubmit.job.job.Job.write_stats', side_effect=RuntimeError("stat fail"))
+    result = job._write_stat_attempt(1)
+    assert result.success is False
+    assert result.error == "stat fail"
+    assert job.updated_stats == 0
 
 
 @pytest.mark.parametrize("start_time_timestamp,effective_wallclock,expected", [

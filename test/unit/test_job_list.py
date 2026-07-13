@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 from typing import Any
+from unittest.mock import MagicMock
 
 import networkx
 import pytest
@@ -617,3 +618,5 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     job_list.add_job(Job("test_job", "1", Status.COMPLETED, 0))
 
     job_list.recover_last_data()
+
+
