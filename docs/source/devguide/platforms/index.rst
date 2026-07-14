@@ -315,10 +315,15 @@ a directory, not a file; the name it uses depends on the platform type:
      - The local platform does not perform a write-permission check.
 
 .. note::
-    Operators searching log files or the remote scratch filesystem need to
-    look for all three directory names, because each platform type uses a
-    different one. A search restricted to ``permission_checker_azxbyc`` will
-    miss probes from ``ps`` and ``ecaccess`` platforms.
+    The probe directory is transient: Autosubmit creates it, confirms that
+    the create+delete succeeded, and removes it in the same call. Under
+    normal operation there is nothing left on the remote filesystem to
+    find afterwards. The directory names above are documented so that
+    operators searching Autosubmit's local logs (or investigating a rare
+    case where a probe crashed between the create and delete steps and
+    left the directory behind) know that each platform type uses a
+    different name — a grep restricted to ``permission_checker_azxbyc``
+    will miss references from ``ps`` and ``ecaccess`` platforms.
 
 When the write-permission check runs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -333,15 +338,18 @@ frequency depends on the command:
    * - Command
      - When the probe runs
    * - ``autosubmit run``
-     - Once per configured platform at the start of the run, before the main loop begins. If the run later encounters a connection error and it is recovered, the probe runs again for each new attempt on each of the platforms. The number of retries is bounded by ``CONFIG.RECOVERY_RETRIALS`` (default ``3650``), so a prolonged outage can produce many probe entries in the logs.
+     - Once per configured platform at the start of the run, before the main loop begins. If the run later encounters a connection error, Autosubmit enters a reconnection loop that retries the SSH connection up to ``CONFIG.RECOVERY_RETRIALS`` **times** (a count of attempts, not a time budget; default ``3650``, with a per-attempt sleep that grows from 15s to a cap of 120s, so the default corresponds to roughly 72–122 hours of outage tolerance). The probe only runs on the retry where the connection is actually re-established, not on the failing attempts. In practice this means a prolonged outage produces many SSH retry log entries but at most one probe entry per platform per recovery episode.
    * - ``autosubmit setstatus``
      - Once per platform that currently has jobs in ``QUEUING``, ``SUBMITTED`` or ``RUNNING`` state. When ``setstatus`` is run before ``autosubmit create`` (the typical operational case, where all jobs are still ``WAITING`` or ``READY``) no probe is created.
    * - ``autosubmit stop --cancel``
      - Once per configured platform. This applies to any scheduler, not only Slurm; the trigger is the ``--cancel`` flag, not the platform type.
 
-The probe does **not** run during the main loop of ``autosubmit run`` after
-startup, during ``autosubmit recovery``, during ``autosubmit create``, or
-when Autosubmit reconnects after a transient network error mid-run.
+The probe does **not** run during the normal main loop of ``autosubmit
+run`` after startup, during ``autosubmit recovery``, during ``autosubmit
+create``, or when an individual SSH command inside the main loop fails
+with a network error and its channel is silently re-established (that
+reconnect path bypasses the ``restore_platforms`` step and therefore
+skips the probe).
 
 .. _stale_job_data_recovery:
 
@@ -355,11 +363,12 @@ recorded), Autosubmit will try to fetch the missing values from the remote
 ``STAT`` file for that job. This recovery runs during ``autosubmit run``,
 ``autosubmit create``, ``autosubmit setstatus`` and ``autosubmit recovery``.
 
-The path opens SSH sessions to the affected platforms when needed, but it
-does not run the write-permission probe. ``autosubmit create`` is the case
-worth flagging here: it normally appears to be a local operation, but if
-there are stale rows in the history database it will open one SSH session
-per affected platform.
+When Autosubmit performs this stale-job-data recovery it opens an SSH
+session to each affected platform, but it does not run the
+write-permission probe. ``autosubmit create`` is the case worth flagging
+here: it normally appears to be a local operation, but if there are stale
+rows in the history database it will open one SSH session per affected
+platform.
 
 Connections opened during a run
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -408,18 +417,17 @@ before exiting.
     The close operations are best-effort. If the underlying transport is
     already broken, the close will fail silently and the next connection
     will be opened anyway. This prevents a stuck close from blocking
-    recovery, but it means operators who want to confirm that no SSH
+    recovery, but it means users who want to confirm that no SSH
     sessions have leaked should spot-check the login node directly (for
     example with ``who`` or ``ss``) rather than rely on Autosubmit's
     logs alone.
 
 The reconnection behaviour described above applies after the workflow has
 started running. If the very first connection attempt at the start of
-``autosubmit run`` fails — for example because the HPC login node is
-briefly unreachable — Autosubmit makes two internal retries within a
-single connection attempt, but does not currently retry the whole
-``autosubmit run`` startup. If both internal retries fail, the run
-aborts. Adding a workflow-level startup retry is tracked separately.
+``autosubmit run`` fails, Autosubmit makes two internal retries within a
+single connection attempt and then aborts if both fail — see
+:ref:`userguide/run/index:retries` for the retry configuration Autosubmit
+exposes at the workflow level.
 
 Filesystem operations during a run
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -428,28 +436,41 @@ Beyond handling write-permission probes and SSH sessions, Autosubmit performs se
 
 .. list-table::
    :header-rows: 1
-   :widths: 32 68
+   :widths: 26 18 56
 
    * - Operation
+     - Command(s)
      - When it happens
    * - Upload of ``.cmd`` job scripts
+     - ``autosubmit run``
      - One upload per job script per submission cycle. A submission cycle happens for every main loop iteration that has new ``READY`` jobs to dispatch.
    * - Creation of the remote log directory
+     - ``autosubmit run``
      - Once per platform at startup, and then once per upload as part of the upload itself. ``ecaccess`` platforms create one directory per path level because their ``mkdir`` does not have a recursive option.
    * - Listing of ``_COMPLETED`` marker files
+     - ``autosubmit run``
      - Once per platform per status-check cycle, to detect newly completed jobs.
    * - Download of ``.out`` / ``.err`` log files
+     - ``autosubmit run``
      - Two downloads per completed job (one for standard output, one for standard error). These run in the per-platform log-recovery process, in parallel with the main loop.
-   * - Download of job ``STAT`` files
-     - One download per job at the end of execution. Additional opportunistic downloads happen when the history database contains incomplete rows.
-   * - Reads of remote ``STAT`` files
+   * - Download of ``STAT`` files at job end
+     - ``autosubmit run``
+     - One download per job at the end of execution, as part of the completed-job handling in the main loop.
+   * - Download of ``STAT`` files for stale history rows
+     - ``autosubmit run``, ``autosubmit create``, ``autosubmit setstatus``, ``autosubmit recovery``
+     - Opportunistic download of missing ``STAT`` files when the history database contains rows without start/end timestamps. Runs before and after the main loop of ``autosubmit run``, at the start of ``autosubmit create`` and ``autosubmit setstatus``, and during ``autosubmit recovery``.
+   * - Batched reads of remote ``STAT`` files
+     - ``autosubmit run``
      - One batched read per status-check cycle, covering all relevant ``STAT`` files in a single round-trip.
    * - Cleanup of previous-run marker files
-     - Once per platform at the start of ``autosubmit run``, scoped to the experiment's log directory.
+     - ``autosubmit run``
+     - Once per platform at startup, scoped to the experiment's log directory.
    * - Compression of remote logs
-     - One compression command per log file, only when ``COMPRESS_REMOTE_LOGS`` is enabled on the platform.
+     - ``autosubmit run``
+     - One compression command per log file, only when ``COMPRESS_REMOTE_LOGS`` is enabled on the platform. Runs in the log-recovery process, in parallel with the main loop.
    * - Write-permission probe
-     - See above.
+     - ``autosubmit run``, ``autosubmit setstatus``, ``autosubmit stop --cancel``
+     - See :ref:`When the write-permission check runs <platform_connections>` above.
 
 A few patterns worth knowing when reasoning about filesystem load:
 
@@ -463,10 +484,6 @@ A few patterns worth knowing when reasoning about filesystem load:
 - **``STAT`` files are written by the jobs, not by Autosubmit.** The remote
   job script appends a Unix epoch timestamp at start and finish; Autosubmit
   only reads these files.
-- **Wrappers reduce per-job I/O.** A wrapped package submits one script for
-  many jobs and produces consolidated log and ``STAT`` output, which cuts
-  the per-job upload and download counts roughly in proportion to the
-  number of jobs in the wrapper.
 
 .. note::
     The table above describes which operations Autosubmit performs and
