@@ -2191,7 +2191,7 @@ class Job(object):
         parameters['FREQUENCY'] = self.frequency
         parameters['SYNCHRONIZE'] = self.synchronize
         parameters['PACKED'] = self.packed
-        parameters['CHUNK'] = 1
+        parameters['CHUNK'] = self.chunk if self.chunk is not None else 1
         parameters['RETRIALS'] = self.retrials
         parameters['DELAY_RETRIALS'] = self.delay_retrials
         parameters['DELETE_WHEN_EDGELESS'] = self.delete_when_edgeless
