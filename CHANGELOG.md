@@ -2,6 +2,7 @@
 
 **Bug fixes:**
 
+- Fixed `%CHUNK%` always resolving to 1 for jobs with `SYNCHRONIZE: date` #3087
 - Fixed wrapper deadlock false positive when non-wrapped jobs are still
   active or could become ready later #3084
 - Fixed leftover wrapper batch stuck on MIN_WRAPPED when remaining
