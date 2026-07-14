@@ -198,7 +198,8 @@ class DbManager:
                 result = conn.execute(query)
         return result.rowcount
 
-    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str], batch_size: int = 1000) -> int:
+    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str],
+                     exclude_cols: Optional[List[str]] = None, batch_size: int = 1000) -> int:
         """Perform an upsert (update or insert) operation.
         First delete the affected rows
         then insert the new data.
@@ -206,6 +207,8 @@ class DbManager:
         :param table_name: Name of the table.
         :param data: List of dictionaries containing the data to upsert.
         :param conflict_cols: List of columns to check for conflicts. ( unique keys and primary keys )
+        :param exclude_cols: Optional list of columns to exclude from the UPDATE SET clause,
+            preserving their existing values on conflict.
         :return: Number of rows affected.
         :raises ValueError: If data is empty or unsupported dialect.
         """
@@ -213,7 +216,8 @@ class DbManager:
             return 0
 
         table: Table = self.table_registry.get(table_name)
-        update_cols = [col for col in data[0].keys() if col not in conflict_cols]
+        update_cols = [col for col in data[0].keys()
+                       if col not in conflict_cols and col not in (exclude_cols or [])]
 
         # NOTE general insert doesn't have on_conflict
         if self._get_engine(table_name).dialect.name == "postgresql":

@@ -451,7 +451,7 @@ class Job(object):
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
         self.updated = False
-        self.log_recovery_call_count = copy.copy(self.updated_log)
+        self.log_recovery_call_count = 0
         self.finished_time = None
         self.validate_template = False
         self.finished_time = None
@@ -1448,7 +1448,7 @@ class Job(object):
     def update_stat_file(self):
         self.stat_file = f"{self.script_name[:-4]}_STAT_"
 
-    def write_stats(self, attempt: int) -> None:
+    def write_stats(self, attempt: int) -> bool:
         """Gathers the stat file, writes statistics into the job_data.db, and updates the total_stat file.
         Considers whether the job is a vertical wrapper and the number of retrials to gather.
 
@@ -1456,29 +1456,29 @@ class Job(object):
         :type attempt: int
         """
 
-        self.check_compressed_local_logs()
-        self.platform.get_stat_file(self, attempt)
+        if not self.platform.get_stat_file(self, attempt):
+            return False
+        self.update_submit_time_on_db()
         self.update_start_time(attempt)
         self.write_start_time(fail_count=attempt)
         self.write_end_time(self.status == Status.COMPLETED, attempt)
-
+        return True
 
     def retrieve_logfiles(self) -> RecoveryReport:
         log_attempts = []
-
+        stats_attempts = []
         for attempt in range(self.updated_log, int(self.fail_count + 1)):
-            result = self._recover_log_attempt(attempt)
-            log_attempts.append(result)
-
-        for attempt in range(self.updated_stats, self.updated_log):
-            self._write_stat_attempt(attempt)
+            if log_attempts and log_attempts[-1].success:
+                log_attempts.append(self._recover_log_attempt(attempt))
+            if stats_attempts and stats_attempts[-1].success:
+                stats_attempts.append(self._write_stat_attempt(attempt))
 
         return RecoveryReport(
             job_name=self.name,
             attempts=log_attempts,
             final_updated_log=self.updated_log,
             final_updated_stats=self.updated_stats,
-            all_succeeded=all(a.success for a in log_attempts) if log_attempts else True
+            all_succeeded=all(a.success for a in log_attempts) and all(s.success for s in stats_attempts) if log_attempts else True
         )
 
     def _restore_previous_state(self, backup_log_local, backup_log_remote, backup_submit_time, backup_id):
@@ -1533,6 +1533,7 @@ class Job(object):
         except Exception as exc:
             self._restore_previous_state(backup_log_local, backup_log_remote, backup_submit_time, backup_id)
             error = str(exc)
+            
         if success:
             self.updated_log = attempt + 1
 
@@ -1554,10 +1555,11 @@ class Job(object):
         success = False
 
         try:
-            self.write_stats(attempt)
-            success = True
+            if self.write_stats(attempt):
+                success = True
         except Exception as exc:
             error = str(exc)
+
         if success:
             self.updated_stats = attempt + 1
 
@@ -2906,11 +2908,13 @@ class Job(object):
         with path.open('w', encoding='utf-8') as f:
             f.write('\n'.join(lines))
 
-    def write_submit_time(self) -> None:
-        """Writes submit date and time to the ``TOTAL_STATS`` file."""
+    def write_submit_time(self, fail_count: Optional[int] = None) -> None:
+        """Writes submit date and time to the ``TOTAL_STATS`` file.
+        :param fail_count: Optional explicit fail_count. Defaults to ``self.fail_count``.
+        """
         self._write_time("submit")
+        fc = fail_count if fail_count is not None else self.fail_count
 
-        # Writing database
         exp_history = ExperimentHistory(self.expid)
 
         status = self.status if self.status == Status.COMPLETED else Status.FAILED
@@ -2924,7 +2928,7 @@ class Job(object):
                                       children=self.children_names_str, workflow_commit=self.workflow_commit,
                                       split=self.split if self.split and int(self.split) > 0 else None,
                                       splits=self.splits if self.splits and int(self.splits) > 0 else None,
-                                      fail_count=self.fail_count)
+                                      fail_count=fc)
 
     def update_submit_time_on_db(self) -> None:
         """Updates an existing job submission entry in the history database for the current fail count.
@@ -3076,19 +3080,18 @@ class Job(object):
         :type attempt: int
         """
         job_data_dc = self._get_submit_data_dc_from_db(attempt)
-
-        if job_data_dc and job_data_dc.submit_datetime:
-            if self.wrapper_type == "vertical" and self.fail_count > 0:
-                previous_attempt_job_data_dc = self._get_finish_time_from_db(self.fail_count - 1)
-                if previous_attempt_job_data_dc and previous_attempt_job_data_dc.finish_datetime:
-                    self.submit_time_timestamp = previous_attempt_job_data_dc.finish_datetime.strftime("%Y%m%d%H%M%S")
-                    self.update_submit_time_on_db()
+        if job_data_dc:
+            self.id = job_data_dc.job_id
+            if job_data_dc.submit_datetime:
+                if self.wrapper_type == "vertical" and attempt > 0:
+                    previous_attempt_job_data_dc = self._get_finish_time_from_db(attempt - 1)
+                    if previous_attempt_job_data_dc and previous_attempt_job_data_dc.finish_datetime:
+                        self.submit_time_timestamp = previous_attempt_job_data_dc.finish_datetime.strftime("%Y%m%d%H%M%S")
+                    else:
+                        self.submit_time_timestamp = job_data_dc.submit_datetime.strftime("%Y%m%d%H%M%S")
                 else:
                     self.submit_time_timestamp = job_data_dc.submit_datetime.strftime("%Y%m%d%H%M%S")
 
-            else:
-                self.submit_time_timestamp = job_data_dc.submit_datetime.strftime("%Y%m%d%H%M%S")
-            self.id = job_data_dc.job_id
         else:
             Log.warning(f"Submit time for job {self.name} and retrial {attempt} not found in the database. "
                         f"Keeping the previous submit time timestamp.")
@@ -3310,15 +3313,6 @@ class WrapperJob(Job):
             if parent in wrapper_job_set
         )
 
-    def _handle_vertical_retries(self) -> None:
-        """Increment fail_count for vertical inner jobs eligible for retry."""
-        for inner_job in self.job_list:
-            if (inner_job.status == Status.FAILED and
-                    inner_job.wrapper_type == "vertical" and
-                    inner_job.updated_log > inner_job.fail_count and
-                    inner_job.fail_count < inner_job.retrials):
-                inner_job.inc_fail_count()
-
     def _apply_io_safe_wait(self, inner_job: Job, current_stat: Status, timeout_to: Status,
                             keep_alive: Status = None) -> Status:
         """Track elapsed time since wrapper finished; timeout transitions to timeout_to.
@@ -3429,7 +3423,6 @@ class WrapperJob(Job):
         """
         save = False
         self.platform.check_all_jobs([self], as_conf)
-        self._handle_vertical_retries()
 
         inner_jobs_stat_statuses = self.platform.confirm_done_jobs_via_stat(self.job_list)
         wrapper_is_done = self.new_status in [Status.COMPLETED, Status.FAILED]

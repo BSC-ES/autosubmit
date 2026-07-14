@@ -726,11 +726,8 @@ class Platform:
     def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
         return True
 
-    def get_stat_file(self, job, attempt=-1):
-        if attempt == -1:  # No internal retrials
-            filename = f"{job.stat_file}{job.fail_count}"
-        else:
-            filename = f'{job.name}_STAT_{str(attempt)}'
+    def get_stat_file(self, job):
+        filename = f"{job.stat_file}{job.fail_count}"
         stat_local_path = (Path(
             self.config.get("LOCAL_ROOT_DIR", ""),self.expid,
             self.config.get("LOCAL_TMP_DIR", ""), filename))
@@ -738,9 +735,9 @@ class Platform:
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                Log.debug(f'{job.name}_STAT_{str(attempt)} file have been transferred')
+                Log.debug(f'{job.name}_STAT_{str(job.fail_count)} file have been transferred')
                 return True
-        Log.warning(f'{job.name}_STAT_{str(attempt)} file not found')
+        Log.warning(f'{job.name}_STAT_{str(job.fail_count)} file not found')
         return False
 
     @autosubmit_parameter(name='current_logdir')

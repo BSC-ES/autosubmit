@@ -32,6 +32,12 @@ from autosubmit.database.tables import JobsTable, Table
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
 
+_LOG_EXCLUDE_KEYS = {
+    'updated_log', 'updated_stats'
+}
+
+_LOG_RESET_STATUSES = {'WAITING', 'READY'}
+
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
@@ -57,6 +63,10 @@ class JobsDbManager(DbManager):
     def save_jobs(self, job_list: List["Job"]) -> None:
         """Save the job list to the database.
 
+        Log columns are excluded from the upsert to preserve data written by
+        :meth:`save_job_log`. For WAITING and READY jobs, log columns are
+        reset to ``0`` to clear stale data before the job starts running.
+
         :param job_list: List of Job objects to save to the database.
         :type job_list: List[Job]
 
@@ -66,8 +76,21 @@ class JobsDbManager(DbManager):
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)
         persistent_data = [job.__getstate__() for job in job_list]
-        pkeys = ['name']
-        self.upsert_many(table.name, persistent_data, pkeys)
+
+        reset_data = []
+        preserve_data = []
+        for d in persistent_data:
+            if d.get('status') in _LOG_RESET_STATUSES:
+                for k in _LOG_EXCLUDE_KEYS:
+                    d[k] = 0
+                reset_data.append(d)
+            else:
+                preserve_data.append(d)
+
+        if reset_data:
+            self.upsert_many(table.name, reset_data, ['name'])
+        if preserve_data:
+            self.upsert_many(table.name, preserve_data, ['name'], exclude_cols=list(_LOG_EXCLUDE_KEYS))
 
     def save_job_log(self, job: "Job") -> None:
         """Save only the log information of a single job to the database.
