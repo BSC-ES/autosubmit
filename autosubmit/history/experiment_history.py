@@ -187,10 +187,12 @@ class ExperimentHistory:
         :return: The updated JobData instance, or None if the record is not found or an exception occurs.
         :rtype: Optional[JobData]
         """
+
         try:
             job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-            if not job_data_dc:
-                raise Exception("Job {0} has not been found in the database.".format(job_name))
+        except Exception:
+            return None
+        try:
             job_data_dc.submit = submit
             job_data_dc.status = status
             job_data_dc.ncpus = ncpus

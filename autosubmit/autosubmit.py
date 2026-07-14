@@ -2187,6 +2187,7 @@ class Autosubmit:
                 as_conf.save()
                 job_changes_tracker = dict()
                 Autosubmit.save_historical_edges(expid)
+                job_list.reset_updated_logs()
                 while job_list.continue_run():
                     try:
 

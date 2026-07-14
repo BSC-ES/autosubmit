@@ -182,6 +182,8 @@ JobsTable = Table(
     Column("updated_log", Integer),
     Column("updated_stats", Integer),
     Column("fail_count", Integer, nullable=False, default=0),
+    Column("retrials", Integer, nullable=False, default=0),
+    Column("wallclock", String),
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
     Column("platform_name", String),

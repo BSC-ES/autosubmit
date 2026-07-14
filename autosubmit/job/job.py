@@ -100,6 +100,8 @@ PERSISTENT_ATTRIBUTES = (
     "updated_log",
     "updated_stats",
     "fail_count",
+    "retrials",
+    "wallclock",
     "packed",
 )
 
@@ -440,6 +442,7 @@ class Job(object):
         self.workflow_commit = None
         self._name = name
         self.name = name
+        self.log_recovery_call_count = 0
         if loaded_data:
             self.__setstate__(loaded_data)
         self.script_name = self.name + ".cmd"
@@ -451,7 +454,6 @@ class Job(object):
             BasicConfig.LOCAL_ROOT_DIR, self.expid, BasicConfig.LOCAL_TMP_DIR)
         self._log_path = Path(f"{self._tmp_path}/LOG_{self.expid}")
         self.updated = False
-        self.log_recovery_call_count = 0
         self.finished_time = None
         self.validate_template = False
         self.finished_time = None
@@ -1257,7 +1259,7 @@ class Job(object):
         """
         return self.parents.__len__()
 
-    def _get_from_stat(self, index: int, fail_count: int = -1) -> int:
+    def _get_from_stat(self, index: int, attempt: int) -> int:
         """
         Returns value from given row index position in STAT file associated to job.
 
@@ -1268,11 +1270,7 @@ class Job(object):
         :return:
         :rtype: int
         """
-        if fail_count == -1:
-            logname = os.path.join(self._tmp_path, f"{self.stat_file}0")
-        else:
-            fail_count = fail_count
-            logname = os.path.join(self._tmp_path, f"{self.stat_file}{fail_count}")
+        logname = os.path.join(self._tmp_path, f"{self.stat_file}{attempt}")
         if os.path.exists(logname):
             with open(logname) as f:
                 lines = f.readlines()
@@ -1305,23 +1303,23 @@ class Job(object):
 
         return lst
 
-    def check_end_time(self, fail_count=-1) -> int:
+    def check_end_time(self, attempt) -> int:
         """
         Returns end time from stat file
 
         :return: date and time
         :rtype: int
         """
-        return self._get_from_stat(1, fail_count)
+        return self._get_from_stat(1, attempt)
 
-    def check_start_time(self, fail_count=-1):
+    def check_start_time(self, attempt: int) -> int:
         """
         Returns job's start time
 
         :return: start time
         :rtype: str
         """
-        return self._get_from_stat(0, fail_count)
+        return self._get_from_stat(0, attempt)
 
     def check_retrials_end_time(self):
         """
@@ -1370,14 +1368,14 @@ class Job(object):
                 retrials_list.insert(0, retrial_dates)
         return retrials_list
 
-    def get_new_remotelog_name(self, count=-1):
+    def get_new_remotelog_name(self, attempt: int):
         """
         Checks if remote log file exists on remote host
         if it exists, remote_log variable is updated
         :param
         """
         try:
-            remote_logs = (f"{self.script_name}.out.{count}", f"{self.script_name}.err.{count}")
+            remote_logs = (f"{self.script_name}.out.{attempt}", f"{self.script_name}.err.{attempt}")
         except BaseException as e:
             remote_logs = ""
             Log.printlog(f"Trace {e} \n Failed to retrieve log file for job {self.name}", 6000)
@@ -1394,15 +1392,10 @@ class Job(object):
         try:
             out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1,
                                                         show_logs=show_logs)
-        except IOError:
-            Log.debug(f'Output log {self.remote_logs[0]} still does not exist')
-            out_exist = False
-        try:
             err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1,
                                                         show_logs=show_logs)
         except IOError:
-            Log.debug(f'Error log {self.remote_logs[1]} still does not exist')
-            err_exist = False
+            return False
         return out_exist or err_exist
 
     def _sync_retrieve_logfiles(self):
@@ -1458,27 +1451,33 @@ class Job(object):
 
         if not self.platform.get_stat_file(self, attempt):
             return False
-        self.update_submit_time_on_db()
+
+        self.update_submit_time_on_db(attempt)
+
         self.update_start_time(attempt)
-        self.write_start_time(fail_count=attempt)
+        self.write_start_time(attempt)
         self.write_end_time(self.status == Status.COMPLETED, attempt)
         return True
 
     def retrieve_logfiles(self) -> RecoveryReport:
         log_attempts = []
         stats_attempts = []
-        for attempt in range(self.updated_log, int(self.fail_count + 1)):
-            if log_attempts and log_attempts[-1].success:
-                log_attempts.append(self._recover_log_attempt(attempt))
-            if stats_attempts and stats_attempts[-1].success:
-                stats_attempts.append(self._write_stat_attempt(attempt))
+        for attempt in range(copy.copy(self.updated_log), int(self.retrials + 1)):
+            log_attempts.append(self._recover_log_attempt(attempt))
+            if log_attempts[-1].error and "Remote logs not found" in log_attempts[-1].error:
+                Log.warning(log_attempts[-1].error)
+                continue
+            stats_attempts.append(self._write_stat_attempt(attempt))
 
         return RecoveryReport(
             job_name=self.name,
             attempts=log_attempts,
             final_updated_log=self.updated_log,
             final_updated_stats=self.updated_stats,
-            all_succeeded=all(a.success for a in log_attempts) and all(s.success for s in stats_attempts) if log_attempts else True
+            all_succeeded=all(a.success for a in log_attempts)
+            and all(s.success for s in stats_attempts)
+            if log_attempts
+            else True,
         )
 
     def _restore_previous_state(self, backup_log_local, backup_log_remote, backup_submit_time, backup_id):
@@ -1517,8 +1516,9 @@ class Job(object):
 
             if not self.check_remote_log_exists():
                 if not self.check_compressed_local_logs():
+                    error = f"Remote logs not found for job {self.name}"
+                    Log.warning(self.remote_logs)
                     self._restore_previous_state(backup_log_local, backup_log_remote, backup_submit_time, backup_id)
-                    error = f"Remote logs not found: {self.remote_logs}"
                 else:
                     success = True
                     result_local = self.local_logs
@@ -1533,7 +1533,7 @@ class Job(object):
         except Exception as exc:
             self._restore_previous_state(backup_log_local, backup_log_remote, backup_submit_time, backup_id)
             error = str(exc)
-            
+
         if success:
             self.updated_log = attempt + 1
 
@@ -2394,6 +2394,8 @@ class Job(object):
     def reset_logs(self) -> None:
         """Reset job log counters."""
         self.updated_log = 0
+        self.updated_stats = 0
+
 
     def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
         """Find and substitute dynamic placeholders in `parameters` using the provided
@@ -2908,12 +2910,9 @@ class Job(object):
         with path.open('w', encoding='utf-8') as f:
             f.write('\n'.join(lines))
 
-    def write_submit_time(self, fail_count: Optional[int] = None) -> None:
-        """Writes submit date and time to the ``TOTAL_STATS`` file.
-        :param fail_count: Optional explicit fail_count. Defaults to ``self.fail_count``.
-        """
+    def write_submit_time(self) -> None:
+        """Writes submit date and time to the ``TOTAL_STATS`` file."""
         self._write_time("submit")
-        fc = fail_count if fail_count is not None else self.fail_count
 
         exp_history = ExperimentHistory(self.expid)
 
@@ -2928,9 +2927,9 @@ class Job(object):
                                       children=self.children_names_str, workflow_commit=self.workflow_commit,
                                       split=self.split if self.split and int(self.split) > 0 else None,
                                       splits=self.splits if self.splits and int(self.splits) > 0 else None,
-                                      fail_count=fc)
+                                      fail_count=self.fail_count)
 
-    def update_submit_time_on_db(self) -> None:
+    def update_submit_time_on_db(self, attempt: int) -> None:
         """Updates an existing job submission entry in the history database for the current fail count.
 
         Unlike :meth:`write_submit_time`, this method does not insert a new record but instead updates
@@ -2939,7 +2938,7 @@ class Job(object):
         exp_history = ExperimentHistory(self.expid)
         # TODO: for compatibility reasons.. convert back to EPOCH for database storage
         status = self.status if self.status == Status.COMPLETED else Status.FAILED
-        exp_history.update_submit_time(self.name, submit=self._datestr_to_epoch(str(self.submit_time_timestamp)),
+        if not exp_history.update_submit_time(self.name, submit=self._datestr_to_epoch(str(self.submit_time_timestamp)),
                                        status=Status.VALUE_TO_KEY.get(status, "UNKNOWN"), ncpus=0,
                                        wallclock=self.wallclock, qos=self.queue, date=self.date, member=self.member,
                                        section=self.section, chunk=self.chunk,
@@ -2949,14 +2948,16 @@ class Job(object):
                                        children=self.children_names_str, workflow_commit=self.workflow_commit,
                                        split=self.split if self.split and int(self.split) > 0 else None,
                                        splits=self.splits if self.splits and int(self.splits) > 0 else None,
-                                       fail_count=self.fail_count)
+                                       fail_count=attempt):
+            # Row does not exist
+            self.write_submit_time()
 
-    def update_start_time(self, count=-1):
+    def update_start_time(self, attempt=-1):
         """Updates the job's start time based on the count of retries.
-        :param count: The retry count.
-        :type count: int
+        :param attempt: The retry count.
+        :type attempt: int
         """
-        start_time_ = self.check_start_time(count)  # last known start time from the .cmd file
+        start_time_ = self.check_start_time(attempt)  # last known start time from the .cmd file
         if start_time_:
             self.start_time_timestamp = datetime.datetime.fromtimestamp(start_time_).strftime("%Y%m%d%H%M%S")
         else:
@@ -2989,17 +2990,14 @@ class Job(object):
                 else:
                     Log.debug(f"Log file {old_log_path} does not exist, skipping rename.")
 
-    def write_start_time(self, fail_count: int = -1):
+    def write_start_time(self, attempt: int):
         """Writes start date and time to TOTAL_STATS file and the history database.
 
-        :param fail_count: The fail count to identify the correct database row.
-                           Defaults to ``self.fail_count``.
-        :type fail_count: int
+        :param attempt: The fail count to identify the correct database row.
+        :type attempt: int
         :return: True if successful, False otherwise
         :rtype: bool
         """
-        if fail_count < 0:
-            fail_count = self.fail_count
         self._write_time("start")
         exp_history = ExperimentHistory(self.expid)
         # TODO: for compatibility reasons.. convert back to EPOCH for database storage
@@ -3009,7 +3007,7 @@ class Job(object):
                                      job_id=self.id, wrapper_queue=self._wrapper_queue,
                                      wrapper_code=0 if not self.packed else 1,
                                      children=self.children_names_str,
-                                     fail_count=fail_count)
+                                     fail_count=attempt)
         return True
 
     @staticmethod
@@ -3017,15 +3015,15 @@ class Job(object):
         """Convert a date string in the format YYYYMMDDHHMMSS to epoch time."""
         return int(datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S").timestamp())
 
-    def write_end_time(self, completed, count=-1):
+    def write_end_time(self, completed, attempt):
         """Writes end timestamp to TOTAL_STATS file and jobs_data.db
         :param completed: True if the job has been completed, False otherwise
         :type completed: bool
-        :param count: number of retrials
-        :type count: int
+        :param attempt: number of retrials
+        :type attempt: int
         """
         self.status = Status.COMPLETED if completed else Status.FAILED
-        end_time = self.check_end_time(count)
+        end_time = self.check_end_time(attempt)
         if end_time > 0:
             self.finish_time_timestamp = datetime.datetime.fromtimestamp(end_time).strftime("%Y%m%d%H%M%S")
         if not self.finish_time_timestamp:
@@ -3043,7 +3041,7 @@ class Job(object):
                                                     finish=self._datestr_to_epoch(str(self.finish_time_timestamp)),
                                                     status=status_str,
                                                     job_id=self.id, out_file=out, err_file=err,
-                                                    fail_count=count if count >= 0 else self.fail_count)
+                                                    fail_count=attempt)
 
         # Launch second as threaded function only for slurm
         if job_data_dc and type(self.platform) is not str and self.platform.type == "slurm":
@@ -3313,6 +3311,16 @@ class WrapperJob(Job):
             if parent in wrapper_job_set
         )
 
+    def _handle_vertical_retries(self) -> None:
+        """Increment fail_count for vertical inner jobs eligible for retry."""
+        for inner_job in self.job_list:
+            if (inner_job.status == Status.FAILED and
+                    inner_job.wrapper_type == "vertical" and
+                    inner_job.fail_count < inner_job.retrials):
+                inner_job.inc_fail_count()
+                Log.warning(f"Incrementing fail_count for vertical inner job {inner_job.name} to {inner_job.fail_count} ")
+
+
     def _apply_io_safe_wait(self, inner_job: Job, current_stat: Status, timeout_to: Status,
                             keep_alive: Status = None) -> Status:
         """Track elapsed time since wrapper finished; timeout transitions to timeout_to.
@@ -3423,6 +3431,7 @@ class WrapperJob(Job):
         """
         save = False
         self.platform.check_all_jobs([self], as_conf)
+        self._handle_vertical_retries()
 
         inner_jobs_stat_statuses = self.platform.confirm_done_jobs_via_stat(self.job_list)
         wrapper_is_done = self.new_status in [Status.COMPLETED, Status.FAILED]

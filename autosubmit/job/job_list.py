@@ -285,6 +285,10 @@ class JobList(object):
         """
         self.dbmanager.clear_wrappers(preview=preview)
 
+    def reset_updated_logs(self) -> None:
+        """Reset updated_log and updated_stats to 0 for all jobs with fail_count == 0."""
+        self.dbmanager.reset_updated_logs()
+
     def _reset_workflow_graph(self) -> None:
         """Resets the workflow graph to a zero state by clearing the graph and resetting the database."""
         Log.debug("Resetting the workflow graph to a zero state")
@@ -2681,12 +2685,10 @@ class JobList(object):
                     (job.status == Status.FAILED
                      and job.fail_count >= job.retrials
                      and job.log_recovery_call_count > job.fail_count
-                     and job.updated_log > job.fail_count
                      and not self.is_wrapper_still_running(job))
                     or
                     (job.status in (Status.COMPLETED, Status.SKIPPED)
                      and job.log_recovery_call_count > job.fail_count
-                     and job.updated_log > job.fail_count
                      and not self.is_wrapper_still_running(job))
             )
         ]
@@ -2827,16 +2829,24 @@ class JobList(object):
         """
         return sorted(self.job_list, key=lambda k: k.status)
 
-    def save_jobs(self, jobs_to_save: Optional[List[Job]] = None):
-        """Persists the job list"""
+    def save_jobs(self, jobs_to_save: Optional[List[Job]] = None, reset_log_counters: bool = False):
+        """Persists the job list
+        :param jobs_to_save: Optional list of jobs to save. If None, saves all jobs in the job list.
+        :type jobs_to_save: Optional[List[Job]]
+        :param reset_log_counters: If True, resets the log counters for the jobs being saved. Defaults to False.
+        :type reset_log_counters: bool
+        :return: None
+        :rtype: None
+        :raises Exception: If a database access error occurs while saving jobs.
+        """
 
         if not self.disable_save:
             Log.info("Saving jobs to the database...")
             if not jobs_to_save:
                 self.update_status_log()
-                self.dbmanager.save_jobs(self.job_list)
+                self.dbmanager.save_jobs(self.job_list, reset_log_counters=reset_log_counters)
             else:
-                self.dbmanager.save_jobs(jobs_to_save)
+                self.dbmanager.save_jobs(jobs_to_save, reset_log_counters=reset_log_counters)
             Log.info("Jobs saved.")
 
     def load_jobs(self, full_load: bool = False, load_failed_jobs: bool = False) -> list[Job]:
@@ -3140,10 +3150,15 @@ class JobList(object):
             job.send_cpmip_notification(self._as_conf)
         else:
             # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
-            job.write_submit_time()
+            # TODO This should be in a db manager
+            exp_history = ExperimentHistory(self.expid)
+            existing = exp_history.get_submit_data_dc(job.name, job.fail_count)
+            if existing is None or str(existing.job_id) != str(job.id):
+                job.write_submit_time()
             job.platform.add_job_to_log_recover(job)
-
         job.log_recovery_call_count += 1
+
+
 
     def recover_logs(self) -> bool:
         """Update jobs' log recovered status.

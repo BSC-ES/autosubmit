@@ -36,9 +36,6 @@ _LOG_EXCLUDE_KEYS = {
     'updated_log', 'updated_stats'
 }
 
-_LOG_RESET_STATUSES = {'WAITING', 'READY'}
-
-
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
 
@@ -60,15 +57,16 @@ class JobsDbManager(DbManager):
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
         self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
-    def save_jobs(self, job_list: List["Job"]) -> None:
+    def save_jobs(self, job_list: List["Job"], reset_log_counters: bool = False) -> None:
         """Save the job list to the database.
 
         Log columns are excluded from the upsert to preserve data written by
-        :meth:`save_job_log`. For WAITING and READY jobs, log columns are
-        reset to ``0`` to clear stale data before the job starts running.
-
+        :meth:`save_job_log`.
+        
         :param job_list: List of Job objects to save to the database.
         :type job_list: List[Job]
+        :param reset_log_counters: Whether to reset log counters.
+        :type reset_log_counters: bool
 
         :return: None
         :raises: May raise database-related exceptions during upsert operations.
@@ -77,20 +75,14 @@ class JobsDbManager(DbManager):
         self.create_table(table.name)
         persistent_data = [job.__getstate__() for job in job_list]
 
-        reset_data = []
-        preserve_data = []
+        preserve_data: list = []
         for d in persistent_data:
-            if d.get('status') in _LOG_RESET_STATUSES:
+            if reset_log_counters:
                 for k in _LOG_EXCLUDE_KEYS:
                     d[k] = 0
-                reset_data.append(d)
-            else:
-                preserve_data.append(d)
-
-        if reset_data:
-            self.upsert_many(table.name, reset_data, ['name'])
+            preserve_data.append(d)
         if preserve_data:
-            self.upsert_many(table.name, preserve_data, ['name'], exclude_cols=list(_LOG_EXCLUDE_KEYS))
+            self.upsert_many(table.name, preserve_data, ['name'], exclude_cols=list(_LOG_EXCLUDE_KEYS) if not reset_log_counters else None)
 
     def save_job_log(self, job: "Job") -> None:
         """Save only the log information of a single job to the database.
@@ -557,6 +549,16 @@ class JobsDbManager(DbManager):
         wrappers = self.select_all_with_columns(wrapper_info_table.name)
         return [wrapper[1] for wrapper in wrappers]
 
+
+    def reset_updated_logs(self) -> None:
+        """Reset updated_log and updated_stats to 0 for all jobs with fail_count == 0."""
+        table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        self.update_where(
+            table.name,
+            {'updated_log': 0, 'updated_stats': 0},
+            {'fail_count': 0}
+        )
 
     def get_failed_job_data(self) -> list[dict[str, Any]]:
         """Get the names of jobs that have failed.

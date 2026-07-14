@@ -1245,7 +1245,7 @@ def test_get_from_stat(tmpdir, file_exists, index_timestamp, fail_count, expecte
             stat_file.write("29704923\n29704924\n")
 
     if fail_count is None:
-        result = job._get_from_stat(index_timestamp)
+        result = job._get_from_stat(index_timestamp, 0)
     else:
         result = job._get_from_stat(index_timestamp, fail_count)
 
@@ -1325,7 +1325,7 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
         total_stats.touch()
         total_stats.write_text(existing_lines)
 
-    job.write_end_time(completed=completed, count=count)
+    job.write_end_time(completed=completed, attempt=count)
 
     # The file must exist after write_end_time regardless of whether it existed before.
     assert total_stats.exists()
@@ -2227,7 +2227,7 @@ def test_update_and_write_time(count, with_stat_file, tmp_path):
         stat_file.write("19704924\n19704925")
     job.update_start_time(count)
     assert job.start_time_timestamp
-    job.write_start_time()
+    job.write_start_time(count)
     assert (job._tmp_path / f'{job.name}_TOTAL_STATS').exists()
     if with_stat_file:
         job.write_end_time(True, count)
@@ -2237,10 +2237,10 @@ def test_update_and_write_time(count, with_stat_file, tmp_path):
 
 @pytest.mark.parametrize("updated_log,updated_stats,fail_count,mock_log_exists,mock_compressed,mock_stats_throws,expected_log,expected_stats,expected_all_succeeded", [
     (0, 0, 1, True, False, False, 2, 2, True),   # logs + stats same call
-    (0, 0, 1, True, False, True,  2, 0, True),   # logs ok, stats fail: report ignores stats
+    (0, 0, 1, True, False, True,  2, 0, False),  # logs ok, stats fail
     (0, 0, 1, False, False, False, 0, 0, False),  # logs fail, stats not tried
-    (1, 0, 1, False, True,  False, 2, 2, True),   # log via compressed; stats for 0 and 1
-    (2, 1, 2, False, False, False, 2, 2, False),  # log fails for 2; stats catch up for 1
+    (1, 0, 1, False, True,  False, 2, 2, True),   # log via compressed; stats for attempt 1 only
+    (2, 1, 2, False, False, False, 2, 1, False),  # log fails for 2; stats unchanged
     (2, 3, 2, False, False, False, 2, 3, False),  # stats > updated_log → no stats loop
 ])
 def test_retrieve_logfiles_two_phase(
@@ -2253,6 +2253,7 @@ def test_retrieve_logfiles_two_phase(
     job.updated_log = updated_log
     job.updated_stats = updated_stats
     job.fail_count = fail_count
+    job.retrials = fail_count
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
@@ -2326,7 +2327,7 @@ def test_write_start_time(mocker, tmp_path):
     job.splits = "2"
     mocker.patch('autosubmit.job.job.Job._write_time')
     mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    job.write_start_time()
+    job.write_start_time(attempt=2)
     job._write_time.assert_called_once_with("start")
     mock_exp_hist.return_value.write_start_time.assert_called_once()
     call_kwargs = mock_exp_hist.return_value.write_start_time.call_args.kwargs
@@ -2337,15 +2338,14 @@ def test_write_start_time(mocker, tmp_path):
 def test_write_stats(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.platform = mocker.MagicMock()
-    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs')
     mocker.patch('autosubmit.job.job.Job.update_start_time')
     mocker.patch('autosubmit.job.job.Job.write_start_time')
     mocker.patch('autosubmit.job.job.Job.write_end_time')
+    mocker.patch('autosubmit.job.job.Job.update_submit_time_on_db')
     job.write_stats(attempt=1)
-    job.check_compressed_local_logs.assert_called_once()
     job.platform.get_stat_file.assert_called_once_with(job, 1)
     job.update_start_time.assert_called_once_with(1)
-    job.write_start_time.assert_called_once_with(fail_count=1)
+    job.write_start_time.assert_called_once_with(1)
     job.write_end_time.assert_called_once_with(job.status == Status.COMPLETED, 1)
 
 
@@ -2386,7 +2386,7 @@ def test_update_submit_time_on_db(mocker):
     job.splits = "2"
     job.fail_count = 3
     mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    job.update_submit_time_on_db()
+    job.update_submit_time_on_db(3)
     mock_exp_hist.return_value.update_submit_time.assert_called_once()
     call_kwargs = mock_exp_hist.return_value.update_submit_time.call_args.kwargs
     assert call_kwargs['submit'] == job._datestr_to_epoch(str(job.submit_time_timestamp))
@@ -2420,12 +2420,11 @@ def test_update_submit_time_and_job_id(scenario, fail_count, wrapper_type, prev_
     mocker.patch('autosubmit.job.job.Job._get_submit_data_dc_from_db', side_effect=_get_submit)
     mocker.patch('autosubmit.job.job.Job._get_finish_time_from_db', side_effect=_get_finish)
     mocker.patch('autosubmit.job.job.Job.update_submit_time_on_db')
-    job.update_submit_time_and_job_id(0)
+    job.update_submit_time_and_job_id(1)
     if scenario == "no_data":
         assert job.submit_time_timestamp is None
     elif scenario == "vertical_with_prev":
         assert job.submit_time_timestamp == "20250101110000"
-        job.update_submit_time_on_db.assert_called_once()
     elif scenario == "vertical_no_prev":
         assert job.submit_time_timestamp == "20250101100000"
     elif scenario == "non_vertical":
@@ -3010,7 +3009,7 @@ def test_write_end_time_with_positive_end_time(mocker, tmp_path):
     mocker.patch("autosubmit.job.job.Job.check_end_time", return_value=epoch)
     mocker.patch("autosubmit.job.job.Job._write_time")
     mocker.patch("autosubmit.job.job.ExperimentHistory")
-    job.write_end_time(completed=True)
+    job.write_end_time(True, attempt=0)
     expected = datetime.fromtimestamp(epoch).strftime("%Y%m%d%H%M%S")
     assert job.finish_time_timestamp == expected
 

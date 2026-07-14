@@ -726,8 +726,8 @@ class Platform:
     def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
         return True
 
-    def get_stat_file(self, job):
-        filename = f"{job.stat_file}{job.fail_count}"
+    def get_stat_file(self, job, attempt: int):
+        filename = f"{job.stat_file}{attempt}"
         stat_local_path = (Path(
             self.config.get("LOCAL_ROOT_DIR", ""),self.expid,
             self.config.get("LOCAL_TMP_DIR", ""), filename))
@@ -735,9 +735,9 @@ class Platform:
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                Log.debug(f'{job.name}_STAT_{str(job.fail_count)} file have been transferred')
+                Log.debug(f'{job.name}_STAT_{str(attempt)} file have been transferred')
                 return True
-        Log.warning(f'{job.name}_STAT_{str(job.fail_count)} file not found')
+        Log.warning(f'{job.name}_STAT_{str(attempt)} file not found')
         return False
 
     @autosubmit_parameter(name='current_logdir')
@@ -1030,17 +1030,22 @@ class Platform:
             job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_data["name"]))
             job.platform_name = self.name  # Change the original platform to this process platform.
             job.platform = self
+            Log.warning(f"{self.name} job updated log {job.updated_log} and retrials {job.retrials} and fail_count {job.fail_count}")
             report = job.retrieve_logfiles()
             job.send_cpmip_notification(self._as_conf)
 
             if not report.all_succeeded:
-                failed = [a for a in report.attempts if not a.success]
-                Log.warning(
-                    f"{self.name}(log_recovery): Job {job.name} had "
-                    f"{len(failed)} failed recovery attempt(s): "
-                    f"{[a.error for a in failed]}"
-                )
-            elif report.attempts:
+                failed = [a for a in report.attempts if a.error and "Remote logs not found" not in a.error]
+                if len(failed) > 0:
+                    Log.warning(
+                        f"{self.name}(log_recovery): Job {job.name} had "
+                        f"{len(failed)} failed recovery attempt(s): "
+                        f"{[a.error for a in failed]}"
+                    )
+                attempts = len(report.attempts) - len(failed) - 1
+            else:
+                attempts = len(report.attempts)
+            if attempts > 0:
                 Log.result(
                     f"{self.name}(log_recovery): Job {job.name} recovered "
                     f"{len(report.attempts)} attempt(s)."
