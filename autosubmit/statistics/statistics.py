@@ -48,11 +48,11 @@ class Statistics:
         self.max_fail = 0
         self.start_times: list[Union[datetime, None]] = []
         self.end_times: list[Union[datetime, None]] = []
-        self.queued: list[timedelta] = []
-        self.run: list[timedelta] = []
+        self.queued: list[float] = []
+        self.run: list[float] = []
         self.failed_jobs: list[int] = []
-        self.fail_queued: list[timedelta] = []
-        self.fail_run: list[timedelta] = []
+        self.fail_queued: list[float] = []
+        self.fail_run: list[float] = []
         self.wallclocks: list[float] = []
         self.threshold = 0.0
         self.failed_jobs_dict: dict[str, int] = {}

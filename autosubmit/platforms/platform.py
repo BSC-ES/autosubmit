@@ -23,23 +23,25 @@ import traceback
 from contextlib import suppress
 from multiprocessing.queues import Queue
 from multiprocessing.synchronize import Event
+
 # noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
-from typing import Any, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import setproctitle
 
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log
+from autosubmit.log.log import AutosubmitCritical, Log
 
 if TYPE_CHECKING:
+    from multiprocessing.process import BaseProcess
+
     from autosubmit.config.configcommon import AutosubmitConfig
-    from autosubmit.job.job_packages import JobPackageBase
     from autosubmit.job.job import Job
     from autosubmit.job.job_list import JobList
-    from multiprocessing.process import BaseProcess
+    from autosubmit.job.job_packages import JobPackageBase
 
 
 def _init_logs_log_process(as_conf: 'AutosubmitConfig', platform_name: str) -> None:
@@ -98,7 +100,7 @@ class CopyQueue(Queue):
     A queue that copies the object gathered.
     """
 
-    def __init__(self, maxsize: int = -1, block: bool = True, timeout: float = None, ctx: Any = None) -> None:
+    def __init__(self, maxsize: int = -1, block: bool = True, timeout: Optional[float] = None, ctx: Any = None) -> None:
         """Initializes the Queue.
 
         :param maxsize: Maximum size of the queue. Defaults to -1 (infinite size).
@@ -166,8 +168,8 @@ class Platform:
         self._partition = None
         self.ec_queue = "hpc"
         self.processors_per_node = None
-        self.scratch_free_space = None
-        self.custom_directives = None
+        self.scratch_free_space: Optional[str] = None
+        self.custom_directives: Optional[dict] = None
         self._host = ''
         self._user = ''
         self._project = ''
@@ -204,7 +206,7 @@ class Platform:
         self.two_factor_method = self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
         if auth_password is not None and self.two_factor_auth:
             if isinstance(auth_password, list):
-                self.pw = auth_password[0]
+                self.pw: Optional[str] = auth_password[0]
             else:
                 self.pw = auth_password
         else:
@@ -234,7 +236,7 @@ class Platform:
             self.compression_level = platform_config.get("COMPRESSION_LEVEL", 9)
 
         self.log_queue_size = log_queue_size
-        self.remote_log_dir = None
+        self.remote_log_dir: str = ""
         self.has_scheduler = True
         self.IO_SAFE_WAIT = int(
             self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("IO_SAFE_WAIT", self.IO_SAFE_WAIT))
@@ -717,9 +719,10 @@ class Platform:
             filename = f"{job.stat_file}{job.fail_count}"
         else:
             filename = f'{job.name}_STAT_{str(count)}'
-        stat_local_path = os.path.join(
-            self.config.get("LOCAL_ROOT_DIR"), self.expid, self.config.get("LOCAL_TMP_DIR"), filename)
-        if os.path.exists(stat_local_path):
+        stat_local_path = (Path(
+            self.config.get("LOCAL_ROOT_DIR", ""),self.expid,
+            self.config.get("LOCAL_TMP_DIR", ""), filename))
+        if stat_local_path.exists():
             os.remove(stat_local_path)
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
@@ -739,7 +742,7 @@ class Platform:
         :rtype: str
         """
         if self.type == "local":
-            path = Path(self.root_dir) / self.config.get("LOCAL_TMP_DIR") / f'LOG_{self.expid}'
+            path = Path(self.root_dir, self.config.get("LOCAL_TMP_DIR", ""), f'LOG_{self.expid}')
         else:
             path = Path(self.remote_log_dir)
         return str(path)
@@ -1009,6 +1012,9 @@ class Platform:
 
         :return: Updated set of jobs pending to process.
         """
+        if self.recovery_queue is None:
+            raise AutosubmitCritical("As the recovery job was initialized some of"
+                                     "the variable were not properly initialized")
         while not self.recovery_queue.empty():
             from autosubmit.job.job import Job
             job = Job(loaded_data=self.recovery_queue.get(timeout=5))
@@ -1073,7 +1079,7 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: Optional[int] = None) -> Union[bytes, None]:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path

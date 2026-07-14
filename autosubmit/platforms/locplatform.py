@@ -283,7 +283,7 @@ class LocalPlatform(ParamikoPlatform):
         # This function has a short sleep as the files are locally
         sleeptime = 1
         for i in range(max_retries):
-            if os.path.isfile(os.path.join(self.get_files_path(), src)):
+            if Path(self.get_files_path(), src).is_file():
                 return True
             sleep(sleeptime)
         Log.warning(f"File {src} does not exist")

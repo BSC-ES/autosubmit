@@ -2980,3 +2980,56 @@ def test_update_parameters_synchronize_date_binds_chunk(autosubmit_config, chunk
     parameters = job.update_parameters(as_conf, set_attributes=True)
     assert parameters['CHUNK'] == chunk
 
+    
+@pytest.mark.parametrize("chunk_unit,chunk_size,date_format,expected_end,expected_ldate", [
+    ("month", 4,  "",  "20000901",     "20000831"),
+    ("day",   30, "",  "20000301",     "20000229"),
+    ("year",  1,  "",  "20020101",     "20011231"),
+    ("hour",  12, "H", "2000010200",   "2000010123"),
+])
+def test_calendar_chunk_exposes_experiment_terminal_dates(
+    chunk_unit, chunk_size, date_format, expected_end, expected_ldate
+):
+    """Issue #2430: date-aware jobs see CHUNK_END_DATE_LAST and LDATE
+    pointing at the experiment's end, independent of their own chunk."""
+    job = Job('A', '1', Status.WAITING, 0)
+    job.date = datetime(2000, 1, 1)
+    job.chunk = None
+    job.date_format = date_format
+    parameters = {
+        'EXPERIMENT.NUMCHUNKS': 2,
+        'EXPERIMENT.CHUNKSIZE': chunk_size,
+        'EXPERIMENT.CHUNKSIZEUNIT': chunk_unit,
+        'EXPERIMENT.CALENDAR': 'standard',
+    }
+
+    result = job.calendar_chunk(parameters)
+
+    assert result['CHUNK_END_DATE_LAST'] == expected_end
+    assert result['LDATE'] == expected_ldate
+
+
+@pytest.mark.parametrize("chunk_unit,chunk_size", [
+    ("month", 4),
+    ("day",   30),
+    ("year",  1),
+    ("hour",  12),
+])
+def test_calendar_chunk_last_chunk_consistency(chunk_unit, chunk_size):
+    """On the last chunk the new variables equal the per-chunk ones."""
+    job = Job('A', '1', Status.WAITING, 0)
+    job.date = datetime(2000, 1, 1)
+    job.chunk = 2
+    job.date_format = ''
+    parameters = {
+        'EXPERIMENT.NUMCHUNKS': 2,
+        'EXPERIMENT.CHUNKSIZE': chunk_size,
+        'EXPERIMENT.CHUNKSIZEUNIT': chunk_unit,
+        'EXPERIMENT.CALENDAR': 'standard',
+    }
+
+    result = job.calendar_chunk(parameters)
+
+    assert result['CHUNK_END_DATE'] == result['CHUNK_END_DATE_LAST']
+    assert result['CHUNK_SECOND_TO_LAST_DATE'] == result['LDATE']
+    
