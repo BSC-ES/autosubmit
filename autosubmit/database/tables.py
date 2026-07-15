@@ -183,6 +183,8 @@ JobsTable = Table(
     Column("updated_stats", Integer),
     Column("fail_count", Integer, nullable=False, default=0),
     Column("retrials", Integer, nullable=False, default=0),
+    Column("log_recovery_call_count", Integer, nullable=False, default=0),
+    Column("wrapper_type", Text, nullable=True, default=None),
     Column("wallclock", String),
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),

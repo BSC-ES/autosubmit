@@ -103,6 +103,8 @@ PERSISTENT_ATTRIBUTES = (
     "retrials",
     "wallclock",
     "packed",
+    "log_recovery_call_count",
+    "wrapper_type",
 )
 
 
@@ -1185,8 +1187,6 @@ class Job(object):
 
     def set_ready_date(self) -> None:
         """Sets the ready start date for the job"""
-        self.updated_log = 0
-        self.updated_stats = 0
         self.ready_date = int(time.strftime("%Y%m%d%H%M%S"))
 
     def inc_fail_count(self):
@@ -1194,6 +1194,16 @@ class Job(object):
         Increments fail count
         """
         self.fail_count += 1
+
+    @property
+    def has_pending_logs(self) -> bool:
+        """Whether there are still logs pending recovery."""
+        return self.log_recovery_call_count > self.fail_count
+
+    @property
+    def can_retry(self) -> bool:
+        """Whether the job is FAILED and has remaining retries."""
+        return self.status == Status.FAILED and self.fail_count < self.retrials
 
     # Maybe should be renamed to the plural?
     def add_parent(self, *parents):
@@ -1452,8 +1462,8 @@ class Job(object):
         if not self.platform.get_stat_file(self, attempt):
             return False
 
-        self.update_submit_time_on_db(attempt)
-
+        if self.wrapper_type == "vertical" and attempt > 0:
+            self.update_submit_time_on_db(attempt)
         self.update_start_time(attempt)
         self.write_start_time(attempt)
         self.write_end_time(self.status == Status.COMPLETED, attempt)
@@ -2910,7 +2920,7 @@ class Job(object):
         with path.open('w', encoding='utf-8') as f:
             f.write('\n'.join(lines))
 
-    def write_submit_time(self) -> None:
+    def write_submit_time(self, attempt: int) -> None:
         """Writes submit date and time to the ``TOTAL_STATS`` file."""
         self._write_time("submit")
 
@@ -2927,7 +2937,7 @@ class Job(object):
                                       children=self.children_names_str, workflow_commit=self.workflow_commit,
                                       split=self.split if self.split and int(self.split) > 0 else None,
                                       splits=self.splits if self.splits and int(self.splits) > 0 else None,
-                                      fail_count=self.fail_count)
+                                      fail_count=attempt)
 
     def update_submit_time_on_db(self, attempt: int) -> None:
         """Updates an existing job submission entry in the history database for the current fail count.
@@ -2936,7 +2946,6 @@ class Job(object):
         the existing one identified by the job name and the current :attr:`fail_count`.
         """
         exp_history = ExperimentHistory(self.expid)
-        # TODO: for compatibility reasons.. convert back to EPOCH for database storage
         status = self.status if self.status == Status.COMPLETED else Status.FAILED
         if not exp_history.update_submit_time(self.name, submit=self._datestr_to_epoch(str(self.submit_time_timestamp)),
                                        status=Status.VALUE_TO_KEY.get(status, "UNKNOWN"), ncpus=0,
@@ -2950,7 +2959,7 @@ class Job(object):
                                        splits=self.splits if self.splits and int(self.splits) > 0 else None,
                                        fail_count=attempt):
             # Row does not exist
-            self.write_submit_time()
+            self.write_submit_time(attempt)
 
     def update_start_time(self, attempt=-1):
         """Updates the job's start time based on the count of retries.
@@ -3311,15 +3320,13 @@ class WrapperJob(Job):
             if parent in wrapper_job_set
         )
 
-    def _handle_vertical_retries(self) -> None:
+    def _handle_vertical_retries(self) -> bool:
         """Increment fail_count for vertical inner jobs eligible for retry."""
-        for inner_job in self.job_list:
-            if (inner_job.status == Status.FAILED and
-                    inner_job.wrapper_type == "vertical" and
-                    inner_job.fail_count < inner_job.retrials):
-                inner_job.inc_fail_count()
-                Log.warning(f"Incrementing fail_count for vertical inner job {inner_job.name} to {inner_job.fail_count} ")
-
+        save = False
+        for inner_job in [job for job in self.job_list if job.status == Status.FAILED and job.can_retry and job.wrapper_type == "vertical"]:
+            inner_job.inc_fail_count()
+            save = True
+        return save
 
     def _apply_io_safe_wait(self, inner_job: Job, current_stat: Status, timeout_to: Status,
                             keep_alive: Status = None) -> Status:
@@ -3431,7 +3438,7 @@ class WrapperJob(Job):
         """
         save = False
         self.platform.check_all_jobs([self], as_conf)
-        self._handle_vertical_retries()
+        save |= self._handle_vertical_retries()
 
         inner_jobs_stat_statuses = self.platform.confirm_done_jobs_via_stat(self.job_list)
         wrapper_is_done = self.new_status in [Status.COMPLETED, Status.FAILED]
@@ -3440,6 +3447,7 @@ class WrapperJob(Job):
             inner_job.new_status = self._compute_inner_job_status(
                 inner_job, inner_jobs_stat_statuses, wrapper_is_done
             )
+
 
         self.platform.set_start_time_from_remote_stat_file([
             inner_job for inner_job in self.job_list
@@ -3458,6 +3466,11 @@ class WrapperJob(Job):
         elif self.status != self.prev_status:
             Log.debug(f"Wrapper job {self.name} and id {self.id} status updated to {self.status_str}.")
             save = True
+
+        for inner_job in self.job_list:
+            if inner_job.status != inner_job.prev_status:
+                save = True
+                break
 
         return save
 

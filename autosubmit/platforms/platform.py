@@ -802,7 +802,6 @@ class Platform:
         else:
             Log.warning(
                 f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry. This shouldn't happen!")
-            job.updated_log += 1
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
@@ -1026,7 +1025,7 @@ class Platform:
             raise AutosubmitCritical("As the recovery job was initialized some of"
                                      "the variable were not properly initialized")
         while not self.recovery_queue.empty():
-            job_data = self.recovery_queue.get(timeout=1)
+            job_data = self.recovery_queue.get(timeout=5)
             job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_data["name"]))
             job.platform_name = self.name  # Change the original platform to this process platform.
             job.platform = self

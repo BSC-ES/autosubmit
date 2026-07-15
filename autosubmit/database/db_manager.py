@@ -19,7 +19,7 @@
 from pathlib import Path
 from typing import Any, Optional, cast, List, Dict, Union
 
-from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc
+from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc, inspect
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
@@ -77,6 +77,13 @@ class DbManager:
                 if self.schema:
                     conn.execute(CreateSchema(self.schema, if_not_exists=True))
                 conn.execute(CreateTable(table, if_not_exists=True))
+                # Auto-add missing columns for schema evolution
+                existing = {col['name'] for col in inspect(conn).get_columns(table_name)}
+                for column in table.columns:
+                    if column.name not in existing:
+                        conn.execute(
+                            f"ALTER TABLE {table_name} ADD COLUMN {column.name} {column.type}"
+                        )
 
     def drop_table(self, table_name: str) -> None:
         table = self.table_registry.get(table_name)

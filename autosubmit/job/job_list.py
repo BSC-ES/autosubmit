@@ -538,6 +538,10 @@ class JobList(object):
         for job in self.job_list:
             if not self.run_mode and new:
                 job.fail_count = 0
+                job.updated_log = 0
+                job.updated_stats = 0
+                job.log_recovery_call_count = 0
+                job.wrapper_type = None
             if new:
                 job.status = Status.READY if not self.has_parents(job.name) else Status.WAITING
             else:
@@ -585,7 +589,7 @@ class JobList(object):
         :param create: If True, creates new entries in the database.
         :param new: If True, saves the state of new jobs.
         """
-        self.save_jobs()
+        self.save_jobs(reset_log_counters=new)
         self.save_edges()
         self.save_sections()
         for job in self.job_list:
@@ -2675,6 +2679,7 @@ class JobList(object):
         Log.debug(f"Jobs loaded: {len(self.job_list)}")
         Log.debug(f"Edges loaded: {len(self.graph_dict)}")
         self.update_wrappers_references()
+
         return len(self.get_active()) > 0
 
     def unload_finished_jobs(self):
@@ -2683,12 +2688,11 @@ class JobList(object):
             job for job in self.job_list
             if (
                     (job.status == Status.FAILED
-                     and job.fail_count >= job.retrials
-                     and job.log_recovery_call_count > job.fail_count
+                     and not job.can_retry
                      and not self.is_wrapper_still_running(job))
                     or
                     (job.status in (Status.COMPLETED, Status.SKIPPED)
-                     and job.log_recovery_call_count > job.fail_count
+                     and not job.has_pending_logs
                      and not self.is_wrapper_still_running(job))
             )
         ]
@@ -2705,7 +2709,6 @@ class JobList(object):
         jobs_to_unload = list(jobs_to_unload_set)
         # update edges completion status before removing them
         for job in (job for job in jobs_to_unload):
-            job.fail_count = 0
             for child in job.children:
                 self.graph.edges[job.name, child.name]['completion_status'] = "COMPLETED"
             for parent in job.parents:
@@ -3154,7 +3157,7 @@ class JobList(object):
             exp_history = ExperimentHistory(self.expid)
             existing = exp_history.get_submit_data_dc(job.name, job.fail_count)
             if existing is None or str(existing.job_id) != str(job.id):
-                job.write_submit_time()
+                job.write_submit_time(job.fail_count)
             job.platform.add_job_to_log_recover(job)
         job.log_recovery_call_count += 1
 
@@ -3162,15 +3165,17 @@ class JobList(object):
 
     def recover_logs(self) -> bool:
         """Update jobs' log recovered status.
-
-        Iterate over the current job list and mark jobs whose stdout/stderr logs
-        have been recovered.
-
+        Loads finished jobs from DB that need recovery.
         """
-        jobs_to_recover = [job for job in self.job_list if
-                           job.status in self._FINAL_STATUSES and job.log_recovery_call_count <= job.fail_count]
-        for job in jobs_to_recover:
-            self._recover_log(job)
+        jobs_to_recover=[]
+        for data in self.dbmanager.select_finished_jobs_needing_log_recovery():
+            self._add_job_node_with_platform(data, connect_to_platform=self.submitter is not None)
+            jobs_to_recover.append(self.graph.nodes[data["name"]]["job"])
+
+        if jobs_to_recover:
+            for job in jobs_to_recover:
+                self._recover_log(job)
+            self.save_jobs(jobs_to_recover)
         return len(jobs_to_recover) > 0
 
     def _update_db_edges_completion_status(self, finished_parents: List[Job], non_finished_parents: List[Job],
@@ -3199,6 +3204,11 @@ class JobList(object):
             if any(parent.status == Status.WAITING for parent in job.parents):
                 job.status = Status.WAITING
                 job.id = None
+                job.fail_count = 0
+                job.updated_log = 0
+                job.updated_stats = 0
+                job.log_recovery_call_count = 0
+                job.wrapper_type = None
                 Log.info(f"Job {job.name} was marked as COMPLETED but has WAITING parents. Resetting to WAITING.")
 
     def update_list(
@@ -3238,7 +3248,6 @@ class JobList(object):
             save_edges = True
             self._update_db_edges_completion_status(job.parents, [], job)
             job.set_ready_date()
-            job.updated_log = 0
 
         self.update_two_step_jobs()
 

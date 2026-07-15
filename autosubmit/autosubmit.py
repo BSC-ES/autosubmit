@@ -1839,10 +1839,9 @@ class Autosubmit:
                 job_list.job_package_map.pop(active_wrapper.id, None)
                 job_list.packages_dict.pop(active_wrapper.name, None)
 
-        if not Autosubmit.exit:
-            for job in job_list.get_job_list():
-                if job.id not in job_list.job_package_map and job.status != Status.FAILED:
-                    jobs_to_check[job.platform_name].append([job, job.status])
+        for job in job_list.get_job_list():
+            if job.id not in job_list.job_package_map and job.status != Status.FAILED:
+                jobs_to_check[job.platform_name].append([job, job.status])
 
         return jobs_to_check, job_changes_tracker
 
@@ -2188,6 +2187,7 @@ class Autosubmit:
                 job_changes_tracker = dict()
                 Autosubmit.save_historical_edges(expid)
                 job_list.reset_updated_logs()
+                job_list.load_wrappers()
                 while job_list.continue_run():
                     try:
 
@@ -2234,8 +2234,11 @@ class Autosubmit:
                             Log.warning(
                                 "Couldn't recover the Historical database, AS will continue without it, GUI may be affected")
                         if Autosubmit.exit:
+                            job_list.update_db_wrappers()
+                            job_list.save_edges()
                             job_list.save_jobs()
                             as_conf.save()
+                            break
                         else:
                             safetysleeptime = as_conf.get_safetysleeptime()
                             time.sleep(safetysleeptime)
@@ -3055,7 +3058,11 @@ class Autosubmit:
 
                 elif job.status != Status.SUSPENDED:
                     job.status = Status.WAITING
-                    job._fail_count = 0
+                    job.fail_count = 0
+                    job.updated_log = 0
+                    job.updated_stats = 0
+                    job.log_recovery_call_count = 0
+                    job.wrapper_type = None
                     Log.info(f"CHANGED job '{job.name}' status to WAITING")
 
             job_list.check_completed_jobs_after_recovery()
@@ -3065,7 +3072,7 @@ class Autosubmit:
 
             if save:
                 job_list.recover_last_data()
-                job_list.save_jobs()
+                job_list.save_jobs(reset_log_counters=True)
                 job_list.save_edges()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
@@ -5218,9 +5225,11 @@ class Autosubmit:
                 if save and wrongExpid == 0:
                     job_list.recover_last_data(final_list)
                     for job in final_list:
-                        job.updated_log = job.fail_count + 1
-                        job.updated_stats = job.fail_count + 1
-                    job_list.save_jobs()
+                        job.fail_count = 0
+                        job.log_recovery_call_count = 0
+                        job.wrapper_type = None
+                        job.id = None
+                    job_list.save_jobs(reset_log_counters=True)
                     end = time.time()
                     Log.info(f"JobList saved in {end - start:.2f} seconds.")
                     exp_history = ExperimentHistory(expid)

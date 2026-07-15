@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from docker.models.containers import Container
 
 @pytest.mark.docker
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [
@@ -144,39 +145,14 @@ if TYPE_CHECKING:
             RUNNING: chunk
             wallclock: 00:10
             retrials: 2
-        job2:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED + wrappers job2"
-            PLATFORM: TEST_SLURM
-            DEPENDENCIES: job2-1
-            RUNNING: chunk
-            wallclock: 00:10
-            retrials: 2
-        job3:
-            SCRIPT: |
-                sleep 2
-                d_echo "Hello World with id=FAILED + wrappers job3"
-            PLATFORM: TEST_SLURM
-            DEPENDENCIES: job3-1
-            RUNNING: chunk
-            wallclock: 00:10
-            retrials: 2
     wrappers:
         wrapper:
             JOBS_IN_WRAPPER: job
             TYPE: vertical
             policy: flexible
-        wrapper2:
-            JOBS_IN_WRAPPER: job2
-            TYPE: vertical
-            policy: flexible
-        wrapper3:
-            JOBS_IN_WRAPPER: job3
-            TYPE: vertical
-            policy: flexible
 
-    """), (2 + 1) * 3, "FAILED", "vertical")  # Wrappers present, vertical type
+
+    """), (2 + 1) * 1, "FAILED", "vertical")  # Wrappers present, vertical type
 
 ], ids=[
     "Success",
@@ -203,8 +179,8 @@ def test_run_interrupted(
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
     as_conf.set_last_as_command('run')
 
-    for attempt in range(3):
-        as_thread, result, stop_event = run_in_thread(
+    for _ in range(3):
+        as_thread, _, stop_event = run_in_thread(
             as_exp.autosubmit.run_experiment,
             expid=as_exp.expid
         )

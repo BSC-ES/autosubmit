@@ -80,6 +80,7 @@ class JobsDbManager(DbManager):
             if reset_log_counters:
                 for k in _LOG_EXCLUDE_KEYS:
                     d[k] = 0
+                d['log_recovery_call_count'] = 0
             preserve_data.append(d)
         if preserve_data:
             self.upsert_many(table.name, preserve_data, ['name'], exclude_cols=list(_LOG_EXCLUDE_KEYS) if not reset_log_counters else None)
@@ -199,6 +200,16 @@ class JobsDbManager(DbManager):
             condition = table.c.status.in_(statuses)
             job_list = self.select_where_with_columns(table, condition)
         return job_list
+
+    def select_finished_jobs_needing_log_recovery(self) -> List[Dict[str, Any]]:
+        """Return COMPLETED/FAILED jobs whose log_recovery_call_count <= fail_count."""
+        table: Table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        condition = and_(
+            table.c.status.in_(self._FINAL_STATUSES),
+            table.c.log_recovery_call_count <= table.c.fail_count
+        )
+        return [dict(job) for job in self.select_where_with_columns(table, condition)]
 
     def select_children_jobs(
             self,

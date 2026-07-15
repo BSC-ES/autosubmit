@@ -1278,7 +1278,7 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
         total_stats.touch()
         total_stats.write_text('First line')
 
-    job.write_submit_time()
+    job.write_submit_time(0)
 
     # It will exist regardless of the argument ``total_stats_exists``, as ``write_submit_time()``
     # must have created it.
