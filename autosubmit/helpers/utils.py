@@ -33,6 +33,7 @@ from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_submitter import _get_host, get_platform_by_type
 from autosubmit.platforms.platform import Platform
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -344,7 +345,7 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
     :param expid: Experiment identifier.
     :return: Connected platform instance.
     """
-    if platform_name.lower() == LocalPlatform.TYPE:
+    if platform_name.lower() == PlatformType.LOCAL:
         config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
             "LOCAL_TMP_DIR": BasicConfig.LOCAL_TMP_DIR,

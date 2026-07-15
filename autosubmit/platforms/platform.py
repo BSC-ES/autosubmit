@@ -575,7 +575,7 @@ class Platform(ABC):
         as_conf.experiment_data['HPCBUDG'] = self.budget
         as_conf.experiment_data['HPCRESERVATION'] = self.reservation
         as_conf.experiment_data['HPCEXCLUSIVITY'] = self.exclusivity
-        as_conf.experiment_data['HPCTYPE'] = self.TYPE
+        as_conf.experiment_data['HPCTYPE'] = self.TYPE.value
         as_conf.experiment_data['HPCSCRATCH_DIR'] = self.scratch
         as_conf.experiment_data['HPCTEMP_DIR'] = self.temp_dir
         # TODO: Isn't this strange that we may set ``HPCTEMP_DIR`` as ``None``, then here we

@@ -112,11 +112,12 @@ class EcPlatform(ParamikoPlatform):
     def __init__(self, expid, name, config, scheduler):
         ParamikoPlatform.__init__(self, expid, name, config)
         # version=scheduler
-        if scheduler.lower() == PlatformType.PBS.lower():
+        scheduler_lower = scheduler.lower()
+        if scheduler_lower == PlatformType.PBS.lower():
             self._header = EcCcaHeader()
-        elif scheduler == PlatformType.LOAD_LEVELER.lower():
+        elif scheduler_lower == PlatformType.LOAD_LEVELER.lower():
             self._header = EcHeader()
-        elif scheduler == PlatformType.SLURM.lower():
+        elif scheduler_lower == PlatformType.SLURM.lower():
             self._header = SlurmHeader()
         else:
             raise ParamikoPlatformException('ecaccess scheduler {0} not supported'.format(scheduler))

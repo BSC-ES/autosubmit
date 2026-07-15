@@ -215,9 +215,10 @@ class ParamikoSubmitter:
             jobs_data=exp_data.get('JOBS', {})
         )
         platforms_data = exp_data.get('PLATFORMS', {})
+        platforms_data_upper = {k.upper(): v for k, v in platforms_data.items()}
         platforms_serial_in_parallel = _get_serial_platforms(
             platforms_used=platforms_used,
-            platforms_data=platforms_data
+            platforms_data=platforms_data_upper
         )
 
         # Build Local Platform Object

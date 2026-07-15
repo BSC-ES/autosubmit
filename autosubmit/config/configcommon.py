@@ -41,9 +41,7 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
-from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.platform_type import PlatformType
-from autosubmit.platforms.psplatform import PsPlatform
 
 
 class AutosubmitConfig(object):
@@ -105,7 +103,7 @@ class AutosubmitConfig(object):
             ).lower()
             platforms = self.experiment_data.get("PLATFORMS")
             if platforms is None:
-                if hpcarch == LocalPlatform.TYPE:
+                if hpcarch == PlatformType.LOCAL:
                     # DEFAULT.HPCARCH is LOCAL and no defined platform, return empty dict
                     return {}
                 raise AutosubmitCritical(
@@ -1367,7 +1365,7 @@ class AutosubmitConfig(object):
         """Checks experiment's platforms configuration file."""
         parser_data = self.experiment_data.get("PLATFORMS", {})
         main_platform_found = False
-        if self.hpcarch.lower() == LocalPlatform.TYPE:
+        if self.hpcarch.lower() == PlatformType.LOCAL:
             main_platform_found = True
         elif self.ignore_undefined_platforms:
             main_platform_found = True
@@ -1380,7 +1378,7 @@ class AutosubmitConfig(object):
                     self.wrong_config["Platform"] += [[section, "Mandatory TYPE parameter not found"]]
                 else:
                     platform_type = platform_type.lower()
-                if platform_type.lower() != PsPlatform.TYPE:
+                if platform_type.lower() != PlatformType.PS:
                     if not section_data.get('PROJECT', ""):
                         self.wrong_config["Platform"] += [[section, "Mandatory PROJECT parameter not found"]]
                     if not section_data.get('USER', ""):
@@ -1946,7 +1944,7 @@ class AutosubmitConfig(object):
         :param parameters: Dictionary to populate with HPC values. If None, use self.experiment_data.
         """
         platforms = self.experiment_data.get("PLATFORMS", {})
-        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", LocalPlatform.TYPE)
+        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", PlatformType.LOCAL)
         hpcarch_data: dict = platforms.get(hpcarch, {})
 
         target = parameters if parameters is not None else self.experiment_data
@@ -1964,7 +1962,7 @@ class AutosubmitConfig(object):
             target["HPCROOTDIR"] = Path(scratch) / project / user / self.expid
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
         # Default local paths.
-        elif hpcarch.lower() == LocalPlatform.TYPE:
+        elif hpcarch.lower() == PlatformType.LOCAL:
             target["HPCROOTDIR"] = Path(BasicConfig.LOCAL_ROOT_DIR) / self.expid / BasicConfig.LOCAL_TMP_DIR
             target["HPCLOGDIR"] = target["HPCROOTDIR"] / f"LOG_{self.expid}"
 
@@ -2849,6 +2847,8 @@ class AutosubmitConfig(object):
         origin = str(self.experiment_data["GIT"].get('PROJECT_ORIGIN', ""))
         branch = self.get_git_project_branch()
         commit = self.get_git_project_commit()
+        # TODO: Review the if/else logic; the branch name defaults to "master", so
+        #       maybe a validator+typechecker will prevent empty/none from happening.
         return bool(
             origin
             and (
