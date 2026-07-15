@@ -2234,7 +2234,7 @@ class AutosubmitConfig(object):
         :return: git branch
         :rtype: str
         """
-        return self.get_section(['GIT', 'PROJECT_BRANCH'], 'master')
+        return self.get_section(['GIT', 'PROJECT_BRANCH'], "")
 
     def get_git_project_commit(self) -> str:
         """Returns git commit from experiment's config file
@@ -2844,18 +2844,8 @@ class AutosubmitConfig(object):
 
     def is_valid_git_repository(self) -> bool:
         """Check if the Git project origin exists and is valid."""
-        origin = str(self.experiment_data["GIT"].get('PROJECT_ORIGIN', ""))
-        branch = self.get_git_project_branch()
-        commit = self.get_git_project_commit()
-        # TODO: Review the if/else logic; the branch name defaults to "master", so
-        #       maybe a validator+typechecker will prevent empty/none from happening.
-        return bool(
-            origin
-            and (
-                (branch is not None and len(str(branch)) > 0)
-                or (commit is not None and len(str(commit)) > 0)
-            )
-        )
+        origin_exists = str(self.experiment_data["GIT"].get('PROJECT_ORIGIN', ""))
+        return bool(origin_exists)
 
     def parse_githooks(self) -> None:
         """Parse githooks section in the configuration file."""
