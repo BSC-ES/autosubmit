@@ -21,12 +21,16 @@ class Notifier:
         pass  # pragma: no cover
 
     @staticmethod
-    def notify_status_change(implementation, exp_id, job_name="", prev_status="", status="", notify_to=""):
+    def notify_status_change(implementation, exp_id, job_name="", prev_status="", status="", notify_to=None):
+        if notify_to is None:
+            notify_to = []
         implementation.notify_status_change(exp_id, job_name, prev_status, status, notify_to)
 
     @staticmethod
-    def notify_experiment_status(implementation, exp_id, notify_to="",platform=""):
-        implementation.notify_experiment_status(exp_id,notify_to,platform)
+    def notify_experiment_status(implementation, exp_id, notify_to=None, platform=""):
+        if notify_to is None:
+            notify_to = []
+        implementation.notify_experiment_status(exp_id, notify_to, platform)
 
     @staticmethod
     def notify_cpmip_threshold_violations(
@@ -34,5 +38,7 @@ class Notifier:
             exp_id,
             job_name="",
             violations=None,
-            notify_to=""):
+            notify_to=None):
+        if notify_to is None:
+            notify_to = []
         implementation.notify_cpmip_threshold_violations(exp_id, job_name, violations, notify_to)
