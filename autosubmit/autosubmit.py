@@ -1829,13 +1829,6 @@ class Autosubmit:
             wrapper_job = Autosubmit.manage_wrapper_job(as_conf, job_list, active_wrapper)
             Autosubmit.wrapper_notify(as_conf, expid, wrapper_job)
             if active_wrapper.status in [Status.FAILED, Status.COMPLETED]:
-                # Vertical wrappers handle retries internally; when they fail,
-                # the inner jobs' fail_count must be set to retrials so the
-                # main loop doesn't keep them active indefinitely.
-                if active_wrapper.status == Status.FAILED:
-                    for inner_job in active_wrapper.job_list:
-                        if inner_job.wrapper_type == "vertical" and inner_job.fail_count < inner_job.retrials:
-                            inner_job.fail_count = inner_job.retrials
                 job_list.job_package_map.pop(active_wrapper.id, None)
                 job_list.packages_dict.pop(active_wrapper.name, None)
 

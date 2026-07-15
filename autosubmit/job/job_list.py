@@ -2692,7 +2692,6 @@ class JobList(object):
                      and not self.is_wrapper_still_running(job))
                     or
                     (job.status in (Status.COMPLETED, Status.SKIPPED)
-                     and not job.has_pending_logs
                      and not self.is_wrapper_still_running(job))
             )
         ]
