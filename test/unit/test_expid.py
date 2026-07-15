@@ -24,6 +24,7 @@ from shutil import rmtree
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
 
@@ -84,3 +85,82 @@ def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypat
         assert path.exists() 
         assert isinstance(expid, str) and len(expid) == 4
         
+
+def test_expid_create_structure_failure_deletes_experiment(mocker, tmp_path):
+    """Test that failing to create an experiment due to an ``OSError`` cleans up the experiment folders."""
+    expid = "a000"
+
+    mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
+
+    mocker.patch("autosubmit.autosubmit.new_experiment", return_value=expid)
+    mocker.patch("autosubmit.autosubmit.create_required_folders", side_effect=OSError("disk full"))
+
+    delete_experiment = mocker.patch("autosubmit.autosubmit.delete_experiment")
+
+    with pytest.raises(AutosubmitCritical) as exc:
+        Autosubmit.expid("test experiment", hpc="local")
+
+    assert "Error while creating the experiment structure" in str(exc.value)
+    delete_experiment.assert_called_once_with(expid, True)
+
+
+def test_expid_create_config_failure_deletes_experiment(mocker, tmp_path):
+    """Test that an ``Exception`` generating the config cleans up the experiment folders."""
+    expid = "a000"
+
+    mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
+
+    mocker.patch("autosubmit.autosubmit.new_experiment", return_value=expid)
+    mocker.patch("autosubmit.autosubmit.create_required_folders")
+    mocker.patch.object(Autosubmit, "generate_as_config", side_effect=Exception("config failed"))
+
+    delete_experiment = mocker.patch("autosubmit.autosubmit.delete_experiment")
+
+    with pytest.raises(AutosubmitCritical) as exc:
+        Autosubmit.expid("test experiment", hpc="local")
+
+    assert "Error while creating the experiment configuration" in str(exc.value)
+    delete_experiment.assert_called_once_with(expid, True)
+
+
+def test_expid_default_values_failure_deletes_experiment(mocker, tmp_path):
+    """Test that error setting default values cleans up the experiment folders."""
+    expid = "a000"
+
+    mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
+
+    mocker.patch("autosubmit.autosubmit.new_experiment", return_value=expid)
+    mocker.patch("autosubmit.autosubmit.create_required_folders")
+    mocker.patch.object(Autosubmit, "generate_as_config")
+    mocker.patch("autosubmit.autosubmit.as_conf_default_values", side_effect=Exception("defaults failed"))
+
+    delete_experiment = mocker.patch("autosubmit.autosubmit.delete_experiment")
+
+    with pytest.raises(AutosubmitCritical) as exc:
+        Autosubmit.expid("test experiment", hpc="local")
+
+    assert "Error while setting the default values" in str(exc.value)
+    delete_experiment.assert_called_once_with(expid, True)
+
+
+def test_expid_copy_config_failure_deletes_experiment(mocker, tmp_path):
+    """Tests that failing to copy an experiment cleans up the experiment folders."""
+    expid = "a000"
+    copy_id = "b000"
+
+    mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
+
+    (tmp_path / copy_id / "conf").mkdir(parents=True)
+    (tmp_path / copy_id / "conf" / "minimal.yml").touch()
+
+    mocker.patch("autosubmit.autosubmit.copy_experiment", return_value=expid)
+    mocker.patch("autosubmit.autosubmit.create_required_folders")
+    mocker.patch.object(Autosubmit, "copy_as_config", side_effect=Exception("copy config failed"))
+
+    delete_experiment = mocker.patch("autosubmit.autosubmit.delete_experiment")
+
+    with pytest.raises(AutosubmitCritical) as exc:
+        Autosubmit.expid("test experiment", hpc="local", copy_id=copy_id)
+
+    assert "Error while creating the experiment configuration" in str(exc.value)
+    delete_experiment.assert_called_once_with(expid, True)

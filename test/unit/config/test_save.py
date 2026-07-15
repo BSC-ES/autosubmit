@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 from pathlib import Path
 
 import pytest
@@ -38,11 +37,11 @@ from ruamel.yaml import YAML
     ],
     ids=["local_true", "local_false"]
 )
-def test_save(autosubmit_config, tmpdir, mocker, data: dict, owner: str):
+def test_save(autosubmit_config, tmpdir, mocker, data: dict, owner: str, monkeypatch):
     if owner:
-        os.environ["USER"] = Path(tmpdir).owner()
+        monkeypatch.setenv("USER", Path(tmpdir).owner())
     else:
-        os.environ["USER"] = 'whatever'
+        monkeypatch.setenv("USER", "whatever")
     as_conf = autosubmit_config(expid='t000', experiment_data=data, include_basic_config=False)
     as_conf.load_common_parameters(as_conf.experiment_data)
     as_conf.save()

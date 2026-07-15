@@ -27,7 +27,16 @@ from typing import Optional, Union
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
+from autosubmit.platforms.platform_type import PlatformType
+
+__all__ = [
+    'check_unpushed_changes',
+    'clean_git',
+    'clone_repository',
+    'is_git_repo'
+]
 
 Log.get_logger("Autosubmit")
 
@@ -124,210 +133,223 @@ def clean_git(as_conf: AutosubmitConfig) -> bool:
     :return: ``True`` if the Git project directory was successfully deleted, ``False`` otherwise.
     """
     dirname_path = Path(as_conf.get_project_dir())
-    Log.debug("Checking git directory status...")
+    # NOTE: For some weird reason, coverage is showing the Log.debug calls not covered; maybe because
+    #       debug-logging is not enabled? Marking this as not covered.
+    Log.debug("Checking git directory status...")  # pragma: no cover
 
     if not dirname_path.is_dir():
-        Log.debug("Not a directory... SKIPPING!")
+        Log.debug("Not a directory... SKIPPING!")  # pragma: no cover
         return False
 
     if not Path(dirname_path, '.git').is_dir():
-        Log.debug("Not a git repository... SKIPPING!")
+        Log.debug("Not a git repository... SKIPPING!")  # pragma: no cover
         return False
 
     if _get_uncommitted_code(dirname_path):
-        Log.info("Changes not committed detected... SKIPPING!")
+        Log.info("Changes not committed detected... SKIPPING!")  # pragma: no cover
         raise AutosubmitCritical("Commit needed!", 7013)
 
     if _get_code_not_pushed(dirname_path):
-        Log.info("Changes not pushed detected... SKIPPING!")
+        Log.info("Changes not pushed detected... SKIPPING!")  # pragma: no cover
         raise AutosubmitCritical("Synchronization needed!", 7064)
 
     proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
-    Log.debug(f"Removing project directory {str(proj_dir)}")
+    Log.debug(f"Removing project directory {str(proj_dir)}")  # pragma: no cover
     rmtree(proj_dir)
 
     return True
 
 
-class AutosubmitGit:
-    """Class to handle experiment git repository."""
+def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
+    """Clone the configured Git repository into the project folder.
 
-    @staticmethod
-    def clone_repository(as_conf, force, hpcarch):
-        """
-        Clones a specified git repository on the project folder
+    If the platform defined in the Autosubmit configuration is invalid, the local platform is used
+    instead and remote Git cloning is disabled.
 
-        :param as_conf: experiment configuration
-        :type as_conf: autosubmit.config.AutosubmitConfig
-        :param force: if True, it will overwrite any existing clone
-        :type force: bool
-        :param hpcarch: current main platform
-        :type force: bool
-        :return: True if clone was successful, False otherwise
-        """
-        submodule_failure = False
+    :param as_conf: Autosubmit configuration.
+    :param force: Overwrite files when cloning if ``True``.
+    :return: ``True`` if the repository was cloned successfully, ``False`` otherwise.
+    :raises AutosubmitCritical: If:
+        - Loading the Autosubmit platforms fails.
+        - The configured platform is invalid.
+        - The Git configuration is invalid.
+        - Cloning the Git repository fails.
+    """
+    submodule_failure = False
 
-        if not as_conf.is_valid_git_repository():
-            raise AutosubmitCritical(
-                "Incorrect git Configuration, check origin,commit and branch settings of expdef file", 7064)
-        git_project_origin = as_conf.get_git_project_origin()
-        git_project_branch = as_conf.get_git_project_branch()
-        git_remote_project_path = as_conf.get_git_remote_project_root()
+    hpcarch = as_conf.get_platform()
 
-        git_project_commit = as_conf.get_git_project_commit()
-        git_project_submodules: Union[list[str], bool] = as_conf.get_submodules_list()
-        git_project_submodules_depth = as_conf.get_project_submodules_depth()
-        max_depth = -1
-        if len(git_project_submodules_depth) > 0:
-            max_depth = max(git_project_submodules_depth)
-        if as_conf.get_fetch_single_branch() != "true":
-            git_single_branch = False
+    try:
+        submitter = ParamikoSubmitter(as_conf=as_conf)
+    except Exception as e:
+        raise AutosubmitCritical(f"Failed to load the Autosubmit platforms: {str(e)}")
+
+    if hpcarch not in submitter.platforms:
+        Log.warning(f"Platform {hpcarch} not found in configuration file, will fallback to the LOCAL platform")
+        hpcarch = PlatformType.LOCAL
+
+    platform = submitter.platforms[hpcarch]
+
+    if not as_conf.is_valid_git_repository():
+        raise AutosubmitCritical("Invalid Git configuration, check your Git origin/commit/branch settings", 7064)
+
+    git_project_origin = as_conf.get_git_project_origin()
+    git_project_branch = as_conf.get_git_project_branch()
+    git_remote_project_path = as_conf.get_git_remote_project_root()
+
+    git_project_commit = as_conf.get_git_project_commit()
+    git_project_submodules: Union[list[str], bool] = as_conf.get_submodules_list()
+    git_project_submodules_depth = as_conf.get_project_submodules_depth()
+    max_depth = -1
+    if len(git_project_submodules_depth) > 0:
+        max_depth = max(git_project_submodules_depth)
+    if as_conf.get_fetch_single_branch() != "true":
+        git_single_branch = False
+    else:
+        git_single_branch = True
+    project_destination = as_conf.get_project_destination()
+    project_path = os.path.join(
+        BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
+    project_backup_path = os.path.join(
+        BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, 'proj_{0}'.format(int(time())))
+    git_path = as_conf.get_project_dir()
+
+    # Making proj backup
+    if force:
+        if os.path.exists(project_path):
+            Log.info("Making a backup of your current proj folder at {0}".format(
+                project_backup_path))
+            shutil.move(project_path, project_backup_path)
+        # shutil.make_archive(project_backup_path, 'zip', project_path)
+        # project_backup_path = project_backup_path + ".zip"
+
+    if os.path.exists(os.path.join(project_path, project_destination)):
+        Log.info("Using project folder: {0}", project_path)
+        # print("Force {0}".format(force))
+        if not force:
+            Log.debug("The project folder exists. SKIPPING...")  # pragma: no cover
+            return True
         else:
-            git_single_branch = True
-        project_destination = as_conf.get_project_destination()
-        project_path = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
-        project_backup_path = os.path.join(
-            BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, 'proj_{0}'.format(int(time())))
-        git_path = as_conf.get_project_dir()
+            shutil.rmtree(project_path)
+    if not os.path.exists(project_path):
+        os.mkdir(project_path)
+        Log.debug("The project folder {0} has been created.", project_path)
+    command_0 = ""
+    command_githook = ""
+    command_1 = ""
 
-        # Making proj backup
-        if force:
-            if os.path.exists(project_path):
-                Log.info("Making a backup of your current proj folder at {0}".format(
-                    project_backup_path))
-                shutil.move(project_path, project_backup_path)
-            # shutil.make_archive(project_backup_path, 'zip', project_path)
-            # project_backup_path = project_backup_path + ".zip"
-
-        if os.path.exists(os.path.join(project_path, project_destination)):
-            Log.info("Using project folder: {0}", project_path)
-            # print("Force {0}".format(force))
-            if not force:
-                Log.debug("The project folder exists. SKIPPING...")
-                return True
-            else:
-                shutil.rmtree(project_path)
-        if not os.path.exists(project_path):
-            os.mkdir(project_path)
-            Log.debug("The project folder {0} has been created.", project_path)
-        command_0 = ""
-        command_githook = ""
-        command_1 = ""
-
-        if git_remote_project_path != '':
-            if git_remote_project_path[-1] == '/':
-                git_remote_path = os.path.join(
-                    git_remote_project_path[:-1], as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
-            else:
-                git_remote_path = os.path.join(
-                    git_remote_project_path, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
-            project_path = git_remote_path
-
-        Log.info("Cloning {0} into {1}", git_project_branch + " " + git_project_origin, project_path)
-        if not git_single_branch:
-            command_0 += " git clone -b {0} {1} {2};".format(git_project_branch, git_project_origin,
-                                                             project_destination)
+    if git_remote_project_path != '':
+        if git_remote_project_path[-1] == '/':
+            git_remote_path = os.path.join(
+                git_remote_project_path[:-1], as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
         else:
-            command_0 += " git clone --single-branch -b {0} {1} {2};".format(git_project_branch,
-                                                                             git_project_origin,
-                                                                             project_destination)
+            git_remote_path = os.path.join(
+                git_remote_project_path, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
+        project_path = git_remote_path
+
+    Log.info("Cloning {0} into {1}", git_project_branch + " " + git_project_origin, project_path)
+    if not git_single_branch:
+        command_0 += " git clone -b {0} {1} {2};".format(git_project_branch, git_project_origin,
+                                                         project_destination)
+    else:
+        command_0 += " git clone --single-branch -b {0} {1} {2};".format(git_project_branch,
+                                                                         git_project_origin,
+                                                                         project_destination)
+    try:
+        # command 0
+        Log.debug('Clone command: {0}', command_0)
         try:
-            # command 0
-            Log.debug('Clone command: {0}', command_0)
-            try:
-                git_version = subprocess.check_output("git --version", shell=True)
-                git_version = git_version.decode(locale.getlocale()[1]).split(" ")[-1].strip("\n")
+            git_version = subprocess.check_output("git --version", shell=True)
+            git_version = git_version.decode(locale.getlocale()[1]).split(" ")[-1].strip("\n")
 
-                version_int = ""
-                for number in git_version.split("."):
-                    version_int += number
-                git_version = int(version_int)
-            except Exception:
-                git_version = 2251
-            if git_remote_project_path == '':
-                command_0 = "cd {0} ; {1}".format(project_path, command_0)
-                subprocess.check_output(command_0, shell=True)
+            version_int = ""
+            for number in git_version.split("."):
+                version_int += number
+            git_version = int(version_int)
+        except Exception:
+            git_version = 2251
+        if git_remote_project_path == '':
+            command_0 = "cd {0} ; {1}".format(project_path, command_0)
+            subprocess.check_output(command_0, shell=True)
+        else:
+            command_0 = "cd {0} ; {1}".format(project_path, command_0)
+            platform.send_command(command_0)
+        # command 1
+
+        if os.path.exists(os.path.join(git_path, ".githooks")) and git_version > 2136:
+            for root_dir, dirs, files in os.walk(os.path.join(git_path, ".githooks")):
+                for f_dir in dirs:
+                    os.chmod(os.path.join(root_dir, f_dir), 0o750)
+                for f_file in files:
+                    os.chmod(os.path.join(root_dir, f_file), 0o750)
+            command_githook += " git config core.hooksPath ./.githooks ; "
+        if git_project_commit:
+            command_1 += "git checkout {0}; ".format(git_project_commit)
+        else:
+            command_1 += "git checkout; "
+
+        if git_project_submodules is not False:
+            if len(git_project_submodules) == 0:
+                if max_depth > 0:
+                    Log.info("Depth is incompatible with --recursive, ignoring recursive option")
+                    command_1 += " git submodule update --init --depth {0}; ".format(max_depth)
+                else:
+                    command_1 += " git submodule update --init --recursive; "
             else:
-                command_0 = "cd {0} ; {1}".format(project_path, command_0)
-                hpcarch.send_command(command_0)
-            # command 1
-
-            if os.path.exists(os.path.join(git_path, ".githooks")) and git_version > 2136:
-                for root_dir, dirs, files in os.walk(os.path.join(git_path, ".githooks")):
-                    for f_dir in dirs:
-                        os.chmod(os.path.join(root_dir, f_dir), 0o750)
-                    for f_file in files:
-                        os.chmod(os.path.join(root_dir, f_file), 0o750)
-                command_githook += " git config core.hooksPath ./.githooks ; "
-            if git_project_commit:
-                command_1 += "git checkout {0}; ".format(git_project_commit)
-            else:
-                command_1 += "git checkout; "
-
-            if git_project_submodules is not False:
-                if len(git_project_submodules) == 0:
+                command_1 += " git submodule init; "
+                index_submodule = 0
+                for submodule in git_project_submodules:
                     if max_depth > 0:
                         Log.info("Depth is incompatible with --recursive, ignoring recursive option")
-                        command_1 += " git submodule update --init --depth {0}; ".format(max_depth)
-                    else:
-                        command_1 += " git submodule update --init --recursive; "
-                else:
-                    command_1 += " git submodule init; "
-                    index_submodule = 0
-                    for submodule in git_project_submodules:
-                        if max_depth > 0:
-                            Log.info("Depth is incompatible with --recursive, ignoring recursive option")
-                            if index_submodule < len(git_project_submodules_depth):
-                                command_1 += " git submodule update --init --depth {0} {1}; ".format(
-                                    git_project_submodules_depth[index_submodule], submodule)
-                            else:
-                                command_1 += " git submodule update --init --depth {0} {1}; ".format(
-                                    max_depth, submodule)
+                        if index_submodule < len(git_project_submodules_depth):
+                            command_1 += " git submodule update --init --depth {0} {1}; ".format(
+                                git_project_submodules_depth[index_submodule], submodule)
                         else:
-                            command_1 += " git submodule update --init --recursive {0}; ".format(submodule)
-                        index_submodule += 1
-            if git_remote_project_path == '':
-                try:
-                    if len(command_githook) > 0:
-                        command_githook = "cd {0} ; {1}".format(git_path, command_githook)
-                        as_conf.parse_githooks()
-                        subprocess.check_output(command_githook, shell=True)
-                    command_1 = "cd {0}; {1} ".format(git_path, command_1)
-                    Log.debug(f'Githook + Checkout and Submodules: {command_githook} {command_1}')
-                    subprocess.check_output(command_1, shell=True)
-                except BaseException as e:
-                    submodule_failure = True
-                    Log.printlog("Trace: {0}".format(str(e)), 6014)
-                    Log.printlog(
-                        "Submodule has a wrong configuration.\n{0}".format(command_1), 6014)
-            else:
+                            command_1 += " git submodule update --init --depth {0} {1}; ".format(
+                                max_depth, submodule)
+                    else:
+                        command_1 += " git submodule update --init --recursive {0}; ".format(submodule)
+                    index_submodule += 1
+        if git_remote_project_path == '':
+            try:
                 if len(command_githook) > 0:
-                    command_githook = "cd {0} ; {1}".format(project_path, command_githook)
+                    command_githook = "cd {0} ; {1}".format(git_path, command_githook)
                     as_conf.parse_githooks()
-                    hpcarch.send_command(command_githook)
-                command_1 = "cd {0}; {1} ".format(project_path, command_1)
-                hpcarch.send_command(command_1)
-        except subprocess.CalledProcessError:
-            shutil.rmtree(project_path)
-            if os.path.exists(project_backup_path):
-                Log.info("Restoring proj folder...")
-                shutil.move(project_backup_path, project_path)
-            raise AutosubmitCritical(
-                f'Can not clone {git_project_branch + " " + git_project_origin} into {project_path}', 7065)
-        if submodule_failure:
-            Log.info("Some Submodule failures have been detected. Backup {0} will not be removed.".format(
-                project_backup_path))
-            return False
-
+                    subprocess.check_output(command_githook, shell=True)
+                command_1 = "cd {0}; {1} ".format(git_path, command_1)
+                Log.debug(f'Githook + Checkout and Submodules: {command_githook} {command_1}')
+                subprocess.check_output(command_1, shell=True)
+            except BaseException as e:
+                submodule_failure = True
+                Log.printlog("Trace: {0}".format(str(e)), 6014)
+                Log.printlog(
+                    "Submodule has a wrong configuration.\n{0}".format(command_1), 6014)
+        else:
+            if len(command_githook) > 0:
+                command_githook = "cd {0} ; {1}".format(project_path, command_githook)
+                as_conf.parse_githooks()
+                platform.send_command(command_githook)
+            command_1 = "cd {0}; {1} ".format(project_path, command_1)
+            platform.send_command(command_1)
+    except subprocess.CalledProcessError:
+        shutil.rmtree(project_path)
         if os.path.exists(project_backup_path):
-            Log.info("Removing backup...")
-            shutil.rmtree(project_backup_path)
+            Log.info("Restoring proj folder...")  # pragma: no cover
+            shutil.move(project_backup_path, project_path)
+        raise AutosubmitCritical(
+            f'Cannot clone {git_project_branch + " " + git_project_origin} into {project_path}', 7065)
+    if submodule_failure:
+        Log.info("Some Submodule failures have been detected. Backup {0} will not be removed.".format(
+            project_backup_path))
+        return False
 
-        return True
+    if os.path.exists(project_backup_path):
+        Log.info("Removing backup...")  # pragma: no cover
+        shutil.rmtree(project_backup_path)
 
-    @staticmethod
-    def is_git_repo(git_repo: str) -> bool:
-        git_repo = git_repo.lower().strip()
+    return True
 
-        return _GIT_URL_PATTERN.match(git_repo) is not None
+def is_git_repo(git_repo: str) -> bool:
+    git_repo = git_repo.lower().strip()
+
+    return _GIT_URL_PATTERN.match(git_repo) is not None

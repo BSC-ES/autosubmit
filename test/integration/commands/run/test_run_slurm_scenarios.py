@@ -1440,7 +1440,7 @@ def test_build_and_connect_platform_slurm(autosubmit_exp, slurm_server, general_
     as_exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False, create=True)
     plat = build_and_connect_platform("TEST_SLURM", as_exp.as_conf, as_exp.expid)
     assert type(plat).__name__ == "SlurmPlatform"
-    assert plat.type == "slurm"
+    assert plat.TYPE == "slurm"
     assert plat.connected
 
 

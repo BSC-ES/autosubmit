@@ -28,11 +28,16 @@ from typing import TYPE_CHECKING, Optional
 from bscearth.utils.date import date2str
 
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
 from autosubmit.platforms.headers.ec_header import EcHeader
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
+from autosubmit.platforms.paramiko_platform import (
+    ParamikoPlatform,
+    ParamikoPlatformException,
+)
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import EcWrapperFactory
 
 if TYPE_CHECKING:
@@ -59,6 +64,9 @@ class EcPlatform(ParamikoPlatform):
     :param scheduler: scheduler to use
     :type scheduler: str (pbs, loadleveler)
     """
+
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.ECACCESS
 
     def parse_all_jobs_output(self, output, job_id):
         """Parse ecaccess-job-list tabular output for a single job ID.
@@ -104,11 +112,12 @@ class EcPlatform(ParamikoPlatform):
     def __init__(self, expid, name, config, scheduler):
         ParamikoPlatform.__init__(self, expid, name, config)
         # version=scheduler
-        if scheduler == 'pbs':
+        scheduler_lower = scheduler.lower()
+        if scheduler_lower == PlatformType.PBS.lower():
             self._header = EcCcaHeader()
-        elif scheduler == 'loadleveler':
+        elif scheduler_lower == PlatformType.LOAD_LEVELER.lower():
             self._header = EcHeader()
-        elif scheduler == 'slurm':
+        elif scheduler_lower == PlatformType.SLURM.lower():
             self._header = SlurmHeader()
         else:
             raise ParamikoPlatformException('ecaccess scheduler {0} not supported'.format(scheduler))
@@ -350,14 +359,6 @@ class EcPlatform(ParamikoPlatform):
 
         return f"{pre} {self._submit_cmd}{script_name} {post}"
 
-    def parse_job_output(self, output):
-        job_state = output.split('\n')
-        if len(job_state) > 7:
-            job_state = job_state[7].split()
-            if len(job_state) > 1:
-                return job_state[1]
-        return 'DONE'
-
     def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
 
@@ -367,9 +368,6 @@ class EcPlatform(ParamikoPlatform):
         """
 
         return [out.strip() for out in output.splitlines()]
-
-    def get_check_job_cmd(self, job_id):
-        return self._checkjob_cmd + str(job_id)
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.

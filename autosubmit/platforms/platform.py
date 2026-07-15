@@ -20,6 +20,7 @@ import multiprocessing
 import os
 import time
 import traceback
+from abc import ABC
 from contextlib import suppress
 from multiprocessing.queues import Queue
 from multiprocessing.synchronize import Event
@@ -34,6 +35,8 @@ import setproctitle
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     from multiprocessing.process import BaseProcess
@@ -129,15 +132,26 @@ class CopyQueue(Queue):
         super().put(job.__getstate__(), block, timeout)
 
 
-class Platform:
-    """
-    Class to manage the connections to the different platforms.
+class Platform(ABC):
+    """Class to manage the connections to the different platforms.
+
+    Attributes:
+        EXECUTION_MODE: The execution mode (DIRECT or BATCH).
+        TYPE: The platform type.
+        expid: The experiment identifier associated with this platform.
+        _name: The platform name.
+        config: The platform configuration dictionary.
+        pw: Optional authentication password (e.g., for 2FA).
+        has_scheduler: Whether the platform is a scheduler wrapper (e.g. ECACCESS wrapping SLURM/PBS).
     """
     # This is a list of the keep_alive events, used to send the signal outside the main loop of Autosubmit
     worker_events: list[Event] = []
     # Shared lock between the main process and a retrieval log process
     lock = multiprocessing.Lock()
     IO_SAFE_WAIT = 0
+
+    TYPE: PlatformType
+    EXECUTION_MODE: ExecutionMode
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         """Initializes the Platform object with the given experiment ID, platform name, configuration,
@@ -176,7 +190,6 @@ class Platform:
         self._budget = ''
         self._reservation = ''
         self._exclusivity = ''
-        self._type = ''
         self._scratch = ''
         self._project_dir = ''
         self.temp_dir = ''
@@ -350,16 +363,6 @@ class Platform:
         self._hyperthreading = value
 
     @property
-    @autosubmit_parameter(name='current_type')
-    def type(self):
-        """Platform scheduler type. """
-        return self._type
-
-    @type.setter
-    def type(self, value):
-        self._type = value
-
-    @property
     @autosubmit_parameter(name='current_scratch_dir')
     def scratch(self):
         """Platform's scratch folder path. """
@@ -464,18 +467,17 @@ class Platform:
                 innerJob.updated_log = innerJob.retrials
 
     @property
-    def serial_platform(self):
+    def serial_platform(self) -> 'Platform':
         """Platform to use for serial jobs.
 
         :return: platform's object
-        :rtype: platform
         """
         if self._serial_platform is None:
             return self
         return self._serial_platform
 
     @serial_platform.setter
-    def serial_platform(self, value):
+    def serial_platform(self, value: 'Platform'):
         self._serial_platform = value
 
     @property
@@ -558,12 +560,10 @@ class Platform:
         return self._allow_python_jobs == "true"
 
     def add_parameters(self, as_conf: 'AutosubmitConfig'):
-        """Add parameters for the current platform to the given parameters list
+        """Add parameters for the current platform to the given parameters list.
 
         :param as_conf: autosubmit config object
-        :type as_conf: AutosubmitConfig object
         """
-
         as_conf.experiment_data['HPCARCH'] = self.name
         as_conf.experiment_data['HPCHOST'] = self.host
         as_conf.experiment_data['HPCQUEUE'] = self.queue
@@ -575,9 +575,11 @@ class Platform:
         as_conf.experiment_data['HPCBUDG'] = self.budget
         as_conf.experiment_data['HPCRESERVATION'] = self.reservation
         as_conf.experiment_data['HPCEXCLUSIVITY'] = self.exclusivity
-        as_conf.experiment_data['HPCTYPE'] = self.type
+        as_conf.experiment_data['HPCTYPE'] = self.TYPE.value
         as_conf.experiment_data['HPCSCRATCH_DIR'] = self.scratch
         as_conf.experiment_data['HPCTEMP_DIR'] = self.temp_dir
+        # TODO: Isn't this strange that we may set ``HPCTEMP_DIR`` as ``None``, then here we
+        #       set the local instance-variable as an empty string? Why not both?
         if self.temp_dir is None:
             self.temp_dir = ''
 
@@ -741,7 +743,8 @@ class Platform:
         :return: platform's LOG directory
         :rtype: str
         """
-        if self.type == "local":
+        # Circular import -- bad class design, probably can be re-designed.
+        if self.TYPE is PlatformType.LOCAL:
             path = Path(self.root_dir, self.config.get("LOCAL_TMP_DIR", ""), f'LOG_{self.expid}')
         else:
             path = Path(self.remote_log_dir)
@@ -948,7 +951,7 @@ class Platform:
                 Log.result(
                     f"Process {self.log_recovery_process.name} finished with pid {self.log_recovery_process.pid}")
         else:
-            Log.result("Log_Recovery_Process is empty no process joinned")
+            Log.result("Log recovery process is not running (will not wait/join the process)")
 
     def spawn_log_retrieval_process(self, as_conf: Optional['AutosubmitConfig']) -> None:
         """Spawns a process to recover the logs of the jobs that have been completed on this platform.
@@ -1007,7 +1010,7 @@ class Platform:
         self.work_event.clear()
         return process_log
 
-    def recover_job_log(self) -> set[Any]:
+    def recover_job_log(self) -> None:
         """Recovers log files for jobs from the recovery queue and retries failed jobs.
 
         :return: Updated set of jobs pending to process.
@@ -1072,13 +1075,6 @@ class Platform:
     def create_a_new_copy(self):
         raise NotImplementedError  # pragma: no cover
 
-    def get_file_size(self, src: str) -> Union[int, None]:
-        """Get file size in bytes.
-
-        :param src: file path
-        """
-        raise NotImplementedError  # pragma: no cover
-
     def read_file(self, src: str, max_size: Optional[int] = None) -> Union[bytes, None]:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
@@ -1130,7 +1126,6 @@ class Platform:
         """Confirm that jobs marked as done are actually completed by checking their STAT files.
 
         :param job_list: List of jobs to confirm.
-        :param has_internal_retries: Indicates if the jobs have internal retries, which affects the STAT file naming convention.
         :return: List of jobs that are confirmed as completed.
         """
         raise NotImplementedError  # pragma: no cover

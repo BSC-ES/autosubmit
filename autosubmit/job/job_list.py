@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -25,8 +25,8 @@ from contextlib import suppress
 from itertools import groupby
 from pathlib import Path
 from shutil import move
-from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Optional, Union
+from time import localtime, mktime, strftime
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
@@ -34,16 +34,15 @@ from networkx import DiGraph
 import autosubmit.database.db_structure as DbStructure
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_package_persistence import JobPackagePersistence
-from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.job.job_packages import JobPackageThread
-from autosubmit.job.job_utils import Dependency
-from autosubmit.job.job_utils import transitive_reduction
+from autosubmit.job.job_utils import Dependency, transitive_reduction
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.monitor.diagram import JobData
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
@@ -476,6 +475,7 @@ class JobList(object):
         :return:
         """
         from itertools import combinations
+
         from networkx import NetworkXError
 
         delete_relations = set()
@@ -1851,9 +1851,6 @@ class JobList(object):
                 date_format = 'M'
         return date_format
 
-    def copy_ordered_jobs_by_date_member(self):
-        pass  # pragma: no cover
-
     def get_ordered_jobs_by_date_member(self, section):
         """Get the dictionary of jobs ordered according to wrapper's
         expression divided by date and member.
@@ -1879,18 +1876,6 @@ class JobList(object):
         if wrapper:
             return [job for job in completed_jobs if job.packed is False]
         return completed_jobs
-
-    def get_completed_failed_without_logs(self) -> list[Job]:
-        """Returns a list of completed or failed jobs without updated logs.
-
-        :return: List of completed and failed jobs without updated logs.
-        :rtype: List[Job]
-        """
-
-        completed_failed_jobs = [job for job in self._job_list if
-                                 job.status in [Status.COMPLETED, Status.FAILED] and job.updated_log <= job.fail_count]
-
-        return completed_failed_jobs
 
     def get_uncompleted(self, platform=None, wrapper=False):
         """Returns a list of completed jobs.
@@ -2198,18 +2183,6 @@ class JobList(object):
                                                           job.platform.name == platform.name) and job.status == Status.WAITING]
         if wrapper:
             return [job for job in waiting_jobs if job.packed is False]
-        return waiting_jobs
-
-    def get_waiting_remote_dependencies(self, platform_type='slurm'.lower()):
-        """Returns a list of jobs waiting on slurm scheduler.
-
-        :param platform_type: platform type
-        :type platform_type: str
-        :return: waiting jobs
-        :rtype: list
-        """
-        waiting_jobs = [job for job in self._job_list if (
-                job.platform.type == platform_type and job.status == Status.WAITING)]
         return waiting_jobs
 
     def get_held_jobs(self, platform=None):
@@ -2998,15 +2971,6 @@ class JobList(object):
         ]
         return wrapper_info, wrapper_inner_jobs
 
-    def clear_preview_wrapper(self) -> None:
-        """Clear the wrapper preview table used by the ``-cw`` flag.
-
-        Drops and recreates the ``wrapper_job_package`` table so that stale
-        preview data from a previous ``inspect -cw`` or ``create -cw`` run
-        does not persist between calls.
-        """
-        self.get_packages_persistence().reset_table(preview=True)
-
     def check_scripts(self, as_conf) -> bool:
         """When we have created the scripts, all parameters should have been substituted.
         %PARAMETER% handlers not allowed.
@@ -3116,14 +3080,6 @@ class JobList(object):
                             if not monitor:
                                 parent.status = Status.WAITING
                             Log.debug("Parent: " + parent.name)
-
-    def _get_jobs_parser(self):
-        jobs_parser = self._parser_factory.create_parser()
-        jobs_parser.optionxform = str
-        jobs_parser.load(
-            os.path.join(self._config.LOCAL_ROOT_DIR, self._expid,
-                         'conf', "jobs_" + self._expid + ".yaml"))
-        return jobs_parser
 
     def remove_rerun_only_jobs(self) -> None:
         """Removes all jobs to be run only in reruns. """

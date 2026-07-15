@@ -40,10 +40,10 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packager import JobPackager
-from autosubmit.log.utils import is_gzip_file, is_xz_file
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.integration.conftest import AutosubmitExperimentFixture
+from test.unit.test_utils import is_gzip_file, is_xz_file
 
 if TYPE_CHECKING:
     from docker.models.containers import Container

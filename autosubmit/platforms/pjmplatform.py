@@ -23,8 +23,10 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.pjm_header import PJMHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import PJMWrapperFactory
 
 if TYPE_CHECKING:
@@ -52,6 +54,9 @@ class PJMPlatform(ParamikoPlatform):
     :param expid: experiment's identifier
     :type expid: str
     """
+
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.PJM
 
     def __init__(self, expid, name, config):
         ParamikoPlatform.__init__(self, expid, name, config)
@@ -82,7 +87,6 @@ class PJMPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
         self._submit_script_base_name = os.path.join(
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
-        self.type = "pjm"
 
     def create_a_new_copy(self):
         return PJMPlatform(self.expid, self.name, self.config)
@@ -131,9 +135,6 @@ class PJMPlatform(ParamikoPlatform):
 
     def get_remote_log_dir(self):
         return self.remote_log_dir
-
-    def parse_job_output(self, output):
-        return output.strip().split()[1].strip().strip("\n")
 
     def queuing_reason_cancel(self, reason):
         try:
@@ -212,11 +213,6 @@ class PJMPlatform(ParamikoPlatform):
         if jobs_id[-1] == ",":
             jobs_id = jobs_id[:-1]  # deletes comma
         return f"pjstat -H -v --choose jid,st,ermsg --filter \"jid={jobs_id}\" > as_checkalljobs.txt ; pjstat -v --choose jid,st,ermsg --filter \"jid={jobs_id}\" >> as_checkalljobs.txt ; cat as_checkalljobs.txt ; rm as_checkalljobs.txt"
-
-    def get_check_job_cmd(self, job_id):
-        return f"pjstat -H -v --choose st --filter \"jid={job_id}\" > as_checkjob.txt ; pjstat -v --choose st --filter \"jid={job_id}\" >> as_checkjob.txt ; cat as_checkjob.txt ; rm as_checkjob.txt"
-        # return 'pjstat -v --choose jid,st,ermsg --filter \"jid={0}\"'.format(job_id)
-
 
     def get_job_id_by_job_name_cmd(self, job_name):
         if job_name[-1] == ",":

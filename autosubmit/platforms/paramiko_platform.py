@@ -25,33 +25,32 @@ import re
 import select
 import socket
 import sys
-import threading
-import time
 from contextlib import suppress
 from io import BufferedReader
 from pathlib import Path
 from threading import Thread
-from time import sleep
-from typing import Optional, Tuple, Union, TYPE_CHECKING, Any
+from time import sleep, time
+from typing import TYPE_CHECKING, Optional, Tuple, Union
 
-import Xlib.support.connect as xlib_connect
 import paramiko
+import Xlib.support.connect as xlib_connect
 from bscearth.utils.date import date2str
 from paramiko import ProxyCommand
 from paramiko.agent import Agent
-from paramiko.ssh_exception import (SSHException)
+from paramiko.ssh_exception import SSHException
 
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import AutosubmitError, AutosubmitCritical, Log
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.platform import Platform
 
 if TYPE_CHECKING:
     # Avoid circular imports
+    from paramiko.channel import Channel
+
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job import Job
-    from autosubmit.platforms.headers import PlatformHeader
-    from paramiko.channel import Channel
     from autosubmit.job.job_packages import JobPackageBase
+    from autosubmit.platforms.headers import PlatformHeader
 
 
 def threaded(fn):
@@ -129,11 +128,24 @@ def _get_user_config_file(
     return Path("~/.ssh/config").expanduser()
 
 
+def _init_poller():
+    """Retrieve the system event notification mechanism.
+
+    Uses `poll()` on Linux and `kqueue()` on BSD-based systems.
+
+    References:
+        Python select: https://docs.python.org/3/library/select.html
+        poll(2): https://man7.org/linux/man-pages/man2/poll.2.html
+        kqueue(2): https://man.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
+    """
+    return select.kqueue() if sys.platform != "linux" else select.poll()
+
+
 class ParamikoPlatform(Platform):
     """Class to manage the connections to the different platforms with the Paramiko library."""
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
-        """An SSH-enabled platform, that uses the Paramiko library.
+        """An SSH-enabled platform that uses the Paramiko library.
 
         :param expid: Experiment ID.
         :param name: Platform name.
@@ -155,14 +167,10 @@ class ParamikoPlatform(Platform):
         self._ftpChannel: Optional[paramiko.SFTPClient] = None
         self.transport: Optional[paramiko.Transport] = None
         self.channels: dict = {}
-        if sys.platform != "linux":
-            self.poller = select.kqueue()
-        else:
-            self.poller = select.poll()
+        self.poller = _init_poller()
         self._header = None
         self._wrapper = None
         self.remote_log_dir = ""
-        # self.get_job_energy_cmd = ""
         self._init_local_x11_display()
 
         self.remove_log_files_on_transfer = False
@@ -207,10 +215,7 @@ class ParamikoPlatform(Platform):
         self._ftpChannel = None
         self.transport = None
         self.channels = {}
-        if sys.platform != "linux":
-            self.poller = select.kqueue()
-        else:
-            self.poller = select.poll()
+        self.poller = _init_poller()
         self._init_local_x11_display()
 
     def test_connection(self, as_conf: Optional['AutosubmitConfig']) -> Optional[str]:
@@ -458,22 +463,12 @@ class ParamikoPlatform(Platform):
                 raise AutosubmitError(
                     "Couldn't establish a connection to the specified host, wrong configuration?", 6003, str(e))
 
-    def check_completed_files(self, sections=None) -> Optional[str]:
-        if self.host == 'localhost':
-            return None
-        command = f"find {self.remote_log_dir} "
-        if sections:
-            for i, section in enumerate(sections.split()):
-                command += f" -name {section}_COMPLETED"
-                if i < len(sections.split()) - 1:
-                    command += " -o "
-        else:
-            command += " -name *_COMPLETED"
-
-        if self.send_command(command, True):
-            return self._ssh_output
-        return None
-
+    # TODO: This may not appear as used in an IDE search, but in reality it is.
+    #       It is called via a ``Platform``-typed object; ``Platform`` doesn't
+    #       have ``remove_multiple_files``, thus the confused IDE. If it is
+    #       common to all platforms, then we should move it to the ``Platform``
+    #       class, if not, then we probably need to review the type of the
+    #       ``self.platform`` in ``job_package.py``.
     def remove_multiple_files(self, filenames):
         log_dir = os.path.join(self.tmp_path, f'LOG_{self.expid}')
         multiple_delete_previous_run = os.path.join(
@@ -515,9 +510,6 @@ class ParamikoPlatform(Platform):
         self.get_files(
             [job_out_filename, job_err_filename], False, "LOG_{0}".format(exp_id)
         )
-
-    def get_list_of_files(self):
-        return self._ftpChannel.get(self.get_files_path)
 
     def _chunked_md5(self, file_buffer: BufferedReader) -> str:
         """Calculate the MD5 checksum of a file in chunks to avoid high memory usage.
@@ -806,25 +798,6 @@ class ParamikoPlatform(Platform):
 
         return submitted_pids
 
-    def get_estimated_queue_time_cmd(self, job_id):
-        """Returns command to get estimated queue time on remote platforms
-
-        :param job_id: id of job to check
-        :param job_id: str
-        :return: command to get estimated queue time
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def parse_estimated_time(self, output):
-        """Parses estimated queue time from output of get_estimated_queue_time_cmd
-
-        :param output: output of get_estimated_queue_time_cmd
-        :type output: str
-        :return: estimated queue time
-        :rtype:
-        """
-        raise NotImplementedError  # pragma: no cover
-
     def job_is_over_wallclock(self, job, job_status, cancel=False):
         if job.is_over_wallclock():
             try:
@@ -1089,7 +1062,7 @@ class ParamikoPlatform(Platform):
                     stat_status = stat_statuses.get(job.name, Status.UNKNOWN)
                     new_status, new_finished_time = self._resolve_stat_status(
                         job.name, stat_status, scheduler_job_status,
-                        job.finished_time, self.IO_SAFE_WAIT, time.time(),
+                        job.finished_time, self.IO_SAFE_WAIT, time(),
                     )
                     job.finished_time = new_finished_time
                     job.new_status = new_status
@@ -1184,14 +1157,6 @@ class ParamikoPlatform(Platform):
             # get all ids by job-name
             job_ids = [job_id.split(',')[0] for job_id in job_ids_names]
         return job_ids
-
-    def get_check_job_cmd(self, job_id: str) -> str:
-        """Returns command to check job status on remote platforms.
-
-        :param job_id: id of job to check
-        :return: command to check job status
-        """
-        raise NotImplementedError  # pragma: no cover
 
     def get_check_all_jobs_cmd(self, jobs_id: str):
         """Returns command to check jobs status on remote platforms.
@@ -1336,11 +1301,6 @@ class ParamikoPlatform(Platform):
 
         return False, False, False
 
-    def send_command_non_blocking(self, command, ignore_log):
-        thread = threading.Thread(target=self.send_command, args=(command, ignore_log))
-        thread.start()
-        return thread
-
     def send_command(self, command: str, ignore_log=False, x11=False) -> bool:
         """Sends a given command to an HPC platform.
 
@@ -1447,27 +1407,6 @@ class ParamikoPlatform(Platform):
         except IOError as e:
             raise AutosubmitError(f"I/O issues: {str(e)}", 6016)
 
-    def parse_job_output(self, output):
-        """Parses check job command output, so it can be interpreted by autosubmit
-
-        :param output: output to parse
-        :type output: str
-        :return: job status
-        :rtype: str
-        """
-        raise NotImplementedError  # pragma: no cover
-
-    def parse_all_jobs_output(self, output, job_id):
-        """Parses check jobs command output, so it can be interpreted by autosubmit
-
-        :param output: output to parse
-        :param job_id: select the job to parse
-        :type output: str
-        :return: job status
-        :rtype: str
-        """
-        raise NotImplementedError  # pragma: no cover
-
     def get_multi_submit_cmd(self, job_scripts: dict) -> str:
         """Gets command to submit all the current active jobs on HPC
 
@@ -1510,9 +1449,6 @@ class ParamikoPlatform(Platform):
         """
         return self._ssh_output
 
-    def get_ssh_output_err(self):
-        return self._ssh_output_err
-
     def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
         """Gets the command to submit a job, for the current platform, with the given parameters.
          This needs to be adapted to each scheduler, the default assumes that is being launched directly.
@@ -1531,7 +1467,9 @@ class ParamikoPlatform(Platform):
 
     def get_call(self, script_name, timeout: float, export: str, executable: str, x11_options: str, fail_count: int,
                  sub_queue: str, redirect_out_err: bool = False) -> str:
-        """Gets execution command for given job. it builds the command to execute the script on the remote platform.
+        """Gets execution command for the given job.
+
+        It builds the command to execute the script on the remote platform.
 
         :param script_name: script to run
         :param timeout: timeout for the execution
@@ -1554,7 +1492,7 @@ class ParamikoPlatform(Platform):
 
     @staticmethod
     def get_pscall(job_id):
-        """Gets command to check if a job is running given process identifier
+        """Gets command to check if a job is running given a process identifier
 
         :param job_id: process identifier
         :type job_id: int
@@ -1720,17 +1658,7 @@ class ParamikoPlatform(Platform):
             return self._ftpChannel.stat(src)
         return False
 
-    def get_file_size(self, src: str) -> Union[int, None]:
-        """Get file size in bytes
-        :param src: file path
-        """
-        try:
-            return self._ftpChannel.stat(str(src)).st_size
-        except Exception as e:
-            Log.debug(f"Error getting file size for {src}: {str(e)}")
-            return None
-
-    def read_file(self, src: str, max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: Optional[int]=None) -> Union[bytes, None]:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path
@@ -1776,13 +1704,6 @@ class ParamikoPlatform(Platform):
         except Exception as e:
             Log.warning(f"X11 display not found: {e}")
             self.local_x11_display = None
-
-    def _init_poller(self):
-        """Initialize the platform file descriptor poller. """
-        if sys.platform != "linux":
-            self.poller = select.kqueue()
-        else:
-            self.poller = select.poll()
 
     def update_cmds(self):
         """Updates commands for this platform. """
@@ -1853,14 +1774,10 @@ class ParamikoPlatform(Platform):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def process_ready_jobs(self, scripts_to_submit: dict[str, 'JobPackageBase']) -> tuple[bool, list[Any]]:
+    def process_ready_jobs(self, scripts_to_submit: dict[str, 'JobPackageBase']) -> None:
         """Retrieve multiple jobs identifiers.
 
-        :param scripts_to_submit: List of valid Job Packages to be processes
-        :type scripts_to_submit: List[Any]
-
-        :return: retrieve the ID of the Jobs
-        :rtype: tuple[bool, list[Any]]
+        :param scripts_to_submit: Dictionary with (id => Job package) pairs to be processed.
         """
         jobs_id: list[int] = self.submit_multiple_jobs(scripts_to_submit)
         for jobid_index, package in enumerate(scripts_to_submit.values()):

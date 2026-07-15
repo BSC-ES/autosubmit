@@ -20,15 +20,35 @@
 import copy
 from pathlib import Path
 from textwrap import dedent
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     from test.unit.conftest import AutosubmitConfigFactory
+
+
+_EXPID = "t000"
+"""Experiment ID used for testing."""
+
+
+@pytest.fixture
+def submitter(mocker):
+    """Create a fake submitter."""
+    local = mocker.Mock(name="local_platform")
+    remote = mocker.Mock(name="remote_platform")
+
+    return SimpleNamespace(
+        platforms={
+            "HPC": remote,
+            PlatformType.LOCAL.upper(): local,
+        }
+    )
 
 
 def test_get_submodules_list_default_empty_list(autosubmit_config: 'AutosubmitConfigFactory'):
@@ -852,3 +872,315 @@ def test_get_section_missing_returns_d_value(
     else:
         result = as_conf.get_section(section, d_value=d_value, must_exists=must_exists)
         assert result == expected
+
+
+def test_no_conf_folder(mocker, tmp_path):
+    mocked_basic_config = mocker.patch('autosubmit.config.configcommon.BasicConfig')
+    mocked_basic_config.LOCAL_ROOT_DIR.return_value = str(tmp_path / 'does_not_exist')
+    with pytest.raises(IOError):
+        AutosubmitConfig(_EXPID)
+
+
+def test_jobs_data_no_jobs(autosubmit_config):
+    as_conf = autosubmit_config(_EXPID, experiment_data={})
+    del as_conf.experiment_data['JOBS']
+    with pytest.raises(AutosubmitCritical) as cm:
+        len(as_conf.jobs_data)
+    assert 'JOBS section not found' in str(cm.value)
+
+
+def test_jobs_data_unexpected_error(autosubmit_config):
+    as_conf = autosubmit_config(_EXPID, experiment_data={})
+    as_conf.experiment_data = None
+    with pytest.raises(AutosubmitCritical) as cm:
+        len(as_conf.jobs_data)
+    assert 'Error while reading JOBS' in str(cm.value)
+
+
+def test_get_wrapper_export_when_none(autosubmit_config):
+    """Test that when the ``wrapper`` given is ``None``, it uses an empty dictionary."""
+    as_conf = autosubmit_config(_EXPID, experiment_data={})
+    wrapper_export = as_conf.get_wrapper_export(None)
+    assert wrapper_export == ''
+
+
+def test_check_platforms_conf_valid_main_platform(autosubmit_config):
+    """Test that the main platform is found in the configuration."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "PLATFORMS": {
+                "MARENOSTRUM": {
+                    "TYPE": "slurm",
+                    "HOST": "host",
+                    "PROJECT": "proj",
+                    "USER": "user",
+                    "SCRATCH_DIR": "/scratch",
+                }
+            }
+        },
+    )
+    as_conf.hpcarch = "MARENOSTRUM"
+
+    assert as_conf.check_platforms_conf() is True
+    assert "Platform" not in as_conf.wrong_config
+
+
+def test_check_platforms_conf_main_platform_not_defined(autosubmit_config):
+    """Test the experiment default HPCARCH missing from the platforms."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "PLATFORMS": {
+                "OTHER": {
+                    "TYPE": "slurm",
+                    "HOST": "host",
+                    "PROJECT": "proj",
+                    "USER": "user",
+                    "SCRATCH_DIR": "/scratch",
+                }
+            }
+        },
+    )
+    as_conf.hpcarch = "MARENOSTRUM"
+
+    assert as_conf.check_platforms_conf() is True
+
+    assert any(
+        "Main platform is not defined" in err
+        for _, err in as_conf.wrong_config["Expdef"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("missing_key", "expected"),
+    [
+        ("TYPE", "Mandatory TYPE parameter"),
+        ("HOST", "Mandatory HOST parameter"),
+        ("PROJECT", "Mandatory PROJECT parameter"),
+        ("USER", "Mandatory USER parameter"),
+        ("SCRATCH_DIR", "Mandatory SCRATCH_DIR parameter"),
+    ],
+)
+def test_check_platforms_conf_missing_required_parameter(
+    autosubmit_config,
+    missing_key,
+    expected,
+):
+    """Test when the platform has missing required parameters."""
+    platform = {
+        "TYPE": "slurm",
+        "HOST": "host",
+        "PROJECT": "proj",
+        "USER": "user",
+        "SCRATCH_DIR": "/scratch",
+    }
+    del platform[missing_key]
+
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={"PLATFORMS": {"MARENOSTRUM": platform}},
+    )
+    as_conf.hpcarch = "MARENOSTRUM"
+
+    assert as_conf.check_platforms_conf() is False
+
+    assert any(
+        expected in message
+        for _, message in as_conf.wrong_config["Platform"]
+    )
+
+
+def test_check_platforms_conf_ps_platform_does_not_require_project_or_user(autosubmit_config):
+    """Test when a ``PS`` platform is missing parameters (project or user)."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "PLATFORMS": {
+                "PS": {
+                    "TYPE": PlatformType.PS,
+                    "HOST": "host",
+                    "SCRATCH_DIR": "/scratch",
+                }
+            }
+        },
+    )
+    as_conf.hpcarch = "PS"
+
+    assert as_conf.check_platforms_conf() is True
+    assert "Platform" not in as_conf.wrong_config
+
+
+def test_check_platforms_conf_invalid_secondary_platform_is_ignored(autosubmit_config):
+    """Test when invalid configuration is found in a unused platform, the other remains OK."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "PLATFORMS": {
+                "MAIN": {
+                    "TYPE": "slurm",
+                    "HOST": "host",
+                    "PROJECT": "proj",
+                    "USER": "user",
+                    "SCRATCH_DIR": "/scratch",
+                },
+                "BROKEN": {
+                    "USER": "someone",
+                },
+            }
+        },
+    )
+    as_conf.hpcarch = "MAIN"
+
+    assert as_conf.check_platforms_conf() is True
+    assert "Platform" not in as_conf.wrong_config
+
+
+def test_check_platforms_conf_local_platform_is_implicit(autosubmit_config):
+    """Test when the no platforms are defined, the ``LOCAL`` platform is still auto-initialised."""
+    as_conf = autosubmit_config(_EXPID, experiment_data={"PLATFORMS": {}})
+    as_conf.hpcarch = PlatformType.LOCAL
+
+    assert as_conf.check_platforms_conf() is True
+
+
+def test_check_platforms_conf_ignore_undefined_platforms(autosubmit_config):
+    """Test when no platforms are defined and ``.ignore_undefined_platforms`` is set to ``True``."""
+    as_conf = autosubmit_config(_EXPID, experiment_data={"PLATFORMS": {}})
+    as_conf.hpcarch = "UNKNOWN"
+    as_conf.ignore_undefined_platforms = True
+
+    assert as_conf.check_platforms_conf() is True
+
+
+def test_check_wrapper_conf_local_platform_not_supported(autosubmit_config):
+    """Test that using wrappers with the ``LOCAL`` platform raises an error."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "JOBS": {
+                "JOB1": {
+                    "PLATFORM": "LOCAL",
+                },
+            },
+        },
+    )
+
+    wrappers = {
+        "wrapper": {
+            "JOBS_IN_WRAPPER": ["JOB1"],
+        },
+    }
+
+    with pytest.raises(AutosubmitCritical) as exc:
+        as_conf.check_wrapper_conf(wrappers)
+
+    assert "LOCAL platform does not support wrappers" in str(exc.value)
+
+
+def test_load_section_parameters_uses_default_platform(autosubmit_config, submitter, mocker):
+    """Test that jobs without a platform use the default platform."""
+    as_conf = autosubmit_config("a000")
+
+    as_conf.hpcarch = "HPC"
+    as_conf.check_conf_files = mocker.Mock()
+
+    job = mocker.Mock()
+    job.platform_name = None
+    job.section = "SIM"
+    job.parameters = {}
+
+    job_list = mocker.Mock()
+    job_list.get_job_list.return_value = [job]
+    job_list.parameters = {}
+
+    job.update_parameters.side_effect = (lambda *_: job.parameters.update({"FOO": "BAR"}))
+
+    result = as_conf.load_section_parameters(job_list, as_conf, submitter)
+
+    as_conf.check_conf_files.assert_called_once_with(False)  # type: ignore
+    assert job.platform is submitter.platforms["HPC"]
+    assert result == {"SIM_FOO": "BAR"}
+
+
+def test_load_section_parameters_falls_back_to_local_platform(autosubmit_config, submitter, mocker):
+    """Test that an unknown platform falls back to LOCAL."""
+    as_conf = autosubmit_config("a000")
+    as_conf.check_conf_files = mocker.Mock()
+
+    job = mocker.Mock()
+    job.platform_name = "DOES_NOT_EXIST"
+    job.section = "SIM"
+    job.parameters = {}
+
+    job_list = mocker.Mock()
+    job_list.get_job_list.return_value = [job]
+    job_list.parameters = {}
+
+    job.update_parameters.side_effect = lambda *_: None
+
+    as_conf.load_section_parameters(job_list, as_conf, submitter)
+
+    assert job.platform is submitter.platforms[PlatformType.LOCAL.upper()]
+
+
+def test_load_section_parameters_updates_each_section_once(autosubmit_config, submitter, mocker):
+    """Test that parameters are updated once per section."""
+    as_conf = autosubmit_config("a000")
+    as_conf.check_conf_files = mocker.Mock()
+
+    job1 = mocker.Mock(section="SIM", platform_name="HPC", parameters={})
+    job2 = mocker.Mock(section="SIM", platform_name="HPC", parameters={})
+    job3 = mocker.Mock(section="POST", platform_name="HPC", parameters={})
+
+    job_list = mocker.Mock()
+    job_list.get_job_list.return_value = [job1, job2, job3]
+    job_list.parameters = {}
+
+    job1.update_parameters.side_effect = lambda *_: None
+    job2.update_parameters.side_effect = lambda *_: None
+    job3.update_parameters.side_effect = lambda *_: None
+
+    as_conf.load_section_parameters(job_list, as_conf, submitter)
+
+    job1.update_parameters.assert_called_once()
+    job2.update_parameters.assert_not_called()
+    job3.update_parameters.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "existing,expected",
+    [
+        ({}, {"SIM_A": 1, "SIM_B": 2}),
+        ({"A": 0}, {"SIM_B": 2}),
+        ({"A": 0, "B": 0}, {}),
+    ],
+)
+def test_load_section_parameters_filters_existing_parameters(
+    autosubmit_config,
+    submitter,
+    mocker,
+    existing: dict[str, int],
+    expected: dict[str, int],
+):
+    """Test that existing parameters are not returned."""
+    as_conf = autosubmit_config("a000")
+    as_conf.check_conf_files = mocker.Mock()
+
+    job = mocker.Mock()
+    job.platform_name = "HPC"
+    job.section = "SIM"
+    job.parameters = {}
+
+    def update_parameters(*_):
+        job.parameters = { "A": 1,"B": 2 }
+
+    job.update_parameters.side_effect = update_parameters
+
+    job_list = mocker.Mock()
+    job_list.get_job_list.return_value = [job]
+    job_list.parameters = existing
+
+    result = as_conf.load_section_parameters(job_list, as_conf, submitter)
+
+    assert result == expected
