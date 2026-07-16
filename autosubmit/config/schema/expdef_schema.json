@@ -1,0 +1,370 @@
+{
+    "$schema": "https://json-schema.org/draft-07/schema#",
+    "$id": "https://earth.bsc.es/autosubmit/expdef-schema",
+    "title": "Autosubmit Experiment Definition Schema",
+    "description": "Schema for the experiment definition configuration of the autosubmit workflow",
+    "type": "object",
+    "required": [
+        "DEFAULT",
+        "EXPERIMENT",
+        "PROJECT"
+    ],
+    "definitions": {
+        "nonEmptyString": {
+            "$type": "string",
+            "minLength": 1,
+            "description": "A string with at least one character."
+        },
+        "positiveInteger": {
+            "$type": "integer",
+            "minimum": 1,
+            "description": "An integer greater than zero."
+        },
+        "nonNegativeInteger": {
+            "$type": "integer",
+            "minimum": 0,
+            "description": "An integer greater than or equal to zero."
+        },
+        "boolean": {
+            "oneOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "type": "string",
+                    "enum": [
+                        "true",
+                        "false",
+                        "True",
+                        "False"
+                    ]
+                }
+            ],
+            "$description": "A boolean or a string representation of a boolean"
+        },
+        "booleanLike": {
+            "oneOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "type": "string",
+                    "enum": [
+                        "true",
+                        "false",
+                        "True",
+                        "False",
+                        "yes",
+                        "no"
+                    ]
+                }
+            ],
+            "$description": "A boolean or a string representation of a boolean."
+        },
+        "customConfigSpec": {
+            "oneOf": [
+                {
+                    "type": "string",
+                    "description": "Path to a single custom config file."
+                },
+                {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of custom config files."
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "PRE": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "List of custom config files."
+                        },
+                        "POST": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "List of custom config files."
+                        }
+                    },
+                    "additionalProperties": false,
+                    "description": "PRE files load before experiment config, POST files after."
+                }
+            ]
+        },
+        "defaultSection": {
+            "type": "object",
+            "description": "Experiment default parameters. EXPID nad HPCARCH are required.",
+            "required": [
+                "EXPID",
+                "HPCARCH"
+            ],
+            "properties": {
+                "EXPID": {
+                    "$ref": "#/definitions/nonEmptyString",
+                    "description": "4 characters experiment ID. (Example: a000)"
+                },
+                "HPCARCH": {
+                    "$ref": "#/definitions/nonEmptyString",
+                    "description": "Default HPC platform name. Must match a PLATFORMS key or be LOCAL."
+                },
+                "CUSTOM_CONFIG": {
+                    "$ref": "#/definitions/customConfigSpec"
+                },
+                "DESCRIPTION": {
+                    "type": "string",
+                    "description": "Experiment description."
+                }
+            },
+            "additionalProperties": false
+        },
+        "experimentSection": {
+            "type": "object",
+            "description": "Experiment ensemble configuration.",
+            "required": [
+                "DATELIST",
+                "MEMBERS",
+                "CHUNKSIZEUNIT",
+                "NUMCHUNKS",
+                "CALENDAR"
+            ],
+            "properties": {
+                "DATELIST": {
+                    "$ref": "#/definitions/nonEmptyString",
+                    "description": "Space-separated start dates. Available formats YYYYMMDD, YYYYMMDDhh, YYYYMMDDhhmm. Also you can use an abbreviated syntax for multiple dates with common parts, e.g. 20000101 20000115 <=> 200001[01 15]; 19600101 19600201 19600301 <=> 1060[0101 0201 0301]."
+                },
+                "MEMBERS": {
+                    "$ref": "#/definitions/nonEmptyString",
+                    "description": "Space-separated member names. E.g. fc0 fc1 fc2."
+                },
+                "CHUNKSIZEUNIT": {
+                    "type": "string",
+                    "enum": [
+                        "year",
+                        "month",
+                        "day",
+                        "hour"
+                    ],
+                    "description": "Unit of the chunk size."
+                },
+                "CHUNKSIZE": {
+                    "$ref": "#/definitions/positiveInteger",
+                    "default": 1,
+                    "description": "Number of units per chunk."
+                },
+                "NUMCHUNKS": {
+                    "$ref": "#/definitions/positiveInteger",
+                    "description": "Total chunks to run per member."
+                },
+                "CHUNKINI": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/definitions/positiveInteger"
+                        },
+                        {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                        }
+                    ],
+                    "default": 1,
+                    "description": "First chunk index to start from."
+                },
+                "CALENDAR": {
+                    "type": "string",
+                    "enum": [
+                        "standard",
+                        "noleap"
+                    ],
+                    "description": "Calendar type for date calculations."
+                }
+            },
+            "additionalProperties": false
+        },
+        "projectSection": {
+            "type": "object",
+            "description": "Project source configuration.",
+            "required": [
+                "PROJECT_TYPE"
+            ],
+            "properties": {
+                "PROJECT_TYPE": {
+                    "type": "string",
+                    "enum": [
+                        "none",
+                        "git",
+                        "svn",
+                        "local"
+                    ],
+                    "description": "Source control type."
+                },
+                "PROJECT_DESTINATION": {
+                    "type": "string",
+                    "default": "project_files",
+                    "description": "Subdirectory name under proj/."
+                }
+            },
+            "additionalProperties": false
+        },
+        "gitSection": {
+            "type": "object",
+            "description": "Git repository configuration,",
+            "properties": {
+                "PROJECT_ORIGIN": {
+                    "type": "string",
+                    "description": "Git remote url."
+                },
+                "PROJECT_BRANCH": {
+                    "type": "string",
+                    "description": "Branch to clone."
+                },
+                "PROJECT_COMMIT": {
+                    "type": "string",
+                    "description": "Commit hash to check out."
+                },
+                "PROJECT_SUBMODULES": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "boolean",
+                            "enum": [
+                                false
+                            ]
+                        }
+                    ],
+                    "description": "String lists the submodules, false disables it."
+                },
+                "FETCH_SINGLE_BRANCH": {
+                    "$ref": "#/definitions/booleanLike",
+                    "default": true,
+                    "description": "Limits the data of the submodule to a single branch."
+                },
+                "REMOTE_CLONE_ROOT": {
+                    "type": "string",
+                    "description": "Clones a git project on the main HPC platform."
+                },
+                "PROJECT_SUBMODULES_DEPTH": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/definitions/positiveInteger"
+                        },
+                        {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                        },
+                        {
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "description": "Submodule clone depth. Minimum depth is 1."
+                }
+            }
+        },
+        "svnSection": {
+            "type": "object",
+            "description": "Subversion repository configuration.",
+            "properties": {
+                "PROJECT_URL": {
+                    "type": "string",
+                    "description": "SVN repository URL."
+                },
+                "PROJECT_REVISION": {
+                    "type": "string",
+                    "description": "SVN revision number."
+                }
+            }
+        },
+        "localSection": {
+            "type": "object",
+            "description": "Local project path. Used only when PROJECT_TYPE=local.",
+            "properties": {
+                "PROJECT_PATH": {
+                    "type": "string",
+                    "description": "Path to the local project directory."
+                }
+            },
+            "additionalProperties": false
+        },
+        "projectFilesSection": {
+            "type": "object",
+            "description": "Paths to project configuration files.",
+            "properties": {
+                "PROJECT_FILES": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of project files to copy."
+                }
+            },
+            "additionalProperties": false
+        },
+        "rerunSection": {
+            "type": "object",
+            "description": "Automatic rerun configuration.",
+            "properties": {
+                "RERUN": {
+                    "$ref": "#/definitions/booleanLike",
+                    "default": false,
+                    "description": "Enable automatic reruns."
+                },
+                "RERUN_JOBLIST": {
+                    "type": "string",
+                    "description": "Space-separated list of jobs to rerun."
+                }
+            },
+            "additionalProperties": false
+        },
+        "properties": {
+            "DEFAULT": {
+                "$ref": "#/definitions/defaultSection",
+                "description": "Global experiment defaults."
+            },
+            "EXPERIMENT": {
+                "$ref": "#/definitions/experimentSection",
+                "description": "Experiment ensemble configuration."
+            },
+            "PROJECT": {
+                "$ref": "#/definitions/projectSection",
+                "description": "Project source configuration."
+            },
+            "GIT": {
+                "$ref": "#/definitions/gitSection",
+                "description": "Git repository configuration."
+            },
+            "SVN": {
+                "$ref": "#/definitions/svnSection",
+                "description": "Subversion repository configuration."
+            },
+            "LOCAL": {
+                "$ref": "#/definitions/localSection",
+                "description": "Local project path configuration."
+            },
+            "PROJECT_FILES": {
+                "$ref": "#/definitions/projectFilesSection",
+                "description": "Paths to project configuration files."
+            },
+            "RERUN": {
+                "$ref": "#/definitions/rerunSection",
+                "description": "Automatic rerun configuration."
+            }
+        },
+        "additionalProperties": true
+    }
+}
