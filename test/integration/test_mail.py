@@ -252,7 +252,7 @@ def test_recipients_list(
     mail_notifier = create_mail_notifier(exp, smtp_port)
 
     if expected_error_message:
-        with pytest.raises(ValueError, match=expected_error_message):
+        with pytest.raises((ValueError, TypeError), match=expected_error_message):
             mail_notifier.notify_status_change(exp.expid, job_name, Status.VALUE_TO_KEY[Status.RUNNING],
                 Status.VALUE_TO_KEY[Status.FAILED], list_recipients  # type: ignore
             )

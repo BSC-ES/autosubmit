@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS 
+ # Copyright 2015-2025 Earth Sciences Department, BSC-CNS
 # 
 # This file is part of Autosubmit. 
 # 
@@ -198,10 +198,10 @@ def _generate_message_cpmip_threshold_violations(
 
 def _check_mail_address(mail_to: list[str]) -> None:
     if not isinstance(mail_to, list):
-        raise ValueError('Recipients of mail notifications must be a list of emails!')
+        raise TypeError('Recipients of mail notifications must be a list of emails!')
     elif not mail_to:
         raise ValueError('Empty recipient list')
-    elif any([not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$', mail) for mail in mail_to]):
+    elif any(not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+$', mail) for mail in mail_to):
         raise ValueError('Invalid email in recipient list')
 
 
@@ -227,6 +227,7 @@ class MailNotifier:
             try:
                 compressed_run_log = _compress_file(temp_dir, latest_run_log)
                 _attach_file(compressed_run_log, message)
+                Log.info("File was successfully compressed!")
             except AutosubmitError as e:
                 Log.printlog(code=e.code, message=e.message)
             finally:

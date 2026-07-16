@@ -79,7 +79,11 @@ from autosubmit.git.autosubmit_git import (
     is_git_repo,
 )
 from autosubmit.helpers.enums import ChunkUnit
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
+from autosubmit.helpers.utils import (
+    check_jobs_file_exists,
+    get_rc_path,
+    restore_platforms,
+)
 from autosubmit.helpers.version import get_version
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
