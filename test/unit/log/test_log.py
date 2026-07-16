@@ -32,7 +32,6 @@ from autosubmit.log.log import (
 )
 from autosubmit.log.utils import compress_xz
 from test.unit.test_utils import find_uncompressed_files, is_xz_file
-from autosubmit.log.utils import compress_xz, find_uncompressed_files, is_xz_file
 
 if TYPE_CHECKING:
     from pytest_mock import MockFixture

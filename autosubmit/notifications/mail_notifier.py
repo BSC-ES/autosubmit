@@ -227,6 +227,7 @@ class MailNotifier:
             try:
                 compressed_run_log = _compress_file(temp_dir, latest_run_log)
                 _attach_file(compressed_run_log, message)
+                Log.info("File was successfully compressed!")
             except AutosubmitError as e:
                 Log.printlog(code=e.code, message=e.message)
             finally:

@@ -80,6 +80,7 @@ from autosubmit.helpers.utils import (
     check_jobs_file_exists,
     get_rc_path,
     recover_stale_job_data,
+    restore_platforms,
     user_yes_no_query,
 )
 from autosubmit.history.experiment_history import ExperimentHistory
