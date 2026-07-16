@@ -2686,17 +2686,6 @@ def _make_wrapper_job(mocker, inner_jobs=None, new_status=Status.RUNNING):
     return wrapper
 
 
-@pytest.mark.parametrize("eligible", [True, False])
-def test_handle_vertical_retries(eligible, mocker):
-    inner = Job("inner", 2, Status.FAILED, 0)
-    inner.wrapper_type = "vertical" if eligible else "horizontal"
-    inner.updated_log = 2
-    inner.fail_count = 0
-    inner.retrials = 3
-    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
-    wrapper._handle_vertical_retries()
-    assert inner.fail_count == (1 if eligible else 0)
-
 
 @pytest.mark.parametrize("has_finished_time,elapsed,expected,keep_alive", [
     (False, 2, Status.RUNNING, None),          # fresh timer, not elapsed
@@ -3131,3 +3120,41 @@ def test_calendar_chunk_last_chunk_consistency(chunk_unit, chunk_size):
 
     assert result['CHUNK_END_DATE'] == result['CHUNK_END_DATE_LAST']
     assert result['CHUNK_SECOND_TO_LAST_DATE'] == result['LDATE']
+
+
+def test_recover_log_disabled_threads(mocker):
+    job = Job("test", 1, Status.COMPLETED, 0)
+    as_conf = mocker.MagicMock()
+    as_conf.platforms_data.get.return_value = {"DISABLE_RECOVERY_THREADS": "true"}
+    mock_retrieve = mocker.patch("autosubmit.job.job.Job.retrieve_logfiles")
+    mock_notify = mocker.patch("autosubmit.job.job.Job.send_cpmip_notification")
+    job.recover_log(as_conf)
+    mock_retrieve.assert_called_once()
+    mock_notify.assert_called_once_with(as_conf)
+    assert job.log_recovery_call_count == 1
+
+
+def test_recover_log_queues_recovery(mocker):
+    job = Job("test", 1, Status.COMPLETED, 0)
+    job.expid = "a000"
+    as_conf = mocker.MagicMock()
+    as_conf.platforms_data.get.return_value = {}
+    job.platform = mocker.MagicMock()
+    mocker.patch("autosubmit.job.job.Job.write_submit_time")
+    job.recover_log(as_conf)
+    job.platform.add_job_to_log_recover.assert_called_once_with(job)
+    assert job.log_recovery_call_count == 1
+
+
+def test_compute_inner_job_status_triggers_recover_log(mocker):
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner._retrials = 3
+    inner.wrapper_type = "vertical"
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
+    mock_recover = mocker.patch("autosubmit.job.job.Job.recover_log")
+    mocker.patch.object(WrapperJob, "_inner_job_can_run", return_value=True)
+
+    result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
+
+    mock_recover.assert_called_once_with(wrapper.as_config)
+    assert result == Status.FAILED

@@ -3159,6 +3159,21 @@ class Job(object):
             self.local_logs = local_logs
             self.remote_logs = copy.deepcopy(local_logs)
 
+    def recover_log(self, as_conf) -> None:
+        """Recover the log files for the job and send a CPMIP notification"""
+        if self.log_recovery_call_count <= self.fail_count:
+            if str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS',
+                                                                    "false")).lower() == "true":
+                self.retrieve_logfiles()
+                self.send_cpmip_notification(as_conf)
+            else:
+                exp_history = ExperimentHistory(self.expid)
+                existing = exp_history.get_submit_data_dc(self.name, self.fail_count)
+                if existing is None or str(existing.job_id) != str(self.id):
+                    self.write_submit_time(self.fail_count)
+                self.platform.add_job_to_log_recover(self)
+            self.log_recovery_call_count += 1
+
     def recover_last_ready_date(self) -> None:
         """Recovers the last ready date for this job"""
         if not self.ready_date:
@@ -3320,14 +3335,6 @@ class WrapperJob(Job):
             if parent in wrapper_job_set
         )
 
-    def _handle_vertical_retries(self) -> bool:
-        """Increment fail_count for vertical inner jobs eligible for retry."""
-        save = False
-        for inner_job in [job for job in self.job_list if job.status == Status.FAILED and job.can_retry and job.wrapper_type == "vertical"]:
-            inner_job.inc_fail_count()
-            save = True
-        return save
-
     def _apply_io_safe_wait(self, inner_job: Job, current_stat: Status, timeout_to: Status,
                             keep_alive: Status = None) -> Status:
         """Track elapsed time since wrapper finished; timeout transitions to timeout_to.
@@ -3369,8 +3376,12 @@ class WrapperJob(Job):
 
         if stat == Status.RUNNING and wrapper_is_done:
             return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.FAILED)
-        elif stat == Status.FAILED:
-            pass
+        elif stat == Status.FAILED and inner_job.can_retry and inner_job.wrapper_type == "vertical":
+            Log.info("f!!there should be 4 records of this")
+            # This is not called!
+            inner_job.recover_log(self.as_config)
+            inner_job.inc_fail_count()
+            stat = Status.RUNNING
         elif stat == Status.QUEUING and wrapper_is_done:
             return self._apply_io_safe_wait(inner_job, Status.QUEUING, Status.QUEUING,
                                             keep_alive=Status.RUNNING)
@@ -3437,8 +3448,8 @@ class WrapperJob(Job):
         :rtype: bool
         """
         save = False
+        # wrapper new_status is checked here
         self.platform.check_all_jobs([self], as_conf)
-        save |= self._handle_vertical_retries()
 
         inner_jobs_stat_statuses = self.platform.confirm_done_jobs_via_stat(self.job_list)
         wrapper_is_done = self.new_status in [Status.COMPLETED, Status.FAILED]

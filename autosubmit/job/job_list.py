@@ -3146,19 +3146,7 @@ class JobList(object):
         :param job: The job object to recover the log for.
         :type job: Job
         """
-        if str(self._as_conf.platforms_data.get(job.name, {}).get('DISABLE_RECOVERY_THREADS',
-                                                                  "false")).lower() == "true":
-            job.retrieve_logfiles()
-            job.send_cpmip_notification(self._as_conf)
-        else:
-            # Submit time is not stored in the _STAT, so failures in the log recovery can lead to missing the submit time
-            # TODO This should be in a db manager
-            exp_history = ExperimentHistory(self.expid)
-            existing = exp_history.get_submit_data_dc(job.name, job.fail_count)
-            if existing is None or str(existing.job_id) != str(job.id):
-                job.write_submit_time(job.fail_count)
-            job.platform.add_job_to_log_recover(job)
-        job.log_recovery_call_count += 1
+        job.recover_log(self._as_conf)
 
 
 
