@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -53,6 +53,31 @@ _GIT_UNCOMMITTED_CMD = ('git', 'status', '--porcelain')
 
 _GIT_UNPUSHED_CMD = ('git', 'log', '--branches', '--not', '--remotes')
 """Command to check if there are changes not pushed to Git remotes."""
+
+_FALLBACK_GIT_VERSION = 2320
+"""Minimum supported Git version. Used as a fallback when ``git --version`` cannot be executed or parsed."""
+
+_HOOKS_PATH_GIT_VERSION = 2136
+"""Minimum Git version that supports the ``core.hooksPath`` configuration option."""
+
+__all__ = ["AutosubmitGit"]
+
+
+def _get_git_version() -> int:
+    """Get the current Git version as an integer.
+
+    The version is returned as an integer concadenation.
+    E.g, Git version 2.32.0 will be returned as 2320.
+    Falls back to `_FALLBACK_GIT_VERSION` if the Git version cannot be determined.
+
+    :return: The current Git version as an integer.
+    """
+    try:
+        raw = subprocess.check_output("git --version", shell=True)
+        version_str = raw.decode(locale.getlocale()[1]).split(" ")[-1].strip("\n")
+        return int("".join(version_str.split(".")))
+    except Exception:
+        return _FALLBACK_GIT_VERSION
 
 
 def _get_uncommitted_code(git_repo: Path) -> Optional[str]:
@@ -263,16 +288,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
         try:
             # command 0
             Log.debug('Clone command: {0}', command_0)
-            try:
-                git_version = subprocess.check_output("git --version", shell=True)
-                git_version = git_version.decode(locale.getlocale()[1]).split(" ")[-1].strip("\n")
-
-                version_int = ""
-                for number in git_version.split("."):
-                    version_int += number
-                git_version = int(version_int)
-            except Exception:
-                git_version = 2251
+            git_version = _get_git_version()
             if git_remote_project_path == '':
                 command_0 = "cd {0} ; {1}".format(project_path, command_0)
                 subprocess.check_output(command_0, shell=True)
@@ -281,7 +297,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
                 platform.send_command(command_0)
             # command 1
 
-            if os.path.exists(os.path.join(git_path, ".githooks")) and git_version > 2136:
+            if os.path.exists(os.path.join(git_path, ".githooks")) and git_version > _HOOKS_PATH_GIT_VERSION:
                 for root_dir, dirs, files in os.walk(os.path.join(git_path, ".githooks")):
                     for f_dir in dirs:
                         os.chmod(os.path.join(root_dir, f_dir), 0o750)
@@ -359,3 +375,67 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
         git_repo = git_repo.lower().strip()
 
         return _GIT_URL_PATTERN.match(git_repo) is not None
+
+    @staticmethod
+    def check_unpushed_changes(expid: str, as_conf: AutosubmitConfig) -> None:
+        """Check if the Git repository is dirty for an operational experiment.
+
+        Raises an AutosubmitCritical error if the experiment is operational,
+        the platform is Git, and there are unpushed changes in the local Git
+        repository, or in any of its Git submodules.
+
+        :param expid: The experiment ID.
+        :param as_conf: Autosubmit configuration object.
+        """
+        project_type = as_conf.get_project_type()
+        if expid[0] == 'o' and project_type == 'git':
+            proj_dir = Path(as_conf.get_project_dir())
+
+            if uncommitted_code := _get_uncommitted_code(proj_dir):
+                message = ("You must commit and push your code to the remote Git repository in an "
+                        f"operational experiment before running it.\n\n{uncommitted_code}")
+                raise AutosubmitCritical(message, 7075)
+
+            if not_pushed := _get_code_not_pushed(proj_dir):
+                message = ("You must push your code to the remote Git repository in an "
+                        f"operational experiment before running it.\n\n{not_pushed}")
+                raise AutosubmitCritical(message, 7075)
+
+    @staticmethod
+    def clean_git(as_conf: AutosubmitConfig) -> bool:
+        """Clean the cloned Git repository inside the project directory of the experiment.
+
+        Skipped if the project directory location is not a valid directory.
+
+        Skipped if the project directory is not a valid Git repository.
+
+        Skipped if there are changes in the Git repository that were not committed or
+        not pushed.
+
+        :param as_conf: experiment configuration
+        :return: ``True`` if the Git project directory was successfully deleted, ``False`` otherwise.
+        """
+        dirname_path = Path(as_conf.get_project_dir())
+        Log.debug("Checking git directory status...")
+
+        if not dirname_path.is_dir():
+            Log.debug("Not a directory... SKIPPING!")
+            return False
+
+        if not Path(dirname_path, '.git').is_dir():
+            Log.debug("Not a git repository... SKIPPING!")
+            return False
+
+        if _get_uncommitted_code(dirname_path):
+            Log.info("Changes not committed detected... SKIPPING!")
+            raise AutosubmitCritical("Commit needed!", 7013)
+
+        if _get_code_not_pushed(dirname_path):
+            Log.info("Changes not pushed detected... SKIPPING!")
+            raise AutosubmitCritical("Synchronization needed!", 7064)
+
+        proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
+        Log.debug(f"Removing project directory {str(proj_dir)}")
+        rmtree(proj_dir)
+
+        return True
