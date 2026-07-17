@@ -4,6 +4,10 @@
 
 - Fix timeout guard is silently disabled for login/local jobs #3081
 
+**Enhancements:**
+
+- Auto-detect git default branch when `-b` flag not specified #3101
+
 ### 4.1.17: Unreleased
 
 **Bug fixes:**
