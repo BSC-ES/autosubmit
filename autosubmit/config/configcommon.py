@@ -1522,7 +1522,7 @@ class AutosubmitConfig(object):
         else:
             project_type = parser['PROJECT'].get('PROJECT_TYPE', "")
         if project_type.lower() not in ['none', 'git', 'svn', 'local']:
-            self.wrong_config["PROJECT"] += [['PROJECT_TYPE', "Mandatory PROJECT_TYPE choice is invalid"]]
+            self.wrong_config["Expdef"] += [['PROJECT_TYPE', "Mandatory PROJECT_TYPE choice is invalid"]]
         else:
             if project_type == 'git':
                 if parser.get('GIT', "") == "":

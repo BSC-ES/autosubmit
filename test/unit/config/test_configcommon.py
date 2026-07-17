@@ -299,6 +299,102 @@ def test_check_autosubmit_conf_invalid_param(
 
 
 @pytest.mark.parametrize(
+    "experiment_data, should_pass",
+    [
+        (
+            {
+                "PROJECT": {"PROJECT_TYPE": "git"},
+                "GIT": {"PROJECT_ORIGIN": "https://github.com/user/repo.git"},
+            },
+            True,
+        ),
+        (
+            {
+                "PROJECT": {"PROJECT_TYPE": "git"},
+                "GIT": {
+                    "PROJECT_ORIGIN": "https://github.com/user/repo.git",
+                    "PROJECT_BRANCH": "master",
+                },
+            },
+            True,
+        ),
+        ({"PROJECT": {"PROJECT_TYPE": "git"}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "git"}, "GIT": {"PROJECT_ORIGIN": ""}}, False),
+        (
+            {
+                "PROJECT": {"PROJECT_TYPE": "svn"},
+                "SVN": {
+                    "PROJECT_URL": "https://svn.example.com/repo",
+                    "PROJECT_REVISION": "123",
+                },
+            },
+            True,
+        ),
+        ({"PROJECT": {"PROJECT_TYPE": "svn"}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "svn"}, "SVN": {"PROJECT_URL": ""}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "svn"}, "SVN": {"PROJECT_REVISION": ""}}, False),
+        (
+            {
+                "PROJECT": {"PROJECT_TYPE": "local"},
+                "LOCAL": {"PROJECT_PATH": "/path/to/project"},
+            },
+            True,
+        ),
+        ({"PROJECT": {"PROJECT_TYPE": "local"}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "local"}, "LOCAL": {"PROJECT_PATH": ""}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "invalid"}}, False),
+        ({}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "none"}}, True),
+    ],
+    ids=[
+        "Valid git project configuration without PROJECT_BRANCH",
+        "Valid git project configuration with PROJECT_BRANCH",
+        "Missing GIT section for git project",
+        "Empty PROJECT_ORIGIN for git project",
+        "Valid SVN project configuration",
+        "Missing SVN section for SVN project",
+        "Empty PROJECT_URL for SVN project",
+        "Empty PROJECT_REVISION for SVN project",
+        "Valid local project configuration",
+        "Missing LOCAL section for local project",
+        "Empty PROJECT_PATH for local project",
+        "Invalid project type",
+        "Missing PROJECT section",
+        "Valid none project type",
+    ],
+)
+def test_check_expdef_conf_invalid_params(
+    autosubmit_config: "AutosubmitConfigFactory",
+    experiment_data: dict,
+    should_pass: bool,
+) -> None:
+    """Test experiment configuration validation for different project types."""
+    base = {
+        "DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"},
+        "EXPERIMENT": {
+            "DATELIST": "20200101",
+            "MEMBERS": "fc0",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": 1,
+            "NUMCHUNKS": 1,
+            "CALENDAR": "standard",
+        },
+    }
+    base.update(experiment_data)
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=base)
+
+    result = as_conf.check_expdef_conf()
+
+    if should_pass:
+        assert (
+            result is True
+        ), f"Expected check_expdef_conf to pass, but it failed. wrong_config={as_conf.wrong_config}"
+    else:
+        assert result is False, "Expected check_expdef_conf to fail, but it passed"
+        assert "Expdef" in as_conf.wrong_config
+
+
+@pytest.mark.parametrize(
     'experiment_data, raise_error',
     [
         [{}, False],
