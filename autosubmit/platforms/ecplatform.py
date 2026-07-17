@@ -252,15 +252,22 @@ class EcPlatform(ParamikoPlatform):
             remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
             local_path = Path(self.tmp_path) / stat_name
 
-            subprocess.check_output(
-                f"{self.get_cmd} {remote_path} {local_path}",
-                shell=True,
-                stderr=subprocess.DEVNULL,
-            )
+            # The job may still be queuing and not yet running, in that case the
+            # STAT file won't exist on the remote side and the download will fail.
+            try:
+                subprocess.check_output(
+                    f"{self.get_cmd} {remote_path} {local_path}",
+                    shell=True,
+                    stderr=subprocess.DEVNULL,
+                )
+            except subprocess.CalledProcessError:
+                continue
             content = local_path.read_text().strip()
             if content:
                 last_line = content.splitlines()[-1]
                 result[job.name] = self._resolve_status(last_line)
+            # ecaccess doesn't provide a command to fetch so we have to remove the uncompleted stat file
+            local_path.unlink(missing_ok=True)
 
         return result
 

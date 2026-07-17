@@ -833,6 +833,53 @@ def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
     assert not any("t000_MISSING_STAT_0" in c for c in downloaded)
 
 
+@pytest.mark.parametrize("check_output_behaviour,expected_value", [
+    ("failure", None),
+    ("success", Status.COMPLETED),
+])
+def test_confirm_done_jobs_via_stat_handles_download_outcomes(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    check_output_behaviour: str,
+    expected_value: Status | None,
+) -> None:
+    """Verify confirm_done_jobs_via_stat handles both download failure and success correctly."""
+    ec_platform.host = "hpc"
+    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.get_cmd = "ecaccess-file-get"
+
+    def _send_command(cmd: str, **_) -> bool:
+        ec_platform._ssh_output = "t000_INI_STAT_0|size  5550\n"
+        return True
+
+    monkeypatch.setattr(ec_platform, "send_command", _send_command)
+
+    def _check_output(cmd: str, **_) -> bytes:
+        if check_output_behaviour == "failure":
+            raise subprocess.CalledProcessError(255, cmd)
+        local_file = cmd.split()[-1]
+        Path(local_file).write_text("COMPLETED\n")
+        return b""
+
+    monkeypatch.setattr(subprocess, "check_output", _check_output)
+
+    class MockJob:
+        def __init__(self, name: str, fail_count: int):
+            self.name = name
+            self.fail_count = fail_count
+
+    job_list = [MockJob("t000_INI", 0)]
+    result = ec_platform.confirm_done_jobs_via_stat(job_list)
+
+    if expected_value is None:
+        assert "t000_INI" not in result
+    else:
+        assert result["t000_INI"] == expected_value
+    assert not (tmp_path / "t000_INI_STAT_0").exists()
+
+
 def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     ec_platform: EcPlatform,
     monkeypatch: pytest.MonkeyPatch,
