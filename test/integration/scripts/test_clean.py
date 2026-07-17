@@ -159,7 +159,7 @@ def test_clean_git_project(
     """
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
 
-    mocker.patch('autosubmit.autosubmit.AutosubmitGit.clean_git', return_value=clean_git_return)
+    mocker.patch('autosubmit.autosubmit.clean_git', return_value=clean_git_return)
 
     git_project = Path(tmp_path / 'tmp_git_project')
     git_project.mkdir()
