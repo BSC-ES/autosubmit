@@ -77,7 +77,7 @@ job, you can use ``CUSTOM_DIRECTIVES=--gpus-per-node=10``.
 Platform variables
 ==================
 
-Platform variables come from the ``PLATFORMS``section of the configuration
+Platform variables come from the ``PLATFORMS`` section of the configuration
 files. Each ``JOBS`` entry can reference any of these platforms via its
 ``PLATFORM`` key. If no platform is specified, the job uses the experiment's
 default platform (``DEFAULT.HPCARCH``).
@@ -133,7 +133,7 @@ Consider the following experiment configuration:
 
 In this example:
 
-* ``SIM``uses ``MARENOSTRUM5`` as its platform, so it will have access to all the keys under
+* ``SIM`` uses ``MARENOSTRUM5`` as its platform, so it will have access to all the keys under
   ``PLATFORMS.MARENOSTRUM5``.
 * ``POST`` uses ``SLURM`` as its platform, so it will have access to all the keys under
   ``PLATFORMS.SLURM``.
@@ -192,7 +192,7 @@ From the example above (default platform is ``PS``):
 
 .. note::
 
-    The key name is used as-is. E.g.``HPCPROJECT`` (not ``HPCPROJ``).
+    The key name is used as-is. E.g. ``HPCPROJECT`` (not ``HPCPROJ``).
     If you add a custom key to your platform (e.g. ``GPU_MODEL: A100``),
     it becomes available as ``%HPCGPU_MODEL%``.
 
@@ -226,7 +226,7 @@ In addition, Autosubmit automatically computes the following derived variables:
 
 ---
 
-**3. ``CURRENT_`` prefixed keys (per-job)**
+**3. CURRENT_ prefixed keys (per-job)**
 
 Each job has access to the keys of its own platform (the one it runs on)
 with a ``CURRENT_`` prefix. This means different jobs may have different
@@ -273,7 +273,7 @@ The ``CURRENT_`` prefix is also populated from the job's section keys
 (``JOBS.<section>``). This allows you to inject job-specific information 
 into your templates.
 
-**Auto-generated ``CURRENT_`` variables**
+**Auto-generated CURRENT_ variables**
 
 Below is a list of the auto-generated ``CURRENT_`` variables that are available in each job.
 These are always available regardless of the raw YAML keys defined.

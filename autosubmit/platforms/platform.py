@@ -355,7 +355,7 @@ class Platform(ABC):
     @property
     @autosubmit_parameter(name='current_hyperthreading')
     def hyperthreading(self):
-        """TODO"""
+        """True if hyperthreading is enabled on this platform. """
         return self._hyperthreading
 
     @hyperthreading.setter
