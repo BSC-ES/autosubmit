@@ -160,6 +160,7 @@ In the output of :ref:`report <report>` you will find them with the pattern
     PLATFORMS.MARENOSTRUM5.SCRATCH_DIR=/gpfs/scratch
     PLATFORMS.SLURM.TYPE=slurm
     ...
+
 ---
 
 **2. HPC prefixed keys (default platform, global)**
