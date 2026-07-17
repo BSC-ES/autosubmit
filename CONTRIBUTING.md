@@ -110,6 +110,25 @@ or just the tests that require Slurm:
 $ pytest -m 'slurm'
 ```
 
+### Running the tests on VS Code
+
+If you want to discover, run, and debug your test suites directly inside the native Visual Studio Code Test Explorer panel, you must configure `pytest` arguments to find the decoupled test directories.
+
+Create or append the following configuration to your local workspace settings file (`.vscode/settings.json`):
+
+```json
+{
+    "python.testing.pytestArgs": [
+        "test/unit",
+        "test/integration",
+        "test/regression",
+        "--override-ini=addopts=--strict-markers --doctest-modules --durations=5"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}
+```
+
 ## Random ports
 
 Some tests require random ports. To acquire a free random port, we rely
