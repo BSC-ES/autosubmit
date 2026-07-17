@@ -23,7 +23,7 @@ from typing import Callable, ContextManager, Union, TYPE_CHECKING
 
 import pytest
 
-from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
+from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.log.log import AutosubmitCritical
 from test.integration.test_utils.git import (
     create_git_repository, git_commit_all_in_dir, git_clone_repository, git_add_submodule
@@ -119,7 +119,7 @@ def test_git_local_dirty(
         git_commit_all_in_dir(proj_dir, push=push)
 
     with expected:
-        check_unpushed_changes(expid, as_conf)
+        AutosubmitGit.check_unpushed_changes(expid, as_conf)
 
 
 def create_git_repository_and_server(
@@ -244,7 +244,7 @@ def test_git_submodules_dirty(
         git_commit_all_in_dir(proj_dir, push=push_git)
 
     with expected:
-        check_unpushed_changes(expid, as_conf)
+        AutosubmitGit.check_unpushed_changes(expid, as_conf)
 
 
 @pytest.mark.parametrize(
@@ -336,7 +336,7 @@ def test_clean_git_not_a_dir(autosubmit_exp, mocker, get_next_expid: Callable[[]
     proj_dir.parent.mkdir(parents=True, exist_ok=True)
     proj_dir.touch()
 
-    assert not clean_git(as_conf)
+    assert not AutosubmitGit.clean_git(as_conf)
 
     assert mocked_log.debug.call_args_list[1][0][0] == 'Not a directory... SKIPPING!'
 
@@ -351,7 +351,7 @@ def test_clean_git_not_a_git_repo(autosubmit_exp, mocker, get_next_expid: Callab
     proj_dir = Path(as_conf.get_project_dir())
     proj_dir.mkdir(parents=True, exist_ok=True)
 
-    assert not clean_git(as_conf)
+    assert not AutosubmitGit.clean_git(as_conf)
 
     assert mocked_log.debug.call_args_list[1][0][0] == 'Not a git repository... SKIPPING!'
 
@@ -368,7 +368,7 @@ def test_clean_git_not_committed(
     as_conf = create_git_repository_and_server(tmp_path, autosubmit_exp, git_server, get_next_expid, test_clean_git_not_committed.__name__)
 
     with pytest.raises(AutosubmitCritical) as cm:
-        clean_git(as_conf)
+        AutosubmitGit.clean_git(as_conf)
 
     assert str(cm.value.code) == '7013'
 
@@ -388,7 +388,7 @@ def test_clean_git_not_pushed(
     git_commit_all_in_dir(proj_dir, push=False)
 
     with pytest.raises(AutosubmitCritical) as cm:
-        clean_git(as_conf)
+        AutosubmitGit.clean_git(as_conf)
 
     assert str(cm.value.code) == '7064'
 
@@ -408,5 +408,5 @@ def test_clean_git(
     git_commit_all_in_dir(proj_dir, push=True)
 
     assert proj_dir.exists()
-    assert clean_git(as_conf)
+    assert AutosubmitGit.clean_git(as_conf)
     assert not proj_dir.exists()

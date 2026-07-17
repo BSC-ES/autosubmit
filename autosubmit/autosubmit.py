@@ -69,12 +69,7 @@ from autosubmit.experiment.experiment_common import (
     delete_experiment,
     new_experiment,
 )
-from autosubmit.git.autosubmit_git import (
-    check_unpushed_changes,
-    clean_git,
-    clone_repository,
-    is_git_repo,
-)
+from autosubmit.git.autosubmit_git import AutosubmitGit
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.utils import (
     check_jobs_file_exists,
@@ -2192,7 +2187,7 @@ class Autosubmit:
 
                 if git_operational_check_enabled:
                     Log.debug('Checking for dirty local Git repository')
-                    check_unpushed_changes(expid, as_conf)
+                    AutosubmitGit.check_unpushed_changes(expid, as_conf)
                 else:
                     Log.warning('Git operational check disabled by user')
 
@@ -2896,7 +2891,7 @@ class Autosubmit:
                 project_type = autosubmit_config.get_project_type()
                 if project_type == "git":
                     Log.info("Cleaning GIT directory...")
-                    if not clean_git(autosubmit_config):
+                    if not AutosubmitGit.clean_git(autosubmit_config):
                         return False
                     Log.result("Git project cleaned!\n")
                 else:
