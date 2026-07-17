@@ -1531,10 +1531,6 @@ class AutosubmitConfig(object):
                     if not parser['GIT'].get('PROJECT_ORIGIN', ""):
                         self.wrong_config["Expdef"] += [['git',
                                                          "PROJECT_ORIGIN parameter is invalid"]]
-                    if not parser['GIT'].get('PROJECT_BRANCH', ""):
-                        self.wrong_config["Expdef"] += [['git',
-                                                         "PROJECT_BRANCH parameter is invalid"]]
-
             elif project_type == 'svn':
                 if parser.get('SVN', "") == "":
                     self.wrong_config["Expdef"] += [['SVN', "Mandatory SVN section doesn't exists"]]

@@ -279,7 +279,8 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
                 git_remote_project_path, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
         project_path = git_remote_path
 
-    Log.info("Cloning {0} into {1}", git_project_branch + " " + git_project_origin, project_path)
+    clone_description = f"{git_project_branch} {git_project_origin}" if git_project_branch else git_project_origin
+    Log.info("Cloning {0} into {1}", clone_description, project_path)
     if git_project_branch:
         if not git_single_branch:
             command_0 += " git clone -b {0} {1} {2};".format(git_project_branch, git_project_origin,
@@ -362,8 +363,9 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
         if os.path.exists(project_backup_path):
             Log.info("Restoring proj folder...")  # pragma: no cover
             shutil.move(project_backup_path, project_path)
+        clone_description = f"{git_project_branch} {git_project_origin}" if git_project_branch else git_project_origin
         raise AutosubmitCritical(
-            f'Cannot clone {git_project_branch + " " + git_project_origin} into {project_path}', 7065)
+            f'Cannot clone {clone_description} into {project_path}', 7065)
     if submodule_failure:
         Log.info("Some Submodule failures have been detected. Backup {0} will not be removed.".format(
             project_backup_path))
