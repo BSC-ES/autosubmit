@@ -1475,7 +1475,6 @@ class Job(object):
         for attempt in range(copy.copy(self.updated_log), int(self.retrials + 1)):
             log_attempts.append(self._recover_log_attempt(attempt))
             if log_attempts[-1].error and "Remote logs not found" in log_attempts[-1].error:
-                Log.warning(log_attempts[-1].error)
                 continue
             stats_attempts.append(self._write_stat_attempt(attempt))
 
@@ -3424,7 +3423,7 @@ class WrapperJob(Job):
         """
         pending = [Status.QUEUING, Status.SUBMITTED, Status.RUNNING]
 
-        if any(inner_job.status == Status.RUNNING for inner_job in self.job_list):
+        if any(inner_job.status == Status.RUNNING or (inner_job.status == Status.FAILED and inner_job.can_retry) for inner_job in self.job_list):
             self.status = Status.RUNNING
             return False  # Not finalized yet
 

@@ -243,7 +243,7 @@ class Log:
         }
         levels["NO_LOG"] = levels["CRITICAL"] + 1000
 
-        level = levels.get(str(level).upper(), "DEBUG")
+        level = levels.get(str(level).upper(), level)
 
         retries = 0
 

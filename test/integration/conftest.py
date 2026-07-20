@@ -544,7 +544,7 @@ def setup_as_logs_pytest(tmp_path: 'LocalPath') -> None:
     Log.set_file(
         str(Path(tmp_path, 'as_log_out.txt')),
         'out',
-        level='DEBUG'
+        level='STATUS'
     )
     Log.set_file(
         str(Path(tmp_path, 'as_log_err.txt')),
