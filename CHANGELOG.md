@@ -48,6 +48,8 @@
 - Fixed `CPU per task` for new version of autosubmit #2897
 - Fixed issue overwritting expid config variables with the ones from the github repo #2877
 - Fixed inspect infinite loop when PLATFORMS.TOTALJOBS or PLATFORMS.MAX_WAITING_JOBS is set to 0 #2749
+- Fixed wrappers on Lumi platform #3059 
+- Fixed HPC2020 platform #3059
 
 **Enhancements:**
 
