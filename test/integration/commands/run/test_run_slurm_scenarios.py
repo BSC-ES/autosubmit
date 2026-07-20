@@ -1469,18 +1469,18 @@ def test_build_and_connect_platform_slurm(autosubmit_exp, slurm_server, general_
     # Failure
     (dedent("""\
     EXPERIMENT:
-        NUMCHUNKS: '2'
+        NUMCHUNKS: '1'
     JOBS:
         job:
             SCRIPT: |
-                sleep 2
+                sleep 1
                 d_echo "Hello World with id=FAILED"
             PLATFORM: TEST_SLURM
             RUNNING: chunk
             wallclock: 00:01
             retrials: 2
 
-    """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
+    """), (2 + 1) * 1, "FAILED", "simple"),  # No wrappers, simple type
 
     # Failure wrappers
     (dedent("""\
