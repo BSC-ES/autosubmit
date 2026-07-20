@@ -41,6 +41,11 @@ from test._oldschema import old_job_data_table, old_experiment_run_table
 _EXPID = 'a000'
 
 
+@pytest.fixture
+def as_conf(autosubmit_config):
+    return autosubmit_config(_EXPID, experiment_data={"JOBS": {}, "PLATFORMS": {}})
+
+
 # TODO: this file has ``setup_job_list`` and ``job_list`` that create job lists.
 #  Maybe merge/make it into a function?
 

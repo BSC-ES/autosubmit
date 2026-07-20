@@ -41,8 +41,6 @@ from autosubmit.platforms.pjmplatform import PJMPlatform
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
-_EXPID = "a000"
-
 
 # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 class AutosubmitConfigFactory(Protocol):
@@ -430,11 +428,6 @@ def fake_job_list(mocker) -> JobList:
     job_list = JobList("a000", as_conf, YAMLParserFactory(), JobListPersistencePkl())
     job_list._packages_persistence = mocker.MagicMock()
     return job_list
-
-
-@pytest.fixture
-def as_conf(autosubmit_config):
-    return autosubmit_config(_EXPID, experiment_data={"JOBS": {}, "PLATFORMS": {}})
 
 
 def _create_dummy_job_with_status(job_id: int, status: int) -> Job:

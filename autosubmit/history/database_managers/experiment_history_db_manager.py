@@ -20,9 +20,9 @@ import textwrap
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Generator, Optional, Protocol, cast
+from typing import Any, Generator, Optional, Protocol, cast, Sequence, Callable
 
-from sqlalchemy import and_, func, inspect, desc, insert, select, text, update
+from sqlalchemy import and_, func, inspect, desc, insert, select, text, update, Row
 from sqlalchemy.schema import CreateTable, CreateSchema
 
 import autosubmit.history.utils as HUtils
@@ -399,7 +399,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      experiment_run_dc.suspended, HUtils.get_current_datetime(), experiment_run_dc.run_id)
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
-    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
+    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> Optional[JobData]:
         """Get the latest JobData for a given job_name and fail_count.
 
         :param job_name: The job name.
@@ -443,13 +443,14 @@ class ExperimentHistoryDbManager(DatabaseManager):
         :return: The maximum counter value, or the default value if no rows are found.
         :rtype: int
         """
+        counter_result: list[tuple[Optional[int]]]
         if job_name:
             statement = "SELECT MAX(counter) as maxcounter FROM job_data WHERE job_name = ?"
             arguments = (job_name,)
-            counter_result: list[tuple[Optional[int]]] = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
+            counter_result = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
         else:
             statement = "SELECT MAX(counter) as maxcounter FROM job_data"
-            counter_result: list[tuple[Optional[int]]] = self.get_from_statement(self.historicaldb_file_path, statement)
+            counter_result = self.get_from_statement(self.historicaldb_file_path, statement)
 
         if not counter_result[0][0]:
             return DEFAULT_MAX_COUNTER
@@ -497,7 +498,7 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def register_experiment_run_dc(self, experiment_run_dc): ...
 
-    def update_experiment_run_dc_by_id(self, experiment_run_dc): ...
+    def update_experiment_run_dc_by_id(self, experiment_run_dc) -> ExperimentRun: ...
 
     def is_there_a_last_experiment_run(self): ...
 
@@ -549,12 +550,15 @@ class SqlAlchemyExperimentHistoryDbManager:
         :param jobdata_path: Directory (sqlite) or URL Path (postgres).
         :param jobdata_file: Optional DB filename (used for sqlite; ignored for Postgres).
         """
+        default_base: str
+        self.schema: Optional[str]
+
         if BasicConfig.DATABASE_BACKEND == "postgres":
             default_base = BasicConfig.DATABASE_CONN_URL
         else:
             default_base = BasicConfig.JOBDATA_DIR
 
-        base = jobdata_path if jobdata_path is not None else default_base
+        base: Path = Path(jobdata_path) if jobdata_path is not None else Path(default_base)
 
         # For sqlite we expect a filesystem path; for postgres we expect a connection URL.
         if BasicConfig.DATABASE_BACKEND == "postgres":
@@ -562,7 +566,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             self.schema = schema
         else:
             file_name = jobdata_file if jobdata_file is not None else f"job_data_{schema}.db"
-            db_path = Path(base) / file_name
+            db_path = base.joinpath(file_name)
             connection_url = get_connection_url(db_path)
             self.schema = None
 
@@ -925,7 +929,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             conn.execute(query)
             conn.commit()
 
-    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
+    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> Optional[JobData]:
         """Get the latest JobData for a given job_name and fail_count.
 
         :param job_name: The job name.
@@ -961,7 +965,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             result = conn.execute(query).first()
             return JobData.from_model(result)
 
-    def get_job_data_max_counter(self, job_name: str = None):
+    def get_job_data_max_counter(self, job_name: Optional[str] = None):
         """ The max counter is the maximum count value for the count column in job_data. """
         job_data_table = get_table_with_schema(self.schema, JobDataTable)
         query = select(func.max(job_data_table.c.counter).label("maxcounter"))
@@ -969,8 +973,9 @@ class SqlAlchemyExperimentHistoryDbManager:
             query = query.where(job_data_table.c.job_name == job_name)  # type: ignore
         with self.engine.connect() as conn:
             result = conn.execute(query).first()
-        max_counter = result.maxcounter
-        return max_counter if max_counter else DEFAULT_MAX_COUNTER
+        if result is not None and result.maxcounter:
+            return result.maxcounter
+        return DEFAULT_MAX_COUNTER
 
     def get_jobs_data_last_row(self, job_names) -> dict[str, Any]:
         job_data_table = get_table_with_schema(self.schema, JobDataTable)
@@ -1024,7 +1029,7 @@ class SqlAlchemyExperimentHistoryDbManager:
                 conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
                 conn.commit()
 
-    def select_jobs_data(self, table, job_names: list[str]) -> list[tuple[str, Any]]:
+    def select_jobs_data(self, table, job_names: list[str]) -> list[tuple[tuple[Any, Any], ...]]:
         """Return last=1 job_data rows for the requested job names.
 
         :param table: The SQLAlchemy ``job_data`` Table object to query.
@@ -1040,7 +1045,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         columns = table.c.keys()
         return [tuple(zip(columns, row)) for row in rows]
 
-    def get_stale_rows(self) -> list:
+    def get_stale_rows(self) -> Sequence[Row[tuple[Any, Any, Any]]]:
         """Return all job_data rows with submit>0 and (start=0 or finish=0).
 
         :return: List of Row objects with job_name, fail_count, platform.
@@ -1058,7 +1063,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         with self.engine.connect() as conn:
             return conn.execute(query).fetchall()
 
-    def update_job_data_values(self, job_name: str, fail_count: int, start: int, finish: int) -> int:
+    def update_job_data_values(self, job_name: str, fail_count: int, start: int, finish: int) -> Callable[[], int]:
         """Update start and finish for a specific job_data row.
 
         :param job_name: Job identifier.
@@ -1084,8 +1089,12 @@ def create_experiment_history_db_manager(db_engine: str, **options: Any) -> Expe
     jobdata_dir_path = options.get("jobdata_dir_path", BasicConfig.JOBDATA_DIR)
     if use_sql_alchemy:
         job_data_file = options.get("jobdata_file", None)
-        return cast(ExperimentHistoryDatabaseManager, SqlAlchemyExperimentHistoryDbManager(options["expid"], jobdata_dir_path, job_data_file))
+        return cast(ExperimentHistoryDatabaseManager, cast(object,
+                                                           SqlAlchemyExperimentHistoryDbManager(options["expid"],
+                                                                                                jobdata_dir_path,
+                                                                                                job_data_file)))
     elif db_engine == 'sqlite':
-        return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(options["expid"], jobdata_dir_path))
+        return cast(ExperimentHistoryDatabaseManager,
+                    cast(object, ExperimentHistoryDbManager(options["expid"], jobdata_dir_path)))
     else:
         raise ValueError(f"Invalid database engine: {db_engine}")

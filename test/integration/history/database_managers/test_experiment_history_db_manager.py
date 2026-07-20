@@ -268,12 +268,15 @@ def test_sqlite_is_header_ready_db_version_no_db(autosubmit_exp, tmp_path):
 def test_get_job_data_by_job_id_name(as_db: str, autosubmit_exp):
     exp = autosubmit_exp(experiment_data={})
 
-    db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
-        as_db,
-        schema=exp.expid,
-        expid=exp.expid,
-        jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
-    ))
+    db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager',
+                                                    cast(object, create_experiment_history_db_manager(
+                                                        as_db,
+                                                        schema=exp.expid,
+                                                        expid=exp.expid,
+                                                        jobdata_dir_path=str(
+                                                            Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata',
+                                                                 'data'))
+                                                    )))
     db_manager.initialize()
 
     new_job = JobData(
@@ -307,12 +310,15 @@ def test_get_job_data_max_counter(as_db: str, job_name: str, counters: list[int]
     """Persists the job data for the given optional job name, and its counters to verify the max counter."""
     exp = autosubmit_exp(experiment_data={})
 
-    db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
-        as_db,
-        schema=exp.expid,
-        expid=exp.expid,
-        jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
-    ))
+    db_manager: 'ExperimentHistoryDbManager' = cast('ExperimentHistoryDbManager',
+                                                    cast(object, create_experiment_history_db_manager(
+                                                        as_db,
+                                                        schema=exp.expid,
+                                                        expid=exp.expid,
+                                                        jobdata_dir_path=str(
+                                                            Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata',
+                                                                 'data'))
+                                                    )))
     db_manager.initialize()
 
     sum_counters = max(counters) if counters else 0
