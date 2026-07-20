@@ -31,7 +31,7 @@ from autosubmit.log.log import AutosubmitCritical
         ("some other failure", "Connection failed to host", "Issues while checking the connectivity of platforms."),
     ],
 )
-def test_restore_platforms_raises_on_issues(
+def test_restore_platforms_connection_on_issues(
     get_next_expid, autosubmit_exp, mocker, message_fragment: str, expected_log, expected_cm: str
 ) -> None:
     """When a platform yields a problematic message, an AutosubmitCritical is raised."""
@@ -50,9 +50,25 @@ def test_restore_platforms_raises_on_issues(
     assert expected_log in mock_log_printlog.call_args.args[0]
 
 
+def test_restore_platforms_raises(get_next_expid, autosubmit_exp, mocker) -> None:
+    """When a platform yields a problematic message, an AutosubmitCritical is raised."""
+    #needs to be finished
+    exp = autosubmit_exp(get_next_expid(), experiment_data={})
+    exp.platform = mocker.Mock()
+    exp.platform.test_connection.return_value = Exception("Something went wrong.")
+
+    with pytest.raises(AutosubmitCritical) as cm:
+        restore_platforms([exp.platform], mail_notify=False, as_conf=None, expid=None)
+
+    assert "Issues while checking the connectivity of platforms." == str(cm.value.message)
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
 def test_restore_platforms(get_next_expid, autosubmit_exp):
     expid = get_next_expid()
-    exp = autosubmit_exp(expid,
+    exp = autosubmit_exp(
+        expid,
         experiment_data={
             "DEFAULT": {"CUSTOM_CONFIG": "test"},
             "MAIL": {
@@ -74,12 +90,13 @@ def test_restore_platforms(get_next_expid, autosubmit_exp):
                     "type": "ps",
                     "whatever": "dummy_value",
                     "whatever2": "dummy_value2",
-                    "CUSTOM_DIRECTIVES": ["$SBATCH directive1", "$SBATCH directive2"],
+                    "CUSTOM_DIRECTIVES": {"$SBATCH directive1", "$SBATCH directive2"},
                 },
             },
         },
         include_jobs=True,
     )
+    assert exp.as_conf.experiment_data["MAIL"]["ATTACHMENT"]
 
     with pytest.raises(AutosubmitCritical) as cm:
         restore_platforms(
