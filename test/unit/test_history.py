@@ -41,7 +41,7 @@ from test._oldschema import old_experiment_run_table, old_job_data_table
 
 EXPID_TT00_SOURCE = "test_database.db~"
 EXPID_TT01_SOURCE = "test_database_no_run.db~"
-EXPID = "a000"
+EXPID = "tt00"
 EXPID_NONE = "tt01"
 BasicConfig.read()
 JOBDATA_DIR = BasicConfig.JOBDATA_DIR
@@ -620,7 +620,7 @@ def test_get_finish_data_dc(tmp_path, monkeypatch):
     )
     exp_history.write_start_time(
         JOB_NAME,
-        start=time.time(),
+        start=int(time.time()),
         status="RUNNING",
         qos="debug",
         job_id=JOB_ID,

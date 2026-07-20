@@ -71,7 +71,8 @@ class ExperimentHistory:
     def initialize_database(self):
         """Initialize the database manager, creating tables and running schema migrations."""
         try:
-            self.manager.initialize()
+            if self.manager is not None:
+                self.manager.initialize()
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
@@ -104,6 +105,8 @@ class ExperimentHistory:
         splits=None,
         fail_count=0,
     ):
+        if self.manager is None:
+            return None
         status = status if status == "COMPLETED" else "FAILED"
         try:
             next_counter = self._get_next_counter_by_job_name(job_name)
@@ -219,6 +222,8 @@ class ExperimentHistory:
         :return: The updated JobData, or None if an exception occurs.
         :rtype: JobData
         """
+        if self.manager is None:
+            return None
         try:
             job_data_dc = (
                 self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(
@@ -227,7 +232,7 @@ class ExperimentHistory:
             )
             if not job_data_dc:
                 raise Exception(
-                    "Job {0} has not been found in the database.".format(job_name)
+                    f"Job {job_name} has not been found in the database."
                 )
             job_data_dc.submit = submit
             job_data_dc.status = status
@@ -299,7 +304,7 @@ class ExperimentHistory:
             )
             if not job_data_dc_last:
                 raise Exception(
-                    "Job {0} has not been found in the database.".format(job_name)
+                    f"Job {job_name} has not been found in the database."
                 )
             job_data_dc_last.start = start
             job_data_dc_last.qos = self._get_defined_queue_name(
@@ -355,7 +360,7 @@ class ExperimentHistory:
             )
             if not job_data_dc_last:
                 raise Exception(
-                    "Job {0} has not been found in the database.".format(job_name)
+                    f"Job {job_name} has not been found in the database."
                 )
             job_data_dc_last.finish = finish if finish > 0 else int(time())
             job_data_dc_last.status = status
@@ -372,6 +377,8 @@ class ExperimentHistory:
 
     def write_platform_data_after_finish(self, job_data_dc, platform_obj):
         """Call it in a thread."""
+        if self.manager is None:
+            return None
         try:
             ssh_output = platform_obj.check_job_energy(job_data_dc.job_id)
             slurm_monitor = SlurmMonitor(ssh_output)
@@ -588,6 +595,8 @@ class ExperimentHistory:
         self, chunk_unit, chunk_size, current_config="", job_list=None
     ):
         """Create new experiment_run row and return the new Models.ExperimentRun data class from database."""
+        if self.manager is None:
+            return None
         status_counts = self.get_status_counts_from_job_list(job_list)
         experiment_run_dc = ExperimentRun(
             0,
@@ -607,6 +616,8 @@ class ExperimentHistory:
 
     def detect_changes_in_job_list(self, job_list):
         """Detect changes in job_list compared to the current contents of job_data table. Returns a list of JobData data classes where the status of each item is the new status."""
+        if self.manager is None:
+            return None
         job_name_to_job = {str(job.name): job for job in job_list}
         current_job_data_dcs = self.manager.get_all_last_job_data_dcs()
         differences = []
@@ -640,8 +651,10 @@ class ExperimentHistory:
             return wrapper_queue
         return qos
 
-    def _get_next_counter_by_job_name(self, job_name):
+    def _get_next_counter_by_job_name(self, job_name) -> Optional[int]:
         """Return the counter attribute from the latest job data row by job_name."""
+        if self.manager is None:
+            return None
         job_data_dc = self.manager.get_job_data_dc_unique_latest_by_job_name(job_name)
         max_counter = self.manager.get_job_data_max_counter(job_name)
         if job_data_dc:
@@ -649,7 +662,7 @@ class ExperimentHistory:
         else:
             return max_counter
 
-    def _get_date_member_completed_count(self, job_list):
+    def _get_date_member_completed_count(self, job_list) -> int:
         """Each item in the job_list must have attributes: date, member, status_str."""
         job_list = job_list if job_list else []
         return sum(

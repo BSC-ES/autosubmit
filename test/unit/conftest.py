@@ -71,7 +71,7 @@ def autosubmit_config(
 
     def _create_autosubmit_config(
         expid: str,
-        experiment_data: dict = None,
+        experiment_data: Optional[dict] = None,
         include_basic_config: bool = True,
         *_,
         **kwargs,
@@ -476,8 +476,9 @@ def jobs_as_dict(next_job_id):
 
 
 @pytest.fixture
-def job_list(as_conf, mocker, jobs_as_dict):
+def job_list(autosubmit_config, mocker, jobs_as_dict):
     parameters = {"fake-key": "fake-value", "fake-key2": "fake-value2"}
+    as_conf = autosubmit_config("a000", experiment_data={})
     as_conf.load_parameters = mocker.Mock(return_value=parameters)
     as_conf.default_parameters = {}
     joblist_persistence = JobListPersistencePkl()
