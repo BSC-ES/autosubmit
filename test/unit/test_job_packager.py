@@ -24,7 +24,7 @@ import json
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_packager import JobPackager
-from autosubmit.job.job_packages import JobPackageVertical
+from autosubmit.job.job_packages import JobPackageDelegated, JobPackageVertical
 
 
 @dataclass

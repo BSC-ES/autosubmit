@@ -59,9 +59,12 @@ def build_flux_wrapper_script(wrapper_builder_kwargs, mocker):
 def test_slurm_flux_wrapper_builder(build_flux_wrapper_script):
     """Test that the FluxWrapperBuilder correctly builds the wrapper script."""
     wrapper_script = build_flux_wrapper_script(custom_env_setup = "")
-    assert "srun --cpu-bind=none" in wrapper_script
-    assert "flux start" in wrapper_script
-    assert "flux_runner_" in wrapper_script
+    srun_command = next(line for line in wrapper_script.splitlines() if "srun" in line)
+
+    assert "--ntasks=1" in srun_command
+    assert "--cpu-bind=none" in srun_command
+    assert "flux start" in srun_command
+    assert "flux_runner_" in srun_command
 
 def test_custom_env_setup_delegated(build_flux_wrapper_script):
     """

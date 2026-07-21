@@ -981,7 +981,7 @@ class JobPackager(object):
                                             jobs_resources=jobs_resources, method=self.wrapper_method[self.current_wrapper_section], 
                                             configuration=self._as_config, wrapper_section=self.current_wrapper_section, wrapper_info=wrapper_info)
 
-    def _build_delegated_package(self, jobs_list: list[Job], wrapper_limits: dict, section_list: list[str], wrapper_info: dict) -> List[JobPackageDelegated]:
+    def _build_delegated_package(self, jobs_list: list[Job], wrapper_limits: dict, section_list: list[str], wrapper_info: list) -> List[JobPackageDelegated]:
         """
         Builds a "delegated" type package, composed by jobs that are not necessarily structured
         in a vertical or horizontal way, and can contain jobs from different sections with interdependencies.
@@ -1380,6 +1380,7 @@ class JobPackagerDelegated(object):
         self.wrapper_limits = wrapper_limits
         self.max_processors = max_processors
         self.max_wallclock = self._parse_wallclock(max_wallclock)
+        self.extensible_wallclock: int = wrapper_info[4]
         self.job_sections = job_sections
         self.wrapper_info = wrapper_info
 
@@ -1451,9 +1452,15 @@ class JobPackagerDelegated(object):
         path = nx.dag_longest_path(self._package, weight='weight')
         length = nx.dag_longest_path_length(self._package, weight='weight')
         length += self._package.nodes[path[-1]]["wallclock"]
+        
+        # Add extensible wallclock (per level)
+        if self.extensible_wallclock > 0:
+            levels = len(list(nx.topological_generations(self._package)))
+            wallclock_by_level = length / levels if levels > 0 else 0
+            length += wallclock_by_level * self.extensible_wallclock
 
-        hours = length // 3600
-        minutes = (length % 3600) // 60
+        hours = int(length // 3600)
+        minutes = int((length % 3600) // 60)
         return f"{hours:02d}:{minutes:02d}"
     
     def serialize(self) -> str:
@@ -1640,13 +1647,19 @@ class JobPackagerDelegated(object):
         if self._num_tasks_per_section[section] >= self.wrapper_limits["max_by_section"][section]:
             return False
         
-        # Check if the wallclock of the critical path of the package graph can be exceeded
-        if nx.dag_longest_path_length(self._package, weight='weight') > self.max_wallclock:
-            return False
         # Check if the number of vertical levels of the package graph can be exceeded
-        if len(list(nx.topological_generations(self._package))) > self.wrapper_limits["max_v"]:
+        levels = len(list(nx.topological_generations(self._package)))
+        if levels > self.wrapper_limits["max_v"]:
             return False
-
+        
+        # Check if the wallclock of the critical path of the package graph can be exceeded
+        wallclock = nx.dag_longest_path_length(self._package, weight='weight')
+        if self.extensible_wallclock > 0 and levels > 0:
+            wallclock_by_level = wallclock / levels
+            wallclock += wallclock_by_level + self.extensible_wallclock
+        if wallclock > self.max_wallclock:
+            return False
+            
         # Check the horizontal constraints
         if self.processors > self.max_processors or self.width > self.wrapper_limits["max_h"]:
             return False
