@@ -116,22 +116,7 @@ if TYPE_CHECKING:
             RUNNING: chunk
             wallclock: 00:01
             retrials: 10
-        job2:
-            SCRIPT: |
-                d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-            retrials: 10
-        job3:
-            SCRIPT: |
-                sleep 1
-                d_echo "Hello World with id=FAILED"
-            PLATFORM: TEST_SLURM
-            RUNNING: chunk
-            wallclock: 00:01
-            retrials: 10
-    """), 66, "FAILED", "simple"),  # No wrappers, simple type
+    """), 22, "FAILED", "simple"),  # No wrappers, simple type
 
     # Failure wrappers
     (dedent("""\

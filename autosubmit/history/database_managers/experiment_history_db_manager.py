@@ -569,6 +569,8 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData: ...
 
+    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> Optional[JobData]: ...
+
     def get_stale_rows(self) -> list: ...
 
     def update_job_data_values(self, job_name: str, fail_count: int, start: int, finish: int) -> int: ...
@@ -1025,6 +1027,18 @@ class SqlAlchemyExperimentHistoryDbManager:
         if result is None:
             raise Exception(f"No job_data found for job_name='{job_name}' and fail_count={fail_count}.")
         return JobData.from_model(result)
+
+    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> Optional[JobData]:
+        job_data_table = self.table_registry.get(JobDataTable.name)
+        query = (
+            select(job_data_table)
+            .where(job_data_table.c.job_id == job_id)
+            .where(job_data_table.c.fail_count == fail_count)
+            .order_by(desc(job_data_table.c.id))
+        )
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+        return JobData.from_model(result) if result else None
 
     def get_last_job_data_dc_by_job_name_and_counter(self, job_name: str, counter: int) -> JobData:
         """Get the last JobData for a given job_name and counter.

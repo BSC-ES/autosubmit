@@ -732,7 +732,7 @@ class Platform:
             self.config.get("LOCAL_ROOT_DIR", ""),self.expid,
             self.config.get("LOCAL_TMP_DIR", ""), filename))
         if stat_local_path.exists():
-            os.remove(stat_local_path)
+            stat_local_path.unlink()
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
                 Log.debug(f'{job.name}_STAT_{str(attempt)} file have been transferred')
@@ -832,7 +832,7 @@ class Platform:
         if self.ctx is None:
             self.ctx = self.get_mp_context()
 
-        if self.cleanup_event:
+        if self.cleanup_event is not None:
             self.cleanup_event.set()
 
         if self.log_recovery_process:

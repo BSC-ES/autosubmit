@@ -202,15 +202,14 @@ class JobsDbManager(DbManager):
         return job_list
 
     def select_finished_jobs_needing_log_recovery(self) -> List[Dict[str, Any]]:
-        """Return COMPLETED/FAILED jobs whose log_recovery_call_count <= fail_count."""
+        """Return COMPLETED/FAILED jobs whose updated_log <= fail_count."""
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)
         condition = and_(
             table.c.status.in_(self._FINAL_STATUSES),
-            table.c.log_recovery_call_count <= table.c.fail_count
+            table.c.updated_log <= table.c.fail_count
         )
         return [dict(job) for job in self.select_where_with_columns(table, condition)]
-
     def select_children_jobs(
             self,
             job_list: List[Union[str, Any]],

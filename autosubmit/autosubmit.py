@@ -2179,6 +2179,7 @@ class Autosubmit:
                 as_conf.save()
                 job_changes_tracker = dict()
                 Autosubmit.save_historical_edges(expid)
+                job_list.recover_logs(from_db=True)
                 job_list.reset_updated_logs()
                 job_list.load_wrappers()
                 while job_list.continue_run():
@@ -2322,12 +2323,6 @@ class Autosubmit:
                 # search hint - finished run
                 Log.info("Waiting for all logs to be updated")
                 for p in platforms_to_test:
-                    if (p.log_recovery_process is not None and p.log_recovery_process.is_alive()
-                            and p.cleanup_event is not None):
-                        p.cleanup_event.set()  # Send cleanup event
-                        p.log_recovery_process.join(timeout=300)
-                        if p.log_recovery_process.is_alive():
-                            Log.warning(f"Log recovery process for {p.name} did not terminate within timeout.")
                     p.clean_log_recovery_process()
                 Autosubmit.process_historical_data_iteration(job_list, job_changes_tracker, expid)
 

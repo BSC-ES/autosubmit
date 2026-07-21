@@ -23,6 +23,7 @@ import re
 import traceback
 from contextlib import suppress
 from pathlib import Path
+import time
 from time import strftime, localtime, mktime
 from typing import List, Dict, Tuple, Any, Optional, Union
 
@@ -3141,28 +3142,35 @@ class JobList(object):
 
         return non_completed, completed
 
-    def _recover_log(self, job: Job) -> None:
-        """Recover the log for a given job.
-        :param job: The job object to recover the log for.
-        :type job: Job
-        """
-        job.recover_log(self._as_conf)
 
-
-
-    def recover_logs(self) -> bool:
+    def recover_logs(self, from_db: bool = False) -> bool:
         """Update jobs' log recovered status.
         Loads finished jobs from DB that need recovery.
         """
-        jobs_to_recover=[]
-        for data in self.dbmanager.select_finished_jobs_needing_log_recovery():
-            self._add_job_node_with_platform(data, connect_to_platform=self.submitter is not None)
-            jobs_to_recover.append(self.graph.nodes[data["name"]]["job"])
+
+        jobs_to_recover = []
+        if from_db:
+            for data in self.dbmanager.select_finished_jobs_needing_log_recovery():
+                self._add_job_node_with_platform(data, connect_to_platform=self.submitter is not None)
+                jobs_to_recover.append(self.graph.nodes[data["name"]]["job"])
+        else:
+            jobs_to_recover = [job for job in self.job_list if job.status in [Status.COMPLETED, Status.FAILED]]
 
         if jobs_to_recover:
             for job in jobs_to_recover:
-                self._recover_log(job)
+                job.recover_log(self._as_conf)
             self.save_jobs(jobs_to_recover)
+
+            if from_db:
+                used_platforms = {job.platform for job in jobs_to_recover if self._as_conf.experiment_data.get(job.platform_name, {}).get('DISABLE_RECOVERY_THREADS', "false").lower() == "true"}
+                for p in used_platforms:
+                    if p.work_event is not None:
+                        p.work_event.set()
+                        start = time.time()
+                        while (time.time() - start) < min(60,p.keep_alive_timeout):
+                            if not p.recovery_queue.empty() or p.work_event.is_set():
+                                break
+                            time.sleep(1)
         return len(jobs_to_recover) > 0
 
     def _update_db_edges_completion_status(self, finished_parents: List[Job], non_finished_parents: List[Job],

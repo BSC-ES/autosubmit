@@ -138,6 +138,18 @@ class ExperimentHistory:
         except Exception:
             return None
 
+    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> Optional[JobData]:
+        """Retrieve JobData by job_id and fail_count.
+
+        :param job_id: The scheduler job ID.
+        :param fail_count: The attempt (fail_count) to look up.
+        :return: The JobData instance, or None if not found.
+        """
+        try:
+            return self.manager.get_job_data_by_job_id_and_fail_count(job_id, fail_count)
+        except Exception:
+            return None
+
     def update_submit_time(self, job_name: str, submit: int = 0, status: str = "UNKNOWN", ncpus: int = 0,
                            wallclock: str = "00:00", qos: str = "debug", date: str = "", member: str = "",
                            section: str = "", chunk: int = 0, platform: str = "NA", job_id: int = 0,

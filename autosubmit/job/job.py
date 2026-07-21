@@ -1334,6 +1334,16 @@ class Job(object):
         """
         return self._get_from_total_stats(2)
 
+    def stat_file_is_completed(self, attempt: int) -> bool:
+        """Check if FAILED/COMPLETED exists"""
+
+        result = self._get_from_stat(2, attempt)
+        if result == 0:
+            stat_file = Path(self._tmp_path) / f"{self.stat_file}{attempt}"
+            if stat_file.exists():
+                stat_file.unlink()
+        return result > 0
+
     def check_retrials_start_time(self):
         """
         Returns list of start datetime for retrials from total stats file
@@ -1454,8 +1464,6 @@ class Job(object):
         :param attempt: The retrial count.
         :return: True if the STAT file was fetched and written successfully.
         """
-        if not self.platform.get_stat_file(self, attempt):
-            return False
 
         self._update_submit_time_from_stat(attempt)
         self.write_submit_time(attempt)
@@ -1475,15 +1483,12 @@ class Job(object):
     def retrieve_logfiles(self) -> RecoveryReport:
         log_attempts = []
         stats_attempts = []
-
-        # Try to recover all possible logs, after the last successful attempt, and write the stats for each attempt.
-        for attempt in range(0, self.retrials + 1):
-            log = self._recover_log_attempt(attempt)
-            if attempt > self.log_recovery_call_count:
-                log_attempts.append(log)
-            stat = self._write_stat_attempt(attempt)
-            if attempt  > self.log_recovery_call_count:
-                stats_attempts.append(stat)
+        for attempt in range(self.updated_log, self.retrials + 1):
+            if not self.platform.get_stat_file(self, attempt) or not self.stat_file_is_completed(attempt) or self.stat_registered(attempt):
+                Log.info(f"entered here {self.updated_log}")
+                break
+            stats_attempts.append(self._write_stat_attempt(attempt))
+            log_attempts.append(self._recover_log_attempt(attempt))
 
         return RecoveryReport(
             job_name=self.name,
@@ -1526,14 +1531,12 @@ class Job(object):
         error: Optional[str] = None
 
         try:
-            self._update_submit_time_from_stat(attempt)
             self.update_local_logs(attempt)
             self.remote_logs = self.get_new_remotelog_name(attempt)
 
             if not self.check_remote_log_exists():
                 if not self.check_compressed_local_logs():
                     error = f"Remote logs not found for job {self.name}"
-                    Log.warning(self.remote_logs)
                     self._restore_previous_state(backup_log_local, backup_log_remote, backup_submit_time, backup_id)
                 else:
                     success = True
@@ -3063,6 +3066,15 @@ class Job(object):
         exp_history = ExperimentHistory(self.expid)
         return exp_history.get_finish_data_dc(self.name, attempt)
 
+    def stat_registered(self, attempt: int) -> bool:
+        """Check if submit/start/finish are registered in the historical DB for this job_id and attempt.
+
+        :param attempt: The fail_count (attempt) to look up.
+        :return: True if submit, start, and finish are all non-zero in the historical record.
+        """
+        exp_history = ExperimentHistory(self.expid)
+        job_data = exp_history.get_job_data_by_job_id_and_fail_count(self.id, attempt)
+        return job_data is not None
 
     def check_started_after(self, date_limit):
         """
