@@ -18,6 +18,8 @@ env:
   TESTCONTAINERS_RYUK_DISABLED: true
 
 jobs:
+  # To run the Docker containers with the same user as the GH VM.
+  # Ref: https://github.com/actions/runner/issues/691#issuecomment-1145421807
   configure:
     runs-on: ubuntu-latest
     outputs:
@@ -57,7 +59,7 @@ jobs:
       #       It appeared to be a bug in Python3.11, pdb, pytest-xdist.
       - name: Unit tests
         run: |
-          pytest \
+          python${{ matrix.python-version }} -m pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
             --cov-report=xml:test/coverage.xml --cov-append \
