@@ -214,7 +214,7 @@ class SlurmWrapperFactory(WrapperFactory):
     def delegated_wrapper(self, **kwargs):
         if kwargs["method"] == 'flux':
             return FluxWrapperBuilder(**kwargs)
-        if kwargs["method"] == 'hyperqueue':
+        elif kwargs["method"] == 'hyperqueue':
             return HyperQueueWrapperBuilder(**kwargs)
         else:
             raise NotImplementedError(self.exception_method(kwargs["method"]))  # pragma: no cover

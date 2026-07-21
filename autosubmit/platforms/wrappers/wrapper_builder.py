@@ -660,7 +660,7 @@ class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
     def _engine_setup(self) -> str:
         return textwrap.dedent("""
         # Exclusive directory for the server
-        export HQ_SERVER_DIR=.hq-server-${{SLURM_JOB_ID}}
+        export HQ_SERVER_DIR=.hq-server-${SLURM_JOB_ID}
         mkdir -p "$HQ_SERVER_DIR"
 
         # Start the HyperQueue server and wait until it is ready
@@ -675,21 +675,21 @@ class HyperQueueWrapperBuilder(DelegatedWrapperBuilder):
         fi
 
         # Compute the number of required CPUs per worker
-        if [ "${{SLURM_NNODES:-0}}" -ge 1 ] || [ "$EXCLUSIVE" = "true" ]; then
+        if [ "${SLURM_NNODES:-0}" -ge 1 ] || [ "$EXCLUSIVE" = "true" ]; then
             CORES_PER_WORKER=$SLURM_CPUS_ON_NODE
-        elif [ -n "${{SLURM_CPUS_PER_TASK:-0}}" ]; then
-            CORES_PER_WORKER="${{SLURM_CPUS_PER_TASK}}"
+        elif [ -n "${SLURM_CPUS_PER_TASK:-0}" ]; then
+            CORES_PER_WORKER="${SLURM_CPUS_PER_TASK}"
         else
             echo "WARNING: --cpus-per-task not defined for the wrapper script. Using 1 core per worker."
             CORES_PER_WORKER=1
         fi
 
         # Start the workers over the nodes
-        if [ "${{SLURM_NNODES:-0}}" -ge 2 ]; then
-            echo "EXCLUSIVE=${{EXCLUSIVE}}"
-            srun --ntasks="${{SLURM_NNODES}}" \\
-                --nodes="${{SLURM_NNODES}}" \\
-                --cpus-per-task="${{CORES_PER_WORKER}}" \\
+        if [ "${SLURM_NNODES:-0}" -ge 2 ]; then
+            echo "EXCLUSIVE=${EXCLUSIVE}"
+            srun --ntasks="${SLURM_NNODES}" \\
+                --nodes="${SLURM_NNODES}" \\
+                --cpus-per-task="${CORES_PER_WORKER}" \\
                 hq worker start \\
                     --server-dir "$HQ_SERVER_DIR" \\
                     --detect-resources all \\
