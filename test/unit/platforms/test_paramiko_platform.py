@@ -517,11 +517,10 @@ def test_get_call(executable: str, timeout, paramiko_platform: ParamikoPlatform)
 
     call = call.strip()
 
+    assert 'echo $(date +%s) > job_a_STAT_0' in call
+    assert 'nohup' in call
     if timeout > 0:
         assert 'timeout' in call
-    else:
-        assert call.startswith('nohup')
-    assert call.startswith('nohup')
     assert 'job_a' in call
 
 

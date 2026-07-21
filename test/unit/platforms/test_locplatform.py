@@ -157,7 +157,7 @@ def test_check_all_jobs_stat_confirmation(
 
     if stat_line:
         (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text(
-            f'1000\n1060\n{stat_line}\n'
+            f'900\n1000\n1060\n{stat_line}\n'
         )
 
     as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
@@ -183,7 +183,7 @@ def test_check_all_jobs_save_flag_set_when_status_changes(
     platform.connected = True
 
     job = _make_simple_job('t001_INI', status=Status.RUNNING)
-    (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text('1000\n1060\nCOMPLETED\n')
+    (remote_log / f'{job.name}_STAT_{job.fail_count}').write_text('900\n1000\n1060\nCOMPLETED\n')
 
     as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
 

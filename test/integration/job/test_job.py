@@ -52,7 +52,7 @@ def test_retrieve_logfiles(autosubmit_exp, tmp_path, slurm_server, mocker, remot
         slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/some.cmd.out.0")
         slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/some.cmd.err.0")
         slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/some_COMPLETED")
-        slurm_server.exec_run(f"printf '%s\n' 19704923 19704924 19704925 > {job.platform.remote_log_dir}/some_STAT_0")
+        slurm_server.exec_run(f"printf '%s\n' 19704922 19704923 19704924 19704925 > {job.platform.remote_log_dir}/some_STAT_0")
 
         report = job.retrieve_logfiles()
         assert report.all_succeeded
@@ -97,7 +97,7 @@ def test_retrieve_logfiles_with_retrials(autosubmit_exp, tmp_path, slurm_server,
             for attempt in range(job.fail_count + 1):
                 slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/{job.name}.cmd.out.{attempt}")
                 slurm_server.exec_run(f"touch {job.platform.remote_log_dir}/{job.name}.cmd.err.{attempt}")
-                slurm_server.exec_run(f"printf '%s\n' 19704923 19704924 19704925 > {job.platform.remote_log_dir}/{job.name}_STAT_{attempt}")
+                slurm_server.exec_run(f"printf '%s\n' 19704922 19704923 19704924 19704925 > {job.platform.remote_log_dir}/{job.name}_STAT_{attempt}")
 
     for job in jobs:
         if remote_logs:

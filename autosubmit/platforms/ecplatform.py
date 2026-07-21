@@ -220,6 +220,9 @@ class EcPlatform(ParamikoPlatform):
         Overrides the base ``awk``-based implementation because EcPlatform runs
         commands locally via subprocess and cannot read remote files directly.
 
+        STAT format: submit_time (L0), start_time (L1), end_time (L2), status (L3).
+        A single numeric line means the job is submitted but not yet started → QUEUING.
+
         :param job_list: Jobs to confirm.
         :return: Mapping of job names to resolved statuses.
         """
@@ -259,18 +262,18 @@ class EcPlatform(ParamikoPlatform):
             )
             content = local_path.read_text().strip()
             if content:
-                last_line = content.splitlines()[-1]
-                result[job.name] = self._resolve_status(last_line)
+                lines = content.splitlines()
+                if len(lines) == 1 and lines[-1].isdigit():
+                    result[job.name] = Status.QUEUING
+                else:
+                    result[job.name] = self._resolve_status(lines[-1])
 
         return result
 
     def set_start_time_from_remote_stat_file(self, job_list: list) -> None:
-        """Set the start_time_timestamp for each job from the first line of its STAT file.
+        """Set ``start_time_timestamp`` from line 1 (second line) of each remote STAT file.
 
-        Overrides the base SSH ``head``-based implementation because EcPlatform
-        runs commands locally via subprocess and cannot read remote files directly.
-        The first line of each STAT file contains the job start time as a Unix
-        epoch float.
+        Reads line 1 (not line 0) because L0 is now submit_time.
 
         :param job_list: Jobs whose start times should be filled from remote STAT files.
         """
@@ -304,8 +307,8 @@ class EcPlatform(ParamikoPlatform):
                 )
                 content = local_path.read_text().strip()
                 if content:
-                    first_line = content.splitlines()[0]
-                    start_epoch = float(first_line)
+                    lines = content.splitlines()
+                    start_epoch = float(lines[1]) if len(lines) >= 2 else float(lines[0])
                     job.start_time_timestamp = datetime.datetime.fromtimestamp(start_epoch).strftime("%Y%m%d%H%M%S")
             except Exception:
                 Log.warning(

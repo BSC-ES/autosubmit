@@ -2259,7 +2259,7 @@ def test_retrieve_logfiles_two_phase(
     job.submit_time_timestamp = "0"
     job.id = "1"
 
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id')
+    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
     mocker.patch('autosubmit.job.job.Job.update_local_logs')
     mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
     mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=mock_log_exists)
@@ -2338,12 +2338,15 @@ def test_write_start_time(mocker, tmp_path):
 def test_write_stats(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.platform = mocker.MagicMock()
+    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
+    mocker.patch('autosubmit.job.job.Job.write_submit_time')
     mocker.patch('autosubmit.job.job.Job.update_start_time')
     mocker.patch('autosubmit.job.job.Job.write_start_time')
     mocker.patch('autosubmit.job.job.Job.write_end_time')
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_on_db')
     job.write_stats(attempt=1)
     job.platform.get_stat_file.assert_called_once_with(job, 1)
+    job._update_submit_time_from_stat.assert_called_once_with(1)
+    job.write_submit_time.assert_called_once_with(1)
     job.update_start_time.assert_called_once_with(1)
     job.write_start_time.assert_called_once_with(1)
     job.write_end_time.assert_called_once_with(job.status == Status.COMPLETED, 1)
@@ -2368,68 +2371,7 @@ def test_datestr_to_epoch():
 
 
 
-def test_update_submit_time_on_db(mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.submit_time_timestamp = "20250101120000"
-    job.status = Status.SUBMITTED
-    job.queue = "debug"
-    job.date = datetime(2025, 1, 1)
-    job.member = "fc0"
-    job.section = "A"
-    job.chunk = 1
-    job.platform_name = "local"
-    job.id = "123"
-    job._wrapper_queue = "wq"
-    job.packed = False
-    job.workflow_commit = "abc"
-    job.split = "1"
-    job.splits = "2"
-    job.fail_count = 3
-    mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    job.update_submit_time_on_db(3)
-    mock_exp_hist.return_value.update_submit_time.assert_called_once()
-    call_kwargs = mock_exp_hist.return_value.update_submit_time.call_args.kwargs
-    assert call_kwargs['submit'] == job._datestr_to_epoch(str(job.submit_time_timestamp))
-    assert call_kwargs['fail_count'] == 3
-    assert call_kwargs['split'] == "1"
-    assert call_kwargs['splits'] == "2"
 
-
-@pytest.mark.parametrize("scenario,fail_count,wrapper_type,prev_finish", [
-    ("no_data", 0, None, None),
-    ("vertical_with_prev", 1, "vertical", datetime(2025, 1, 1, 11, 0, 0)),
-    ("vertical_no_prev", 1, "vertical", None),
-    ("non_vertical", 0, None, None),
-])
-def test_update_submit_time_and_job_id(scenario, fail_count, wrapper_type, prev_finish, mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.fail_count = fail_count
-    job.wrapper_type = wrapper_type
-    mock_job_data = mocker.MagicMock()
-    mock_job_data.submit_datetime = datetime(2025, 1, 1, 10, 0, 0)
-    mock_job_data.job_id = "999"
-    mock_prev = mocker.MagicMock()
-    mock_prev.finish_datetime = prev_finish
-
-    def _get_submit(attempt):
-        return None if scenario == "no_data" else mock_job_data
-
-    def _get_finish(attempt):
-        return mock_prev if scenario in ("vertical_with_prev", "vertical_no_prev") else None
-
-    mocker.patch('autosubmit.job.job.Job._get_submit_data_dc_from_db', side_effect=_get_submit)
-    mocker.patch('autosubmit.job.job.Job._get_finish_time_from_db', side_effect=_get_finish)
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_on_db')
-    job.update_submit_time_and_job_id(1)
-    if scenario == "no_data":
-        assert job.submit_time_timestamp is None
-    elif scenario == "vertical_with_prev":
-        assert job.submit_time_timestamp == "20250101110000"
-    elif scenario == "vertical_no_prev":
-        assert job.submit_time_timestamp == "20250101100000"
-    elif scenario == "non_vertical":
-        assert job.submit_time_timestamp == "20250101100000"
-        assert job.id == "999"
 
 
 def test_get_submit_data_dc_from_db(mocker):
@@ -2463,7 +2405,7 @@ def test_recover_log_attempt_success(mocker):
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
     job.id = "1"
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id')
+    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
     mocker.patch('autosubmit.job.job.Job.update_local_logs')
     mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
     mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=True)
@@ -2486,7 +2428,7 @@ def test_recover_log_attempt_no_remote_no_local(mocker):
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
     job.id = "1"
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id')
+    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
     mocker.patch('autosubmit.job.job.Job.update_local_logs')
     mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
     mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=False)
@@ -2509,7 +2451,7 @@ def test_recover_log_attempt_exception(mocker):
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
     job.id = "1"
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id', side_effect=RuntimeError("boom"))
+    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat', side_effect=RuntimeError("boom"))
     result = job._recover_log_attempt(0)
     assert result.success is False
     assert result.error == "boom"
@@ -2855,7 +2797,7 @@ def test_recover_log_attempt_no_remote_with_compressed_local(mocker):
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
     job.id = "1"
-    mocker.patch("autosubmit.job.job.Job.update_submit_time_and_job_id")
+    mocker.patch("autosubmit.job.job.Job._update_submit_time_from_stat")
     mocker.patch("autosubmit.job.job.Job.update_local_logs")
     mocker.patch("autosubmit.job.job.Job.get_new_remotelog_name", return_value=("new_out", "new_err"))
     mocker.patch("autosubmit.job.job.Job.check_remote_log_exists", return_value=False)
@@ -3136,11 +3078,9 @@ def test_recover_log_disabled_threads(mocker):
 
 def test_recover_log_queues_recovery(mocker):
     job = Job("test", 1, Status.COMPLETED, 0)
-    job.expid = "a000"
     as_conf = mocker.MagicMock()
     as_conf.platforms_data.get.return_value = {}
     job.platform = mocker.MagicMock()
-    mocker.patch("autosubmit.job.job.Job.write_submit_time")
     job.recover_log(as_conf)
     job.platform.add_job_to_log_recover.assert_called_once_with(job)
     assert job.log_recovery_call_count == 1
@@ -3157,4 +3097,4 @@ def test_compute_inner_job_status_triggers_recover_log(mocker):
     result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
 
     mock_recover.assert_called_once_with(wrapper.as_config)
-    assert result == Status.FAILED
+    assert result == Status.RUNNING

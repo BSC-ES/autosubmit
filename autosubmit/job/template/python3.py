@@ -27,6 +27,7 @@ _AS_PY3_HEADER = dedent("""\
         # Autosubmit header
         ###################
         import locale
+        from pathlib import Path
         import time
         try:
             try:
@@ -42,9 +43,12 @@ _AS_PY3_HEADER = dedent("""\
         except Exception as e:
             locale.setlocale(locale.LC_ALL, 'C')
         job_name_ptrn = '%CURRENT_LOGDIR%/%JOBNAME%'
-        stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'w')
-        stat_file.write(f'{int(time.time())}\\n')
-        stat_file.close()
+        stat_path = job_name_ptrn + '_STAT_%FAIL_COUNT%'
+        if not Path(stat_path).exists():
+            with open(stat_path, 'w') as stat:
+                stat.write(f'{int(time.time())}\\n')
+        with open(stat_path, 'a') as stat:
+            stat.write(f'{int(time.time())}\\n')
         ###################
         # Autosubmit Checkpoint
         ###################

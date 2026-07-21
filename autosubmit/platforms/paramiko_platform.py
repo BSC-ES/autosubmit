@@ -967,10 +967,15 @@ class ParamikoPlatform(Platform):
         return scheduler_job_status, None
 
     def confirm_done_jobs_via_stat(self, job_list: list) -> dict[str, "Status"]:
-        """Checks the STAT files for the given jobs to confirm their completion status.
-        This method retrieves the last line of each STAT file corresponding to the jobs in the job_list and resolves their status using the _resolve_status method.
-        :param job_list: A list of Job objects for which to check the STAT files.
-        :return: A dictionary mapping job names to their resolved Status.
+        """Read remote STAT files and resolve job status from their last line.
+
+        STAT format (four lines): submit_time, start_time, end_time, status.
+        - If the file has a single numeric line the job is treated as QUEUING
+          (submitted but not yet started).
+        - Otherwise the last line is passed to ``_resolve_status``.
+
+        :param job_list: Jobs to confirm via STAT files.
+        :return: Mapping of job names to resolved Status.
         """
         if not job_list:
             return {}
@@ -982,7 +987,7 @@ class ParamikoPlatform(Platform):
         result: dict[str, str] = {job.name: "" for job in job_list}
 
         paths_str = " ".join(f'"{p}"' for p in file_to_job)
-        cmd = f'for f in {paths_str}; do res=$(awk \'NF{{last=$0}} END{{print last}}\' "$f" 2>/dev/null); printf "%s: \\"%s\\"\\n" "$f" "${{res:-None}}"; done'
+        cmd = f'for f in {paths_str}; do res=$(awk \'END{{if(NR==1 && $0 ~ /^[0-9]+$/) print "QUEUING"; else print $0}}\' "$f" 2>/dev/null); printf "%s: \\"%s\\"\\n" "$f" "${{res:-None}}"; done'
         self.send_command(cmd, ignore_log=True)
 
         output = self._ssh_output
@@ -1135,15 +1140,12 @@ class ParamikoPlatform(Platform):
             raise AutosubmitError("Failed to check job status after multiple retries", 6000)
 
     def set_start_time_from_remote_stat_file(self, job_list: list["Job"]) -> None:
-        """Set the start_time_timestamp for each job from the first line of its remote STAT file.
+        """Set ``start_time_timestamp`` from line 1 (second line) of each remote STAT file.
 
-        For each job, reads the first line of ``{job.name}_STAT_{job.fail_count}`` in the
-        remote log directory. That line contains the job start time as a Unix epoch float.
-        If the file does not exist or the value cannot be parsed, a warning is logged and
-        the current datetime is used as a fallback.
+        STAT format: submit_time (L0), start_time (L1), end_time (L2), status (L3).
+        Reads line 1 (not line 0) because submit_time was written at submission time.
 
         :param job_list: Jobs whose start times should be filled from remote STAT files.
-        :type job_list: list[Job]
         """
         if not job_list:
             return
@@ -1156,7 +1158,7 @@ class ParamikoPlatform(Platform):
         paths_str = " ".join(f'"{p}"' for p in file_to_job)
         cmd = (
             f'for f in {paths_str}; do '
-            f'res=$(head -1 "$f" 2>/dev/null); '
+            f'res=$(sed -n \'2p\' "$f" 2>/dev/null); '
             f'printf "%s: \\"%s\\"\\n" "$f" "${{res:-None}}"; '
             f'done'
         )
@@ -1573,7 +1575,10 @@ class ParamikoPlatform(Platform):
         pre += f"{export} " if export else ""
         pre += f"{executable} " if executable and not self.has_scheduler else ""
         post = f"> {script_name.replace('.cmd', f'.cmd.out.{fail_count}')} 2> {script_name.replace('.cmd', f'.cmd.err.{fail_count}')}" if redirect_out_err else ""
-        return self._construct_final_call(script_name, pre.strip(), post.strip(), x11_options).strip(" ;,")
+        submit_cmd = self._construct_final_call(script_name, pre.strip(), post.strip(), x11_options).strip(" ;,")
+        stat_name = script_name.replace('.cmd', '')
+        stat_cmd = f"echo $(date +%s) > {stat_name}_STAT_{fail_count}"
+        return f"{stat_cmd} ; {submit_cmd}"
 
     @staticmethod
     def get_pscall(job_id):

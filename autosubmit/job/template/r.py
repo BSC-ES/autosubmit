@@ -46,7 +46,13 @@ _AS_R_HEADER = dedent("""\
         } 
         options( warn = oldw )
         job_name_ptrn = '%CURRENT_LOGDIR%/%JOBNAME%'
-        fileConn<-file(paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = ''),"w")
+        stat_path <- paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = '')
+        if (!file.exists(stat_path)) {
+            fileConn<-file(stat_path,"w")
+            writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
+            close(fileConn)
+        }
+        fileConn<-file(stat_path,"a")
         writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
         close(fileConn)
         ###################

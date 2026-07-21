@@ -45,7 +45,9 @@ else
         export LC_ALL=C
     fi 
 fi
-echo "$(date +%s)" > "${job_name_ptrn}_STAT_%FAIL_COUNT%"
+stat_file="${job_name_ptrn}_STAT_%FAIL_COUNT%"
+[ -f "$stat_file" ] || echo "$(date +%s)" > "$stat_file"
+echo "$(date +%s)" >> "$stat_file"
 
 ################### 
 # AS TRAP FUNCTIONS
