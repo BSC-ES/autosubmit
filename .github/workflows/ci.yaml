@@ -41,6 +41,10 @@ jobs:
           python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
           python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
 
+      - name: Git setup
+        run: |
+          git config --global --add safe.directory '*'
+
       # NOTE: We used `--trace --full-trace` with pytest but had strange
       #       bugs in unit tests with py3.11:
       #       - TypeError: 'list' object is not callable
