@@ -101,9 +101,9 @@ def _get_code_not_pushed(git_repo: Path) -> Optional[str]:
 
 
 def _get_git_version() -> int:
-    """Parse `git --version` into a comparable integer.
+    """Parse ``git --version`` into a comparable integer.
 
-    Concadenates major.minor.patch into an integer, e.g. 2.32.1 -> 2321.
+    Concatenates major.minor.patch into an integer, e.g. 2.32.1 -> 2321.
     Falls back to `_FALLBACK_GIT_VERSION` if the Git version cannot be determined.
 
     :return: Git version as an integer.
