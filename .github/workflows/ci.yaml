@@ -18,25 +18,14 @@ env:
   TESTCONTAINERS_RYUK_DISABLED: true
 
 jobs:
-  # To run the Docker containers with the same user as the GH VM.
-  # Ref: https://github.com/actions/runner/issues/691#issuecomment-1145421807
-  configure:
-    runs-on: ubuntu-latest
-    outputs:
-      uid_gid: ${{ steps.get-user.outputs.uid_gid }}
-    steps:
-      - id: get-user
-        run: echo "::set-output name=uid_gid::$(id -u):$(id -g)"
-
   test-unit:
-    needs: configure
     env:
       COVERAGE_PROCESS_START: .coveragerc
     # needs: lint
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/bsc-es/autosubmit-ci:latest
-      options: --init --user ${{ needs.configure.outputs.uid_gid }}
+      options: --init
     timeout-minutes: 10
 
     strategy:
