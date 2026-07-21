@@ -44,29 +44,41 @@ def test_create_experiment_status_db_manager_invalid_value():
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, get_next_expid):
+def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, use_sqlalchemy: bool, get_next_expid):
+    if as_db == "postgres" and not use_sqlalchemy:
+        pytest.skip("Postgres only supports SQLAlchemy")
+
     expid = get_next_expid()
     options = {"expid": expid}
     tmp_test_dir = tmp_path / "test_status"
     tmp_test_dir.mkdir()
 
-    clazz = SqlAlchemyExperimentStatusDbManager
-
-    is_sqlalchemy = as_db == "sqlite"
-    if is_sqlalchemy:
-        clazz = ExperimentStatusDbManager
-
+    if as_db == "sqlite":
         options["db_dir_path"] = tmp_test_dir
         options["local_root_dir_path"] = tmp_test_dir
         options["main_db_name"] = "tests.db"
 
+    if as_db == "sqlite" and use_sqlalchemy:
+        database_manager = SqlAlchemyExperimentStatusDbManager()
+        clazz = SqlAlchemyExperimentStatusDbManager
+    else:
+        database_manager = create_experiment_status_db_manager(as_db, **options)
+        clazz = (
+            ExperimentStatusDbManager
+            if as_db == "sqlite"
+            else SqlAlchemyExperimentStatusDbManager
+        )
+
     # Assert type of database manager
-    database_manager = create_experiment_status_db_manager(as_db, **options)  # type: clazz
     assert isinstance(database_manager, clazz)
 
-    # Test initialization of the table (is possible is created by some previous test)
-    if is_sqlalchemy:
-        assert Path(cast(ExperimentStatusDbManager, database_manager)._as_times_file_path).exists()
+    if as_db == "sqlite" and not use_sqlalchemy:
+        assert Path(
+            cast(ExperimentStatusDbManager, database_manager)._as_times_file_path
+        ).exists()
+    elif as_db == "sqlite" and use_sqlalchemy:
+        inspector = inspect(database_manager.engine)
+        assert inspector.has_table(ExperimentStatusTable.name)
     else:
         inspector = inspect(database_manager.engine)
         assert inspector.has_table(ExperimentStatusTable.name, schema="public")
