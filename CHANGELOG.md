@@ -1,8 +1,16 @@
+### 4.2.0: Unreleased
+
+**Enhancements:**
+
+- Enforce connection pool usage when using PostgreSQL as database backend #2973
+
+
 ### 4.1.18: Unreleased
 
 **Bug fixes:**
 
 - Fix timeout guard is silently disabled for login/local jobs #3081
+
 
 ### 4.1.17: Unreleased
 

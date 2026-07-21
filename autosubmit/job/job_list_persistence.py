@@ -27,8 +27,8 @@ from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
+from autosubmit.database.session import get_engine
 from autosubmit.database.tables import JobPklTable
 from autosubmit.log.log import Log
 
@@ -153,8 +153,8 @@ class JobListPersistenceDb(JobListPersistence):
     def __init__(self, expid):
         self.expid = expid
         database_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl', f'job_list_{expid}.db')
-        connection_url = get_connection_url(db_path=database_file)
-        self.db_manager = DbManager(connection_url=connection_url)
+        engine = get_engine(db_path=database_file)
+        self.db_manager = DbManager(engine=engine)
         self.db_manager.create_table(JobPklTable.name)
 
     def load(self, persistence_path, persistence_file):

@@ -134,7 +134,6 @@ def test_create_experiment_history_db_manager_invalid():
 
 def test_functions_not_implemented(mocker):
     """Confirm that we do not implement a few functions for Postgres."""
-    mocker.patch('autosubmit.history.database_managers.experiment_history_db_manager.get_connection_url')
     mocker.patch('autosubmit.history.database_managers.experiment_history_db_manager.session')
     db_manager = SqlAlchemyExperimentHistoryDbManager(None, BasicConfig.JOBDATA_DIR)
     # NOTE: These are all parameter-less.

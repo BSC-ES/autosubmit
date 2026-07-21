@@ -26,8 +26,8 @@ from sqlalchemy import Table, delete, func, insert, select, text
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
+from autosubmit.database.session import get_engine
 from autosubmit.database.tables import (
     WrapperInfoTable,
     PreviewWrapperInfoTable,
@@ -50,14 +50,14 @@ class JobPackagePersistence:
     def __init__(self, expid: str):
         self.database_file = Path(BasicConfig.LOCAL_ROOT_DIR, expid, 'pkl', f'job_packages_{expid}.db')
         self.database_file.parent.mkdir(parents=True, exist_ok=True, mode=0o775)
-        connection_url = get_connection_url(db_path=self.database_file)
+        engine = get_engine(db_path=self.database_file)
 
         if BasicConfig.DATABASE_BACKEND == "postgres":
             _schema = expid
         else:
             _schema = None
 
-        self.db_manager = DbManager(connection_url=connection_url, schema=_schema)
+        self.db_manager = DbManager(engine=engine, schema=_schema)
         self.table_registry = TableRegistry(schema=_schema)
         self.db_manager.create_table(WrapperInfoTable.name)
         self.db_manager.create_table(PreviewWrapperInfoTable.name)

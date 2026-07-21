@@ -22,8 +22,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
+from autosubmit.database.session import get_engine
 from autosubmit.database.tables import DBVersionTable
 
 if TYPE_CHECKING:
@@ -32,8 +32,8 @@ if TYPE_CHECKING:
 
 
 def _create_db_manager(db_path: Path):
-    connection_url = get_connection_url(db_path=db_path)
-    return DbManager(connection_url=connection_url)
+    engine = get_engine(db_path=db_path)
+    return DbManager(engine=engine)
 
 
 def test_db_manager_has_made_correct_initialization(tmp_path: "LocalPath") -> None:
