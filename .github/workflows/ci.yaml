@@ -18,14 +18,23 @@ env:
   TESTCONTAINERS_RYUK_DISABLED: true
 
 jobs:
+  configure:
+    runs-on: ubuntu-latest
+    outputs:
+      uid_gid: ${{ steps.get-user.outputs.uid_gid }}
+    steps:
+      - id: get-user
+        run: echo "::set-output name=uid_gid::$(id -u):$(id -g)"
+
   test-unit:
+    needs: configure
     env:
       COVERAGE_PROCESS_START: .coveragerc
     # needs: lint
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/bsc-es/autosubmit-ci:latest
-      options: --init --user $(id -u):$(id -g)
+      options: --init --user ${{ needs.configure.outputs.uid_gid }}
     timeout-minutes: 10
 
     strategy:
