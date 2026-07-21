@@ -150,7 +150,136 @@ def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
 
     mocker.patch('sys.argv', ['autosubmit', '-lc', 'ERROR', '-lf', 'WARNING', 'describe', exp.expid])
     _, args = autosubmit.parse_args()
+    assert args
     output = autosubmit.run_command(args=args)
 
     assert getuser() == output[0]
-    
+
+
+@pytest.mark.parametrize("user", ["", "*"])
+def test_describe_current_user(
+    user,
+    autosubmit_exp,
+    mocker,
+):
+    """Current user aliases resolve correctly."""
+    exp = autosubmit_exp(experiment_data=_experiment_data())
+
+    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+
+    Autosubmit.describe(input_experiment_list=exp.expid, get_from_user=user)
+
+    assert mocked_log.result.called
+    assert f"Location: {exp.exp_path}" in _location_lines(mocked_log)
+
+
+def test_describe_skip_other_user(autosubmit_exp, get_next_expid, mocker):
+    """Experiments owned by another user are skipped."""
+    exp = autosubmit_exp(experiment_data=_experiment_data())
+
+    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+    fake_owner = mocker.Mock()
+    fake_owner.pw_name = "someone_else"
+    mocker.patch("autosubmit.autosubmit.pwd.getpwuid", return_value=fake_owner)
+
+    Autosubmit.describe(input_experiment_list=exp.expid, get_from_user="current_user")
+
+    assert not _location_lines(mocked_log)
+
+
+def test_describe_uid_without_user(autosubmit_exp, mocker):
+    """UID without passwd entry falls back to numeric id."""
+    exp = autosubmit_exp(experiment_data=_experiment_data())
+
+    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+
+    owner = mocker.Mock()
+    owner.pw_name = "current"
+
+    def fake(uid):
+        if fake.calls == 0:
+            fake.calls += 1
+            return owner
+        raise KeyError
+
+    fake.calls = 0
+    mocker.patch("autosubmit.autosubmit.pwd.getpwuid", side_effect=fake)
+
+    Autosubmit.describe(input_experiment_list=exp.expid, get_from_user="current")
+    mocked_log.warning.assert_any_call("The user does not exist anymore in the system, using id instead")
+
+
+def test_describe_archived_without_snapshot(autosubmit_exp, mocker):
+    """Archived experiments without a snapshot cannot be described."""
+    exp = autosubmit_exp(experiment_data=_experiment_data())
+
+    rmtree(exp.exp_path)
+
+    details = mocker.patch("autosubmit.autosubmit.ExperimentDetails")
+    details.return_value.get_details.return_value = None
+
+    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+
+    Autosubmit.describe(exp.expid)
+
+    assert mocked_log.printlog.call_count == 1
+
+    msg = mocked_log.printlog.call_args.args[0]
+
+    assert "Could not describe the following experiments" in msg
+    assert exp.expid in msg
+
+    assert any(
+        call.args[0].startswith(f"Failed to describe experiment {exp.expid}")
+        for call in mocked_log.warning.mock_calls
+    )
+
+
+@pytest.mark.parametrize(
+    "exception",
+    [
+        KeyError,
+        TypeError,
+    ],
+)
+def test_describe_ignore_owner_lookup_errors(
+    exception,
+    autosubmit_exp,
+    mocker,
+    monkeypatch,
+):
+    """Owner lookup failures are ignored."""
+    exp = autosubmit_exp(experiment_data=_experiment_data())
+
+    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+    monkeypatch.setattr(
+        "autosubmit.autosubmit.pwd.getpwuid",
+        lambda *_: (_ for _ in ()).throw(exception),
+    )
+
+    Autosubmit.describe(input_experiment_list=exp.expid, get_from_user="some-user")
+    assert f"Location: {exp.exp_path}" in _location_lines(mocked_log)
+
+
+def test_describe_ignore_owner_stat_errors(autosubmit_exp, mocker, monkeypatch):
+    """Missing folder ownership information does not prevent describing."""
+    exp = autosubmit_exp(experiment_data=_experiment_data())
+    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+    monkeypatch.setattr(Path, "is_dir", lambda *_: True)
+
+    original_stat = Path.stat
+
+    def failing_stat(path: Path, *args, **kwargs):
+        if path == exp.exp_path:
+            raise OSError("Cannot stat experiment folder")
+        return original_stat(path, *args, **kwargs)  # type: ignore
+
+    monkeypatch.setattr(Path, "stat", failing_stat)
+
+    Autosubmit.describe(
+        input_experiment_list=exp.expid,
+        get_from_user="some-user",
+    )
+
+    assert f"Location: {exp.exp_path}" in _location_lines(mocked_log)
+    assert f"Location: {exp.exp_path}" in _location_lines(mocked_log)

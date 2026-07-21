@@ -56,7 +56,6 @@ jobs:
           pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             --verbose --verbosity="2" \
             test/unit -m "not postgres"
 
@@ -134,7 +133,6 @@ jobs:
           pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
             -m "${{ matrix.pytest-markers }}"
 
@@ -219,7 +217,6 @@ jobs:
           pytest \
             -n $(nproc) \
             --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             test/regression \
             -m ''
 
@@ -269,7 +266,6 @@ jobs:
           pytest -x \
             -n 3 \
             --cov=autosubmit --cov-config=.coveragerc \
-            --cov-report=xml:test/coverage.xml --cov-append \
             test/integration \
             -m 'slurm'
 

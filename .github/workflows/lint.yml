@@ -38,12 +38,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install mypy
       - run: |
-          python3 -m pip install \
-            types-mock \
-            types-requests \
-            types-paramiko  
+          pip install -e .[mypy]
           mypy --install-types
       - name: Get Python changed files
         id: changed-py-files
