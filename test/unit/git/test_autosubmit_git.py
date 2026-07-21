@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -448,6 +448,41 @@ def test_clone_repository_without_single_branch(autosubmit_config, mocker) -> No
         and "--single-branch" not in str(call)
         for call in platform.method_calls
     )
+
+
+def test_clone_repository_without_branch_omits_flag(autosubmit_config, mocker) -> None:
+    """Verify that clone omits ``-b`` when ``PROJECT_BRANCH`` is empty (auto-detect default branch)."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "GIT": {
+                "PROJECT_ORIGIN": "https://github.com/user/repo.git",
+                "PROJECT_BRANCH": "",
+                "PROJECT_COMMIT": "",
+                "REMOTE_CLONE_ROOT": "workflow",
+            },
+            "PROJECT": {
+                "PROJECT_TYPE": "GIT",
+                "PROJECT_DESTINATION": "git_project",
+            },
+        },
+    )
+
+    platform = mocker.Mock()
+    submitter_cls = mocker.patch("autosubmit.git.autosubmit_git.ParamikoSubmitter")
+    submitter_cls.return_value.platforms = {
+        as_conf.get_platform(): platform,
+    }
+
+    clone_repository(as_conf, False)
+
+    clone_calls = [
+        str(call) for call in platform.method_calls
+        if "git clone" in str(call)
+    ]
+    assert len(clone_calls) > 0
+    assert all("-b " not in call for call in clone_calls)
+    assert all("--single-branch" not in call for call in clone_calls)
 
 
 def test_clone_repository_force_without_existing_project_skips_backup(autosubmit_config, mocker) -> None:

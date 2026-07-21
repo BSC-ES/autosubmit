@@ -66,7 +66,7 @@ HOW TO DEPLOY/SETUP AUTOSUBMIT FRAMEWORK
    * Lindgren (PDC machine)
    * Fugaku (RIKEN machine)
 
-- Pre-requisites: These packages (bash, python2, sqlite3, git-scm > 1.8.2, subversion, pip >= 24.0, dialog*) must be available at local
+- Pre-requisites: These packages (bash, python2, sqlite3, git-scm >= 2.32, subversion, pip >= 24.0, dialog*) must be available at local
   machine. These packages (argparse, dateutil, pyparsing, numpy, pydotplus, matplotlib, paramiko,
   python2-pythondialog*, mock, portalocker) must be available for python runtime. And the machine is also able to access
   HPC platforms via password-less ssh.
