@@ -1885,7 +1885,7 @@ class Job(object):
             self.shape = parameters.get("CURRENT_SHAPE", "")
             self.processors_per_node = parameters.get("CURRENT_PROCESSORS_PER_NODE", "1")
             self.nodes = parameters.get("CURRENT_NODES", "")
-            self.exclusive = parameters.get("CURRENT_EXCLUSIVE", False)
+            self.exclusive = parameters.get("CURRENT_EXCLUSIVITY", False)
             self.threads = parameters.get("CURRENT_THREADS", "1")
             self.tasks = parameters.get("CURRENT_TASKS", "0")
             self.reservation = parameters.get("CURRENT_RESERVATION", "")
