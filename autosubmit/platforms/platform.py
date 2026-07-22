@@ -1029,7 +1029,10 @@ class Platform:
             job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_data["name"]))
             job.platform_name = self.name  # Change the original platform to this process platform.
             job.platform = self
-            Log.warning(f"{self.name} job updated log {job.updated_log} and retrials {job.retrials} and fail_count {job.fail_count}")
+            # TODO: handle missing job IDs (id=0). During an Autosubmit run, a job's log
+            # may fail to be retrieved. When recovery or setstatus or while running, later, it  tries to recover
+            # it, the job id is 0 because it was never persisted.
+            job.id = job_data["id"]
             report = job.retrieve_logfiles()
             job.send_cpmip_notification(self._as_conf)
 
