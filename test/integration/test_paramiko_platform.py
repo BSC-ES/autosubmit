@@ -565,13 +565,24 @@ def test_exec_command_socket_error(
     finally:
         ps_platform.close_connection()
 
-
+@pytest.mark.parametrize(
+    'transport',
+    [
+        pytest.param(
+            True,
+        ),
+        pytest.param(
+            False,
+        )
+    ],
+)
 @pytest.mark.ssh
 @pytest.mark.docker
 def test_exec_command_ssh_session_not_active_cannot_restore(
         request: 'FixtureRequest',
         get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
         ssh_server,
+        transport: bool,
         mocker
 ):
     """Test that when an error occurs, and it cannot restore, then we return falsey values."""
@@ -583,10 +594,17 @@ def test_exec_command_ssh_session_not_active_cannot_restore(
 
         exp_ps_platform.close_connection()
 
+        if not transport:
+            exp_ps_platform.transport = None
+            exp_ps_platform.restore_connection = mocker.Mock()
+            exp_ps_platform.restore_connection.return_value = None
+
         # This dummy mock prevents the platform from being able to restore its connection.
         mocker.patch.object(exp_ps_platform, 'restore_connection')
 
         exp_ps_platform.exec_command('whoami')
+    except AutosubmitError as e:
+        assert "Failed to send (with retries) SSH command whoami" in e.error_message
     finally:
         exp_ps_platform.close_connection()
 
@@ -645,19 +663,28 @@ def test_fs_operations(
 
 
 @pytest.mark.parametrize(
-    'ssh_fixture,x11,user_or_false',
+    'ssh_fixture,x11,user_or_false,transport',
     [
         pytest.param(
             'ssh_x11_server',
             True,
             getuser(),
+            True,
             id='X11 enabled and everything works'
         ),
         pytest.param(
             'ssh_x11_server',
             False,
             getuser(),
+            True,
             id='X11 disabled and everything still works'
+        ),
+        pytest.param(
+            'ssh_x11_server',
+            False,
+            getuser(),
+            False,
+            id='Forcing Transport ConnectionError'
         )
     ],
     indirect=['ssh_fixture']
@@ -669,8 +696,10 @@ def test_exec_command_with_x11(
         ssh_fixture: 'DockerContainer',
         x11: bool,
         user_or_false: Union[str, bool],
+        transport: bool,
         request: 'FixtureRequest',
-        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment']
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        mocker
 ):
     """Tests connecting and executing a command when X11 is enabled and when it is disabled (parameters)."""
     exp = get_experiment(request)
@@ -680,10 +709,18 @@ def test_exec_command_with_x11(
         ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
         assert ps_platform.local_x11_display
 
+        if not transport:
+            ps_platform.transport = None
+            ps_platform.restore_connection = mocker.Mock()
+            ps_platform.restore_connection.return_value = None
+
         stdin, stdout, stderr = ps_platform.exec_command('whoami', x11=x11)
 
         assert isinstance(stdout, ChannelFile), f"Invalid value for stdout: {stderr, stdout}"
         assert user_or_false == stdout.readline().decode('UTF-8').strip()
+    except AutosubmitError as e:
+        assert not transport
+        assert "Failed to send (with retries) SSH command whoami" in e.error_message
     finally:
         ps_platform.close_connection()
 
