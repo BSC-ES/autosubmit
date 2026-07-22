@@ -6,6 +6,7 @@
 
 **Enhancements:**
 
+- `autosubmit refresh` no longer creates a `proj_{timestamp}` backup by default and aborts on uncommitted or unpushed changes. #2633
 - Auto-detect git default branch when `-b` flag not specified #3101
 
 ### 4.1.17: Unreleased
