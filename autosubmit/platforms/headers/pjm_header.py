@@ -21,7 +21,7 @@ import textwrap
 
 
 class PJMHeader(object):
-    """Class to handle the PJM headers of a job"""
+    """Class to handle the PJM (also known as TCM Technical Computing Suite) headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_queue_directive(self, job, parameters):
