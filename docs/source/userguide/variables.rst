@@ -294,19 +294,19 @@ These are always available regardless of the raw YAML keys defined.
       **automatically** filled by Autosubmit.
     
     * ``CURRENT_USER``, ``CURRENT_PROJ``, ``CURRENT_QUEUE``,
-    ``CURRENT_PARTITION`` and ``CURRENT_TEMP_DIR`` are only
-    filled if the corresponding YAML key (``USER``,
-    ``PROJECT``, ``QUEUE``, ``PARTITION``, ``TEMP_DIR``) is
-    defined in the platform configuration. On the LOCAL
-    platform they remain empty.
+      ``CURRENT_PARTITION`` and ``CURRENT_TEMP_DIR`` are only
+      filled if the corresponding YAML key (``USER``,
+      ``PROJECT``, ``QUEUE``, ``PARTITION``, ``TEMP_DIR``) is
+      defined in the platform configuration. On the LOCAL
+      platform they remain empty.
 
     * ``CURRENT_BUDG``, ``CURRENT_RESERVATION`` and
-    ``CURRENT_EXCLUSIVITY`` are only populated if the
-    corresponding YAML keys (``BUDGET``, ``RESERVATION``,
-    ``EXCLUSIVITY``) are defined in the platform configuration.
-    They are only used by certain schedulers: ``CURRENT_BUDG`` 
-    is used by the ECMWF header, ``CURRENT_RESERVATION`` by 
-    SLURM and PBS, and ``CURRENT_EXCLUSIVITY`` by SLURM.
+      ``CURRENT_EXCLUSIVITY`` are only populated if the
+      corresponding YAML keys (``BUDGET``, ``RESERVATION``,
+      ``EXCLUSIVITY``) are defined in the platform configuration.
+      They are only used by certain schedulers: ``CURRENT_BUDG`` 
+      is used by the ECMWF header, ``CURRENT_RESERVATION`` by 
+      SLURM and PBS, and ``CURRENT_EXCLUSIVITY`` by SLURM.
 
 
 Other variables
