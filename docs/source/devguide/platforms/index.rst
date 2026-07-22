@@ -282,14 +282,14 @@ Platform Connections
 --------------------
 
 This section describes how Autosubmit interacts with the platforms it is
-configured to use: when a connections is opened, Autosubmit checks if it has the
+configured to use: when a connection is opened, Autosubmit checks if it has the
 write access to the remote filesystem, and what to be done when a connection has
 to be re-established mid-run.
 
 The write-permission check
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Before relying on a remote platform, Autosubmit verifies that entries can be created
+Before relying on a remote platform, Autosubmit verifies that entries(a probe file in this context) can be created
 and deleted under the configured ``SCRATCH_DIR``. It is done by creating a small probe directory under
 ``<scratch_dir>/<project>/<user>/`` and immediately removing it. The probe is
 a directory, not a file; the name it uses depends on the platform type:
@@ -338,7 +338,7 @@ frequency depends on the command:
    * - Command
      - When the probe runs
    * - ``autosubmit run``
-     - Once per configured platform at the start of the run, before the main loop begins. If the run later encounters a connection error, Autosubmit enters a reconnection loop that retries the SSH connection up to ``CONFIG.RECOVERY_RETRIALS`` **times** (a count of attempts, not a time budget; default ``3650``, with a per-attempt sleep that grows from 15s to a cap of 120s, so the default corresponds to roughly 72–122 hours of outage tolerance). The probe only runs on the retry where the connection is actually re-established, not on the failing attempts. In practice this means a prolonged outage produces many SSH retry log entries but at most one probe entry per platform per recovery episode.
+     - Once per configured platform at the start of the run, before the main loop begins. If the run later encounters a connection error, Autosubmit enters a reconnection loop that retries the SSH connection up to ``CONFIG.RECOVERY_RETRIALS`` **times** (a count of attempts, not a time budget; default ``3650``, with a per-attempt sleep that grows from 15s to a cap of 120s, so the default corresponds to roughly 72–122 hours of outage tolerance). The probe only runs on the retry where the connection is actually re-established, not on the failing attempts. In practice this means a prolonged outage produces many SSH retry log entries but at most one probe entry per platform per recovery session.
    * - ``autosubmit setstatus``
      - Once per platform that currently has jobs in ``QUEUING``, ``SUBMITTED`` or ``RUNNING`` state. When ``setstatus`` is run before ``autosubmit create`` (the typical operational case, where all jobs are still ``WAITING`` or ``READY``) no probe is created.
    * - ``autosubmit stop --cancel``
@@ -403,7 +403,7 @@ Reconnection on error
 ~~~~~~~~~~~~~~~~~~~~~
 
 If a connection is lost mid-run, Autosubmit closes the existing session
-before opening a replacement: the SFTP channel, the SSH transport and the
+before opening a replacement session: the SFTP channel, the SSH transport and the
 SSH client itself are all closed, and then a fresh session is opened. This
 applies both to the main session and to the per-platform log-recovery
 process. Sessions are not silently reused after a failure, and they are
@@ -472,7 +472,7 @@ Beyond handling write-permission probes and SSH sessions, Autosubmit performs se
      - ``autosubmit run``, ``autosubmit setstatus``, ``autosubmit stop --cancel``
      - See :ref:`When the write-permission check runs <platform_connections>` above.
 
-A few patterns worth knowing when reasoning about filesystem load:
+A few patterns worth knowing when reasoning about Autosubmit filesystem load:
 
 - **Submission and log retrieval run in parallel.** The main loop submits
   jobs and queries their status; a separate per-platform process downloads
