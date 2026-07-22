@@ -99,6 +99,64 @@ def test_get_submodules(autosubmit_config: 'AutosubmitConfigFactory'):
     assert "sub_b" in submodules_list
 
 
+def test_get_git_project_backup_yaml_true_overrides_basicconfig_false(
+    autosubmit_config: "AutosubmitConfigFactory", mocker
+) -> None:
+    """YAML setting wins over BasicConfig when both are set."""
+    as_conf: AutosubmitConfig = autosubmit_config(
+        expid=_EXPID,
+        experiment_data={"GIT": {"PROJECT_BACKUP": True}},
+    )
+    mocker.patch(
+        "autosubmit.config.configcommon.BasicConfig.GIT_PROJECT_BACKUP",
+        False,
+    )
+
+    assert as_conf.get_git_project_backup() is True
+
+
+def test_get_git_project_backup_yaml_false_overrides_basicconfig_true(
+    autosubmit_config: "AutosubmitConfigFactory", mocker
+) -> None:
+    """YAML False wins over BasicConfig True (proves precedence, not truthiness)."""
+    as_conf: AutosubmitConfig = autosubmit_config(
+        expid=_EXPID,
+        experiment_data={"GIT": {"PROJECT_BACKUP": False}},
+    )
+    mocker.patch(
+        "autosubmit.config.configcommon.BasicConfig.GIT_PROJECT_BACKUP",
+        True,
+    )
+
+    assert as_conf.get_git_project_backup() is False
+
+
+def test_get_git_project_backup_falls_back_to_basicconfig(
+    autosubmit_config: "AutosubmitConfigFactory", mocker
+) -> None:
+    """With no YAML setting, BasicConfig value is used."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid=_EXPID, experiment_data={})
+    mocker.patch(
+        "autosubmit.config.configcommon.BasicConfig.GIT_PROJECT_BACKUP",
+        True,
+    )
+
+    assert as_conf.get_git_project_backup() is True
+
+
+def test_get_git_project_backup_default_is_false(
+    autosubmit_config: "AutosubmitConfigFactory", mocker
+) -> None:
+    """With no YAML and no rc override, default is False."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid=_EXPID, experiment_data={})
+    mocker.patch(
+        "autosubmit.config.configcommon.BasicConfig.GIT_PROJECT_BACKUP",
+        False,
+    )
+
+    assert as_conf.get_git_project_backup() is False
+
+    
 @pytest.mark.parametrize('owner', [True, False])
 def test_is_current_real_user_owner(owner: bool, autosubmit_config: 'AutosubmitConfigFactory'):
     as_conf = autosubmit_config(expid='a000', experiment_data={})
