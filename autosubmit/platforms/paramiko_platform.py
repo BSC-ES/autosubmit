@@ -36,6 +36,7 @@ import Xlib.support.connect as xlib_connect
 from bscearth.utils.date import date2str
 from paramiko import ProxyCommand, SFTPError
 from paramiko.agent import Agent
+from paramiko.channel import Channel, ChannelFile
 from paramiko.ssh_exception import SSHException
 
 from autosubmit.job.job_common import Status
@@ -44,7 +45,6 @@ from autosubmit.platforms.platform import Platform
 
 if TYPE_CHECKING:
     # Avoid circular imports
-    from paramiko.channel import Channel
 
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job import Job
@@ -552,6 +552,8 @@ class ParamikoPlatform(Platform):
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60, banner_timeout=60,
                                               disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
+                if self._ssh is None:
+                    raise AutosubmitError("SSH connection not initialized")
                 self.transport = self._ssh.get_transport()
                 self.transport.banner_timeout = 60
                 self.transport.clear_to_send_timeout = clear_to_send_timeout
@@ -561,6 +563,8 @@ class ParamikoPlatform(Platform):
                 Log.warning("If you are using a token, please type the token code when asked")
 
                 self.transport = paramiko.Transport((self._host_config['hostname'], port))
+                if self.transport is None:
+                    raise AutosubmitError("Failure to create a new SSH session to the server")
                 self.transport.start_client()
 
                 try:
@@ -572,7 +576,6 @@ class ParamikoPlatform(Platform):
                     Log.printlog(f"2FA authentication failed: {str(e)}", 7000)
                     raise
                 if self.transport.is_authenticated():
-                    self._ssh._transport = self.transport
                     self.transport.banner_timeout = 60
                     self.transport.clear_to_send_timeout = clear_to_send_timeout
                 else:
@@ -582,6 +585,8 @@ class ParamikoPlatform(Platform):
                 self.transport.set_keepalive(ssh_keepalive)
             self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport, window_size=pow(4, 12),
                                                                   max_packet_size=pow(4, 12))
+            if self._ftpChannel is None:
+                raise AutosubmitError("Failure to communicate with the server")
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
             if not log_recovery_process:
@@ -911,7 +916,6 @@ class ParamikoPlatform(Platform):
         :type script_names: list[str]
         :return: Matching process IDs in submission order, one per script.
             Returns an empty list if any script has no newly submitted process.
-        :rtype: list[int]
         """
         output = self._get_process_list_output()
         if not output:
@@ -1397,8 +1401,8 @@ class ParamikoPlatform(Platform):
                             del self.channels[fd]
 
     def exec_command(
-            self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False
-    ) -> tuple[paramiko.ChannelFile, paramiko.ChannelFile, paramiko.ChannelFile] | tuple[bool, bool, bool]:
+            self, command, bufsize=-1, retries=3, x11=False
+    ) -> tuple[ChannelFile, ChannelFile, ChannelFile] | tuple[bool, bool, bool]:
         """Execute a command on the SSH server.
 
         A new ``.Channel`` is open and the requested command is executed.
@@ -1786,10 +1790,6 @@ class ParamikoPlatform(Platform):
         with suppress(Exception):
             if self._ssh:
                 self._ssh.close()
-        with suppress(Exception):
-            if self.transport:
-                self.transport.close()
-                self.transport.stop_thread()
 
     def check_remote_permissions(self) -> bool:
         """Check remote permissions on a platform.
