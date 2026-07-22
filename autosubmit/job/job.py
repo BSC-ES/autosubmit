@@ -1885,6 +1885,7 @@ class Job(object):
             self.shape = parameters.get("CURRENT_SHAPE", "")
             self.processors_per_node = parameters.get("CURRENT_PROCESSORS_PER_NODE", "1")
             self.nodes = parameters.get("CURRENT_NODES", "")
+            # FIXME: Should be ``CURRENT_EXCLUSIVITY`` instead of ``CURRENT_EXCLUSIVE`` to match the platform parameter?
             self.exclusive = parameters.get("CURRENT_EXCLUSIVE", False)
             self.threads = parameters.get("CURRENT_THREADS", "1")
             self.tasks = parameters.get("CURRENT_TASKS", "0")
