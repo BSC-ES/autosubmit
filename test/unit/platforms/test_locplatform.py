@@ -56,7 +56,6 @@ def test_local_platform_copy():
 def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file_exists: bool,
                        autosubmit_config, mocker):
     """Test that ``get_stat_file`` uses the correct file name."""
-    mocked_os_remove = mocker.patch('os.remove')
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
@@ -66,9 +65,8 @@ def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file
     job = Job('job', '1', Status.WAITING, None, None)
     job.fail_count = job_fail_count
 
-    # TODO: this is from ``job.py``; we can probably find an easier way to fetch the file name,
-    #       so we can re-use it in tests (e.g. move the logic to a small function/property/etc.).
     filename = f'{job.name}_STAT_{str(job.fail_count)}'
+    local_stat_path = Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, filename)
 
     if remote_file_exists:
         # Create fake remote stat file transferred.
@@ -76,10 +74,15 @@ def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file
 
     if stats_file_exists:
         # Create fake local stat file, to be deleted before copying the remote file (created above).
-        Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, filename).touch()
+        local_stat_path.touch()
 
     assert remote_file_exists == local.get_stat_file(job=job, attempt=job.fail_count)
-    assert mocked_os_remove.called == stats_file_exists
+    if stats_file_exists and not remote_file_exists:
+        # Local stat file deleted and not recreated (no remote file to copy).
+        assert not local_stat_path.exists()
+    elif not stats_file_exists and remote_file_exists:
+        # Remote stat file copied to local path.
+        assert local_stat_path.exists()
 
 
 def test_get_job_names_cmd_contains_expected_jobs() -> None:

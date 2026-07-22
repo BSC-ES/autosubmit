@@ -1498,7 +1498,7 @@ class Job(object):
             all_succeeded=all(a.success for a in log_attempts)
             and all(s.success for s in stats_attempts)
             if log_attempts
-            else True,
+            else False,
         )
 
     def _restore_previous_state(self, backup_log_local, backup_log_remote, backup_submit_time, backup_id):

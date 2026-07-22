@@ -283,7 +283,8 @@ def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmi
             'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
             'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
             'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
-            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats'
+            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats',
+            'wallclock', 'wrapper_type', 'retrials', 'log_recovery_call_count',
         }
 
 
@@ -341,7 +342,8 @@ def test_db_job_list_jobs_and_edges_together(
             'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
             'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
             'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
-            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats'
+            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats',
+            'wallclock', 'wrapper_type', 'retrials', 'log_recovery_call_count',
         }
 
     for edge in loaded_edges:

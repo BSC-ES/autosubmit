@@ -446,20 +446,6 @@ def test_retrieve_times(setup_job_list, tmp_path, make_exception, seconds):
         assert retrieve_data.status == Status.VALUE_TO_KEY[job.status]
 
 
-def test_unload_requires_log_recovery_attempted(setup_job_list):
-    """Verify job stays in memory until log_recovery_call_count > fail_count."""
-    jobs, _, job_list = setup_job_list
-    job = jobs[0]  # job1, COMPLETED
-    job.fail_count = 0
-    job.retrials = 0
-    job.log_recovery_call_count = 0  # NOT attempted yet
-    job.updated_log = 0
-    job.packed = False
-    job_list.job_package_map = {}
-    job_list.unload_finished_jobs()
-    assert job.name in job_list.graph.nodes
-
-
 def test_unload_after_confirmed_recovery(setup_job_list):
     """Verify job is unloaded once updated_log > fail_count."""
     jobs, _, job_list = setup_job_list

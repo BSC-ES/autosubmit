@@ -612,7 +612,7 @@ class AutosubmitConfig(object):
         If the input is a string, it splits the string by spaces and converts each dependency to uppercase.
         If the input is a dictionary, it converts each dependency key to uppercase and processes the status.
 
-        Additionally, it checks if any final status is allowed, and if so, it sets the flag "ANY_FINAL_STATUS_IS_VALID".
+        Additionally, it checks for a ``?`` suffix in ``MIN_TRIGGER_STATUS``/``STATUS`` to set ``FAIL_OK``.
 
         :param dependencies: The dependencies to normalize, either as a string or a dictionary.
         :type dependencies: Union[str, dict]

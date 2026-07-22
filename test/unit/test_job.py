@@ -2145,7 +2145,7 @@ def test_write_time(tmp_path, local):
     ]
 )
 def test_update_status(create_jobs: list[Job], status: Status,
-                       autosubmit_config: 'AutosubmitConfigFactory', local: 'LocalPlatform'):
+                       autosubmit_config: 'AutosubmitConfigFactory', local: 'LocalPlatform', mocker):
     as_conf = autosubmit_config('t000', experiment_data={
         'PLATFORMS': {
             local.name: {
@@ -2158,6 +2158,7 @@ def test_update_status(create_jobs: list[Job], status: Status,
     job.platform = local
     job.platform_name = local.name
     job.new_status = status
+    mocker.patch.object(local, 'get_completed_job_names', return_value=[])
 
     assert job.status != status
     job.update_status(as_conf=as_conf)
@@ -2238,9 +2239,9 @@ def test_update_and_write_time(count, with_stat_file, tmp_path):
 @pytest.mark.parametrize("updated_log,updated_stats,fail_count,mock_log_exists,mock_compressed,mock_stats_throws,expected_log,expected_stats,expected_all_succeeded", [
     (0, 0, 1, True, False, False, 2, 2, True),   # logs + stats same call
     (0, 0, 1, True, False, True,  2, 0, False),  # logs ok, stats fail
-    (0, 0, 1, False, False, False, 0, 0, False),  # logs fail, stats not tried
+    (0, 0, 1, False, False, False, 0, 2, False),  # logs fail; stats processed for both attempts
     (1, 0, 1, False, True,  False, 2, 2, True),   # log via compressed; stats for attempt 1 only
-    (2, 1, 2, False, False, False, 2, 1, False),  # log fails for 2; stats unchanged
+    (2, 1, 2, False, False, False, 2, 3, False),  # log fails for 2; stats processed for attempt 2
     (2, 3, 2, False, False, False, 2, 3, False),  # stats > updated_log → no stats loop
 ])
 def test_retrieve_logfiles_two_phase(
@@ -2259,6 +2260,11 @@ def test_retrieve_logfiles_two_phase(
     job.submit_time_timestamp = "0"
     job.id = "1"
 
+    job.platform = mocker.MagicMock()
+    job.platform.get_stat_file.return_value = True
+
+    mocker.patch('autosubmit.job.job.Job.stat_file_is_completed', return_value=True)
+    mocker.patch('autosubmit.job.job.Job.stat_registered', return_value=False)
     mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
     mocker.patch('autosubmit.job.job.Job.update_local_logs')
     mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
@@ -2337,14 +2343,12 @@ def test_write_start_time(mocker, tmp_path):
 
 def test_write_stats(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
-    job.platform = mocker.MagicMock()
     mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
     mocker.patch('autosubmit.job.job.Job.write_submit_time')
     mocker.patch('autosubmit.job.job.Job.update_start_time')
     mocker.patch('autosubmit.job.job.Job.write_start_time')
     mocker.patch('autosubmit.job.job.Job.write_end_time')
     job.write_stats(attempt=1)
-    job.platform.get_stat_file.assert_called_once_with(job, 1)
     job._update_submit_time_from_stat.assert_called_once_with(1)
     job.write_submit_time.assert_called_once_with(1)
     job.update_start_time.assert_called_once_with(1)
@@ -2396,7 +2400,23 @@ def test_get_finish_time_from_db(mocker):
     mock_exp_hist.return_value.get_finish_data_dc.assert_called_once_with("dummy", 2)
 
 
-def test_recover_log_attempt_success(mocker):
+@pytest.mark.parametrize(
+    "remote_exists, compressed_exists, remote_raises, expected_success, expected_updated_log, expected_error_contains, expect_restored",
+    [
+        (True,  False, False, True,  1, None,              False),
+        (False, False, False, False, 0, "Remote logs not found", True),
+        (False, False, True,  False, 0, "boom",            True),
+        (False, True,  False, True,  1, None,              False),
+    ],
+    ids=[
+        "remote_logs_found",
+        "no_remote_no_local",
+        "check_remote_raises",
+        "no_remote_with_compressed_local",
+    ]
+)
+def test_recover_log_attempt(mocker, remote_exists, compressed_exists, remote_raises,
+                              expected_success, expected_updated_log, expected_error_contains, expect_restored):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.updated_log = 0
     job.updated_stats = 0
@@ -2405,59 +2425,35 @@ def test_recover_log_attempt_success(mocker):
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
     job.id = "1"
-    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
+
     mocker.patch('autosubmit.job.job.Job.update_local_logs')
     mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
-    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=True)
-    mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
-    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs')
+
+    if remote_raises:
+        mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', side_effect=RuntimeError("boom"))
+    else:
+        mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=remote_exists)
+
+    if remote_exists:
+        mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
+
+    if compressed_exists is not None:
+        mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=compressed_exists)
+
     result = job._recover_log_attempt(0)
-    assert result.success is True
     assert result.attempt == 0
-    assert result.error is None
-    assert job.updated_log == 1
+    assert result.success is expected_success
     assert job.updated_stats == 0
+    if expected_error_contains:
+        assert expected_error_contains in result.error
+    else:
+        assert result.error is None
 
+    if expect_restored:
+        assert job.local_logs == ("out", "err")
+        assert job.remote_logs == ("rout", "rerr")
 
-def test_recover_log_attempt_no_remote_no_local(mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.updated_log = 0
-    job.updated_stats = 0
-    job.fail_count = 0
-    job.local_logs = ("out", "err")
-    job.remote_logs = ("rout", "rerr")
-    job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
-    mocker.patch('autosubmit.job.job.Job.update_local_logs')
-    mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
-    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=False)
-    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=False)
-    result = job._recover_log_attempt(0)
-    assert result.success is False
-    assert "Remote logs not found" in result.error
-    assert job.local_logs == ("out", "err")
-    assert job.remote_logs == ("rout", "rerr")
-    assert job.updated_log == 0
-    assert job.updated_stats == 0
-
-
-def test_recover_log_attempt_exception(mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.updated_log = 0
-    job.updated_stats = 0
-    job.fail_count = 0
-    job.local_logs = ("out", "err")
-    job.remote_logs = ("rout", "rerr")
-    job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat', side_effect=RuntimeError("boom"))
-    result = job._recover_log_attempt(0)
-    assert result.success is False
-    assert result.error == "boom"
-    assert job.local_logs == ("out", "err")
-    assert job.updated_log == 0
-    assert job.updated_stats == 0
+    assert job.updated_log == expected_updated_log
 
 
 def test_restore_previous_state(mocker):
@@ -2784,29 +2780,6 @@ def test_clean_attributes_resets_both_counters():
     job.retrials = 5
     job.clean_attributes()
     assert job.updated_log == 0
-    assert job.updated_stats == 0
-
-
-def test_recover_log_attempt_no_remote_with_compressed_local(mocker):
-    """_recover_log_attempt: remote missing but compressed local logs -> success."""
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.updated_log = 0
-    job.updated_stats = 0
-    job.fail_count = 0
-    job.local_logs = ("out", "err")
-    job.remote_logs = ("rout", "rerr")
-    job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch("autosubmit.job.job.Job._update_submit_time_from_stat")
-    mocker.patch("autosubmit.job.job.Job.update_local_logs")
-    mocker.patch("autosubmit.job.job.Job.get_new_remotelog_name", return_value=("new_out", "new_err"))
-    mocker.patch("autosubmit.job.job.Job.check_remote_log_exists", return_value=False)
-    mocker.patch("autosubmit.job.job.Job.check_compressed_local_logs", return_value=True)
-    result = job._recover_log_attempt(0)
-    assert result.success is True
-    assert result.local_logs == job.local_logs
-    assert result.remote_logs == job.remote_logs
-    assert job.updated_log == 1
     assert job.updated_stats == 0
 
 

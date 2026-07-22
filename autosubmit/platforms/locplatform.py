@@ -88,7 +88,7 @@ class LocalPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Updates commands for platforms."""
-        self.root_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
+        self.root_dir = os.path.join(self.config.get("LOCAL_ROOT_DIR", BasicConfig.LOCAL_ROOT_DIR), self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "tmp", 'LOG_' + self.expid)
         self.cancel_cmd = "kill -2"
         self._checkhost_cmd = "echo 1"

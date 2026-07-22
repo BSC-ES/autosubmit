@@ -78,11 +78,13 @@ class DbManager:
                     conn.execute(CreateSchema(self.schema, if_not_exists=True))
                 conn.execute(CreateTable(table, if_not_exists=True))
                 # Auto-add missing columns for schema evolution
-                existing = {col['name'] for col in inspect(conn).get_columns(table_name)}
+                schema_arg = {"schema": self.schema} if self.schema else {}
+                existing = {col['name'] for col in inspect(conn).get_columns(table_name, **schema_arg)}
                 for column in table.columns:
                     if column.name not in existing:
+                        qualified_name = f"{self.schema}.{table_name}" if self.schema else table_name
                         conn.execute(
-                            f"ALTER TABLE {table_name} ADD COLUMN {column.name} {column.type}"
+                            f"ALTER TABLE {qualified_name} ADD COLUMN {column.name} {column.type}"
                         )
 
     def drop_table(self, table_name: str) -> None:

@@ -47,26 +47,23 @@ def test_get_stat_file(file_exists, count, tmp_path):
 
     basic_config = FakeBasicConfig()
     basic_config.LOCAL_ROOT_DIR = str(tmp_path)
-    basic_config.LOCAL_TMP_DIR = str(tmp_path)
+    basic_config.LOCAL_TMP_DIR = "tmp"
 
     job = TestJob()
     job.stat_file = "test_file"
     job.name = "test_name"
     job.fail_count = count
-    filename = job.name + f'_STAT_{str(job.fail_count)}'
+    filename = f"{job.stat_file}{count}"
 
     if file_exists:
-        with open(f"{basic_config.LOCAL_ROOT_DIR}/{filename}", "w", encoding="utf-8") as f:
-            f.write("dummy content")
-            f.flush()
-        Path(f"{basic_config.LOCAL_ROOT_DIR}/LOG_t000/").mkdir()
-        with open(f"{basic_config.LOCAL_ROOT_DIR}/LOG_t000/{filename}", "w", encoding="utf-8") as f:
-            f.write("dummy content")
-            f.flush()
+        local_stat_path = Path(str(tmp_path), "t000", "tmp", filename)
+        local_stat_path.parent.mkdir(parents=True, exist_ok=True)
+        local_stat_path.write_text("dummy content")
+        remote_stat_path = Path(str(tmp_path), "t000", "tmp", "LOG_t000", filename)
+        remote_stat_path.parent.mkdir(parents=True, exist_ok=True)
+        remote_stat_path.write_text("dummy content")
 
     platform = LocalPlatform("t000", 'platform', basic_config.props())
-    assert Path(f"{basic_config.LOCAL_ROOT_DIR}/{filename}").exists() == file_exists
-    assert Path(f"{basic_config.LOCAL_ROOT_DIR}/LOG_t000/{filename}").exists() == file_exists
     assert platform.get_stat_file(job, count) == file_exists
 
 

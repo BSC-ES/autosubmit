@@ -1636,28 +1636,9 @@ class JobList(object):
         :return: A dictionary of filters to apply for the job based on the dependency relationships.
         """
         filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
-        filters_to_apply.pop("MIN_TRIGGER_STATUS", "COMPLETED")
-        # Don't do perform special filter if only "FROM_STEP" is applied
-        if "FROM_STEP" in filters_to_apply:
-            if (filters_to_apply.get("CHUNKS_TO", "none") == "none" and filters_to_apply.
-                    get("MEMBERS_TO", "none") == "none" and filters_to_apply.get("DATES_TO", "none")
-                    == "none" and filters_to_apply.get("SPLITS_TO", "none") == "none"):
-                filters_to_apply = {}
-        filters_to_apply.pop("FROM_STEP", 0)
-        filters_to_apply.pop("FAIL_OK", False)
-
-        # BACKWARDS COMPATIBILITY, at the end the filters_to_apply should only contain filters and discard the rest
-        filters_to_apply.pop("OPTIONAL", False)
-
-        # If the selected filter is "natural" for all filters_to, trigger the natural dependency
-        # calculation
-        all_natural = True
-        for f_value in filters_to_apply.values():
-            if f_value.lower() != "natural":
-                all_natural = False
-                break
-        if all_natural:
-            filters_to_apply = {}
+        filters_to_apply = {k: v for k, v in filters_to_apply.items() if k.endswith("_TO")}
+        if filters_to_apply and all(v.lower() == "natural" for v in filters_to_apply.values()):
+            return {}
         return filters_to_apply
 
     def _normalize_auto_keyword(self, job: Job, dependency: Dependency) -> Dependency:
@@ -2886,7 +2867,8 @@ class JobList(object):
                          edge.get("e_from", "") in self.graph.nodes and edge.get("e_to", "") in self.graph.nodes):
                 self._add_edge_and_parent(edge)
         # get node from the graph
-        return self.graph.nodes.get(job_name, None)['job']
+        node_data = self.graph.nodes.get(job_name)
+        return node_data['job'] if node_data else None
 
     def save_edges(self):
         """
@@ -3577,6 +3559,8 @@ class JobList(object):
                     job = self.get_job_by_name(job_name)
                     if not job:
                         job = self.load_job_by_name(job_name)
+                    if not job:
+                        continue
                     if job.id == wrappers_info[package_name]["id"]:
                         wrappers_info[package_name]["job_list"].append(job)
                 if wrappers_info[package_name]["job_list"]:
