@@ -1152,10 +1152,13 @@ class ParamikoPlatform(Platform):
             retries -= 1
             sleep(2)
         if retries >= 0:
-            # get id last line
-            job_ids_names = job_id_name.split('\n')[1:-1]
-            # get all ids by job-name
-            job_ids = [job_id.split(',')[0] for job_id in job_ids_names]
+            # Only keep lines where the first comma-delimited field is a numeric job ID,
+            # skipping the squeue header and any SSH banner lines in stdout.
+            job_ids = [
+                line.split(',')[0].strip()
+                for line in job_id_name.splitlines()
+                if line.split(',')[0].strip().isdigit()
+            ]
         return job_ids
 
     def get_check_all_jobs_cmd(self, jobs_id: str):

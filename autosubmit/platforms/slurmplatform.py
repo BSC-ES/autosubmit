@@ -146,9 +146,9 @@ class SlurmPlatform(ParamikoPlatform):
             self.scratch, self.project_dir, self.user, self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
         self.cancel_cmd = "scancel"
-        self._submit_cmd = f'sbatch --no-requeue -D {self.remote_log_dir} '
+        self._submit_cmd = f'sbatch --parsable --no-requeue -D {self.remote_log_dir} '
         self._submit_command_name = "sbatch"
-        self._submit_hold_cmd = f'sbatch -H -D {self.remote_log_dir} '
+        self._submit_hold_cmd = f'sbatch --parsable -H -D {self.remote_log_dir} '
         # jobid =$(sbatch WOA_run_mn4.sh 2 > & 1 | grep -o "[0-9]*"); scontrol hold $jobid;
         self.put_cmd = "scp"
         self.get_cmd = "scp"
@@ -208,7 +208,12 @@ class SlurmPlatform(ParamikoPlatform):
             if x11:
                 return int(output.splitlines()[0])
             for line in output.splitlines():
-                jobs_id.append(int(line.split(' ')[3]))
+                # With --parsable, sbatch outputs "<jobid>" or "<jobid>;<cluster>"
+                part = line.split(';')[0].strip()
+                if part.isdigit():
+                    jobs_id.append(int(part))
+            if not jobs_id:
+                raise AutosubmitCritical("Submission failed. No job ID found in sbatch output", 7014)
             return jobs_id
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
@@ -463,7 +468,13 @@ class SlurmPlatform(ParamikoPlatform):
 
         for pattern in critical_patterns:
             if pattern in err_lower:
+                # Filter SSH banner/module-load lines; keep only Slurm-relevant stderr lines
+                slurm_lines = [
+                    line for line in err.splitlines()
+                    if re.search(r'(?:sbatch|salloc|srun|sinfo|squeue|scancel|slurm)\b', line, re.IGNORECASE)
+                ]
+                clean_err = "\n".join(slurm_lines) if slurm_lines else err
                 raise AutosubmitCritical(
-                    f"Permanent Slurm error: {err}",
+                    f"Permanent Slurm error: {clean_err}",
                     7014,
                 )
