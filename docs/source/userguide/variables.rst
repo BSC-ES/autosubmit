@@ -282,12 +282,32 @@ These are always available regardless of the raw YAML keys defined.
 
 
 .. note::
-    The variables ``CURRENT_USER``, ``CURRENT_PROJ`` and ``CURRENT_BUDG``
-    have no value on the LOCAL platform.
+    The table above lists the ``CURRENT_`` variables that Autosubmit 
+    exposes from the platform section. Not all of them are always
+    populated. Some are filled automatically by Autosubmit, others
+    come from the YAML configuration, and a few are only used by certain
+    schedulers.
 
-    Certain variables (e.g. ``CURRENT_RESERVATION``,
-    ``CURRENT_EXCLUSIVITY``) are only available for certain
-    platforms (e.g. MareNostrum).
+    * ``CURRENT_ARCH``, ``CURRENT_HOST``, ``CURRENT_TYPE``,
+      ``CURRENT_SCRATCH_DIR``, ``CURRENT_ROOTDIR``,
+      ``CURRENT_LOGDIR`` and ``CURRENT_HYPERTHREADING`` are
+      **automatically** filled by Autosubmit.
+    
+    * ``CURRENT_USER``, ``CURRENT_PROJ``, ``CURRENT_QUEUE``,
+    ``CURRENT_PARTITION`` and ``CURRENT_TEMP_DIR`` are only
+    filled if the corresponding YAML key (``USER``,
+    ``PROJECT``, ``QUEUE``, ``PARTITION``, ``TEMP_DIR``) is
+    defined in the platform configuration. On the LOCAL
+    platform they remain empty.
+
+    * ``CURRENT_BUDG``, ``CURRENT_RESERVATION`` and
+    ``CURRENT_EXCLUSIVITY`` are only populated if the
+    corresponding YAML keys (``BUDGET``, ``RESERVATION``,
+    ``EXCLUSIVITY``) are defined in the platform configuration.
+    They are only used by certain schedulers: ``CURRENT_BUDG`` 
+    is used by the ECMWF header, ``CURRENT_RESERVATION`` by 
+    SLURM and PBS, and ``CURRENT_EXCLUSIVITY`` by SLURM.
+
 
 Other variables
 =================
