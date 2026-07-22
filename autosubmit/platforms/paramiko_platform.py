@@ -341,6 +341,17 @@ class ParamikoPlatform(Platform):
         except Exception as exc:
             Log.error("Writing Job Id Failed : " + str(exc))
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+        try:
+            self.send_command(f"head -1 {remote_path}")
+            output = self.get_ssh_output()
+            first_line = output.strip()
+            if first_line.startswith('[INFO] JOBID='):
+                return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, IndexError):
+            pass
+        return None
+
     def connect(
             self,
             as_conf: Optional['AutosubmitConfig'],

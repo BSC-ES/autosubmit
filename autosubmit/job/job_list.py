@@ -670,7 +670,7 @@ class JobList(object):
                         p_job = self.get_job_by_name(edge["e_from"])
                         if not p_job:
                             p_job = self.load_job_by_name(edge["e_from"])
-                        if p_job and p_job.section != section and edge["COMPLETION_STATUS"] != "COMPLETED":
+                        if p_job and p_job.section != section and edge.get("COMPLETION_STATUS", "WAITING") != "COMPLETED":
                             # If the job is not in the current section and is not completed, it cannot be loaded
                             can_be_loaded = False
                             break
@@ -3472,7 +3472,7 @@ class JobList(object):
         import secrets
         retries = max_retries
         while retries > 0:
-            new_id = secrets.randbelow(100000)
+            new_id = -secrets.randbelow(100000)
             if new_id not in self.check_wrapper_fake_ids:
                 for job in package.jobs:
                     job.id = int(new_id)
@@ -3520,6 +3520,9 @@ class JobList(object):
                 num_processors=package._num_processors,
                 platform=package.platform,
                 as_config=as_conf,
+                sections=package.sections,
+                method=package.method,
+                wr_type=package.wrapper_type,
             )
             self.job_package_map[int(wrapper_job.id)] = wrapper_job
             self.packages_dict[package.name] = wrapper_job.job_list

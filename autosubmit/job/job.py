@@ -1413,32 +1413,18 @@ class Job(object):
         return out_exist or err_exist
 
     def _sync_retrieve_logfiles(self):
-        """
-        Synchronizes the log files.
-        It prepares the log files to be retrieved by writing the jobid to them
-        and compressing them if enabled. Then, it retrieves the log files
+        """Synchronizes the log files.
+        It compresses them if enabled and retrieves the log files
         from the platform.
         """
         self.synchronize_logs(self.platform, self.remote_logs, self.local_logs)
         remote_logs = list(copy.deepcopy(self.local_logs))
 
-        # Prepare remote logs
+        # Compress if enabled
         for idx, remote_log in enumerate(remote_logs):
             log_full_path = Path(
                 self.platform.get_files_path(), remote_log
             )
-
-            # Write jobid to logs
-            try:
-                self.platform.write_jobid(self.id, str(log_full_path))
-            except BaseException as exc:
-                Log.printlog(
-                    "Trace {0} \n Failed to write the {1} e=6001".format(
-                        str(exc), self.name
-                    )
-                )
-
-            # Compress if enabled
             if self.platform.compress_remote_logs:
                 compressed_path = self.platform.compress_file(str(log_full_path))
                 remote_logs[idx] = str(Path(compressed_path).name) if compressed_path else remote_log
@@ -1487,8 +1473,10 @@ class Job(object):
             if not self.platform.get_stat_file(self, attempt) or not self.stat_file_is_completed(attempt) or self.stat_registered(attempt):
                 Log.info(f"entered here {self.updated_log}")
                 break
-            stats_attempts.append(self._write_stat_attempt(attempt))
-            log_attempts.append(self._recover_log_attempt(attempt))
+            log_result = self._recover_log_attempt(attempt)
+            log_attempts.append(log_result)
+            if log_result.success:
+                stats_attempts.append(self._write_stat_attempt(attempt))
 
         return RecoveryReport(
             job_name=self.name,
@@ -1543,6 +1531,10 @@ class Job(object):
                     result_local = self.local_logs
                     result_remote = self.remote_logs
             else:
+                remote_out = Path(self.platform.get_files_path(), self.remote_logs[0])
+                parsed_id = self.platform.read_jobid_from_remote_log(str(remote_out))
+                if parsed_id is not None:
+                    self.id = parsed_id
                 self._sync_retrieve_logfiles()
                 self.check_compressed_local_logs()
                 success = True
@@ -3247,7 +3239,8 @@ class WrapperJob(Job):
         self._safe_wait = 60  # seconds to wait before considering a wrapper stuck in RUNNING when all the inner jobs are finished
         self._finished_time = None
         self.sections = sections
-        self.type = wr_type
+        if wr_type is not None:
+            self.type = wr_type
         self.method = method
         self.num_processors = num_processors
 

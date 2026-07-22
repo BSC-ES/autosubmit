@@ -177,6 +177,9 @@ class PythonWrapperBuilder(WrapperBuilder):
         """Return a code snippet that records wrapper start time and registers an atexit handler."""
         # TODO: move atexit to def build_import
         return textwrap.dedent(f"""\
+        _as_job_id = next((os.environ[v] for v in ('SLURM_JOBID', 'PBS_JOBID', 'JOB_ID', 'LSB_JOBID', 'LOADL_STEP_ID', 'PJM_JOBID') if v in os.environ), str(os.getpid()))
+        sys.stdout.write('[INFO] JOBID=' + _as_job_id + '\\n')
+        sys.stderr.write('[INFO] JOBID=' + _as_job_id + '\\n')
         from pathlib import Path
         import atexit
         stat_file = Path.cwd() / f"{self.name}_STAT_{self.fail_count}"
@@ -735,6 +738,14 @@ class BashWrapperBuilder(WrapperBuilder):
         attempt's end_time (line 2 of the previous STAT via ``awk NR==3``).
         """
         return textwrap.dedent(f"""\
+        for _as_var in SLURM_JOBID PBS_JOBID JOB_ID LSB_JOBID LOADL_STEP_ID PJM_JOBID; do
+            _as_val=$(printenv "$_as_var" 2>/dev/null) || continue
+            echo "[INFO] JOBID=$_as_val"
+            echo "[INFO] JOBID=$_as_val" >&2
+            _as_jobid_set=1
+            break
+        done
+        [ -z "${{_as_jobid_set:-}}" ] && echo "[INFO] JOBID=$$" && echo "[INFO] JOBID=$$" >&2
         _wrapper_stat_file="$(pwd)/{self.name}_STAT_{self.fail_count}"
         if [ {self.fail_count} -gt 0 ]; then
             prev_stat="$(pwd)/{self.name}_STAT_$(({self.fail_count} - 1))"

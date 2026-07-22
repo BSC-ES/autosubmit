@@ -2239,9 +2239,9 @@ def test_update_and_write_time(count, with_stat_file, tmp_path):
 @pytest.mark.parametrize("updated_log,updated_stats,fail_count,mock_log_exists,mock_compressed,mock_stats_throws,expected_log,expected_stats,expected_all_succeeded", [
     (0, 0, 1, True, False, False, 2, 2, True),   # logs + stats same call
     (0, 0, 1, True, False, True,  2, 0, False),  # logs ok, stats fail
-    (0, 0, 1, False, False, False, 0, 2, False),  # logs fail; stats processed for both attempts
+    (0, 0, 1, False, False, False, 0, 0, False),  # logs fail; no stats
     (1, 0, 1, False, True,  False, 2, 2, True),   # log via compressed; stats for attempt 1 only
-    (2, 1, 2, False, False, False, 2, 3, False),  # log fails for 2; stats processed for attempt 2
+    (2, 1, 2, False, False, False, 2, 1, False),  # log fails for 2; no stats for attempt 2
     (2, 3, 2, False, False, False, 2, 3, False),  # stats > updated_log → no stats loop
 ])
 def test_retrieve_logfiles_two_phase(
@@ -2262,6 +2262,7 @@ def test_retrieve_logfiles_two_phase(
 
     job.platform = mocker.MagicMock()
     job.platform.get_stat_file.return_value = True
+    job.platform.read_jobid_from_remote_log.return_value = None
 
     mocker.patch('autosubmit.job.job.Job.stat_file_is_completed', return_value=True)
     mocker.patch('autosubmit.job.job.Job.stat_registered', return_value=False)
@@ -2401,22 +2402,25 @@ def test_get_finish_time_from_db(mocker):
 
 
 @pytest.mark.parametrize(
-    "remote_exists, compressed_exists, remote_raises, expected_success, expected_updated_log, expected_error_contains, expect_restored",
+    "remote_exists, compressed_exists, remote_raises, expected_success, expected_updated_log, expected_error_contains, expect_restored, expected_job_id",
     [
-        (True,  False, False, True,  1, None,              False),
-        (False, False, False, False, 0, "Remote logs not found", True),
-        (False, False, True,  False, 0, "boom",            True),
-        (False, True,  False, True,  1, None,              False),
+        (True,  False, False, True,  1, None,              False, 1),
+        (False, False, False, False, 0, "Remote logs not found", True, 1),
+        (False, False, True,  False, 0, "boom",            True, 1),
+        (False, True,  False, True,  1, None,              False, 1),
+        (True,  False, False, True,  1, None,              False, 12345),
     ],
     ids=[
         "remote_logs_found",
         "no_remote_no_local",
         "check_remote_raises",
         "no_remote_with_compressed_local",
+        "remote_logs_found_with_jobid_parse",
     ]
 )
 def test_recover_log_attempt(mocker, remote_exists, compressed_exists, remote_raises,
-                              expected_success, expected_updated_log, expected_error_contains, expect_restored):
+                              expected_success, expected_updated_log, expected_error_contains, expect_restored,
+                              expected_job_id):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.updated_log = 0
     job.updated_stats = 0
@@ -2424,7 +2428,13 @@ def test_recover_log_attempt(mocker, remote_exists, compressed_exists, remote_ra
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
-    job.id = "1"
+    job.id = 1
+
+    job.platform = mocker.MagicMock()
+    if expected_job_id != 1:
+        job.platform.read_jobid_from_remote_log.return_value = expected_job_id
+    else:
+        job.platform.read_jobid_from_remote_log.return_value = None
 
     mocker.patch('autosubmit.job.job.Job.update_local_logs')
     mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
@@ -2444,6 +2454,7 @@ def test_recover_log_attempt(mocker, remote_exists, compressed_exists, remote_ra
     assert result.attempt == 0
     assert result.success is expected_success
     assert job.updated_stats == 0
+    assert job.id == expected_job_id
     if expected_error_contains:
         assert expected_error_contains in result.error
     else:

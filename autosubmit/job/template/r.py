@@ -55,6 +55,15 @@ _AS_R_HEADER = dedent("""\
         fileConn<-file(stat_path,"a")
         writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
         close(fileConn)
+        _as_job_id <- Sys.getenv('SLURM_JOBID', unset=NA)
+        if (is.na(_as_job_id)) _as_job_id <- Sys.getenv('PBS_JOBID', unset=NA)
+        if (is.na(_as_job_id)) _as_job_id <- Sys.getenv('JOB_ID', unset=NA)
+        if (is.na(_as_job_id)) _as_job_id <- Sys.getenv('LSB_JOBID', unset=NA)
+        if (is.na(_as_job_id)) _as_job_id <- Sys.getenv('LOADL_STEP_ID', unset=NA)
+        if (is.na(_as_job_id)) _as_job_id <- Sys.getenv('PJM_JOBID', unset=NA)
+        if (is.na(_as_job_id)) _as_job_id <- paste(Sys.getpid())
+        cat('[INFO] JOBID=', _as_job_id, '\n', sep='')
+        cat('[INFO] JOBID=', _as_job_id, '\n', file=stderr(), sep='')
         ###################
         # Autosubmit Checkpoint
         ###################

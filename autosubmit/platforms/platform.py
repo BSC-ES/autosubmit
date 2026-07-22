@@ -777,6 +777,14 @@ class Platform:
         """
         raise NotImplementedError  # pragma: no cover
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+        """Reads the JOBID from the first line of a remote log file.
+
+        :param remote_path: full remote path to the log file
+        :return: job ID if found, None otherwise
+        """
+        return None
+
     def add_job_to_log_recover(self, job):
         if job.id and int(job.id) != 0:
             if self.recovery_queue is None:

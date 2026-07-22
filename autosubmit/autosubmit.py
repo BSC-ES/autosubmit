@@ -1687,7 +1687,6 @@ class Autosubmit:
                     job.status = Status.WAITING
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, False)
-            job_list.clear_wrappers_db(preview=True)
             Log.info("No more scripts to generate, you can proceed to check them manually")
             Log.result(file_paths)
 
@@ -2647,6 +2646,7 @@ class Autosubmit:
         # WRAPPERS
         try:
             if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrapper:
+                job_list.clear_wrappers_db(preview=True)
                 Autosubmit.generate_scripts_andor_wrappers(
                     as_conf, job_list, True)
                 job_list.load_wrappers(preview=check_wrapper)

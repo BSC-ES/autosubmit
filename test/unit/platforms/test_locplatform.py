@@ -218,3 +218,23 @@ def test_check_all_jobs_no_change_returns_false(
     platform.check_all_jobs([job], as_conf)
 
     assert job.new_status == Status.RUNNING
+
+
+@pytest.mark.parametrize("content,expected", [
+    ("[INFO] JOBID=42\nline2\n", 42),
+    ("[INFO] JOBID=99999\n", 99999),
+    ("line without jobid\n", None),
+    ("", None),
+])
+def test_read_jobid_from_remote_log(tmp_path, content, expected):
+    platform = LocalPlatform(_EXPID, 'local', {}, auth_password=None)
+    log_file = tmp_path / 'job.out'
+    log_file.write_text(content)
+    result = platform.read_jobid_from_remote_log(str(log_file))
+    assert result == expected
+
+
+def test_read_jobid_from_remote_log_not_exists(tmp_path):
+    platform = LocalPlatform(_EXPID, 'local', {}, auth_password=None)
+    result = platform.read_jobid_from_remote_log(str(tmp_path / 'noexist.out'))
+    assert result is None

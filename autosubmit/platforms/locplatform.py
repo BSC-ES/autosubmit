@@ -142,6 +142,17 @@ class LocalPlatform(ParamikoPlatform):
         except Exception as exc:
             Log.error("Writing Job Id Failed : " + str(exc))
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+        try:
+            if os.path.exists(remote_path):
+                with open(remote_path) as f:
+                    first_line = f.readline()
+                if first_line.startswith('[INFO] JOBID='):
+                    return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, IndexError):
+            pass
+        return None
+
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
 
