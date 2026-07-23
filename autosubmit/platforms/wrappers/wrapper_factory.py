@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -20,7 +20,8 @@ import re
 from autosubmit.platforms.wrappers.wrapper_builder import (
     WrapperDirector, PythonVerticalWrapperBuilder, PythonHorizontalWrapperBuilder,
     PythonHorizontalVerticalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder, BashHorizontalWrapperBuilder,
-    BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder, SrunVerticalHorizontalWrapperBuilder
+    BashVerticalWrapperBuilder, SrunHorizontalWrapperBuilder, SrunVerticalHorizontalWrapperBuilder,
+    FluxWrapperBuilder
 )
 
 
@@ -54,6 +55,15 @@ class WrapperFactory(object):
             kwargs['threads'] = self.threads(str(wrapper_data.threads))
             kwargs['reservation'] = self.reservation(wrapper_data.reservation)
 
+            # When handling it with an external tool (e.g. Flux), give it control over all resources
+            if kwargs['wrapper_data'].wrapper_type.lower() == 'delegated':
+                if wrapper_data.nodes == '':
+                    kwargs['threads'] = self.threads(str(int(wrapper_data.threads) * int(kwargs['num_processors_value'])))
+                else:
+                    kwargs['threads'] = self.threads('')
+                kwargs['num_processors'] = self.processors('')
+                kwargs['tasks'] = self.tasks('')
+
         kwargs["executable"] = wrapper_data.executable
         kwargs["fail_count"] = 0
 
@@ -86,6 +96,9 @@ class WrapperFactory(object):
         raise NotImplementedError(self.exception)  # pragma: no cover
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
+        raise NotImplementedError(self.exception)  # pragma: no cover
+
+    def delegated_wrapper(self, **kwargs):
         raise NotImplementedError(self.exception)  # pragma: no cover
 
     def header_directives(self, **kwargs):
@@ -162,28 +175,47 @@ class WrapperFactory(object):
 
     def threads_directive(self, threads):
         raise NotImplementedError(self.exception)  # pragma: no cover
+    
+    @staticmethod
+    def exception_method(method: str = ""):
+        return f"""The specified wrapping method "{method}" is not available for this wrapper type or platform"""
 
 
 class SlurmWrapperFactory(WrapperFactory):
 
     def vertical_wrapper(self, **kwargs):
-        return PythonVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'asthread':
+            return PythonVerticalWrapperBuilder(**kwargs)
+        else:
+            raise NotImplementedError(self.exception_method(kwargs["method"]))  # pragma: no cover
 
     def horizontal_wrapper(self, **kwargs):
-
-        if kwargs["method"] == 'srun':
+        if kwargs["method"] == 'asthread':
+            return PythonHorizontalWrapperBuilder(**kwargs)
+        elif kwargs["method"] == 'srun':
             return SrunHorizontalWrapperBuilder(**kwargs)
         else:
-            return PythonHorizontalWrapperBuilder(**kwargs)
+            raise NotImplementedError(self.exception_method(kwargs["method"]))  # pragma: no cover
 
     def hybrid_wrapper_horizontal_vertical(self, **kwargs):
-        return PythonHorizontalVerticalWrapperBuilder(**kwargs)
+        if kwargs["method"] == 'asthread':
+            return PythonHorizontalVerticalWrapperBuilder(**kwargs)
+        else:
+            raise NotImplementedError(self.exception_method(kwargs["method"]))  # pragma: no cover
 
     def hybrid_wrapper_vertical_horizontal(self, **kwargs):
-        if kwargs["method"] == 'srun':
+        if kwargs["method"] == 'asthread':
+            return PythonVerticalHorizontalWrapperBuilder(**kwargs)
+        elif kwargs["method"] == 'srun':
             return SrunVerticalHorizontalWrapperBuilder(**kwargs)
         else:
-            return PythonVerticalHorizontalWrapperBuilder(**kwargs)
+            raise NotImplementedError(self.exception_method(kwargs["method"]))  # pragma: no cover
+
+    def delegated_wrapper(self, **kwargs):
+        if kwargs["method"] == 'flux':
+            return FluxWrapperBuilder(**kwargs)
+        else:
+            raise NotImplementedError(self.exception_method(kwargs["method"]))  # pragma: no cover
 
     def header_directives(self, **kwargs):
         return self.platform.wrapper_header(**kwargs)
@@ -225,7 +257,6 @@ class PJMWrapperFactory(WrapperFactory):
         return PythonVerticalWrapperBuilder(**kwargs)
 
     def horizontal_wrapper(self, **kwargs):
-
         if kwargs["method"] == 'srun':
             return SrunHorizontalWrapperBuilder(**kwargs)
         else:

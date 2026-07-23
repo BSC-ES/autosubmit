@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -14,10 +14,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import random
 import string
 import textwrap
+from abc import ABC, abstractmethod
 
 
 
@@ -82,7 +84,8 @@ class WrapperBuilder(object):
         return ""  # pragma: no cover
 
     def build_job_thread(self):
-        pass  # pragma: no cover
+        """Return an empty string by default; subclasses may override."""
+        return ""  # pragma: no cover
 
     # hybrids
     def build_joblist_thread(self, **kwargs):
@@ -131,6 +134,252 @@ class WrapperBuilder(object):
         padding = amount * ch
         return ''.join(padding + line for line in text.splitlines(True))
 
+class DelegatedWrapperBuilder(WrapperBuilder, ABC):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self._custom_env_setup = kwargs['wrapper_data'].custom_env_setup
+
+        # Get a unique identifier for the wrapper
+        self._unique_part = '_'.join(kwargs['name'].split('_')[2:])
+
+        # Filenames
+        self._delegated_script_name = f"{self.engine_name}_runner_{self._unique_part}.py"
+        self._subworkflow_name = f"subworkflow_{self._unique_part}.json"
+
+    def build_wrapper_stat(self) -> str: # TODO: [ENGINES] This is a copy of the method in the Bash builder
+        """Return bash code that records wrapper start/end time and exit status."""
+        return textwrap.dedent(f"""\
+        _wrapper_stat_file="$(pwd)/{self.name}_STAT_{self.fail_count}"
+        date +%s > "$_wrapper_stat_file"
+        _write_wrapper_stat() {{
+            if [ $? -eq 0 ]; then
+                _wrapper_exit_status="COMPLETED"
+            else
+                _wrapper_exit_status="FAILED"
+            fi
+            date +%s >> "$_wrapper_stat_file"
+            echo "$_wrapper_exit_status" >> "$_wrapper_stat_file"
+        }}
+        trap _write_wrapper_stat EXIT
+        """)
+
+    def build_main(self) -> str:
+        return (
+            textwrap.dedent(os.linesep +
+                f"""\
+                # Delegated script generation
+                cat << 'EOF' > {self._delegated_script_name}
+                """
+            )
+            + self._generate_delegated_script()
+            + textwrap.dedent(
+                f"""\
+                EOF
+
+                # Grant execution permission to the generated script
+                chmod +x {self._delegated_script_name}
+
+                # Load user environment
+                """
+            )
+            + self._custom_environmet_setup()
+            + textwrap.dedent(
+                f"""\
+                # Instantiate the manager within the allocated resources and run the jobs
+                {self.command}
+                """
+            )
+        )
+
+    def _custom_environmet_setup(self) -> str:
+        commands = self._custom_env_setup
+        if not commands:
+            commands = "# No commands provided"
+        return str(commands) + os.linesep
+
+    @property
+    @abstractmethod
+    def engine_name(self) -> str:
+        pass  # pragma: no cover
+
+    @property
+    @abstractmethod
+    def command(self) -> str:
+        pass  # pragma: no cover
+
+    @abstractmethod
+    def _generate_delegated_script(self) -> str: # TODO: [ENGINES] Would it be better to transfer it once as a file instead of generating it?
+        pass  # pragma: no cover
+
+class FluxWrapperBuilder(DelegatedWrapperBuilder):
+
+    @property
+    def engine_name(self):
+        return "flux"
+    
+    @property
+    def command(self) -> str:
+        return f"srun --ntasks=1 --cpu-bind=none flux start --verbose=2 python {self._delegated_script_name}"
+    
+    def _generate_delegated_script(self) -> str:
+        return textwrap.dedent(f"""
+        #!/usr/bin/env python3
+
+        import gc
+        import json
+        import os
+        import flux
+        import flux.job
+        from flux.job import JobspecV1
+        from typing import Dict, List
+        from collections import defaultdict, deque
+
+
+        class FluxWrapperSubmitter:
+            def __init__(self, dag_json: str):
+                self.dag = json.loads(dag_json)
+                self.tasks: Dict[str, Dict] = {{n["id"]: n for n in self.dag["tasks"]}}
+                self.dependencies: List[Dict] = self.dag["dependencies"]
+                self.cwd = self.dag["graph"]["wrapper_defaults"]["cwd"]
+
+                self.jobids: Dict[str, str] = {{}}
+                self.parents: Dict[str, List[str]] = defaultdict(list) # child -> [parents]
+                self.children = defaultdict(list) # parent -> [children]
+                self.pending_jobs = int()
+                self.wrapper_failed = False
+
+                self.handle = flux.Flux()
+
+                self._build_dependency_graph()
+            
+            def submit_wrapper(self):
+                # Submit wrapped jobs in topological order respecting dependencies
+                order = self._topological_order()
+                
+                for task_id in order:
+                    deps_jobids = []
+                    for parent_id in self.parents[task_id]:
+                        deps_jobids.append(self.jobids[parent_id])
+                    
+                    self.jobids[task_id] = self._submit_job(task_id, deps_jobids)
+
+                self._release_graph_memory()
+                
+                print("Wrapper submitted.")
+
+            def wait_for_completion(self):
+                self.pending_jobs = len(self.jobids)
+                
+                for task_id, jobid in self.jobids.items():
+                    future = flux.job.wait_async(self.handle, jobid)
+                    future.then(self._on_job_done, task_id)
+
+                self.handle.reactor_run()
+
+                if self.wrapper_failed:
+                    open("{self.name}_WRAPPER_FAILED",'w').close()
+            
+            def _build_dependency_graph(self):
+                # Build the dependency graph, with children containing their parents
+                for dependency in self.dependencies:
+                    parent = dependency["from"]
+                    child = dependency["to"]
+                    self.parents[child].append(parent)
+                    self.children[parent].append(child)
+
+            def _topological_order(self) -> List[str]:
+                indegree = {{task: len(self.parents.get(task, [])) for task in self.tasks}}
+                
+                queue = deque([task for task, d in indegree.items() if d == 0])
+                order = []
+
+                while queue:
+                    task = queue.popleft()
+                    order.append(task)
+                    
+                    for child in self.children[task]:
+                        indegree[child] -= 1
+                        if indegree[child] == 0:
+                            queue.append(child)
+                
+                return order
+            
+            def _submit_job(self, task_id: str, deps_jobids: list[str] | None = None) -> str:
+                task = self.tasks[task_id]
+
+                script_path = self.cwd + "/" + task_id + ".cmd"
+
+                specs = dict(
+                    script=script_path,
+                    name=task_id,
+                    cwd=self.cwd,
+                    output=script_path + ".out.0",
+                    error=script_path + ".err.0",
+                    env=os.environ.copy(),
+                    time_limit=task.get("wallclock", None)
+                )
+
+                nodes = task.get("nodes")
+                nslots = task.get("processors")
+                cores_per_slot = task.get("threads")
+                            
+                if nodes is not None:
+                    specs["nodes"] = nodes
+                    specs["exclusive"] = task.get("exclusive", False)
+                if nslots is not None:
+                    specs["nslots"] = nslots
+                if cores_per_slot is not None:
+                    specs["cores_per_slot"] = cores_per_slot
+                if deps_jobids is not None and len(deps_jobids) > 0:
+                    specs["dependency"] = [f"afterok:{{str(jobid)}}" for jobid in deps_jobids]
+
+                jobspec = JobspecV1.from_batch(**specs)
+
+                jobid = flux.job.submit(self.handle, jobspec, waitable=True)
+                print(f"Task {{task_id}} submitted ({{str(jobid)}})")
+
+                return jobid
+
+            def _on_job_done(self, future, task_id):
+                _, success, err = flux.job.wait_get_status(future)
+
+                if os.path.exists(task_id + "_COMPLETED"):
+                    print(f"Task completed: {{task_id}}")
+                else:
+                    if not success:
+                        print(f"Task failed: {{task_id}} -> {{err}}")
+                    else:
+                        print(f"Task failed: {{task_id}} -> error log not available")
+                    open(task_id + "_FAILED",'w').close()
+                    self.wrapper_failed = True
+
+                self.pending_jobs -= 1
+                if self.pending_jobs == 0:
+                    self.handle.reactor_stop()
+            
+            def _release_graph_memory(self):
+                # Release memory used by the graph after submission
+                del self.dag
+                del self.tasks
+                del self.dependencies
+                del self.cwd
+                del self.parents
+                del self.children
+                gc.collect()
+
+
+        def main():
+            with open(f"subworkflow_{self._unique_part}.json", "r") as f:
+                dag_json = f.read()
+            submitter = FluxWrapperSubmitter(dag_json)
+            submitter.submit_wrapper()
+            submitter.wait_for_completion()
+
+
+        if __name__ == "__main__":
+            main()
+        """)
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self, letters_count, digits_count):

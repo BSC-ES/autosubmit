@@ -215,7 +215,6 @@ class JobPackageBase:
 
     def send_files(self):
         """ Send local files to the platform. """
-        raise NotImplementedError  # pragma: no cover
 
     def process_jobs_to_submit(self, job_id: int) -> None:
         for job in self.jobs:
@@ -573,7 +572,6 @@ class JobPackageVertical(JobPackageThread):
     :type jobs:
     :param: dependency:
     """
-
     def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
                  wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
         if wrapper_info is None:
@@ -668,9 +666,9 @@ class JobPackageHorizontal(JobPackageThread):
 
     def __init__(self, jobs: list[Job], dependency: Optional[str] = None, jobs_resources: Optional[dict] = None,
                  method: str = 'ASThread', configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section="WRAPPERS"):
+                 wrapper_section="WRAPPERS", wrapper_info: list=None):
         super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources, configuration=configuration,
-                                                   wrapper_section=wrapper_section)
+                                                   wrapper_section=wrapper_section, wrapper_info=wrapper_info)
         self.method = method
         self._queue = self.queue
         for job in jobs:
@@ -697,17 +695,19 @@ class JobPackageHorizontal(JobPackageThread):
 
 class JobPackageHybrid(JobPackageThread):
     """
-        Class to manage a hybrid (horizontal and vertical) thread-based package of jobs to be submitted by autosubmit
-        """
+    Class to manage a hybrid (horizontal and vertical) thread-based package of jobs to be submitted by autosubmit
+    """
 
     def __init__(self, jobs: list[list[Job]], num_processors: str, total_wallclock, dependency=None,
                  jobs_resources: Optional[dict] = None, method: str = "ASThread",
-                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS"):
+                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS",
+                 wrapper_info: list = None):
         all_jobs = [item for sublist in jobs for item in sublist]  # flatten list
         if jobs_resources is None:
             jobs_resources = {}
         super(JobPackageHybrid, self).__init__(all_jobs, dependency, jobs_resources, method,
-                                               configuration=configuration, wrapper_section=wrapper_section)
+                                               configuration=configuration, wrapper_section=wrapper_section,
+                                               wrapper_info=wrapper_info)
         self.jobs_lists = jobs
         self.method = method
         self._num_processors = int(num_processors)
@@ -758,3 +758,72 @@ class JobPackageHorizontalVertical(JobPackageHybrid):
                                                  threads=self._threads, method=self.method.lower(),
                                                  partition=self.partition, wrapper_data=self,
                                                  num_processors_value=self._num_processors)
+
+class JobPackageDelegated(JobPackageThread):
+    """
+    Class to manage adaptative hybrid wrappers handled by external (delegated) scheduling tools.
+    Delegated wrappers default method is Flux.
+
+    :param jobs: List of jobs that constitute the package.
+    :type jobs: list[Job]
+    :param subworkflow: The representation of the package task graph, in JSON string format.
+    :type subworkflow: str
+    :param num_processors: The processor request.
+    :type num_processors: int
+    :param total_wallclock: Total wallclock of the package.
+    :type total_wallclock: str
+    :param dependency: Dependency.
+    :param jobs_resources: Resource dictionary.
+    :type jobs_resources: Optional[dict]
+    :param method: Method to be used to handle the task execution remotely. Defaults to "flux".
+    :type method: str
+    :param configuration: as_config.
+    :type configuration: Optional['AutosubmitConfig']
+    :param wrapper_section: Wrapper section in the configuration, defaults to "WRAPPERS".
+    :type wrapper_section: str
+    :param wrapper_info: Wrapper parameters.
+    :type wrapper_info: Optional[list]
+    """
+
+    def __init__(self, jobs: list[Job], subworkflow: str, num_processors: int, total_wallclock: str, max_height: int,
+                 max_width: int, dependency=None, jobs_resources: Optional[dict] = None, method: str = "flux",
+                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS",
+                 wrapper_info: Optional[list] = None, custom_env_setup=""):
+        super(JobPackageDelegated, self).__init__(jobs, dependency, jobs_resources, method, configuration=configuration, 
+                                            wrapper_section=wrapper_section, wrapper_info=wrapper_info)
+        self.name = f"{self._expid}_WRAPPER_{jobs_in_wrapper_str(configuration, self.current_wrapper_section)}_{str(int(time.time())) + str(random.randint(1, 10000))}_{self._num_processors}_{len(self._jobs)}"
+        self.method = method
+        self.max_height = max_height
+        self.max_width = max_width
+        self._subworkflow = subworkflow
+        self._subworkflow_path = None
+        self._num_processors = num_processors
+        self._threads = 1 # TODO: [ENGINES] Should receive it
+        self._wallclock = total_wallclock
+        self.custom_env_setup = custom_env_setup
+
+    def send_files(self) -> None:
+        super().send_files()
+        if self._subworkflow_path:
+            self.platform.send_file(self._subworkflow_path)
+
+    def _common_script_content(self) -> str:
+        return self._wrapper_factory.get_wrapper(self._wrapper_factory.delegated_wrapper,
+                                                 name=self.name, queue=self._queue, project=self._project,
+                                                 wallclock=self._wallclock, num_processors=self._num_processors,
+                                                 jobs_scripts=self._jobs_scripts, dependency=self._job_dependency,
+                                                 jobs_resources=self._jobs_resources, expid=self._expid,
+                                                 rootdir=self.platform.root_dir, directives=self._custom_directives,
+                                                 threads=self._threads, method=self.method.lower(), type="delegated",
+                                                 partition=self.partition, wrapper_data=self,
+                                                 num_processors_value=self._num_processors)
+    
+    def _create_scripts(self, configuration) -> None:
+        super()._create_scripts(configuration)
+        self._subworkflow_path = self._create_subworkflow_file('_'.join(self.name.split('_')[2:]))
+
+    def _create_subworkflow_file(self, unique_part) -> None:
+        script_file = f'subworkflow_{unique_part}.json'
+        open(os.path.join(self._tmp_path, script_file), 'wb').write(self._subworkflow.encode('UTF-8'))
+        os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
+        return script_file

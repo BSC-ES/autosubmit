@@ -98,6 +98,7 @@
 - Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
 - Changed JOBS_IN_WRAPPER unknown job from critical error to warning #3006
 - Added ``ECACCESS_RETRIES`` platform config key to configure SSL retries for ecaccess platforms. Defaults to 100 #3059
+- Now Autosubmit supports delegated wrappers. This enables the in situ management of wrappers on HPC platforms. The new 'Flux' wrapping method is now available for delegated wrappers [#2968](https://github.com/BSC-ES/autosubmit/issues/2968)
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

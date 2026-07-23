@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2017-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2017-2026 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
 
@@ -287,7 +287,7 @@ class SlurmHeader(object):
 
     def get_tasks_per_node(self, job: 'Job', parameters: dict = None, het=-1) -> str:
         """
-        Returns memory per task directive for the specified job
+        Returns tasks per node directive for the specified job
 
         :param job: job to create directive `TASKS` for SLURM HEADER
         :type job: Job
@@ -332,13 +332,14 @@ class SlurmHeader(object):
     """
         else:
             wr_header = self.calculate_wrapper_het_header(kwargs["wrapper_data"])
-        if kwargs["method"] == 'srun':
-            language = kwargs["executable"]
+
+        language = kwargs["executable"]
+
+        if kwargs["method"] == 'srun' or kwargs['wrapper_data'].wrapper_type.lower() == 'delegated':
             if language is None or len(language) == 0:
                 language = "#!/bin/bash"
             return language + wr_header
         else:
-            language = kwargs["executable"]
             if language is None or len(language) == 0 or "bash" in language:
                 language = "#!/usr/bin/env python3"
             return language + wr_header
