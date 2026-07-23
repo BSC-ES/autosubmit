@@ -15,11 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import argparse
+
 import pytest
 from portalocker.exceptions import BaseLockException
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
-from autosubmit.scripts.autosubmit import delete_lock_file, exit_from_error
+from autosubmit.scripts.autosubmit import _owns_lock, delete_lock_file, exit_from_error, main
 
 
 def test_delete_lockfile(tmp_path):
@@ -34,18 +36,14 @@ def test_delete_lockfile(tmp_path):
 
 
 def test_log_critical_raises_error(mocker):
-    """TODO: this probably should never happen?"""
-
     def _fn():
         raise ValueError
 
     try:
         _fn()
     except BaseException as e:
-        mocker.patch('autosubmit.scripts.autosubmit._exit')  # mock this to avoid the system from exiting
         mocked_log = mocker.patch('autosubmit.scripts.autosubmit.Log')
         mocked_print = mocker.patch('autosubmit.scripts.autosubmit.print')
-
         mocked_log.critical.side_effect = BaseException()
         with pytest.raises(BaseException):
             exit_from_error(e)
@@ -58,42 +56,83 @@ _TEST_EXCEPTION.trace = 'a trace'
 
 
 @pytest.mark.parametrize(
-    'exception,debug_calls,critical_calls,delete_called',
+    'exception,lock_path_provided,delete_called',
     [
-        (ValueError, 0, 2, True),
-        (BaseLockException, 0, 1, False),
-        (AutosubmitCritical, 0, 2, True),
-        (_TEST_EXCEPTION, 0, 3, True),
-        (AutosubmitError, 0, 2, True)
+        (ValueError, True, True),
+        (AutosubmitCritical, True, True),
+        (_TEST_EXCEPTION, True, True),
+        (AutosubmitError, True, True),
+        (BaseLockException, True, False),
+        (BaseLockException, False, False),
+        (ValueError, False, False),
+        (AutosubmitCritical, False, False),
+        (AutosubmitError, False, False),
     ],
     ids=[
-        'normal_exception',
-        'portalocker_exception',
-        'autosubmit_critical',
-        'autosubmit_critical_with_trace',
-        'autosubmit_error'
+        'normal_exception_with_lock_path',
+        'autosubmit_critical_with_lock_path',
+        'autosubmit_critical_with_trace_with_lock_path',
+        'autosubmit_error_with_lock_path',
+        'portalocker_with_lock_path',
+        'portalocker_without_lock_path',
+        'normal_exception_without_lock_path',
+        'autosubmit_critical_without_lock_path',
+        'autosubmit_error_without_lock_path',
     ]
 )
-def test_exit_from_error(
-        mocker,
-        tmp_path,
-        exception: BaseException,
-        debug_calls: int,
-        critical_calls: int,
-        delete_called: bool
-):
+def test_exit_from_error(mocker, tmp_path, exception, lock_path_provided, delete_called):
     def _fn():
         raise exception
 
     try:
         _fn()
     except BaseException as e:
-        mocker.patch('autosubmit.scripts.autosubmit._exit')  # mock this to avoid the system from exiting
-        mocked_log = mocker.patch('autosubmit.scripts.autosubmit.Log')
+        mocker.patch('autosubmit.scripts.autosubmit.Log')
         mocked_delete = mocker.patch('autosubmit.scripts.autosubmit.delete_lock_file')
-
-        exit_from_error(e)
-
-        assert mocked_log.debug.call_count == debug_calls
-        assert mocked_log.critical.call_count == critical_calls
+        lock_path = str(tmp_path) if lock_path_provided else None
+        exit_from_error(e, lock_path)
         assert mocked_delete.called == delete_called
+
+
+@pytest.mark.parametrize(
+    'command,expected',
+    [
+        ('run', True),
+        ('create', True),
+        ('recovery', True),
+        ('setstatus', True),
+        ('pklfix', True),
+        ('inspect', False),
+        ('monitor', False),
+        ('archive', False),
+    ]
+)
+def test_owns_lock(command, expected):
+    args = argparse.Namespace(command=command, expid='a000')
+    assert _owns_lock(args) is expected
+
+
+def test_owns_lock_handles_none_args():
+    assert _owns_lock(None) is False
+    assert _owns_lock(argparse.Namespace()) is False
+
+
+@pytest.mark.parametrize(
+    'command,should_delete',
+    [
+        ('run', True),
+        ('create', True),
+        ('inspect', False),
+        ('monitor', False),
+        ('archive', False),
+    ]
+)
+def test_main_only_deletes_lock_for_restrictive_commands(mocker, command, should_delete):
+    args = argparse.Namespace(command=command, expid='a000')
+    mocker.patch('autosubmit.scripts.autosubmit.Autosubmit.parse_args', return_value=(0, args))
+    mocker.patch('autosubmit.scripts.autosubmit.Autosubmit.run_command', return_value=0)
+    mocked_delete = mocker.patch('autosubmit.scripts.autosubmit.delete_lock_file')
+
+    main()
+
+    assert mocked_delete.called is should_delete
