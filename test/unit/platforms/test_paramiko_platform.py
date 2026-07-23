@@ -204,8 +204,8 @@ Host mn5-gpp
 @pytest.mark.parametrize(
     "user,env_ssh_config_defined",
     [
-        (os.environ["USER"], True),
-        (os.environ["USER"], False),
+        (None, True),
+        (None, False),
         ("dummy-one", True),
         ("dummy-one", False),
         ("not-exists", True),
@@ -220,7 +220,9 @@ Host mn5-gpp
         "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(not defined)"
     ]
 )
-def test__get_user_config_file(user: str, env_ssh_config_defined: bool, tmpdir, autosubmit_config, generate_all_files):
+def test__get_user_config_file(user: Optional[str], env_ssh_config_defined: bool, tmpdir, autosubmit_config, generate_all_files):
+    if not user:
+        user = getuser()
     tmp_dir = str(tmpdir)
     experiment_data = {
         "ROOTDIR": tmp_dir,
