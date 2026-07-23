@@ -2661,7 +2661,6 @@ class JobList(object):
         Log.debug(f"Jobs loaded: {len(self.job_list)}")
         Log.debug(f"Edges loaded: {len(self.graph_dict)}")
         self.update_wrappers_references()
-
         return len(self.get_active()) > 0
 
     def unload_finished_jobs(self):
@@ -3372,7 +3371,7 @@ class JobList(object):
             tmp = [parent for parent in job.parents if
                    parent.status == Status.COMPLETED or parent.status == Status.SKIPPED]
 
-            if not job.parents or (len(tmp) == len(job.parents) and self.check_all_edges_fail_ok(job)):
+            if not job.parents or len(tmp) == len(job.parents) or self.check_all_edges_fail_ok(job):
                 Log.debug(f"Setting job: {job.name} status to: READY (all parents completed)...")
                 job.status = Status.READY
                 job.hold = False

@@ -589,6 +589,60 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
     assert '999' not in fake_job_list.job_package_map
 
 
+@pytest.mark.parametrize(
+    "parent_statuses,fail_ok,expected",
+    [
+        ([], False, True),
+        ([Status.COMPLETED], False, True),
+        ([Status.COMPLETED, Status.COMPLETED], False, True),
+        ([Status.COMPLETED, Status.SKIPPED], False, True),
+        ([Status.FAILED], True, True),
+        ([Status.FAILED, Status.COMPLETED], True, True),
+        ([Status.FAILED], False, False),
+        ([Status.FAILED, Status.RUNNING], True, True),
+        ([Status.COMPLETED, Status.FAILED], True, True),
+        ([Status.COMPLETED, Status.FAILED], False, False),
+    ],
+    ids=[
+        "no_parents",
+        "all_completed",
+        "all_completed_multiple",
+        "all_completed_or_skipped",
+        "single_failed_fail_ok",
+        "mixed_failed_fail_ok_and_completed",
+        "single_failed_no_fail_ok",
+        "all_failed_fail_ok",
+        "mixed_fail_ok",
+        "mixed_no_fail_ok_blocks",
+    ]
+)
+def test_update_waiting_and_delayed_jobs(
+    as_conf,
+    tmp_path,
+    parent_statuses: Any,
+    fail_ok: bool,
+    expected: bool,
+) -> None:
+    """Test _update_waiting_and_delayed_jobs with different parent/fail_ok combinations."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    job_list.graph = networkx.DiGraph()
+    child = Job("child", 99, Status.WAITING, 0)
+    job_list.add_job(child)
+
+    for i, status in enumerate(parent_statuses):
+        parent = Job(f"parent{i}", i, status, 0)
+        job_list.add_job(parent)
+        job_list.graph.add_edge(parent.name, child.name, fail_ok=fail_ok)
+
+    job_list.fill_parents_children()
+    job_list._update_waiting_and_delayed_jobs()
+
+    if expected:
+        assert child.status == Status.READY
+    else:
+        assert child.status == Status.WAITING
+
+
 def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     """recover_last_data migrates and queries an old-schema database without crashing."""
     db_dir = tmp_path / "metadata" / "data"

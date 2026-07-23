@@ -2698,7 +2698,7 @@ def test_apply_io_safe_wait_resets_finished_time(mocker):
     (True, Status.RUNNING, True, Status.RUNNING, Status.RUNNING),
     (True, Status.RUNNING, False, Status.RUNNING, Status.RUNNING),
     (True, Status.FAILED, True, Status.RUNNING, Status.FAILED),
-    (True, Status.QUEUING, True, Status.RUNNING, Status.RUNNING),
+    (True, Status.QUEUING, True, Status.RUNNING, Status.QUEUING),
     (True, Status.QUEUING, False, Status.RUNNING, Status.QUEUING),
     (True, Status.COMPLETED, True, Status.RUNNING, Status.COMPLETED),
 ])
@@ -2744,7 +2744,7 @@ def test_finalize_wrapper_completion(inner_statuses, wrapper_status, expected_sa
     mocker.patch("autosubmit.job.job.Job.update_status")
     mock_log = mocker.patch("autosubmit.job.job.Log.warning")
 
-    result = wrapper._finalize_wrapper_completion(wrapper.as_config)
+    result = wrapper._finalize_wrapper_completion()
     assert result == expected_save
     if wrapper_status == Status.FAILED:
         mock_log.assert_called_once()
@@ -3070,15 +3070,12 @@ def test_recover_log_queues_recovery(mocker):
     assert job.log_recovery_call_count == 1
 
 
-def test_compute_inner_job_status_triggers_recover_log(mocker):
+def test_compute_inner_job_status_returns_stat_when_done(mocker):
     inner = Job("inner", 2, Status.FAILED, 0)
     inner._retrials = 3
     inner.wrapper_type = "vertical"
     wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
-    mock_recover = mocker.patch("autosubmit.job.job.Job.recover_log")
-    mocker.patch.object(WrapperJob, "_inner_job_can_run", return_value=True)
 
     result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
 
-    mock_recover.assert_called_once_with(wrapper.as_config)
-    assert result == Status.RUNNING
+    assert result == Status.FAILED

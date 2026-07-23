@@ -3324,7 +3324,7 @@ class WrapperJob(Job):
         return keep_alive if keep_alive is not None else current_stat
 
     def _compute_inner_job_status(self, inner_job: Job, stat_statuses: dict,
-                                  wrapper_is_done: bool) -> Status:
+                                  wrapper_is_done: bool) -> int:
         """Determine the new status for a single inner job.
         :param inner_job: The inner job to compute the status for.
         :type inner_job: Job
@@ -3333,26 +3333,21 @@ class WrapperJob(Job):
         :param wrapper_is_done: Whether the wrapper job is in a done state (COMPLETED or FAILED).
         :type wrapper_is_done: bool
         :return: The new status for the inner job.
-        :rtype: Status
+        :rtype: int
         """
-        if not self._inner_job_can_run(inner_job, self.job_list):
-            return Status.SUBMITTED
+        fallback = Status.WAITING if wrapper_is_done else Status.SUBMITTED
 
-        stat = stat_statuses.get(inner_job.name, inner_job.status)
+        stat = stat_statuses.get(inner_job.name, fallback)
 
-        if stat == Status.RUNNING and wrapper_is_done:
-            return self._apply_io_safe_wait(inner_job, Status.RUNNING, Status.FAILED)
-        elif stat == Status.FAILED and inner_job.can_retry and inner_job.wrapper_type == "vertical":
-            Log.info("f!!there should be 4 records of this")
-            # This is not called!
-            inner_job.recover_log(self.as_config)
-            inner_job.inc_fail_count()
-            stat = Status.RUNNING
-        elif stat == Status.QUEUING and wrapper_is_done:
-            return self._apply_io_safe_wait(inner_job, Status.QUEUING, Status.QUEUING,
-                                            keep_alive=Status.RUNNING)
+        if stat in (Status.COMPLETED, Status.FAILED, Status.RUNNING):
+            if inner_job.can_retry and inner_job.wrapper_type == "vertical":
+                inner_job.inc_fail_count()
+            return stat
 
-        return stat
+        elif stat is None or not self._inner_job_can_run(inner_job, self.job_list):
+            return fallback
+
+        return inner_job.status
 
     def _check_wrapper_wallclock_and_handle(self) -> bool:
         """Return True if over-wallclock and handled (wrapper set to FAILED)."""
@@ -3383,21 +3378,10 @@ class WrapperJob(Job):
         for inner_job in [inner_job for inner_job in self.job_list if inner_job.status != inner_job.new_status]:
             inner_job.update_status(as_conf)
 
-    def _finalize_wrapper_completion(self, as_conf: AutosubmitConfig) -> bool:
-        """Reset pending inner jobs to WAITING and log. Returns True if save is needed.
-        :param as_conf: Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
-        """
-        pending = [Status.QUEUING, Status.SUBMITTED, Status.RUNNING]
-
+    def _finalize_wrapper_completion(self) -> bool:
         if any(inner_job.status == Status.RUNNING or (inner_job.status == Status.FAILED and inner_job.can_retry) for inner_job in self.job_list):
             self.status = Status.RUNNING
-            return False  # Not finalized yet
-
-        for inner_job in (j for j in self.job_list if j.status in pending):
-            if inner_job.status in [Status.QUEUING, Status.SUBMITTED]:
-                inner_job.new_status = Status.WAITING
-                inner_job.update_status(as_conf)
+            return False
 
         if self.status == Status.COMPLETED:
             Log.result(f"Wrapper job {self.name} and id {self.id} finished with status {self.status_str}.")
@@ -3439,7 +3423,7 @@ class WrapperJob(Job):
         self.status = self.new_status
 
         if self.status in [Status.COMPLETED, Status.FAILED]:
-            save = self._finalize_wrapper_completion(as_conf)
+            save = self._finalize_wrapper_completion()
         elif self.status != self.prev_status:
             Log.debug(f"Wrapper job {self.name} and id {self.id} status updated to {self.status_str}.")
             save = True

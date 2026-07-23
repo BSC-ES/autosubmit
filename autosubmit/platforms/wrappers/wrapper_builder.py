@@ -182,8 +182,9 @@ class PythonWrapperBuilder(WrapperBuilder):
         sys.stderr.write('[INFO] JOBID=' + _as_job_id + '\\n')
         from pathlib import Path
         import atexit
+        prev_count = {self.fail_count} - 1
         stat_file = Path.cwd() / f"{self.name}_STAT_{self.fail_count}"
-        prev_stat = Path.cwd() / f"{self.name}_STAT_{{{self.fail_count} - 1}}"
+        prev_stat = Path.cwd() / f"{self.name}_STAT_{{prev_count}}"
         try:
             with open(prev_stat) as f:
                 lines = f.readlines()
