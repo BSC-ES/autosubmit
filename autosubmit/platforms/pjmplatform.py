@@ -153,7 +153,7 @@ class PJMPlatform(ParamikoPlatform):
             return False
 
     def parse_all_jobs_output(self, output, job_id):
-        status = ""
+        status = []
         try:
             status = [x.split()[1] for x in output.splitlines()
                       if x.split()[0] == str(job_id)]
@@ -228,6 +228,22 @@ class PJMPlatform(ParamikoPlatform):
         if len(reason) > 0:
             return reason[0]
         return reason
+
+    def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str):
+        """Gets the command to submit a job, for the current platform, with the given parameters.
+         This needs to be adapted to each scheduler, the default assumes that is being launched directly.
+
+        :param script_name: name of the script to submit
+        :type script_name: str
+        :param pre: command part to be placed before the script name, e.g. timeout, export, executable
+        :type pre: str
+        :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
+        :type post: str
+        :param x11_options: x11 options to run the script, if any
+        :type x11_options: str
+        :return: command to submit a job
+        """
+        return f"{self._submit_command_name} --no-check-directory {script_name} {x11_options} {post} & echo $!"
 
     def wrapper_header(self, **kwargs):
         wr_header = textwrap.dedent(f"""
@@ -350,7 +366,7 @@ class PJMPlatform(ParamikoPlatform):
         if not job_names:
             return ""
 
-        commands = " ; ".join(
+        commands = "+".join(
             f'pjstat -v --choose jid,jnam --filter "jnam={job_name}"'
             for job_name in job_names
         )
