@@ -36,7 +36,7 @@ import paramiko
 import Xlib.support.connect as xlib_connect
 from bscearth.utils.date import date2str
 from paramiko import ProxyCommand
-from paramiko.agent import Agent
+from paramiko.channel import Channel, ChannelFile
 from paramiko.ssh_exception import SSHException
 
 from autosubmit.job.job_common import Status
@@ -45,7 +45,6 @@ from autosubmit.platforms.platform import Platform
 
 if TYPE_CHECKING:
     # Avoid circular imports
-    from paramiko.channel import Channel
 
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job import Job
@@ -153,16 +152,17 @@ class ParamikoPlatform(Platform):
         :param auth_password: Optional password for 2FA.
         """
         Platform.__init__(self, expid, name, config, auth_password=auth_password)
+        self.host: str = ""
         self._proxy: Optional[ProxyCommand] = None
-        self._ssh_output_err = ""
+        self._ssh_output_err: str = ""
         self.connected = False
         self._default_queue = None
         self.job_status: Optional[dict[str, list]] = None
         self._ssh: Optional[paramiko.SSHClient] = None
-        self._ssh_config = None
-        self._ssh_output = ""
-        self._host_config: Optional[dict] = None
-        self._host_config_id = None
+        self._ssh_config: Optional[paramiko.SSHConfig] = None
+        self._ssh_output: str = ""
+        self._host_config: Optional[paramiko.SSHConfigDict] = None
+        self._host_config_id: Optional[int] = None
         self.submit_cmd = ""
         self._ftpChannel: Optional[paramiko.SFTPClient] = None
         self.transport: Optional[paramiko.Transport] = None
@@ -175,13 +175,13 @@ class ParamikoPlatform(Platform):
 
         self.remove_log_files_on_transfer = False
         if self.config:
-            platform_config = self.config.get("PLATFORMS", {}).get(
+            platform_config: dict = self.config.get("PLATFORMS", {}).get(
                 self.name.upper(), {}
             )
             self.remove_log_files_on_transfer = platform_config.get(
                 "REMOVE_LOG_FILES_ON_TRANSFER", False
             )
-        self._uses_local_api = False
+        self._uses_local_api: bool = False
         # Pre-submission snapshot used by get_submitted_jobs_by_name to exclude
         # stale processes from previous runs on process-based platforms.
         self._pre_submission_pids: dict[str, set[int]] = {}
@@ -207,7 +207,7 @@ class ParamikoPlatform(Platform):
     def reset(self):
         self.close_connection()
         self.connected = False
-        self._ssh = None
+        self._ssh = paramiko.SSHClient()
         self._ssh_config = None
         self._ssh_output = ""
         self._host_config = None
@@ -309,8 +309,8 @@ class ParamikoPlatform(Platform):
         :return: True if authentication was successful, False otherwise
         """
         try:
-            self._ssh._agent = Agent()
-            for key in self._ssh._agent.get_keys():
+            self._agent = paramiko.Agent()
+            for key in self._agent.get_keys():
                 if not hasattr(key, "public_blob"):
                     key.public_blob = None
             self._ssh.connect(self._host_config['hostname'], port=port, username=self.user, timeout=60,
@@ -411,6 +411,8 @@ class ParamikoPlatform(Platform):
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60, banner_timeout=60,
                                               disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
+                if self._ssh is None:
+                    raise AutosubmitError("SSH connection not initialized")
                 self.transport = self._ssh.get_transport()
                 self.transport.banner_timeout = 60
             else:
@@ -419,6 +421,8 @@ class ParamikoPlatform(Platform):
                 Log.warning("If you are using a token, please type the token code when asked")
 
                 self.transport = paramiko.Transport((self._host_config['hostname'], port))
+                if self.transport is None:
+                    raise AutosubmitError("Failure to create a new SSH session to the server")
                 self.transport.start_client()
 
                 try:
@@ -429,14 +433,15 @@ class ParamikoPlatform(Platform):
                 except Exception as e:
                     Log.printlog(f"2FA authentication failed: {str(e)}", 7000)
                     raise
-                if self.transport.is_authenticated():
-                    self._ssh._transport = self.transport
+                if self.transport is not None and self.transport.is_authenticated():
                     self.transport.banner_timeout = 60
                 else:
                     self.transport.close()
                     raise SSHException
             self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport, window_size=pow(4, 12),
                                                                   max_packet_size=pow(4, 12))
+            if self._ftpChannel is None:
+                raise AutosubmitError("Failure to communicate with the server")
             self._ftpChannel.get_channel().settimeout(120)
             self.connected = True
             if not log_recovery_process:
@@ -674,7 +679,7 @@ class ParamikoPlatform(Platform):
         self.send_command(check_energy_cmd)
         return self.get_ssh_output()
 
-    def submit_multiple_jobs(self, script_names: dict[str, 'JobPackageBase']) -> list[int]:
+    def submit_multiple_jobs(self, script_names: dict[str, 'JobPackageBase']) -> list[str]:
         """Submit multiple scripts to the platform.
 
         :param script_names: Script filenames to submit on the remote
@@ -685,7 +690,7 @@ class ParamikoPlatform(Platform):
         :raises AutosubmitCritical: If Slurm reports a critical submission
             failure.
         :return: Submitted Slurm job identifiers in submission order.
-        :rtype: list[int]
+        :rtype: list[str]
         """
 
         if not script_names:
@@ -755,7 +760,7 @@ class ParamikoPlatform(Platform):
                             pre.setdefault(stem, set()).add(pid)
             self._pre_submission_pids = pre
 
-    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
+    def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[str]:
         """Return submitted process IDs by script name.
 
         This is a fallback used when the submission command does not return
@@ -771,7 +776,7 @@ class ParamikoPlatform(Platform):
         :type script_names: list[str]
         :return: Matching process IDs in submission order, one per script.
             Returns an empty list if any script has no newly submitted process.
-        :rtype: list[int]
+        :rtype: list[str]
         """
         output = self._get_process_list_output()
         if not output:
@@ -794,7 +799,7 @@ class ParamikoPlatform(Platform):
             new_pids = all_pids - self._pre_submission_pids.get(stem, set())
             if not new_pids:
                 return []
-            submitted_pids.append(max(new_pids))
+            submitted_pids.append(str(max(new_pids)))
 
         return submitted_pids
 
@@ -1236,8 +1241,8 @@ class ParamikoPlatform(Platform):
                             del self.channels[fd]
 
     def exec_command(
-            self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False
-    ) -> Union[tuple[paramiko.ChannelFile, paramiko.ChannelFile, paramiko.ChannelFile], tuple[bool, bool, bool]]:
+            self, command, bufsize=-1, retries=3, x11=False
+    ) -> tuple[ChannelFile, ChannelFile, ChannelFile]:
         """Execute a command on the SSH server.
 
         A new ``.Channel`` is open and the requested command is executed.
@@ -1250,13 +1255,13 @@ class ParamikoPlatform(Platform):
         :type command: str
         :param bufsize: interpreted the same way as by the built-in ``file()`` function in Python.
         :type bufsize: int
-        :param timeout: set command's channel timeout. See ``Channel.settimeout``.
-        :type timeout: int
         :return: the stdin, stdout, and stderr of the executing command
         """
         for retry in range(retries):
             Log.debug(f'Executing command {command}, retry #{retry + 1} out of {retries}')
             try:
+                if self.transport is None:
+                    raise ConnectionError("Transport is not available")
                 chan: Channel = self.transport.open_session()
 
                 if x11:
@@ -1298,8 +1303,8 @@ class ParamikoPlatform(Platform):
                 #        earlier...).
                 #        https://github.com/BSC-ES/autosubmit/issues/2439
                 # chan.settimeout(timeout)
+        raise AutosubmitError(f'Failed to send (with retries) SSH command {command}', 6005)
 
-        return False, False, False
 
     def send_command(self, command: str, ignore_log=False, x11=False) -> bool:
         """Sends a given command to an HPC platform.
@@ -1316,9 +1321,6 @@ class ParamikoPlatform(Platform):
 
         try:
             stdin, stdout, stderr = self.exec_command(command, x11=x11)
-
-            if (False, False, False) == (stdin, stdout, stderr):
-                raise AutosubmitError(f'Failed to send (with retries) SSH command {command}', 6005)
 
             channel = stdout.channel
             if not x11:
@@ -1426,7 +1428,7 @@ class ParamikoPlatform(Platform):
             timeout = package.timeout if package.timeout else 0
             x11_options = package.x11_options.strip("")
             cmd_list.append(
-                f"{self.get_call(abs_path, timeout, export, package.executable if not self.has_scheduler and not self._uses_local_api else None, x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if not self.has_scheduler and not self._uses_local_api and not x11_options else False)}")
+                f"{self.get_call(abs_path, timeout, export, package.executable if not self.has_scheduler and not self._uses_local_api else '', x11_options, package.fail_count, package.ec_queue, redirect_out_err=True if not self.has_scheduler and not self._uses_local_api and not x11_options else False)}")
 
         return " ;".join(cmd_list)
 
@@ -1592,19 +1594,15 @@ class ParamikoPlatform(Platform):
             if self._ftpChannel:
                 self._ftpChannel.close()
         with suppress(Exception):
-            if self._ssh._agent:  # May not be in all runs
-                self._ssh._agent.close()
-        with suppress(Exception):
-            if self._ssh._transport:
-                self._ssh._transport.close()
-                self._ssh._transport.stop_thread()
-        with suppress(Exception):
-            if self._ssh:
-                self._ssh.close()
+            if self._agent:  # May not be in all runs
+                self._agent.close()
         with suppress(Exception):
             if self.transport:
                 self.transport.close()
                 self.transport.stop_thread()
+        with suppress(Exception):
+            if self._ssh:
+                self._ssh.close()
 
     def check_remote_permissions(self) -> bool:
         """Check remote permissions on a platform.
@@ -1778,6 +1776,7 @@ class ParamikoPlatform(Platform):
         """Retrieve multiple jobs identifiers.
 
         :param scripts_to_submit: Dictionary with (id => Job package) pairs to be processed.
+        :type scripts_to_submit: List[Any]
         """
         jobs_id: list[int] = self.submit_multiple_jobs(scripts_to_submit)
         for jobid_index, package in enumerate(scripts_to_submit.values()):
