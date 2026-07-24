@@ -20,7 +20,6 @@ import os
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Union
-from autosubmit.log.log import Log
 
 
 class BasicConfig:
@@ -220,9 +219,6 @@ class BasicConfig:
                 BasicConfig.__read_file_config(home_user_config_path)
             else:
                 if legacy_etc_rc_path.exists():
-                    Log.warning(
-                        "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
-                    )
                     BasicConfig.__read_file_config(legacy_etc_rc_path)
                 # Overwrite legacy config
                 if etc_rc_path.exists():

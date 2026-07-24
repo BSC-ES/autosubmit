@@ -94,41 +94,27 @@ def test_read_loads_etc_files_with_priority(
                 with patch(
                     "autosubmit.config.basicconfig.BasicConfig._update_config", Mock()
                 ):
-                    with patch(
-                        "autosubmit.config.basicconfig.Log.warning"
-                    ) as mock_log_warning:
-                        filename = "autosubmitrc"
-                        dot_filename = f".{filename}"
-                        user_config_path = Path(Path.cwd(), dot_filename)
-                        home_user_config_path = Path(Path.home(), dot_filename)
-                        etc_rc_path = Path("/etc", filename)
-                        legacy_etc_rc_path = Path("/etc", dot_filename)
+                    filename = "autosubmitrc"
+                    dot_filename = f".{filename}"
+                    user_config_path = Path(Path.cwd(), dot_filename)
+                    home_user_config_path = Path(Path.home(), dot_filename)
+                    etc_rc_path = Path("/etc", filename)
+                    legacy_etc_rc_path = Path("/etc", dot_filename)
 
-                        BasicConfig.read()
+                    BasicConfig.read()
 
-                        expected_read_calls = []
-                        if user_config:
-                            expected_read_calls = [call(user_config_path)]
-                        elif home_user_config:
-                            expected_read_calls = [call(home_user_config_path)]
-                        else:
-                            if legacy_etc_rc:
-                                expected_read_calls.append(call(legacy_etc_rc_path))
-                            if etc_rc:
-                                expected_read_calls.append(call(etc_rc_path))
+                    expected_read_calls = []
+                    if user_config:
+                        expected_read_calls = [call(user_config_path)]
+                    elif home_user_config:
+                        expected_read_calls = [call(home_user_config_path)]
+                    else:
+                        if legacy_etc_rc:
+                            expected_read_calls.append(call(legacy_etc_rc_path))
+                        if etc_rc:
+                            expected_read_calls.append(call(etc_rc_path))
 
-                        assert mock_read.call_args_list == expected_read_calls
-
-                        if (
-                            (not user_config)
-                            and (not home_user_config)
-                            and legacy_etc_rc
-                        ):
-                            mock_log_warning.assert_called_once_with(
-                                "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
-                            )
-                        else:
-                            mock_log_warning.assert_not_called()
+                    assert mock_read.call_args_list == expected_read_calls
 
 
 def test_read_overwrites_config_with_etc_files(tmp_path):

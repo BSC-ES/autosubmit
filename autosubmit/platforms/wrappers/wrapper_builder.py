@@ -604,7 +604,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                         input=filedata,
                         stdout=out_f,
                         stderr=err_f,
-                        text=True,
+                        universal_newlines=True,
                     )
                 (self.status) = (proc.returncode, '')
 
