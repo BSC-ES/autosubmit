@@ -1,0 +1,172 @@
+{
+    "$schema": "https://json-schema.org/draft-07/schema#",
+    "$id": "https://earth.bsc.es/autosubmit/autosubmit-schema",
+    "title": "Autosubmit schema",
+    "description": "Schema for the configuration of the autosubmit tool",
+    "type": "object",
+    "required": [
+        "CONFIG"
+    ],
+    "definitions": {
+        "nonEmptyString": {
+            "$type": "string",
+            "minLength": 1,
+            "description": "A string with at least one character."
+        },
+        "positiveInteger": {
+            "$type": "integer",
+            "minimum": 1,
+            "description": "An integer greater than zero."
+        },
+        "nonNegativeInteger": {
+            "$type": "integer",
+            "minimum": 0,
+            "description": "An integer greater than or equal to zero."
+        },
+        "boolean": {
+            "oneOf": [
+                {
+                    "type": "boolean"
+                },
+                {
+                    "type": "string",
+                    "enum": [
+                        "true",
+                        "false",
+                        "True",
+                        "False"
+                    ]
+                }
+            ],
+            "$description": "A boolean or a string representation of a boolean"
+        },
+        "wallclockFormat": {
+            "type": "string",
+            "pattern": "^\\d{2}:\\d{2}$",
+            "description": "Time in HH:MM format, e.g. '02:30'."
+        },
+        "configSection": {
+            "type": "object",
+            "description": "Core Autosubmit configuration",
+            "required": [
+                "AUTOSUBMIT_VERSION",
+                "MAXWAITINGJOBS",
+                "TOTALJOBS"
+            ],
+            "properties": {
+                "AUTOSUBMIT_VERSION": {
+                    "$ref": "#/definitions/nonEmptyString",
+                    "description": "Autosubmit version that created this experiment."
+                },
+                "MAXWAITINGJOBS": {
+                    "$ref": "#/definitions/positiveInteger",
+                    "description": "Max jobs allowed in WAITING status simultaneously."
+                },
+                "TOTALJOBS": {
+                    "$ref": "#/definitions/positiveInteger",
+                    "description": "Max concurrent running jobs."
+                },
+                "RETRIALS": {
+                    "$ref": "#/definitions/nonNegativeInteger",
+                    "default": 0,
+                    "description": "Automatic retry attempts for failed jobs."
+                },
+                "SAFETYSLEEPTIME": {
+                    "$ref": "#/definitions/positiveInteger",
+                    "default": 10,
+                    "description": "Sleep interval (s) between scheduler polls."
+                },
+                "JOB_WALLCLOCK": {
+                    "$ref": "#/definitions/wallclockFormat",
+                    "default": "24:00",
+                    "description": "Default wallclock limit for all jobs."
+                },
+                "MAX_WALLCLOCK": {
+                    "$ref": "#/definitions/wallclockFormat",
+                    "description": "Global max wallclock override."
+                },
+                "OUTPUT": {
+                    "type": "string",
+                    "default": "pdf",
+                    "description": "Report output format."
+                },
+                "RELOAD_WHILE_RUNNING": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Reload config while experiment is running."
+                },
+                "SAFE_PLACEHOLDERS": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Placeholder names excluded from dynamic variable substitution."
+                },
+                "CHUNKS": {
+                    "type": "string",
+                    "description": "Deprecated: number of chunks (use EXPERIMENT.NUMCHUNKS)."
+                }
+            },
+            "additionalProperties": false
+        },
+        "mailSection": {
+            "type": "object",
+            "description": "Mail configuration for notifications",
+            "properties": {
+                "NOTIFICATIONS": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable/disable email notifications."
+                },
+                "TO": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "description": "Recipient email address(es) for notifications."
+                },
+                "additionalProperties": false
+            }
+        },
+        "storageSection": {
+            "type": "object",
+            "description": "Persistence backend configuration.",
+            "properties": {
+                "TYPE": {
+                    "type": "string",
+                    "enum": [
+                        "pkl",
+                        "db"
+                    ],
+                    "default": "pkl",
+                    "description": "Storage backend type."
+                },
+                "COPY_REMOTE_LOGS": {
+                    "$ref": "#/definitions/booleanLike",
+                    "default": true,
+                    "description": "Copy remote logs to local storage."
+                }
+            },
+            "additionalProperties": false
+        },
+        "properties": {
+            "CONFIG": {
+                "$ref": "#/definitions/configSection"
+            },
+            "MAIL": {
+                "$ref": "#/definitions/mailSection"
+            },
+            "STORAGE": {
+                "$ref": "#/definitions/storageSection"
+            }
+        },
+        "additionalProperties": true
+    }
+}
