@@ -109,6 +109,9 @@
             },
             "additionalProperties": false
         },
+        "wrapperEntry": {
+
+        },
         "mailSection": {
             "type": "object",
             "description": "Mail configuration for notifications",
