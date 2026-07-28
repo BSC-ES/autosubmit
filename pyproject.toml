@@ -139,3 +139,11 @@ min_confidence = 70
 
 [project.entry-points.console_scripts]
 autosubmit = "autosubmit.scripts.autosubmit:main"
+
+[tool.ruff.lint]
+ignore = [
+    "DTZ005",
+    "E501",
+    "F401",
+    "FA102"
+]
