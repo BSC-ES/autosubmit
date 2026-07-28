@@ -25,13 +25,17 @@ from time import sleep, time
 from typing import TYPE_CHECKING
 
 import requests
-# noinspection PyProtectedMember
-from docker import from_env
 from testcontainers.core.container import DockerContainer  # type: ignore
 from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore
 
+# noinspection PyProtectedMember
+from docker import from_env
 from test.integration.test_utils.networking import get_free_port, wait_for_tcp_port
-from test.integration.test_utils.ssh import create_ssh_keypair_and_config, wait_for_ssh_port, mock_ssh_config_and_client
+from test.integration.test_utils.ssh import (
+    create_ssh_keypair_and_config,
+    mock_ssh_config_and_client,
+    wait_for_ssh_port,
+)
 
 if TYPE_CHECKING:
     from docker.models.containers import Container, ExecResult
@@ -42,17 +46,17 @@ __all__ = [
     'get_container_by_id',
     'get_containers_by_filter',
     'get_git_container',
-    'prepare_and_test_git_container',
-    'get_slurm_container',
-    'prepare_and_test_slurm_container',
-    'get_ssh_container',
-    'prepare_and_test_ssh_container',
-    'stop_test_containers',
-    'get_svn_container',
-    'prepare_and_test_svn_container',
     'get_mail_container',
+    'get_mailhog_messages',
+    'get_slurm_container',
+    'get_ssh_container',
+    'get_svn_container',
+    'prepare_and_test_git_container',
     'prepare_and_test_mail_container',
-    'get_mailhog_messages'
+    'prepare_and_test_slurm_container',
+    'prepare_and_test_ssh_container',
+    'prepare_and_test_svn_container',
+    'stop_test_containers'
 ]
 
 _SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
@@ -254,7 +258,7 @@ def prepare_and_test_slurm_container(
     #     "EOF"
     # ])
 
-    priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config_slurm')
+    _, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config_slurm')
 
     for authorized_keys_path in [Path('/root/.ssh/authorized_keys'), Path(f'/home/{user}/.ssh/authorized_keys')]:
         # noinspection PyProtectedMember
@@ -356,7 +360,7 @@ def prepare_and_test_ssh_container(
 
     ssh_path.mkdir()
 
-    priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config')
+    _priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config')
 
     wait_for_ssh_port('localhost', ssh_port, timeout=30)
 
@@ -511,9 +515,9 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
                     try:
                         container.stop(timeout=stop_timeout)
                     except Exception as e:
-                        print(f'Failed to stop container {container.id}: {str(e)}')
+                        print(f'Failed to stop container {container.id}: {e!s}')
         except Exception as e:
-            print(f'Failed to list containers with label {label}: {str(e)}')
+            print(f'Failed to list containers with label {label}: {e!s}')
 
     # Loop to wait for all containers to have really stopped.
     start = time()
@@ -537,4 +541,4 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
 
             sleep(1)
         except Exception as e:
-            print(f'Failed to list containers with label {label}: {str(e)}')
+            print(f'Failed to list containers with label {label}: {e!s}')
