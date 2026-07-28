@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Fixtures for integration tests."""
-from __future__ import annotations
 
 import configparser
 import io
@@ -107,7 +106,7 @@ class AutosubmitExperimentFixture(Protocol):
 
 
 @pytest.fixture(scope='session')
-def get_next_expid(tmp_path_factory: TempPathFactory) -> Callable[[], str]:
+def get_next_expid(tmp_path_factory: "TempPathFactory") -> Callable[[], str]:
     """Returns a factory to retrieve the next Autosubmit experiment ID.
 
     The returned experiment ID by the factory function is guaranteed to
@@ -136,9 +135,9 @@ def get_next_expid(tmp_path_factory: TempPathFactory) -> Callable[[], str]:
 @pytest.fixture
 def autosubmit_exp(
         autosubmit: Autosubmit,
-        request: FixtureRequest,
-        tmp_path: LocalPath,
-        mocker: MockerFixture,
+        request: "FixtureRequest",
+        tmp_path: "LocalPath",
+        mocker: "MockerFixture",
         get_next_expid: Callable[[], str]
 ) -> AutosubmitExperimentFixture:
     """Create an instance of ``Autosubmit`` with an experiment.
@@ -334,7 +333,7 @@ def paramiko_platform() -> Iterator[ParamikoPlatform]:
 
 
 @pytest.fixture(scope="function")
-def git_server(request, tmp_path) -> Generator[tuple[DockerContainer, Path, str], Any, None]:
+def git_server(request, tmp_path) -> Generator[tuple["DockerContainer", Path, str], Any, None]:
     # Start a container to serve it -- otherwise, we would have to use
     # `git -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
@@ -355,7 +354,7 @@ def git_server(request, tmp_path) -> Generator[tuple[DockerContainer, Path, str]
 
 
 @pytest.fixture(scope="function")
-def svn_server(request, tmp_path) -> Generator[tuple[DockerContainer, Path, str], Any, None]:
+def svn_server(request, tmp_path) -> Generator[tuple["DockerContainer", Path, str], Any, None]:
     # Start a container to serve it -- otherwise, we would have to use
     # `svn -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
@@ -382,7 +381,7 @@ def ps_platform() -> PsPlatform:
 
 
 @pytest.fixture(scope='function')
-def ssh_server(request, tmp_path: LocalPath, mocker: MockerFixture) -> Generator[Container, Any, None]:
+def ssh_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") -> Generator["Container", Any, None]:
     """Start a single Docker container serving SSH for integration tests."""
     container, ssh_port = get_ssh_container(mfa=False, x11=False)
     with container:
@@ -392,7 +391,7 @@ def ssh_server(request, tmp_path: LocalPath, mocker: MockerFixture) -> Generator
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_server(request, tmp_path: LocalPath, mocker: MockerFixture) -> Generator[Container, Any, None]:
+def ssh_x11_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") -> Generator["Container", Any, None]:
     """Get a running SSH server with X11 enabled (no MFA)."""
     container, ssh_port = get_ssh_container(mfa=False, x11=True)
     with container:
@@ -402,7 +401,7 @@ def ssh_x11_server(request, tmp_path: LocalPath, mocker: MockerFixture) -> Gener
 
 
 @pytest.fixture(scope='function')
-def ssh_x11_mfa_server(request, tmp_path: LocalPath, mocker: MockerFixture) -> Generator[Container, Any, None]:
+def ssh_x11_mfa_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") -> Generator["Container", Any, None]:
     """Get a running SSH server with X11 and MFA enabled."""
     container, ssh_port = get_ssh_container(mfa=True, x11=True)
     with container:
@@ -412,7 +411,7 @@ def ssh_x11_mfa_server(request, tmp_path: LocalPath, mocker: MockerFixture) -> G
 
 
 @pytest.fixture(scope="function")
-def slurm_server(request, tmp_path, mocker) -> Generator[Container, Any, None]:
+def slurm_server(request, tmp_path, mocker) -> Generator["Container", Any, None]:
     """Function-scoped fixture that creates a Slurm server container per test."""
     # TODO: Needed? If so, explain why.
     mocker.patch(
@@ -446,7 +445,7 @@ def ssh_fixture(request):
     return None
 
 @pytest.fixture(scope='session', autouse=True)
-def postgres_server(request: FixtureRequest) -> Generator[PostgresContainer | None, None, None]:
+def postgres_server(request: "FixtureRequest") -> Generator[PostgresContainer | None, None, None]:
     """Fixture to set up and tear down a Postgres database for testing.
 
     Enabled only if the mark 'postgres' was specified.
@@ -478,7 +477,7 @@ def postgres_server(request: FixtureRequest) -> Generator[PostgresContainer | No
             yield container
 
 @pytest.fixture(params=['postgres', 'sqlite'])
-def as_db(request: FixtureRequest, autosubmit: Autosubmit, tmp_path: LocalPath, postgres_server: DockerContainer,
+def as_db(request: "FixtureRequest", autosubmit: Autosubmit, tmp_path: "LocalPath", postgres_server: "DockerContainer",
           autosubmit_exp, monkeypatch):
     """A parametrized fixture that creates the autosubmitrc file for databases.
 
@@ -548,7 +547,7 @@ def as_db(request: FixtureRequest, autosubmit: Autosubmit, tmp_path: LocalPath, 
 
 
 @pytest.fixture(scope='function', autouse=True)
-def setup_as_logs_pytest(tmp_path: LocalPath) -> None:
+def setup_as_logs_pytest(tmp_path: "LocalPath") -> None:
     """Sets up Autosubmit logs to redirect to a Pytest directory."""
     Log.set_file(
         str(Path(tmp_path, 'as_log_out.txt')),
@@ -581,9 +580,9 @@ def copy_content_from_containers(request, log_name, path_to_docker=""):
     if has_failures and log_name in func_args and func_args[log_name]:
         container_in_use: Container
         if log_name == 'git_server':
-            container_in_use: Container = func_args[log_name][0].get_wrapped_container()
+            container_in_use = func_args[log_name][0].get_wrapped_container()
         else:
-            container_in_use: Container = func_args[log_name]
+            container_in_use = func_args[log_name]
 
         if "No such file" not in str(container_in_use.exec_run(f"ls {path_to_docker}").output):
             stream = (container_in_use.get_archive(path_to_docker))[0]

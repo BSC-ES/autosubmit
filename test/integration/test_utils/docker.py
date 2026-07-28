@@ -25,6 +25,7 @@ from time import sleep, time
 from typing import TYPE_CHECKING
 
 import requests
+from docker.errors import ContainerError
 from testcontainers.core.container import DockerContainer  # type: ignore
 from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore
 
@@ -514,9 +515,9 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
                 for container in containers:
                     try:
                         container.stop(timeout=stop_timeout)
-                    except Exception as e:
+                    except ContainerError as e:
                         print(f'Failed to stop container {container.id}: {e!s}')
-        except Exception as e:
+        except ContainerError as e:
             print(f'Failed to list containers with label {label}: {e!s}')
 
     # Loop to wait for all containers to have really stopped.
@@ -540,5 +541,5 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
                 raise RuntimeError(f'Failed to stop all Docker containers after {stop_all_timeout} seconds')
 
             sleep(1)
-        except Exception as e:
+        except ContainerError as e:
             print(f'Failed to list containers with label {label}: {e!s}')
