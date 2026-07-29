@@ -15,9 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import argparse
+import sys
 from pathlib import Path
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 from ruamel.yaml import YAML
@@ -26,15 +29,19 @@ from autosubmit.log.log import AutosubmitCritical
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
-    from test.integration.conftest import AutosubmitExperiment, AutosubmitExperimentFixture
+
+    from test.integration.conftest import (
+        AutosubmitExperiment,
+        AutosubmitExperimentFixture,
+    )
 
 
 def set_up_test(
         expid: str,
         command: list[str],
-        autosubmit_exp: 'AutosubmitExperimentFixture',
+        autosubmit_exp: AutosubmitExperimentFixture,
         mocker
-) -> tuple['AutosubmitExperiment', argparse.Namespace, list[str]]:
+) -> tuple[AutosubmitExperiment, argparse.Namespace, list[str]]:
     test_files_path = Path(__file__).resolve().parents[2]
     fake_jobs: dict = YAML().load(test_files_path / "files/fake-jobs.yml")
     fake_platforms: dict = YAML().load(test_files_path / "files/fake-platforms.yml")
@@ -119,8 +126,8 @@ def set_up_test(
 )
 def test_run_command(
         command: list[str],
-        autosubmit_exp: 'AutosubmitExperimentFixture',
-        mocker: 'MockerFixture',
+        autosubmit_exp: AutosubmitExperimentFixture,
+        mocker: MockerFixture,
         get_next_expid: Callable[[], str]):
     """Test the is simply used to check if commands are not broken on runtime, it doesn't check behaviour or output
 
@@ -259,8 +266,8 @@ def test_run_command(
 )
 def test_run_command_plot_behavior(
     command: list[str],
-    autosubmit_exp: "AutosubmitExperimentFixture",
-    mocker: "MockerFixture",
+    autosubmit_exp: AutosubmitExperimentFixture,
+    mocker: MockerFixture,
     get_next_expid: Callable[[], str],
 ):
     """Test the plot behavior of the setstatus, create and recovery commands."""
@@ -275,9 +282,7 @@ def test_run_command_plot_behavior(
 
     if "create" in command:
         assert exp.autosubmit.run_command(args=args) == 0
-    elif "setstatus" in command:
-        assert exp.autosubmit.run_command(args=args)
-    elif "recovery" in command:
+    elif "setstatus" in command or "recovery" in command:
         assert exp.autosubmit.run_command(args=args)
 
 
@@ -293,8 +298,8 @@ def test_run_command_plot_behavior(
 )
 def test_run_command_raises_autosubmit(
         command: list[str],
-        autosubmit_exp: 'AutosubmitExperimentFixture',
-        mocker: 'MockerFixture',
+        autosubmit_exp: AutosubmitExperimentFixture,
+        mocker: MockerFixture,
         get_next_expid: Callable[[], str]):
     """Test the is simply used to check if commands are not broken on runtime.
 
@@ -334,8 +339,8 @@ def test_run_command_raises_autosubmit(
 def test_run_command_logs_warning(
     command: list[str],
     warning_log_message: str,
-    autosubmit_exp: "AutosubmitExperimentFixture",
-    mocker: "MockerFixture",
+    autosubmit_exp: AutosubmitExperimentFixture,
+    mocker: MockerFixture,
     get_next_expid: Callable[[], str],
 ):
     exp, args, command = set_up_test(get_next_expid(), command, autosubmit_exp, mocker)
@@ -358,8 +363,8 @@ def test_run_command_logs_warning(
 def test_run_report_command(
         command: list[str],
         expected: dict,
-        autosubmit_exp: 'AutosubmitExperimentFixture',
-        mocker: 'MockerFixture',
+        autosubmit_exp: AutosubmitExperimentFixture,
+        mocker: MockerFixture,
         get_next_expid: Callable[[], str]):
     """Validate `autosubmit report -all` output (issue #1043).
 
@@ -422,8 +427,8 @@ def test_run_report_command(
 def test_run_report_template_edge_cases(
         template_content: str,
         expected_output: str,
-        autosubmit_exp: 'AutosubmitExperimentFixture',
-        mocker: 'MockerFixture',
+        autosubmit_exp: AutosubmitExperimentFixture,
+        mocker: MockerFixture,
         tmp_path: Path,
         get_next_expid: Callable[[], str]):
     """Validate template-substitution edge cases for `autosubmit report -t`.
@@ -439,3 +444,68 @@ def test_run_report_template_edge_cases(
     report = next(Path(exp.tmp_dir).glob(f"{expid}_report_*"))
     rendered = report.read_text().rstrip('\n')
     assert rendered == expected_output
+
+
+@pytest.mark.parametrize(
+    "argv, expected_profile, expected_trace",
+    [
+        (["autosubmit", "run"], None, False),
+        (["autosubmit", "run", "--profile"], 0, False),
+        (["autosubmit", "run", "--profile", "3"], 3, False),
+        (["autosubmit", "run", "--profile", "--trace"], 0, True),
+    ],
+)
+def test_run_command_forwards_profile_arguments(
+        argv: list[str],
+        expected_profile: int | None,
+        autosubmit_exp: AutosubmitExperimentFixture,
+        expected_trace: bool,
+        mocker,
+        get_next_expid: Callable[[], str],
+) -> None:
+    expid = get_next_expid()
+    argv.insert(2, expid)
+    exp, args, _ = set_up_test(expid, argv, autosubmit_exp, mocker)
+
+    mocker.patch("sys.argv", argv)
+    mocked_run = mocker.patch(
+        "autosubmit.autosubmit.Autosubmit.run_experiment",
+        return_value=0,
+    )
+    mocker.patch("autosubmit.autosubmit.Autosubmit._init_logs", return_value=None)
+
+    status, args = exp.autosubmit.parse_args()
+
+    assert status == 0
+    assert args is not None
+
+    exp.autosubmit.run_command(args)
+
+    mocked_run.assert_called_once_with(
+        expid,
+        None,
+        None,
+        None,
+        expected_profile,
+        expected_trace,
+    )
+
+
+def test_run_command_rejects_trace_without_profile(mocker,
+        autosubmit_exp: AutosubmitExperimentFixture,
+        get_next_expid: Callable[[], str],) -> None:
+    expid = get_next_expid()
+    mocker.patch("sys.argv", ["autosubmit", "run", expid, "--trace"])
+    mocker.patch("autosubmit.autosubmit.Autosubmit._init_logs", return_value=None)
+
+    exp, args, _ = set_up_test(expid, sys.argv, autosubmit_exp, mocker)
+
+    status, args = exp.autosubmit.parse_args()
+
+    assert status == 0
+    assert args is not None
+
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        exp.autosubmit.run_command(args)
+
+    assert exc_info.value.code == 7012

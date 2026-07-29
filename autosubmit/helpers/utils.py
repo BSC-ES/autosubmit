@@ -15,15 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import os
 import pwd
 import re
 import sys
 from collections import defaultdict
+from collections.abc import Iterable
 from contextlib import suppress
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, Optional, Union
+from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -39,7 +42,9 @@ if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
 
 
-def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: Optional[str] = None):
+def check_jobs_file_exists(
+    as_conf: AutosubmitConfig, current_section_name: str | None = None
+):
     """Raise an error if the jobs file does not exist.
 
     By default, it will search all jobs sections. Alternatively, callers can pass
@@ -48,14 +53,18 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: Op
     :raise: AutosubmitCritical if the templates directory is a file or does not exist,
             or if the job file (templates) cannot be found.
     """
-    if as_conf.get_project_type() != 'none':
+    if as_conf.get_project_type() != "none":
         templates_dir = Path(as_conf.get_project_dir())
 
         if not templates_dir.exists():
-            raise AutosubmitCritical(f"Templates directory {templates_dir} does not exist", 7011)
+            raise AutosubmitCritical(
+                f"Templates directory {templates_dir} does not exist", 7011
+            )
 
         if not templates_dir.is_dir():
-            raise AutosubmitCritical(f"Templates directory {templates_dir} is not a directory", 7011)
+            raise AutosubmitCritical(
+                f"Templates directory {templates_dir} is not a directory", 7011
+            )
 
         # Check if all files in jobs_data exist or only current section
         jobs_data: Iterable
@@ -69,36 +78,49 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: Op
 
         for data in jobs_data:
             if "SCRIPT" not in data and "FILE" in data:
-                job_file = Path(templates_dir, data['FILE'])
+                job_file = Path(templates_dir, data["FILE"])
                 if job_file.exists() and job_file.is_file():
                     Log.result(f"File {job_file} exists")
                 else:
                     missing_files.append(str(job_file))
 
         if missing_files:
-            missing_files_text = ' \n'.join(missing_files)
-            raise AutosubmitCritical(f"Templates not found:\n{missing_files_text}", 7011)
+            missing_files_text = " \n".join(missing_files)
+            raise AutosubmitCritical(
+                f"Templates not found:\n{missing_files_text}", 7011
+            )
 
 
 def check_experiment_ownership(
-        expid: str, basic_config: BasicConfig, raise_error=False, logger: Optional[Log] = None
+    expid: str,
+    basic_config: BasicConfig,
+    raise_error=False,
+    logger: Log | None = None,
 ) -> tuple[bool, bool, str]:
     # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available
     my_user_id = os.getuid()
     current_owner_id = 0
     current_owner_name = "NA"
     try:
-        current_owner_id = os.stat(os.path.join(basic_config.LOCAL_ROOT_DIR, expid)).st_uid
-        current_owner_name = pwd.getpwuid(os.stat(os.path.join(basic_config.LOCAL_ROOT_DIR, expid)).st_uid).pw_name
+        current_owner_id = os.stat(
+            os.path.join(basic_config.LOCAL_ROOT_DIR, expid)
+        ).st_uid
+        current_owner_name = pwd.getpwuid(
+            os.stat(os.path.join(basic_config.LOCAL_ROOT_DIR, expid)).st_uid
+        ).pw_name
     except Exception as e:
         if logger:
-            logger.info(f"Error while trying to get the experiment's owner information: {str(e)}")
+            logger.info(
+                f"Error while trying to get the experiment's owner information: {e!s}"
+            )
     finally:
         if current_owner_id <= 0 and logger:
-            logger.info(f"Current owner '{current_owner_name}' of experiment {expid} does not exist anymore.")
+            logger.info(
+                f"Current owner '{current_owner_name}' of experiment {expid} does not exist anymore."
+            )
     is_owner = current_owner_id == my_user_id
     # If eadmin no exists, it would be "" so INT() would fail.
-    eadmin_user = os.popen('id -u eadmin').read().strip()
+    eadmin_user = os.popen("id -u eadmin").read().strip()
     if eadmin_user != "":
         is_eadmin = my_user_id == int(eadmin_user)
     else:
@@ -112,9 +134,11 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
     Log.info("Checking the connection to all platforms in use")
     issues = ""
     ssh_config_issues = ""
-    private_key_error = ("Please, add your private key to the ssh-agent ( ssh-add <path_to_key> )"
-                         " or use a non-encrypted key\nIf ssh agent is not initialized, prompt "
-                         "first eval `ssh-agent -s`")
+    private_key_error = (
+        "Please, add your private key to the ssh-agent ( ssh-add <path_to_key> )"
+        " or use a non-encrypted key\nIf ssh agent is not initialized, prompt "
+        "first eval `ssh-agent -s`"
+    )
     for platform in platform_to_test:
         platform_issues = ""
         try:
@@ -125,29 +149,41 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
                 if message.find("doesn't accept remote connections") != -1:
                     ssh_config_issues += message
                 elif message.find("Authentication failed") != -1:
-                    ssh_config_issues += message + (". Please, check the user and project of this platform\n"
-                                                    "If it is correct, try another host")
+                    ssh_config_issues += message + (
+                        ". Please, check the user and project of this platform\n"
+                        "If it is correct, try another host"
+                    )
                 elif message.find("private key file is encrypted") != -1:
                     if private_key_error not in ssh_config_issues:
                         ssh_config_issues += private_key_error
                 elif message.find("Invalid certificate") != -1:
                     ssh_config_issues += message + ".Please, the eccert expiration date"
                 else:
-                    ssh_config_issues += message + (" this is an PARAMIKO SSHEXCEPTION: indicates that there is "
-                                                    f"something incompatible in the ssh_config for host:{platform.host}\n maybe "
-                                                    "you need to contact your sysadmin")
+                    ssh_config_issues += message + (
+                        " this is an PARAMIKO SSHEXCEPTION: indicates that there is "
+                        f"something incompatible in the ssh_config for host:{platform.host}\n maybe "
+                        "you need to contact your sysadmin"
+                    )
         except Exception as e:
             with suppress(Exception):
                 if mail_notify:
                     email = as_conf.get_mails_to()
                     if "@" in email[0]:
-                        Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, platform)
-            platform_issues += f"\n[{platform.name}] Connection Unsuccessful to host {platform.host} "
+                        Notifier.notify_experiment_status(
+                            MailNotifier(BasicConfig), expid, email, platform
+                        )
+            platform_issues += (
+                f"\n[{platform.name}] Connection Unsuccessful to host {platform.host} "
+            )
             issues += platform_issues
-            Log.warning(f"Error restoring platform [{platform.name}] host [{platform.host}]: {str(e)}")
+            Log.warning(
+                f"Error restoring platform [{platform.name}] host [{platform.host}]: {e!s}"
+            )
             continue
         if platform.check_remote_permissions():
-            Log.result(f"[{platform.name}] Correct user privileges for host {platform.host}")
+            Log.result(
+                f"[{platform.name}] Correct user privileges for host {platform.host}"
+            )
         else:
             platform_issues += (
                 f"\n[{platform.name}] has configuration issues.\n Check that the connection is passwd-less."
@@ -156,18 +192,23 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
             )
             issues += platform_issues
         if platform_issues == "":
-
-            Log.printlog(f"[{platform.name}] Connection successful to host {platform.host}", Log.RESULT)
+            Log.printlog(
+                f"[{platform.name}] Connection successful to host {platform.host}",
+                Log.RESULT,
+            )
         else:
             if platform.connected:
                 platform.connected = False
                 Log.printlog(
                     f"[{platform.name}] Connection successful to host {platform.host}, "
                     f"however there are issues with %HPCROOT%",
-                    Log.WARNING
+                    Log.WARNING,
                 )
             else:
-                Log.printlog(f"[{platform.name}] Connection failed to host {platform.host}", Log.WARNING)
+                Log.printlog(
+                    f"[{platform.name}] Connection failed to host {platform.host}",
+                    Log.WARNING,
+                )
 
     if issues != "":
         if ssh_config_issues.find(private_key_error[:-2]) != -1:
@@ -177,13 +218,13 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
                 "It will remain open as long as session is active, "
                 "for force clean you can prompt ssh-add -D",
                 7073,
-                issues + "\n" + ssh_config_issues
+                issues + "\n" + ssh_config_issues,
             )
         else:
             raise AutosubmitCritical(
                 "Issues while checking the connectivity of platforms.",
                 7010,
-                issues + "\n" + ssh_config_issues
+                issues + "\n" + ssh_config_issues,
             )
 
 
@@ -235,7 +276,7 @@ class NaturalSort:
         False
     """
 
-    PATTERN = re.compile(r'(\d+)')
+    PATTERN = re.compile(r"(\d+)")
 
     def __init__(self, value: str):
         self.value = tuple(
@@ -284,12 +325,12 @@ def strtobool(val: str) -> bool:
     Original code: from distutils.util import strtobool
     """
     val = val.lower()
-    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+    if val in ("y", "yes", "t", "true", "on", "1"):
         return True
-    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+    elif val in ("n", "no", "f", "false", "off", "0"):
         return False
     else:
-        raise ValueError("invalid truth value %r" % (val,))
+        raise ValueError(f"invalid truth value {val}")
 
 
 def get_rc_path(machine: bool, local: bool) -> Path:
@@ -309,7 +350,7 @@ def get_rc_path(machine: bool, local: bool) -> Path:
     if "AUTOSUBMIT_CONFIGURATION" in os.environ:
         return Path(os.environ["AUTOSUBMIT_CONFIGURATION"])
 
-    rc_path: Union[str, Path]
+    rc_path: str | Path
     if machine:
         return Path("/etc/autosubmitrc")  # Higher priority than /etc/.autosubmitrc
     elif local:
@@ -326,21 +367,25 @@ def user_yes_no_query(question: str) -> bool:
     :param question: question to ask
     :return: True if answer is yes, False if it is no
     """
-    sys.stdout.write(f'{question} [y/n]\n')
+    sys.stdout.write(f"{question} [y/n]\n")
     while True:
         try:
             answer = input()
             return strtobool(answer.lower())
         except ValueError:
-            sys.stdout.write('Please respond with \'y\' or \'n\'.\n')
+            sys.stdout.write("Please respond with 'y' or 'n'.\n")
         except Exception as e:
-            raise AutosubmitCritical("No input detected, the experiment will not be erased.", 7011, str(e))
+            raise AutosubmitCritical(
+                "No input detected, the experiment will not be erased.", 7011, str(e)
+            )
 
 
-def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', expid: str) -> Platform:
+def build_and_connect_platform(
+    platform_name: str, as_conf: AutosubmitConfig, expid: str
+) -> Platform:
     """Build a minimal platform object and connect to it for STAT recovery.
 
-    :param platform_name: Name of the platform in the experiment configuration.
+    :param platform_name: Name of the plat  form in the experiment configuration.
     :param as_conf: Autosubmit config object.
     :param expid: Experiment identifier.
     :return: Connected platform instance.
@@ -352,33 +397,46 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
         }
         plat = LocalPlatform(expid, platform_name, config=config)
     else:
-        platforms_data = as_conf.experiment_data.get('PLATFORMS', {})
+        platforms_data = as_conf.experiment_data.get("PLATFORMS", {})
         platform_config = platforms_data.get(platform_name.upper(), {})
-        platform_type = platform_config.get('TYPE', '').lower()
-        platform_version = platform_config.get('VERSION', '')
+        platform_type = platform_config.get("TYPE", "").lower()
+        platform_version = platform_config.get("VERSION", "")
 
         plat = get_platform_by_type(
-            platform_type, expid, platform_name,
-            as_conf.experiment_data, platform_version, None
+            platform_type,
+            expid,
+            platform_name,
+            as_conf.experiment_data,
+            platform_version,
+            None,
         )
 
         if plat is None:
             raise AutosubmitCritical(
-                f"PLATFORMS.{platform_name.upper()}.TYPE: {platform_type} is not supported", 7012
+                f"PLATFORMS.{platform_name.upper()}.TYPE: {platform_type} is not supported",
+                7012,
             )
         plat._version = platform_version
 
-        add_project_to_host = str(platform_config.get('ADD_PROJECT_TO_HOST', False)).lower() != "false"
-        section_project = platform_config.get('PROJECT', "")
-        section_host = platform_config.get('HOST', "")
+        add_project_to_host = (
+            str(platform_config.get("ADD_PROJECT_TO_HOST", False)).lower() != "false"
+        )
+        section_project = platform_config.get("PROJECT", "")
+        section_host = platform_config.get("HOST", "")
         plat.host = _get_host(section_host, add_project_to_host, section_project)
-        plat.user = platform_config.get('USER', "")
-        plat.scratch = platform_config.get('SCRATCH_DIR', "")
-        plat.temp_dir = platform_config.get('TEMP_DIR', "")
-        plat.root_dir = str(Path(plat.scratch) /
-                             (plat.project if hasattr(plat, 'project') and plat.project else section_project) /
-                             (plat.user if hasattr(plat, 'user') and plat.user else "") /
-                             expid)
+        plat.user = platform_config.get("USER", "")
+        plat.scratch = platform_config.get("SCRATCH_DIR", "")
+        plat.temp_dir = platform_config.get("TEMP_DIR", "")
+        plat.root_dir = str(
+            Path(plat.scratch)
+            / (
+                plat.project
+                if hasattr(plat, "project") and plat.project
+                else section_project
+            )
+            / (plat.user if hasattr(plat, "user") and plat.user else "")
+            / expid
+        )
 
         with suppress(Exception):
             plat.update_cmds()
@@ -388,9 +446,9 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
 
 
 def recover_stale_job_data(
-        expid: str,
-        as_conf: 'AutosubmitConfig',
-        platforms: Optional[dict[str, Platform]] = None
+    expid: str,
+    as_conf: AutosubmitConfig,
+    platforms: dict[str, Platform] | None = None,
 ) -> None:
     """Fetch STAT files for rows with submit>0 and (start=0 or finish=0)
     and update job_data directly. Uses existing platform connections when
@@ -417,7 +475,7 @@ def recover_stale_job_data(
 
     for pn, jobs in by_platform.items():
         plat = platforms.get(pn) if platforms else None
-        if not plat or not getattr(plat, 'connected', False):
+        if not plat or not getattr(plat, "connected", False):
             try:
                 plat = build_and_connect_platform(pn, as_conf, expid)
             except Exception as e:
@@ -434,10 +492,7 @@ def recover_stale_job_data(
 
 
 def _fetch_stat_timestamps(
-        plat: Platform,
-        exp_path: Path,
-        job_name: str,
-        fail_count: int
+    plat: Platform, exp_path: Path, job_name: str, fail_count: int
 ) -> tuple[int, int]:
     """Download STAT file from platform and return (start, finish) timestamps.
 
@@ -464,4 +519,55 @@ def _parse_stat_file(path: Path) -> tuple[int, int]:
     except ValueError:
         Log.warning(f"STAT file {path} contains non-integer data, skipping")
         return 0, 0
-    return (values[0], values[1]) if len(values) >= 2 else (values[0], 0) if values else (0, 0)
+    return (
+        (values[0], values[1])
+        if len(values) >= 2 else (values[0], 0)
+        if values else (0, 0)
+    )
+
+
+def describe_command_details(args) -> None:
+    try:
+        descriptor = "\n"
+        descriptor = "".join(f"{descriptor}executable: {sys.argv[0]}\n")
+        descriptor = "".join(f"{descriptor}command: autosubmit {sys.argv[1]}\n")
+        args_print = ""
+        for key, value in args.__dict__.items():
+            if value is None or value == "" or not value:
+                continue
+            if key in [
+                "version",
+                "logfile",
+                "logconsole",
+                "command",
+                "advanced",
+                "database_backend",
+                "database_conn_url",
+                "databasepath",
+                "databasefilename",
+                "localrootpath",
+                "platformsconfpath",
+                "jobsconfpath",
+                "smtphostname",
+            ]:
+                continue
+            args_print = "".join(f"{args_print} {key}={value}")
+
+        descriptor = "".join(f"{descriptor}args:{args_print}\n")
+        if hasattr(args, "expid") and args.expid and args.expid != "*":
+            descriptor = "".join(f"{descriptor}expid: {args.expid}\n")
+            current_owner_id = Path(BasicConfig.LOCAL_ROOT_DIR, args.expid).stat().st_uid
+            try:
+                current_owner = pwd.getpwuid(current_owner_id).pw_name
+            except (TypeError, KeyError) as e:
+                Log.warning(
+                    f"Current owner of experiment {args.expid} could not be retrieved. "
+                    f"The owner is no longer in the system database: {e!s}"
+                )
+            user_descriptor = (
+                current_owner if current_owner is not None else current_owner_id
+            )
+            descriptor = "".join(f"{descriptor}user: {user_descriptor}\n")
+        Log.info(f"{descriptor}")
+    except Exception as e:
+        Log.error(f"An error occurred as the command Log tried to be generated {e}")
