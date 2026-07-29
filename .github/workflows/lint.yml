@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - run: pip install ruff
+      - run: pip install ruff==0.15.22
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
