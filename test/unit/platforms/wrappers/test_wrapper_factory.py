@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -22,7 +22,7 @@ from typing import Union
 import pytest
 
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.platforms.wrappers.wrapper_builder import BashVerticalWrapperBuilder
+from autosubmit.platforms.wrappers.wrapper_builder import BashVerticalWrapperBuilder, FluxWrapperBuilder
 from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory, SrunHorizontalWrapperBuilder, \
     SrunVerticalHorizontalWrapperBuilder, PythonHorizontalWrapperBuilder, PythonVerticalWrapperBuilder, \
     PythonVerticalHorizontalWrapperBuilder, PythonHorizontalVerticalWrapperBuilder, EcWrapperFactory
@@ -71,15 +71,15 @@ def test_constructor(slurm_platform):
     assert wrapper_factory.wrapper_director
     assert 'this platform' in wrapper_factory.exception
 
-
 @pytest.mark.parametrize(
-    'method,expected_horizontal_clazz,expected_vertical_horizontal_clazz',
+    'method,expected_vertical_clazz,expected_horizontal_clazz,expected_vertical_horizontal_clazz,expected_horizontal_vertical_clazz',
     [
-        ['srun', SrunHorizontalWrapperBuilder, SrunVerticalHorizontalWrapperBuilder],
-        ['threads', PythonHorizontalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder],
+        ['srun', None, SrunHorizontalWrapperBuilder, SrunVerticalHorizontalWrapperBuilder, None],
+        ['asthread', PythonVerticalWrapperBuilder, PythonHorizontalWrapperBuilder, PythonVerticalHorizontalWrapperBuilder, PythonHorizontalVerticalWrapperBuilder],
     ]
 )
-def test_get_wrapper_slurm(method: str, expected_horizontal_clazz: type, expected_vertical_horizontal_clazz: type,
+def test_get_wrapper_slurm(method: str, expected_vertical_clazz: type, expected_horizontal_clazz: type,
+                           expected_vertical_horizontal_clazz: type, expected_horizontal_vertical_clazz: type,
                            slurm_platform: SlurmPlatform, wrapper_builder_kwargs: dict, mocker):
     """Test that we can call ``get_wrapper`` for different Slurm wrapper configurations."""
     wrapper_factory = SlurmWrapperFactory(slurm_platform)
@@ -112,14 +112,112 @@ def test_get_wrapper_slurm(method: str, expected_horizontal_clazz: type, expecte
     vertical_horizontal_wrapper = wrapper_factory.hybrid_wrapper_vertical_horizontal(**wrapper_builder_kwargs)
     assert type(vertical_horizontal_wrapper) is expected_vertical_horizontal_clazz
 
-    vertical_wrapper = wrapper_factory.vertical_wrapper(**wrapper_builder_kwargs)
-    assert type(vertical_wrapper) is PythonVerticalWrapperBuilder
+    # considers that some types might not be supported for this platform
+    if expected_vertical_clazz is not None:
+        vertical_wrapper = wrapper_factory.vertical_wrapper(**wrapper_builder_kwargs)
+        assert type(vertical_wrapper) is expected_vertical_clazz
+    else:
+        with pytest.raises(NotImplementedError):
+            wrapper_factory.vertical_wrapper(**wrapper_builder_kwargs)
 
-    horizontal_vertical_wrapper = wrapper_factory.hybrid_wrapper_horizontal_vertical(**wrapper_builder_kwargs)
-    assert type(horizontal_vertical_wrapper) is PythonHorizontalVerticalWrapperBuilder
+    if expected_horizontal_clazz is not None:
+        horizontal_wrapper = wrapper_factory.horizontal_wrapper(**wrapper_builder_kwargs)
+        assert type(horizontal_wrapper) is expected_horizontal_clazz
+    else:
+        with pytest.raises(NotImplementedError):
+            wrapper_factory.horizontal_wrapper(**wrapper_builder_kwargs)
+
+    if expected_vertical_horizontal_clazz is not None:
+        vertical_horizontal_wrapper = wrapper_factory.hybrid_wrapper_vertical_horizontal(**wrapper_builder_kwargs)
+        assert type(vertical_horizontal_wrapper) is expected_vertical_horizontal_clazz
+    else:
+        with pytest.raises(NotImplementedError):
+            wrapper_factory.hybrid_wrapper_vertical_horizontal(**wrapper_builder_kwargs)
+
+    if expected_horizontal_vertical_clazz is not None:
+        horizontal_vertical_wrapper = wrapper_factory.hybrid_wrapper_horizontal_vertical(**wrapper_builder_kwargs)
+        assert type(horizontal_vertical_wrapper) is expected_horizontal_vertical_clazz
+    else:
+        with pytest.raises(NotImplementedError):
+            wrapper_factory.hybrid_wrapper_horizontal_vertical(**wrapper_builder_kwargs)
+
+def test_get_wrapper_slurm_unknown_method(slurm_platform: SlurmPlatform, wrapper_builder_kwargs: dict):
+    """Test that we raise an error when we call ``get_wrapper`` with an unknown method."""
+    wrapper_factory = SlurmWrapperFactory(slurm_platform)
+    wrapper_builder_kwargs['method'] = 'unknown_method'
+
+    with pytest.raises(NotImplementedError):
+        wrapper_factory.vertical_wrapper(**wrapper_builder_kwargs)
+    
+    with pytest.raises(NotImplementedError):
+        wrapper_factory.horizontal_wrapper(**wrapper_builder_kwargs)
+    
+    with pytest.raises(NotImplementedError):
+        wrapper_factory.hybrid_wrapper_vertical_horizontal(**wrapper_builder_kwargs)
+    
+    with pytest.raises(NotImplementedError):
+        wrapper_factory.hybrid_wrapper_horizontal_vertical(**wrapper_builder_kwargs)    
 
     assert '--reservation=operationals' in wrapper_factory.reservation_directive('operationals')
 
+@pytest.mark.parametrize(
+    'method,expected_delegated_clazz',
+    [
+        ['flux', FluxWrapperBuilder],
+    ]
+)
+def test_get_wrapper_slurm_delegated(method: str, expected_delegated_clazz: type,
+                           slurm_platform: SlurmPlatform, wrapper_builder_kwargs: dict, mocker):
+    """Test that we can call ``get_wrapper`` for different Slurm wrapper configurations."""
+    wrapper_factory = SlurmWrapperFactory(slurm_platform)
+    wrapper_data = mocker.MagicMock()
+
+    wrapper_builder_kwargs['method'] = method
+    wrapper_builder_kwargs['wrapper_data'] = wrapper_data
+
+    delegated_wrapper = wrapper_factory.delegated_wrapper(**wrapper_builder_kwargs)
+    assert type(delegated_wrapper) is expected_delegated_clazz
+
+    wrapper_builder_kwargs['method'] = 'unknown_method'
+    with pytest.raises(NotImplementedError):
+        wrapper_factory.delegated_wrapper(**wrapper_builder_kwargs)
+
+@pytest.mark.parametrize(
+    "nodes, expected_threads",
+    [
+        ("", "2"),          # no nodes
+        ("2", ""),          # with nodes
+    ],
+)
+def test_get_wrapper_delegated_kwargs(nodes: str, expected_threads: str, slurm_platform: SlurmPlatform, wrapper_builder_kwargs: dict, mocker):
+    """Test that when we call ``get_wrapper`` for a delegated wrapper with no nodes requested, it computes
+    the resource request correctly."""
+    wrapper_factory = SlurmWrapperFactory(slurm_platform)
+    
+    wrapper_data = mocker.MagicMock()
+    wrapper_data.wrapper_type = 'delegated'
+    wrapper_data.nodes = nodes
+    wrapper_data.threads = 2
+    wrapper_data.custom_env_setup = ''
+    wrapper_data.het = {"HETSIZE": 0}
+
+    wrapper_builder_kwargs['dependency'] = ''
+    wrapper_builder_kwargs['project'] = 'bsc32'
+    wrapper_builder_kwargs['wallclock'] = '00:30'
+    wrapper_builder_kwargs['method'] = 'flux'
+    wrapper_builder_kwargs['wrapper_data'] = wrapper_data
+    wrapper_builder_kwargs['threads'] = 2
+    wrapper_builder_kwargs['tasks'] = 3
+
+    wrapper_factory.processors = mocker.MagicMock(return_value="P")
+    wrapper_factory.threads = mocker.MagicMock(return_value="TH")
+    wrapper_factory.tasks = mocker.MagicMock(return_value="T")
+
+    wrapper_factory.get_wrapper(FluxWrapperBuilder, **wrapper_builder_kwargs)
+
+    wrapper_factory.threads.assert_any_call(expected_threads)
+    wrapper_factory.processors.assert_any_call("")
+    wrapper_factory.tasks.assert_any_call("")
 
 def test_wrapper_factory_slurm_placeholders(slurm_platform: SlurmPlatform, wrapper_builder_kwargs: dict, mocker):
     """Test that the Wrapper Factory is using placeholders correctly."""

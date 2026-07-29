@@ -21,7 +21,7 @@ import copy
 from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 
@@ -705,6 +705,100 @@ def test_load_config_file_misc(new_config_data: str, load_misc: bool, expected_m
     as_conf.load_config_file(current_config, tmp_path / 'a000.yml', load_misc=load_misc)
 
     assert len(as_conf.misc_files) == expected_misc_files_length
+
+def test_getter_custom_env_setup(autosubmit_config: 'AutosubmitConfigFactory'):
+    """Test the getter method for the custom environment setup."""
+    custom_env_setup_wrappers = 'echo "Wrappers"'
+    custom_env_setup_delegated = 'echo "Delegated wrapper"'
+
+    wrappers_config = {
+        "WRAPPERS": {
+            "DELEGATED_WRAPPER": {
+                "POLICY": "flexible",
+                "TYPE": "delegated",
+                "MIN_WRAPPED": 6,
+                "MAX_WRAPPED": 6,
+                "JOBS_IN_WRAPPER": "SECT1 SECT2",
+                "CUSTOM_ENV_SETUP": custom_env_setup_delegated
+            },
+            "CUSTOM_ENV_SETUP": custom_env_setup_wrappers
+        }
+    }
+
+    wrapper = wrappers_config['WRAPPERS']['DELEGATED_WRAPPER']
+
+    # custom_env_setup is in the delegated wrapper configuration
+    as_conf = autosubmit_config(expid="a000", experiment_data=wrappers_config)
+    result = as_conf.get_custom_env_setup(wrapper)
+    assert result == custom_env_setup_delegated
+
+    # custom_env_setup is in the global wrapper configuration
+    wrappers_config["WRAPPERS"]["DELEGATED_WRAPPER"].pop("CUSTOM_ENV_SETUP", None)
+    as_conf = autosubmit_config(expid="a000", experiment_data=wrappers_config)
+    result = as_conf.get_custom_env_setup(wrapper)
+    assert result == custom_env_setup_wrappers
+
+    # custom_env_setup is not present anywhere
+    wrappers_config["WRAPPERS"].pop("CUSTOM_ENV_SETUP", None)
+    as_conf = autosubmit_config(expid="a000", experiment_data=wrappers_config)
+    result = as_conf.get_custom_env_setup(wrapper)
+    assert result == ""
+
+    # wrapper is none
+    assert as_conf.get_custom_env_setup() == ""
+
+@pytest.fixture
+def generate_wrappers_config() -> Callable:
+    def _wrappers_config(type: str = None, method: str = None, global_wrapper_method: str = None) -> dict:
+        wrappers_config = {
+            "WRAPPERS": {
+                "TYPE": "horizontal",
+                "WRAPPER_SECT1_SECT2": {
+                    "POLICY": "flexible",
+                    "MIN_WRAPPED": 6,
+                    "MAX_WRAPPED": 6
+                }
+            }
+        }
+        if type is not None:
+            wrappers_config["WRAPPERS"]["WRAPPER_SECT1_SECT2"]["TYPE"] = type
+        if method is not None:
+            wrappers_config["WRAPPERS"]["WRAPPER_SECT1_SECT2"]["METHOD"] = method
+        if global_wrapper_method is not None:
+            wrappers_config["WRAPPERS"]["METHOD"] = global_wrapper_method
+        return wrappers_config
+    return _wrappers_config
+
+@pytest.mark.parametrize(
+    "type, method, global_wrapper_method, expected_method",
+    [
+        ("delegated", "flux", None, "flux"),
+        ("delegated", None, None, "flux"),
+        ("vertical", "asthread", None, "asthread"),
+        ("vertical", None, None, "asthread"),
+        (None, None, "srun", "srun")
+    ]
+)
+def test_getter_wrapper_method(type: str, method: str, global_wrapper_method: str, expected_method: str,
+                               autosubmit_config: 'AutosubmitConfigFactory', generate_wrappers_config):
+    """
+    Test that the default wrapper method is 'flux' for the delegated wrappers and 'asthread' for
+    the others.
+    """
+    wrappers_config = generate_wrappers_config(type, method, global_wrapper_method)
+    wrapper = wrappers_config['WRAPPERS']['WRAPPER_SECT1_SECT2']
+    as_conf = autosubmit_config(expid="a000", experiment_data=wrappers_config)
+
+    assert as_conf.get_wrapper_method(wrapper).lower() == expected_method
+
+def test_getter_none_wrapper_method(autosubmit_config: 'AutosubmitConfigFactory', generate_wrappers_config):
+    """
+    Test the getter when the received wrapper is None.
+    """
+    wrappers_config = generate_wrappers_config()
+    as_conf = autosubmit_config(expid="a000", experiment_data=wrappers_config)
+
+    assert as_conf.get_wrapper_method(None).lower() == "asthread"
 
 
 @pytest.mark.parametrize(

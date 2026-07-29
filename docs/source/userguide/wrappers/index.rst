@@ -1,12 +1,13 @@
 Wrappers
 ========
 
-Job packages, or "wrappers", are jobs created as bundles of different tasks (submitted at once in a single script to the platform) assembled by Autosubmit to maximize the usage of platforms managed by a scheduler (by minimizing the queuing time between consecutive or concurrent tasks). Autosubmit supports four wrapper types that can be used depending on the experiment’s workflow.
+Job packages, or "wrappers", are jobs created as bundles of different tasks (submitted at once in a single script to the platform) assembled by Autosubmit to maximize the usage of platforms managed by a scheduler (by minimizing the queuing time between consecutive or concurrent tasks). Autosubmit supports multiple wrapper types that can be used depending on the experiment's workflow needs.
 
 * Horizontal_
 * Vertical_
 * Horizontal-vertical_
 * Vertical-horizontal_
+* Delegated_
 
 .. note:: To have a preview of wrappers, you must use the parameter `-cw` available on inspect, monitor, and create.
 
@@ -104,6 +105,8 @@ When using multiple wrappers or 2-dim wrappers is essential to define the `JOBS_
     :width: 100%
     :align: center
     :alt: wrapper all
+
+.. note:: You can find an example of a *delegated* wrapper configuration in the :ref:`Delegated <Delegated>` section.
 
 .. important:: Autosubmit will not wrap tasks with external and non-fulfilled dependencies.
 
@@ -515,3 +518,55 @@ Considering the following configuration:
     :width: 100%
     :align: center
     :alt: crossdate-example
+
+.. _Delegated:
+
+Delegated wrapper
+-----------------
+
+Delegated wrappers are a special type of wrapper capable of adapting to the topology of the grouped tasks, supporting complex dependencies between sections
+that previous types of wrappers cannot handle. To do this, they use task scheduling tools on the compute nodes, called *wrapper engines*. By delegating the
+scheduling and resource management logic to these tools, delegated wrappers are more flexible and easily scalable.
+
+Currently, Autosubmit has integrated Flux as a wrapper engine for Slurm platforms, and it is enabled by default for wrappers of the ``delegated`` type.
+If you would like to use another wrapper engine, you must specify it in the ``METHOD`` directive of the wrapper configuration.
+
+These tools are often not available by default on the HPC platform, so the responsibility for providing an environment that makes them accessible to
+Autosubmit falls on the user. To do this, the ``CUSTOM_ENV_SETUP`` directive can be used within the wrapper configuration, which allows one to specify
+the necessary instructions to load the module or activate the environment containing the installation.
+
+All the directives available for other wrapper types are also available for delegated wrappers, except for ``EXTEND_WALLCLOCK``, which is disabled.
+
+The following example shows a configuration for a delegated wrapper that uses the Flux method. This wrapper groups the workflow's post-processing tasks,
+which have complex dependencies among them. Flux is accessible via a Conda environment on the remote platform.
+
+.. code-block:: yaml
+
+  WRAPPERS:
+    WRAPPER_POST:
+      POLICY: flexible
+      TYPE: delegated
+      JOBS_IN_WRAPPER: POST1 POST2 POST3 POST4
+    METHOD: flux
+    CUSTOM_ENV_SETUP: |
+      module load miniconda
+      conda activate flux-0.84-0.50
+
+
+.. autosubmitfigure::
+    :command: create
+    :expid: a000
+    :type: png
+    :args: -cw -plt
+    :figure: wrapper_delegated.png
+    :name: wrapper_deleg
+    :width: 100%
+    :align: center
+    :alt: wrapper delegated
+
+.. important::
+  
+  Please note that Autosubmit will ignore any custom scheduling directives configured for tasks. To ensure interoperability, please use the built-in
+  scheduling directives.
+
+.. important:: Delegated wrappers are not compatible with Slurm `hetjobs`.

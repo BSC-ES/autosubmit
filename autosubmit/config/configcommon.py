@@ -2686,6 +2686,16 @@ class AutosubmitConfig(object):
             wrapper = {}
         return wrapper.get('POLICY', self.experiment_data.get("WRAPPERS", {}).get("POLICY", 'flexible'))
 
+    def get_custom_env_setup(self, wrapper=None):
+        """Returns custom environment setup commands for a wrapper that runs with a wrapper engine.
+
+        :return: wrapper type (or none)
+        :rtype: string
+        """
+        if wrapper is None:
+            wrapper = {}
+        return wrapper.get('CUSTOM_ENV_SETUP', self.experiment_data.get("WRAPPERS", {}).get("CUSTOM_ENV_SETUP", ''))
+
     def get_wrappers(self):
         """Returns the jobs that should be wrapped, configured in the autosubmit's config.
 
@@ -2745,7 +2755,14 @@ class AutosubmitConfig(object):
          """
         if wrapper is None:
             wrapper = {}
-        return wrapper.get('METHOD', self.experiment_data.get("WRAPPERS", {}).get("METHOD", 'ASThread'))
+        # TODO: [ENGINES] Double check this. It should be able to return "None" and the job packager would decide the default method based on the type.
+        method = wrapper.get('METHOD', self.experiment_data.get("WRAPPERS", {}).get("METHOD", ''))
+        if not method:
+            if wrapper.get('TYPE', "") == "delegated":
+                method = "flux"
+            else:
+                method = 'ASThread'
+        return method
 
     def get_wrapper_check_time(self):
         """Returns time to check the status of jobs in the wrapper.
