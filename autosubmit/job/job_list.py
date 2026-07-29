@@ -2855,16 +2855,16 @@ class JobList(object):
         Mirrors :meth:`get_jobs_by_section` but queries the database directly
         instead of iterating the in-memory job list.
 
-        Parameters:
-        section_list (list): List of sections to filter jobs by.
-        banned_jobs (list, optional): List of job names to exclude from the result.
-            Defaults to an empty list.
-        get_only_non_completed (bool, optional): If True, only non-completed jobs are included.
-            Defaults to False.
-        status_filter (str, optional): If set, only jobs with this status are included.
-
-        Returns:
-        set[str]: Set of job names matching the criteria.
+        :param section_list: List of sections to filter jobs by.
+        :type section_list: list
+        :param banned_jobs: List of job names to exclude from the result. Defaults to an empty list.
+        :type banned_jobs: list, optional
+        :param get_only_non_completed: If True, only non-completed jobs are included. Defaults to False.
+        :type get_only_non_completed: bool, optional
+        :param status_filter: If set, only jobs with this status are included.
+        :type status_filter: str, optional
+        :return: Set of job names matching the criteria.
+        :rtype: set[str]
         """
         if banned_jobs is None:
             banned_jobs = []
