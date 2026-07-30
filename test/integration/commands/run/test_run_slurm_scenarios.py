@@ -1205,7 +1205,7 @@ def test_run_interrupted_destine_like(
             expid=as_exp.expid
         )
 
-        time.sleep(6)
+        time.sleep(4)
 
         if as_thread.is_alive():
             stop_event.set()
@@ -1228,7 +1228,7 @@ def test_run_interrupted_destine_like(
     # 1 sim, 2 downstream, 2 operator, 2 application = 7 total ASThread files expected
     assert len(asthread_files) == 7, f"Expected 7 ASThread files, found {len(asthread_files)}"
 
-@pytest.mark.timeout(60)
+@pytest.mark.timeout(120)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh

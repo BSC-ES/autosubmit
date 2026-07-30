@@ -288,6 +288,11 @@ class JobPackager(object):
                 wrapper_limits["min_h"] and not failed_innerjobs) or \
                 (not failed_innerjobs and
                  self._jobs_list.dbmanager.remaining_blocked_by_package(
+                    self._jobs_list.get_jobs_by_section_db(
+                        self.jobs_in_wrapper[self.current_wrapper_section],
+                        [job.name for job in p.jobs],
+                        True
+                    ) if not self._jobs_list.disable_save else
                     {j.name for j in self._jobs_list.get_jobs_by_section(
                         self.jobs_in_wrapper[self.current_wrapper_section],
                         [job.name for job in p.jobs],
