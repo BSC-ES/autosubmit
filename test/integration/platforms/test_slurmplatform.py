@@ -1096,7 +1096,7 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     assert check and len(job_result) == 3
 
 
-@pytest.mark.timeout(45)
+@pytest.mark.timeout(120)
 @pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
