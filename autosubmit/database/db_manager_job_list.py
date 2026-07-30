@@ -808,10 +808,33 @@ class JobsDbManager(DbManager):
                 return True
 
         if 'splits' in section_diff and job.get('split') is not None:
+
             if (job.get('split') is None and section_diff['splits'] is not None) or \
                     (section_diff['splits'] is None and job.get('split') is not None):
                 return True
-            if job['split'] > int(section_diff['splits']) or (job['split'] == -1 and int(section_diff['splits']) > 0):
+
+            # splits=auto makes a dictionary now
+            try:
+                section_splits = int(section_diff['splits'])
+            except (ValueError, TypeError):
+                try:
+                    import ast
+                    splits_dict = ast.literal_eval(section_diff['splits'])
+                except Exception:
+                    return True
+                if not isinstance(splits_dict, dict) or job.get('date') is None:
+                    return True
+                date_str = datetime.datetime.fromisoformat(job['date']).strftime('%Y%m%d')
+                chunk_idx = job.get('chunk', 1) or 1
+                if date_str not in splits_dict:
+                    return True
+                chunk_splits = splits_dict[date_str]
+                if isinstance(chunk_splits, list) and len(chunk_splits) >= chunk_idx:
+                    section_splits = chunk_splits[chunk_idx - 1]
+                else:
+                    return True
+
+            if job['split'] > section_splits or (job['split'] == -1 and section_splits > 0):
                 return True
 
         if 'datelist' in section_diff and job.get('date') is not None:
