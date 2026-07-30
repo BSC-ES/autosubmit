@@ -45,7 +45,7 @@ AS_CONF_LARGE = {
         "SAFETYSLEEPTIME": 10,
         "RETRIALS": 0},
     "MAIL": {"NOTIFICATIONS": False, "TO": None},
-    "STORAGE": {"TYPE": "pkl", "COPY_REMOTE_LOGS": True},
+    "STORAGE": {"TYPE": "sqlite", "COPY_REMOTE_LOGS": True},
     "DEFAULT": {"EXPID": "a02j", "HPCARCH": "marenostrum4"},
     "EXPERIMENT": {
         "DATELIST": "20000101",

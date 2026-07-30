@@ -229,6 +229,9 @@ class EcPlatform(ParamikoPlatform):
         Overrides the base ``awk``-based implementation because EcPlatform runs
         commands locally via subprocess and cannot read remote files directly.
 
+        STAT format: submit_time (L0), start_time (L1), end_time (L2), status (L3).
+        A single numeric line means the job is submitted but not yet started → QUEUING.
+
         :param job_list: Jobs to confirm.
         :return: Mapping of job names to resolved statuses.
         """
@@ -273,20 +276,19 @@ class EcPlatform(ParamikoPlatform):
                 continue
             content = local_path.read_text().strip()
             if content:
-                last_line = content.splitlines()[-1]
-                result[job.name] = self._resolve_status(last_line)
-            # ecaccess doesn't provide a command to fetch so we have to remove the uncompleted stat file
+                lines = content.splitlines()
+                if len(lines) == 1 and lines[-1].isdigit():
+                    result[job.name] = Status.QUEUING
+                else:
+                    result[job.name] = self._resolve_status(lines[-1])
             local_path.unlink(missing_ok=True)
 
         return result
 
     def set_start_time_from_remote_stat_file(self, job_list: list) -> None:
-        """Set the start_time_timestamp for each job from the first line of its STAT file.
+        """Set ``start_time_timestamp`` from line 1 (second line) of each remote STAT file.
 
-        Overrides the base SSH ``head``-based implementation because EcPlatform
-        runs commands locally via subprocess and cannot read remote files directly.
-        The first line of each STAT file contains the job start time as a Unix
-        epoch float.
+        Reads line 1 (not line 0) because L0 is now submit_time.
 
         :param job_list: Jobs whose start times should be filled from remote STAT files.
         """
@@ -320,8 +322,8 @@ class EcPlatform(ParamikoPlatform):
                 )
                 content = local_path.read_text().strip()
                 if content:
-                    first_line = content.splitlines()[0]
-                    start_epoch = float(first_line)
+                    lines = content.splitlines()
+                    start_epoch = float(lines[1]) if len(lines) >= 2 else float(lines[0])
                     job.start_time_timestamp = datetime.datetime.fromtimestamp(start_epoch).strftime("%Y%m%d%H%M%S")
             except Exception:
                 Log.warning(
@@ -542,6 +544,33 @@ class EcPlatform(ParamikoPlatform):
         if not process_ok:
             Log.printlog("Log file don't recovered {0}".format(filename), 6004)
         return process_ok
+
+    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+        """Read the JOBID from the first line of the remote output file.
+
+        Overrides ``ParamikoPlatform.read_jobid_from_remote_log`` because
+        ``EcPlatform.send_command`` runs commands *locally*, so a plain
+        ``head -1`` would not find the remote file.
+
+        Downloads the file via ``ecaccess-file-get`` and parses the JOBID
+        from the ``[INFO] JOBID=`` marker on the first line.
+        """
+        filename = Path(remote_path).name
+        local_path = Path(self.tmp_path) / f".tmp_{filename}"
+        try:
+            subprocess.check_output(
+                f"{self.get_cmd} {self.host}:{remote_path} {local_path}",
+                shell=True,
+                stderr=subprocess.DEVNULL,
+            )
+            first_line = local_path.read_text().strip()
+            if first_line.startswith('[INFO] JOBID='):
+                return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, subprocess.CalledProcessError):
+            pass
+        finally:
+            local_path.unlink(missing_ok=True)
+        return None
 
     def delete_file(self, filename: str) -> bool:
         command = '{0} {1}:{2}'.format(self.del_cmd, self.host, os.path.join(self.get_files_path(), filename))

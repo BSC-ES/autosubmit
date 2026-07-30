@@ -44,8 +44,7 @@ def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
         as_conf = exp.as_conf
         parameters = as_conf.load_parameters()
 
-        job_list_persistence = autosubmit._get_job_list_persistence(exp.expid, as_conf)
-        job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory(), job_list_persistence)
+        job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory())
 
         job_list.generate(
             as_conf,
@@ -58,9 +57,9 @@ def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
             as_conf.get_retrials(),
             as_conf.get_default_job_type(),
             {},
-            run_only_members=[],
-            force=False,
-            create=True)
+            full_load=True)
+        for job in job_list.get_job_list():
+            job.update_parameters(as_conf, set_attributes=True)
 
         return JobPackager(exp.as_conf, local, job_list)
 

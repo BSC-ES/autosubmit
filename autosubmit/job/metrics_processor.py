@@ -25,10 +25,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy.schema import CreateTable, CreateSchema
+from sqlalchemy import insert, delete
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.database import session, tables
+from autosubmit.database import session
+from autosubmit.database.tables import TableRegistry
 from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
@@ -130,16 +132,15 @@ class UserMetricRepository:
             self.connection_url = f"sqlite:///{db_path}"
             self.schema = None
 
-        self.table = tables.get_table_from_name(
-            schema=self.schema, table_name="user_metrics"
-        )
+        self.table_registry = TableRegistry(schema=self.schema)
+        self.table = self.table_registry.get("user_metrics")
         self.engine = session.create_engine(self.connection_url)
 
         with self.engine.connect() as conn:
-            if self.schema:
-                conn.execute(CreateSchema(self.schema, if_not_exists=True))
-            conn.execute(CreateTable(self.table, if_not_exists=True))
-            conn.commit()
+            with conn.begin():
+                if self.schema:
+                    conn.execute(CreateSchema(self.schema, if_not_exists=True))
+                conn.execute(CreateTable(self.table, if_not_exists=True))
 
     def store_metric(
         self, run_id: int, job_name: str, metric_name: str, metric_value: Any
@@ -148,28 +149,28 @@ class UserMetricRepository:
         Store the metric value in the database. Will overwrite the value if it already exists.
         """
         with self.engine.connect() as conn:
-            # Delete the existing metric
-            conn.execute(
-                self.table.delete().where(
-                    self.table.c.run_id == run_id,
-                    self.table.c.job_name == job_name,
-                    self.table.c.metric_name == metric_name,
+            with conn.begin():
+                # Delete the existing metric
+                conn.execute(
+                    delete(self.table).where(
+                        self.table.c.run_id == run_id,
+                        self.table.c.job_name == job_name,
+                        self.table.c.metric_name == metric_name,
+                    )
                 )
-            )
 
-            # Insert the new metric
-            conn.execute(
-                self.table.insert().values(
-                    run_id=run_id,
-                    job_name=job_name,
-                    metric_name=metric_name,
-                    metric_value=str(metric_value),
-                    modified=datetime.now(tz=timezone.utc).isoformat(
-                        timespec="seconds"
-                    ),
+                # Insert the new metric
+                conn.execute(
+                    insert(self.table).values(
+                        run_id=run_id,
+                        job_name=job_name,
+                        metric_name=metric_name,
+                        metric_value=str(metric_value),
+                        modified=datetime.now(tz=timezone.utc).isoformat(
+                            timespec="seconds"
+                        ),
+                    )
                 )
-            )
-            conn.commit()
 
 
 class UserMetricProcessor:

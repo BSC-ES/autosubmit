@@ -32,6 +32,9 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 
 import setproctitle
 
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.db_manager_job_list import JobsDbManager
+
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -78,6 +81,7 @@ def recover_platform_job_logs_wrapper(
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
+    BasicConfig.read()
     as_conf.experiment_data = {
         "AS_ENV_PLATFORMS_PATH": as_conf.experiment_data.get("AS_ENV_PLATFORMS_PATH", None),
         "AS_ENV_SSH_CONFIG_PATH": as_conf.experiment_data.get("AS_ENV_SSH_CONFIG_PATH", None),
@@ -129,7 +133,16 @@ class CopyQueue(Queue):
         :param timeout: Timeout for blocking operations. Defaults to None.
         :type timeout: float
         """
-        super().put(job.__getstate__(), block, timeout)
+        job_data: dict = {
+            "id": job.id,
+            "name": job.name,
+            "fail_count": job.fail_count,
+            "submit_time_timestamp": job.submit_time_timestamp,
+            "start_time_timestamp": job.start_time_timestamp,
+            "finish_time_timestamp": job.finish_time_timestamp,
+            "wrapper_type": job.wrapper_type,
+        }
+        super().put(job_data, block, timeout)
 
 
 class Platform(ABC):
@@ -429,7 +442,7 @@ class Platform(ABC):
         scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
         x11_scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
         for package in packages_to_submit:
-            self.prepare_dry_run_if_applicable(package, only_wrappers, inspect)
+            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, as_conf)
             if not only_wrappers:
                 package.generate_scripts(as_conf, inspect)
             if not inspect and not only_wrappers:
@@ -443,9 +456,8 @@ class Platform(ABC):
         return scripts_to_submit_by_section, x11_scripts_to_submit_by_section
 
     @staticmethod
-    def prepare_dry_run_if_applicable(package: 'JobPackageBase', only_wrappers: bool,
-                                      inspect: bool,
-                                      ) -> None:
+    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool,
+                                      inspect: bool, as_conf: 'AutosubmitConfig') -> None:
         """Dry-run preparation of a package to emulate that the package was submitted, without following the normal submission flow.
 
         :param package: Package being prepared for inspect or wrapper-only mode.
@@ -713,27 +725,21 @@ class Platform(ABC):
         if self.check_file_exists(filename):
             self.delete_file(filename)
 
-    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
+    def check_file_exists(self, src, wrapper_failed=False, sleeptime=5, max_retries=3, show_logs: bool = True):
         return True
 
-    def get_stat_file(self, job, count=-1):
-        if count == -1:  # No internal retrials
-            filename = f"{job.stat_file}{job.fail_count}"
-        else:
-            filename = f'{job.name}_STAT_{str(count)}'
+    def get_stat_file(self, job, attempt: int):
+        filename = f"{job.stat_file}{attempt}"
         stat_local_path = (Path(
             self.config.get("LOCAL_ROOT_DIR", ""),self.expid,
             self.config.get("LOCAL_TMP_DIR", ""), filename))
         if stat_local_path.exists():
-            os.remove(stat_local_path)
+            stat_local_path.unlink()
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                if count == -1:
-                    Log.debug(f'{job.name}_STAT_{str(job.fail_count)} file have been transferred')
-                else:
-                    Log.debug(f'{job.name}_STAT_{str(count)} file have been transferred')
+                Log.debug(f'{job.name}_STAT_{str(attempt)} file have been transferred')
                 return True
-        Log.warning(f'{job.name}_STAT_{str(count)} file not found')
+        Log.warning(f'{job.name}_STAT_{str(attempt)} file not found')
         return False
 
     @autosubmit_parameter(name='current_logdir')
@@ -774,6 +780,14 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+        """Reads the JOBID from the first line of a remote log file.
+
+        :param remote_path: full remote path to the log file
+        :return: job ID if found, None otherwise
+        """
+        return None
+
     def add_job_to_log_recover(self, job):
         if job.id and int(job.id) != 0:
             if self.recovery_queue is None:
@@ -789,6 +803,8 @@ class Platform(ABC):
                         f"Skipping log recovery for {job.name}.")
                     return
                 self.recovery_queue.put(job, timeout=30)
+                if self.work_event is not None:
+                    self.work_event.set()
                 Log.debug(
                     f"Added job {job.name} and retry number:{job.fail_count} to the log recovery queue.")
             except Exception as e:
@@ -797,7 +813,6 @@ class Platform(ABC):
         else:
             Log.warning(
                 f"Job {job.name} and retry number:{job.fail_count} has no job id. Autosubmit will no record this retry. This shouldn't happen!")
-            job.updated_log += 1
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
@@ -828,7 +843,7 @@ class Platform(ABC):
         if self.ctx is None:
             self.ctx = self.get_mp_context()
 
-        if self.cleanup_event:
+        if self.cleanup_event is not None:
             self.cleanup_event.set()
 
         if self.log_recovery_process:
@@ -869,6 +884,9 @@ class Platform(ABC):
         self.log_recovery_process = None
         self.work_event = None
         self.processed_wrapper_logs = set()
+
+    def update_as_conf(self, as_conf: 'AutosubmitConfig') -> None:
+        self.config = as_conf.experiment_data
 
     def load_process_info(self, platform):
 
@@ -1010,34 +1028,42 @@ class Platform(ABC):
         self.work_event.clear()
         return process_log
 
-    def recover_job_log(self) -> None:
+    def recover_job_log(self, jobs_db_manager: 'JobsDbManager', as_conf: 'AutosubmitConfig') -> None:
         """Recovers log files for jobs from the recovery queue and retries failed jobs.
-
-        :return: Updated set of jobs pending to process.
         """
+        from autosubmit.job.job import Job
         if self.recovery_queue is None:
             raise AutosubmitCritical("As the recovery job was initialized some of"
                                      "the variable were not properly initialized")
         while not self.recovery_queue.empty():
-            from autosubmit.job.job import Job
-            job = Job(loaded_data=self.recovery_queue.get(timeout=5))
+            job_data = self.recovery_queue.get(timeout=5)
+            job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_data["name"]))
             job.platform_name = self.name  # Change the original platform to this process platform.
             job.platform = self
+            # TODO: handle missing job IDs (id=0). During an Autosubmit run, a job's log
+            # may fail to be retrieved. When recovery or setstatus or while running, later, it  tries to recover
+            # it, the job id is 0 because it was never persisted.
+            job.id = job_data["id"]
             report = job.retrieve_logfiles()
             job.send_cpmip_notification(self._as_conf)
 
             if not report.all_succeeded:
-                failed = [a for a in report.attempts if not a.success]
-                Log.warning(
-                    f"{self.name}(log_recovery): Job {job.name} had "
-                    f"{len(failed)} failed recovery attempt(s): "
-                    f"{[a.error for a in failed]}"
-                )
+                failed = [a for a in report.attempts if a.error and "Remote logs not found" not in a.error]
+                if len(failed) > 0:
+                    Log.warning(
+                        f"{self.name}(log_recovery): Job {job.name} had "
+                        f"{len(failed)} failed recovery attempt(s): "
+                        f"{[a.error for a in failed]}"
+                    )
+                attempts = len(report.attempts) - len(failed) - 1
             else:
+                attempts = len(report.attempts)
+            if attempts > 0:
                 Log.result(
                     f"{self.name}(log_recovery): Job {job.name} recovered "
                     f"{len(report.attempts)} attempt(s)."
                 )
+            jobs_db_manager.save_job_log(job)
 
     def recover_platform_job_logs(self, as_conf: 'AutosubmitConfig') -> None:
         """Recovers the logs of the jobs that have been submitted.
@@ -1046,7 +1072,12 @@ class Platform(ABC):
         self._as_conf = as_conf
         setproctitle.setproctitle(f"autosubmit log {self.expid} recovery {self.name.lower()}")
         identifier = f"{self.name.lower()}(log_recovery):"
+        jobs_db_manager = JobsDbManager(schema=self.expid)
         try:
+            from autosubmit.config.configcommon import AutosubmitConfig
+            from autosubmit.config.yamlparser import YAMLParserFactory
+            self._as_conf = AutosubmitConfig(self.expid, BasicConfig, YAMLParserFactory())
+            self._as_conf.check_conf_files(running_time=False, force_load=True)
             Log.info(f"{identifier} Starting...")
             self.connected = False
             self.restore_connection(as_conf, log_recovery_process=True)
@@ -1054,12 +1085,12 @@ class Platform(ABC):
             self.keep_alive_timeout = self.config.get("LOG_RECOVERY_TIMEOUT", 60 * 5)
             while not self.cleanup_event.is_set() and self.wait_for_work():
                 try:
-                    self.recover_job_log()
+                    self.recover_job_log(jobs_db_manager, as_conf)
                 except Exception as e:
                     Log.debug(f'{identifier} Error during log recovery: {e}')
                     Log.debug(traceback.format_exc())
                     self.restore_connection(as_conf, log_recovery_process=True)
-            self.recover_job_log()
+            self.recover_job_log(jobs_db_manager, as_conf)
         except Exception as e:
             Log.error(f"{identifier} {e}")
             Log.debug(traceback.format_exc())

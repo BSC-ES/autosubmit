@@ -69,14 +69,6 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     assert new_yaml_file.stat().st_size > 0
 
 
-def test_pkl_fix_postgres(monkeypatch, autosubmit):
-    """Test that trying to fix the pkl when using Postgres results in an error."""
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
-
-    with pytest.raises(AutosubmitCritical):
-        autosubmit.pkl_fix('a000')
-
-
 def test_database_backup_postgres(monkeypatch, autosubmit, mocker):
     """Test that trying to back up a Postgres DB results in just a log message of WIP."""
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
@@ -103,9 +95,9 @@ def test_iteration_info(completed, failed, mocker):
     """
     total_jobs = completed + failed
     job_list = mocker.MagicMock()
-    job_list.get_job_list.return_value = list(range(total_jobs))
-    job_list.get_completed.return_value = list(range(completed))
-    job_list.get_failed.return_value = list(range(failed))
+    job_list.total_size = total_jobs
+    job_list.completed_size = completed
+    job_list.failed_size = failed
 
     expected_safety_time = 42
     expected_default_retries = 22
@@ -120,17 +112,18 @@ def test_iteration_info(completed, failed, mocker):
 
     total, safety_time, default_retries, check_wrapper_time = Autosubmit.get_iteration_info(as_conf, job_list)
 
+    assert total == total_jobs
     assert expected_default_retries == default_retries
     assert expected_check_wrapper_time == check_wrapper_time
     assert expected_safety_time == safety_time
 
-    log_info_called = mocked_log.info.call_count
-    expected_info_called = 2 if failed > 0 else 1
-    assert log_info_called == expected_info_called
+    assert mocked_log.info.call_count == 1
 
     if failed > 0:
-        failed_text = "job has" if failed == 1 else "jobs have"
-        assert failed_text in mocked_log.info.call_args_list[1][0][0]
+        assert mocked_log.warning.call_count == 1
+        assert "jobs have failed" in mocked_log.warning.call_args_list[0][0][0]
+    else:
+        assert mocked_log.warning.call_count == 0
 
 
 def test_install_creates_directories(monkeypatch, tmp_path, autosubmit, mocker):
@@ -237,22 +230,20 @@ def test_check_non_wrapped_jobs_calls_platform_and_updates_status(
 
     job1 = Job('a000_20000101_fc0_1_SIM', 10, Status.RUNNING, 0)
     job1.platform = fake_platform
-    fake_job_list._job_list.append(job1)
+    fake_job_list.add_job(job1)
 
     def mock_update_status(self, conf):
         self.status = Status.COMPLETED
         return Status.COMPLETED
 
     mocker.patch.object(JobClass, 'update_status', mock_update_status)
-    # Avoid hitting the filesystem – save() would try to pickle to a tmp path.
-    mocker.patch.object(fake_job_list, 'save')
-    # Simulate new_status differing so update_status is called.
+    mocker.patch.object(fake_job_list, 'save_jobs')
     job1.new_status = Status.COMPLETED
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, 'a000')
 
     fake_platform.check_all_jobs.assert_called_once()
-    fake_job_list.save.assert_called_once()
+    fake_job_list.save_jobs.assert_called_once()
 
 
 @pytest.mark.parametrize("status,elapsed,should_check", [
@@ -300,17 +291,17 @@ def test_manage_wrapper_job_saves_on_change(mocker):
 
     Autosubmit.manage_wrapper_job(as_conf, job_list, wrapper_job)
 
-    job_list.save.assert_called_once()
+    job_list.save_jobs.assert_called_once()
 
 
 def test_check_non_wrapped_jobs_empty_platform_jobs(mocker, fake_job_list, fake_platform):
     """check_non_wrapped_jobs: skips platform when no non-wrapped jobs exist."""
     as_conf = mocker.MagicMock()
     fake_job_list.job_package_map = {10: "wrapper"}
+    mocker.patch.object(fake_job_list, 'get_wrappers_id_from_db', return_value=[10])
     job = Job("a000_20000101_fc0_1_SIM", 10, Status.RUNNING, 0)
     job.platform = fake_platform
-    fake_job_list._job_list.append(job)
-    # job.id (10) is in job_package_map, so platform_jobs will be empty
+    fake_job_list.add_job(job)
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")
 
@@ -326,14 +317,14 @@ def test_check_non_wrapped_jobs_notifies_on_change(mocker, fake_job_list, fake_p
     job.platform = fake_platform
     job.new_status = Status.COMPLETED
     job.prev_status = Status.QUEUING  # differs from current status
-    fake_job_list._job_list.append(job)
+    fake_job_list.add_job(job)
 
     def mock_update_status(self, conf):
         self.status = Status.COMPLETED
         return Status.COMPLETED
 
     mocker.patch.object(Job, "update_status", mock_update_status)
-    mocker.patch.object(fake_job_list, "save")
+    mocker.patch.object(fake_job_list, "save_jobs")
     mock_notify = mocker.patch.object(Autosubmit, "job_notify")
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")
@@ -343,6 +334,7 @@ def test_check_non_wrapped_jobs_notifies_on_change(mocker, fake_job_list, fake_p
 
 def test_finish_current_experiment_run(mocker):
     """finish_current_experiment_run: delegates to ExperimentHistory."""
+    mocker.patch("autosubmit.autosubmit.Autosubmit.save_historical_edges")
     mock_exp_hist = mocker.patch("autosubmit.autosubmit.ExperimentHistory")
     Autosubmit.finish_current_experiment_run("a000")
     mock_exp_hist.return_value.finish_current_experiment_run.assert_called_once()
@@ -392,14 +384,14 @@ def test_check_non_wrapped_jobs_no_status_change(mocker, fake_job_list, fake_pla
     job = Job("a000_20000101_fc0_1_SIM", 10, Status.RUNNING, 0)
     job.platform = fake_platform
     job.new_status = Status.RUNNING  # same as status
-    fake_job_list._job_list.append(job)
+    fake_job_list.add_job(job)
 
-    mocker.patch.object(fake_job_list, "save")
+    mocker.patch.object(fake_job_list, "save_jobs")
     mock_notify = mocker.patch.object(Autosubmit, "job_notify")
 
     Autosubmit.check_non_wrapped_jobs([fake_platform], fake_job_list, as_conf, "a000")
 
-    fake_job_list.save.assert_not_called()
+    fake_job_list.save_jobs.assert_not_called()
     mock_notify.assert_not_called()
 
 
@@ -453,59 +445,6 @@ def test_wrapper_notify_skips_when_disabled(mocker):
     mock_job_notify.assert_not_called()
 
 
-@pytest.mark.parametrize("statuses,expected,terminal", [
-    ([Status.COMPLETED, Status.COMPLETED], Status.COMPLETED, True),
-    ([Status.RUNNING, Status.WAITING], Status.RUNNING, False),
-    ([Status.FAILED, Status.WAITING], Status.FAILED, True),
-    ([Status.QUEUING, Status.WAITING], Status.QUEUING, False),
-    ([Status.HELD, Status.WAITING], Status.HELD, False),
-    ([Status.SUBMITTED, Status.WAITING], Status.SUBMITTED, False),
-])
-def test_check_wrapper_stored_status_sets_status(mocker, statuses, expected, terminal):
-    """check_wrapper_stored_status: derives wrapper status from inner job statuses."""
-    as_conf = mocker.MagicMock()
-    job_list = mocker.MagicMock()
-    job_list.packages_dict = {"wrapper_1": [
-        Job("j1", 10, statuses[0], 0),
-        Job("j2", 11, statuses[1], 0),
-    ]}
-    job_list.job_package_map = {}
-
-    result = Autosubmit.check_wrapper_stored_status(as_conf, job_list, "01:00")
-
-    if terminal:
-        assert "wrapper_1" not in result.packages_dict
-    else:
-        assert 10 in result.job_package_map
-        assert result.job_package_map[10].status == expected
-
-
-def test_check_wrapper_stored_status_pops_terminal(mocker):
-    """check_wrapper_stored_status: removes COMPLETED/FAILED wrappers from packages_dict."""
-    as_conf = mocker.MagicMock()
-    job_list = mocker.MagicMock()
-    job_list.packages_dict = {"wrapper_1": [
-        Job("j1", 10, Status.COMPLETED, 0),
-    ]}
-    job_list.job_package_map = {}
-
-    result = Autosubmit.check_wrapper_stored_status(as_conf, job_list, "01:00")
-
-    assert "wrapper_1" not in result.packages_dict
-    assert 10 not in result.job_package_map
-
-
-def test_check_wrapper_stored_status_no_packages_dict(mocker):
-    """check_wrapper_stored_status: returns job_list unchanged when no packages_dict."""
-    as_conf = mocker.MagicMock()
-    job_list = mocker.MagicMock()
-    # Remove packages_dict so hasattr returns False
-    del job_list.packages_dict
-
-    result = Autosubmit.check_wrapper_stored_status(as_conf, job_list, "01:00")
-    assert result is job_list
-
-
 def test_submit_ready_jobs_raises_on_missing_template(mocker):
     """submit_ready_jobs: raises AutosubmitCritical when job template is missing."""
     as_conf = mocker.MagicMock()
@@ -522,3 +461,10 @@ def test_submit_ready_jobs_raises_on_missing_template(mocker):
         Autosubmit.submit_ready_jobs(as_conf, job_list, [platform], inspect=False, only_wrappers=False)
 
     assert "SIM" in str(exc_info.value)
+
+def test_sigint_handler_sets_exit_flag():
+    """Verify signal_handler sets Autosubmit.exit = True."""
+    from autosubmit.autosubmit import signal_handler, Autosubmit
+    Autosubmit.exit = False
+    signal_handler(2, None)  # SIGINT = 2
+    assert Autosubmit.exit is True

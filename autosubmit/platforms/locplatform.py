@@ -92,7 +92,7 @@ class LocalPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Updates commands for platforms."""
-        self.root_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
+        self.root_dir = os.path.join(self.config.get("LOCAL_ROOT_DIR", BasicConfig.LOCAL_ROOT_DIR), self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "tmp", 'LOG_' + self.expid)
         self.cancel_cmd = "kill -2"
         self._checkhost_cmd = "echo 1"
@@ -140,6 +140,17 @@ class LocalPlatform(ParamikoPlatform):
         except Exception as exc:
             Log.error("Writing Job Id Failed : " + str(exc))
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> Optional[int]:
+        try:
+            if os.path.exists(remote_path):
+                with open(remote_path) as f:
+                    first_line = f.readline()
+                if first_line.startswith('[INFO] JOBID='):
+                    return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, IndexError):
+            pass
+        return None
+
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
 
@@ -149,7 +160,7 @@ class LocalPlatform(ParamikoPlatform):
         :return: None
         """
         self.connected = True
-        if log_recovery_process:
+        if not log_recovery_process:
             self.spawn_log_retrieval_process(as_conf)
 
     def test_connection(self, as_conf: 'AutosubmitConfig') -> None:
@@ -264,7 +275,7 @@ class LocalPlatform(ParamikoPlatform):
 
     # Moves .err .out
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 1,
-                          max_retries: int = 1) -> bool:
+                          max_retries: int = 1, show_logs: bool = True) -> bool:
         """Checks if a file exists in the platform.
 
         :param src: source name.
@@ -284,7 +295,8 @@ class LocalPlatform(ParamikoPlatform):
             if Path(self.get_files_path(), src).is_file():
                 return True
             sleep(sleeptime)
-        Log.warning(f"File {src} does not exist")
+        if show_logs:
+            Log.warning(f"File {src} does not exist")
         return False
 
     def delete_file(self, filename, del_cmd=False):

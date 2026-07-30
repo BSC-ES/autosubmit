@@ -277,7 +277,7 @@ class PJMPlatform(ParamikoPlatform):
     def allocated_nodes():
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
-    def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
+    def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3, show_logs: bool = True):
         file_exist = False
         retries = 0
 
@@ -294,15 +294,14 @@ class PJMPlatform(ParamikoPlatform):
                     retries = retries + 1
                 else:
                     retries = 9999
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
+            except Exception as e:
+                if "garbage" in str(e).lower():
                     if not wrapper_failed:
                         sleep(sleeptime)
                         sleeptime = sleeptime + 5
                         retries = retries + 1
                 else:
-                    file_exist = False  # won't exist
-                    retries = 999  # no more retries
+                    raise
         return file_exist
 
     def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:

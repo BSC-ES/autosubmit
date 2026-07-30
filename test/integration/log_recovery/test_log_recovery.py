@@ -335,3 +335,20 @@ def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
     local.clean_log_recovery_process()
     assert local.recovery_queue is None
     assert local.log_recovery_process is None
+
+
+def test_add_job_to_log_recover_signals_work_event(local, mocker):
+    """Verify work_event is set after adding a job to the recovery queue."""
+    local.prepare_process()
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    local.log_recovery_process = mocker.MagicMock()
+    local.log_recovery_process.is_alive.return_value = True
+
+    job = Job('t000', '0000', Status.COMPLETED, 0)
+    job.name = 'test_job'
+    job.id = 123
+    job.updated_log = 0
+    job.updated_stats = 0
+
+    local.add_job_to_log_recover(job)
+    assert local.work_event.is_set()

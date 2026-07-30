@@ -70,7 +70,7 @@ def packager(mocker):
     as_conf.get_extensible_wallclock.return_value = 0
 
     job_list = mocker.MagicMock()
-    job_list._job_list = []
+    job_list.job_list = []
     job_list.get_in_queue.return_value = []
     job_list.get_ready.return_value = []
     job_list.get_prepared.return_value = []
@@ -124,7 +124,7 @@ def _build_jobs(config: list[JobSpec]) -> list[Job]:
     "simple COMPLETED + wrappable READY",
 ])
 def test_has_blocking_non_wrapped_jobs(packager, jobs_config, expected):
-    packager._jobs_list._job_list = _build_jobs(jobs_config)
+    packager._jobs_list.job_list = _build_jobs(jobs_config)
     assert packager._has_blocking_non_wrapped_jobs() is expected
 
 
@@ -146,7 +146,7 @@ def test_has_blocking_non_wrapped_jobs(packager, jobs_config, expected):
 def test_is_deadlock(packager, mocker, any_simple, queue_len, jobs_config, not_wrappable, built, expected):
     if queue_len > 0:
         packager._jobs_list.get_in_queue.return_value = [mocker.MagicMock()]
-    packager._jobs_list._job_list = _build_jobs(jobs_config)
+    packager._jobs_list.job_list = _build_jobs(jobs_config)
     assert packager.is_deadlock(
         any_simple_packages=any_simple,
         not_wrappeable_package_info=not_wrappable,

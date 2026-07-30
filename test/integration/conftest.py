@@ -46,7 +46,7 @@ from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 # noinspection PyProtectedMember
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from test.integration.test_utils.docker import (
+from test.integration.test_utils.docker_utils import (
     get_git_container,
     get_slurm_container,
     get_ssh_container,
@@ -552,7 +552,7 @@ def setup_as_logs_pytest(tmp_path: "LocalPath") -> None:
     Log.set_file(
         str(Path(tmp_path, 'as_log_out.txt')),
         'out',
-        level='DEBUG'
+        level='STATUS'
     )
     Log.set_file(
         str(Path(tmp_path, 'as_log_err.txt')),

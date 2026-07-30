@@ -18,6 +18,7 @@
 import os
 import textwrap
 import time
+import traceback
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Generator, Optional, Protocol, cast
@@ -31,8 +32,7 @@ from autosubmit.database import session
 from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.tables import (
     ExperimentRunTable,
-    JobDataTable,
-    get_table_with_schema,
+    JobDataTable, TableRegistry,
 )
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
@@ -40,6 +40,7 @@ from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
 )
+from autosubmit.log.log import Log
 
 CURRENT_DB_VERSION = 21  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
@@ -208,6 +209,13 @@ class ExperimentHistoryDbManager(DatabaseManager):
     def get_experiment_run_dc_with_max_id(self):
         """ Get Current (latest) ExperimentRun data class. """
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
+
+    def get_experiment_run_dc_with_max_id_or_none(self) -> Optional[ExperimentRun]:
+        """Get Current (latest) ExperimentRun data class, or None if not available."""
+        try:
+            return self.get_experiment_run_dc_with_max_id()
+        except Exception:
+            return None
 
     def register_experiment_run_dc(self, experiment_run_dc):
         self._insert_experiment_run(experiment_run_dc)
@@ -399,23 +407,6 @@ class ExperimentHistoryDbManager(DatabaseManager):
                      experiment_run_dc.suspended, HUtils.get_current_datetime(), experiment_run_dc.run_id)
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
-    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
-        """Get the latest JobData for a given job_name and fail_count.
-
-        :param job_name: The job name.
-        :type job_name: str
-        :param fail_count: The fail count.
-        :type fail_count: int
-        :return: The latest JobData instance.
-        :rtype: JobData
-        """
-        statement = self.get_built_select_statement("job_data", "job_name=? AND fail_count=? ORDER BY id DESC LIMIT 1")
-        arguments = (str(job_name), int(fail_count),)
-        job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
-        if len(job_data_rows) == 0:
-            return None
-        return JobData.from_model(Models.JobDataRow(*job_data_rows[0]))
-
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
         """
         Get the latest JobData for a given job_id and job_name.
@@ -433,6 +424,58 @@ class ExperimentHistoryDbManager(DatabaseManager):
         models = [Models.JobDataRow(*row) for row in job_data_rows][-1]
         return JobData.from_model(models)
 
+    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
+        """Get the last JobData for a given job_name and counter.
+
+        :param job_name: The job name.
+        :type job_name: str
+        :param fail_count: The counter value.
+        :type fail_count: int
+        :return: The most recent JobData instance for the given job_name and counter.
+        :rtype: JobData
+        :raises Exception: If no job_data is found for the given job_name and counter.
+        """
+        statement = self.get_built_select_statement("job_data", "job_name=? AND fail_count=? ORDER BY id DESC LIMIT 1")
+        arguments = (str(job_name), int(fail_count),)
+        job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
+        if not job_data_rows:
+            raise Exception(f"No job_data found for job_name='{job_name}' and fail_count={fail_count}.")
+        return JobData.from_model(Models.JobDataRow(*job_data_rows[0]))
+
+    def get_last_job_data_dc_by_job_name_and_counter(self, job_name: str, counter: int) -> JobData:
+        """Get the last JobData for a given job_name and counter.
+
+        :param job_name: The job name.
+        :type job_name: str
+        :param counter: The counter value.
+        :type counter: int
+        :return: The most recent JobData instance for the given job_name and counter.
+        :rtype: JobData
+        :raises Exception: If no job_data is found for the given job_name and counter.
+        """
+        statement = self.get_built_select_statement("job_data", "job_name=? AND counter=? ORDER BY id DESC LIMIT 1")
+        arguments = (str(job_name), int(counter),)
+        job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
+        if not job_data_rows:
+            raise Exception(f"No job_data found for job_name='{job_name}' and counter={counter}.")
+        return JobData.from_model(Models.JobDataRow(*job_data_rows[0]))
+
+    def get_last_job_data_dc_by_job_name(self, job_name: str) -> JobData:
+        """Get the most recent JobData for a given job_name regardless of counter.
+
+        :param job_name: The job name.
+        :type job_name: str
+        :return: The JobData instance with the highest id for the given job_name.
+        :rtype: JobData
+        :raises Exception: If no job_data is found for the given job_name.
+        """
+        statement = self.get_built_select_statement("job_data", "job_name=? ORDER BY id DESC LIMIT 1")
+        arguments = (str(job_name),)
+        job_data_rows = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
+        if not job_data_rows:
+            raise Exception(f"No job_data found for job_name='{job_name}'.")
+        return JobData.from_model(Models.JobDataRow(*job_data_rows[0]))
+
     def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int:
         """
         Get the maximum counter value from the `job_data` table. If a `job_name` is provided,
@@ -446,7 +489,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
         if job_name:
             statement = "SELECT MAX(counter) as maxcounter FROM job_data WHERE job_name = ?"
             arguments = (job_name,)
-            counter_result: list[tuple[Optional[int]]] = self.get_from_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
+            counter_result: list[tuple[Optional[int]]] = self.get_from_statement_with_arguments(
+                self.historicaldb_file_path, statement, arguments)
         else:
             statement = "SELECT MAX(counter) as maxcounter FROM job_data"
             counter_result: list[tuple[Optional[int]]] = self.get_from_statement(self.historicaldb_file_path, statement)
@@ -495,6 +539,8 @@ class ExperimentHistoryDatabaseManager(Protocol):
 
     def get_experiment_run_dc_with_max_id(self) -> ExperimentRun: ...
 
+    def get_experiment_run_dc_with_max_id_or_none(self) -> Optional[ExperimentRun]: ...
+
     def register_experiment_run_dc(self, experiment_run_dc): ...
 
     def update_experiment_run_dc_by_id(self, experiment_run_dc): ...
@@ -522,6 +568,8 @@ class ExperimentHistoryDatabaseManager(Protocol):
     def get_job_data_max_counter(self, job_name: Optional[str] = None) -> int: ...
 
     def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData: ...
+
+    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> Optional[JobData]: ...
 
     def get_stale_rows(self) -> list: ...
 
@@ -565,7 +613,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             db_path = Path(base) / file_name
             connection_url = get_connection_url(db_path)
             self.schema = None
-
+        self.table_registry = TableRegistry(schema=self.schema)
         self.engine = session.create_engine(connection_url=connection_url)
 
     def initialize(self):
@@ -630,11 +678,11 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def create_historical_database(self):
         with self.engine.connect() as conn:
-            if BasicConfig.DATABASE_BACKEND != "sqlite":
-                conn.execute(CreateSchema(self.schema, if_not_exists=True))
-            conn.execute(CreateTable(get_table_with_schema(self.schema, ExperimentRunTable), if_not_exists=True))
-            conn.execute(CreateTable(get_table_with_schema(self.schema, JobDataTable), if_not_exists=True))
-            conn.commit()
+            with conn.begin():
+                if BasicConfig.DATABASE_BACKEND != "sqlite":
+                    conn.execute(CreateSchema(self.schema, if_not_exists=True))
+                conn.execute(CreateTable(self.table_registry.get(ExperimentRunTable.name), if_not_exists=True))
+                conn.execute(CreateTable(self.table_registry.get(JobDataTable.name), if_not_exists=True))
             # TODO: implement db migrations?
             # self._set_historical_pragma_version(CURRENT_DB_VERSION)
 
@@ -645,9 +693,16 @@ class SqlAlchemyExperimentHistoryDbManager:
         run = self._get_experiment_run_with_max_id()
         return ExperimentRun.from_model(run)
 
+    def get_experiment_run_dc_with_max_id_or_none(self) -> Optional[ExperimentRun]:
+        """Get Current (latest) ExperimentRun data class, or None if not available."""
+        try:
+            return self.get_experiment_run_dc_with_max_id()
+        except Exception:
+            return None
+
     def register_experiment_run_dc(self, experiment_run_dc):
         query = (
-            insert(get_table_with_schema(self.schema, ExperimentRunTable)).
+            insert(self.table_registry.get(ExperimentRunTable.name)).
             values(
                 created=HUtils.get_current_datetime(),
                 modified=HUtils.get_current_datetime(),
@@ -666,12 +721,12 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
+            with conn.begin():
+                conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
     def update_experiment_run_dc_by_id(self, experiment_run_dc):
-        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
             update(experiment_run_table).
             where(experiment_run_table.c.run_id == experiment_run_dc.run_id).  # type: ignore
@@ -690,12 +745,13 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
+            with conn.begin():
+                conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
     def _get_experiment_run_with_max_id(self):
-        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        """ Get Models.ExperimentRunRow for the maximum id run. """
+        experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
             select(experiment_run_table).
             where(experiment_run_table.c.run_id > 0).
@@ -707,8 +763,17 @@ class SqlAlchemyExperimentHistoryDbManager:
                 raise Exception("No Experiment Runs registered.")
         return Models.ExperimentRunRow(*row)
 
+    def _get_max_experiment_run_id(self) -> int:
+        """Get the maximum experiment run ID from the experiment_run table."""
+        experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
+        query = select(func.max(experiment_run_table.c.run_id))
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+        return result[0] if result and result[0] is not None else 0
+
     def is_there_a_last_experiment_run(self):
-        experiment_run_table = get_table_with_schema(self.schema, ExperimentRunTable)
+        """Return ``True`` if there is at least one experiment run in the database. ``False`` otherwise."""
+        experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
             select(experiment_run_table).
             where(experiment_run_table.c.run_id > 0).
@@ -719,7 +784,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         return result is not None
 
     def get_job_data_all(self):
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         with self.engine.connect() as conn:
             job_data_rows = conn.execute(select(job_data_table)).all()
         return [Models.JobDataRow(*row) for row in job_data_rows]
@@ -756,14 +821,15 @@ class SqlAlchemyExperimentHistoryDbManager:
             self._update_job_data_by_id(job_data_dc)
         return len(job_data_dcs)
 
-    def get_job_data_dc_unique_latest_by_job_name(self, job_name):
+    def get_job_data_dc_unique_latest_by_job_name(self, job_name: Optional[str]):
+        """ Returns JobData data class for the latest job_data_row with last=1 by job_name. """
         job_data_row_last = self._get_job_data_last_by_name(job_name)
         if len(job_data_row_last) > 0:
             return JobData.from_model(job_data_row_last[0])
         return None
 
     def _get_job_data_last_by_name(self, job_name):
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table).
             where(
@@ -794,7 +860,7 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def _get_job_data_last_by_wrapper_code(self, wrapper_code):
         """ Get List of Models.JobDataRow for last=1 and rowtype=wrapper_code """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table).
             where(
@@ -816,7 +882,7 @@ class SqlAlchemyExperimentHistoryDbManager:
 
     def _get_all_last_job_data_rows(self):
         """ Get List of Models.JobDataRow for last=1. """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table).
             where(job_data_table.c.last == 1)  # type: ignore
@@ -826,7 +892,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         return [Models.JobDataRow(*row) for row in job_data_rows]
 
     def _insert_job_data(self, job_data):
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         insert_query = (
             insert(job_data_table).
             values(
@@ -867,8 +933,8 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            result = conn.execute(insert_query)
-            conn.commit()
+            with conn.begin():
+                result = conn.execute(insert_query)
         return result.lastrowid
 
     def update_many_job_data_change_status(self, changes):
@@ -877,23 +943,23 @@ class SqlAlchemyExperimentHistoryDbManager:
         Update many job_data rows in bulk. Requires a changes list of argument tuples.
         Only updates finish, modified, status, and rowstatus by id.
         """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         with self.engine.connect() as conn:
-            for change in changes:
-                query = (
-                    update(job_data_table).
-                    where(job_data_table.c.id == change[3]).  # type: ignore
-                    values(
-                        modified=change[0],
-                        status=change[1],
-                        rowstatus=change[2]
+            with conn.begin():
+                for change in changes:
+                    query = (
+                        update(job_data_table).
+                        where(job_data_table.c.id == change[3]).  # type: ignore
+                        values(
+                            modified=change[0],
+                            status=change[1],
+                            rowstatus=change[2]
+                        )
                     )
-                )
-                conn.execute(query)
-            conn.commit()
+                    conn.execute(query)
 
     def _update_job_data_by_id(self, job_data_dc):
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         # noinspection PyProtectedMember
         query = (
             update(job_data_table).
@@ -922,35 +988,12 @@ class SqlAlchemyExperimentHistoryDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
-
-    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
-        """Get the latest JobData for a given job_name and fail_count.
-
-        :param job_name: The job name.
-        :type job_name: str
-        :param fail_count: The fail count.
-        :type fail_count: int
-        :return: The latest JobData instance.
-        :rtype: JobData
-        """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
-        query = (
-            select(job_data_table)
-            .where(job_data_table.c.job_name == job_name)  # type: ignore
-            .where(job_data_table.c.fail_count == fail_count)
-            .order_by(job_data_table.c.id.desc())
-        )
-        with self.engine.connect() as conn:
-            result = conn.execute(query).first()
-            if not result:
-                return None
-            return JobData.from_model(result)
+            with conn.begin():
+                conn.execute(query)
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
         """Get the job data by job ID and name."""
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table)
             .where(job_data_table.c.job_id == job_id)  # type: ignore
@@ -961,9 +1004,90 @@ class SqlAlchemyExperimentHistoryDbManager:
             result = conn.execute(query).first()
             return JobData.from_model(result)
 
+    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
+        """Get the last job data by job name and fail_count.
+
+        :param job_name: The job name.
+        :type job_name: str
+        :param fail_count: The counter value.
+        :type fail_count: int
+        :return: The most recent JobData instance for the given job_name and counter.
+        :rtype: JobData
+        :raises Exception: If no job_data is found for the given job_name and counter.
+        """
+        job_data_table = self.table_registry.get(JobDataTable.name)
+        query = (
+            select(job_data_table)
+            .where(job_data_table.c.job_name == job_name)  # type: ignore
+            .where(job_data_table.c.fail_count == fail_count)  # type: ignore
+            .order_by(desc(job_data_table.c.id))
+        )
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+        if result is None:
+            raise Exception(f"No job_data found for job_name='{job_name}' and fail_count={fail_count}.")
+        return JobData.from_model(result)
+
+    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> Optional[JobData]:
+        job_data_table = self.table_registry.get(JobDataTable.name)
+        query = (
+            select(job_data_table)
+            .where(job_data_table.c.job_id == job_id)
+            .where(job_data_table.c.fail_count == fail_count)
+            .order_by(desc(job_data_table.c.id))
+        )
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+        return JobData.from_model(result) if result else None
+
+    def get_last_job_data_dc_by_job_name_and_counter(self, job_name: str, counter: int) -> JobData:
+        """Get the last JobData for a given job_name and counter.
+
+        :param job_name: The job name.
+        :type job_name: str
+        :param counter: The counter value.
+        :type counter: int
+        :return: The most recent JobData instance for the given job_name and counter.
+        :rtype: JobData
+        :raises Exception: If no job_data is found for the given job_name and counter.
+        """
+        job_data_table = self.table_registry.get(JobDataTable.name)
+        query = (
+            select(job_data_table)
+            .where(job_data_table.c.job_name == job_name)  # type: ignore
+            .where(job_data_table.c.counter == counter)  # type: ignore
+            .order_by(desc(job_data_table.c.id))
+        )
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+        if result is None:
+            raise Exception(f"No job_data found for job_name='{job_name}' and counter={counter}.")
+        return JobData.from_model(result)
+
+    def get_last_job_data_dc_by_job_name(self, job_name: str) -> JobData:
+        """Get the most recent JobData for a given job_name regardless of counter.
+
+        :param job_name: The job name.
+        :type job_name: str
+        :return: The JobData instance with the highest id for the given job_name.
+        :rtype: JobData
+        :raises Exception: If no job_data is found for the given job_name.
+        """
+        job_data_table = self.table_registry.get(JobDataTable.name)
+        query = (
+            select(job_data_table)
+            .where(job_data_table.c.job_name == job_name)  # type: ignore
+            .order_by(desc(job_data_table.c.id))
+        )
+        with self.engine.connect() as conn:
+            result = conn.execute(query).first()
+        if result is None:
+            raise Exception(f"No job_data found for job_name='{job_name}'.")
+        return JobData.from_model(result)
+
     def get_job_data_max_counter(self, job_name: str = None):
         """ The max counter is the maximum count value for the count column in job_data. """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = select(func.max(job_data_table.c.counter).label("maxcounter"))
         if job_name:
             query = query.where(job_data_table.c.job_name == job_name)  # type: ignore
@@ -973,7 +1097,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         return max_counter if max_counter else DEFAULT_MAX_COUNTER
 
     def get_jobs_data_last_row(self, job_names) -> dict[str, Any]:
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         jobs_data = self.select_jobs_data(job_data_table, job_names)
         jobs_data = [dict(job) for job in jobs_data]
         jobs_data_by_name = {}
@@ -1046,7 +1170,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         :return: List of Row objects with job_name, fail_count, platform.
         :rtype: list
         """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         query = select(
             job_data_table.c.job_name,
             job_data_table.c.fail_count,
@@ -1068,7 +1192,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         :return: Number of rows updated.
         :rtype: int
         """
-        job_data_table = get_table_with_schema(self.schema, JobDataTable)
+        job_data_table = self.table_registry.get(JobDataTable.name)
         stmt = update(job_data_table).where(
             job_data_table.c.job_name == job_name,
             job_data_table.c.fail_count == fail_count
@@ -1079,12 +1203,34 @@ class SqlAlchemyExperimentHistoryDbManager:
             return result.rowcount
 
 
+def get_last_run_id(expid: str) -> Optional[int]:
+    """Get the last experiment run ID, or None if not available.
+    Bypasses ExperimentHistory.__init__ to avoid silent failure on manager creation.
+    """
+    try:
+        BasicConfig.read()
+        force_sql_alchemy = BasicConfig.DATABASE_BACKEND == "postgres"
+        manager = create_experiment_history_db_manager(
+            BasicConfig.DATABASE_BACKEND,
+            expid=expid,
+            force_sql_alchemy=force_sql_alchemy,
+        )
+        manager.initialize()
+        run = manager.get_experiment_run_dc_with_max_id_or_none()
+        return run.run_id if run else None
+    except Exception as exp:
+        Log.warning(f"Could not get last experiment run ID for {expid}: {exp}")
+        Log.debug(traceback.format_exc())
+        return None
+
+
 def create_experiment_history_db_manager(db_engine: str, **options: Any) -> ExperimentHistoryDatabaseManager:
     use_sql_alchemy = options.get("force_sql_alchemy", False) or db_engine == 'postgres'
     jobdata_dir_path = options.get("jobdata_dir_path", BasicConfig.JOBDATA_DIR)
     if use_sql_alchemy:
         job_data_file = options.get("jobdata_file", None)
-        return cast(ExperimentHistoryDatabaseManager, SqlAlchemyExperimentHistoryDbManager(options["expid"], jobdata_dir_path, job_data_file))
+        return cast(ExperimentHistoryDatabaseManager,
+                    SqlAlchemyExperimentHistoryDbManager(options["expid"], jobdata_dir_path, job_data_file))
     elif db_engine == 'sqlite':
         return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(options["expid"], jobdata_dir_path))
     else:
