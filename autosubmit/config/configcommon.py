@@ -1546,7 +1546,7 @@ class AutosubmitConfig(object):
                 if parser['EXPERIMENT']['NUMCHUNKS'] == "-1":
                     self.wrong_config["Expdef"] += [['experiment', "Mandatory EXPERIMENT.NUMCHUNKS is not defined"]]
                 parser['EXPERIMENT']['NUMCHUNKS'] = int(parser['EXPERIMENT']['NUMCHUNKS'])
-            if parser['EXPERIMENT'].get('CALENDAR', "").lower() not in ['standard', 'noleap']:
+            if parser['EXPERIMENT'].get('CALENDAR', "standard").lower() not in ['standard', 'noleap']:
                 self.wrong_config["Expdef"] += [['experiment', "Mandatory EXPERIMENT.CALENDAR choice is invalid"]]
         if parser.get('PROJECT', "") == "":
             self.wrong_config["Expdef"] += [['PROJECT', "Mandatory PROJECT section doesn't exists"]]
