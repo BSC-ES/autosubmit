@@ -34,7 +34,7 @@ jobs:
     steps:
       - name: Get PR info
         id: pr
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -155,7 +155,7 @@ jobs:
           retention-days: 7
 
       - name: Comment results
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         if: ${{ !env.ACT }}
         with:
           script: |
@@ -235,7 +235,7 @@ jobs:
           retention-days: 7
 
       - name: Comment results
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         if: ${{ !env.ACT }}
         with:
           script: |
