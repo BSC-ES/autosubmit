@@ -161,7 +161,7 @@ class Platform(ABC):
     worker_events: list[Event] = []
     # Shared lock between the main process and a retrieval log process
     lock = multiprocessing.Lock()
-    IO_SAFE_WAIT = 0
+    IO_SAFE_WAIT = 60
 
     TYPE: PlatformType
     EXECUTION_MODE: ExecutionMode
