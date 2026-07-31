@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 from collections.abc import Generator
 from getpass import getuser
 from pathlib import Path
@@ -221,7 +220,7 @@ Host mn5-gpp
         "SUDO USER(not exists) + AS_ENV_CONFIG_SSH_PATH(not defined)"
     ]
 )
-def test__get_user_config_file(user: Optional[str], env_ssh_config_defined: bool, tmpdir, autosubmit_config, generate_all_files):
+def test__get_user_config_file(user: str | None, env_ssh_config_defined: bool, tmpdir, autosubmit_config, generate_all_files):
     if not user:
         user = getuser()
     tmp_dir = str(tmpdir)
@@ -235,7 +234,7 @@ def test__get_user_config_file(user: Optional[str], env_ssh_config_defined: bool
     as_env_ssh_config_path = None
     if env_ssh_config_defined:
         experiment_data["AS_ENV_SSH_CONFIG_PATH"] = str(tmpdir.join(f".ssh/config_{user}"))
-        as_env_ssh_config_path = Path(experiment_data["AS_ENV_SSH_CONFIG_PATH"])
+        as_env_ssh_config_path = experiment_data["AS_ENV_SSH_CONFIG_PATH"]
 
     as_conf = autosubmit_config(expid='a000', experiment_data=experiment_data)
 
@@ -273,9 +272,9 @@ def test_submit_multiple_jobs(mocker, autosubmit_config, tmpdir):
     }
     platform = ParamikoPlatform(expid='a000', name='local', config=experiment_data)
     platform._ssh_config = mocker.MagicMock()
-    platform.get_submit_cmd = mocker.MagicMock(return_value="dummy")
-    platform.send_command = mocker.MagicMock(return_value=True)
-    platform.get_submitted_job_id = mocker.MagicMock(return_value=[10000])
+    platform.submit_cmd = mocker.MagicMock(return_value="dummy")
+    platform.send_command = mocker.MagicMock(return_value=True)  # type: ignore[method-assign]
+    platform.get_submitted_job_id = mocker.MagicMock(return_value=[10000])  # type: ignore[method-assign]
     platform._ssh_output = "10000"
     jobs_id = platform.submit_multiple_jobs({"dummy.cmd": mocker.MagicMock()})
     assert jobs_id == [10000]
@@ -520,7 +519,7 @@ def test_get_call(executable: str, timeout, paramiko_platform: ParamikoPlatform)
         executable=executable,
         x11_options='',
         fail_count=0,
-        sub_queue=None,
+        sub_queue="",
     )
 
     call = call.strip()
@@ -540,7 +539,7 @@ def test_get_call_no_job(paramiko_platform: ParamikoPlatform):
         executable='',
         x11_options='',
         fail_count=0,
-        sub_queue=None,
+        sub_queue="",
     )
     assert 'nohup' in call
     assert 'job_a' in call
@@ -640,7 +639,7 @@ def test_check_and_cancel_duplicated_job_names_no_duplicates(
     :param slurm_platform: Slurm platform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)
+    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)  # type: ignore
     slurm_platform._ssh_output = "job_a:1001\n"
 
     cancelled: list[str] = []
@@ -660,7 +659,7 @@ def test_check_and_cancel_duplicated_job_names_with_duplicates(
     :param slurm_platform: Slurm platform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)
+    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)  # type: ignore
     slurm_platform._ssh_output = "job_a:1001,1002\n"
 
     cancelled: list[str] = []
@@ -680,7 +679,7 @@ def test_check_and_cancel_duplicated_job_names_empty_output(
     :param slurm_platform: Slurm platform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)
+    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)  # type: ignore
     slurm_platform._ssh_output = ""
 
     cancelled: list[str] = []
@@ -727,7 +726,7 @@ def test_get_job_id_by_job_name_parses_truncated_names(
     :param ssh_output: Simulated squeue output.
     :param expected_job_ids: Expected parsed job identifiers.
     """
-    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)
+    monkeypatch.setattr(slurm_platform, "send_command", lambda cmd, **_: None)  # type: ignore
     slurm_platform._ssh_output = ssh_output
 
     assert slurm_platform.get_job_id_by_job_name("any_name") == expected_job_ids
@@ -758,7 +757,7 @@ def test_submit_multiple_jobs_uses_fallback_when_count_mismatch(
     monkeypatch.setattr(paramiko_platform, "get_submitted_job_id", lambda out, **_: [])
     monkeypatch.setattr(paramiko_platform, "get_submitted_jobs_by_name", lambda names: [101])
 
-    result = paramiko_platform.submit_multiple_jobs({"job_a.cmd": object()})
+    result = paramiko_platform.submit_multiple_jobs({"job_a.cmd": object()})  # type: ignore
 
     assert result == [101]
 
@@ -780,7 +779,7 @@ def test_submit_multiple_jobs_raises_when_both_paths_fail(
     monkeypatch.setattr(paramiko_platform, "get_submitted_jobs_by_name", lambda names: [])
 
     with pytest.raises(AutosubmitError) as exc_info:
-        paramiko_platform.submit_multiple_jobs({"job_a.cmd": object()})
+        paramiko_platform.submit_multiple_jobs({"job_a.cmd": object()})  # type: ignore
 
     assert exc_info.value.code == 6005
 
@@ -804,12 +803,13 @@ def test_get_completed_job_names(tmp_path: Path, mode: str) -> None:
     """Test that completed job names are correctly retrieved from the remote platform."""
     # Actually we want to test a paramiko function, but using local platform for simplicity with the "send_command" part.
     platform = LocalPlatform(expid='t001', name='local', config={})
-    platform.remote_log_dir = tmp_path / 't001/remote_logs'
-    platform.remote_log_dir.mkdir(parents=True, exist_ok=True)
+    remote_logs_path = tmp_path / 't001/remote_logs'
+    remote_logs_path.mkdir(parents=True, exist_ok=True)
+    platform.remote_log_dir = str(remote_logs_path)
     platform.connected = True
     completed_jobs = ['job1_COMPLETED', 'job2_COMPLETED', 'job3_COMPLETED']
     for job_file in completed_jobs:
-        (platform.remote_log_dir / job_file).touch()
+        (remote_logs_path / job_file).touch()
 
     if mode == "all":
         job_names = platform.get_completed_job_names()
@@ -840,7 +840,7 @@ def multi_platform_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dic
     sent: dict[str, list[str]] = {"local": [], "ps": [], "slurm": []}
     for platform, key in [(local, "local"), (ps, "ps"), (slurm, "slurm")]:
         monkeypatch.setattr(
-            platform, "send_command", lambda cmd, _k=key, **kw: sent[_k].append(cmd)
+            platform, "send_command", lambda cmd, _k=key, **kw: sent[_k].append(cmd)  # type: ignore
         )
 
     return {"platforms": {"local": local, "ps": ps, "slurm": slurm}, "sent": sent}
@@ -1021,7 +1021,7 @@ def test_change_status_handles_send_command_failure_gracefully(
         raise Exception("SSH connection lost")
 
     for platform in platforms.values():
-        monkeypatch.setattr(platform, "send_command", _raise)
+        monkeypatch.setattr(platform, "send_command", _raise)  # type: ignore
 
     jobs = [
         _make_job(f"job_{name}", str(i), Status.RUNNING, platform)
