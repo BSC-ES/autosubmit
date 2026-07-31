@@ -43,7 +43,7 @@ jobs:
 
       - name: Git setup
         run: |
-          git config --global --add safe.directory '*'
+          
 
       # NOTE: We used `--trace --full-trace` with pytest but had strange
       #       bugs in unit tests with py3.11:
@@ -52,10 +52,8 @@ jobs:
       #       It appeared to be a bug in Python3.11, pdb, pytest-xdist.
       - name: Unit tests
         run: |
-          python${{ matrix.python-version }} -m pytest \
-            -n $(nproc) \
-            --verbose --verbosity="2" \
-            test/unit -m "not postgres and not profile and not profilelong"
+          git config --system --add safe.directory '*'
+          python${{ matrix.python-version }} -m pytest -n $(nproc)
 
       - name: Coverage report
         run: |
