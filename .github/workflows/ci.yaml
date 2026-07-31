@@ -87,9 +87,6 @@ jobs:
       COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    container:
-      image: ghcr.io/bsc-es/autosubmit-ci:latest
-      options: --init -v /var/run/docker.sock:/var/run/docker.sock
 
     strategy:
       matrix:
@@ -225,8 +222,6 @@ jobs:
     env:
       COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 10
 
     strategy:
@@ -387,8 +382,6 @@ jobs:
   #       we can build it and ii) collect the coverage of the examples executed.
   test-docs:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 10
 
     strategy:

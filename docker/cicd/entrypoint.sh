@@ -27,7 +27,7 @@ if [ "$USER_ID" != "0" ]; then
     ln -sf "$HOME/.local/bin/autosubmit" /usr/local/bin/autosubmit || true
 
     export PYTEST_ADDOPTS="-o cache_dir=/tmp/.pytest_cache"
-    export MPLCONFIGDIR=/tmp/matplotlib-$(date +%s)
+    MPLCONFIGDIR=/tmp/matplotlib-$(date +%s)
     mkdir -p "$MPLCONFIGDIR"
 fi
 
