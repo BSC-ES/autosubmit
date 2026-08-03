@@ -282,11 +282,21 @@ def _make_ps_job(name: str, status: Status, fail_count: int = 0):
     return job
 
 
-@pytest.mark.parametrize('stat_line,expected_final_status', [
-    ('COMPLETED', Status.COMPLETED),
-    ('FAILED', Status.FAILED),
-    ('', Status.COMPLETED),  # STAT not flushed, IO_SAFE_WAIT=0 → scheduler status wins
-])
+@pytest.mark.parametrize(
+    "stat_line,expected_final_status",
+    [
+        ("COMPLETED", Status.COMPLETED),
+        ("FAILED", Status.FAILED),
+        (
+            "",
+            Status.COMPLETED,
+        ),  # STAT not flushed, IO_SAFE_WAIT=0 → scheduler status wins
+        (
+            "-1",
+            Status.RUNNING,
+        ),  # STAT not flushed, IO_SAFE_WAIT=60 → scheduler status running
+    ],
+)
 def test_ps_check_all_jobs_stat_confirmation(
         ps_platform: PsPlatform,
         tmp_path: Path,
@@ -320,6 +330,8 @@ def test_ps_check_all_jobs_stat_confirmation(
         ps_platform._ssh_output = stat_output if 'for f in' in cmd else ps_output
 
     monkeypatch.setattr(ps_platform, 'send_command', _send_command)
+    if stat_line == "":
+        monkeypatch.setattr(ps_platform, 'IO_SAFE_WAIT', 0)
     monkeypatch.setattr(ps_platform, 'check_job', lambda j, **kw: setattr(j, 'new_status', Status.COMPLETED), raising=False)
 
     as_conf = type('Conf', (), {'get_copy_remote_logs': lambda self: None})()
