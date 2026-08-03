@@ -88,7 +88,7 @@ jobs:
           # rename the file to include the enviroment used for testing
 
       - name: Upload test artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: performance-metrics-${{ steps.autosubmit_version.outputs.version }}
           path: .benchmarks/artifacts
@@ -148,7 +148,7 @@ jobs:
           python .benchmarks/generate_markdown.py --version "${{ needs.metrics.outputs.version }}"
 
       - name: Upload benchmark artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: summary_${{ needs.metrics.outputs.version }}_${{ needs.metrics.outputs.test_type }}.md
           path: .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.md
@@ -228,7 +228,7 @@ jobs:
           python .benchmarks/generate_plot.py --version "${{ needs.metrics.outputs.version }}"
 
       - name: Upload plot artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: summary_${{ needs.metrics.outputs.version }}_${{ needs.metrics.outputs.test_type }}.png
           path: .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.png
