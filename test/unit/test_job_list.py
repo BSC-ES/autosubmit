@@ -689,12 +689,13 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
 
 
 def _retry_delays(mocker, delay_retry_time, retries=4):
-    """Drive ``update_list`` and return the delay, in seconds, applied to each retry."""
+    """Drive ``_update_failed_jobs`` and return the delay, in seconds, applied to each retry."""
     job = Job("t000_SIM", "1", Status.FAILED, 0)
     job.section = "SIM"
     job.parents = set()
     job.fail_count = 0
     job.delay_retrials = None
+    job.wrapper_type = None
 
     as_conf = mocker.MagicMock()
     as_conf.jobs_data = {"SIM": {}}
@@ -702,18 +703,13 @@ def _retry_delays(mocker, delay_retry_time, retries=4):
     as_conf.get_delay_retry_time.return_value = delay_retry_time
 
     job_list = mocker.MagicMock()
-    job_list.update_from_file.return_value = False
     job_list.get_failed.return_value = [job]
     job_list.is_wrapper_still_running.return_value = False
-    job_list.check_special_status.return_value = []
-    job_list.get_skippable_jobs.return_value = {}
-    for getter in ("get_completed", "get_delayed", "get_waiting", "get_ready"):
-        getattr(job_list, getter).return_value = []
 
     delays = []
     for _ in range(retries):
         before = datetime.datetime.now()
-        JobList.update_list(job_list, as_conf)
+        JobList._update_failed_jobs(job_list, as_conf)
         delays.append(round((job.delay_end - before).total_seconds()))
     return delays
 
