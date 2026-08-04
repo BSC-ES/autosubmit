@@ -4,10 +4,6 @@ Platforms
 
     <br />
 
-
-.. note::
-    This documentation is based on the v4.1.13 branch, and can only guarantee reproducibility in this context
-
 Extending an Existing Platform
 ------------------------------
 
@@ -17,9 +13,27 @@ platform class, for which first we need to identify which existing platform is t
 
 .. note::
     Currently the platforms available are:
-    |br| :ref:`Local Platform <Local Platform>` :mod:`Platform <autosubmit.platforms.platform>`
-    |br| :mod:`EC Platform <autosubmit.platforms.ecplatform>` :mod:`PJM Platform <autosubmit.platforms.pjmplatform>`
-    |br| :mod:`Slurm Platform <autosubmit.platforms.slurmplatform>`
+
+    - :mod:`Local Platform <autosubmit.platforms.locplatform>` — runs jobs
+      directly on the machine where Autosubmit is running. No SSH, no
+      scheduler. Used for local preparation steps in a workflow.
+    - :mod:`PS Platform <autosubmit.platforms.psplatform>` — a remote host with
+      no batch scheduler. Connects via SSH and tracks jobs as remote OS
+      processes (using the Unix ``ps`` command).
+    - :mod:`EC Platform <autosubmit.platforms.ecplatform>` — ECMWF systems
+      reached through the ``ecaccess`` toolchain. The underlying scheduler is
+      selected via the platform's ``VERSION`` field (``slurm`` on ECMWF's
+      current Atos systems; ``pbs`` is also supported for older
+      configurations).
+    - :mod:`PJM Platform <autosubmit.platforms.pjmplatform>` — Fujitsu's PJM
+      scheduler, used on Fugaku and other large-scale supercomputers. (also known as TCM Technical Computing Suite)
+      Connects via SSH.
+    - :mod:`PBS Platform <autosubmit.platforms.pbsplatform>` — Portable Batch
+      System (PBS) / PBS Pro / OpenPBS scheduler, used on systems such as
+      Miyabi. Connects via SSH.
+    - :mod:`Slurm Platform <autosubmit.platforms.slurmplatform>` — the Slurm
+      workload manager (MareNostrum, Leonardo, LUMI, etc.). Connects via SSH.
+      The tutorial below uses Slurm as its working example.
 
 Composing the Extended Platform Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -141,8 +155,8 @@ the timestamp to TOTAL_STATS file and jobs_data.db properly.
 
     if job_data_dc and type(self.platform) is not str and (self.platform.type in ["slurm", "example"]):
         thread_write_finish = Thread(target=ExperimentHistory(self.expid, jobdata_dir_path=BasicConfig.JOBDATA_DIR, historiclog_dir_path=BasicConfig.HISTORICAL_LOG_DIR).write_platform_data_after_finish, args=(job_data_dc, self.platform))
-            thread_write_finish.name = "JOB_data_{}".format(self.name)
-            thread_write_finish.start()
+        thread_write_finish.name = f"JOB_data_{self.name}"
+        thread_write_finish.start()
 
 ``autosubmit/job/job.py`` in `line 2817 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2817>`_ add a new validation for the validation of the queue
 creation with the platform type
@@ -169,7 +183,7 @@ creation where the platform type
 
 
 How to Configure a Platform
-------------------------------------
+---------------------------
 
 To set up your platform, you first have to create a new experiment by running the following command:
 |br| *Change the platform from MARENOSTRUM5 to whichever you will use*
@@ -240,8 +254,6 @@ You must input the information suitable for your project (e.g.: user, host, plat
 
 .. _TargetPlatform:
 
----------
-
 .. code-block:: yaml
 
     PLATFORMS:
@@ -263,8 +275,225 @@ You must input the information suitable for your project (e.g.: user, host, plat
     Make sure to create the folder with your USERNAME inside the proper path you pointed to
     (e.g.: <Project_Dir>/<Project_Name_Folder>/<USER>)
 
+
+.. _platform_connections:
+
+Platform Connections
+--------------------
+
+This section describes how Autosubmit interacts with the platforms it is
+configured to use: when a connection is opened, Autosubmit checks if it has the
+write access to the remote filesystem, and what to be done when a connection has
+to be re-established mid-run.
+
+The write-permission check
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before relying on a remote platform, Autosubmit verifies that entries(a probe file in this context) can be created
+and deleted under the configured ``SCRATCH_DIR``. It is done by creating a small probe directory under
+``<scratch_dir>/<project>/<user>/`` and immediately removing it. The probe is
+a directory, not a file; the name it uses depends on the platform type:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 35 43
+
+   * - Platform type
+     - Probe directory name
+     - How it is created
+   * - ``slurm`` / ``pjm`` / ``pbs``
+     - ``permission_checker_azxbyc``
+     - Over the existing SSH/SFTP session.
+   * - ``ps``
+     - ``ps_permission_checker_azxbyc``
+     - Shell commands over the existing SSH session.
+   * - ``ecaccess``
+     - ``_permission_checker_azxbyc``
+     - Local ``ecaccess-file-*`` commands against the ECMWF gateway. Several parent directories are created first because ``ecaccess-file-mkdir`` has no recursive option.
+   * - ``local``
+     - (none)
+     - The local platform does not perform a write-permission check.
+
+.. note::
+    The probe directory is transient: Autosubmit creates it, confirms that
+    the create+delete succeeded, and removes it in the same call. Under
+    normal operation there is nothing left on the remote filesystem to
+    find afterwards. The directory names above are documented so that
+    operators searching Autosubmit's local logs (or investigating a rare
+    case where a probe crashed between the create and delete steps and
+    left the directory behind) know that each platform type uses a
+    different name — a grep restricted to ``permission_checker_azxbyc``
+    will miss references from ``ps`` and ``ecaccess`` platforms.
+
+When the write-permission check runs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The check is triggered by a small number of user-facing commands, and the
+frequency depends on the command:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Command
+     - When the probe runs
+   * - ``autosubmit run``
+     - Once per configured platform at the start of the run, before the main loop begins. If the run later encounters a connection error, Autosubmit enters a reconnection loop that retries the SSH connection up to ``CONFIG.RECOVERY_RETRIALS`` **times** (a count of attempts, not a time budget; default ``3650``, with a per-attempt sleep that grows from 15s to a cap of 120s, so the default corresponds to roughly 72–122 hours of outage tolerance). The probe only runs on the retry where the connection is actually re-established, not on the failing attempts. In practice this means a prolonged outage produces many SSH retry log entries but at most one probe entry per platform per recovery session.
+   * - ``autosubmit setstatus``
+     - Once per platform that currently has jobs in ``QUEUING``, ``SUBMITTED`` or ``RUNNING`` state. When ``setstatus`` is run before ``autosubmit create`` (the typical operational case, where all jobs are still ``WAITING`` or ``READY``) no probe is created.
+   * - ``autosubmit stop --cancel``
+     - Once per configured platform. This applies to any scheduler, not only Slurm; the trigger is the ``--cancel`` flag, not the platform type.
+
+The probe does **not** run during the normal main loop of ``autosubmit
+run`` after startup, during ``autosubmit recovery``, during ``autosubmit
+create``, or when an individual SSH command inside the main loop fails
+with a network error and its channel is silently re-established (that
+reconnect path bypasses the ``restore_platforms`` step and therefore
+skips the probe).
+
+.. _stale_job_data_recovery:
+
+Stale job-data recovery
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Autosubmit keeps a history database with one row per job execution. If a job
+ran but the row for that execution is incomplete (for example because
+Autosubmit was interrupted before the start and end timestamps were
+recorded), Autosubmit will try to fetch the missing values from the remote
+``STAT`` file for that job. This recovery runs during ``autosubmit run``,
+``autosubmit create``, ``autosubmit setstatus`` and ``autosubmit recovery``.
+
+When Autosubmit performs this stale-job-data recovery it opens an SSH
+session to each affected platform, but it does not run the
+write-permission probe. ``autosubmit create`` is the case worth flagging
+here: it normally appears to be a local operation, but if there are stale
+rows in the history database it will open one SSH session per affected
+platform.
+
+Connections opened during a run
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When ``autosubmit run`` starts, Autosubmit opens **two SSH sessions per
+platform** for every platform of type ``slurm``, ``pjm``, ``pbs`` or
+``ps``:
+
+1. A **main session** used by the running workflow for submission, status
+   queries and file transfers.
+2. A **log-recovery session** owned by a per-platform background process,
+   used to download job log files in parallel while the main loop carries
+   on with other work.
+
+The log-recovery session is only created during ``autosubmit run``. Other
+commands (``setstatus``, ``recovery``, ``stop``, ``create``)
+open at most the main session per platform.
+
+For ``ecaccess`` platforms, no SSH session is opened at all. Every
+interaction with ECMWF is a local ``ecaccess-*`` command against the
+ECMWF gateway, so the connection cost is gateway traffic rather than
+login-node SSH sessions.
+
+For the ``local`` platform, no connection of any kind is opened.
+
+During the main loop, Autosubmit does not open new connections.
+Submission, status checks and file transfers all reuse the SSH session
+that was opened at startup, and keepalive packets are sent on the
+existing channel to keep it open.
+
+Reconnection on error
+~~~~~~~~~~~~~~~~~~~~~
+
+If a connection is lost mid-run, Autosubmit closes the existing session
+before opening a replacement session: the SFTP channel, the SSH transport and the
+SSH client itself are all closed, and then a fresh session is opened. This
+applies both to the main session and to the per-platform log-recovery
+process. Sessions are not silently reused after a failure, and they are
+not stacked.
+
+At the end of a successful run, Autosubmit explicitly closes every
+session it opened, and waits for each log-recovery process to finish
+before exiting.
+
+.. warning::
+    The close operations are best-effort. If the underlying transport is
+    already broken, the close will fail silently and the next connection
+    will be opened anyway. This prevents a stuck close from blocking
+    recovery, but it means users who want to confirm that no SSH
+    sessions have leaked should spot-check the login node directly (for
+    example with ``who`` or ``ss``) rather than rely on Autosubmit's
+    logs alone.
+
+The reconnection behaviour described above applies after the workflow has
+started running. If the very first connection attempt at the start of
+``autosubmit run`` fails, Autosubmit makes two internal retries within a
+single connection attempt and then aborts if both fail — see
+:ref:`userguide/run/index:retries` for the retry configuration Autosubmit
+exposes at the workflow level.
+
+Filesystem operations during a run
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Beyond handling write-permission probes and SSH sessions, Autosubmit performs several file operations against the remote ``<SCRATCH_DIR>`` during each run. The exact number of these operations can vary based on the workflow's complexity, including factors such as the number of jobs, retries, wrapper usage, and recovery events. The table below outlines the types of operations performed at different stages, with descriptions provided in qualitative terms to reflect this variability.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 18 56
+
+   * - Operation
+     - Command(s)
+     - When it happens
+   * - Upload of ``.cmd`` job scripts
+     - ``autosubmit run``
+     - One upload per job script per submission cycle. A submission cycle happens for every main loop iteration that has new ``READY`` jobs to dispatch.
+   * - Creation of the remote log directory
+     - ``autosubmit run``
+     - Once per platform at startup, and then once per upload as part of the upload itself. ``ecaccess`` platforms create one directory per path level because their ``mkdir`` does not have a recursive option.
+   * - Listing of ``_COMPLETED`` marker files
+     - ``autosubmit run``
+     - Once per platform per status-check cycle, to detect newly completed jobs.
+   * - Download of ``.out`` / ``.err`` log files
+     - ``autosubmit run``
+     - Two downloads per completed job (one for standard output, one for standard error). These run in the per-platform log-recovery process, in parallel with the main loop.
+   * - Download of ``STAT`` files at job end
+     - ``autosubmit run``
+     - One download per job at the end of execution, as part of the completed-job handling in the main loop.
+   * - Download of ``STAT`` files for stale history rows
+     - ``autosubmit run``, ``autosubmit create``, ``autosubmit setstatus``, ``autosubmit recovery``
+     - Opportunistic download of missing ``STAT`` files when the history database contains rows without start/end timestamps. Runs before and after the main loop of ``autosubmit run``, at the start of ``autosubmit create`` and ``autosubmit setstatus``, and during ``autosubmit recovery``.
+   * - Batched reads of remote ``STAT`` files
+     - ``autosubmit run``
+     - One batched read per status-check cycle, covering all relevant ``STAT`` files in a single round-trip.
+   * - Cleanup of previous-run marker files
+     - ``autosubmit run``
+     - Once per platform at startup, scoped to the experiment's log directory.
+   * - Compression of remote logs
+     - ``autosubmit run``
+     - One compression command per log file, only when ``COMPRESS_REMOTE_LOGS`` is enabled on the platform. Runs in the log-recovery process, in parallel with the main loop.
+   * - Write-permission probe
+     - ``autosubmit run``, ``autosubmit setstatus``, ``autosubmit stop --cancel``
+     - See :ref:`When the write-permission check runs <platform_connections>` above.
+
+A few patterns worth knowing when reasoning about Autosubmit filesystem load:
+
+- **Submission and log retrieval run in parallel.** The main loop submits
+  jobs and queries their status; a separate per-platform process downloads
+  the logs of completed jobs. Activity from both runs concurrently against
+  the same remote directory.
+- **Status queries are batched.** A single scheduler query per platform per
+  cycle covers all jobs in flight, regardless of how many there are. Reads
+  of remote ``STAT`` files are similarly batched into a single round-trip.
+- **``STAT`` files are written by the jobs, not by Autosubmit.** The remote
+  job script appends a Unix epoch timestamp at start and finish; Autosubmit
+  only reads these files.
+
+.. note::
+    The table above describes which operations Autosubmit performs and
+    when, but not absolute numbers (bytes transferred, IOPS, syscall
+    counts) for a given workflow. Producing those numbers requires either
+    instrumenting Autosubmit with an I/O tracer or running a representative
+    workflow under ``strace`` / ``iostat`` against a controlled HPC.
+
 How to generate a new experiment
-------------------------------------
+--------------------------------
 
 Now you can add jobs at the end of the file to see the execution
 Each job will point to one of the ``Bash`` files that will be created in the next step, meaning that Autosubmit will
@@ -376,7 +605,7 @@ So add the following the instruction below to one or more ``Bash`` files created
     sleep 5
 
 How to run the experiment
-------------------------------------
+-------------------------
 
 ``autosubmit create -f -v <EXPID>``
 
