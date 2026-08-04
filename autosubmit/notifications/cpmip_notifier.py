@@ -31,7 +31,6 @@ A ``CPMIPNotifier`` orchestrates three concerns:
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from bscearth.utils.date import chunk_end_date, chunk_start_date, subs_dates
 
@@ -57,7 +56,7 @@ class CPMIPNotifier:
     """Build CPMIP metric inputs from a job and notify on threshold violations."""
 
     @staticmethod
-    def capture(job, as_conf) -> Optional[CPMIPEvaluation]:
+    def capture(job, as_conf) -> CPMIPEvaluation | None:
         """Snapshot the data required to evaluate CPMIP thresholds.
 
         Call this before ``JobList.update_log_status`` clears the job's runtime
@@ -107,7 +106,7 @@ class CPMIPNotifier:
         )
 
 
-def _estimate_cpus(job) -> Optional[int]:
+def _estimate_cpus(job) -> int | None:
     """Compute the number of CPUs used by the job, mirroring statistics logic."""
     try:
         return _calculate_processing_elements(
@@ -122,7 +121,7 @@ def _estimate_cpus(job) -> Optional[int]:
         return None
 
 
-def _simulated_years(job, as_conf) -> Optional[float]:
+def _simulated_years(job, as_conf) -> float | None:
     """Return chunk duration in simulated years, honouring the experiment calendar.
 
     Uses the same calendar primitives the Job class relies on so the result

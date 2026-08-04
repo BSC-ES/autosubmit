@@ -14,8 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
-
 import datetime
 import json
 import locale
@@ -27,7 +25,7 @@ import time
 from contextlib import suppress
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from bscearth.utils.date import date2str, sum_str_hours
 
@@ -98,7 +96,7 @@ class JobPackageBase:
         self.x11_options = first_job.x11_options
         # Here we consider the internal platform if the platform is serial
         is_batch_platform = self.platform.EXECUTION_MODE is ExecutionMode.BATCH
-        self.timeout: Optional[int] = None if is_batch_platform else max(job.wallclock_in_seconds for job in jobs)
+        self.timeout: int | None = None if is_batch_platform else max(job.wallclock_in_seconds for job in jobs)
         self.x11 = first_job.x11
         self.het = dict()
         self._num_processors = '0'
@@ -282,9 +280,9 @@ class JobPackageThread(JobPackageBase):
     """
     FILE_PREFIX = 'ASThread'
 
-    def __init__(self, jobs: list[Job], dependency=None, jobs_resources: Optional[dict] = None,
-                 method: str = 'ASThread', configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
+    def __init__(self, jobs: list[Job], dependency=None, jobs_resources: dict | None = None,
+                 method: str = 'ASThread', configuration: 'AutosubmitConfig | None' = None,
+                 wrapper_section: str = "WRAPPERS", wrapper_info: list | None = None):
         """
         :param dependency: Dependency
         :type dependency: String
@@ -472,7 +470,8 @@ class JobPackageThread(JobPackageBase):
                 lang = 'UTF-8'
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content.encode(lang))
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content.encode(lang))
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 
@@ -515,7 +514,7 @@ class JobPackageThreadWrapped(JobPackageThread):
     """
     FILE_PREFIX = 'ASThread'
 
-    def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
+    def __init__(self, jobs: list[Job], dependency=None, configuration: 'AutosubmitConfig | None' = None,
                  wrapper_section="WRAPPERS"):
         super(JobPackageThreadWrapped, self).__init__(jobs, configuration)
         self._job_scripts = {}
@@ -556,7 +555,8 @@ class JobPackageThreadWrapped(JobPackageThread):
     def _create_common_script(self, filename: str = ""):
         script_content = self._common_script_content()
         script_file = self.name + '.cmd'
-        open(os.path.join(self._tmp_path, script_file), 'wb').write(script_content)
+        with open(Path(self._tmp_path) / script_file, 'wb') as f:
+            f.write(script_content)
         os.chmod(os.path.join(self._tmp_path, script_file), 0o755)
         return script_file
 
@@ -574,8 +574,8 @@ class JobPackageVertical(JobPackageThread):
     :param: dependency:
     """
 
-    def __init__(self, jobs: list[Job], dependency=None, configuration: Optional['AutosubmitConfig'] = None,
-                 wrapper_section: str = "WRAPPERS", wrapper_info: Optional[list] = None):
+    def __init__(self, jobs: list[Job], dependency=None, configuration: 'AutosubmitConfig | None' = None,
+                 wrapper_section: str = "WRAPPERS", wrapper_info: list | None = None):
         if wrapper_info is None:
             wrapper_info = []
         super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
@@ -666,8 +666,8 @@ class JobPackageHorizontal(JobPackageThread):
     Class to manage a horizontal thread-based package of jobs to be submitted by autosubmit
     """
 
-    def __init__(self, jobs: list[Job], dependency: Optional[str] = None, jobs_resources: Optional[dict] = None,
-                 method: str = 'ASThread', configuration: Optional['AutosubmitConfig'] = None,
+    def __init__(self, jobs: list[Job], dependency: str | None = None, jobs_resources: dict | None = None,
+                 method: str = 'ASThread', configuration: 'AutosubmitConfig | None' = None,
                  wrapper_section="WRAPPERS"):
         super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources, configuration=configuration,
                                                    wrapper_section=wrapper_section)
@@ -701,8 +701,8 @@ class JobPackageHybrid(JobPackageThread):
         """
 
     def __init__(self, jobs: list[list[Job]], num_processors: str, total_wallclock, dependency=None,
-                 jobs_resources: Optional[dict] = None, method: str = "ASThread",
-                 configuration: Optional['AutosubmitConfig'] = None, wrapper_section="WRAPPERS"):
+                 jobs_resources: dict | None = None, method: str = "ASThread",
+                 configuration: 'AutosubmitConfig | None' = None, wrapper_section="WRAPPERS"):
         all_jobs = [item for sublist in jobs for item in sublist]  # flatten list
         if jobs_resources is None:
             jobs_resources = {}

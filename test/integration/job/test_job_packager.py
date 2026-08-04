@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, Protocol
+from typing import Protocol
 
 import pytest
 
@@ -29,23 +29,22 @@ class CreatePackagerFixture(Protocol):
 
     def __call__(
             self,
-            experiment_data: Optional[dict] = None,
-            total_jobs: Optional[int] = 20
+            experiment_data: dict | None = None,
+            total_jobs: int | None = 20
     ) -> JobPackager:
         ...
 
 
 @pytest.fixture
 def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
-    def _job_packager(experiment_data: Optional[dict], total_jobs: Optional[int] = 20) -> JobPackager:
+    def _job_packager(experiment_data: dict | None, total_jobs: int | None = 20) -> JobPackager:
         local.total_jobs = total_jobs
 
         exp = autosubmit_exp(experiment_data=experiment_data)
         as_conf = exp.as_conf
         parameters = as_conf.load_parameters()
 
-        job_list_persistence = autosubmit._get_job_list_persistence(exp.expid, as_conf)
-        job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory(), job_list_persistence)
+        job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory())
 
         job_list.generate(
             as_conf,
@@ -58,9 +57,9 @@ def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
             as_conf.get_retrials(),
             as_conf.get_default_job_type(),
             {},
-            run_only_members=[],
-            force=False,
-            create=True)
+            full_load=True)
+        for job in job_list.get_job_list():
+            job.update_parameters(as_conf, set_attributes=True)
 
         return JobPackager(exp.as_conf, local, job_list)
 

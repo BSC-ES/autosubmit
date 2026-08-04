@@ -17,7 +17,7 @@
 
 import signal
 from itertools import chain
-from typing import Optional, List
+from typing import List
 
 import pytest
 
@@ -200,7 +200,7 @@ def test_stop_expids(autosubmit, mocker, expids: str, num_expids: int, cancel: b
         # (as we passed ``force=False``), so we avoid the ``sleep`` and loop by returning
         # a ``None``, which is interpreted as if the process was correctly killed by
         # ``os.kill``.
-        returned_pids: List[Optional[int]] = [pid + n for n in range(num_expids)]
+        returned_pids: List[int | None] = [pid + n for n in range(num_expids)]
         if sleep:
             # To test that we ``sleep`` once, we return not just the list followed by
             # as many ``None``s as expids (see comment above), but instead of return

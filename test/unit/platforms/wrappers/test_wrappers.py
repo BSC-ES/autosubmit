@@ -15,13 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import copy
 import inspect
 import shutil
 import tempfile
 from collections import OrderedDict
 from pathlib import Path
 from random import randrange
+from typing import Any
 
 import mock
 import pytest
@@ -32,7 +32,6 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.job.job_packages import JobPackageHorizontal, JobPackageHorizontalVertical, \
     JobPackageVerticalHorizontal, JobPackageSimple
@@ -198,13 +197,7 @@ class TestWrappers:
         self.as_conf.experiment_data["PLATFORMS"] = dict()
         self.as_conf.experiment_data["WRAPPERS"] = dict()
         self.temp_directory = tempfile.mkdtemp()
-        # TODO: The ``MagicMock`` argument is replacing this old call:
-        #       ``JobListPersistenceDb(self.experiment_id)``. The reason is that we need the pytest
-        #       fixtures to mock the DB_PATH/DB_DIR/etc., but the ones we have are function-scoped.
-        #       Once this code gets ported to function-based, instead of class-based, we can use
-        #       those fixtures, removing that mock (we have plenty of other places testing already
-        #       ``JobList``, but less mocking is always better.
-        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory(), MagicMock())
+        self.job_list = JobList(self.experiment_id, self.as_conf, YAMLParserFactory())
 
         self.parser_mock = MagicMock(spec='SafeConfigParser')
 
@@ -1316,8 +1309,9 @@ class TestWrappers:
             ordered_jobs_by_date_member["d2"]["m2"] = [d2_m2_1_s2, d2_m2_1_s3, d2_m2_2_s2, d2_m2_2_s3, d2_m2_3_s2,
                                                        d2_m2_3_s3, d2_m2_4_s2, d2_m2_4_s3, d2_s5]
 
-            assert self.job_list._create_sorted_dict_jobs(
-                "s2 s3 s5") == ordered_jobs_by_date_member
+            result = self.job_list._create_sorted_dict_jobs(
+                "s2 s3 s5")
+            self._assert_ordered_jobs_equal(ordered_jobs_by_date_member, result)
 
     def test_ordered_dict_jobs_running_once_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1385,8 +1379,44 @@ class TestWrappers:
             ordered_jobs_by_date_member["d2"]["m2"] = [d2_m2_1_s2, d2_m2_1_s3, d2_m2_2_s2, d2_m2_2_s3, d2_m2_3_s2,
                                                        d2_m2_3_s3, d2_m2_4_s2, d2_m2_4_s3, s5]
 
-            assert self.job_list._create_sorted_dict_jobs(
-                "s2 s3 s5") == ordered_jobs_by_date_member
+            ordered_jobs_result = self.job_list._create_sorted_dict_jobs(
+                "s2 s3 s5")
+
+            self._assert_ordered_jobs_equal(ordered_jobs_by_date_member, ordered_jobs_result)
+
+    @staticmethod
+    def _assert_ordered_jobs_equal(expected: dict[str, Any], actual: dict[str, Any]) -> None:
+        """
+        Compare two ordered job dictionaries and raise an AssertionError with a readable diff
+        if they are not equal.
+
+        :param expected: Expected ordered jobs dictionary.
+        :type expected: Dict[str, Any]
+        :param actual: Actual ordered jobs dictionary returned by the function under test.
+        :type actual: Dict[str, Any]
+        :raises AssertionError: If the dictionaries do not match; message contains a unified diff,
+                               plus pretty-printed expected and actual structures.
+        """
+        import pprint
+        import difflib
+        exp_str = pprint.pformat(expected, width=120)
+        act_str = pprint.pformat(actual, width=120)
+        if expected != actual:
+            diff = "\n".join(difflib.unified_diff(
+                exp_str.splitlines(),
+                act_str.splitlines(),
+                fromfile="expected",
+                tofile="actual",
+                lineterm=""
+            ))
+            raise AssertionError(
+                "Ordered jobs mismatch:\n\n"
+                f"{diff}\n\n"
+                "Expected:\n"
+                f"{exp_str}\n\n"
+                "Actual:\n"
+                f"{act_str}\n"
+            )
 
     def test_ordered_dict_jobs_synchronize_date_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1459,8 +1489,10 @@ class TestWrappers:
                                                        d2_m2_3_s2,
                                                        d2_m2_3_s3, _3_s5, d2_m2_4_s2, d2_m2_4_s3, _4_s5]
 
-            assert self.job_list._create_sorted_dict_jobs(
-                "s2 s3 s5") == ordered_jobs_by_date_member
+            result = self.job_list._create_sorted_dict_jobs(
+                "s2 s3 s5")
+            self._assert_ordered_jobs_equal(ordered_jobs_by_date_member, result)
+
 
     def test_ordered_dict_jobs_synchronize_member_mixed_wrapper(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1538,8 +1570,9 @@ class TestWrappers:
                                                        d2_m2_3_s2,
                                                        d2_m2_3_s3, d2_3_s5, d2_m2_4_s2, d2_m2_4_s3, d2_4_s5]
 
-            assert self.job_list._create_sorted_dict_jobs(
-                "s2 s3 s5") == ordered_jobs_by_date_member
+            result = self.job_list._create_sorted_dict_jobs(
+                "s2 s3 s5")
+            self._assert_ordered_jobs_equal(ordered_jobs_by_date_member, result)
 
     def test_check_real_package_wrapper_limits(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1981,22 +2014,26 @@ class TestWrappers:
                               }
             self.job_packager.jobs_in_wrapper = {self.job_packager.current_wrapper_section: {'S2': 2, 'S3': 2}}
             packages_to_submit = []
-            packages_to_submit2, max_jobs_to_submit2 = self.job_packager.check_packages_respect_wrapper_policy(
-                packages_h, packages_to_submit,
-                max_jobs_to_submit, wrapper_limits)
-            assert max_jobs_to_submit2 == 0
-            assert len(packages_to_submit2) == 2
-            for p in packages_to_submit2:
-                assert isinstance(p, JobPackageSimple)
+            with mock.patch.object(self.job_packager._jobs_list, 'get_jobs_by_section_db',
+                                   return_value={"remaining_s2"}), \
+                 mock.patch.object(self.job_packager._jobs_list.dbmanager,
+                                   'remaining_blocked_by_package', return_value=False):
+                packages_to_submit2, max_jobs_to_submit2 = self.job_packager.check_packages_respect_wrapper_policy(
+                    packages_h, packages_to_submit,
+                    max_jobs_to_submit, wrapper_limits)
+                assert max_jobs_to_submit2 == 0
+                assert len(packages_to_submit2) == 2
+                for p in packages_to_submit2:
+                    assert isinstance(p, JobPackageSimple)
 
-            self.job_packager.wrapper_policy["WRAPPER_V"] = "mixed"
-            packages_to_submit = []
-            self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit, max_jobs_to_submit, wrapper_limits)
-            assert len(self.job_packager.wrappers_with_error) > 0
-            self.job_packager.wrapper_policy["WRAPPER_V"] = "strict"
-            packages_to_submit = []
-            self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit,max_jobs_to_submit, wrapper_limits)
-            assert len(self.job_packager.wrappers_with_error) > 0
+                self.job_packager.wrapper_policy["WRAPPER_V"] = "mixed"
+                packages_to_submit = []
+                self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+                assert len(self.job_packager.wrappers_with_error) > 0
+                self.job_packager.wrapper_policy["WRAPPER_V"] = "strict"
+                packages_to_submit = []
+                self.job_packager.check_packages_respect_wrapper_policy(packages_h, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+                assert len(self.job_packager.wrappers_with_error) > 0
     # def test_build_packages(self):
     # want to test self.job_packager.build_packages()
     # TODO: implement this test in the future
@@ -2009,19 +2046,19 @@ class TestWrappers:
             if running == 'once':
                 name = 'expid_' + section
                 job = self._createDummyJob(name, wallclock, section)
-                self.job_list._job_list.append(job)
+                self.job_list.add_job(job)
             elif running == 'date':
                 for date in date_list:
                     name = 'expid_' + date + "_" + section
                     job = self._createDummyJob(name, wallclock, section, date)
-                    self.job_list._job_list.append(job)
+                    self.job_list.add_job(job)
             elif running == 'member':
                 for date in date_list:
                     for member in member_list:
                         name = 'expid_' + date + "_" + member + "_" + section
                         job = self._createDummyJob(
                             name, wallclock, section, date, member)
-                        self.job_list._job_list.append(job)
+                        self.job_list.add_job(job)
             elif running == 'chunk':
                 synchronize_type = section_dict['SYNCHRONIZE'] if 'SYNCHRONIZE' in section_dict else None
                 if synchronize_type == 'date':
@@ -2029,7 +2066,7 @@ class TestWrappers:
                         name = 'expid_' + str(chunk) + "_" + section
                         job = self._createDummyJob(
                             name, wallclock, section, None, None, chunk)
-                        self.job_list._job_list.append(job)
+                        self.job_list.add_job(job)
                 elif synchronize_type == 'member':
                     for date in date_list:
                         for chunk in chunk_list:
@@ -2037,7 +2074,7 @@ class TestWrappers:
                                    str(chunk) + "_" + section
                             job = self._createDummyJob(
                                 name, wallclock, section, date, None, chunk)
-                            self.job_list._job_list.append(job)
+                            self.job_list.add_job(job)
                 else:
                     for date in date_list:
                         for member in member_list:
@@ -2046,7 +2083,7 @@ class TestWrappers:
                                        "_" + str(chunk) + "_" + section
                                 job = self._createDummyJob(
                                     name, wallclock, section, date, member, chunk)
-                                self.job_list._job_list.append(job)
+                                self.job_list.add_job(job)
 
         self.job_list._date_list = date_list
         self.job_list._member_list = member_list
@@ -2055,7 +2092,7 @@ class TestWrappers:
         self.job_list._dic_jobs = DicJobs(date_list, member_list, chunk_list, "", 0, self.as_conf)
         self._manage_dependencies(sections_dict)
         for job in self.job_list.get_job_list():
-            job._init_runtime_parameters()
+            job.init_runtime_parameters(self.as_conf, reset_logs=True, called_from_log_recovery=False)
             # job.update_parameters = MagicMock()
 
     def _manage_dependencies(self, sections_dict):
@@ -2149,30 +2186,27 @@ def setup(autosubmit_config, tmpdir):
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["JOBS_IN_WRAPPER"] = "SECTION1"
     as_conf.experiment_data["WRAPPERS"]["WRAPPERS"]["TYPE"] = "vertical"
     Path(tmpdir / experiment_id / "tmp").mkdir(parents=True, exist_ok=True)
-    job_list = JobList(experiment_id, as_conf, YAMLParserFactory(),
-                       JobListPersistencePkl())
+    job_list = JobList(experiment_id, as_conf, YAMLParserFactory())
 
     platform = SlurmPlatform(experiment_id, 'dummy-platform', as_conf.experiment_data)
 
     job_list._platforms = [platform]
     # add some jobs to the job list
     job = Job("job1", "1", Status.COMPLETED, 0)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
-    job_list._job_list.append(job)
+    job_list.add_job(job)
     job = Job("job2", "2", Status.SUBMITTED, 0)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = platform
-    job_list._job_list.append(job)
-    wrapper_jobs = copy.deepcopy(job_list.get_job_list())
-    for job in wrapper_jobs:
-        job.platform = platform
+    job_list.add_job(job)
+    job_list._add_edge_and_parent({"e_from": "job2", "e_to": "job1"})
     job_packager = JobPackager(as_conf, platform, job_list)
-    vertical_package = JobPackageVertical(wrapper_jobs, configuration=as_conf)
+    vertical_package = JobPackageVertical(job_list.get_job_list(), configuration=as_conf)
     yield job_packager, vertical_package
 
 
@@ -2196,7 +2230,7 @@ def test_is_deadlock_jobs_in_queue(setup, any_simple_packages, not_wrappeable_pa
 def test_is_deadlock_no_jobs_in_queue(setup, any_simple_packages, not_wrappeable_package_info, built_packages_tmp,
                                       expected):
     job_packager, _ = setup
-    for job in job_packager._jobs_list._job_list:
+    for job in job_packager._jobs_list.get_job_list():
         job.status = Status.COMPLETED
     deadlock = job_packager.is_deadlock(any_simple_packages, not_wrappeable_package_info, built_packages_tmp)
     assert deadlock == expected
@@ -2229,7 +2263,9 @@ def test_process_not_wrappeable_packages_no_more_remaining_jobs(setup, not_wrapp
         policy = "mixed"
     elif unparsed_policy.endswith("_one_job"):
         policy = unparsed_policy.split("_")[0]
-        job_packager._jobs_list._job_list = [job for job in job_packager._jobs_list._job_list if job.name == "job1"]
+        job = job_packager._jobs_list.get_job_by_name("job1")
+        job_packager._jobs_list.clear()
+        job_packager._jobs_list.add_job(job)
         vertical_package = JobPackageVertical([vertical_package.jobs[0]], configuration=job_packager._as_config)
     else:
         policy = unparsed_policy
@@ -2259,10 +2295,9 @@ def test_process_not_wrappeable_packages_no_more_remaining_jobs(setup, not_wrapp
             "strict_one_job", "mixed_one_job", "flexible_one_job"])
 def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wrappeable_package_info,
                                                                    packages_to_submit, max_jobs_to_submit, expected,
-                                                                   unparsed_policy, autosubmit):
+                                                                   unparsed_policy, autosubmit, autosubmit_config):
     job_packager, vertical_package = setup
-    job_list = JobList("t000", job_packager._as_config, YAMLParserFactory(),
-                       JobListPersistencePkl())
+    job_list = JobList("t000", job_packager._as_config, YAMLParserFactory())
     if unparsed_policy == "mixed_failed":
         policy = "mixed"
     elif unparsed_policy.endswith("_one_job"):
@@ -2281,51 +2316,26 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
     if unparsed_policy == "mixed_failed":
         vertical_package.jobs[0].fail_count = 1
     job = Job("job3", "3", Status.WAITING, 0)
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("random-id", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.wallclock = "00:20"
     job.section = "SECTION1"
     job.platform = job_packager._platform
-    job_packager._jobs_list._job_list.append(job)
-    result = job_packager.process_not_wrappeable_packages(not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+    job_packager._jobs_list.add_job(job)
+    job_packager._jobs_list._add_edge_and_parent({"e_from": "job3", "e_to": "job2"})
+    is_blocked = unparsed_policy == "mixed_failed"
+    with mock.patch.object(job_packager._jobs_list, 'get_jobs_by_section_db',
+                           return_value={"job3"}), \
+         mock.patch.object(job_packager._jobs_list.dbmanager,
+                           'remaining_blocked_by_package', return_value=is_blocked):
+        result = job_packager.process_not_wrappeable_packages(
+            not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
     if unparsed_policy in ["strict", "mixed", "strict_one_job", "mixed_one_job"]:
         with pytest.raises(AutosubmitCritical):
             autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
     else:
         autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
     assert result == expected
-
-
-def _make_blocked_test_jobs(package_job_statuses, remaining_job_specs):
-    """Build ``(package_jobs, remaining_jobs)`` for testing ``_remaining_blocked_by_package``.
-
-    Each entry in ``remaining_job_specs`` is a tuple ``(parent_source, parent_index)``
-    determining where the WAITING job gets its parent from:
-    """
-    package_jobs = [Job(f"p{i}", str(i), status, 0)
-                    for i, status in enumerate(package_job_statuses)]
-    remaining_jobs = []
-    for i, (parent_source, parent_index) in enumerate(remaining_job_specs):
-        job = Job(f"r{i}", str(100 + i), Status.WAITING, 0)
-        if parent_source == "pkg":
-            job.parents = {package_jobs[parent_index]}
-        elif parent_source == "rem":
-            job.parents = {remaining_jobs[parent_index]}
-        else:
-            external = Job(f"ext_{i}", str(200 + i), parent_source, 0)
-            job.parents = {external}
-        remaining_jobs.append(job)
-    return package_jobs, remaining_jobs
-
-
-@pytest.mark.parametrize("desc, pkg_statuses, remaining_specs, expected", [
-    ("direct blocked", [Status.READY], [("pkg", 0)], True),
-    ("external FAILED", [Status.READY], [(Status.FAILED, 0)], False),
-    ("transitive chain", [Status.READY], [("pkg", 0), ("rem", 0)], True),
-    ("COMPLETED parent", [], [(Status.COMPLETED, 0)], True),
-], ids=["direct", "external_failed", "transitive", "completed_parent"])
-def test_remaining_blocked_by_package(desc, pkg_statuses, remaining_specs, expected):
-    pkg, remaining = _make_blocked_test_jobs(pkg_statuses, remaining_specs)
-    assert JobPackager._remaining_blocked_by_package(remaining, pkg) is expected
 
 
 @pytest.mark.parametrize("not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, expected, unparsed_policy, two_remaining", [
@@ -2354,8 +2364,9 @@ def test_process_not_wrappeable_packages_remaining_blocked_by_package(
     rem1.section = "SECTION1"
     rem1.platform = job_packager._platform
     rem1.parents = {vertical_package.jobs[0]}
-    job_packager._jobs_list._job_list.append(rem1)
+    job_packager._jobs_list.add_job(rem1)
 
+    remaining_names = {"rem1"}
     if two_remaining:
         rem2 = Job("rem2", "4", Status.WAITING, 0)
         rem2._init_runtime_parameters()
@@ -2363,11 +2374,57 @@ def test_process_not_wrappeable_packages_remaining_blocked_by_package(
         rem2.section = "SECTION1"
         rem2.platform = job_packager._platform
         rem2.parents = {rem1}
-        job_packager._jobs_list._job_list.append(rem2)
+        job_packager._jobs_list.add_job(rem2)
+        remaining_names = {"rem1", "rem2"}
 
-    result = job_packager.process_not_wrappeable_packages(
-        not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
+    with mock.patch.object(job_packager._jobs_list, 'get_jobs_by_section_db',
+                           return_value=remaining_names), \
+         mock.patch.object(job_packager._jobs_list.dbmanager,
+                           'count_non_completed_parents_not_in_memory', return_value=0), \
+         mock.patch.object(job_packager._jobs_list.dbmanager,
+                           'remaining_blocked_by_package', return_value=True):
+        result = job_packager.process_not_wrappeable_packages(
+            not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
     assert result == expected
+
+
+@pytest.mark.parametrize("policy, expected_pkgs, expected_remaining", [
+    ("strict", 1, 99), ("mixed", 1, 99), ("flexible", 1, 99),
+], ids=["strict", "mixed", "flexible"])
+def test_packages_below_min_db_has_remaining(setup, policy, expected_pkgs, expected_remaining):
+    job_packager, _ = setup
+    wrapper_limits = {
+        "real_min": 3, "min_v": 3, "min_h": 1,
+        "min": 3, "max": 99, "max_v": 99, "max_h": 99,
+        "max_by_section": {"SECTION1": 99}
+    }
+    for job in job_packager._jobs_list.job_list:
+        job.status = Status.READY
+    single_package = JobPackageVertical(
+        job_packager._jobs_list.job_list[:], configuration=job_packager._as_config
+    )
+    job_packager.wrapper_policy = {"WRAPPERS": policy}
+    job_packager.retrials = 0
+    pkgs, remaining = job_packager.check_packages_respect_wrapper_policy(
+        [single_package], [], 100, wrapper_limits
+    )
+    assert len(pkgs) == expected_pkgs
+    assert remaining == expected_remaining
+
+
+def test_process_not_wrappeable_db_has_remaining_causes_deadlock(setup):
+    job_packager, vertical_package = setup
+    job_packager._as_config.experiment_data["WRAPPERS"]["WRAPPERS"]["POLICY"] = "strict"
+    job_packager.wrapper_policy = {"WRAPPERS": "strict"}
+    vertical_package.wrapper_policy = "strict"
+    for job in vertical_package.jobs:
+        job.status = Status.READY
+    not_wrappeable_package_info = [[vertical_package, 1, 1, True]]
+    result = job_packager.process_not_wrappeable_packages(
+        not_wrappeable_package_info, [], 100, wrapper_limits
+    )
+    assert result == 99
+    assert len(job_packager.wrappers_with_error) == 0
 
 
 def test_build_imports():
@@ -2486,10 +2543,10 @@ def test_packages_below_min_section_exhausted(setup, policy):
         "min": 3, "max": 99, "max_v": 99, "max_h": 99,
         "max_by_section": {"SECTION1": 99}
     }
-    for job in job_packager._jobs_list._job_list:
+    for job in job_packager._jobs_list.job_list:
         job.status = Status.READY
     single_package = JobPackageVertical(
-        job_packager._jobs_list._job_list[:], configuration=job_packager._as_config
+        job_packager._jobs_list.job_list[:], configuration=job_packager._as_config
     )
     job_packager.wrapper_policy = {"WRAPPERS": policy}
     job_packager.retrials = 0
@@ -2513,10 +2570,10 @@ def test_packages_below_min_section_not_exhausted(
         "min": 3, "max": 99, "max_v": 99, "max_h": 99,
         "max_by_section": {"SECTION1": 99}
     }
-    for job in job_packager._jobs_list._job_list:
+    for job in job_packager._jobs_list.job_list:
         job.status = Status.READY
     single_package = JobPackageVertical(
-        job_packager._jobs_list._job_list[:], configuration=job_packager._as_config
+        job_packager._jobs_list.job_list[:], configuration=job_packager._as_config
     )
     parent_failed = Job("parent_failed", "99", Status.FAILED, 0)
     parent_failed._init_runtime_parameters()
@@ -2532,11 +2589,17 @@ def test_packages_below_min_section_not_exhausted(
     rem1.section = "SECTION1"
     rem1.platform = job_packager._platform
     rem1.parents = {parent_waiting}
-    job_packager._jobs_list._job_list.extend([parent_failed, parent_waiting, rem1])
+    for j in [parent_failed, parent_waiting, rem1]:
+        job_packager._jobs_list.add_job(j)
     job_packager.wrapper_policy = {"WRAPPERS": policy}
     job_packager.retrials = 0
-    pkgs, remaining = job_packager.check_packages_respect_wrapper_policy(
-        [single_package], [], 100, wrapper_limits
-    )
+    remaining_names = {"parent_failed", "parent_waiting", "rem1"}
+    with mock.patch.object(job_packager._jobs_list, 'get_jobs_by_section_db',
+                           return_value=remaining_names), \
+         mock.patch.object(job_packager._jobs_list.dbmanager,
+                           'remaining_blocked_by_package', return_value=False):
+        pkgs, remaining = job_packager.check_packages_respect_wrapper_policy(
+            [single_package], [], 100, wrapper_limits
+        )
     assert len(pkgs) == expected_len
     assert remaining == expected_remaining

@@ -25,7 +25,7 @@ import re
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
@@ -70,7 +70,7 @@ class SlurmPlatform(ParamikoPlatform):
     TYPE = PlatformType.SLURM
 
     def __init__(self, expid: str, name: str, config: dict,
-                 auth_password: Optional[Union[str, list[str]]] = None) -> None:
+                 auth_password: Union[str, list[str]] | None = None) -> None:
         """Initialization of the Class SlurmPlatform.
 
         :param expid: ID of the experiment which will instantiate the SlurmPlatform.
@@ -349,13 +349,12 @@ class SlurmPlatform(ParamikoPlatform):
                 else:
                     sleep(2)
                     retries = retries + 1
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
+            except Exception as e:
+                if "garbage" in str(e).lower():
                     sleep(2)
                     retries = retries + 1
                 else:
-                    file_exist = False  # won't exist
-                    retries = 999  # no more retries
+                    raise
         if not file_exist and show_logs:
             Log.warning(f"File {src} couldn't be found")
         return file_exist

@@ -22,7 +22,7 @@ from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 from random import seed, randint, choice
 from time import time
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Protocol
 
 import pytest
 
@@ -33,7 +33,7 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
+
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.pbsplatform import PBSPlatform
@@ -48,7 +48,7 @@ class AutosubmitConfigFactory(Protocol):
     def __call__(
             self,
             expid: str,
-            experiment_data: Optional[dict] = None,
+            experiment_data: dict | None = None,
             include_basic_config: bool = True,
             *args: Any,
             **kwargs: Any
@@ -115,9 +115,9 @@ def autosubmit_config(
         conf_dir = exp_path / "conf"
         Path(aslogs_dir).mkdir(exist_ok=True)
         Path(conf_dir).mkdir(exist_ok=True)
-        # <expid>/pkl
-        pkl_dir = exp_path / "pkl"
-        Path(pkl_dir).mkdir(exist_ok=True)
+        # <expid>/db
+        db_dir = exp_path / "db"
+        Path(db_dir).mkdir(exist_ok=True)
         # ~/autosubmit/autosubmit.db
         is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
         db_path = Path(BasicConfig.DB_PATH)
@@ -422,6 +422,6 @@ def fake_job_list(mocker) -> JobList:
     """
     as_conf = mocker.MagicMock()
     as_conf.experiment_data = {}
-    job_list = JobList('a000', as_conf, YAMLParserFactory(), JobListPersistencePkl())
-    job_list._packages_persistence = mocker.MagicMock()
+    job_list = JobList('a000', as_conf, YAMLParserFactory())
+    job_list.dbmanager = mocker.MagicMock()
     return job_list

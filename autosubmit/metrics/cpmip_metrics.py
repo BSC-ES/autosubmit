@@ -16,7 +16,7 @@
 # along with Autosubmit. If not, see <http://www.gnu.org/licenses/>.
 
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 from autosubmit.log.log import Log
 
@@ -30,18 +30,14 @@ class CPMIPMetricsData:
     This decouples metrics computation from job object structure.
     
     :param start_time: Unix timestamp (seconds) when the job started.
-    :type start_time: Optional[int]
     :param end_time: Unix timestamp (seconds) when the job ended.
-    :type end_time: Optional[int]
     :param run_years: Length of the simulation in years. Can be None.
-    :type run_years: Optional[float]
     :param ncpus: Number of CPUs used by the job. Can be None if unavailable.
-    :type ncpus: Optional[int]
     """
-    start_time: Optional[int] = None
-    end_time: Optional[int] = None
-    run_years: Optional[float] = None
-    ncpus: Optional[int] = None
+    start_time: int | None = None
+    end_time: int | None = None
+    run_years: float | None = None
+    ncpus: int | None = None
 
 
 class CPMIPMetrics:
@@ -89,20 +85,16 @@ class CPMIPMetrics:
     def _validate_positive(
         value: Union[int, float],
         var_name: str,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
         allow_zero: bool = False,
     ) -> None:
         """
         Validate that a value is positive, optionally allowing zero.
 
         :param value: Value to validate.
-        :type value: Union[int, float]
         :param var_name: Variable name for error messages.
-        :type var_name: str
         :param error_message: Optional custom message for invalid values.
-        :type error_message: Optional[str]
         :param allow_zero: Whether value can be equal to zero.
-        :type allow_zero: bool
         :raises ValueError: If value is invalid for the configured positivity rule.
         """
         if allow_zero:
@@ -197,16 +189,13 @@ class CPMIPMetrics:
                 setattr(data, field_name, None)
 
     @staticmethod
-    def _validate_timestamp_pair(start_time: Optional[int], end_time: Optional[int]) -> bool:
+    def _validate_timestamp_pair(start_time: int | None, end_time: int | None) -> bool:
         """
         Validate start_time and end_time, ensuring end_time > start_time.
 
         :param start_time: Unix timestamp (seconds) when job started.
-        :type start_time: Optional[int]
         :param end_time: Unix timestamp (seconds) when job ended.
-        :type end_time: Optional[int]
         :return: True when timestamps are valid for runtime computation, otherwise False.
-        :rtype: bool
         """
         if start_time is None or end_time is None:
             Log.warning(
@@ -400,16 +389,13 @@ class CPMIPMetrics:
         return metrics
 
     @staticmethod
-    def _resolve_metric_for_evaluation(metric_name: str, metrics: dict) -> Optional[str]:
+    def _resolve_metric_for_evaluation(metric_name: str, metrics: dict) -> str | None:
         """
         Resolve a metric alias to its canonical name and ensure it was computed.
 
         :param metric_name: Metric alias provided by the threshold configuration.
-        :type metric_name: str
         :param metrics: Dictionary of already computed metrics.
-        :type metrics: dict
         :return: Canonical metric name if resolvable and present in computed metrics, otherwise None.
-        :rtype: Optional[str]
         """
         canonical_metric_name = CPMIPMetrics._METRIC_NAME_LOOKUP.get(metric_name.strip().lower())
         if canonical_metric_name is None:
@@ -425,16 +411,13 @@ class CPMIPMetrics:
         return canonical_metric_name
 
     @staticmethod
-    def _extract_threshold_for_evaluation(metric_name: str, threshold_config: dict) -> Optional[dict]:
+    def _extract_threshold_for_evaluation(metric_name: str, threshold_config: dict) -> dict | None:
         """
         Validate threshold configuration and normalize it for evaluation.
 
         :param metric_name: Metric name from the thresholds configuration.
-        :type metric_name: str
         :param threshold_config: Raw threshold configuration dictionary.
-        :type threshold_config: dict
         :return: Normalized threshold configuration dictionary, or None if invalid.
-        :rtype: Optional[dict]
         """
         try:
             return CPMIPMetrics._validate_threshold_config(metric_name, threshold_config)
@@ -448,22 +431,17 @@ class CPMIPMetrics:
         threshold: float,
         comparison: str,
         accepted_error: float,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """
         Compute violation payload for a single metric.
 
         Assumes comparison has already been validated by _validate_threshold_config.
 
         :param real_value: Computed metric value.
-        :type real_value: float
         :param threshold: Threshold value to compare against.
-        :type threshold: float
         :param comparison: Comparison operator, either greater_than or less_than.
-        :type comparison: str
         :param accepted_error: Accepted error percentage.
-        :type accepted_error: float
         :return: Violation payload when out of bounds, otherwise None.
-        :rtype: Optional[dict]
         """
         tolerance_factor = accepted_error / 100.0
         is_violation = False

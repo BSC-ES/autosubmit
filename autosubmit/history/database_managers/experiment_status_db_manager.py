@@ -15,10 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import textwrap
 from pathlib import Path
-from typing import Optional, Protocol, cast
+from typing import Protocol, cast
 
 from sqlalchemy import insert, select, update
 from sqlalchemy.schema import CreateTable
@@ -43,9 +42,12 @@ class ExperimentStatusDbManager(DatabaseManager):
             local_root_dir_path: str = DEFAULT_LOCAL_ROOT_DIR
     ):
         super(ExperimentStatusDbManager, self).__init__(expid, local_root_dir_path=local_root_dir_path)
-        self._as_times_file_path = os.path.join(db_dir_path, BasicConfig.AS_TIMES_DB)
-        self._ecearth_file_path = os.path.join(db_dir_path, main_db_name)
-        self._pkl_file_path = os.path.join(local_root_dir_path, self.expid, "pkl", f"job_list_{self.expid}.pkl")
+        db_dir = Path(db_dir_path)
+        local_root = Path(local_root_dir_path)
+
+        self._as_times_file_path = db_dir / BasicConfig.AS_TIMES_DB
+        self._ecearth_file_path = db_dir / main_db_name
+        self._db_file_path = local_root / self.expid / "db" / f"job_list_{self.expid}.db"
         self._validate_status_database()
 
     def _validate_status_database(self):
@@ -70,7 +72,7 @@ class ExperimentStatusDbManager(DatabaseManager):
         """ Create a new experiment_status row for the Models.Experiment item."""
         self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
 
-    def get_experiment_status_row_by_expid(self, expid: str) -> Optional[Models.ExperimentStatusRow]:
+    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None:
         """Get Models.ExperimentRow by expid."""
         experiment_row = self.get_experiment_row_by_expid(expid)
         return self.get_experiment_status_row_by_exp_id(experiment_row.id)
@@ -85,7 +87,7 @@ class ExperimentStatusDbManager(DatabaseManager):
 
         return Models.ExperimentRow(*current_rows[0])
 
-    def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Optional[Models.ExperimentStatusRow]:
+    def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Models.ExperimentStatusRow | None:
         """ Get Models.ExperimentStatusRow from as_times.db by exp_id (int)."""
         statement = self.get_built_select_statement("experiment_status", "exp_id=?")
         arguments = (exp_id,)
@@ -118,11 +120,11 @@ class ExperimentStatusDatabaseManager(Protocol):
 
     def create_experiment_status_as_running(self, experiment: Models.ExperimentRow) -> None: ...
 
-    def get_experiment_status_row_by_expid(self, expid: str) -> Optional[Models.ExperimentStatusRow]: ...
+    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None: ...
 
     def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow: ...
 
-    def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Optional[Models.ExperimentStatusRow]: ...
+    def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Models.ExperimentStatusRow | None: ...
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int: ...
 
@@ -145,8 +147,8 @@ class SqlAlchemyExperimentStatusDbManager:
         connection_url = get_connection_url(Path(BasicConfig.DATABASE_CONN_URL))
         self.engine = session.create_engine(connection_url=connection_url)
         with self.engine.connect() as conn:
-            conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
-            conn.commit()
+            with conn.begin():
+                conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
 
     def set_existing_experiment_status_as_running(self, expid):
         self.update_exp_status(expid, Models.RunningStatus.RUNNING)
@@ -154,7 +156,7 @@ class SqlAlchemyExperimentStatusDbManager:
     def create_experiment_status_as_running(self, experiment):
         self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
 
-    def get_experiment_status_row_by_expid(self, expid: str) -> Optional[Models.ExperimentRow]:
+    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentRow | None:
         experiment_row = self.get_experiment_row_by_expid(expid)
         return self.get_experiment_status_row_by_exp_id(experiment_row.id)
 
@@ -169,7 +171,7 @@ class SqlAlchemyExperimentStatusDbManager:
                 raise ValueError("Experiment {0} not found in Postgres {1}".format(expid, expid))
         return Models.ExperimentRow(*row)
 
-    def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Optional[Models.ExperimentStatusRow]:
+    def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Models.ExperimentStatusRow | None:
         query = (
             select(ExperimentStatusTable).
             where(ExperimentStatusTable.c.exp_id == exp_id)  # type: ignore
@@ -192,10 +194,10 @@ class SqlAlchemyExperimentStatusDbManager:
             )
         )
         with self.engine.connect() as conn:
-            result = conn.execute(query)
-            # NOTE: SQLite == rowcount(), PG == rowcount. Intriguing.
-            row_count = result.rowcount() if callable(result.rowcount) else result.rowcount
-            conn.commit()
+            with conn.begin():
+                result = conn.execute(query)
+                # NOTE: SQLite == rowcount(), PG == rowcount. Intriguing.
+                row_count = result.rowcount() if callable(result.rowcount) else result.rowcount
         return row_count
 
     def update_exp_status(self, expid: str, status="RUNNING") -> None:
@@ -209,8 +211,8 @@ class SqlAlchemyExperimentStatusDbManager:
             )
         )
         with self.engine.connect() as conn:
-            conn.execute(query)
-            conn.commit()
+            with conn.begin():
+                conn.execute(query)
 
 
 def create_experiment_status_db_manager(db_engine: str, **options) -> ExperimentStatusDatabaseManager:

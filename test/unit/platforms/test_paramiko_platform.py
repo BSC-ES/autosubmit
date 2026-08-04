@@ -19,7 +19,7 @@ import os
 from getpass import getuser
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Generator, Optional
+from typing import TYPE_CHECKING, Generator
 
 import pytest
 
@@ -298,7 +298,7 @@ def test_remove_multiple_files_no_error_path_does_not_exist(paramiko_platform):
         [None, True]
     ]
 )
-def test_init_local_x11_display(exception: Optional[Exception], expected: Optional[bool], paramiko_platform, mocker):
+def test_init_local_x11_display(exception: Exception | None, expected: bool | None, paramiko_platform, mocker):
     """Test the X11 display initialization.
 
     We rely heavily on mocking here.
@@ -522,11 +522,10 @@ def test_get_call(executable: str, timeout, paramiko_platform: ParamikoPlatform)
 
     call = call.strip()
 
+    assert 'echo $(date +%s) > job_a_STAT_0' in call
+    assert 'nohup' in call
     if timeout > 0:
         assert 'timeout' in call
-    else:
-        assert call.startswith('nohup')
-    assert call.startswith('nohup')
     assert 'job_a' in call
 
 

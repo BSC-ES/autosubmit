@@ -3,7 +3,7 @@ import os
 import pstats
 import shutil
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Tuple
 
 import pytest
 
@@ -101,7 +101,7 @@ def prepare_workflow_runs(current_tmpdir: Path) -> None:
         if not experiment.is_file():
             experiment.joinpath("proj").mkdir(parents=True, exist_ok=True)
             experiment.joinpath("conf").mkdir(parents=True, exist_ok=True)
-            experiment.joinpath("pkl").mkdir(parents=True, exist_ok=True)
+            experiment.joinpath("db").mkdir(parents=True, exist_ok=True)
             experiment.joinpath("plot").mkdir(parents=True, exist_ok=True)
             experiment.joinpath("status").mkdir(parents=True, exist_ok=True)
             as_tmp = experiment.joinpath("tmp")
@@ -151,20 +151,17 @@ def parse_job_list(lines: List[str]) -> List[SimpleJoblist]:
     return sorted(roots, key=lambda x: x.name)
 
 
-def compare_and_print_differences(node1: Optional[SimpleJoblist], node2: Optional[SimpleJoblist]) -> List[str]:
+def compare_and_print_differences(node1: SimpleJoblist | None, node2: SimpleJoblist | None) -> List[str]:
     """
     Compare two job list nodes and return a list of differences.
 
     :param node1: The first job list node to compare.
-    :type node1: Optional[SimpleJoblist]
     :param node2: The second job list node to compare.
-    :type node2: Optional[SimpleJoblist]
     :return: A list of differences between the two nodes.
-    :rtype: List[str]
     """
     differences = []
     path = ""
-    stack: List[Tuple[Optional[SimpleJoblist], Optional[SimpleJoblist], str]] = [(node1, node2, path)]
+    stack: List[Tuple[SimpleJoblist | None, SimpleJoblist | None, str]] = [(node1, node2, path)]
 
     while stack:
         n1, n2, current_path = stack.pop()
@@ -256,10 +253,9 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     add_new_test = False  # Enable when adding a new test
     show_workflow_plot = False  # Enable only for debugging purposes
     expids_to_plot = []
-    if expid.startswith("Destin"):  # Modify only for debugging purposes
+    if expid.startswith("basic_dependencies"):  # Modify only for debugging purposes
         expids_to_plot.append(expid)
     profiler = cProfile.Profile()
-
     # Running section
     workflow_dir = get_project_root() / 'test' / 'regression' / 'workflows'
 
@@ -268,7 +264,7 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
     if PROFILE:
         profiler.enable()
 
-    init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test')
+    init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, full_load=True, test_type='test')
 
     with open(Path(f"{current_tmpdir}/workflows/{expid}/tmp/ASLOGS/jobs_active_status.log"), "r") as new_file:
         new_lines = new_file.readlines()
@@ -304,7 +300,8 @@ def test_workflows_dependencies(prepare_workflow_runs: Any, expid: str, current_
             differences.extend(compare_and_print_differences(new_root, ref_root))
 
     if show_workflow_plot and expid in expids_to_plot:
-        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, create=True, test_type='test',
+        init_expid(os.environ["AUTOSUBMIT_CONFIGURATION"], platform='local', expid=expid, full_load=True,
+                   test_type='test',
                    plot=show_workflow_plot)
     if differences:
         pytest.fail("\n".join(differences))

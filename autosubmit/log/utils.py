@@ -18,12 +18,12 @@
 import gzip
 import lzma
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 
 def compress_xz(
     input_path: Union[Path, str],
-    output_path: Optional[Union[Path, str]] = None,
+    output_path: Union[Path, str] | None = None,
     preset: int = 6,
     extreme: bool = False,
     keep_input: bool = True,
@@ -56,7 +56,7 @@ def compress_xz(
 
 def compress_gzip(
     input_path: str,
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
     compression_level: int = 9,
     keep_input: bool = True,
 ):

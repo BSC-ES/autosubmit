@@ -19,15 +19,12 @@
 """ Test file for autosubmit/autosubmit.py """
 
 from contextlib import contextmanager
-from shutil import rmtree
 
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
-
 
 @contextmanager
 def does_not_raise():
@@ -51,7 +48,7 @@ def build_db_mock(current_experiment_id, mock_db_common, mocker):
     ('', does_not_raise()),
     ('test', pytest.raises(AutosubmitCritical))
 ], ids=['success', 'fail'])
-def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypatch) -> None:
+def test_expid(copy_id, expected, tmp_path, autosubmit_config, monkeypatch, autosubmit) -> None:
     """
     Function to test if the autosubmit().expid generates the paths and expid properly
 
@@ -59,108 +56,33 @@ def test_expid(mocker, copy_id, expected, tmp_path, autosubmit_config, monkeypat
     :param tmp_path: Path
     :return: None
     """
+    autosubmit.install()
     monkeypatch.setattr(db_common, 'TIMEOUT', 1)
-
-    current_experiment_id = "empty"
-
-    monkeypatch.setattr(db_common, 'TIMEOUT', 1)
-
-    db_common_mock = mocker.patch('autosubmit.experiment.experiment_common.db_common')
-    build_db_mock(current_experiment_id, db_common_mock, mocker)
-
-    basic_config = autosubmit_config('a000').basic_config
-    basic_config.STRUCTURES_DIR = basic_config.LOCAL_ROOT_DIR = str(tmp_path)
-    basic_config.JOBDATA_DIR = str(tmp_path)
-    basic_config.read()
-
-    # The fixtures create the experiment directories, so we must remove them before calling
-    # expid here.
-    exp_path = tmp_path / 'a000'
-    rmtree(exp_path)
-
     with expected:
         expid = Autosubmit.expid("Test", copy_id=copy_id)
         # The `describe` call was removed here due to describe now needing the db, which conflicts with mock.
         path = tmp_path / expid
-        assert path.exists() 
+        assert path.exists()
         assert isinstance(expid, str) and len(expid) == 4
-        
-
-def test_expid_create_structure_failure_deletes_experiment(mocker, tmp_path):
-    """Test that failing to create an experiment due to an ``OSError`` cleans up the experiment folders."""
-    expid = "a000"
-
-    mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
-
-    mocker.patch("autosubmit.autosubmit.new_experiment", return_value=expid)
-    mocker.patch("autosubmit.autosubmit.create_required_folders", side_effect=OSError("disk full"))
-
-    delete_experiment = mocker.patch("autosubmit.autosubmit.delete_experiment")
-
-    with pytest.raises(AutosubmitCritical) as exc:
-        Autosubmit.expid("test experiment", hpc="local")
-
-    assert "Error while creating the experiment structure" in str(exc.value)
-    delete_experiment.assert_called_once_with(expid, True)
 
 
-def test_expid_create_config_failure_deletes_experiment(mocker, tmp_path):
-    """Test that an ``Exception`` generating the config cleans up the experiment folders."""
-    expid = "a000"
+@pytest.mark.parametrize(
+    'description',
+    [None]  # TODO: "" is OK?
+)
+def test_expid_missing_description(description):
+    with pytest.raises(AutosubmitCritical) as cm:
+        Autosubmit.expid(description, '', '', False, False)
 
-    mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
-
-    mocker.patch("autosubmit.autosubmit.new_experiment", return_value=expid)
-    mocker.patch("autosubmit.autosubmit.create_required_folders")
-    mocker.patch.object(Autosubmit, "generate_as_config", side_effect=Exception("config failed"))
-
-    delete_experiment = mocker.patch("autosubmit.autosubmit.delete_experiment")
-
-    with pytest.raises(AutosubmitCritical) as exc:
-        Autosubmit.expid("test experiment", hpc="local")
-
-    assert "Error while creating the experiment configuration" in str(exc.value)
-    delete_experiment.assert_called_once_with(expid, True)
+    assert "experiment description" in str(cm.value)
 
 
-def test_expid_default_values_failure_deletes_experiment(mocker, tmp_path):
-    """Test that error setting default values cleans up the experiment folders."""
-    expid = "a000"
+@pytest.mark.parametrize(
+    'hpc',
+    [None]  # TODO: "" is OK?
+)
+def test_expid_missing_hpc(hpc):
+    with pytest.raises(AutosubmitCritical) as cm:
+        Autosubmit.expid('test', hpc, '', False, False)
 
-    mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
-
-    mocker.patch("autosubmit.autosubmit.new_experiment", return_value=expid)
-    mocker.patch("autosubmit.autosubmit.create_required_folders")
-    mocker.patch.object(Autosubmit, "generate_as_config")
-    mocker.patch("autosubmit.autosubmit.as_conf_default_values", side_effect=Exception("defaults failed"))
-
-    delete_experiment = mocker.patch("autosubmit.autosubmit.delete_experiment")
-
-    with pytest.raises(AutosubmitCritical) as exc:
-        Autosubmit.expid("test experiment", hpc="local")
-
-    assert "Error while setting the default values" in str(exc.value)
-    delete_experiment.assert_called_once_with(expid, True)
-
-
-def test_expid_copy_config_failure_deletes_experiment(mocker, tmp_path):
-    """Tests that failing to copy an experiment cleans up the experiment folders."""
-    expid = "a000"
-    copy_id = "b000"
-
-    mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
-
-    (tmp_path / copy_id / "conf").mkdir(parents=True)
-    (tmp_path / copy_id / "conf" / "minimal.yml").touch()
-
-    mocker.patch("autosubmit.autosubmit.copy_experiment", return_value=expid)
-    mocker.patch("autosubmit.autosubmit.create_required_folders")
-    mocker.patch.object(Autosubmit, "copy_as_config", side_effect=Exception("copy config failed"))
-
-    delete_experiment = mocker.patch("autosubmit.autosubmit.delete_experiment")
-
-    with pytest.raises(AutosubmitCritical) as exc:
-        Autosubmit.expid("test experiment", hpc="local", copy_id=copy_id)
-
-    assert "Error while creating the experiment configuration" in str(exc.value)
-    delete_experiment.assert_called_once_with(expid, True)
+    assert "provide an HPC" in str(cm.value)

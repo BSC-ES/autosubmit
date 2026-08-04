@@ -180,7 +180,7 @@ class RunCmdDirective(code.CodeBlock):
         for items in reader:
             for regex in items:
                 if regex != "":
-                    match: Optional[re.Match[str]] = RE_SPLIT.match(regex)
+                    match: re.Match[str] | None = RE_SPLIT.match(regex)
                     p = match.group("pattern")  # type: ignore
                     # Let's unescape the escape chars here as we don't need them to be
                     # escaped in the replacement at this point
