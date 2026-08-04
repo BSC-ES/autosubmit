@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 from typing import Any
 
+import datetime
 import networkx
 import pytest
 from sqlalchemy import create_engine
@@ -687,3 +688,44 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     job_list.recover_last_data()
 
 
+def _retry_delays(mocker, delay_retry_time, retries=4):
+    """Drive ``_update_failed_jobs`` and return the delay, in seconds, applied to each retry."""
+    job = Job("t000_SIM", "1", Status.FAILED, 0)
+    job.section = "SIM"
+    job.parents = set()
+    job.fail_count = 0
+    job.delay_retrials = None
+    job.wrapper_type = None
+
+    as_conf = mocker.MagicMock()
+    as_conf.jobs_data = {"SIM": {}}
+    as_conf.get_retrials.return_value = retries + 1
+    as_conf.get_delay_retry_time.return_value = delay_retry_time
+
+    job_list = mocker.MagicMock()
+    job_list.get_failed.return_value = [job]
+    job_list.is_wrapper_still_running.return_value = False
+
+    delays = []
+    for _ in range(retries):
+        before = datetime.datetime.now()
+        JobList._update_failed_jobs(job_list, as_conf)
+        delays.append(round((job.delay_end - before).total_seconds()))
+    return delays
+
+
+@pytest.mark.parametrize(
+    "delay_retry_time, expected",
+    [
+        ("11", [11, 11, 11, 11]),
+        ("+11", [11, 22, 33, 44]),      # was [2, 3, 4, 5]
+        ("*11", [11, 110, 1100, 11000]),  # was [121, 1331, 14641, 161051]
+        ("+5", [5, 10, 15, 20]),        # was ValueError from int("+")
+        ("*2", [2, 20, 200, 2000]),     # was [22, 242, 2662, 29282]
+    ],
+    ids=["constant", "linear", "factor_of_ten", "linear_single_digit", "factor_of_ten_single_digit"],
+)
+def test_delay_retry_time_matches_documented_sequence(mocker, delay_retry_time, expected):
+    """DELAY_RETRY_TIME must produce the sequences promised in the configuration reference."""
+    assert _retry_delays(mocker, delay_retry_time) == expected
+    

@@ -6,6 +6,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 
 **Bug fixes:**
 
+- Fixed `DELAY_RETRY_TIME` not matching the documented `+N` and `*N` delay sequences #3138
 - Fix timeout guard is silently disabled for login/local jobs #3081
 
 **New Features:**
