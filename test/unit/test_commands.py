@@ -15,8 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional
-
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
@@ -57,7 +55,7 @@ def test_invalid_commands(command, args, mocker):
         "AutosubmitCritical raised for ValueError",
     ],
 )
-def test_exceptions_raised(exception: BaseException, raised: BaseException, status: Optional[int], mocker):
+def test_exceptions_raised(exception: BaseException, raised: BaseException, status: int | None, mocker):
     """Test exceptions being raised (for whatever reason) when running commands."""
     mocker.patch('autosubmit.autosubmit.MyParser', **{'side_effect': exception})
 

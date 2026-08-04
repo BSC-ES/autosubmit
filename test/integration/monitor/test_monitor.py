@@ -19,7 +19,6 @@
 
 from pathlib import Path
 from subprocess import CalledProcessError, SubprocessError
-from typing import Optional
 
 import time
 import pytest
@@ -47,8 +46,8 @@ from autosubmit.monitor.monitor import (
 def test_generate_output(
         output_format: str,
         show: bool,
-        display_error: Optional[SubprocessError],
-        error_raised: Optional[BaseException],
+        display_error: SubprocessError | None,
+        error_raised: BaseException | None,
         autosubmit_exp,
         mocker
 ):
@@ -58,8 +57,7 @@ def test_generate_output(
     exp = autosubmit_exp(experiment_data={})
     exp_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / exp.expid
 
-    job_list_persistence = exp.autosubmit._get_job_list_persistence(exp.expid, exp.as_conf)
-    job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory(), job_list_persistence)
+    job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory())
     date_list = exp.as_conf.get_date_list()
     # TODO: we can probably simplify our code, so that ``date_format`` is calculated more easily...
     date_format = ''
@@ -70,7 +68,6 @@ def test_generate_output(
             date_format = 'H'
         if date.minute > 1:
             date_format = 'M'
-    wrapper_jobs = {}
     job_list.generate(
         exp.as_conf,
         date_list,
@@ -81,10 +78,9 @@ def test_generate_output(
         date_format,
         exp.as_conf.get_retrials(),
         exp.as_conf.get_default_job_type(),
-        wrapper_jobs,
-        run_only_members=exp.as_conf.get_member_list(run_only=True),
+        new=True,
         force=True,
-        create=True)
+        full_load=True)
 
     monitor = Monitor()
     if error_raised:

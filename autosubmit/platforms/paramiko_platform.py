@@ -30,7 +30,7 @@ from io import BufferedReader
 from pathlib import Path
 from threading import Thread
 from time import sleep, time
-from typing import TYPE_CHECKING, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Tuple, Union
 
 import paramiko
 import Xlib.support.connect as xlib_connect
@@ -99,8 +99,8 @@ def _load_ssh_config(ssh_config_path: Path) -> paramiko.SSHConfig:
 
 def _get_user_config_file(
         is_current_real_user_owner: bool,
-        as_env_ssh_config_path: Optional[str],
-        as_env_current_user: Optional[str]
+        as_env_ssh_config_path: str | None,
+        as_env_current_user: str | None
 ) -> Path:
     """Retrieve the user SSH configuration file.
 
@@ -144,7 +144,7 @@ def _init_poller():
 class ParamikoPlatform(Platform):
     """Class to manage the connections to the different platforms with the Paramiko library."""
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: Union[str, list[str]] | None = None):
         """An SSH-enabled platform that uses the Paramiko library.
 
         :param expid: Experiment ID.
@@ -153,19 +153,19 @@ class ParamikoPlatform(Platform):
         :param auth_password: Optional password for 2FA.
         """
         Platform.__init__(self, expid, name, config, auth_password=auth_password)
-        self._proxy: Optional[ProxyCommand] = None
+        self._proxy: ProxyCommand | None = None
         self._ssh_output_err = ""
         self.connected = False
         self._default_queue = None
-        self.job_status: Optional[dict[str, list]] = None
-        self._ssh: Optional[paramiko.SSHClient] = None
+        self.job_status: dict[str, list] | None = None
+        self._ssh: paramiko.SSHClient | None = None
         self._ssh_config = None
         self._ssh_output = ""
-        self._host_config: Optional[dict] = None
+        self._host_config: dict | None = None
         self._host_config_id = None
         self.submit_cmd = ""
-        self._ftpChannel: Optional[paramiko.SFTPClient] = None
-        self.transport: Optional[paramiko.Transport] = None
+        self._ftpChannel: paramiko.SFTPClient | None = None
+        self.transport: paramiko.Transport | None = None
         self.channels: dict = {}
         self.poller = _init_poller()
         self._header = None
@@ -218,7 +218,7 @@ class ParamikoPlatform(Platform):
         self.poller = _init_poller()
         self._init_local_x11_display()
 
-    def test_connection(self, as_conf: Optional['AutosubmitConfig']) -> Optional[str]:
+    def test_connection(self, as_conf: 'AutosubmitConfig | None') -> str | None:
         """Test if the connection is still alive, reconnect if not."""
         try:
             if not self.connected:
@@ -249,7 +249,7 @@ class ParamikoPlatform(Platform):
             self.connected = False
             raise AutosubmitCritical(str(e), 7051)
 
-    def restore_connection(self, as_conf: Optional['AutosubmitConfig'], log_recovery_process: bool = False) -> None:
+    def restore_connection(self, as_conf: 'AutosubmitConfig | None', log_recovery_process: bool = False) -> None:
         """Restores the SSH connection to the platform.
 
         This is where the first connection to a remote platform normally starts in an Autosubmit
@@ -346,9 +346,20 @@ class ParamikoPlatform(Platform):
         except Exception as exc:
             Log.error("Writing Job Id Failed : " + str(exc))
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> int | None:
+        try:
+            self.send_command(f"head -1 {remote_path}")
+            output = self.get_ssh_output()
+            first_line = output.strip()
+            if first_line.startswith('[INFO] JOBID='):
+                return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, IndexError):
+            pass
+        return None
+
     def connect(
             self,
-            as_conf: Optional['AutosubmitConfig'],
+            as_conf: 'AutosubmitConfig | None',
             reconnect: bool = False,
             log_recovery_process: bool = False
     ) -> None:
@@ -816,13 +827,11 @@ class ParamikoPlatform(Platform):
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
 
-    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+    def get_completed_job_names(self, job_names: list[str] | None = None) -> list[str]:
         """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
 
         :param job_names: If provided, filters the results to include only these job names.
-        :type job_names: Optional[List[str]]
         :return: List of job names with COMPLETED files.
-        :rtype: List[str]
         """
         final_job_names = []
         if self.expid in str(self.remote_log_dir):  # Ensure we are in the right experiment
@@ -836,6 +845,25 @@ class ParamikoPlatform(Platform):
             completed_files = [f for f in output.strip().split("\n") if f]
             final_job_names = [Path(file).name.replace('_COMPLETED', '') for file in completed_files]
         return final_job_names
+
+    def get_failed_job_names(self, job_names_provided: list[str] | None = None) -> list[str]:
+        """Retrieve the names of all files ending with '_FAILED' from the remote log directory using SSH.
+
+        :param job_names_provided: If provided, filters the results to include only these job names.
+        :return: List of job names with FAILED files.
+        """
+        job_names = []
+        if self.expid in str(self.remote_log_dir):
+            if not job_names_provided:
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 -name '*_FAILED' -type f"
+            else:
+                patterns = ' -o '.join([f"-name '{name}_FAILED'" for name in job_names_provided])
+                cmd = f"find {self.remote_log_dir} -maxdepth 1 \\( {patterns} \\) -type f"
+            self.send_command(cmd)
+            output = self.get_ssh_output()
+            completed_files = output.strip().split('\n') if output else []
+            job_names = [Path(file).name.replace('_FAILED', '') for file in completed_files]
+        return job_names
 
     def delete_previous_run_files_by_job_names(self, job_names: list[str]) -> None:
         """Deletes the COMPLETED, FAILED for the given job names.
@@ -884,10 +912,10 @@ class ParamikoPlatform(Platform):
         job_name: str,
         stat_status: Status,
         scheduler_job_status: Status,
-        finished_time: Optional[float],
+        finished_time: float | None,
         io_safe_wait: int,
         now: float,
-    ) -> Tuple[Status, Optional[float]]:
+    ) -> Tuple[Status, float | None]:
         """Resolve final job status from STAT file and scheduler information.
 
         :param job_name: Job name for logging.
@@ -919,10 +947,15 @@ class ParamikoPlatform(Platform):
         return scheduler_job_status, None
 
     def confirm_done_jobs_via_stat(self, job_list: list) -> dict[str, "Status"]:
-        """Checks the STAT files for the given jobs to confirm their completion status.
-        This method retrieves the last line of each STAT file corresponding to the jobs in the job_list and resolves their status using the _resolve_status method.
-        :param job_list: A list of Job objects for which to check the STAT files.
-        :return: A dictionary mapping job names to their resolved Status.
+        """Read remote STAT files and resolve job status from their last line.
+
+        STAT format (four lines): submit_time, start_time, end_time, status.
+        - If the file has a single numeric line the job is treated as QUEUING
+          (submitted but not yet started).
+        - Otherwise the last line is passed to ``_resolve_status``.
+
+        :param job_list: Jobs to confirm via STAT files.
+        :return: Mapping of job names to resolved Status.
         """
         if not job_list:
             return {}
@@ -934,7 +967,7 @@ class ParamikoPlatform(Platform):
         result: dict[str, str] = {job.name: "" for job in job_list}
 
         paths_str = " ".join(f'"{p}"' for p in file_to_job)
-        cmd = f'for f in {paths_str}; do res=$(awk \'NF{{last=$0}} END{{print last}}\' "$f" 2>/dev/null); printf "%s: \\"%s\\"\\n" "$f" "${{res:-None}}"; done'
+        cmd = f'for f in {paths_str}; do res=$(awk \'END{{if(NR==1 && $0 ~ /^[0-9]+$/) print "QUEUING"; else print $0}}\' "$f" 2>/dev/null); printf "%s: \\"%s\\"\\n" "$f" "${{res:-None}}"; done'
         self.send_command(cmd, ignore_log=True)
 
         output = self._ssh_output
@@ -1087,15 +1120,12 @@ class ParamikoPlatform(Platform):
             raise AutosubmitError("Failed to check job status after multiple retries", 6000)
 
     def set_start_time_from_remote_stat_file(self, job_list: list["Job"]) -> None:
-        """Set the start_time_timestamp for each job from the first line of its remote STAT file.
+        """Set ``start_time_timestamp`` from line 1 (second line) of each remote STAT file.
 
-        For each job, reads the first line of ``{job.name}_STAT_{job.fail_count}`` in the
-        remote log directory. That line contains the job start time as a Unix epoch float.
-        If the file does not exist or the value cannot be parsed, a warning is logged and
-        the current datetime is used as a fallback.
+        STAT format: submit_time (L0), start_time (L1), end_time (L2), status (L3).
+        Reads line 1 (not line 0) because submit_time was written at submission time.
 
         :param job_list: Jobs whose start times should be filled from remote STAT files.
-        :type job_list: list[Job]
         """
         if not job_list:
             return
@@ -1108,7 +1138,7 @@ class ParamikoPlatform(Platform):
         paths_str = " ".join(f'"{p}"' for p in file_to_job)
         cmd = (
             f'for f in {paths_str}; do '
-            f'res=$(head -1 "$f" 2>/dev/null); '
+            f'res=$(sed -n \'2p\' "$f" 2>/dev/null); '
             f'printf "%s: \\"%s\\"\\n" "$f" "${{res:-None}}"; '
             f'done'
         )
@@ -1397,6 +1427,8 @@ class ParamikoPlatform(Platform):
 
             self._ssh_output = ''.join([s.decode(lang) for s in stdout_chunks if s.decode(lang) != ''])
             self._ssh_output_err = ''.join([s.decode(lang) for s in stderr_readlines if s.decode(lang) != ''])
+            Log.debug(f"send_command() output: {self._ssh_output}")
+            Log.debug(f"send_command() error output: {self._ssh_output_err}")
             self._check_for_unrecoverable_errors()
 
             if not ignore_log and self._ssh_output_err:
@@ -1488,7 +1520,10 @@ class ParamikoPlatform(Platform):
         pre += f"{export} " if export else ""
         pre += f"{executable} " if executable and not self.has_scheduler else ""
         post = f"> {script_name.replace('.cmd', f'.cmd.out.{fail_count}')} 2> {script_name.replace('.cmd', f'.cmd.err.{fail_count}')}" if redirect_out_err else ""
-        return self._construct_final_call(script_name, pre.strip(), post.strip(), x11_options).strip(" ;,")
+        submit_cmd = self._construct_final_call(script_name, pre.strip(), post.strip(), x11_options).strip(" ;,")
+        stat_name = script_name.replace('.cmd', '')
+        stat_cmd = f"echo $(date +%s) > {stat_name}_STAT_{fail_count}"
+        return f"{stat_cmd} ; {submit_cmd}"
 
     @staticmethod
     def get_pscall(job_id):
@@ -1658,7 +1693,7 @@ class ParamikoPlatform(Platform):
             return self._ftpChannel.stat(src)
         return False
 
-    def read_file(self, src: str, max_size: Optional[int]=None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: int | None=None) -> Union[bytes, None]:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path

@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from ruamel.yaml import YAML
 
@@ -129,10 +129,10 @@ def expand_values(raw_value: str, known_values: list[str]) -> set[str]:
 def apply_job_filters(
     job_list,  # should be type JobList, avoid circular imports
     base_job_names: set[str],
-    filter_section: Optional[str],
-    filter_chunk: Optional[str],
-    filter_status: Optional[str],
-    filter_list: Optional[str],
+    filter_section: str | None,
+    filter_chunk: str | None,
+    filter_status: str | None,
+    filter_list: str | None,
     filter_sections_splits_fn: Callable,
     filter_chunks_fn: Callable,
     status_from_str_fn: Callable,
@@ -141,25 +141,15 @@ def apply_job_filters(
 
     All provided filters are combined using intersection (AND). Jobs must match all filters.
     :param job_list: job list object
-    :type job_list: JobList
     :param base_job_names: set of job names before filtering
-    :type base_job_names: set[str]
     :param filter_section: section filter
-    :type filter_section: Optional[str]
     :param filter_chunk: chunk filter
-    :type filter_chunk: Optional[str]
     :param filter_status: status filter
-    :type filter_status: Optional[str]
     :param filter_list: list filter
-    :type filter_list: Optional[str]
     :param filter_sections_splits_fn: function to filter sections and splits
-    :type filter_sections_splits_fn: Callable
     :param filter_chunks_fn: function to filter chunks
-    :type filter_chunks_fn: Callable
     :param status_from_str_fn: function to convert status from string
-    :type status_from_str_fn: Callable
     :return: set of selected job names
-    :rtype: set[str]
     """
     jobs_scope = job_list.get_job_list()
     selected_job_names = set(base_job_names)

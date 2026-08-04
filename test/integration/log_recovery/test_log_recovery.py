@@ -45,7 +45,9 @@ def as_conf(prepare_test, mocker):
 
 
 def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
-    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('fork'))
+    # Exercise the production start method. Spawn starts a fresh interpreter,
+    # which is also the path that needs separate coverage collection.
+    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context', return_value=mp.get_context('spawn'))
     local.config['LOG_RECOVERY_TIMEOUT'] = 1
 
     local.spawn_log_retrieval_process(as_conf)
@@ -67,8 +69,8 @@ def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
     assert local.log_recovery_process.is_alive()
     local.work_event.set()
     assert local.log_recovery_process.is_alive()
-    # there is new auto-fixture that doesn't allow sleeps higher than 1 while testing
-    deadline = time.monotonic() + 1.2
+    # Give the child enough time to drain the queue and exit after the keep-alive timeout.
+    deadline = time.monotonic() + 5
     while time.monotonic() < deadline and local.log_recovery_process.is_alive():
         time.sleep(0.1)
     assert local.log_recovery_process.is_alive() is False
@@ -335,3 +337,20 @@ def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
     local.clean_log_recovery_process()
     assert local.recovery_queue is None
     assert local.log_recovery_process is None
+
+
+def test_add_job_to_log_recover_signals_work_event(local, mocker):
+    """Verify work_event is set after adding a job to the recovery queue."""
+    local.prepare_process()
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    local.log_recovery_process = mocker.MagicMock()
+    local.log_recovery_process.is_alive.return_value = True
+
+    job = Job('t000', '0000', Status.COMPLETED, 0)
+    job.name = 'test_job'
+    job.id = 123
+    job.updated_log = 0
+    job.updated_stats = 0
+
+    local.add_job_to_log_recover(job)
+    assert local.work_event.is_set()

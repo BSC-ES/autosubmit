@@ -30,11 +30,12 @@ def test_is_current_real_user_owner(autosubmit_config, mocker, is_owner):
 
 
 @pytest.mark.parametrize("is_owner", [True, False])
-def test_is_current_logged_user_owner(autosubmit_config, mocker, is_owner, monkeypatch):
+def test_is_current_logged_user_owner(autosubmit_config, mocker, is_owner, tmp_path, monkeypatch):
     """Test if the USER from the environment matches the owner of the current experiment."""
+
     as_conf = autosubmit_config(
         expid='a000',
-        experiment_data={"ROOTDIR": "/dummy/rootdir"}
+        experiment_data={"ROOTDIR": f"{str(tmp_path)}"}
     )
     if is_owner:
         monkeypatch.setenv("USER", "dummy")

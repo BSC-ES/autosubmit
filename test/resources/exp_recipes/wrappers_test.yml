@@ -108,7 +108,7 @@ MAIL:
   NOTIFICATIONS: False
   TO:
 STORAGE:
-  TYPE: pkl
+  TYPE: sqlite
   COPY_REMOTE_LOGS: true
 DEFAULT:
   # Job experiment ID.

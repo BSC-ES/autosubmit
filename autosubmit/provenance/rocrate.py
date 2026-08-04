@@ -29,7 +29,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Optional, Union, cast
+from typing import Any, Callable, Union, cast
 
 from rocrate.model.contextentity import ContextEntity
 from rocrate.rocrate import File, ROCrate
@@ -95,7 +95,7 @@ DEFAULT_EXPORTED_KEYS = [
 
 
 def _add_files(crate: ROCrate, base_path: Path, relative_path: str, expid: str,
-               encoding_format: Optional[str] = None) -> None:
+               encoding_format: str | None = None) -> None:
     """Add all files of a directory into the RO-Crate.
 
     Ignores existing crate archives.
@@ -115,7 +115,7 @@ def _add_files(crate: ROCrate, base_path: Path, relative_path: str, expid: str,
             _add_file(crate, base_path, file_path, encoding_format)
 
 
-def _add_file(crate: ROCrate, base_path: Optional[Path], file_path: Path, encoding_format: Optional[str] = None,
+def _add_file(crate: ROCrate, base_path: Path | None, file_path: Path, encoding_format: str | None = None,
               use_uri: bool = False, **args: Any) -> Any:
     """Add a file into the RO-Crate.
 
@@ -137,7 +137,7 @@ def _add_file(crate: ROCrate, base_path: Optional[Path], file_path: Path, encodi
         "contentSize": file_path.stat().st_size,
         **args
     }
-    guessed_mime_type: Optional[str] = _guess_mime(file_path)
+    guessed_mime_type: str | None = _guess_mime(file_path)
     if not guessed_mime_type and not encoding_format:
         Log.warning(f"Could not guess the MIME type of {file_path}")
     else:
@@ -316,7 +316,7 @@ def _init_mimetypes() -> None:
     mimetypes.add_type("application/yaml", ".yaml")
 
 
-def _guess_mime(path: Path) -> Optional[str]:
+def _guess_mime(path: Path) -> str | None:
     """Guess the MIME type of the file."""
     suffix = path.suffix
 
@@ -368,7 +368,9 @@ def create_rocrate_archive(
     crate.description = get_experiment_description(expid)[0][0]
     for profile in PROFILES:
         crate.add(ContextEntity(crate, properties=profile))
-    crate.conformsTo = conforming_profiles
+    # conformsTo does not exist in every version of RO-Crate py.
+    if hasattr(crate, 'conformsTo'):  # pragma: no cover
+        crate.conformsTo = conforming_profiles  # pragma: no cover
     crate.root_dataset['conformsTo'] = conforming_profiles
 
     Log.info('Creating RO-Crate archive...')
@@ -414,7 +416,7 @@ def create_rocrate_archive(
     # Add status files.
     _add_files(crate, experiment_path, "status", expid, "text/plain")
     # Add SQLite DB and pickle files.
-    _add_files(crate, experiment_path, "pkl", expid)
+    _add_files(crate, experiment_path, "db", expid)
 
     # Register the Workflow Run RO-Crate (WRROC) profile. This code was adapted from COMPSs and StreamFlow.
     #

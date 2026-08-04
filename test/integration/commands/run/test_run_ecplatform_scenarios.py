@@ -21,15 +21,18 @@ from shutil import copy
     (dedent("""\
 
     EXPERIMENT:
-        NUMCHUNKS: '3'
+        NUMCHUNKS: '2'
     JOBS:
         job:
             SCRIPT: |
+                sleep 10
                 echo "Hello World with id=Success"
+            DEPENDENCIES:
+                job-1:
             PLATFORM: TEST_EC
             RUNNING: chunk
-            wallclock: 00:01
-    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+            wallclock: 00:03
+    """), 2, "COMPLETED", "simple"),  # No wrappers, simple type
 
 ], ids=["Success"])
 def test_run_uninterrupted(

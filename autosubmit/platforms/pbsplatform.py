@@ -21,7 +21,7 @@ import os
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
@@ -40,7 +40,7 @@ class PBSPlatform(ParamikoPlatform):
     EXECUTION_MODE = ExecutionMode.BATCH
     TYPE = PlatformType.PBS
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[str] = None) -> None:
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str | None = None) -> None:
         """Initialization of the Class PBSPlatform.
 
         :param expid: ID of the experiment which will instantiate the PBSPlatform.
@@ -430,13 +430,12 @@ class PBSPlatform(ParamikoPlatform):
             except IOError:  # File doesn't exist, retry in sleeptime
                 sleep(sleeptime)
                 retries = retries + 1
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
+            except Exception as e:
+                if "garbage" in str(e).lower():
                     sleep(2)
                     retries = retries + 1
                 else:
-                    file_exist = False  # won't exist
-                    retries = 999  # no more retries
+                    raise
         if not file_exist:
             Log.warning(f"File {src} couldn't be found")
         return file_exist

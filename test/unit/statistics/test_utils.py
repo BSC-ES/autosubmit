@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import timedelta, datetime
-from typing import Optional
 
 import pytest
 
@@ -154,5 +153,5 @@ def test_timedelta2hours():
         ('1:2:3', 108)
     ]
 )
-def test_parse_number_processors(n: Optional[str], expected: int):
+def test_parse_number_processors(n: str | None, expected: int):
     assert parse_number_processors(n) == expected

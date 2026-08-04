@@ -15,13 +15,13 @@
 # You should have received a copy of the GNU General Public License 
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>. 
 
-from typing import Any, Callable, Generator, Optional, Union, TYPE_CHECKING
+from typing import Any, Callable, Generator, Union, TYPE_CHECKING
 
 import pytest
 
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
-from test.integration.test_utils.docker import (
+from test.integration.test_utils.docker_utils import (
     get_mail_container,
     get_mailhog_messages,
     prepare_and_test_mail_container,
@@ -243,7 +243,7 @@ def test_recipients_list(
         create_mail_notifier: Callable[['AutosubmitExperiment', int], MailNotifier],
         fake_smtp_server: tuple[int, str],
         list_recipients: Union[str, list[str]],
-        expected_error_message: Optional[str]):
+        expected_error_message: str | None):
     smtp_port, api_base = fake_smtp_server
     job_name = 'SIM'
 

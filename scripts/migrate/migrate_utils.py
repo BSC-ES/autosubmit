@@ -61,7 +61,7 @@ def check_table_schema(engine: Engine, valid_tables: List[Table]) -> Union[Table
     return None
 
 
-def table_copy(table: Table, metadata: Optional[MetaData] = None) -> Table:
+def table_copy(table: Table, metadata: MetaData | None = None) -> Table:
     """
     Copy a table schema
     """
@@ -134,7 +134,7 @@ def _copy_table_data(
     target_conn: Connection,
     expid: str,
     source_table: Table,
-    dest_table: Optional[Table] = None,
+    dest_table: Table | None = None,
     schema_required=True,
 ):
     """

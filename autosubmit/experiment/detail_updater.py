@@ -17,22 +17,21 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from abc import ABC, abstractmethod
 import datetime
 import pwd
-from pathlib import Path
 import sqlite3
+from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Dict, Union
 
-from sqlalchemy import Table
-from autosubmit.database.db_common import get_connection_url, get_experiment_id
-from autosubmit.config.configcommon import AutosubmitConfig
+from sqlalchemy import Table, select, insert, delete
+
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-
+from autosubmit.database.db_common import get_connection_url, get_experiment_id
 from autosubmit.database.session import create_engine
-from autosubmit.database.tables import get_table_from_name
-
+from autosubmit.database.tables import TableRegistry
 
 LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
 
@@ -174,15 +173,14 @@ class ExperimentDetailsSQLAlchemyRepository(ExperimentDetailsRepository):
     """
 
     def __init__(self):
-        self.table: Table = get_table_from_name(schema=None, table_name='details')
+        table_registry = TableRegistry(None)
+        self.table: Table = table_registry.get("details")
         connection_url = get_connection_url(BasicConfig.DB_PATH)
         self.engine = create_engine(connection_url=connection_url)
 
     def get_details(self, exp_id: int):
         with self.engine.connect() as conn:
-            result = conn.execute(
-                self.table.select().where(self.table.c.exp_id == exp_id)
-            ).one_or_none()
+            result = conn.execute(select(self.table).where(self.table.c.exp_id == exp_id)).one_or_none()
             if result:
                 return {
                     "exp_id": result.exp_id,
@@ -199,23 +197,23 @@ class ExperimentDetailsSQLAlchemyRepository(ExperimentDetailsRepository):
         self, exp_id: int, user: str, created: str, model: str, branch: str, hpc: str
     ):
         with self.engine.connect() as conn:
-            conn.execute(self.table.delete().where(self.table.c.exp_id == exp_id))
-            conn.execute(
-                self.table.insert().values(
-                    exp_id=exp_id,
-                    user=user,
-                    created=created,
-                    model=model,
-                    branch=branch,
-                    hpc=hpc,
+            with conn.begin():
+                conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
+                conn.execute(
+                    insert(self.table).values(
+                        exp_id=exp_id,
+                        user=user,
+                        created=created,
+                        model=model,
+                        branch=branch,
+                        hpc=hpc,
+                    )
                 )
-            )
-            conn.commit()
 
     def delete_details(self, exp_id: int):
         with self.engine.connect() as conn:
-            conn.execute(self.table.delete().where(self.table.c.exp_id == exp_id))
-            conn.commit()
+            with conn.begin():
+                conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
 
 
 def create_experiment_details_repository(

@@ -23,7 +23,7 @@ from contextlib import suppress
 from os import _exit  #noqa
 # noinspection PyProtectedMember
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 from portalocker.exceptions import BaseLockException
 
@@ -96,7 +96,7 @@ def exit_from_error(e: BaseException) -> int:
 
 # noinspection PyProtectedMember
 def main():
-    args: Optional[argparse.Namespace] = None
+    args: argparse.Namespace | None = None
     try:
         return_value, args = Autosubmit.parse_args()
         if args:
@@ -114,7 +114,7 @@ def main():
                 expid = f"<{args.expid}>"
                 with suppress(BaseException):
                     as_conf = AutosubmitConfig(args.expid)
-                    as_conf.reload()
+                    as_conf.load_starter_conf()
                     version = f"{as_conf.experiment_data.get('CONFIG', {}).get('AUTOSUBMIT_VERSION', 'unknown')}"
         Log.error(f"Arguments provided: {str(args)}")
         Log.error(f"This is the experiment: {expid} which had an issue with the command: {command} and it is currently using the Autosubmit Version: {version}.")

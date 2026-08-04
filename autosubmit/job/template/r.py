@@ -46,9 +46,24 @@ _AS_R_HEADER = dedent("""\
         } 
         options( warn = oldw )
         job_name_ptrn = '%CURRENT_LOGDIR%/%JOBNAME%'
-        fileConn<-file(paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = ''),"w")
+        stat_path <- paste(job_name_ptrn,"_STAT_%FAIL_COUNT%", sep = '')
+        if (!file.exists(stat_path)) {
+            fileConn<-file(stat_path,"w")
+            writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
+            close(fileConn)
+        }
+        fileConn<-file(stat_path,"a")
         writeLines(toString(trunc(as.numeric(Sys.time()))), fileConn)
         close(fileConn)
+        as_job_id <- Sys.getenv('SLURM_JOBID', unset=NA)
+        if (is.na(as_job_id)) as_job_id <- Sys.getenv('PBS_JOBID', unset=NA)
+        if (is.na(as_job_id)) as_job_id <- Sys.getenv('JOB_ID', unset=NA)
+        if (is.na(as_job_id)) as_job_id <- Sys.getenv('LSB_JOBID', unset=NA)
+        if (is.na(as_job_id)) as_job_id <- Sys.getenv('LOADL_STEP_ID', unset=NA)
+        if (is.na(as_job_id)) as_job_id <- Sys.getenv('PJM_JOBID', unset=NA)
+        if (is.na(as_job_id)) as_job_id <- paste(Sys.getpid())
+        cat('[INFO] JOBID=', as_job_id, '\\n', sep='')
+        cat('[INFO] JOBID=', as_job_id, '\\n', file=stderr(), sep='')
         ###################
         # Autosubmit Checkpoint
         ###################

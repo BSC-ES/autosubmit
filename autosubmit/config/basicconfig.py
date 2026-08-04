@@ -20,7 +20,6 @@ import os
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Union
-from autosubmit.log.log import Log
 
 
 class BasicConfig:
@@ -40,7 +39,6 @@ class BasicConfig:
         return pr
 
     DB_DIR = os.path.join(os.path.expanduser('~'), 'debug', 'autosubmit')
-    LOG_RECOVERY_TIMEOUT = 60
     STRUCTURES_DIR = os.path.join(
         '/esarchive', 'autosubmit', 'as_metadata', 'structures')
     GLOBAL_LOG_DIR = os.path.join(
@@ -223,9 +221,6 @@ class BasicConfig:
                 BasicConfig.__read_file_config(home_user_config_path)
             else:
                 if legacy_etc_rc_path.exists():
-                    Log.warning(
-                        "The legacy configuration file /etc/.autosubmitrc is deprecated and will be removed in future versions. Please, rename it to /etc/autosubmitrc"
-                    )
                     BasicConfig.__read_file_config(legacy_etc_rc_path)
                 # Overwrite legacy config
                 if etc_rc_path.exists():

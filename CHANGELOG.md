@@ -1,15 +1,43 @@
-### 4.1.18: Unreleased
+### 4.2.0: Minor release
+
+This is a minor release of Autosubmit that introduces significant changes in the management of jobs and dependencies. 
+The main highlight of this release is the introduction of a new database backend for the joblist using SQLAlchemy, which allows for better scalability in handling large workflows.
+This release also includes several bug fixes and enhancements to improve the overall user experience.
 
 **Bug fixes:**
 
 - Fix timeout guard is silently disabled for login/local jobs #3081
 
-**Enhancements:**
+**New Features:**
 
+- Introduced SQLAlchemy as the main database backend for joblist management, replacing the previous pickle-based system. This change allows for better scalability and flexibility in handling large workflows.
+- Added support for PostgreSQL as a database backend, in addition to the default SQLite. This provides users with more options for database management.
+- Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
+- [enhancement] Allow recovery to update current running/ready jobs #1251
+
+**Migration from `job_list.pkl` to Database**
+
+- All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted in significant changes to the code.
+
+**Memory and Performance Improvements**:
+
+- Significant reduction in memory usage by loading only necessary jobs and dependencies for active employment.
+- Enhanced performance during autosubmit runs and ongoing improvements to the log process management through direct database interactions to reduce the communication with the main process.
+- Overall job management features have been improved to ensure better tracking and status updates, removing redundant code to enhance the efficiency of a loop 
+- The recovery and set status commands have been improved for version 4.2.0 and later 4.1.16, resulting in faster operations.
+- Removal of _COMPLETED files to reduce the amount of inodes generated
+- A significant rework of the wrapper building process has been implemented to address ongoing issues and prevent regressions, particularly with 2D wrappers.
+- Various functions have been optimized to minimize calls to save/load operations, enhancing the software's overall efficiency and responsiveness.
+
+**Enhancements**
+
+- **Database Method Enhancements**: Support for both PostgreSQL and SQLite with optimized save/load mechanisms. Improved wrapper data storage and load.
+- **Testing Efforts**: Tests have been added for every rework to enhance reliability, with a particular effort on integration tests.
 - `autosubmit refresh` no longer creates a `proj_{timestamp}` backup by default and aborts on uncommitted or unpushed changes. #2633
 - Auto-detect git default branch when `-b` flag not specified #3101
+- Removed `files` arguments from autosubmit sub-commands, and moved code to upgrade scripts out of `autosubmit.py` #2711
 
-### 4.1.17: Unreleased
+### 4.1.17: Bug fixes and enhancements
 
 **Bug fixes:**
 
@@ -53,6 +81,8 @@
 - Fixed `CPU per task` for new version of autosubmit #2897
 - Fixed issue overwritting expid config variables with the ones from the github repo #2877
 - Fixed inspect infinite loop when PLATFORMS.TOTALJOBS or PLATFORMS.MAX_WAITING_JOBS is set to 0 #2749
+- Fixed wrappers on Lumi platform #3059 
+- Fixed HPC2020 platform #3059
 
 **Enhancements:**
 
