@@ -188,29 +188,28 @@ class SqlAlchemyExperimentStatusDbManager:
         return Models.ExperimentStatusRow(*row)
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int:
-        """
-        Upsert a new experiment status row in the database. If the row already exists, it will be updated.
-        """
+        """Upsert a new experiment status row in the database. If the row already exists, it will be updated."""
         if BasicConfig.DATABASE_BACKEND == "postgres":
             _insert_fn = pg_insert
         else:
             _insert_fn = sqlite_insert
         query = (
-            _insert_fn(ExperimentStatusTable).
-            values(
+            _insert_fn(ExperimentStatusTable)
+            .values(
                 exp_id=exp_id,
                 name=expid,
                 status=status,
                 seconds_diff=0,
-                modified=HUtils.get_current_datetime()
-            ).on_conflict_do_update(
+                modified=HUtils.get_current_datetime(),
+            )
+            .on_conflict_do_update(
                 index_elements=[ExperimentStatusTable.c.exp_id],  # type: ignore
                 set_={
                     "name": expid,
                     "status": status,
                     "seconds_diff": 0,
-                    "modified": HUtils.get_current_datetime()
-                }
+                    "modified": HUtils.get_current_datetime(),
+                },
             )
         )
         with self.engine.connect() as conn:
