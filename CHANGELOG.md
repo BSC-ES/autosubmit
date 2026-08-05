@@ -8,6 +8,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
+- Fixed the Profiler reporting `MEMORY GROW` with the wrong unit when the growth was small relative to the final memory (e.g. ~0.5 MiB shown as 527 "MiB"). #3162
 
 **New Features:**
 
@@ -15,6 +16,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 - Added support for PostgreSQL as a database backend, in addition to the default SQLite. This provides users with more options for database management.
 - Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
 - [enhancement] Allow recovery to update current running/ready jobs #1251
+- Introduced a performance benchmark suite and a `metrics` workflow that profiles `create`, `run`, `recovery` and `setstatus`, compares each run against a per-CPU baseline stored on the `benchmark-reference` branch, and posts a regression report (tables, heatmap plots and artifact download links) on PRs labeled `perf-benchmark`. Maintainers can also trigger it manually with `/metrics`, `/metrics_full` and `/metrics_promote`. #2696 #3162
 
 **Migration from `job_list.pkl` to Database**
 

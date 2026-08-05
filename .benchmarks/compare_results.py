@@ -56,6 +56,7 @@ import re
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 # Deterministic metrics that must not change between runs.
@@ -402,7 +403,6 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     import matplotlib
 
     matplotlib.use("Agg")
-    import numpy as np
     import matplotlib.pyplot as plt
     from matplotlib.colors import TwoSlopeNorm, Normalize
     from matplotlib.patches import Rectangle
