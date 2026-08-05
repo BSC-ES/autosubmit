@@ -30,3 +30,10 @@ dockerfiles/authorized_keys
 venv/
 .ipynb_checkpoints
 .atl
+
+# Benchmark ( reference lives in a separated branch )
+.actrc
+
+.benchmarks/data/
+.benchmarks/artifacts/
+.benchmarks/reference/

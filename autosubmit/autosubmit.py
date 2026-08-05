@@ -79,7 +79,11 @@ from autosubmit.git.autosubmit_git import (
     is_git_repo,
 )
 from autosubmit.helpers.enums import ChunkUnit
-from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
+from autosubmit.helpers.utils import (
+    check_jobs_file_exists,
+    get_rc_path,
+    release_memory_to_os,
+)
 from autosubmit.helpers.version import get_version
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
@@ -2174,6 +2178,10 @@ class Autosubmit:
                 job_list.recover_logs(from_db=True)
                 job_list.reset_updated_logs()
                 job_list.load_wrappers()
+                # Compact the heap before entering the run loop: prepare_run
+                # and the setup above loaded config, job_list, wrappers and
+                # platforms into memory.
+                release_memory_to_os()
                 while job_list.continue_run():
                     try:
 
