@@ -247,13 +247,27 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
     git_path = as_conf.get_project_dir()
 
     # Making proj backup
-    if force:
-        if os.path.exists(project_path):
-            Log.info("Making a backup of your current proj folder at {0}".format(
-                project_backup_path))
+    if force and os.path.exists(project_path):
+        backup_enabled = as_conf.get_git_project_backup()
+        if backup_enabled:
+            Log.info("Making a backup of your current proj folder at {0}".format(project_backup_path))
             shutil.move(project_path, project_backup_path)
-        # shutil.make_archive(project_backup_path, 'zip', project_path)
-        # project_backup_path = project_backup_path + ".zip"
+        else:
+            # Pre-flight: refuse to destroy uncommitted or unpushed work.
+            proj_git_dir = Path(project_path) / project_destination
+            if proj_git_dir.is_dir() and (proj_git_dir / '.git').is_dir():
+                if _get_uncommitted_code(proj_git_dir):
+                    raise AutosubmitCritical(
+                        "Refusing to refresh: local Git repository has uncommitted changes. "
+                        "Commit and push, or enable git_project_backup in .autosubmitrc "
+                        "or GIT.PROJECT_BACKUP in the experiment YAML to keep the old backup behavior.",
+                        7013)
+                if _get_code_not_pushed(proj_git_dir):
+                    raise AutosubmitCritical(
+                        "Refusing to refresh: local Git repository has unpushed commits. "
+                        "Push, or enable git_project_backup in .autosubmitrc "
+                        "or GIT.PROJECT_BACKUP in the experiment YAML to keep the old backup behavior.",
+                        7064)
 
     if os.path.exists(os.path.join(project_path, project_destination)):
         Log.info("Using project folder: {0}", project_path)
