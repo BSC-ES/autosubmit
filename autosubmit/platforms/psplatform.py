@@ -40,7 +40,7 @@ class PsPlatform(ParamikoPlatform):
         self._checkhost_cmd = None
         self.cancel_cmd = None
         self._header = PsHeader()
-        self.job_status = dict()
+        self.job_status = {}
         # TODO: revise this and `parse_all_jobs_outputs` why it returns '1'/'0' instead of 1/0
         self.job_status['COMPLETED'] = ['1']
         self.job_status['RUNNING'] = ['0']

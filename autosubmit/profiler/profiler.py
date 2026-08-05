@@ -20,19 +20,19 @@ import gc
 import io
 import os
 import pstats
+import socket as _socket
 import sys
 import tracemalloc
+from contextlib import suppress
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from pstats import SortKey
 
-from contextlib import suppress
 from psutil import Process
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import Log, AutosubmitCritical
-import socket as _socket
+from autosubmit.log.log import AutosubmitCritical, Log
 
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
 
@@ -460,12 +460,11 @@ def _get_pipe_direction(pid: int, fd_num: int) -> str:
     :return: One of 'read', 'write', or 'unknown'.
     :rtype: str
     """
-    with suppress(OSError):
-        with open(f"/proc/{pid}/fdinfo/{fd_num}") as f:
-            for line in f:
-                if line.startswith("flags:"):
-                    access_mode = int(line.split()[1], 8) & 3
-                    return "read" if access_mode == 0 else "write"
+    with suppress(OSError), open(f"/proc/{pid}/fdinfo/{fd_num}") as f:
+        for line in f:
+            if line.startswith("flags:"):
+                access_mode = int(line.split()[1], 8) & 3
+                return "read" if access_mode == 0 else "write"
     return "unknown"
 
 

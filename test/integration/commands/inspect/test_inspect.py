@@ -18,9 +18,9 @@
 from pathlib import Path
 
 import pytest
+from bscearth.utils.date import date2str
 
 from autosubmit.config.basicconfig import BasicConfig
-from bscearth.utils.date import date2str
 
 """Integration tests for argument behavior."""
 

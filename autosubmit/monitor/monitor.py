@@ -20,11 +20,12 @@
 import os
 import subprocess
 import time
+from collections.abc import Callable
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from sys import platform
-from typing import Any, Callable, Tuple, Union, List, Dict
+from typing import Any
 
 import py3dotplus as pydotplus
 
@@ -32,7 +33,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.monitor.diagram import create_stats_report
 
 _GENERAL_STATS_OPTION_MAX_LENGTH = 1000
@@ -94,7 +95,7 @@ def _display_file_xdg(a_file: str) -> None:
         subprocess.check_output(["mimeopen", a_file])
 
 
-def _display_file(a_file: Union[str, Path]) -> None:
+def _display_file(a_file: str | Path) -> None:
     """Display a file for the user.
 
     The file is displayed using the user-preferred application.
@@ -125,7 +126,7 @@ def _color_status(status: int) -> str:
     :return: The colour
     :rtype: str
     """
-    if status not in _MONITOR_STATUS_TO_COLOR.keys():
+    if status not in _MONITOR_STATUS_TO_COLOR:
         return _MONITOR_STATUS_TO_COLOR[Status.UNKNOWN]
 
     return _MONITOR_STATUS_TO_COLOR[status]
@@ -135,7 +136,7 @@ def _check_node_exists(
         exp: pydotplus.Subgraph,
         job: Job,
         groups: dict[str, Any],
-        hide_groups: bool) -> Tuple[list[pydotplus.Node], bool]:
+        hide_groups: bool) -> tuple[list[pydotplus.Node], bool]:
     """Check if a node exists and if it must be skipped or not.
 
     If the list of ``groups`` is empty, or if the given ``job`` name is not listed
@@ -223,9 +224,9 @@ def _create_node(job, groups, hide_groups) -> "pydotplus.Node | None":
 
 
 def _check_final_status(
-        job_edges_info: List[Dict[str, Any]] | None,
+        job_edges_info: list[dict[str, Any]] | None,
         child: Job,
-) -> Tuple[str | None, int | None, bool | None]:
+) -> tuple[str | None, int | None, bool | None]:
     """Check the final status between a job and its child using edge information.
 
     :param job_edges_info: List of edge information dictionaries.
@@ -327,7 +328,7 @@ class Monitor:
             expid: str,
             joblist: list[Job],
             packages: list[WrapperJob],  # (wrapper_job)
-            groups: dict[str, Union[list[Job], dict]],
+            groups: dict[str, list[Job] | dict],
             hide_groups=False
     ) -> pydotplus.Dot:
         """
@@ -421,7 +422,7 @@ class Monitor:
 
         graph.add_subgraph(exp)
 
-        packages_subgraphs_dict = dict()
+        packages_subgraphs_dict = {}
         if packages:
             Log.debug('Creating wrapper jobs graph...')
             # Wrapper visualization
@@ -622,7 +623,7 @@ class Monitor:
 
     def generate_output_stats(self, expid: str, joblist: list[Job], output_format="pdf", hide=False,
                               section_summary=False, jobs_summary=False, period_ini: datetime | None = None,
-                              period_fi: datetime | None = None, queue_time_fixes: dict[str, int] = None) -> bool:
+                              period_fi: datetime | None = None, queue_time_fixes: dict[str, int] | None = None) -> bool:
         """Plots stats for joblist and stores it in a file.
 
         :param queue_time_fixes:
@@ -651,7 +652,7 @@ class Monitor:
         is_owner, is_eadmin, _ = check_experiment_ownership(expid, BasicConfig, raise_error=False, logger=Log)
         now = time.localtime()
         output_date = time.strftime("%Y%m%d_%H%M%S", now)
-        output_filename = "{}_statistics_{}.{}".format(expid, output_date, output_format)
+        output_filename = f"{expid}_statistics_{output_date}.{output_format}"
         output_complete_path_stats = os.path.join(BasicConfig.DEFAULT_OUTPUT_DIR, output_filename)
         is_default_path = True
         if is_owner or is_eadmin:
@@ -672,8 +673,7 @@ class Monitor:
                 is_default_path = False
         if is_default_path:
             Log.info(
-                "You don't have enough permissions to the experiment's ({}) folder. The output file will be created in the default location: {}".format(
-                    expid, BasicConfig.DEFAULT_OUTPUT_DIR))
+                f"You don't have enough permissions to the experiment's ({expid}) folder. The output file will be created in the default location: {BasicConfig.DEFAULT_OUTPUT_DIR}")
 
             Path(BasicConfig.DEFAULT_OUTPUT_DIR).mkdir(mode=_DEFAULT_MKDIR_GROUP_PERMISSION, parents=True,
                                                        exist_ok=True)

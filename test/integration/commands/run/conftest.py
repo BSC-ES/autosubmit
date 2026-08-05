@@ -26,15 +26,12 @@ an extra and not very well-tested)."""
 import os
 import pwd
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
-from threading import Thread, Event
-from typing import Any, Callable, TYPE_CHECKING
+from threading import Event, Thread
+from typing import TYPE_CHECKING, Any
 
 import pytest
-
-if TYPE_CHECKING:
-    pass
-
 
 # TODO expand the tests (Ecplatform, PJM) whenever possible
 # TODO The db check could be improved to check everything not only the job_data table
@@ -483,7 +480,9 @@ def _build_failure_message(
     :return: Multi-line string describing every failing check.
     :rtype: str
     """
-    from autosubmit.config.basicconfig import BasicConfig  # local import to avoid circular deps
+    from autosubmit.config.basicconfig import (
+        BasicConfig,  # local import to avoid circular deps
+    )
 
     lines: list[str] = [
         f"Experiment folder : {run_tmpdir}",

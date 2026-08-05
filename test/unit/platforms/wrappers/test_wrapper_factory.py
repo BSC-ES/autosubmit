@@ -23,9 +23,16 @@ import pytest
 
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from autosubmit.platforms.wrappers.wrapper_builder import BashVerticalWrapperBuilder
-from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory, SrunHorizontalWrapperBuilder, \
-    SrunVerticalHorizontalWrapperBuilder, PythonHorizontalWrapperBuilder, PythonVerticalWrapperBuilder, \
-    PythonVerticalHorizontalWrapperBuilder, PythonHorizontalVerticalWrapperBuilder, EcWrapperFactory
+from autosubmit.platforms.wrappers.wrapper_factory import (
+    EcWrapperFactory,
+    PythonHorizontalVerticalWrapperBuilder,
+    PythonHorizontalWrapperBuilder,
+    PythonVerticalHorizontalWrapperBuilder,
+    PythonVerticalWrapperBuilder,
+    SlurmWrapperFactory,
+    SrunHorizontalWrapperBuilder,
+    SrunVerticalHorizontalWrapperBuilder,
+)
 
 _EXPID = 't000'
 
@@ -201,7 +208,7 @@ def test_wrapper_factory_slurm_hetsize_greater_than_one(slurm_platform: SlurmPla
     ]
 )
 def test_wrapper_factory_slurm_num_processors(
-        num_processors_value: Union[str, int], nodes: Union[str, int], expected: str,
+        num_processors_value: str | int, nodes: str | int, expected: str,
         slurm_platform: SlurmPlatform, wrapper_builder_kwargs: dict, mocker):
     """Test that the wrapper calculates the number of processors correctly."""
     wrapper_factory = SlurmWrapperFactory(slurm_platform)

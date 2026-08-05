@@ -40,7 +40,7 @@ class LocalPlatform(ParamikoPlatform):
     EXECUTION_MODE = ExecutionMode.DIRECT
     TYPE = PlatformType.LOCAL
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: Union[str, list[str]] | None = None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str | list[str] | None = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.cancel_cmd = None
         self.mkdir_cmd = None
@@ -49,7 +49,7 @@ class LocalPlatform(ParamikoPlatform):
         self.put_cmd = None
         self._checkhost_cmd = None
         self._header = LocalHeader()
-        self.job_status = dict()
+        self.job_status = {}
         self.job_status['COMPLETED'] = ['1']
         self.job_status['RUNNING'] = ['0']
         self.job_status['QUEUING'] = []
@@ -327,7 +327,7 @@ class LocalPlatform(ParamikoPlatform):
             path_root = self.get_files_path()
             os.rename(os.path.join(path_root, src), os.path.join(path_root, dest))
             return True
-        except IOError as e:
+        except OSError as e:
             if must_exist:
                 raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
             else:
@@ -352,7 +352,7 @@ class LocalPlatform(ParamikoPlatform):
         """Do nothing because the log files are already in the local platform (redundancy)."""
         return
 
-    def read_file(self, src: Union[str, Path], max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str | Path, max_size: int | None = None) -> bytes | None:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path

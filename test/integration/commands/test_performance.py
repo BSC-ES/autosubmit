@@ -1,12 +1,12 @@
 import os
-from pathlib import Path
 import re
-from typing import Any, Container
+from collections.abc import Container
+from pathlib import Path
+from typing import Any
 
 import pytest
 
 from autosubmit.profiler.profiler import Profiler
-
 
 # https://github.com/BSC-ES/autosubmit/issues/1332
 

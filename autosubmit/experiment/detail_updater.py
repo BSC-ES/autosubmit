@@ -22,7 +22,7 @@ import pwd
 import sqlite3
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any
 
 from sqlalchemy import Table, delete, insert, select
 
@@ -43,7 +43,7 @@ class ExperimentDetailsRepository(ABC):
     """
 
     @abstractmethod
-    def get_details(self, exp_id: int) -> Union[Dict[str, Any], None]:
+    def get_details(self, exp_id: int) -> dict[str, Any] | None:
         """
         Get the details of an experiment by its ID.
 
@@ -195,24 +195,22 @@ class ExperimentDetailsSQLAlchemyRepository(ExperimentDetailsRepository):
     def upsert_details(
         self, exp_id: int, user: str, created: str, model: str, branch: str, hpc: str
     ):
-        with self.engine.connect() as conn:
-            with conn.begin():
-                conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
-                conn.execute(
-                    insert(self.table).values(
-                        exp_id=exp_id,
-                        user=user,
-                        created=created,
-                        model=model,
-                        branch=branch,
-                        hpc=hpc,
-                    )
+        with self.engine.connect() as conn, conn.begin():
+            conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
+            conn.execute(
+                insert(self.table).values(
+                    exp_id=exp_id,
+                    user=user,
+                    created=created,
+                    model=model,
+                    branch=branch,
+                    hpc=hpc,
                 )
+            )
 
     def delete_details(self, exp_id: int):
-        with self.engine.connect() as conn:
-            with conn.begin():
-                conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
+        with self.engine.connect() as conn, conn.begin():
+            conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
 
 
 def create_experiment_details_repository(
@@ -267,7 +265,7 @@ class ExperimentDetails:
             self.exp_id, self.user, self.created, self.model, self.branch, self.hpc
         )
     
-    def get_details(self) -> Union[Dict[str, Any], None]:
+    def get_details(self) -> dict[str, Any] | None:
         """
         Retrieve the last stored snapshot of the experiment's details
         from the database.

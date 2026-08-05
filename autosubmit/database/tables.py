@@ -17,19 +17,21 @@
 
 
 import datetime
-from typing import List, cast
 from functools import cache, cached_property
+from typing import cast
 
 from sqlalchemy import (
-    MetaData,
+    Boolean,
+    Column,
+    Float,
+    ForeignKey,
     Integer,
+    MetaData,
     String,
     Table,
     Text,
-    Float,
     UniqueConstraint,
-    Column,
-    Boolean, ForeignKey)
+)
 
 metadata_obj = MetaData()
 
@@ -330,7 +332,7 @@ def get_table_with_schema(schema: str | None, table: Table | None) -> Table:
     metadata = MetaData(schema=schema)
     dest_table = Table(table.name, metadata)
 
-    for col in cast(List, table.columns):
+    for col in cast(list, table.columns):
         dest_table.append_column(col.copy())
 
     return dest_table

@@ -17,7 +17,7 @@
 
 """Integration tests for ``HistoricalDbManager``."""
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -27,7 +27,7 @@ from autosubmit.database.db_manager_historical import HistoricalDbManager
 from autosubmit.database.tables import ExperimentRunTable, StructureDataTable
 
 # Minimal graph edges shared across tests.
-_SAMPLE_EDGES: List[Dict[str, Any]] = [
+_SAMPLE_EDGES: list[dict[str, Any]] = [
     {
         "e_from": "a001_LOCAL_SETUP",
         "e_to": "a001_REMOTE_SETUP",
@@ -333,7 +333,7 @@ def test_save_historical_edges_raises_without_run(autosubmit_exp) -> None:
 )
 def test_save_historical_edges_parametrised(
         autosubmit_exp,
-        edges: List[Dict[str, Any]],
+        edges: list[dict[str, Any]],
 ) -> None:
     """_save_historical_edges must persist exactly the provided number of edges."""
     exp = autosubmit_exp()

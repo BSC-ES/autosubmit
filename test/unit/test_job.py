@@ -21,17 +21,20 @@ import pwd
 import re
 import tempfile
 from contextlib import suppress
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
+from unittest.mock import MagicMock, Mock  # type: ignore
 
 import pytest
 from bscearth.utils.date import date2str
-from mock import MagicMock, Mock  # type: ignore
 from mock.mock import patch  # type: ignore
 
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
+from autosubmit.config.configcommon import (
+    AutosubmitConfig,
+    BasicConfig,
+    YAMLParserFactory,
+)
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
@@ -55,13 +58,13 @@ class TestJob:
         self.job_id = 999
         self.job_priority = 0
         self.as_conf = MagicMock()
-        self.as_conf.experiment_data = dict()
-        self.as_conf.experiment_data["JOBS"] = dict()
+        self.as_conf.experiment_data = {}
+        self.as_conf.experiment_data["JOBS"] = {}
         self.as_conf.jobs_data = self.as_conf.experiment_data["JOBS"]
-        self.as_conf.experiment_data["PLATFORMS"] = dict()
+        self.as_conf.experiment_data["PLATFORMS"] = {}
         self.job = Job(self.job_name, self.job_id, Status.WAITING, self.job_priority)
         self.job.processors = 2
-        self.as_conf.load_project_parameters = Mock(return_value=dict())
+        self.as_conf.load_project_parameters = Mock(return_value={})
 
     def test_when_the_job_has_more_than_one_processor_returns_the_parallel_platform(self):
         platform = Platform(self.experiment_id, 'parallel-platform', FakeBasicConfig().props())
@@ -588,7 +591,7 @@ def test_update_stat_file():
 def test_pytest_check_script(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
-    parameters = dict()
+    parameters = {}
     parameters['NUMPROC'] = 999
     parameters['NUMTHREADS'] = 777
     parameters['NUMTASK'] = 666
@@ -641,7 +644,7 @@ def test_create_script(test_tmp_path: Path, mocker) -> None:
     # arrange
     job = Job("job1", "1", Status.READY, 0)
     # arrange
-    parameters = dict()
+    parameters = {}
     parameters['NUMPROC'] = 999
     parameters['NUMTHREADS'] = 777
     parameters['NUMTASK'] = 666
@@ -996,7 +999,7 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
         }
 )], ids=["Simple job"])
 def test_no_start_time(autosubmit_config, experiment_data):
-    job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    job, as_conf, _parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
     del job.start_time
     as_conf.force_load = False
     as_conf.data_changed = False
@@ -1148,7 +1151,7 @@ def _create_relationship(parent, child):
 @pytest.fixture
 def integration_jobs():
     """The name of this function has "integration" because it was in the folder of integration tests."""
-    jobs = list()
+    jobs = []
     jobs.append(Job('whatever', 0, Status.UNKNOWN, 0))
     jobs.append(Job('whatever', 1, Status.UNKNOWN, 0))
     jobs.append(Job('whatever', 2, Status.UNKNOWN, 0))

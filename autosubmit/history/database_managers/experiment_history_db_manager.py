@@ -19,19 +19,21 @@ import os
 import textwrap
 import time
 import traceback
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Generator, Protocol, cast
+from typing import Any, Protocol, cast
 
-from sqlalchemy import and_, func, inspect, desc, insert, select, text, update
-from sqlalchemy.schema import CreateTable, CreateSchema
+from sqlalchemy import and_, desc, func, insert, inspect, select, text, update
+from sqlalchemy.schema import CreateSchema, CreateTable
 
 import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.tables import (
     ExperimentRunTable,
-    JobDataTable, TableRegistry,
+    JobDataTable,
+    TableRegistry,
 )
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
@@ -53,7 +55,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
 
     def __init__(self, expid: str, jobdata_dir_path=BasicConfig.JOBDATA_DIR):
         """ Requires expid and jobdata_dir_path. """
-        super(ExperimentHistoryDbManager, self).__init__(expid, jobdata_dir_path=jobdata_dir_path)
+        super().__init__(expid, jobdata_dir_path=jobdata_dir_path)
         self._set_schema_changes()
         self._set_table_queries()
         self.historicaldb_file_path = str(Path(jobdata_dir_path) / f"job_data_{expid}.db")
@@ -502,7 +504,7 @@ class ExperimentHistoryDbManager(DatabaseManager):
 
     def _set_historical_pragma_version(self, version=10):
         """ Sets the pragma version. """
-        statement = "pragma user_version={v:d};".format(v=version)
+        statement = f"pragma user_version={version:d};"
         self.execute_statement_on_dbfile(self.historicaldb_file_path, statement)
 
     def _get_pragma_version(self):
@@ -712,9 +714,8 @@ class SqlAlchemyExperimentHistoryDbManager:
                 metadata=experiment_run_dc.metadata
             )
         )
-        with self.engine.connect() as conn:
-            with conn.begin():
-                conn.execute(query)
+        with self.engine.connect() as conn, conn.begin():
+            conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
     def update_experiment_run_dc_by_id(self, experiment_run_dc):
@@ -736,9 +737,8 @@ class SqlAlchemyExperimentHistoryDbManager:
                 modified=HUtils.get_current_datetime()
             )
         )
-        with self.engine.connect() as conn:
-            with conn.begin():
-                conn.execute(query)
+        with self.engine.connect() as conn, conn.begin():
+            conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
     def _get_experiment_run_with_max_id(self):
@@ -924,9 +924,8 @@ class SqlAlchemyExperimentHistoryDbManager:
                 fail_count=job_data.fail_count,
             )
         )
-        with self.engine.connect() as conn:
-            with conn.begin():
-                result = conn.execute(insert_query)
+        with self.engine.connect() as conn, conn.begin():
+            result = conn.execute(insert_query)
         return result.lastrowid
 
     def update_many_job_data_change_status(self, changes):
@@ -936,19 +935,18 @@ class SqlAlchemyExperimentHistoryDbManager:
         Only updates finish, modified, status, and rowstatus by id.
         """
         job_data_table = self.table_registry.get(JobDataTable.name)
-        with self.engine.connect() as conn:
-            with conn.begin():
-                for change in changes:
-                    query = (
-                        update(job_data_table).
-                        where(job_data_table.c.id == change[3]).  # type: ignore
-                        values(
-                            modified=change[0],
-                            status=change[1],
-                            rowstatus=change[2]
-                        )
+        with self.engine.connect() as conn, conn.begin():
+            for change in changes:
+                query = (
+                    update(job_data_table).
+                    where(job_data_table.c.id == change[3]).  # type: ignore
+                    values(
+                        modified=change[0],
+                        status=change[1],
+                        rowstatus=change[2]
                     )
-                    conn.execute(query)
+                )
+                conn.execute(query)
 
     def _update_job_data_by_id(self, job_data_dc):
         job_data_table = self.table_registry.get(JobDataTable.name)
@@ -979,9 +977,8 @@ class SqlAlchemyExperimentHistoryDbManager:
                 fail_count=job_data_dc.fail_count,
             )
         )
-        with self.engine.connect() as conn:
-            with conn.begin():
-                conn.execute(query)
+        with self.engine.connect() as conn, conn.begin():
+            conn.execute(query)
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
         """Get the job data by job ID and name."""
@@ -1077,7 +1074,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             raise Exception(f"No job_data found for job_name='{job_name}'.")
         return JobData.from_model(result)
 
-    def get_job_data_max_counter(self, job_name: str = None):
+    def get_job_data_max_counter(self, job_name: str | None = None):
         """ The max counter is the maximum count value for the count column in job_data. """
         job_data_table = self.table_registry.get(JobDataTable.name)
         query = select(func.max(job_data_table.c.counter).label("maxcounter"))
@@ -1095,10 +1092,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         jobs_data_by_name = {}
         counters = {}
         for job in jobs_data:
-            if job['job_name'] not in counters:
-                counters[job['job_name']] = job['counter']
-                jobs_data_by_name[job['job_name']] = job
-            elif job['counter'] > counters[job['job_name']]:
+            if job['job_name'] not in counters or job['counter'] > counters[job['job_name']]:
                 counters[job['job_name']] = job['counter']
                 jobs_data_by_name[job['job_name']] = job
         return jobs_data_by_name
@@ -1118,7 +1112,8 @@ class SqlAlchemyExperimentHistoryDbManager:
         :yields: ``(conn, tmp)`` — the connection and the temp table expression.
         """
         # Local import avoids shadowing any `table` / `column` parameter.
-        from sqlalchemy import column as _col, table as _tbl
+        from sqlalchemy import column as _col
+        from sqlalchemy import table as _tbl
 
         table_name = f"_tmp_job_names_{time.time_ns()}"
         tmp = _tbl(table_name, _col("job_name"))

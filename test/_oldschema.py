@@ -1,4 +1,4 @@
-from sqlalchemy import Table, Column, Integer, Text, MetaData
+from sqlalchemy import Column, Integer, MetaData, Table, Text
 
 _OLD_META = MetaData()
 

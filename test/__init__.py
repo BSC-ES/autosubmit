@@ -25,7 +25,6 @@ import os
 
 import pytest
 
-
 # This might help when you have no clue about what's happening.
 # from autosubmit.log.log import Log
 # Log.set_console_level('DEBUG')

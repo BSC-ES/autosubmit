@@ -16,15 +16,15 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import pytest
+from bscearth.utils.date import date2str
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
 )
 from autosubmit.job.job_common import Status
-import pytest
-
 from autosubmit.log.log import AutosubmitCritical
-from bscearth.utils.date import date2str
 
 
 def reset(as_exp_, target="WAITING"):

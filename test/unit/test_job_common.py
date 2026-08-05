@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import pytest
 
-import autosubmit.job.job_common as job_common
+from autosubmit.job import job_common
 from autosubmit.job.job_common import Status
 
 """This test is intended to prevent wrong changes on the Status class definition."""

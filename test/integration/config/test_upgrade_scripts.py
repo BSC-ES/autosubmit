@@ -19,12 +19,12 @@
 import shutil
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from ruamel.yaml import YAML
 
-from autosubmit.config.upgrade_scripts import upgrade_scripts, ini_to_yaml
+from autosubmit.config.upgrade_scripts import ini_to_yaml, upgrade_scripts
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember

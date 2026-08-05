@@ -326,7 +326,7 @@ def test_set_file_more_than_10_files(test_tmp_path: Path, mocker):
     # TODO: This is strange too, you want to set the file, but first you must have an
     #       existing log file, with the same name, but with the date. (What about the
     #       first ever call? Chicken or egg case?)".
-    for i in range(0, 20):
+    for i in range(20):
         tmp_file_with_date = test_tmp_path / f'{i}_test.tmp'
         tmp_file_with_date.touch()
 

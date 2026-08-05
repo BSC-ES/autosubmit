@@ -26,8 +26,14 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
-from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
-    _assert_db_fields, _assert_files_recovered, run_in_thread
+from test.integration.commands.run.conftest import (
+    _assert_db_fields,
+    _assert_exit_code,
+    _assert_files_recovered,
+    _check_db_fields,
+    _check_files_recovered,
+    run_in_thread,
+)
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -176,7 +182,7 @@ def test_run_interrupted(
     as_conf.set_last_as_command('run')
 
     # Run the experiment
-    as_thread, result, stop_event = run_in_thread(
+    as_thread, _result, stop_event = run_in_thread(
         as_exp.autosubmit.run_experiment,
         expid=as_exp.expid
     )

@@ -111,10 +111,9 @@ def new_features_2024():
 def new_features_2025():
     import datetime
     import os
-    import pytz
 
-    from github import Github
-    from github import Auth
+    import pytz
+    from github import Auth, Github
 
     utc = pytz.UTC
 

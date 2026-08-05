@@ -20,7 +20,7 @@
 import textwrap
 
 
-class EcHeader(object):
+class EcHeader:
     """Class to handle the ECMWF headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal

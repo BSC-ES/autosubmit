@@ -18,9 +18,10 @@
 
 from getpass import getuser
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from bscearth.utils.date import date2str
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.job_data import JobData
@@ -29,7 +30,6 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
 )
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
-from bscearth.utils.date import date2str
 
 if TYPE_CHECKING:
     from docker.models.containers import Container

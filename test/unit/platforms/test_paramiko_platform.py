@@ -16,10 +16,11 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from collections.abc import Generator
 from getpass import getuser
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -414,9 +415,9 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
 @pytest.mark.parametrize(
     'error,must_exist,expected_error_or_return_value',
     [
-        (IOError("Garbage"), True, AutosubmitError),
-        (IOError("garbage"), True, AutosubmitError),
-        (IOError("garbage"), False, False),
+        (OSError("Garbage"), True, AutosubmitError),
+        (OSError("garbage"), True, AutosubmitError),
+        (OSError("garbage"), False, False),
         (Exception("Garbage"), True, AutosubmitError),
         (Exception("garbage"), True, AutosubmitError),
         (Exception("garbage"), False, False)

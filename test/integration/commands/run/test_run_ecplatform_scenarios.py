@@ -1,14 +1,19 @@
-from pathlib import Path
-from textwrap import dedent
 from getpass import getuser
+from pathlib import Path
+from shutil import copy
+from textwrap import dedent
 
 import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
-from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
-    _assert_db_fields, _assert_files_recovered
-from shutil import copy
+from test.integration.commands.run.conftest import (
+    _assert_db_fields,
+    _assert_exit_code,
+    _assert_files_recovered,
+    _check_db_fields,
+    _check_files_recovered,
+)
 
 """WARNING!! this test file can be only run with a valid .eccert in ~/.eccert, otherwise it will fail."""
 

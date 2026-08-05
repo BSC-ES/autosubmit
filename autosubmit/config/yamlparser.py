@@ -31,4 +31,4 @@ class YAMLParser(YAML):
 
     def __init__(self):
         self.data = []
-        super(YAMLParser, self).__init__(typ="rt")
+        super().__init__(typ="rt")

@@ -21,14 +21,14 @@ import pytest
 from sqlalchemy import MetaData
 
 from autosubmit.database.tables import (
-    get_table_with_schema,
-    get_table_from_name,
-    get_all_tables_by_name,
-    create_wrapper_tables,
-    TableRegistry,
     ExperimentTable,
     JobDataTable,
     JobsTable,
+    TableRegistry,
+    create_wrapper_tables,
+    get_all_tables_by_name,
+    get_table_from_name,
+    get_table_with_schema,
 )
 
 JobListTable = JobsTable

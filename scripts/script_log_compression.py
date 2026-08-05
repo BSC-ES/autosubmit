@@ -1,11 +1,13 @@
-import zipfile
-import matplotlib.pyplot as plt
-from autosubmit.log.log import Log
-import time
 import glob
 import os
-import zstandard as zstd
+import time
+import zipfile
+
+import matplotlib.pyplot as plt
 import numpy as np
+import zstandard as zstd
+
+from autosubmit.log.log import Log
 
 t = 3 # number of times to repeat measurement
 
@@ -49,10 +51,8 @@ for i, f in enumerate(filenames):
 
         elapsed = end_time-start_time
         time_zstd[i] += elapsed
-        if elapsed > max_zstd[i]: 
-             max_zstd[i] = elapsed
-        if elapsed < min_zstd[i]: 
-             min_zstd[i] = elapsed
+        max_zstd[i] = max(max_zstd[i], elapsed)
+        min_zstd[i] = min(min_zstd[i], elapsed)
 
         start_time = time.time()
         # xz algorithm
@@ -61,10 +61,8 @@ for i, f in enumerate(filenames):
 
         elapsed = end_time-start_time
         time_xz[i] += elapsed 
-        if elapsed > max_xz[i]: 
-             max_xz[i] = elapsed
-        if elapsed < min_xz[i]: 
-             min_xz[i] = elapsed
+        max_xz[i] = max(max_xz[i], elapsed)
+        min_xz[i] = min(min_xz[i], elapsed)
 
         start_time = time.time()
         # stdlib Python
@@ -75,10 +73,8 @@ for i, f in enumerate(filenames):
 
         elapsed = end_time-start_time
         time_zipfile[i] += elapsed
-        if elapsed > max_zipfile[i]: 
-             max_zipfile[i] = elapsed
-        if elapsed < min_zipfile[i]: 
-             min_zipfile[i] = elapsed
+        max_zipfile[i] = max(max_zipfile[i], elapsed)
+        min_zipfile[i] = min(min_zipfile[i], elapsed)
 
 
     time_xz[i] /= t

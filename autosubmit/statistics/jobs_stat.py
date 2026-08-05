@@ -68,7 +68,7 @@ def _calculate_processing_elements(nodes, processors, tasks, processors_per_node
     return int(processors)
 
 
-class JobStat(object):
+class JobStat:
     def __init__(self, name: str, processors: int, wallclock: float, section: str, date: str,
                  member: str, chunk: str, processors_per_node: str, tasks: str, nodes: str,
                  exclusive: str):

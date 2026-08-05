@@ -18,6 +18,7 @@
 
 from abc import ABCMeta, abstractmethod
 
+
 class PlatformMonitor(metaclass=ABCMeta):
   def __init__(self, platform_output):
     self.original_input = platform_output

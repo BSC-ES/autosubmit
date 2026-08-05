@@ -147,7 +147,7 @@ def test_custom_config_for(temp_folder: Path, default_yaml_file: dict[str, Any],
     as_conf.conf_folder_yaml = Path(temp_folder)
     as_conf.load_workflow_commit = MagicMock()
     as_conf.reload(True)
-    for file_name in project_yaml_files.keys():
+    for file_name in project_yaml_files:
         assert temp_folder / file_name in as_conf.current_loaded_files.keys()
     assert as_conf.experiment_data["VARX"] == expected_data["VARX"]
     assert as_conf.experiment_data["VARY"] == expected_data["VARY"]

@@ -17,8 +17,8 @@
 
 import os
 from pathlib import Path
-from mock import Mock, patch, call
 from textwrap import dedent
+from unittest.mock import Mock, call, patch
 
 import pytest
 
@@ -76,45 +76,42 @@ def test_read_loads_etc_files_with_priority(
     user_config, home_user_config, etc_rc, legacy_etc_rc
 ):
     """Test read precedence among local, home and /etc rc files."""
-    with patch.dict(os.environ, {}, clear=True):
-        with patch.object(
-            Path,
-            "exists",
-            autospec=True,
-            side_effect=lambda path_obj: (
-                (user_config and path_obj == Path(Path.cwd(), ".autosubmitrc"))
-                or (home_user_config and path_obj == Path(Path.home(), ".autosubmitrc"))
-                or (etc_rc and path_obj == Path("/etc", "autosubmitrc"))
-                or (legacy_etc_rc and path_obj == Path("/etc", ".autosubmitrc"))
-            ),
-        ):
-            with patch(
-                "autosubmit.config.basicconfig.BasicConfig._BasicConfig__read_file_config"
-            ) as mock_read:
-                with patch(
-                    "autosubmit.config.basicconfig.BasicConfig._update_config", Mock()
-                ):
-                    filename = "autosubmitrc"
-                    dot_filename = f".{filename}"
-                    user_config_path = Path(Path.cwd(), dot_filename)
-                    home_user_config_path = Path(Path.home(), dot_filename)
-                    etc_rc_path = Path("/etc", filename)
-                    legacy_etc_rc_path = Path("/etc", dot_filename)
+    with patch.dict(os.environ, {}, clear=True), patch.object(
+        Path,
+        "exists",
+        autospec=True,
+        side_effect=lambda path_obj: (
+            (user_config and path_obj == Path(Path.cwd(), ".autosubmitrc"))
+            or (home_user_config and path_obj == Path(Path.home(), ".autosubmitrc"))
+            or (etc_rc and path_obj == Path("/etc", "autosubmitrc"))
+            or (legacy_etc_rc and path_obj == Path("/etc", ".autosubmitrc"))
+        ),
+    ), patch(
+        "autosubmit.config.basicconfig.BasicConfig._BasicConfig__read_file_config"
+    ) as mock_read, patch(
+        "autosubmit.config.basicconfig.BasicConfig._update_config", Mock()
+    ):
+        filename = "autosubmitrc"
+        dot_filename = f".{filename}"
+        user_config_path = Path(Path.cwd(), dot_filename)
+        home_user_config_path = Path(Path.home(), dot_filename)
+        etc_rc_path = Path("/etc", filename)
+        legacy_etc_rc_path = Path("/etc", dot_filename)
 
-                    BasicConfig.read()
+        BasicConfig.read()
 
-                    expected_read_calls = []
-                    if user_config:
-                        expected_read_calls = [call(user_config_path)]
-                    elif home_user_config:
-                        expected_read_calls = [call(home_user_config_path)]
-                    else:
-                        if legacy_etc_rc:
-                            expected_read_calls.append(call(legacy_etc_rc_path))
-                        if etc_rc:
-                            expected_read_calls.append(call(etc_rc_path))
+        expected_read_calls = []
+        if user_config:
+            expected_read_calls = [call(user_config_path)]
+        elif home_user_config:
+            expected_read_calls = [call(home_user_config_path)]
+        else:
+            if legacy_etc_rc:
+                expected_read_calls.append(call(legacy_etc_rc_path))
+            if etc_rc:
+                expected_read_calls.append(call(etc_rc_path))
 
-                    assert mock_read.call_args_list == expected_read_calls
+        assert mock_read.call_args_list == expected_read_calls
 
 
 def test_read_overwrites_config_with_etc_files(tmp_path):

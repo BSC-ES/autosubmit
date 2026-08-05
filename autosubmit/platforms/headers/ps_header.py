@@ -20,7 +20,7 @@
 import textwrap
 
 
-class PsHeader(object):
+class PsHeader:
     """Class to handle the Ps headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal

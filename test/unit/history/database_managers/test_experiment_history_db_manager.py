@@ -18,18 +18,17 @@
 import sqlite3
 
 import pytest
-from sqlalchemy import and_, create_engine, inspect, insert, select
+from sqlalchemy import and_, create_engine, insert, inspect, select
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import JobDataTable, get_table_with_schema
-from autosubmit.history.utils import get_current_datetime
 from autosubmit.history.database_managers.experiment_history_db_manager import (
-    create_experiment_history_db_manager,
     ExperimentHistoryDbManager,
     SqlAlchemyExperimentHistoryDbManager,
+    create_experiment_history_db_manager,
 )
-
-from test._oldschema import old_job_data_table, old_experiment_run_table
+from autosubmit.history.utils import get_current_datetime
+from test._oldschema import old_experiment_run_table, old_job_data_table
 
 
 def _create_old_schema(engine):

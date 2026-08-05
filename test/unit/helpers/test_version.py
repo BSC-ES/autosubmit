@@ -17,8 +17,9 @@
 
 """Tests for the Autosubmit version retrieving function."""
 
-from autosubmit.helpers.version import get_version
 from pathlib import Path
+
+from autosubmit.helpers.version import get_version
 
 
 def test_version():

@@ -969,7 +969,7 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
 )
 def test_ecplatform_header_selected(
         scheduler: str,
-        expected: type[Union[EcCcaHeader, EcHeader, SlurmHeader, Exception]],
+        expected: type[EcCcaHeader | EcHeader | SlurmHeader | Exception],
         ec_platform: EcPlatform,
         tmp_path: Path
 ):

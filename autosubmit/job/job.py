@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from functools import reduce
 from pathlib import Path
 from threading import Thread
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from bscearth.utils.date import (
     chunk_end_date,
@@ -42,7 +42,9 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
-from autosubmit.history.database_managers.experiment_history_db_manager import get_last_run_id
+from autosubmit.history.database_managers.experiment_history_db_manager import (
+    get_last_run_id,
+)
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
 from autosubmit.job.job_utils import get_split_size, get_split_size_unit
@@ -182,7 +184,7 @@ PERSISTENT_ATTRIBUTES = (
         }
     }
 )
-class Job(object):
+class Job:
     """
     Class to handle all the tasks with Jobs at HPC.
 
@@ -193,34 +195,118 @@ class Job(object):
     """
 
     __slots__ = (
-        'rerun_only', 'delay_end', 'wrapper_type', '_wrapper_queue',
-        '_platform', '_queue', '_partition', 'retry_delay', '_section',
-        '_wallclock', 'wchunkinc', '_tasks', '_nodes',
-        '_threads', '_processors', '_memory', '_memory_per_task', '_chunk',
-        '_member', 'date', 'date_split', '_splits', '_split', '_delay',
-        '_frequency', '_synchronize', 'skippable', 'repacked', '_long_name',
-        'date_format', 'type', '_name',
-        'undefined_variables', 'log_retries', 'id',
-        'file', 'additional_files', 'executable', '_local_logs',
-        '_remote_logs', 'script_name', 'stat_file', '_status', 'prev_status',
-        'new_status', 'priority', '_parents', '_children', '_fail_count', 'expid',
-        'parameters', '_tmp_path', '_log_path', '_platform', 'check',
-        'check_warnings', '_packed', 'hold', 'distance_weight', 'level', '_export',
-        '_dependencies', 'running', 'ext_header_path', 'ext_tailer_path',
-        'total_jobs', 'max_waiting_jobs', 'exclusive', '_retrials',
-        'current_checkpoint_step', 'max_checkpoint_step', 'reservation',
-        'delete_when_edgeless', 'het', 'updated_log', 'updated_stats', 'updated', 'log_recovery_call_count',
-        'start_time', 'submit_time_timestamp', 'start_time_timestamp', 'finish_time_timestamp',
-        '_script', '_log_recovery_retries', 'ready_date', 'wrapper_name',
-        'is_wrapper', '_wallclock_in_seconds', '_notify_on', '_cpmip_thresholds', '_chunk_size', '_chunk_size_unit',
+        '_children',
+        '_chunk',
+        '_chunk_size',
+        '_chunk_size_unit',
+        '_cpmip_thresholds',
+        '_custom_directives',
+        '_delay',
+        '_delay_retrials',
+        '_dependencies',
+        '_export',
+        '_fail_count',
+        '_frequency',
+        '_hyperthreading',
+        '_local_logs',
+        '_log_path',
+        '_log_recovery_retries',
+        '_long_name',
+        '_member',
+        '_memory',
+        '_memory_per_task',
+        '_name',
+        '_nodes',
+        '_notify_on',
+        '_packed',
+        '_parents',
+        '_partition',
+        '_platform',
+        '_platform',
+        '_processors',
         '_processors_per_node',
-        'ec_queue', 'platform_name', '_serial_platform',
-        'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
-        '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        'packed_during_building', 'workflow_commit', '_validate_template', 'first_wrapped_level', 'finished_time'
+        '_queue',
+        '_remote_logs',
+        '_retrials',
+        '_scratch_free_space',
+        '_script',
+        '_section',
+        '_serial_platform',
+        '_shape',
+        '_split',
+        '_splits',
+        '_status',
+        '_synchronize',
+        '_tasks',
+        '_threads',
+        '_tmp_path',
+        '_validate_template',
+        '_wallclock',
+        '_wallclock_in_seconds',
+        '_wrapper_queue',
+        '_x11',
+        '_x11_options',
+        'additional_files',
+        'check',
+        'check_warnings',
+        'current_checkpoint_step',
+        'date',
+        'date_format',
+        'date_split',
+        'delay_end',
+        'delete_when_edgeless',
+        'distance_weight',
+        'ec_queue',
+        'exclusive',
+        'executable',
+        'expid',
+        'ext_header_path',
+        'ext_tailer_path',
+        'file',
+        'finish_time_timestamp',
+        'finished_time',
+        'first_wrapped_level',
+        'het',
+        'hold',
+        'id',
+        'is_wrapper',
+        'level',
+        'log_recovery_call_count',
+        'log_retries',
+        'max_checkpoint_step',
+        'max_waiting_jobs',
+        'new_status',
+        'packed_during_building',
+        'parameters',
+        'platform_name',
+        'prev_status',
+        'priority',
+        'ready_date',
+        'repacked',
+        'rerun_only',
+        'reservation',
+        'retry_delay',
+        'running',
+        'script_name',
+        'skippable',
+        'start_time',
+        'start_time_timestamp',
+        'stat_file',
+        'submit_time_timestamp',
+        'submitter',
+        'total_jobs',
+        'type',
+        'undefined_variables',
+        'updated',
+        'updated_log',
+        'updated_stats',
+        'wchunkinc',
+        'workflow_commit',
+        'wrapper_name',
+        'wrapper_type'
     )
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore the job state from persisted metadata.
 
         :param state: Serialized job attributes collected from storage.
@@ -306,7 +392,7 @@ class Job(object):
         self.delay_end = None
         self.wrapper_type = None
         self._wrapper_queue = None
-        self._platform: 'ParamikoPlatform' = None
+        self._platform: ParamikoPlatform = None
         self._queue = None
         self._partition = None
         self.retry_delay = None
@@ -426,7 +512,7 @@ class Job(object):
         :return: None if the job is a terminal failure, otherwise None after resetting.
         """
         if self.status == Status.FAILED and self.fail_count >= self.retrials:
-            return None
+            return
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
@@ -1428,7 +1514,7 @@ class Job(object):
                                                         show_logs=show_logs)
             err_exist = self.platform.check_file_exists(self.remote_logs[1], False, sleeptime=0, max_retries=1,
                                                         show_logs=show_logs)
-        except IOError:
+        except OSError:
             return False
         return out_exist or err_exist
 
@@ -1810,22 +1896,22 @@ class Job(object):
         if type(self.nodes) is list:
             hetsize = max(hetsize, len(self.nodes))
         self.het['HETSIZE'] = hetsize
-        self.het['PROCESSORS'] = list()
-        self.het['NODES'] = list()
-        self.het['NUMTHREADS'] = self.het['THREADS'] = list()
-        self.het['TASKS'] = list()
-        self.het['MEMORY'] = list()
-        self.het['MEMORY_PER_TASK'] = list()
-        self.het['RESERVATION'] = list()
-        self.het['EXCLUSIVE'] = list()
-        self.het['HYPERTHREADING'] = list()
-        self.het['EXECUTABLE'] = list()
-        self.het['CURRENT_QUEUE'] = list()
-        self.het['PARTITION'] = list()
-        self.het['CURRENT_PROJ'] = list()
-        self.het['CUSTOM_DIRECTIVES'] = list()
+        self.het['PROCESSORS'] = []
+        self.het['NODES'] = []
+        self.het['NUMTHREADS'] = self.het['THREADS'] = []
+        self.het['TASKS'] = []
+        self.het['MEMORY'] = []
+        self.het['MEMORY_PER_TASK'] = []
+        self.het['RESERVATION'] = []
+        self.het['EXCLUSIVE'] = []
+        self.het['HYPERTHREADING'] = []
+        self.het['EXECUTABLE'] = []
+        self.het['CURRENT_QUEUE'] = []
+        self.het['PARTITION'] = []
+        self.het['CURRENT_PROJ'] = []
+        self.het['CUSTOM_DIRECTIVES'] = []
         if type(self.processors) is list:
-            self.het['PROCESSORS'] = list()
+            self.het['PROCESSORS'] = []
             for x in self.processors:
                 self.het['PROCESSORS'].append(str(x))
             # Sum processors, each element can be a str or int
@@ -1834,7 +1920,7 @@ class Job(object):
             self.processors = str(self.processors)
         if type(self.nodes) is list:
             # add it to heap dict as it were originally
-            self.het['NODES'] = list()
+            self.het['NODES'] = []
             for x in self.nodes:
                 self.het['NODES'].append(str(x))
             # Sum nodes, each element can be a str or int
@@ -1843,7 +1929,7 @@ class Job(object):
             self.nodes = str(self.nodes)
         if type(self.threads) is list:
             # Get the max threads, each element can be a str or int
-            self.het['NUMTHREADS'] = list()
+            self.het['NUMTHREADS'] = []
             if len(self.threads) == 1:
                 if self.threads > 1:
                     for x in range(self.het['HETSIZE']):
@@ -1859,7 +1945,7 @@ class Job(object):
             self.threads = str(self.threads)
         if type(self.tasks) is list:
             # Get the max tasks, each element can be a str or int
-            self.het['TASKS'] = list()
+            self.het['TASKS'] = []
             if len(self.tasks) == 1:
                 if int(job_platform.processors_per_node) > 1 and int(self.tasks) > int(
                         job_platform.processors_per_node):
@@ -1885,7 +1971,7 @@ class Job(object):
 
         if type(self.memory) is list:
             # Get the max memory, each element can be a str or int
-            self.het['MEMORY'] = list()
+            self.het['MEMORY'] = []
             if len(self.memory) == 1:
                 for x in range(self.het['HETSIZE']):
                     self.het['MEMORY'].append(self.memory)
@@ -1897,7 +1983,7 @@ class Job(object):
             self.memory = str(self.memory)
         if type(self.memory_per_task) is list:
             # Get the max memory per task, each element can be a str or int
-            self.het['MEMORY_PER_TASK'] = list()
+            self.het['MEMORY_PER_TASK'] = []
             if len(self.memory_per_task) == 1:
                 for x in range(self.het['HETSIZE']):
                     self.het['MEMORY_PER_TASK'].append(self.memory_per_task)
@@ -1911,7 +1997,7 @@ class Job(object):
             self.memory_per_task = str(self.memory_per_task)
         if type(self.reservation) is list:
             # Get the reservation name, each element can be a str
-            self.het['RESERVATION'] = list()
+            self.het['RESERVATION'] = []
             if len(self.reservation) == 1:
                 for x in range(self.het['HETSIZE']):
                     self.het['RESERVATION'].append(self.reservation)
@@ -1924,7 +2010,7 @@ class Job(object):
                                                               str) and self.reservation.strip() else ""
         if type(self.exclusive) is list:
             # Get the exclusive, each element can be only be bool
-            self.het['EXCLUSIVE'] = list()
+            self.het['EXCLUSIVE'] = []
             if len(self.exclusive) == 1:
                 for x in range(self.het['HETSIZE']):
                     self.het['EXCLUSIVE'].append(self.exclusive)
@@ -1936,7 +2022,7 @@ class Job(object):
             self.exclusive = self.exclusive
         if type(self.hyperthreading) is list:
             # Get the hyperthreading, each element can be only be bool
-            self.het['HYPERTHREADING'] = list()
+            self.het['HYPERTHREADING'] = []
             if len(self.hyperthreading) == 1:
                 for x in range(self.het['HETSIZE']):
                     self.het['HYPERTHREADING'].append(self.hyperthreading)
@@ -1949,7 +2035,7 @@ class Job(object):
         self.executable = self.executable if self.executable else Language.get_executable(self.type)
         if type(self.queue) is list:
             # Get the queue, each element can be only be bool
-            self.het['CURRENT_QUEUE'] = list()
+            self.het['CURRENT_QUEUE'] = []
             if len(self.queue) == 1:
                 for x in range(self.het['HETSIZE']):
                     self.het['CURRENT_QUEUE'].append(self.queue)
@@ -1961,7 +2047,7 @@ class Job(object):
             self.queue = self.queue
         if type(self.partition) is list:
             # Get the partition, each element can be only be bool
-            self.het['PARTITION'] = list()
+            self.het['PARTITION'] = []
             if len(self.partition) == 1:
                 for x in range(self.het['HETSIZE']):
                     self.het['PARTITION'].append(self.partition)
@@ -1972,7 +2058,7 @@ class Job(object):
         else:
             self.partition = self.partition
 
-        self.het['CUSTOM_DIRECTIVES'] = list()
+        self.het['CUSTOM_DIRECTIVES'] = []
         if type(self.custom_directives) is list:
             self.custom_directives = json.dumps(self.custom_directives)
         self.custom_directives = self.custom_directives.replace("\'", "\"").strip("[]").strip(", ")
@@ -2015,7 +2101,7 @@ class Job(object):
                 self.het['CUSTOM_DIRECTIVES'].append(self.custom_directives)
         # Ignore the heterogeneous parameters if the cores or nodes are no specefied as a list
         if self.het['HETSIZE'] == 1:
-            self.het = dict()
+            self.het = {}
         if not self.wallclock:
             if job_platform.EXECUTION_MODE is ExecutionMode.DIRECT:
                 self.wallclock = "00:00"
@@ -2334,9 +2420,9 @@ class Job(object):
     def update_job_parameters(
             self,
             as_conf: Any,
-            parameters: Dict[str, Any],
+            parameters: dict[str, Any],
             set_attributes: bool
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Update job parameters and optionally set job attributes.
 
         :param as_conf: Autosubmit configuration object.
@@ -2456,7 +2542,7 @@ class Job(object):
                         value_list.append(v)
                 as_conf.dynamic_variables[key] = value_list
                 parameters[key] = as_conf.dynamic_variables[key]
-        as_conf.special_dynamic_variables = dict()
+        as_conf.special_dynamic_variables = {}
 
         as_conf.substitute_dynamic_variables(parameters, in_the_end=False)
 
@@ -2580,9 +2666,7 @@ class Job(object):
                 else:
                     if self.type == Language.BASH:
                         template = 'sleep 5'
-                    elif self.type == Language.PYTHON2:
-                        template = 'time.sleep(5)' + "\n"
-                    elif self.type == Language.PYTHON3 or self.type == Language.PYTHON:
+                    elif self.type == Language.PYTHON2 or self.type == Language.PYTHON3 or self.type == Language.PYTHON:
                         template = 'time.sleep(5)' + "\n"
                     elif self.type == Language.R:
                         template = 'Sys.sleep(5)'
@@ -2599,7 +2683,7 @@ class Job(object):
         return template_content, additional_content
 
     def get_wrapped_content(self, as_conf: AutosubmitConfig, parameters: dict):
-        snippet: 'TemplateSnippet' = get_template_snippet(Language.EMPTY)
+        snippet: TemplateSnippet = get_template_snippet(Language.EMPTY)
         template = f'python $SCRATCH/{self.expid}/LOG_{self.expid}/{self.name}.cmd'
         return self._get_paramiko_template(snippet, template, parameters)
 
@@ -2735,7 +2819,7 @@ class Job(object):
 
         return result.returncode == 0
 
-    def _check_is_well_formed(self, content: str, script_path: Path = None) -> None:
+    def _check_is_well_formed(self, content: str, script_path: Path | None = None) -> None:
         """Check if the script content is syntactically correct depending on the language specified.
 
         :param content: The script content to check.
@@ -2761,7 +2845,7 @@ class Job(object):
             content: str,
             parameters: dict,
             as_conf: AutosubmitConfig,
-            undefined_variables: list[str] = None
+            undefined_variables: list[str] | None = None
     ) -> str:
         """
         Replace placeholders in the template content.
@@ -2787,14 +2871,14 @@ class Job(object):
             key = placeholder[1:-1]
             value = str(parameters.get(key.upper(), ""))
             if not value:
-                content = re.sub(r'%(?<!%%)' + key + r'%(?!%%)', '', content, flags=re.I)
+                content = re.sub(r'%(?<!%%)' + key + r'%(?!%%)', '', content, flags=re.IGNORECASE)
             else:
                 if "\\" in value:
                     value = re.escape(value)
-                content = re.sub(r'%(?<!%%)' + key + r'%(?!%%)', value, content, flags=re.I)
+                content = re.sub(r'%(?<!%%)' + key + r'%(?!%%)', value, content, flags=re.IGNORECASE)
         if undefined_variables:
             for variable in undefined_variables:
-                content = re.sub(r'%(?<!%%)' + variable + r'%(?!%%)', '', content, flags=re.I)
+                content = re.sub(r'%(?<!%%)' + variable + r'%(?!%%)', '', content, flags=re.IGNORECASE)
         return content.replace("%%", "%")
 
     def _write_additional_file(self, additional_file: str, content: str, lang: str) -> None:
@@ -2832,10 +2916,10 @@ class Job(object):
         template_content = self.get_wrapped_content(as_conf, parameters)
         for key, value in parameters.items():
             template_content = re.sub(
-                '%(?<!%%)' + key + '%(?!%%)', str(parameters[key]), template_content, flags=re.I)
+                '%(?<!%%)' + key + '%(?!%%)', str(value), template_content, flags=re.IGNORECASE)
         for variable in self.undefined_variables:
             template_content = re.sub(
-                '%(?<!%%)' + variable + '%(?!%%)', '', template_content, flags=re.I)
+                '%(?<!%%)' + variable + '%(?!%%)', '', template_content, flags=re.IGNORECASE)
         template_content = template_content.replace("%%", "%")
         script_name = f'{self.name}.{wrapper_tag}.cmd'
         with open(Path(self._tmp_path) / script_name, 'w', encoding='utf-8') as f:
@@ -2867,8 +2951,7 @@ class Job(object):
             self.undefined_variables = set(variables) - set(parameters)
             if str(show_logs).lower() != "false":
                 Log.printlog("The following set of variables to be substituted in template script is not part "
-                             "of parameters set, and will be replaced by a blank value: {0}".format(
-                    self.undefined_variables), 5013)
+                             f"of parameters set, and will be replaced by a blank value: {self.undefined_variables}", 5013)
                 if not set(variables).issuperset(set(parameters)):
                     Log.printlog(
                         f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}",
@@ -2927,7 +3010,7 @@ class Job(object):
         path = Path(self._tmp_path) / f"{self.name}_TOTAL_STATS"
         if path.exists():
             text = path.read_text(encoding='utf-8')
-            lines: List[str] = text.splitlines()
+            lines: list[str] = text.splitlines()
         else:
             lines = []
 
@@ -3053,7 +3136,7 @@ class Job(object):
         if job_data_dc and type(self.platform) is not str and self.platform.TYPE is PlatformType.SLURM:
             thread_write_finish = Thread(target=ExperimentHistory(self.expid).write_platform_data_after_finish,
                                          args=(job_data_dc, self.platform))
-            thread_write_finish.name = "JOB_data_{}".format(self.name)
+            thread_write_finish.name = f"JOB_data_{self.name}"
             thread_write_finish.start()
 
     def _get_submit_data_dc_from_db(self, attempt: int):
@@ -3130,9 +3213,7 @@ class Job(object):
         :rtype bool
         """
         for parent in list(self.parents):
-            if parent.is_parent(job):
-                return True
-            elif parent.is_ancestor(job):
+            if parent.is_parent(job) or parent.is_ancestor(job):
                 return True
         return False
 
@@ -3241,7 +3322,7 @@ class WrapperJob(Job):
             job_id: int,
             status: str,
             priority: int,
-            job_list: List[Job],
+            job_list: list[Job],
             total_wallclock: str,
             num_processors: int,
             platform: 'ParamikoPlatform',
@@ -3251,18 +3332,18 @@ class WrapperJob(Job):
             method=None,
             wr_type=None
     ):
-        super(WrapperJob, self).__init__(name, job_id, status, priority)
+        super().__init__(name, job_id, status, priority)
         self.failed = False
         self.job_list = job_list
         # divide jobs in dictionary by state?
         self.wallclock = total_wallclock  # Now it is reloaded after a run -> stop -> run
         self.running_jobs_start: OrderedDict = OrderedDict()
-        self._platform: 'ParamikoPlatform' = platform
+        self._platform: ParamikoPlatform = platform
         self.num_processors = num_processors
         self.as_config = as_config
         # save start time, wallclock and processors?!
         self.checked_time = datetime.datetime.now()
-        self.inner_jobs_running: list = list()
+        self.inner_jobs_running: list = []
         self.is_wrapper = True
         self._safe_wait = 60  # seconds to wait before considering a wrapper stuck in RUNNING when all the inner jobs are finished
         self._finished_time = None

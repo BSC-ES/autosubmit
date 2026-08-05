@@ -26,9 +26,9 @@ from pytest_mock import MockerFixture
 from autosubmit.job.job import Job
 from autosubmit.job.metrics_processor import (
     MAX_FILE_SIZE_MB,
+    MetricSpec,
     MetricSpecSelector,
     MetricSpecSelectorType,
-    MetricSpec,
     UserMetricProcessor,
 )
 from autosubmit.platforms.locplatform import LocalPlatform
