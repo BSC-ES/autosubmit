@@ -23,6 +23,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from autosubmit.helpers.utils import release_memory_to_os
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.profiler import profiler as profiler_module
 
@@ -192,16 +193,11 @@ def test_generate_title_without_title():
     assert all(len(line) == 80 for line in result.splitlines())
 
 
-def test_file_name_with_expid(profiler, mocker):
-    mocker.patch(
-        "autosubmit.profiler.profiler._now",
-        return_value="20260101-120000",
-    )
-
-    assert profiler.file_name == "a000_run_profile_20260101-120000.prof"
-
-
-def test_file_name_without_expid(mocker):
+@pytest.mark.parametrize("expid, expected", [
+    pytest.param("a000", "a000_run_profile_20260101-120000.prof", id="with-expid"),
+    pytest.param(None, "run_profile_20260101-120000.prof", id="without-expid"),
+])
+def test_file_name(mocker, expid, expected):
     mocker.patch(
         "autosubmit.profiler.profiler._now",
         return_value="20260101-120000",
@@ -209,42 +205,30 @@ def test_file_name_without_expid(mocker):
 
     profiler = Profiler(
         subcommand="run",
-        expid=None,
+        expid=expid,
     )
 
-    assert profiler.file_name == "run_profile_20260101-120000.prof"
+    assert profiler.file_name == expected
 
 
-def test_report_path_with_expid(profiler):
-    """Test that the profiler report path uses the experiment directory.
+@pytest.mark.parametrize("expid", [
+    pytest.param("a000", id="with-expid"),
+    pytest.param(None, id="without-expid"),
+])
+def test_report_path(expid):
+    """Test that the profiler report path uses the experiment or global directory.
 
-    :param profiler: Profiler fixture configured with an experiment identifier.
-    :return: None.
-    :raises AssertionError: If the generated report path is incorrect.
-    """
-    # noinspection PyProtectedMember
-    expected = (
-        Path(profiler_module.BasicConfig.LOCAL_ROOT_DIR)
-        / profiler._expid  # type: ignore
-        / "tmp"
-        / "profile"
-    )
-
-    assert profiler.report_path == expected
-
-
-def test_report_path_without_expid():
-    """Test that the profiler report path uses the global profile directory.
-
-    :return: None.
     :raises AssertionError: If the generated report path is incorrect.
     """
     profiler = Profiler(
         subcommand="run",
-        expid=None,
+        expid=expid,
     )
 
-    expected = Path(profiler_module.BasicConfig.GLOBAL_LOG_DIR) / "profile"
+    if expid is None:
+        expected = Path(profiler_module.BasicConfig.GLOBAL_LOG_DIR) / "profile"
+    else:
+        expected = Path(profiler_module.BasicConfig.LOCAL_ROOT_DIR) / expid / "tmp" / "profile"
 
     assert profiler.report_path == expected
 
@@ -547,74 +531,55 @@ def test_capture_allocation_delta_returns_positive_stats(profiler):
     ]
 
 
-def test_calculate_grow(profiler):
-    profiler._mem_iteration = [100, 150, 190, 250]
-    profiler._obj_iteration = [10, 15, 20, 30]
-    profiler._fd_iteration = [3, 4, 5, 7]
-    profiler.checkpoints = 3
+@pytest.mark.parametrize(
+    "mem_iter, obj_iter, fd_iter, checkpoints, expected_mem_grow, expected_obj_grow, "
+    "expected_fd_grow, expected_mem_total, expected_obj_total, expected_fd_total",
+    [
+        pytest.param([100, 150, 190, 250], [10, 15, 20, 30], [3, 4, 5, 7], 3,
+                     [50, 40, 60], [5, 5, 10], [1, 1, 2], 150, 20, 4,
+                     id="four-iterations-three-checkpoints"),
+        pytest.param([100, 150, 190, 250, 310], [10, 15, 20, 30, 45], [3, 4, 5, 7, 9], 4,
+                     [50, 40, 60, 60], [5, 5, 10, 15], [1, 1, 2, 2], 210, 15, 2,
+                     id="five-iterations-four-checkpoints"),
+        pytest.param([100, 150, 190], [10, 15, 20], [3, 4, 5], 3,
+                     [50, 40], [5, 5], [1, 1], 90, 10, 2,
+                     id="three-iterations-three-checkpoints"),
+        pytest.param([], [], [], 0, [], [], [], 0, 0, 0, id="empty"),
+    ],
+)
+def test_calculate_grow(
+    profiler,
+    mem_iter,
+    obj_iter,
+    fd_iter,
+    checkpoints,
+    expected_mem_grow,
+    expected_obj_grow,
+    expected_fd_grow,
+    expected_mem_total,
+    expected_obj_total,
+    expected_fd_total,
+):
+    """Test per-iteration and total growth calculations.
 
-    profiler._calculate_grow()
-
-    assert profiler._mem_grow == [50, 40, 60]
-    assert profiler._obj_grow == [5, 5, 10]
-    assert profiler._fd_grow == [1, 1, 2]
-    assert profiler._mem_total_grow == 150
-    assert profiler._obj_total_grow == 20
-    assert profiler._fd_total_grow == 4
-
-
-def test_calculate_grow_after_three_checkpoints(profiler):
-    """Test that object and FD growth starts after the first three checkpoints.
+    Object and FD totals start after the first three checkpoints.
 
     :param profiler: Profiler fixture used to calculate growth metrics.
-    :return: None.
     :raises AssertionError: If growth is calculated from the wrong checkpoint.
     """
-    profiler._mem_iteration = [100, 150, 190, 250, 310]
-    profiler._obj_iteration = [10, 15, 20, 30, 45]
-    profiler._fd_iteration = [3, 4, 5, 7, 9]
-    profiler.checkpoints = 4
+    profiler._mem_iteration = mem_iter
+    profiler._obj_iteration = obj_iter
+    profiler._fd_iteration = fd_iter
+    profiler.checkpoints = checkpoints
 
     profiler._calculate_grow()
 
-    assert profiler._mem_grow == [50, 40, 60, 60]
-    assert profiler._obj_grow == [5, 5, 10, 15]
-    assert profiler._fd_grow == [1, 1, 2, 2]
-    assert profiler._mem_total_grow == 210
-    assert profiler._obj_total_grow == 15
-    assert profiler._fd_total_grow == 2
-
-
-def test_calculate_grow_with_three_checkpoints():
-    profiler = Profiler(
-        subcommand="run",
-        expid="a000",
-    )
-
-    profiler._mem_iteration = [100, 150, 190]
-    profiler._obj_iteration = [10, 15, 20]
-    profiler._fd_iteration = [3, 4, 5]
-    profiler.checkpoints = 3
-
-    profiler._calculate_grow()
-
-    assert profiler._mem_grow == [50, 40]
-    assert profiler._obj_grow == [5, 5]
-    assert profiler._fd_grow == [1, 1]
-    assert profiler._mem_total_grow == 90
-    assert profiler._obj_total_grow == 10
-    assert profiler._fd_total_grow == 2
-
-
-def test_calculate_grow_empty(profiler):
-    profiler._calculate_grow()
-
-    assert profiler._mem_grow == []
-    assert profiler._obj_grow == []
-    assert profiler._fd_grow == []
-    assert profiler._mem_total_grow == 0
-    assert profiler._obj_total_grow == 0
-    assert profiler._fd_total_grow == 0
+    assert profiler._mem_grow == expected_mem_grow
+    assert profiler._obj_grow == expected_obj_grow
+    assert profiler._fd_grow == expected_fd_grow
+    assert profiler._mem_total_grow == expected_mem_total
+    assert profiler._obj_total_grow == expected_obj_total
+    assert profiler._fd_total_grow == expected_fd_total
 
 
 def test_format_top_allocations_empty(profiler):
@@ -781,11 +746,11 @@ def test_report_includes_growth_and_converts_memory_units(
     report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
 
     assert "Memory, object and file descriptor by iteration" in report
-    assert "MEMORY GROW: 3.00 GiB." in report
+    assert "MEMORY GROWTH: 3.00 GiB." in report
     assert "INITIAL MEMORY: 2.00 GiB." in report
     assert "FINAL MEMORY: 5.00 GiB." in report
-    assert "OBJECTS GROW: 20 objects." in report
-    assert "FILE DESCRIPTORS GROW: 2 file descriptors." in report
+    assert "OBJECTS GROWTH: 20 objects." in report
+    assert "FILE DESCRIPTORS GROWTH: 2 file descriptors." in report
     assert "[fd=9] /tmp/example.txt" in report
 
 
@@ -858,7 +823,7 @@ def test_report_without_iterations(
 
     report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
 
-    assert "MEMORY GROW:" in report
+    assert "MEMORY GROWTH:" in report
     assert "INITIAL MEMORY:" in report
     assert "FINAL MEMORY:" in report
 
@@ -940,18 +905,15 @@ def test_get_current_object_count(mocker):
     objects.assert_called_once()
 
 
-def test_get_current_open_fds(mocker):
+def _patch_process_with_num_fds(mocker):
     process = mocker.patch(
         "autosubmit.profiler.profiler.Process",
     )
     process.return_value.num_fds.return_value = 42
+    return 42
 
-    assert _get_current_open_fds() == 42
 
-
-def test_get_current_open_handles_when_num_fds_unavailable(
-    mocker,
-):
+def _patch_process_with_num_handles(mocker):
     process = mocker.patch(
         "autosubmit.profiler.profiler.Process",
     )
@@ -959,13 +921,10 @@ def test_get_current_open_handles_when_num_fds_unavailable(
 
     del proc.num_fds
     proc.num_handles.return_value = 17
+    return 17
 
-    assert _get_current_open_fds() == 17
 
-
-def test_get_current_open_fds_returns_none_when_unsupported(
-    mocker,
-):
+def _patch_process_without_fd_attributes(mocker):
     process = mocker.patch(
         "autosubmit.profiler.profiler.Process",
     )
@@ -973,96 +932,77 @@ def test_get_current_open_fds_returns_none_when_unsupported(
 
     del proc.num_fds
     del proc.num_handles
+    return None
 
-    assert _get_current_open_fds() is None
+
+@pytest.mark.parametrize("setup", [
+    pytest.param(_patch_process_with_num_fds, id="num-fds"),
+    pytest.param(_patch_process_with_num_handles, id="num-handles-fallback"),
+    pytest.param(_patch_process_without_fd_attributes, id="unsupported"),
+])
+def test_get_current_open_fds(mocker, setup):
+    expected = setup(mocker)
+    assert _get_current_open_fds() == expected
 
 
-def test_get_fd_connection_map_unix_socket():
-    proc = MagicMock()
-    proc.net_connections.return_value = [
-        SimpleNamespace(
+@pytest.mark.parametrize("connections, expected", [
+    pytest.param(
+        [SimpleNamespace(
             fd=5,
             family=profiler_module._socket.AF_UNIX,
             laddr=SimpleNamespace(path="/tmp/test.sock"),
-        )
-    ]
-
-    assert _get_fd_connection_map(proc) == {
-        5: "unix-socket: /tmp/test.sock",
-    }
-
-
-def test_get_fd_connection_map_unnamed_unix_socket():
-    proc = MagicMock()
-    proc.net_connections.return_value = [
-        SimpleNamespace(
+        )],
+        {5: "unix-socket: /tmp/test.sock"},
+        id="unix-socket",
+    ),
+    pytest.param(
+        [SimpleNamespace(
             fd=5,
             family=profiler_module._socket.AF_UNIX,
             laddr=SimpleNamespace(path=""),
-        )
-    ]
-
-    assert _get_fd_connection_map(proc) == {
-        5: "unix-socket: (unnamed)",
-    }
-
-
-def test_get_fd_connection_map_inet_socket():
-    proc = MagicMock()
-    proc.net_connections.return_value = [
-        SimpleNamespace(
+        )],
+        {5: "unix-socket: (unnamed)"},
+        id="unnamed-unix-socket",
+    ),
+    pytest.param(
+        [SimpleNamespace(
             fd=7,
             family=profiler_module._socket.AF_INET,
-            laddr=SimpleNamespace(
-                ip="127.0.0.1",
-                port=1234,
-            ),
-            raddr=SimpleNamespace(
-                ip="127.0.0.1",
-                port=5678,
-            ),
+            laddr=SimpleNamespace(ip="127.0.0.1", port=1234),
+            raddr=SimpleNamespace(ip="127.0.0.1", port=5678),
             status="ESTABLISHED",
-        )
-    ]
-
-    assert _get_fd_connection_map(proc) == {
-        7: "socket: 127.0.0.1:1234 -> 127.0.0.1:5678 [ESTABLISHED]",
-    }
-
-
-def test_get_fd_connection_map_without_remote_address():
-    proc = MagicMock()
-    proc.net_connections.return_value = [
-        SimpleNamespace(
+        )],
+        {7: "socket: 127.0.0.1:1234 -> 127.0.0.1:5678 [ESTABLISHED]"},
+        id="inet-socket",
+    ),
+    pytest.param(
+        [SimpleNamespace(
             fd=7,
             family=profiler_module._socket.AF_INET,
-            laddr=SimpleNamespace(
-                ip="0.0.0.0",
-                port=8080,
-            ),
+            laddr=SimpleNamespace(ip="0.0.0.0", port=8080),
             raddr=None,
             status="LISTEN",
-        )
-    ]
-
-    assert _get_fd_connection_map(proc) == {
-        7: "socket: 0.0.0.0:8080 [LISTEN]",
-    }
-
-
-def test_get_fd_connection_map_skips_negative_fd():
-    proc = MagicMock()
-    proc.net_connections.return_value = [
-        SimpleNamespace(
+        )],
+        {7: "socket: 0.0.0.0:8080 [LISTEN]"},
+        id="without-remote-address",
+    ),
+    pytest.param(
+        [SimpleNamespace(
             fd=-1,
             family=profiler_module._socket.AF_INET,
             laddr=None,
             raddr=None,
             status="",
-        )
-    ]
+        )],
+        {},
+        id="skips-negative-fd",
+    ),
+])
+def test_get_fd_connection_map(connections, expected):
+    proc = MagicMock()
+    proc.net_connections.return_value = connections
 
-    assert _get_fd_connection_map(proc) == {}
+    assert _get_fd_connection_map(proc) == expected
 
 
 def test_get_fd_connection_map_handles_error():
@@ -1112,7 +1052,7 @@ def test_get_pipe_direction_handles_error(mocker):
     assert _get_pipe_direction(123, 4) == "unknown"
 
 
-def test_get_current_open_fds_names(mocker):
+def _patch_standard_fds(mocker):
     mocker.patch(
         "autosubmit.profiler.profiler.os.listdir",
         return_value=["0", "1", "2", "3", "4"],
@@ -1135,17 +1075,16 @@ def test_get_current_open_fds_names(mocker):
         "autosubmit.profiler.profiler._get_pipe_direction",
         return_value="read",
     )
+    return [
+        "[fd=0] stdin (/dev/stdin)",
+        "[fd=1] stdout (/dev/stdout)",
+        "[fd=2] stderr (/dev/stderr)",
+        "[fd=3] pipe (read) pipe:[12345]",
+        "[fd=4] /tmp/test.txt",
+    ]
 
-    result = _get_current_open_fds_names()
 
-    assert "[fd=0] stdin (/dev/stdin)" in result
-    assert "[fd=1] stdout (/dev/stdout)" in result
-    assert "[fd=2] stderr (/dev/stderr)" in result
-    assert "[fd=3] pipe (read) pipe:[12345]" in result
-    assert "[fd=4] /tmp/test.txt" in result
-
-
-def test_get_current_open_fds_names_uses_socket_mapping(mocker):
+def _patch_socket_mapping(mocker):
     mocker.patch(
         "autosubmit.profiler.profiler.os.listdir",
         return_value=["5"],
@@ -1160,15 +1099,12 @@ def test_get_current_open_fds_names_uses_socket_mapping(mocker):
             5: "socket: 127.0.0.1:1234 -> 127.0.0.1:5678 [ESTABLISHED]",
         },
     )
-
-    assert _get_current_open_fds_names() == [
+    return [
         "[fd=5] socket: 127.0.0.1:1234 -> 127.0.0.1:5678 [ESTABLISHED]"
     ]
 
 
-def test_get_current_open_fds_names_ignores_invalid_entries(
-    mocker,
-):
+def _patch_invalid_entries(mocker):
     mocker.patch(
         "autosubmit.profiler.profiler.os.listdir",
         return_value=["not-a-fd"],
@@ -1177,13 +1113,10 @@ def test_get_current_open_fds_names_ignores_invalid_entries(
         "autosubmit.profiler.profiler._get_fd_connection_map",
         return_value={},
     )
+    return []
 
-    assert _get_current_open_fds_names() == []
 
-
-def test_get_current_open_fds_names_handles_disappearing_fd(
-    mocker,
-):
+def _patch_disappearing_fd(mocker):
     mocker.patch(
         "autosubmit.profiler.profiler.os.listdir",
         return_value=["3"],
@@ -1196,8 +1129,18 @@ def test_get_current_open_fds_names_handles_disappearing_fd(
         "autosubmit.profiler.profiler._get_fd_connection_map",
         return_value={},
     )
+    return []
 
-    assert _get_current_open_fds_names() == []
+
+@pytest.mark.parametrize("setup", [
+    pytest.param(_patch_standard_fds, id="standard-fds"),
+    pytest.param(_patch_socket_mapping, id="socket-mapping"),
+    pytest.param(_patch_invalid_entries, id="invalid-entries"),
+    pytest.param(_patch_disappearing_fd, id="disappearing-fd"),
+])
+def test_get_current_open_fds_names(mocker, setup):
+    expected = setup(mocker)
+    assert _get_current_open_fds_names() == expected
 
 
 def test_capture_allocation_delta_collects_autosubmit_objects(
@@ -1469,11 +1412,11 @@ def test_report_includes_all_sections(
 
     # Overall growth section
     assert "Overall Memory, Object and File Descriptor Growth" in report
-    assert "MEMORY GROW: 3.00 KiB." in report
+    assert "MEMORY GROWTH: 3.00 KiB." in report
     assert "INITIAL MEMORY: 1.00 KiB." in report
     assert "FINAL MEMORY: 4.00 KiB." in report
-    assert "OBJECTS GROW: 20 objects." in report
-    assert "FILE DESCRIPTORS GROW: 2 file descriptors." in report
+    assert "OBJECTS GROWTH: 20 objects." in report
+    assert "FILE DESCRIPTORS GROWTH: 2 file descriptors." in report
 
     # Final FD section
     assert "FINAL OPEN FILE DESCRIPTORS:" in report
@@ -1482,3 +1425,9 @@ def test_report_includes_all_sections(
     # tracemalloc/object traceback section
     assert "Unique object tracebacks between iterations:" in report
     assert str(traceback) in report
+
+
+def test_release_memory_to_os_is_safe_and_idempotent():
+    # Must not raise on glibc or on platforms without malloc_trim (macOS/musl).
+    assert release_memory_to_os() is None
+    assert release_memory_to_os() is None
