@@ -156,6 +156,145 @@ $ docker run -d --name some-postgres \
     postgres 
 ```
 
+## Benchmarks
+
+Autosubmit includes a performance benchmark suite to keep track of the cost of
+`create`, `run`, `recovery` and `setstatus` for experiments of increasing size.
+The tests live in `test/integration/commands/test_performance.py` and are marked
+with `profile` (quick) and `profilelong`. They use [pytest-benchmark](https://pytest-benchmark.readthedocs.io)
+and the Autosubmit Profiler; the wall-clock time is measured by pytest-benchmark
+and the profiler metrics (memory, DB sizes, file descriptors, ...) are stored in
+each run's `extra_info`.
+
+The results are stored as pytest-benchmark JSON runs under `.benchmarks/data`
+and a comparison against the stored baseline is produced by
+`.benchmarks/compare_results.py` using the thresholds in
+`.benchmarks/thresholds.yml`. Both directories are git-ignored; the scripts are
+tracked.
+
+### How it is triggered
+
+The performance check runs **before merge** so regressions are caught in time,
+and the baseline is updated by **guarded promotion** (a run that regresses is
+never promoted).
+
+* **PR gate (required status check)**: the `metrics` workflow runs on every
+  pull request. It is a cheap no-op unless the PR carries the `perf-benchmark`
+  label, in which case it runs the full suite (`profilelong`) against the
+  baseline and the merge button stays disabled until the benchmark completes.
+  While the label is on, every push triggers a full run and the `benchmark`
+  concurrency group serializes them, so remove the label once the check passes.
+  Add the label to PRs that may affect runtime performance (requires write/triage
+  access; if you cannot add labels, say so in the PR description so a maintainer
+  can). See the PR template and the "Set up the merge gate" note below.
+* **Manually**: a member of the `BSC-ES/autosubmit` team (or a user listed as
+  `@username` in this repository's `.benchmarks/allowed-users.txt` on the default branch)
+  comments on a PR:
+  * `/metrics` — quick suite
+  * `/metrics_full` — full suite
+  * `/metrics_promote` — promote the last completed run as the new baseline. Run `/metrics` (or `/metrics_full`) first, then `/metrics_promote`
+    to re-baseline that result. The run being promoted must match the current PR
+    head: if you pushed after the last benchmark, re-run `/metrics` (or
+    `/metrics_full`) first.
+
+
+The PR results are posted as a comment comparing them against the baseline,
+flagging regressions beyond the configured thresholds as warnings. Only the
+plots are visible at first glance; the regressions and scenario tables are
+collapsed in a `<details>` block. Two comparison plots are stored on the
+`benchmark-reference` branch and linked from the comment (GitHub strips `data:`
+image URIs, so plots are not embedded inline): one for the `run`
+scenarios (which carry the profiler growth metrics) and one for
+`create`/`recovery`/`setstatus`. The comment also links the run's artifacts for
+direct download (raw benchmark data and the report with markdown, plots and
+JSON). Only the latest plots are kept.
+
+### The baselines
+
+The baselines live on the `benchmark-reference` branch (`.benchmarks/reference`),
+and every promotion is a commit, so its history is preserved.
+
+Baselines are stored **per CPU model**:
+`.benchmarks/reference/<cpu-slug>/` where the slug derives from the runner's
+CPU (`machine_info.cpu.brand_raw`, e.g. `intel-r-xeon-r-platinum-8370c-cpu-2-80ghz`).
+GitHub-hosted runners do not guarantee a fixed CPU, so a run is only compared against the baseline of the same CPU;
+results across different CPUs are not comparable. Baselines fill lazily: the
+first run on a given CPU establishes that CPU's baseline (reported as "no
+baseline yet"), and later runs on the same CPU are compared against it.
+
+To restore a previous baseline after a bad merge:
+
+```bash
+git fetch origin benchmark-reference
+git checkout <previous-baseline-sha> -- .benchmarks/reference
+git commit -m "Restore baseline before merge <merge-sha>"
+git push origin HEAD:benchmark-reference
+```
+
+### Set up the merge gate
+
+1. Create the `perf-benchmark` label (Settings > Labels).
+2. In branch protection for the default branch, enable **Require status
+   checks** and select **`performance-benchmark`** (the job name in
+   `.github/workflows/metrics.yaml`).
+
+### Running the benchmarks locally
+
+Install the benchmark dependencies and run the suite (Docker and a Slurm
+container are required for the `run`, `recovery` and `setstatus` scenarios; the
+`create` scenarios can run without them):
+
+```bash
+$ pip install -e .[all]
+$ pytest -m profile -n 0 --benchmark-save=mylabel \
+    test/integration/commands/test_performance.py
+```
+
+> NOTE: run the suite with `-n 0`. pytest-benchmark cannot save runs under
+> `pytest-xdist` parallelism.
+
+To compare two runs (e.g. a local baseline against a newer run) and generate the
+markdown report and plot:
+
+```bash
+$ python .benchmarks/compare_results.py \
+    --current .benchmarks/data/current.json \
+    --previous .benchmarks/data/baseline.json \
+    --thresholds .benchmarks/thresholds.yml \
+    --version "$(cat VERSION)" \
+    --output-dir .benchmarks/artifacts
+```
+
+The report is written to `.benchmarks/artifacts/summary_<version>.md` and the
+two grid plots (one per scenario group, `run` and
+`create`/`recovery`/`setstatus`) to `summary_<version>_run.png` and
+`summary_<version>_create_recovery_setstatus.png`. Cells are colored red/blue by
+change direction (with a neutral dead zone for |delta| below
+`plot.delta_tolerance`, configurable in `.benchmarks/thresholds.yml`) and
+annotated with the current value; within each group rows are ordered from
+fastest to slowest. Without a baseline, cells are neutral and only show the
+values.
+
+### Adding scenarios or metrics
+
+New parametrizations of an existing command (`create`, `run`, `recovery`,
+`setstatus`) are picked up automatically: they appear as a new row in the
+corresponding plot, ordered by time within their group.
+
+A new **test type** (e.g. a new command being benchmarked) or a new **metric**
+needs a small change in `.benchmarks/compare_results.py`:
+
+* **Test type**: add it to `_RUN_TEST_TYPES` (carries the profiler growth
+  metrics) or `_OTHER_TEST_TYPES` (time/memory/DB metrics), or add a new plot
+  entry in `render_heatmaps()`. If the new type should not carry the growth
+  metrics (`FD GROWTH`, `MEM GROWTH`, `OBJ GROWTH`), also add it to
+  `_NO_GROW_TEST_TYPES`.
+* **Metric**: add it to `METRIC_COLUMNS` so `build_frame()` stores it (and it
+  shows up in the markdown tables), then to the matching plot metric list
+  (`_RUN_PLOT_METRICS` or `_OTHER_PLOT_METRICS`) so the plot renders it. The
+  test must write it into `benchmark.extra_info` (see
+  `_collect_profiler_metrics` in `test/integration/commands/test_performance.py`).
+
 ## Test GitHub Actions locally
 
 Prerequisites: `docker`, `act` and a GitHub token.
@@ -181,7 +320,8 @@ Then you can run `act` with:
 ```bash
 $ act -j metrics -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest -e event.json -s GITHUB_TOKEN="$GITHUB_TOKEN" --artifact-server-path /tmp/artifacts
 ```
-replace `metrics_markdown` with the name of the job you want to run
+replace `metrics` with the name of the job you want to run (`authorize`,
+`metrics`, `report`, `update-baseline`).
 
 For debugging purposes, you can also enter the container where the job is
 being executed with:

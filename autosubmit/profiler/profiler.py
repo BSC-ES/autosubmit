@@ -32,6 +32,7 @@ from pstats import SortKey
 from psutil import Process
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.helpers.utils import release_memory_to_os
 from autosubmit.log.log import AutosubmitCritical, Log
 
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
@@ -147,8 +148,7 @@ class Profiler:
             )
 
         self._profiler.enable()
-
-        gc.collect()
+        release_memory_to_os()
         self._mem_init = _get_current_memory()
 
         if self._trace_enabled and not tracemalloc.is_tracing():
@@ -165,7 +165,7 @@ class Profiler:
         :param loaded_edges: The number of edges loaded in the current iteration.
         :return: True if the maximum number of checkpoints has been reached, False otherwise.
         """
-        gc.collect()
+        release_memory_to_os()
 
         self._mem_iteration.append(_get_current_memory())
         self._obj_iteration.append(_get_current_object_count())
@@ -253,7 +253,7 @@ class Profiler:
             fd_names = self._fd_names_iteration[i]
 
             mem_unit = 0
-            while mem >= 1024 and mem_unit <= len(_UNITS):
+            while mem >= 1024 and mem_unit < len(_UNITS):
                 mem_unit += 1
                 mem /= 1024
             current_iter = f"Iteration {i + 1}:"
@@ -390,36 +390,31 @@ class Profiler:
                 report += self._report_grow()
             report += "\n" + _generate_title("Overall Memory, Object and File Descriptor Growth") + "\n"
 
-            mem_total: float = self._mem_final - self._mem_init  # memory in Bytes
-            absolute_mem_total = abs(mem_total)
-            mem_init = self._mem_init
-            mem_final = self._mem_final
-            unit = 0
-            # reduces the value to its most suitable unit
-            while absolute_mem_total >= 1024 and unit <= len(_UNITS):
-                unit += 1
-                absolute_mem_total /= 1024
-                mem_total /= 1024
-            unit = 0
-            while mem_init >= 1024 and unit <= len(_UNITS):
-                unit += 1
-                mem_init /= 1024
-            unit = 0
-            while mem_final >= 1024 and unit <= len(_UNITS):
-                unit += 1
-                mem_final /= 1024
-            report += f"\nMEMORY GROW: {mem_total:.2f} {_UNITS[unit]}."
-            report += f"\nINITIAL MEMORY: {mem_init:.2f} {_UNITS[unit]}."
-            report += f"\nFINAL MEMORY: {mem_final:.2f} {_UNITS[unit]}."
+            def _to_units(value: float) -> tuple[float, str]:
+                abs_v = abs(value)
+                u = 0
+                while abs_v >= 1024 and u < len(_UNITS):
+                    abs_v /= 1024
+                    value /= 1024
+                    u += 1
+                return value, _UNITS[u]
+
+            growth_val, growth_unit = _to_units(self._mem_final - self._mem_init)
+            init_val, init_unit = _to_units(self._mem_init)
+            final_val, final_unit = _to_units(self._mem_final)
+            report += f"\nMEMORY GROWTH: {growth_val:.2f} {growth_unit}."
+            report += f"\nINITIAL MEMORY: {init_val:.2f} {init_unit}."
+            report += f"\nFINAL MEMORY: {final_val:.2f} {final_unit}."
             if self._obj_grow and self._fd_grow:
-                report += f"\nOBJECTS GROW: {self._obj_total_grow} objects."
-                report += f"\nFILE DESCRIPTORS GROW: {self._fd_total_grow} file descriptors.\n"
+                report += f"\nOBJECTS GROWTH: {self._obj_total_grow} objects."
+                report += f"\nFILE DESCRIPTORS GROWTH: {self._fd_total_grow} file descriptors.\n"
 
             # final list of fds opened.
             fd_names = _get_current_open_fds_names()
             report += "\nFINAL OPEN FILE DESCRIPTORS:\n"
             for fd in fd_names:
                 report += f"  {fd}\n"
+
 
             if self._trace_enabled:
                 report += "\n\nUnique object tracebacks between iterations:\n"

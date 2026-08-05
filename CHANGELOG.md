@@ -11,6 +11,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Remove the unrelated `--filter_status` option from `autosubmit expid` #3241
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
+- Fixed the Profiler reporting `MEMORY GROWTH` with the wrong unit when the growth was small relative to the final memory (e.g. ~0.5 MiB shown as 527 "MiB"). #3162
 
 **New Features:**
 
@@ -20,8 +21,9 @@ several bug fixes and enhancements to improve the overall user experience.
 - [enhancement] Allow recovery to update current running/ready jobs #1251
 - `autosubmit` Bash autocomplete #1227 #3171
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
+- Introduced a performance benchmark suite and a `metrics` workflow that profiles `create`, `run`, `recovery` and `setstatus`, compares each run against a per-CPU baseline stored on the `benchmark-reference` branch, and posts a regression report (tables, heatmap plots and artifact download links) on PRs labeled `perf-benchmark`. Maintainers can also trigger it manually with `/metrics`, `/metrics_full` and `/metrics_promote`. #2696 #3162
 
-**Migration from `job_list.pkl` to Database**
+**Migration from `job_list.pkl` to Database** 
 
 - All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted in significant changes to the code.
 

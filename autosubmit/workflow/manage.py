@@ -43,6 +43,7 @@ from autosubmit.experiment.manage import (
 )
 from autosubmit.experiment.utils import print_job_details
 from autosubmit.git.autosubmit_git import check_unpushed_changes
+from autosubmit.helpers.utils import release_memory_to_os
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
 )
@@ -691,6 +692,10 @@ def run(
         job_list.recover_logs(from_db=True)
         job_list.reset_updated_logs()
         job_list.load_wrappers()
+        # Compact the heap before entering the run loop: prepare_run
+        # and the setup above loaded config, job_list, wrappers and
+        # platforms into memory.
+        release_memory_to_os()
         while job_list.continue_run():
             try:
                 if profiler is not None:
