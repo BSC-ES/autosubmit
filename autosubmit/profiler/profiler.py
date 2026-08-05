@@ -327,27 +327,21 @@ class Profiler:
             report += self._report_grow()
         report += "\n" + _generate_title("Overall Memory, Object and File Descriptor Growth") + "\n"
 
-        mem_total: float = self._mem_final - self._mem_init  # memory in Bytes
-        absolute_mem_total = abs(mem_total)
-        mem_init = self._mem_init
-        mem_final = self._mem_final
-        unit = 0
-        # reduces the value to its most suitable unit
-        while absolute_mem_total >= 1024 and unit <= len(_UNITS):
-            unit += 1
-            absolute_mem_total /= 1024
-            mem_total /= 1024
-        unit = 0
-        while mem_init >= 1024 and unit <= len(_UNITS):
-            unit += 1
-            mem_init /= 1024
-        unit = 0
-        while mem_final >= 1024 and unit <= len(_UNITS):
-            unit += 1
-            mem_final /= 1024
-        report += f"\nMEMORY GROW: {mem_total:.2f} {_UNITS[unit]}."
-        report += f"\nINITIAL MEMORY: {mem_init:.2f} {_UNITS[unit]}."
-        report += f"\nFINAL MEMORY: {mem_final:.2f} {_UNITS[unit]}."
+        def _to_units(value: float) -> tuple[float, str]:
+            abs_v = abs(value)
+            u = 0
+            while abs_v >= 1024 and u < len(_UNITS):
+                abs_v /= 1024
+                value /= 1024
+                u += 1
+            return value, _UNITS[u]
+
+        grow_val, grow_unit = _to_units(self._mem_final - self._mem_init)
+        init_val, init_unit = _to_units(self._mem_init)
+        final_val, final_unit = _to_units(self._mem_final)
+        report += f"\nMEMORY GROW: {grow_val:.2f} {grow_unit}."
+        report += f"\nINITIAL MEMORY: {init_val:.2f} {init_unit}."
+        report += f"\nFINAL MEMORY: {final_val:.2f} {final_unit}."
         if self._obj_grow and self._fd_grow:
             report += f"\nOBJECTS GROW: {self._obj_total_grow} objects."
             report += f"\nFILE DESCRIPTORS GROW: {self._fd_total_grow} file descriptors.\n"
