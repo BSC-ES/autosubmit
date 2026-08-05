@@ -18,7 +18,7 @@
 """Test for the ``autosubmit stats`` command."""
 
 from pathlib import Path
-from time import time, sleep
+from time import sleep, time
 
 from psutil import Process
 

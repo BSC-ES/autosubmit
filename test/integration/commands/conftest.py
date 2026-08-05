@@ -17,7 +17,7 @@
 
 from getpass import getuser
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 import pytest
 
@@ -133,7 +133,7 @@ def general_data(tmp_path: Path) -> dict[str, Any]:
 
 
 @pytest.fixture(scope="function")
-def experiment_data(tmp_path: Path) -> Dict[str, object]:
+def experiment_data(tmp_path: Path) -> dict[str, object]:
     """
     Provide part of the `experiment_data` dictionary used by the
     integration tests in `commands`.
@@ -157,7 +157,7 @@ def experiment_data(tmp_path: Path) -> Dict[str, object]:
 
 
 @pytest.fixture(scope="function")
-def jobs_data(tmp_path: Path) -> Dict[str, object]:
+def jobs_data(tmp_path: Path) -> dict[str, object]:
     """
     Provide a representative `jobs` dictionary used by the
     integration tests in `commands`.
@@ -221,7 +221,7 @@ def jobs_data(tmp_path: Path) -> Dict[str, object]:
     }
 
 
-def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> Dict[str, Any]:
+def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> dict[str, Any]:
     """Provides a `jobs_data` dictionary with wrapped jobs used by the
     integration tests in `commands`.
 

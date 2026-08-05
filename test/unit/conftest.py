@@ -17,12 +17,13 @@
 
 """Fixtures for unit tests."""
 
+from collections.abc import Callable
 from datetime import datetime
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from random import seed, randint, choice
+from random import choice, randint, seed
 from time import time
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 import pytest
 
@@ -33,7 +34,6 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.pbsplatform import PBSPlatform
@@ -74,7 +74,7 @@ def autosubmit_config(
 
     def _create_autosubmit_config(
             expid: str,
-            experiment_data: dict = None,
+            experiment_data: dict | None = None,
             include_basic_config: bool = True,
             *_,
             **kwargs

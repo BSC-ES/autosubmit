@@ -16,9 +16,10 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import collections
-import pytest
 import textwrap
 from math import ceil
+
+import pytest
 
 from autosubmit.platforms.wrappers.wrapper_builder import PythonWrapperBuilder
 
@@ -29,7 +30,7 @@ def job_scripts():
 
 
 def _create_nodelist(num_cores):
-    num_nodes = int(ceil(num_cores / float(48)))
+    num_nodes = ceil(num_cores / float(48))
 
     node_list = []
 
@@ -53,7 +54,7 @@ def test_job_less_than_48_cores_standard(job_scripts):
     cores_list = wrapper_builder.build_cores_list()
     machinefiles_code = wrapper_builder.get_machinefile_function().replace("_NEWLINE_", '\\n')
 
-    result = dict()
+    result = {}
 
     script = textwrap.dedent("""
     from math import ceil
@@ -70,7 +71,7 @@ def test_job_less_than_48_cores_standard(job_scripts):
     exec(script, result)
 
     machinefiles_dict = result["machinefiles_dict"]
-    all_machines = list()
+    all_machines = []
     for job, machines in machinefiles_dict.items():
         machines = machines.split("\n")[:-1]
         job_section = job.split("_")[0]
@@ -98,7 +99,7 @@ def test_job_more_than_48_cores_standard(job_scripts):
     cores_list = wrapper_builder.build_cores_list()
     machinefiles_code = wrapper_builder.get_machinefile_function().replace("_NEWLINE_", '\\n')
 
-    result = dict()
+    result = {}
 
     script = textwrap.dedent("""
     from math import ceil

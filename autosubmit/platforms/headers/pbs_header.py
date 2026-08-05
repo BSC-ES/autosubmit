@@ -20,7 +20,7 @@
 import textwrap
 
 
-class PBSHeader(object):
+class PBSHeader:
     """Class to handle the PBS headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal

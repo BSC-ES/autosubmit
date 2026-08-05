@@ -83,7 +83,7 @@ class CPMIPMetrics:
 
     @staticmethod
     def _validate_positive(
-        value: Union[int, float],
+        value: float,
         var_name: str,
         error_message: str | None = None,
         allow_zero: bool = False,

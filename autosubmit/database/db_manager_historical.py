@@ -18,6 +18,7 @@
 """Contains code to manage a database via SQLAlchemy."""
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.db_manager import DbManager
 

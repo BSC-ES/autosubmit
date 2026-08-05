@@ -18,13 +18,16 @@
 """Integration tests for the experiment status DB managers."""
 
 from pathlib import Path
-from typing import cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from sqlalchemy import inspect
 
 from autosubmit.database.tables import ExperimentStatusTable
-from autosubmit.history.database_managers.database_models import ExperimentRow, ExperimentStatusRow
+from autosubmit.history.database_managers.database_models import (
+    ExperimentRow,
+    ExperimentStatusRow,
+)
 from autosubmit.history.database_managers.experiment_status_db_manager import (
     ExperimentStatusDbManager,
     SqlAlchemyExperimentStatusDbManager,

@@ -17,9 +17,9 @@
 
 import math
 from datetime import datetime
+from unittest.mock import Mock
 
 import pytest
-from mock import Mock
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
@@ -188,8 +188,8 @@ def test_create_job_creates_a_job_with_right_parameters(mocker, dictionary):
     chunk = 'ch0'
     # arrange
 
-    dictionary.experiment_data = dict()
-    dictionary.experiment_data["DEFAULT"] = dict()
+    dictionary.experiment_data = {}
+    dictionary.experiment_data["DEFAULT"] = {}
     dictionary.experiment_data["DEFAULT"]["EXPID"] = "random-id"
     dictionary.experiment_data["JOBS"] = {}
     dictionary.experiment_data["PLATFORMS"] = {}
@@ -292,8 +292,8 @@ def test_get_jobs_calls_get_date_with_given_date(mocker, dictionary):
     returned_jobs = dictionary.get_jobs(section, date, member, chunk)
 
     # arrange
-    assert list() == returned_jobs
-    dictionary._get_date.assert_called_once_with(list(), dic, date, member, chunk)
+    assert [] == returned_jobs
+    dictionary._get_date.assert_called_once_with([], dic, date, member, chunk)
 
 
 def test_get_jobs_calls_get_date_for_all_its_dates(mocker, dictionary):
@@ -309,10 +309,10 @@ def test_get_jobs_calls_get_date_for_all_its_dates(mocker, dictionary):
     returned_jobs = dictionary.get_jobs(section, member=member, chunk=chunk)
 
     # arrange
-    assert list() == returned_jobs
+    assert [] == returned_jobs
     assert len(dictionary._date_list) == dictionary._get_date.call_count
     for date in dictionary._date_list:
-        dictionary._get_date.assert_any_call(list(), dic, date, member, chunk)
+        dictionary._get_date.assert_any_call([], dic, date, member, chunk)
 
 
 def test_create_jobs_split(mocker, dictionary):

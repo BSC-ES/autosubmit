@@ -81,7 +81,7 @@ def job_list(autosubmit_config, tmp_path):
 
 
 def test_grouping_date(job_list):
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1': Status.WAITING, 'd2': Status.WAITING}
     groups_dict['jobs'] = {
         'expid_d1_m1_INI': ['d1'], 'expid_d1_m2_INI': ['d1'], 'expid_d2_m1_INI': ['d2'], 'expid_d2_m2_INI': ['d2'],
@@ -115,12 +115,12 @@ def test_grouping_date(job_list):
 
     subgraph = graph.obj_dict['subgraphs']['Experiment'][0]
 
-    assert sorted(list(subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(subgraph['edges'].keys()) == sorted(edges)
 
 
 def test_grouping_member(job_list):
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1_m1': Status.WAITING,
                              'd1_m2': Status.WAITING,
                              'd2_m1': Status.WAITING,
@@ -163,12 +163,12 @@ def test_grouping_member(job_list):
 
     subgraph = graph.obj_dict['subgraphs']['Experiment'][0]
 
-    assert sorted(list(subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(subgraph['edges'].keys()) == sorted(edges)
 
 
 def test_grouping_chunk(job_list):
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1_m1_1': Status.WAITING, 'd1_m1_2': Status.WAITING,
                              'd1_m2_1': Status.WAITING, 'd1_m2_2': Status.WAITING,
                              'd2_m1_1': Status.WAITING, 'd2_m1_2': Status.WAITING,
@@ -211,12 +211,12 @@ def test_grouping_chunk(job_list):
 
     subgraph = graph.obj_dict['subgraphs']['Experiment'][0]
 
-    assert sorted(list(subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(subgraph['edges'].keys()) == sorted(edges)
 
 
 def test_grouping_automatic_hide(job_list):
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1_m1_1': Status.WAITING, 'd1_m1_2': Status.WAITING,
                              'd1_m2_1': Status.WAITING, 'd1_m2_2': Status.WAITING,
                              'd2_m1_1': Status.WAITING, 'd2_m1_2': Status.WAITING,
@@ -254,8 +254,8 @@ def test_grouping_automatic_hide(job_list):
 
     subgraph = graph.obj_dict['subgraphs']['Experiment'][0]
 
-    assert sorted(list(subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(subgraph['edges'].keys()) == sorted(edges)
 
 
 def test_synchronize_member(job_list):
@@ -325,14 +325,14 @@ def test_synchronize_member(job_list):
     ]
 
     monitor = Monitor()
-    graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), None, dict())
+    graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), None, {})
 
     assert not graph.obj_dict['strict']
 
     subgraph = graph.obj_dict['subgraphs']['Experiment'][0]
 
-    assert sorted(list(subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(subgraph['edges'].keys()) == sorted(edges)
 
 
 def test_synchronize_date(job_list):
@@ -402,14 +402,14 @@ def test_synchronize_date(job_list):
     ]
 
     monitor = Monitor()
-    graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), None, dict())
+    graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), None, {})
 
     assert not graph.obj_dict['strict']
 
     subgraph = graph.obj_dict['subgraphs']['Experiment'][0]
 
-    assert sorted(list(subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(subgraph['edges'].keys()) == sorted(edges)
 
 
 @pytest.fixture()
@@ -524,7 +524,7 @@ def setup_wrappers(job_list, autosubmit_config):
 def test_wrapper_package(setup_wrappers, autosubmit_config):
     _, _, job_list, packages = setup_wrappers
     monitor = Monitor()
-    graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), packages, dict())
+    graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), packages, {})
     assert not graph.obj_dict['strict']
     for wrapper_job in packages:
         assert 'cluster_' + wrapper_job.name in graph.obj_dict['subgraphs']
@@ -559,7 +559,7 @@ def test_synchronize_member_group_member(job_list):
 
             job_list.add_job(job)
 
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1_m1': Status.WAITING,
                              'd1_m2': Status.WAITING,
                              'd2_m1': Status.WAITING,
@@ -606,16 +606,16 @@ def test_synchronize_member_group_member(job_list):
     subgraphs = graph.obj_dict['subgraphs']
     experiment_subgraph = subgraphs['Experiment'][0]
 
-    assert sorted(list(experiment_subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(experiment_subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(experiment_subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(experiment_subgraph['edges'].keys()) == sorted(edges)
 
     subgraph_synchronize_d1 = graph.obj_dict['subgraphs']['cluster_d1_m1_d1_m2'][0]
-    assert sorted(list(subgraph_synchronize_d1['nodes'].keys())) == sorted(['d1_m1', 'd1_m2'])
-    assert sorted(list(subgraph_synchronize_d1['edges'].keys())) == sorted([('d1_m1', 'd1_m2')])
+    assert sorted(subgraph_synchronize_d1['nodes'].keys()) == sorted(['d1_m1', 'd1_m2'])
+    assert sorted(subgraph_synchronize_d1['edges'].keys()) == sorted([('d1_m1', 'd1_m2')])
 
     subgraph_synchronize_d2 = graph.obj_dict['subgraphs']['cluster_d2_m1_d2_m2'][0]
-    assert sorted(list(subgraph_synchronize_d2['nodes'].keys())) == sorted(['d2_m1', 'd2_m2'])
-    assert sorted(list(subgraph_synchronize_d2['edges'].keys())) == sorted([('d2_m1', 'd2_m2')])
+    assert sorted(subgraph_synchronize_d2['nodes'].keys()) == sorted(['d2_m1', 'd2_m2'])
+    assert sorted(subgraph_synchronize_d2['edges'].keys()) == sorted([('d2_m1', 'd2_m2')])
 
 
 def test_synchronize_member_group_chunk(job_list):
@@ -628,7 +628,7 @@ def test_synchronize_member_group_chunk(job_list):
                     job_list.get_job_by_name('expid_' + date + '_' + member + '_' + str(chunk) + '_SIM'))
             job_list.add_job(job)
 
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1_m1_1': Status.WAITING, 'd1_m1_2': Status.WAITING,
                              'd1_m2_1': Status.WAITING, 'd1_m2_2': Status.WAITING,
                              'd2_m1_1': Status.WAITING, 'd2_m1_2': Status.WAITING,
@@ -675,24 +675,24 @@ def test_synchronize_member_group_chunk(job_list):
     subgraphs = graph.obj_dict['subgraphs']
     experiment_subgraph = subgraphs['Experiment'][0]
 
-    assert sorted(list(experiment_subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(experiment_subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(experiment_subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(experiment_subgraph['edges'].keys()) == sorted(edges)
 
     subgraph_synchronize_d1_1 = graph.obj_dict['subgraphs']['cluster_d1_m1_1_d1_m2_1'][0]
-    assert sorted(list(subgraph_synchronize_d1_1['nodes'].keys())) == sorted(['d1_m1_1', 'd1_m2_1'])
-    assert sorted(list(subgraph_synchronize_d1_1['edges'].keys())) == sorted([('d1_m1_1', 'd1_m2_1')])
+    assert sorted(subgraph_synchronize_d1_1['nodes'].keys()) == sorted(['d1_m1_1', 'd1_m2_1'])
+    assert sorted(subgraph_synchronize_d1_1['edges'].keys()) == sorted([('d1_m1_1', 'd1_m2_1')])
 
     subgraph_synchronize_d1_2 = graph.obj_dict['subgraphs']['cluster_d1_m1_2_d1_m2_2'][0]
-    assert sorted(list(subgraph_synchronize_d1_2['nodes'].keys())) == sorted(['d1_m1_2', 'd1_m2_2'])
-    assert sorted(list(subgraph_synchronize_d1_2['edges'].keys())) == sorted([('d1_m1_2', 'd1_m2_2')])
+    assert sorted(subgraph_synchronize_d1_2['nodes'].keys()) == sorted(['d1_m1_2', 'd1_m2_2'])
+    assert sorted(subgraph_synchronize_d1_2['edges'].keys()) == sorted([('d1_m1_2', 'd1_m2_2')])
 
     subgraph_synchronize_d2_1 = graph.obj_dict['subgraphs']['cluster_d2_m1_1_d2_m2_1'][0]
-    assert sorted(list(subgraph_synchronize_d2_1['nodes'].keys())) == sorted(['d2_m1_1', 'd2_m2_1'])
-    assert sorted(list(subgraph_synchronize_d2_1['edges'].keys())) == sorted([('d2_m1_1', 'd2_m2_1')])
+    assert sorted(subgraph_synchronize_d2_1['nodes'].keys()) == sorted(['d2_m1_1', 'd2_m2_1'])
+    assert sorted(subgraph_synchronize_d2_1['edges'].keys()) == sorted([('d2_m1_1', 'd2_m2_1')])
 
     subgraph_synchronize_d2_2 = graph.obj_dict['subgraphs']['cluster_d2_m1_2_d2_m2_2'][0]
-    assert sorted(list(subgraph_synchronize_d2_2['nodes'].keys())) == sorted(['d2_m1_2', 'd2_m2_2'])
-    assert sorted(list(subgraph_synchronize_d2_2['edges'].keys())) == sorted([('d2_m1_2', 'd2_m2_2')])
+    assert sorted(subgraph_synchronize_d2_2['nodes'].keys()) == sorted(['d2_m1_2', 'd2_m2_2'])
+    assert sorted(subgraph_synchronize_d2_2['edges'].keys()) == sorted([('d2_m1_2', 'd2_m2_2')])
 
 
 def test_synchronize_member_group_date(job_list):
@@ -706,7 +706,7 @@ def test_synchronize_member_group_date(job_list):
 
             job_list.add_job(job)
 
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1': Status.WAITING,
                              'd2': Status.WAITING}
     groups_dict['jobs'] = {
@@ -749,8 +749,8 @@ def test_synchronize_member_group_date(job_list):
     subgraphs = graph.obj_dict['subgraphs']
     experiment_subgraph = subgraphs['Experiment'][0]
 
-    assert sorted(list(experiment_subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(experiment_subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(experiment_subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(experiment_subgraph['edges'].keys()) == sorted(edges)
 
     for subgraph in list(subgraphs.keys()):
         assert not subgraph.startswith('cluster')
@@ -767,7 +767,7 @@ def test_synchronize_date_group_member(job_list):
 
         job_list.add_job(job)
 
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1_m1': Status.WAITING,
                              'd1_m2': Status.WAITING,
                              'd2_m1': Status.WAITING,
@@ -813,13 +813,13 @@ def test_synchronize_date_group_member(job_list):
     subgraphs = graph.obj_dict['subgraphs']
     experiment_subgraph = subgraphs['Experiment'][0]
 
-    assert sorted(list(experiment_subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(experiment_subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(experiment_subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(experiment_subgraph['edges'].keys()) == sorted(edges)
 
     subgraph_synchronize_d1_d2 = graph.obj_dict['subgraphs']['cluster_d1_m1_d1_m2_d2_m1_d2_m2'][0]
-    assert sorted(list(subgraph_synchronize_d1_d2['nodes'].keys())) == \
+    assert sorted(subgraph_synchronize_d1_d2['nodes'].keys()) == \
            sorted(['d1_m1', 'd1_m2', 'd2_m1', 'd2_m2'])
-    assert sorted(list(subgraph_synchronize_d1_d2['edges'].keys())) == \
+    assert sorted(subgraph_synchronize_d1_d2['edges'].keys()) == \
            sorted([('d1_m1', 'd1_m2'), ('d1_m2', 'd2_m1'), ('d2_m1', 'd2_m2')])
 
 
@@ -834,7 +834,7 @@ def test_synchronize_date_group_chunk(job_list):
 
         job_list.add_job(job)
 
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1_m1_1': Status.WAITING, 'd1_m1_2': Status.WAITING,
                              'd1_m2_1': Status.WAITING, 'd1_m2_2': Status.WAITING,
                              'd2_m1_1': Status.WAITING, 'd2_m1_2': Status.WAITING,
@@ -865,15 +865,15 @@ def test_synchronize_date_group_chunk(job_list):
     assert graph.obj_dict['strict']
 
     subgraph_synchronize_1 = graph.obj_dict['subgraphs']['cluster_d1_m1_1_d1_m2_1_d2_m1_1_d2_m2_1'][0]
-    assert sorted(list(subgraph_synchronize_1['nodes'].keys())) == \
+    assert sorted(subgraph_synchronize_1['nodes'].keys()) == \
            sorted(['d1_m1_1', 'd1_m2_1', 'd2_m1_1', 'd2_m2_1'])
-    assert sorted(list(subgraph_synchronize_1['edges'].keys())) == \
+    assert sorted(subgraph_synchronize_1['edges'].keys()) == \
            sorted([('d1_m1_1', 'd1_m2_1'), ('d1_m2_1', 'd2_m1_1'), ('d2_m1_1', 'd2_m2_1')])
 
     subgraph_synchronize_2 = graph.obj_dict['subgraphs']['cluster_d1_m1_2_d1_m2_2_d2_m1_2_d2_m2_2'][0]
-    assert sorted(list(subgraph_synchronize_2['nodes'].keys())) == \
+    assert sorted(subgraph_synchronize_2['nodes'].keys()) == \
            sorted(['d1_m1_2', 'd1_m2_2', 'd2_m1_2', 'd2_m2_2'])
-    assert sorted(list(subgraph_synchronize_2['edges'].keys())) == \
+    assert sorted(subgraph_synchronize_2['edges'].keys()) == \
            sorted([('d1_m1_2', 'd1_m2_2'), ('d1_m2_2', 'd2_m1_2'), ('d2_m1_2', 'd2_m2_2')])
 
 
@@ -888,7 +888,7 @@ def test_synchronize_date_group_date(job_list):
 
         job_list.add_job(job)
 
-    groups_dict = dict()
+    groups_dict = {}
     groups_dict['status'] = {'d1': Status.WAITING,
                              'd2': Status.WAITING}
     groups_dict['jobs'] = {
@@ -930,11 +930,11 @@ def test_synchronize_date_group_date(job_list):
     subgraphs = graph.obj_dict['subgraphs']
     experiment_subgraph = subgraphs['Experiment'][0]
 
-    assert sorted(list(experiment_subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(experiment_subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(experiment_subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(experiment_subgraph['edges'].keys()) == sorted(edges)
 
     subgraph_synchronize_d1_d2 = graph.obj_dict['subgraphs']['cluster_d1_d2'][0]
-    assert sorted(list(subgraph_synchronize_d1_d2['nodes'].keys())) == \
+    assert sorted(subgraph_synchronize_d1_d2['nodes'].keys()) == \
            sorted(['d1', 'd2'])
 
 
@@ -987,20 +987,20 @@ def test_normal_workflow(job_list):
     ]
 
     monitor = Monitor()
-    graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), None, dict())
+    graph = monitor.create_tree_list(_EXPID, job_list.get_job_list(), None, {})
 
     assert not graph.obj_dict['strict']
 
     subgraph = graph.obj_dict['subgraphs']['Experiment'][0]
 
-    assert sorted(list(subgraph['nodes'].keys())) == sorted(nodes)
-    assert sorted(list(subgraph['edges'].keys())) == sorted(edges)
+    assert sorted(subgraph['nodes'].keys()) == sorted(nodes)
+    assert sorted(subgraph['edges'].keys()) == sorted(edges)
 
 
 def test_wrapper_and_groups(setup_wrappers):
-    nodes, edges, job_list, packages = setup_wrappers
+    _nodes, _edges, job_list, packages = setup_wrappers
 
-    groups_dict = dict()
+    groups_dict = {}
 
     groups_dict['status'] = {'d1_m1_1': Status.FAILED, 'd1_m1_2': Status.READY, 'd1_m2_1': Status.RUNNING,
                              'd2_m2_2': Status.WAITING}

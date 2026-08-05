@@ -23,13 +23,21 @@ from typing import TYPE_CHECKING
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_common import get_autosubmit_version, _get_autosubmit_version, \
-    _update_experiment_description_version, _get_autosubmit_version_sqlalchemy, _last_name_used_sqlalchemy, check_db_path
-from autosubmit.database.db_common import DbException, create_db, open_conn
+from autosubmit.database.db_common import (
+    DbException,
+    _get_autosubmit_version,
+    _get_autosubmit_version_sqlalchemy,
+    _last_name_used_sqlalchemy,
+    _update_experiment_description_version,
+    check_db_path,
+    create_db,
+    get_autosubmit_version,
+    open_conn,
+)
 from autosubmit.database.db_manager import DbManager
+from autosubmit.database.session import get_engine
 from autosubmit.database.tables import DBVersionTable, ExperimentTable
 from autosubmit.log.log import AutosubmitCritical
-from autosubmit.database.session import get_engine
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember

@@ -16,9 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from autosubmit.helpers.parameters import (
+    PARAMETERS,
     autosubmit_parameter,
     autosubmit_parameters,
-    PARAMETERS
 )
 
 """Tests for the ``helpers.parameters`` module."""

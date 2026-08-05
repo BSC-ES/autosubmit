@@ -19,13 +19,17 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
+from autosubmit.job.job_packages import (
+    JobPackageHorizontal,
+    JobPackageSimple,
+    JobPackageVertical,
+)
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
-from autosubmit.config.yamlparser import YAMLParserFactory
 
 
 @pytest.fixture

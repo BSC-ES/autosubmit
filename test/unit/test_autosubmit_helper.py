@@ -17,8 +17,9 @@
 
 """Test file for ``autosubmit_helper.py``."""
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Callable, Union
+from typing import Union
 
 import pytest
 
@@ -73,7 +74,7 @@ def test_handle_start_time(time):
 def test_get_allowed_members(
         ids,
         return_list_value,
-        result: Union[str, Exception],
+        result: str | Exception,
         autosubmit_config: Callable,
         mocker
 ) -> None:

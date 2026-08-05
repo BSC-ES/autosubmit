@@ -1,10 +1,10 @@
+from argparse import ArgumentParser
 from pathlib import Path
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import pandas as pd
-import matplotlib.patches as mpatches
-from argparse import ArgumentParser
-from benchmark_utils import load_data, get_last_version_names
+from benchmark_utils import get_last_version_names, load_data
 
 parser = ArgumentParser(description="Generate performance comparison plots for Autosubmit.")
 parser.add_argument("--plot", default=False, action="store_true", help="Display the plot after generation.")

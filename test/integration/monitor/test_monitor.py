@@ -17,18 +17,16 @@
 
 """Tests for ``autosubmit.monitor`` package."""
 
+import time
 from pathlib import Path
 from subprocess import CalledProcessError, SubprocessError
 
-import time
 import pytest
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job_list import JobList
 from autosubmit.log.log import AutosubmitCritical
-from autosubmit.monitor.monitor import (
-    Monitor
-)
+from autosubmit.monitor.monitor import Monitor
 
 
 @pytest.mark.parametrize(

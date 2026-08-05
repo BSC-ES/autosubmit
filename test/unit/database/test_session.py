@@ -30,7 +30,7 @@ from autosubmit.database.session import _resolve_engine, get_engine
         (None, ValueError),
     ],
 )
-def test_resolve_engine(url: str, expected: Union[str, Exception]):
+def test_resolve_engine(url: str, expected: str | Exception):
     if type(expected) is not str:
         with pytest.raises(expected):  # type: ignore
             _resolve_engine(connection_url=url)

@@ -124,7 +124,7 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        print((msg.format(*args)))
+        print(msg.format(*args))
 
     @staticmethod
     def info(msg, *args):
@@ -134,7 +134,7 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        print((msg.format(*args)))
+        print(msg.format(*args))
 
     @staticmethod
     def result(msg, *args):
@@ -144,7 +144,7 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        print((LogFormatter.RESULT + msg.format(*args) + LogFormatter.DEFAULT))
+        print(LogFormatter.RESULT + msg.format(*args) + LogFormatter.DEFAULT)
 
     @staticmethod
     def user_warning(msg, *args):
@@ -154,7 +154,7 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        print((LogFormatter.WARNING + msg.format(*args) + LogFormatter.DEFAULT))
+        print(LogFormatter.WARNING + msg.format(*args) + LogFormatter.DEFAULT)
 
     @staticmethod
     def warning(msg, *args):
@@ -164,7 +164,7 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        print((LogFormatter.WARNING + "[WARNING] " + msg.format(*args) + LogFormatter.DEFAULT))
+        print(LogFormatter.WARNING + "[WARNING] " + msg.format(*args) + LogFormatter.DEFAULT)
 
     @staticmethod
     def error(msg, *args):
@@ -174,7 +174,7 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        print((LogFormatter.ERROR + "[ERROR] " + msg.format(*args) + LogFormatter.DEFAULT))
+        print(LogFormatter.ERROR + "[ERROR] " + msg.format(*args) + LogFormatter.DEFAULT)
 
     @staticmethod
     def critical(msg, *args):
@@ -184,4 +184,4 @@ class Log:
         :param msg: message to show
         :param args: arguments for message formatting (it will be done using format() method on str)
         """
-        print((LogFormatter.ERROR + "[CRITICAL] " + msg.format(*args) + LogFormatter.DEFAULT))
+        print(LogFormatter.ERROR + "[CRITICAL] " + msg.format(*args) + LogFormatter.DEFAULT)

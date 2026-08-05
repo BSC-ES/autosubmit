@@ -38,7 +38,7 @@ class Language(str, Enum):
 
     @staticmethod
     def get_executable(language: 'Language') -> str:
-        _EXECUTABLES: dict['Language', str] = {
+        _EXECUTABLES: dict[Language, str] = {
             Language.BASH: 'bash',
             Language.PYTHON2: 'python2',
             Language.PYTHON: 'python3',

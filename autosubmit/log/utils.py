@@ -22,8 +22,8 @@ from typing import Union
 
 
 def compress_xz(
-    input_path: Union[Path, str],
-    output_path: Union[Path, str] | None = None,
+    input_path: Path | str,
+    output_path: Path | str | None = None,
     preset: int = 6,
     extreme: bool = False,
     keep_input: bool = True,
@@ -72,11 +72,10 @@ def compress_gzip(
     if output_path is None:
         output_path = f"{input_path}.gz"
 
-    with open(input_path, "rb") as input_file:
-        with gzip.open(
-            output_path, "wb", compresslevel=compression_level
-        ) as output_file:
-            output_file.writelines(input_file)
+    with open(input_path, "rb") as input_file, gzip.open(
+        output_path, "wb", compresslevel=compression_level
+    ) as output_file:
+        output_file.writelines(input_file)
 
     if not keep_input and input_path != output_path:
         Path(input_path).unlink(missing_ok=True)
