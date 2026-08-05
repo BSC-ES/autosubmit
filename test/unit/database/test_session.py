@@ -19,21 +19,49 @@ from typing import Union
 
 import pytest
 
-from autosubmit.database.session import create_engine
+from autosubmit.database.session import _resolve_engine, get_engine
 
 
 @pytest.mark.parametrize(
-    'url,expected',
+    "url,expected",
     [
-        ('postgresql://user:pass@host:1984/db', 'postgresql'),
-        ('sqlite://', 'sqlite'),
-        (None, ValueError)
-    ]
+        ("postgresql://user:pass@host:1984/db", "postgresql"),
+        ("sqlite://", "sqlite"),
+        (None, ValueError),
+    ],
 )
-def test_create_engine(url: str, expected: Union[str, Exception]):
+def test_resolve_engine(url: str, expected: Union[str, Exception]):
     if type(expected) is not str:
         with pytest.raises(expected):  # type: ignore
-            create_engine(connection_url=url)
+            _resolve_engine(connection_url=url)
     else:
-        engine = create_engine(connection_url=url)
+        engine = _resolve_engine(connection_url=url)
         assert engine.name == expected
+
+
+def test_get_engine_sqlite(mocker):
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig.DATABASE_BACKEND", "sqlite")
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig.DATABASE_CONN_URL", None)
+    engine = get_engine(db_path=":memory:")
+    assert engine.name == "sqlite"
+
+
+@pytest.mark.postgres
+def test_get_engine_postgres(mocker):
+    mocker.patch(
+        "autosubmit.config.basicconfig.BasicConfig.DATABASE_BACKEND", "postgres"
+    )
+    engine = get_engine(db_path="dummy_path")
+    assert engine.name == "postgresql"
+
+    # Singleton behavior: subsequent calls should return the same instance
+    engine2 = get_engine(db_path="dummy_path")
+    assert engine is engine2
+
+
+def test_get_engine_unsupported_backend(mocker):
+    mocker.patch(
+        "autosubmit.config.basicconfig.BasicConfig.DATABASE_BACKEND", "unsupported"
+    )
+    with pytest.raises(ValueError):
+        get_engine(db_path="dummy_path")

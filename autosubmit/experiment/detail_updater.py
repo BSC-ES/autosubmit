@@ -24,13 +24,13 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Union
 
-from sqlalchemy import Table, select, insert, delete
+from sqlalchemy import Table, delete, insert, select
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_common import get_connection_url, get_experiment_id
-from autosubmit.database.session import create_engine
+from autosubmit.database.db_common import get_experiment_id
+from autosubmit.database.session import get_engine
 from autosubmit.database.tables import TableRegistry
 
 LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
@@ -175,8 +175,7 @@ class ExperimentDetailsSQLAlchemyRepository(ExperimentDetailsRepository):
     def __init__(self):
         table_registry = TableRegistry(None)
         self.table: Table = table_registry.get("details")
-        connection_url = get_connection_url(BasicConfig.DB_PATH)
-        self.engine = create_engine(connection_url=connection_url)
+        self.engine = get_engine(db_path=BasicConfig.DB_PATH)
 
     def get_details(self, exp_id: int):
         with self.engine.connect() as conn:

@@ -472,6 +472,12 @@ def postgres_server(request: "FixtureRequest") -> Generator[PostgresContainer | 
 
             yield container
 
+
+@pytest.fixture(params=[False, True])
+def use_sqlalchemy(request):
+    return request.param
+
+
 @pytest.fixture(params=['postgres', 'sqlite'])
 def as_db(request: "FixtureRequest", autosubmit: Autosubmit, tmp_path: "LocalPath", postgres_server: "DockerContainer",
           autosubmit_exp, monkeypatch):
