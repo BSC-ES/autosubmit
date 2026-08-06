@@ -12,7 +12,7 @@
     --as-sidebar-title-font: 1rem;
     --as-sidebar-link-pad: 0.18rem;
     --as-sidebar-item-pad: 0.08rem;
-    --as-sidebar-pad-x: 0.75rem;
+    --as-sidebar-pad-x: 0.34rem;
 }
 
 #autosubmit-workflow-manager > h1 {
@@ -91,7 +91,7 @@ html[data-theme="dark"] .bd-header {
 #pst-primary-sidebar a.reference.internal {
     display: block;
 
-    padding: 0.22rem 0;
+    padding: 0.30rem 0;
 
     line-height: 1.3;
 
@@ -102,6 +102,32 @@ html[data-theme="dark"] .bd-header {
 
 #pst-primary-sidebar a.reference.internal:hover {
     background: rgba(127,127,127,.08);
+}
+
+#pst-primary-sidebar li.current > a.reference.internal,
+#pst-primary-sidebar li.active > a.reference.internal,
+#pst-primary-sidebar .toctree-l1.current > a.reference.internal,
+#pst-primary-sidebar a.reference.internal.current,
+#pst-primary-sidebar a.reference.internal.active {
+    border: 0 !important;
+    border-left: 0 !important;
+    border-inline-start: 0 !important;
+    box-shadow: none !important;
+    background-image: none !important;
+    background-color: rgba(127,127,127,.12) !important;
+    padding-left: 0 !important;
+}
+
+#pst-primary-sidebar li.current > a::before,
+#pst-primary-sidebar li.current > a::after,
+#pst-primary-sidebar li.active > a::before,
+#pst-primary-sidebar li.active > a::after {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+    box-shadow: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 #pst-primary-sidebar ul,
@@ -128,6 +154,9 @@ html[data-theme="dark"] .bd-header {
     padding-right: 2rem;
 }
 
-.bd-main .bd-content .bd-article-container {
+.bd-main .bd-content .bd-article-container,
+.bd-main .bd-content .bd-article {
     max-width: 90rem;
+    margin-left: 0;
+    margin-right: auto;
 }

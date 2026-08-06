@@ -228,8 +228,9 @@ html_css_files = [
 # html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
-html_sidebars: dict[str, list[str]] = {
-    "qstartguide/index": [],
+html_sidebars = {
+    "**": ["sidebar-nav-bs"],
+    "qstartguide/index": [], 
     "installation/index": [],
     "database/index": [], 
     "devguide/platforms/index": [],             
