@@ -13,9 +13,9 @@ name: metrics
 #     serializes them, so remove the label once the check passes to avoid
 #     queueing extra runs.
 #   * Manual: a maintainer (member of the BSC-ES/autosubmit team, or listed in
-#     MAINTAINERS.md on the default branch) comments on a PR:
+#     .benchmarks/allowed-users.txt on the default branch) comments on a PR:
 #       - `/metrics`          quick suite
-#       - `/metrics_full`     full suite (includes run_heavy)
+#       - `/metrics_full`     full suite (adds the 4m/2c/4s and 4m/2c/8s run scenarios)
 #       - `/metrics_promote`  promote the last completed run as the new
 #                             baseline.
 #
@@ -26,7 +26,7 @@ name: metrics
 #
 # NOTE: `issue_comment` workflows run the version of this file on the DEFAULT
 # branch, not the PR head. Changes here only take effect after merging.
-# NOTE: the authorization allowlist is read from MAINTAINERS.md on the
+# NOTE: the authorization allowlist is read from .benchmarks/allowed-users.txt on the
 # default branch (currently `master`) on purpose, so PRs cannot self-authorize.
 
 on:
@@ -49,6 +49,10 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11'
+  # How many times the benchmark suite is run per workflow invocation; the
+  # sessions are merged into a single file (per-scenario medians) before the
+  # artifact upload.
+  BENCHMARK_RUNS: 3
 
 jobs:
   authorize:
@@ -87,7 +91,7 @@ jobs:
             } catch (e) {
               if (e.status !== 404) throw e;
             }
-            // (2) Users listed in MAINTAINERS.md on the default branch.
+            // (2) Users listed in .benchmarks/allowed-users.txt on the default branch.
             if (!allowed) {
               try {
                 const { data: repoInfo } = await github.rest.repos.get({
@@ -97,7 +101,7 @@ jobs:
                 const { data } = await github.rest.repos.getContent({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  path: 'MAINTAINERS.md',
+                  path: '.benchmarks/allowed-users.txt',
                   ref: repoInfo.default_branch,
                 });
                 const text = Buffer.from(data.content, 'base64').toString();
@@ -129,7 +133,6 @@ jobs:
       issue_number: ${{ steps.pr.outputs.issue_number }}
       test_type: ${{ steps.scope.outputs.test_type }}
       should_run: ${{ steps.scope.outputs.should_run }}
-      force_promote: ${{ steps.scope.outputs.force_promote }}
       promote_last: ${{ steps.scope.outputs.promote_last }}
 
     steps:
@@ -187,13 +190,6 @@ jobs:
             echo "test_type=profilelong" >> "$GITHUB_OUTPUT"
           else
             echo "test_type=profile" >> "$GITHUB_OUTPUT"
-          fi
-          # Force promotion only on /metrics_promote.
-          if [ "${{ github.event_name }}" == "issue_comment" ] && \
-             [[ "${{ github.event.comment.body }}" == *"/metrics_promote"* ]]; then
-            echo "force_promote=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "force_promote=false" >> "$GITHUB_OUTPUT"
           fi
           # Promote the last completed run without re-running: /metrics_promote.
           if [ "${{ github.event_name }}" == "issue_comment" ] && \
@@ -284,19 +280,30 @@ jobs:
         if: steps.scope.outputs.should_run == 'true'
         run: |
           short_sha=$(echo "${{ steps.pr.outputs.head_sha }}" | cut -c1-7)
-          args=(
-            -m "${{ steps.scope.outputs.test_type }}"
-            -n 0
-            --benchmark-storage=file://.benchmarks/data
-            --benchmark-save="${{ steps.as_version.outputs.version }}-${short_sha}"
-            test/integration/commands/test_performance.py
-          )
-          # BENCHMARK_K is only set when running the workflow locally with act
-          # (e.g. -k create) to avoid the Docker-in-Docker slurm scenarios.
-          if [ -n "${BENCHMARK_K:-}" ]; then
-            args+=( -k "$BENCHMARK_K" )
-          fi
-          pytest "${args[@]}"
+          for i in $(seq 1 "${BENCHMARK_RUNS:-3}"); do
+            args=(
+              -m "${{ steps.scope.outputs.test_type }}"
+              -n 0
+              --benchmark-storage=file://.benchmarks/data
+              --benchmark-save="${{ steps.as_version.outputs.version }}-${short_sha}-run${i}"
+              test/integration/commands/test_performance.py
+            )
+            # BENCHMARK_K is only set when running the workflow locally with act
+            # (e.g. -k create) to avoid the Docker-in-Docker slurm scenarios.
+            if [ -n "${BENCHMARK_K:-}" ]; then
+              args+=( -k "$BENCHMARK_K" )
+            fi
+            pytest "${args[@]}"
+          done
+          # Merge the BENCHMARK_RUNS sessions into a single file with
+          # per-scenario medians, then drop the raw session files (pytest
+          # stores them with a counter prefix, hence the find): the artifact
+          # holds exactly one file per run.
+          python .benchmarks/merge_runs.py \
+            --input .benchmarks/data \
+            --output ".benchmarks/data/${{ steps.as_version.outputs.version }}-${short_sha}.json"
+          find .benchmarks/data -name '*.json' \
+            ! -name "${{ steps.as_version.outputs.version }}-${short_sha}.json" -delete
 
       - name: Upload benchmark artifacts
         if: steps.scope.outputs.should_run == 'true'
@@ -329,7 +336,6 @@ jobs:
     timeout-minutes: 15
     outputs:
       regressions_detected: ${{ steps.verdict.outputs.regressions_detected }}
-      force_promote: ${{ needs.metrics.outputs.force_promote }}
       cpu_slug: ${{ steps.verdict.outputs.cpu_slug }}
     steps:
       - name: Checkout code
@@ -395,7 +401,13 @@ jobs:
             const repo = context.repo.repo;
             const branch = 'benchmark-reference';
             const dir = '.benchmarks/artifacts';
-            const plotNames = [`summary_${version}_run.png`, `summary_${version}_create_recovery_setstatus.png`];
+            const plotNames = fs.readdirSync(dir)
+              .filter(f => f.startsWith('summary_') && f.endsWith('.png'))
+              .sort();
+            const plotAlts = {
+              [`summary_${version}_run.png`]: 'Run scenarios',
+              [`summary_${version}_create_recovery_setstatus.png`]: 'Create / Recovery / Setstatus',
+            };
 
             const summary = fs.readFileSync(`${dir}/summary_${version}.md`, 'utf8');
 
@@ -456,12 +468,14 @@ jobs:
               }
             } catch (e) { /* keep the run page as fallback */ }
 
+            const plotImages = plotNames.map(pngName =>
+              `![${plotAlts[pngName] || pngName}](https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dir}/${pngName})`
+            );
+
             const body = [
               `## Benchmark Results (${{ needs.metrics.outputs.test_type }})`,
               '',
-              `![Run scenarios](https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dir}/${plotNames[0]})`,
-              '',
-              `![Create / Recovery / Setstatus](https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dir}/${plotNames[1]})`,
+              ...plotImages,
               '',
               titleLine,
               '',
@@ -513,7 +527,7 @@ jobs:
       (
         needs.metrics.outputs.promote_last == 'true' ||
         (needs.report.result == 'success' &&
-         (needs.report.outputs.regressions_detected == 'false' || needs.report.outputs.force_promote == 'true'))
+         needs.report.outputs.regressions_detected == 'false')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -568,7 +582,8 @@ jobs:
       - name: Verify artifact belongs to this PR
         if: needs.metrics.outputs.promote_last == 'true'
         run: |
-          file=$(find artifact/data -name '*.json' | head -n1)
+          # Newest merged file: legacy artifacts may hold several run files.
+          file=$(find artifact/data -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)
           short_expected=$(echo '${{ needs.metrics.outputs.head_sha }}' | cut -c1-7)
           base=$(basename "$file")
           if [[ "$base" != *"$short_expected"* ]]; then
@@ -585,7 +600,7 @@ jobs:
           # where the report job is skipped.
           slug="${{ needs.report.outputs.cpu_slug }}"
           if [ -z "$slug" ]; then
-            file=$(find artifact/data -name '*.json' | head -n1)
+            file=$(find artifact/data -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)
             brand=$(jq -r '.machine_info.cpu.brand_raw // ""' "$file" 2>/dev/null || true)
             slug=$(printf '%s' "$brand" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//')
             [ -n "$slug" ] || slug=unknown-cpu
@@ -605,8 +620,12 @@ jobs:
             git rm -rf . >/dev/null 2>&1 || true
           fi
           mkdir -p .benchmarks/reference
-          rm -rf ".benchmarks/reference/${{ steps.cpu.outputs.cpu_slug }}"
-          cp -r artifact/data/. ".benchmarks/reference/${{ steps.cpu.outputs.cpu_slug }}/"
+          ref_dir=".benchmarks/reference/${{ steps.cpu.outputs.cpu_slug }}"
+          mkdir -p "$ref_dir"
+          new_baseline=$(find artifact/data -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2- | xargs -r basename)
+          [ -n "$new_baseline" ] || { echo "::error::No benchmark file found in artifact/data"; exit 1; }
+          cp "artifact/data/$new_baseline" "$ref_dir/$new_baseline"
+          find "$ref_dir" -name '*.json' ! -name "$new_baseline" -delete
           git add .benchmarks/reference
           if [ "${{ needs.metrics.outputs.promote_last }}" == "true" ]; then
             label="artifact ${{ steps.latest.outputs.artifact_name }} (${{ steps.latest.outputs.run_head_sha }}) [${{ steps.cpu.outputs.cpu_slug }}]"

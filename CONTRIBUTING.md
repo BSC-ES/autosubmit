@@ -188,7 +188,7 @@ never promoted).
   access; if you cannot add labels, say so in the PR description so a maintainer
   can). See the PR template and the "Set up the merge gate" note below.
 * **Manually**: a member of the `BSC-ES/autosubmit` team (or a user listed as
-  `@username` in this repository's `MAINTAINERS.md` on the default branch)
+  `@username` in this repository's `.benchmarks/allowed-users.txt` on the default branch)
   comments on a PR:
   * `/metrics` — quick suite
   * `/metrics_full` — full suite
@@ -203,7 +203,7 @@ flagging regressions beyond the configured thresholds as warnings. Only the
 plots are visible at first glance; the regressions and scenario tables are
 collapsed in a `<details>` block. Two comparison plots are stored on the
 `benchmark-reference` branch and linked from the comment (GitHub strips `data:`
-image URIs, so plots are not embedded inline): one for the `run`/`run_heavy`
+image URIs, so plots are not embedded inline): one for the `run`
 scenarios (which carry the profiler growth metrics) and one for
 `create`/`recovery`/`setstatus`. The comment also links the run's artifacts for
 direct download (raw benchmark data and the report with markdown, plots and
@@ -266,7 +266,7 @@ $ python .benchmarks/compare_results.py \
 ```
 
 The report is written to `.benchmarks/artifacts/summary_<version>.md` and the
-two grid plots (one per scenario group, `run`/`run_heavy` and
+two grid plots (one per scenario group, `run` and
 `create`/`recovery`/`setstatus`) to `summary_<version>_run.png` and
 `summary_<version>_create_recovery_setstatus.png`. Cells are colored red/blue by
 change direction (with a neutral dead zone for |delta| below
@@ -287,7 +287,7 @@ needs a small change in `.benchmarks/compare_results.py`:
 * **Test type**: add it to `_RUN_TEST_TYPES` (carries the profiler growth
   metrics) or `_OTHER_TEST_TYPES` (time/memory/DB metrics), or add a new plot
   entry in `render_heatmaps()`. If the new type should not carry the growth
-  metrics (`FD GROW`, `MEM GROW`, `OBJ GROW`), also add it to
+  metrics (`FD GROWTH`, `MEM GROWTH`, `OBJ GROWTH`), also add it to
   `_NO_GROW_TEST_TYPES`.
 * **Metric**: add it to `METRIC_COLUMNS` so `build_frame()` stores it (and it
   shows up in the markdown tables), then to the matching plot metric list

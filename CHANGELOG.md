@@ -9,6 +9,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 - Fixed the Profiler reporting `MEMORY GROW` with the wrong unit when the growth was small relative to the final memory (e.g. ~0.5 MiB shown as 527 "MiB"). #3162
+- Fixed the Profiler reporting `MEMORY GROWTH` with the wrong unit when the growth was small relative to the final memory (e.g. ~0.5 MiB shown as 527 "MiB"). #3162
 
 **New Features:**
 
