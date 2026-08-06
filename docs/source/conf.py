@@ -227,6 +227,7 @@ html_css_files = [
 
 # Custom sidebar templates, maps document names to template names.
 html_sidebars = {
+    "**": ["sidebar-nav-bs"],
     "qstartguide/index": [], 
     "installation/index": [],
     "database/index": [],              
