@@ -204,11 +204,10 @@ class JobList:
         """Deletes jobs that have no dependencies and are marked for deletion when edgeless."""
         # indices to delete
         for job in self.job_list[:]:
-            if job.dependencies is not None and job.dependencies not in ["{}", "[]"]:
-                if ((len(job.dependencies) > 0 and not job.has_parents() and not
-                job.has_children()) and str(job.delete_when_edgeless).casefold() ==
-                        "true".casefold()):
-                    self.graph.remove_node(job.name)
+            if (job.dependencies is not None and job.dependencies not in ["{}", "[]"] and
+                    ((len(job.dependencies) > 0 and not job.has_parents() and not job.has_children())
+                     and str(job.delete_when_edgeless).casefold() == "true".casefold())):
+                self.graph.remove_node(job.name)
 
     def generate(
             self,
@@ -791,7 +790,7 @@ class JobList:
             for job in jobs_gen:
                 self._apply_jobs_edge_info(job, dependencies)
 
-    def _deep_map_dependencies(self, section, jobs_data, option, dependency_list=set(),
+    def _deep_map_dependencies(self, section, jobs_data, option, dependency_list=(),
                                strip_keys=True):
         """Recursive function to map dependencies of dependencies"""
         if section in dependency_list:
@@ -915,7 +914,7 @@ class JobList:
         from networkx import NetworkXError
 
         delete_relations = set()
-        for section, jobs in problematic_jobs.items():
+        for jobs in problematic_jobs.values():
             for child_name, parents in jobs.items():
                 parents_list = list(parents)
                 for parent_name, another_parent_name in combinations(parents_list, 2):
@@ -1251,38 +1250,37 @@ class JobList:
             value_list = self._member_list
         elif filter_type == "CHUNKS_TO":
             value_list = self._chunk_list
-        if "all".casefold() not in unified_filter[filter_type].casefold():
-            aux = str(filter_to.pop(filter_type, None))
-            if aux:
-                if "," in aux:
-                    split_aux_list = aux.split(",")
+        aux = str(filter_to.pop(filter_type, None))
+        if "all".casefold() not in unified_filter[filter_type].casefold() and aux:
+            if "," in aux:
+                split_aux_list = aux.split(",")
+            else:
+                split_aux_list = [aux]
+            for element in split_aux_list:
+                if element == "":
+                    continue
+                # Get only the first alphanumeric part and [:] chars
+                parsed_element = re.findall(r"([\[:\]a-zA-Z0-9._-]+)", element)[0].lower()
+                extra_data = element[len(parsed_element):]
+                parsed_element = JobList._parse_filter_to_check(parsed_element,
+                                                                value_list=value_list, level_to_check=filter_type,
+                                                                splits=splits)
+                # convert list to str
+                skip = False
+                # check if any element is natural or none
+                for ele in parsed_element:
+                    if type(ele) is str and ele.lower() in ["natural", "none"]:
+                        skip = True
+                if skip and len(unified_filter[filter_type]) > 0:
+                    continue
                 else:
-                    split_aux_list = [aux]
-                for element in split_aux_list:
-                    if element == "":
-                        continue
-                    # Get only the first alphanumeric part and [:] chars
-                    parsed_element = re.findall(r"([\[:\]a-zA-Z0-9._-]+)", element)[0].lower()
-                    extra_data = element[len(parsed_element):]
-                    parsed_element = JobList._parse_filter_to_check(parsed_element,
-                                                                    value_list=value_list, level_to_check=filter_type,
-                                                                    splits=splits)
-                    # convert list to str
-                    skip = False
-                    # check if any element is natural or none
                     for ele in parsed_element:
-                        if type(ele) is str and ele.lower() in ["natural", "none"]:
-                            skip = True
-                    if skip and len(unified_filter[filter_type]) > 0:
-                        continue
-                    else:
-                        for ele in parsed_element:
-                            if extra_data:
-                                check_whole_string = str(ele) + extra_data + ","
-                            else:
-                                check_whole_string = str(ele) + ","
-                            if str(check_whole_string) not in unified_filter[filter_type]:
-                                unified_filter[filter_type] += check_whole_string
+                        if extra_data:
+                            check_whole_string = str(ele) + extra_data + ","
+                        else:
+                            check_whole_string = str(ele) + ","
+                        if str(check_whole_string) not in unified_filter[filter_type]:
+                            unified_filter[filter_type] += check_whole_string
         return unified_filter
 
     @staticmethod
@@ -1430,10 +1428,10 @@ class JobList:
         # divide edge per section name
         parents_by_section: dict = {}
         for parent, _ in self.graph.in_edges(job.name):
-            if self.graph.nodes[parent]['job'].section in filters_to_apply_by_section:
-                if self.graph.nodes[parent]['job'].section not in parents_by_section:
-                    parents_by_section[self.graph.nodes[parent]['job'].section] = set()
-                (parents_by_section[self.graph.nodes[parent]['job'].section].add(self.graph.nodes[parent]['job']))
+            if (self.graph.nodes[parent]['job'].section in filters_to_apply_by_section and
+                    self.graph.nodes[parent]['job'].section not in parents_by_section):
+                parents_by_section[self.graph.nodes[parent]['job'].section] = set()
+                parents_by_section[self.graph.nodes[parent]['job'].section].add(self.graph.nodes[parent]['job'])
         for key, list_of_parents in parents_by_section.items():
             special_conditions = {}
             min_trigger_status = filters_to_apply_by_section[key].get("MIN_TRIGGER_STATUS", "COMPLETED")
@@ -1529,58 +1527,44 @@ class JobList:
                 if found:
                     continue
             if distances_of_current_section.get(dependency.section, 0) == 0:
-                if job.section == parent.section:
-                    if not self.actual_job_depends_on_previous_chunk:
-                        if parent.section not in self.dependency_map[job.section]:
-                            graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
-                                           completion_status="WAITING")
+                if (job.section == parent.section and not self.actual_job_depends_on_previous_chunk
+                        and parent.section not in self.dependency_map[job.section]):
+                    graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED", completion_status="WAITING")
                 else:
-                    if self.actual_job_depends_on_special_chunk and not self.actual_job_depends_on_previous_chunk:
-                        if parent.section not in self.dependency_map[job.section]:
-                            if parent.running == job.running:
-                                graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
-                                               completion_status="WAITING")
-                    elif not self.actual_job_depends_on_previous_chunk:
-                        graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
-                                       completion_status="WAITING")
-                    elif not self.actual_job_depends_on_special_chunk and self.actual_job_depends_on_previous_chunk:
-                        if job.running == "chunk" and job.chunk == 1 or job.running == "member" and parent.running == "member" or job.running == "chunk" and parent.running == "chunk":
+                    if (self.actual_job_depends_on_special_chunk and not self.actual_job_depends_on_previous_chunk and
+                            parent.section not in self.dependency_map[job.section] and parent.running == job.running) or not self.actual_job_depends_on_previous_chunk or (not self.actual_job_depends_on_special_chunk and self.actual_job_depends_on_previous_chunk and
+                          job.running == "chunk" and job.chunk == 1 or job.running == "member" and
+                          parent.running == "member" or job.running == "chunk" and parent.running == "chunk"):
                             graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
                                            completion_status="WAITING")
             else:
-                if job.section == parent.section:
-                    if self.actual_job_depends_on_previous_chunk:
+                if job.section == parent.section and  self.actual_job_depends_on_previous_chunk:
+                    skip = False
+                    for aux in [aux for aux in self.dependency_map[job.section] if aux != job.section]:
+                        distance = 0
+                        for aux_ in self.dependency_map_with_distances.get(aux, []):
+                            if "-" in aux_ and job.section == aux_.split("-")[0]:
+                                distance = int(aux_.split("-")[1])
+                            elif "+" in aux_ and job.section == aux_.split("+")[0]:
+                                distance = int(aux_.split("+")[1])
+                            if distance >= max_distance:
+                                skip = True
+                    # get max value in distances_of_current_section.values
+                    if not skip and job.running == "chunk" and parent.chunk <= (chunk_list[-1] - max_distance):
                         skip = False
-                        for aux in [aux for aux in self.dependency_map[job.section] if aux != job.section]:
-                            distance = 0
-                            for aux_ in self.dependency_map_with_distances.get(aux, []):
-                                if "-" in aux_:
-                                    if job.section == aux_.split("-")[0]:
-                                        distance = int(aux_.split("-")[1])
-                                elif "+" in aux_:
-                                    if job.section == aux_.split("+")[0]:
-                                        distance = int(aux_.split("+")[1])
-                                if distance >= max_distance:
-                                    skip = True
-                        if not skip:
-                            # get max value in distances_of_current_section.values
-                            if job.running == "chunk":
-                                if parent.chunk <= (chunk_list[-1] - max_distance):
-                                    skip = False
-                        if not skip:
-                            problematic_dependencies.add(parent.name)
-                            graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
-                                           completion_status="WAITING")
+                    if not skip:
+                        problematic_dependencies.add(parent.name)
+                        graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
+                                       completion_status="WAITING")
                 else:
                     if job.running == parent.running:
                         skip = False
                         problematic_dependencies.add(parent.name)
                         graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
                                        completion_status="WAITING")
-                    if parent.running == "chunk":
-                        if parent.chunk > (chunk_list[-1] - max_distance):
-                            graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
-                                           completion_status="WAITING")
+                    if parent.running == "chunk" and parent.chunk > (chunk_list[-1] - max_distance):
+                        graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED",
+                                       completion_status="WAITING")
         JobList.handle_frequency_interval_dependencies(chunk, chunk_list, date, date_list, dic_jobs, job,
                                                        member,
                                                        member_list, dependency.section, natural_parents)
@@ -1646,18 +1630,16 @@ class JobList:
             # Ideally we want to avoid adding edges when the current job already has a path to the parent
             # But, that is not solved in all cases. So, we use the problematic_dependencies set to track and prune those redundancy.
             edge_added = False
-            if any_all_filter:
-                if (parent.chunk and parent.chunk != self.depends_on_previous_chunk.get(parent.section, parent.chunk) or
-                        (parent.running == "chunk" and parent.chunk != chunk_list[-1] and parent.section in
-                         self.dependency_map[parent.section]) or
-                        self.actual_job_depends_on_previous_chunk or
-                        self.actual_job_depends_on_special_chunk or
-                        parent.name in special_dependencies
-                ):
-                    continue
-            if parent.section == job.section:
-                if not job.splits or int(job.splits) > 0:
-                    self.depends_on_previous_split[job.section] = int(parent.split)
+            if (any_all_filter and
+                (parent.chunk and parent.chunk != self.depends_on_previous_chunk.get(parent.section, parent.chunk)
+                 or (parent.running == "chunk" and parent.chunk != chunk_list[-1] and
+                     parent.section in self.dependency_map[parent.section])
+                 or self.actual_job_depends_on_previous_chunk or self.actual_job_depends_on_special_chunk
+                 or parent.name in special_dependencies
+            )):
+                continue
+            if parent.section == job.section and not job.splits or int(job.splits) > 0:
+                self.depends_on_previous_split[job.section] = int(parent.split)
             if self.actual_job_depends_on_previous_chunk and parent.section == job.section:
                 graph.add_edge(parent.name, job.name, min_trigger_status="COMPLETED", completion_status="WAITING")
                 edge_added = True
@@ -1730,8 +1712,8 @@ class JobList:
                              f"_{auto_chunk}_1_{dependency.section}")
             if auto_job_name in self.graph.nodes:
                 auto_splits = str(self.graph.nodes[auto_job_name]['job'].splits)
-                for filters_to_keys, filters_to in (
-                        dependency.relationships.get("SPLITS_FROM", {}).items()):
+                for filters_to in (
+                        dependency.relationships.get("SPLITS_FROM", {}).values()):
                     if "auto" in filters_to.get("SPLITS_TO", "").lower():
                         filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].lower()
                         filters_to["SPLITS_TO"] = filters_to["SPLITS_TO"].replace("auto", auto_splits)
@@ -1816,15 +1798,14 @@ class JobList:
 
             # Check if the job depends on previous chunks or members
             if distance != 0:
-                if job.running == "chunk" and int(job.chunk) > 1:
-                    if job.section == aux_key or dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING",
-                                                                                                 "once") == "chunk":
-                        self.actual_job_depends_on_previous_chunk = True
-                if job.running in ["member", "chunk"] and job.member:
-                    if member_list.index(job.member) > 0:
-                        if job.section == aux_key or dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING",
-                                                                                                     "once") == "member":
-                            self.actual_job_depends_on_previous_member = True
+                if (job.running == "chunk" and int(job.chunk) > 1 and
+                        job.section == aux_key or dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING",
+                                                                                                  "once") == "chunk"):
+                    self.actual_job_depends_on_previous_chunk = True
+                if (job.running in ["member", "chunk"] and job.member and member_list.index(job.member) > 0 and
+                        job.section == aux_key or dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING",
+                                                                                                  "once") == "member"):
+                    self.actual_job_depends_on_previous_member = True
 
             # Handle dependencies to other sections
             if aux_key != job.section:
@@ -1835,9 +1816,9 @@ class JobList:
 
                     # Skip dependencies that are already defined or delayed
                     elif key != job.section:
-                        if job.running == "chunk" and dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", None):
-                            if job.chunk <= int(dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", 0)):
-                                continue
+                        if (job.running == "chunk" and dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", None) and
+                                job.chunk <= int(dic_jobs.as_conf.jobs_data[aux_key].get("DELAY", 0))):
+                            continue
                         # Only natural dependencies
                         if dependencies.get(key, None) and not relationships:
                             dependencies_to_del.add(key)
@@ -1857,14 +1838,14 @@ class JobList:
             max_distance = max(max_distance, distance)
 
             # Update distances for chunk and member dependencies
-            if dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING", "once") == "chunk":
-                if aux_key in distances_of_current_section and distance > distances_of_current_section[aux_key]:
-                    distances_of_current_section[aux_key] = distance
+            if (dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING", "once") == "chunk" and
+                    aux_key in distances_of_current_section and distance > distances_of_current_section[aux_key]):
+                distances_of_current_section[aux_key] = distance
 
-            elif dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING", "once") == "member":
-                if (aux_key in distances_of_current_section_member and
-                        distance > distances_of_current_section_member[aux_key]):
-                    distances_of_current_section_member[aux_key] = distance
+            elif (dic_jobs.as_conf.jobs_data.get(aux_key, {}).get("RUNNING", "once") == "member" and
+                  (aux_key in distances_of_current_section_member and
+                   distance > distances_of_current_section_member[aux_key])):
+                distances_of_current_section_member[aux_key] = distance
 
         # Process sections with special filters
         sections_to_calculate = [key for key in dependencies_keys if key not in dependencies_to_del]
@@ -1946,7 +1927,7 @@ class JobList:
         :param date: Current date string or ``None``.
         :param date_list: Ordered list of available dates.
         :param dependency: Dependency object.
-        :returns: Tuple where the first element is a boolean ``skip`` flag and the second is
+        :returns: tuple where the first element is a boolean ``skip`` flag and the second is
             a tuple ``(chunk, member, date)`` with the computed targets.
         """
         skip = False
@@ -2611,7 +2592,7 @@ class JobList:
             return [job for job in waiting_jobs if job.packed is False]
         return waiting_jobs
 
-    def get_waiting_remote_dependencies(self, platform_type='slurm'.lower()):
+    def get_waiting_remote_dependencies(self, platform_type='slurm'):
         """Returns a list of jobs waiting on slurm scheduler.
 
         :param platform_type: platform type
@@ -2620,7 +2601,7 @@ class JobList:
         :rtype: list
         """
         waiting_jobs = [job for job in self.job_list if (
-                job.platform.type == platform_type and job.status == Status.WAITING)]
+                job.platform.type == platform_type.lower() and job.status == Status.WAITING)]
         return waiting_jobs
     def get_held_jobs(self, platform=None):
         """Returns a list of jobs in the platforms (Held).
@@ -2711,8 +2692,8 @@ class JobList:
         for job in self.job_list:
             if not job.updated:
                 job.submitter = self.submitter
-                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
-                        self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
+                job.update_parameters(self._as_conf, set_attributes=True,
+                                      reset_logs= job.status not in self._IN_SCHEDULER + self._FINAL_STATUSES)
         Log.debug(f"Jobs loaded: {len(self.job_list)}")
         for j in sorted(self.job_list, key=lambda j: j.name):
             Log.debug(f"  {j.name:50s} status={Status().VALUE_TO_KEY.get(j.status, j.status):12s} sec={j.section:15s} chunk={j.chunk} mem={j.member} date={j.date}")
@@ -3148,7 +3129,7 @@ class JobList:
         :param parents_nodes: Dictionary mapping parent job names to Job objects.
         :type parents_nodes: dict
         :return A tuple containing two lists: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
-        :rtype: Tuple[List[Job], List[Job]]
+        :rtype: tuple[List[Job], List[Job]]
         """
         non_completed = []
         completed = []
@@ -3681,8 +3662,8 @@ class JobList:
 
         :param wrapper_job: The wrapper job instance to serialize.
         :type wrapper_job: WrapperJob
-        :return: Tuple containing a dictionary of wrapper job attributes (including run_id) and a list of inner job dicts (each with run_id).
-        :rtype: Tuple[Dict[str, Any], List[Dict[str, Any]]]
+        :return: tuple containing a dictionary of wrapper job attributes (including run_id) and a list of inner job dicts (each with run_id).
+        :rtype: tuple[Dict[str, Any], List[Dict[str, Any]]]
         """
         wrapper_info = {
             "name": wrapper_job.name,
@@ -3906,7 +3887,7 @@ class JobList:
             return 'Job List object'
         return "\n".join(results)
 
-    def _recursion_print(self, job, level, visited=[], statusChange=None, nocolor=False):
+    def _recursion_print(self, job, level, visited: list = [], statusChange=None, nocolor=False):
         """Returns the list of children in a recursive way
         Traverses the dependency tree
 
@@ -3970,7 +3951,7 @@ class JobList:
         self.load_wrappers()
         package_to_symbol = {}
         i = 0
-        for package_name, wrapped_job in self.packages_dict.items():
+        for package_name in self.packages_dict.keys():
             if i % 2 == 0:
                 package_to_symbol[package_name] = 'square'
             else:
@@ -4022,12 +4003,11 @@ class JobList:
                         t_start = job_data.start
                         t_finish = job_data.finish
                         # Test if start time does not make sense
-                        if t_start >= t_finish:
-                            if job_times:
-                                _, c_start, _c_finish, _, _ = job_times.get(
-                                    name, (0, t_start, t_finish, 0, 0))
-                                t_start = min(t_start, c_start)
-                                job_data.start = t_start
+                        if t_start >= t_finish and job_times:
+                            _, c_start, _, _, _ = job_times.get(
+                                name, (0, t_start, t_finish, 0, 0))
+                            t_start = min(t_start, c_start)
+                            job_data.start = t_start
 
                         if seconds is False:
                             queue_time = math.ceil(
@@ -4080,7 +4060,7 @@ class JobList:
                 if job_times and status_code not in [Status.READY,
                                                      Status.WAITING, Status.SUSPENDED]:
                     if name in job_times:
-                        submit_time, start_time, finish_time, status, _detail_id = job_times[
+                        submit_time, start_time, finish_time, status, _ = job_times[
                             name]
                         seconds_running = finish_time - start_time
                         seconds_queued = start_time - submit_time
