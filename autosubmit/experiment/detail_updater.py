@@ -40,8 +40,7 @@ __all__ = [
     "ExperimentDetailsSQLAlchemyRepository",
     "ExperimentDetailsSQLiteRepository",
 ]
-
-LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
+from autosubmit.helpers import LOCAL_TZ
 
 
 class ExperimentDetailsRepository(ABC):

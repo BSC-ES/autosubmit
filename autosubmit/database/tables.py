@@ -33,6 +33,8 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 
+from autosubmit.helpers import LOCAL_TZ
+
 metadata_obj = MetaData()
 
 ExperimentTable = Table(
@@ -191,8 +193,8 @@ JobsTable = Table(
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
     Column("platform_name", String),
-    Column("created", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
-    Column("modified", Text, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
+    Column("created", Text, nullable=False, default=lambda: datetime.datetime.now(tz=LOCAL_TZ).isoformat(timespec='seconds')),
+    Column("modified", Text, nullable=False, default=lambda: datetime.datetime.now(tz=LOCAL_TZ).isoformat(timespec='seconds'))
 )
 
 """Table that holds the structure of the experiment jobs."""

@@ -37,7 +37,6 @@ from autosubmit.platforms.platform_type import PlatformType
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
 
-
 def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: str | None = None):
     """Raise an error if the jobs file does not exist.
 
