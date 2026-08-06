@@ -42,6 +42,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
+from autosubmit.helpers import LOCAL_TZ
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
 )
@@ -362,7 +363,7 @@ class Job:
         job_data["remote_logs_err"] = self.remote_logs[1] if self.remote_logs[1] else ""
         if job_data["date"]:
             job_data["date"] = job_data["date"].isoformat()
-        job_data["modified"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        job_data["modified"] = datetime.datetime.now(tz=LOCAL_TZ).isoformat(timespec='seconds')
 
         del job_data["local_logs"]
         del job_data["remote_logs"]
