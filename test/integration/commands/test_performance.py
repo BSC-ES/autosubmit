@@ -273,11 +273,14 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3", "2", "8",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15",
+                                          marks=[pytest.mark.profilelong])
                          ],
                          ids=[
                              "4members_2chunks_2splits",
                              "4members_2chunks_4splits",
-                             "4members_2chunks_8splits"
+                             "4members_2chunks_8splits",
+                             "9members_2chunks_15splits"
                          ],
                          )
 @pytest.mark.timeout(300)
@@ -302,11 +305,14 @@ def test_autosubmit_create_profile_metrics(benchmark, tmp_path: Path, autosubmit
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3", "2", "4", 0, "run", marks=[pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3", "2", "8", 0, "run", marks=[pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", 10, "run",
+                                          marks=[pytest.mark.profilelong]),
                          ],
                          ids=[
                              "4members_2chunks_2splits",
                              "4members_2chunks_4splits",
                              "4members_2chunks_8splits",
+                             "9members_2chunks_15splits_10iterations"
                          ],
                          )
 @pytest.mark.timeout(1800)
@@ -327,14 +333,20 @@ def test_autosubmit_run_profile_metrics(benchmark, tmp_path: Path, autosubmit_ex
 
 @pytest.mark.parametrize("members,chunks,splits",
                          [
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "2", marks=[pytest.mark.profile]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", marks=[pytest.mark.profile]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", marks=[pytest.mark.profile]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "2",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "4",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "8",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15",
+                                          marks=[pytest.mark.profilelong])
                          ],
                          ids=[
                              "4members_2chunks_2splits",
                              "4members_2chunks_4splits",
                              "4members_2chunks_8splits",
+                             "9members_2chunks_15splits"
                          ],
                          )
 @pytest.mark.timeout(600)
@@ -421,6 +433,14 @@ def do_setstatus(as_exp_, fl=None, ftcs=None, fs=None, ft=None, target="WAITING"
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3", "2", "8", "fl",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", "ftcs",
+                                          marks=[pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", "ft",
+                                          marks=[pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", "fs",
+                                          marks=[pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", "fl",
+                                          marks=[pytest.mark.profilelong])
                          ],
                          ids=[
                              "4members_2chunks_2splits_ftcs",
@@ -434,7 +454,12 @@ def do_setstatus(as_exp_, fl=None, ftcs=None, fs=None, ft=None, target="WAITING"
                              "4members_2chunks_8splits_ftcs",
                              "4members_2chunks_8splits_ft",
                              "4members_2chunks_8splits_fs",
-                             "4members_2chunks_8splits_fl"
+                             "4members_2chunks_8splits_fl",
+                             "9members_2chunks_15splits_ftcs",
+                             "9members_2chunks_15splits_ft",
+                             "9members_2chunks_15splits_fs",
+                             "9members_2chunks_15splits_fl"
+
                          ],
                          )
 def test_autosubmit_setstatus_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, members, chunks,
