@@ -32,8 +32,7 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_id
 from autosubmit.database.session import get_engine
 from autosubmit.database.tables import TableRegistry
-
-LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
+from autosubmit.helpers import LOCAL_TZ
 
 
 class ExperimentDetailsRepository(ABC):
