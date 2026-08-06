@@ -31,8 +31,7 @@ __all__ = [
     "LOCAL_TZ",
     "ExperimentDetails",
 ]
-
-LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
+from autosubmit.helpers import LOCAL_TZ
 
 
 class ExperimentDetails:

@@ -17,12 +17,12 @@
 
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.helpers import LOCAL_TZ
 
-LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S%z'
 
 DEFAULT_HISTORICAL_LOGS_DIR = BasicConfig.HISTORICAL_LOG_DIR
