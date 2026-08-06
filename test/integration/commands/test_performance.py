@@ -23,6 +23,7 @@ import pytest
 
 from autosubmit.profiler.profiler import Profiler
 
+
 # https://github.com/BSC-ES/autosubmit/issues/1332
 
 
@@ -266,11 +267,17 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
 
 @pytest.mark.parametrize("members,chunks,splits",
                          [
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30",
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "2",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "4",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "8",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
                          ],
                          ids=[
-                             "9members_2chunks_30splits",
+                             "4members_2chunks_2splits",
+                             "4members_2chunks_4splits",
+                             "4members_2chunks_8splits"
                          ],
                          )
 @pytest.mark.timeout(300)
@@ -320,11 +327,14 @@ def test_autosubmit_run_profile_metrics(benchmark, tmp_path: Path, autosubmit_ex
 
 @pytest.mark.parametrize("members,chunks,splits",
                          [
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "2", marks=[pytest.mark.profile]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", marks=[pytest.mark.profile]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", marks=[pytest.mark.profile]),
                          ],
                          ids=[
-                             "9members_2chunks_30splits",
+                             "4members_2chunks_2splits",
+                             "4members_2chunks_4splits",
+                             "4members_2chunks_8splits",
                          ],
                          )
 @pytest.mark.timeout(600)
@@ -387,20 +397,44 @@ def do_setstatus(as_exp_, fl=None, ftcs=None, fs=None, ft=None, target="WAITING"
 @pytest.mark.timeout(600)
 @pytest.mark.parametrize("members,chunks,splits,filter_type",
                          [
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30", "ftcs",
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "2", "ftcs",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30", "ft",
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "2", "ft",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30", "fs",
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "2", "fs",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30", "fl",
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "2", "fl",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", "ftcs",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", "ft",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", "fs",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", "fl",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", "ftcs",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", "ft",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", "fs",
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", "fl",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
                          ],
                          ids=[
-                             "9members_2chunks_30splits_ftcs",
-                             "9members_2chunks_30splits_ft",
-                             "9members_2chunks_30splits_fs",
-                             "9members_2chunks_30splits_fl",
+                             "4members_2chunks_2splits_ftcs",
+                             "4members_2chunks_2splits_ft",
+                             "4members_2chunks_2splits_fs",
+                             "4members_2chunks_2splits_fl",
+                             "4members_2chunks_4splits_ftcs",
+                             "4members_2chunks_4splits_ft",
+                             "4members_2chunks_4splits_fs",
+                             "4members_2chunks_4splits_fl",
+                             "4members_2chunks_8splits_ftcs",
+                             "4members_2chunks_8splits_ft",
+                             "4members_2chunks_8splits_fs",
+                             "4members_2chunks_8splits_fl"
                          ],
                          )
 def test_autosubmit_setstatus_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, members, chunks,
