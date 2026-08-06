@@ -27,18 +27,17 @@ produces:
   heatmaps of the run and the create/recovery/setstatus scenarios, current vs
   baseline.
 
-Baselines are aggregated with the median across all provided run files, so the
-``--previous`` argument can point to a directory holding several historical
-runs (e.g. the last N master runs committed to the ``benchmark-reference``
-branch). Baselines may be stored per CPU: ``.benchmarks/reference/<cpu-slug>/``,
-in which case the baseline matching the current run's CPU is selected
-automatically (a run on a CPU without a baseline yet is shown without
-comparison and seeds it).
+Each side of the comparison is a single pytest-benchmark file: the workflow
+merges the BENCHMARK_RUNS sessions of a run into one file with per-scenario
+medians (see merge_runs.py), and the baseline reference keeps one file per
+CPU: ``.benchmarks/reference/<cpu-slug>/``, in which case the baseline
+matching the current run's CPU is selected automatically (a run on a CPU
+without a baseline yet is shown without comparison and seeds it).
 
 Usage::
 
     python .benchmarks/compare_results.py \\
-        --current .benchmarks/data/current.json \\
+        --current .benchmarks/data \\
         --previous .benchmarks/reference \\
         --thresholds .benchmarks/thresholds.yml \\
         --version 4.2.0 \\
@@ -48,7 +47,6 @@ When no ``--previous`` is provided the report is rendered current-only (used
 for the first run after the baseline branch is created).
 """
 
-from __future__ import annotations
 
 import argparse
 import json
@@ -69,30 +67,30 @@ METRIC_COLUMNS = [
     "Memory consumption(MiB)",
     "Historical DB Disk Usage(MiB)",
     "Job list DB Usage",
-    "FD GROW",
-    "MEM GROW(MIB)",
-    "OBJ GROW",
+    "FD GROWTH",
+    "MEM GROWTH(MIB)",
+    "OBJ GROWTH",
 ] + EXACT_METRICS
 
 # Profiler growth metrics are only meaningful for the `run` scenarios;
 # elsewhere they are absent or dominated by noise, so they are excluded.
-_GROW_METRICS = {"FD GROW", "MEM GROW(MIB)", "OBJ GROW"}
-_NO_GROW_TEST_TYPES = {"create", "recovery", "setstatus"}
+_GROWTH_METRICS = {"FD GROWTH", "MEM GROWTH(MIB)", "OBJ GROWTH"}
+_NO_GROWTH_TEST_TYPES = {"create", "recovery", "setstatus"}
 
 # The performance plots are split in two: the `run` scenarios carry the
 # profiler growth metrics, the create/recovery/setstatus scenarios only carry
 # time/memory/db.
-_RUN_TEST_TYPES = {"run", "run_heavy"}
+_RUN_TEST_TYPES = {"run"}
 _OTHER_TEST_TYPES = {"create", "recovery", "setstatus"}
-_RUN_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)", "MEM GROW(MIB)", "FD GROW", "OBJ GROW"]
+_RUN_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)", "MEM GROWTH(MIB)", "FD GROWTH", "OBJ GROWTH"]
 _OTHER_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)",
                        "Historical DB Disk Usage(MiB)", "Job list DB Usage"]
 _SHORT_METRICS = {
     "Time Taken(Seconds)": "Time (s)",
     "Memory consumption(MiB)": "Memory (MiB)",
-    "MEM GROW(MIB)": "MEM grow (MiB)",
-    "FD GROW": "FD grow",
-    "OBJ GROW": "Obj grow",
+    "MEM GROWTH(MIB)": "MEM growth (MiB)",
+    "FD GROWTH": "FD growth",
+    "OBJ GROWTH": "Obj growth",
     "Historical DB Disk Usage(MiB)": "Hist DB (KiB)",
     "Job list DB Usage": "Job DB (KiB)",
 }
@@ -100,8 +98,8 @@ _SHORT_METRICS = {
 
 def _allowed_metrics(test_type: str) -> set[str]:
     """Return the metric names to report for the given test type."""
-    if test_type in _NO_GROW_TEST_TYPES:
-        return set(METRIC_COLUMNS) - _GROW_METRICS
+    if test_type in _NO_GROWTH_TEST_TYPES:
+        return set(METRIC_COLUMNS) - _GROWTH_METRICS
     return set(METRIC_COLUMNS)
 
 
@@ -126,7 +124,7 @@ def _iter_run_files(path: str | None, latest_only: bool = False) -> list[Path]:
 
     When ``latest_only`` is set and ``path`` is a directory, only the most
     recently modified run file is returned. This is used for the ``--current``
-    argument so locally accumulated runs are not averaged together.
+    argument so the merged file of the latest run is the one compared.
     """
     if not path:
         return []
@@ -166,58 +164,49 @@ def _cpu_slug(brand_raw: str) -> str:
     return slug or "unknown-cpu"
 
 
-def _is_machine_dir(name: str) -> bool:
-    """pytest-benchmark stores runs under machine dirs like ``Linux-CPython-3.11-64bit``."""
-    return bool(re.match(r"^(linux|darwin|windows)-", name, re.IGNORECASE))
+def _select_previous(previous: str | None, current_cpu: str) -> list[Path]:
+    """Return the baseline run file for the current CPU.
 
-
-def _select_previous(previous: str | None, current_cpu: str) -> tuple[list[Path], str | None]:
-    """Return the baseline run files for the current CPU plus its slug.
-
-    ``--previous`` may be a single file, a flat directory of JSON runs (legacy),
-    or a directory of per-CPU subdirectories (``.benchmarks/reference/<slug>/``).
-    When per-CPU subdirectories exist, the one matching ``current_cpu`` is used;
-    if none matches, no baseline is available for this CPU.
+    ``--previous`` may be a single file or the per-CPU reference directory
+    (``.benchmarks/reference/<slug>/``). The subdirectory matching
+    ``current_cpu`` is used; if none matches, no baseline is available for
+    this CPU.
     """
     if not previous:
-        return [], None
+        return []
     p = Path(previous)
     if p.is_file():
-        return [p], None
+        return [p]
     if p.is_dir():
-        subdirs = [d for d in p.iterdir() if d.is_dir()]
-        if any(not _is_machine_dir(d.name) for d in subdirs):
-            slug = _cpu_slug(current_cpu) if current_cpu else ""
-            target = p / slug if slug else None
-            if target is not None and target.is_dir():
-                return sorted(target.rglob("*.json")), slug
-            return [], slug
-        return sorted(p.rglob("*.json")), None
-    return [], None
+        slug = _cpu_slug(current_cpu) if current_cpu else ""
+        target = p / slug if slug else None
+        if target is not None and target.is_dir():
+            return sorted(target.rglob("*.json"))
+    return []
 
 
-def build_frame(runs: list[dict]) -> pd.DataFrame:
-    """Build a DataFrame indexed by (test type, ID) with median metric values.
+def build_frame(run: dict) -> pd.DataFrame:
+    """Build a DataFrame indexed by (test type, ID) from a single run file.
 
-    If several run files are provided the median across runs is used for each
-    (test type, ID) pair, which gives a robust baseline.
+    Each side of the comparison is one pytest-benchmark file: the workflow
+    merges the BENCHMARK_RUNS sessions with merge_runs.py (per-scenario
+    medians) and the baseline reference keeps one file per CPU.
     """
     records = []
-    for run in runs:
-        for entry in run.get("benchmarks", []):
-            extra = entry.get("extra_info", {})
-            test_type = extra.get("test type")
-            run_id = extra.get("ID")
-            if not test_type or not run_id:
-                continue
-            row = {
-                "test type": test_type,
-                "ID": run_id,
-                "Time Taken(Seconds)": entry.get("stats", {}).get("median"),
-            }
-            for metric in METRIC_COLUMNS[1:]:
-                row[metric] = extra.get(metric)
-            records.append(row)
+    for entry in run.get("benchmarks", []):
+        extra = entry.get("extra_info", {})
+        test_type = extra.get("test type")
+        run_id = extra.get("ID")
+        if not test_type or not run_id:
+            continue
+        row = {
+            "test type": test_type,
+            "ID": run_id,
+            "Time Taken(Seconds)": entry.get("stats", {}).get("median"),
+        }
+        for metric in METRIC_COLUMNS[1:]:
+            row[metric] = extra.get(metric)
+        records.append(row)
 
     if not records:
         return pd.DataFrame(columns=_TABLE_COLUMNS)
@@ -229,12 +218,7 @@ def build_frame(runs: list[dict]) -> pd.DataFrame:
     for col in EXACT_METRICS:
         frame[col] = pd.to_numeric(frame[col], errors="coerce")
 
-    grouped = (
-        frame.groupby(["test type", "ID"], sort=False)
-        .median(numeric_only=True)
-        .reset_index()
-    )
-    return grouped.set_index(["test type", "ID"])
+    return frame.set_index(["test type", "ID"])
 
 
 def _safe_pct(current: float | None, previous: float | None) -> float | None:
@@ -246,6 +230,12 @@ def _safe_pct(current: float | None, previous: float | None) -> float | None:
 
 def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: dict) -> pd.DataFrame:
     """Compare current vs previous applying the configured thresholds.
+
+    Deltas are always computed on the absolute value of the measurement
+    (``|current|`` vs ``|previous|``): a regression means the magnitude grew,
+    which is well-defined even when values can be negative or cross zero (a
+    growth metric going from -15 to +215 MiB is a regression even though the
+    signed delta would read as an "improvement").
 
     Returns a DataFrame with one row per (scenario, metric) pair.
     """
@@ -289,7 +279,8 @@ def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: d
             cfg = metrics_cfg.get(metric, {})
             threshold = float(cfg.get("threshold", 15.0))
             floor = float(cfg.get("floor", 0.0))
-            pct = _safe_pct(cur_val, prev_val)
+            abs_prev = abs(prev_val) if prev_val is not None else None
+            pct = _safe_pct(abs(cur_val), abs_prev)
 
             if not baseline_ok or prev_val is None or pd.isna(prev_val):
                 rows.append({"test type": test_type, "ID": run_id, "metric": metric,
@@ -297,7 +288,12 @@ def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: d
                 continue
 
             verdict = "PASS"
-            if pct is not None and pct > threshold and float(cur_val) >= floor:
+            if pct is not None and pct > threshold and abs(float(cur_val)) >= floor:
+                verdict = "WARN"
+            elif prev_val == 0 and cur_val != 0 and abs(float(cur_val)) >= floor:
+                # A measurable change from an exact zero baseline (e.g. FD
+                # GROWTH going 0 -> 1) has no finite delta, but it is a change:
+                # any magnitude above the floor warns.
                 verdict = "WARN"
             rows.append({"test type": test_type, "ID": run_id, "metric": metric,
                          "baseline": prev_val, "current": cur_val, "delta %": pct, "verdict": verdict})
@@ -404,7 +400,7 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.colors import TwoSlopeNorm, Normalize
+    from matplotlib.colors import Normalize, TwoSlopeNorm
     from matplotlib.patches import Rectangle
 
     class _DeadZoneNorm(Normalize):
@@ -591,11 +587,12 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.version:
+        from importlib.metadata import PackageNotFoundError
         from importlib.metadata import version as pkg_version
 
         try:
             args.version = pkg_version("autosubmit")
-        except Exception:
+        except PackageNotFoundError:
             args.version = (Path(__file__).parent.parent / "VERSION").read_text().strip()
 
     current_files = _iter_run_files(args.current, latest_only=True)
@@ -604,9 +601,12 @@ def main() -> int:
         return 1
 
     current_runs = _load_runs(current_files)
+    if not current_runs:
+        print(f"[ERROR] No readable benchmark runs found under --current {args.current}", file=sys.stderr)
+        return 1
     current_cpu = _current_cpu(current_runs)
 
-    previous_files, baseline_slug = _select_previous(args.previous, current_cpu)
+    previous_files = _select_previous(args.previous, current_cpu)
     previous_runs = _load_runs(previous_files) if previous_files else []
     if previous_runs and current_cpu:
         baseline_cpu = _current_cpu(previous_runs)
@@ -615,8 +615,8 @@ def main() -> int:
                   f"ignoring baseline.")
             previous_runs = []
 
-    current_frame = build_frame(current_runs)
-    previous_frame = build_frame(previous_runs) if previous_runs else None
+    current_frame = build_frame(current_runs[0])
+    previous_frame = build_frame(previous_runs[0]) if previous_runs else None
 
     thresholds = _load_thresholds(Path(args.thresholds))
     report = evaluate(current_frame, previous_frame, thresholds)
@@ -649,7 +649,7 @@ def main() -> int:
         "version": args.version,
         "regressions_detected": n_warnings > 0,
         "n_regressions": n_warnings,
-        "n_scenarios": int(len(current_frame)),
+        "n_scenarios": len(current_frame),
         "cpu": current_cpu,
         "cpu_slug": _cpu_slug(current_cpu) if current_cpu else "",
     }

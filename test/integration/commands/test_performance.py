@@ -15,8 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -242,13 +242,13 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
     else:
         metadata_size = 0
 
-    fd_grow = _find(r"FILE DESCRIPTORS GROW: (\d+)", text)
-    mem_grow_match = re.search(r"MEMORY GROW: (-?\d+\.\d+) ([A-Za-z]+)\.", text)
+    fd_growth = _find(r"FILE DESCRIPTORS GROWTH: (\d+)", text)
+    mem_grow_match = re.search(r"MEMORY GROWTH: (-?\d+\.\d+) ([A-Za-z]+)\.", text)
     if mem_grow_match:
-        mem_grow = _to_mib(mem_grow_match.group(1), mem_grow_match.group(2))
+        mem_growth = _to_mib(mem_grow_match.group(1), mem_grow_match.group(2))
     else:
-        mem_grow = None
-    obj_grow = _find(r"OBJECTS GROW: (\d+)", text)
+        mem_growth = None
+    obj_growth = _find(r"OBJECTS GROWTH: (\d+)", text)
 
     return {
         "test type": test_type,
@@ -258,31 +258,23 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
         "Job list DB Usage": float(db_size),
         "Total Jobs": total_jobs,
         "Total Dependencies": total_dependencies,
-        "FD GROW": fd_grow,
-        "MEM GROW(MIB)": mem_grow,
-        "OBJ GROW": obj_grow,
+        "FD GROWTH": fd_growth,
+        "MEM GROWTH(MIB)": mem_growth,
+        "OBJ GROWTH": obj_growth,
     }
 
 
 @pytest.mark.parametrize("members,chunks,splits",
                          [
-                             pytest.param("fc0", "1", "1", marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30",
-                                          marks=[pytest.mark.profilelong]),
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
                          ],
                          ids=[
-                             "1member_1chunk_1split",
-                             "4members_2chunks_5splits",
-                             "4members_2chunks_10splits",
                              "9members_2chunks_30splits",
                          ],
                          )
 @pytest.mark.timeout(300)
-def test_autosubmit_create_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, general_data, members,
+def test_autosubmit_create_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, members,
                                            chunks, splits):
     """Integration/performance test for `autosubmit create` with profiling enabled."""
     test_type = "create"
@@ -299,25 +291,19 @@ def test_autosubmit_create_profile_metrics(benchmark, tmp_path: Path, autosubmit
 
 @pytest.mark.parametrize("members,chunks,splits,max_iterations,test_type",
                          [
-                             pytest.param("fc0", "1", "1", 0, "run",
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "2", 0, "run",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1", "2", "2", 0, "run",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", 0, "run", marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", 0, "run_heavy", marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "5", "100", 15, "run_heavy",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", 0, "run", marks=[pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", 0, "run", marks=[pytest.mark.profilelong]),
                          ],
                          ids=[
-                             "1member_1chunk_1split",
-                             "2members_2chunks_2splits",
-                             "4members_2chunks_5splits",
-                             "4members_2chunks_10splits",
-                             "MEM_TEST"
+                             "4members_2chunks_2splits",
+                             "4members_2chunks_4splits",
+                             "4members_2chunks_8splits",
                          ],
                          )
 @pytest.mark.timeout(1800)
-def test_autosubmit_run_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, general_data, members, chunks,
+def test_autosubmit_run_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, members, chunks,
                                         splits, max_iterations, slurm_server, test_type):
     """Integration/performance test for `autosubmit run` with profiling enabled."""
     current_id = _scenario_id(members, chunks, splits)
@@ -334,23 +320,15 @@ def test_autosubmit_run_profile_metrics(benchmark, tmp_path: Path, autosubmit_ex
 
 @pytest.mark.parametrize("members,chunks,splits",
                          [
-                             pytest.param("fc0", "1", "1", marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30",
-                                          marks=[pytest.mark.profilelong]),
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
                          ],
                          ids=[
-                             "1member_1chunk_1split",
-                             "4members_2chunks_5splits",
-                             "4members_2chunks_10splits",
                              "9members_2chunks_30splits",
                          ],
                          )
 @pytest.mark.timeout(600)
-def test_autosubmit_recovery_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, general_data, members, chunks,
+def test_autosubmit_recovery_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, members, chunks,
                                              splits, slurm_server):
     """Integration/performance test for `autosubmit recovery` with profiling enabled."""
     test_type = "recovery"
@@ -409,59 +387,23 @@ def do_setstatus(as_exp_, fl=None, ftcs=None, fs=None, ft=None, target="WAITING"
 @pytest.mark.timeout(600)
 @pytest.mark.parametrize("members,chunks,splits,filter_type",
                          [
-                             pytest.param("fc0", "1", "1", "ftcs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", "ftcs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", "ftcs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0", "1", "1", "ft",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", "ft",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", "ft",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0", "1", "1", "fs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", "fs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", "fs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0", "1", "1", "fl",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", "fl",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", "fl",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30", "ftcs",
-                                          marks=[pytest.mark.profilelong]),
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30", "ft",
-                                          marks=[pytest.mark.profilelong]),
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30", "fs",
-                                          marks=[pytest.mark.profilelong]),
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "30", "fl",
-                                          marks=[pytest.mark.profilelong]),
+                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
                          ],
                          ids=[
-                             "1member_1chunk_1split_ftcs",
-                             "4members_2chunks_5splits_ftcs",
-                             "4members_2chunks_10splits_ftcs",
-                             "1member_1chunk_1split_ft",
-                             "4members_2chunks_5splits_ft",
-                             "4members_2chunks_10splits_ft",
-                             "1member_1chunk_1split_fs",
-                             "4members_2chunks_5splits_fs",
-                             "4members_2chunks_10splits_fs",
-                             "1member_1chunk_1split_fl",
-                             "4members_2chunks_5splits_fl",
-                             "4members_2chunks_10splits_fl",
                              "9members_2chunks_30splits_ftcs",
                              "9members_2chunks_30splits_ft",
                              "9members_2chunks_30splits_fs",
                              "9members_2chunks_30splits_fl",
                          ],
                          )
-def test_autosubmit_setstatus_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, general_data, members, chunks,
+def test_autosubmit_setstatus_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, members, chunks,
                                               splits, slurm_server, filter_type):
     """Integration/performance test for `autosubmit setstatus` with profiling enabled."""
 

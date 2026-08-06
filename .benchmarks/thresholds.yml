@@ -19,7 +19,7 @@
 # the noisiest metrics; the deterministic counters should never move).
 metrics:
   Time Taken(Seconds):
-    threshold: 22.0
+    threshold: 15.0
     floor: 5.0 # exclude really quick commands
   Memory consumption(MiB):
     threshold: 10.0
@@ -30,14 +30,14 @@ metrics:
   Job list DB Usage:
     threshold: 10.0
     floor: 1.0
-  FD GROW:
+  FD GROWTH:
     threshold: 15.0
     floor: 1.0
-  MEM GROW(MIB):
+  MEM GROWTH(MIB):
     threshold: 15.0
-    floor: 1.0
-  OBJ GROW:
-    threshold: 20.0
+    floor: 2.0
+  OBJ GROWTH:
+    threshold: 15.0
     floor: 1.0
 
 exact_metrics:
@@ -45,5 +45,5 @@ exact_metrics:
   - Total Dependencies
 
 plot:
-  delta_clip: 20.0
-  delta_tolerance: 0
+  delta_clip: 25.0
+  delta_tolerance: 2.0

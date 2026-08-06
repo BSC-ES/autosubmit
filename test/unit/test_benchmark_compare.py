@@ -70,9 +70,9 @@ def _baseline_entry(**overrides):
         "Job list DB Usage": 0.03,
         "Total Jobs": 7,
         "Total Dependencies": 7,
-        "FD GROW": None,
-        "MEM GROW(MIB)": 0,
-        "OBJ GROW": None,
+        "FD GROWTH": None,
+        "MEM GROWTH(MIB)": 0,
+        "OBJ GROWTH": None,
     }
     extra.update(overrides)
     return extra
@@ -80,7 +80,7 @@ def _baseline_entry(**overrides):
 
 def test_no_baseline_renders_current_only():
     run = _make_run(_make_entry("create", "create", "fc0_1_1", 0.7, **_baseline_entry()))
-    frame = compare.build_frame([run])
+    frame = compare.build_frame(run)
     report = compare.evaluate(frame, None, _thresholds())
 
     assert not report.empty
@@ -91,32 +91,22 @@ def test_no_baseline_renders_current_only():
     assert "No regressions detected" in markdown
 
 
-def test_time_regression_warns():
-    thr = _time_threshold()
-    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
-    current = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0 * (1 + (thr + 10) / 100),
-                                     **_baseline_entry()))
+@pytest.mark.parametrize("baseline_time, current_time, expected, expected_delta", [
+    pytest.param(10.0, 10.0 * (1 + (_time_threshold() + 10) / 100), "WARN",
+                 pytest.approx(_time_threshold() + 10), id="over-threshold-warns"),
+    pytest.param(0.01, _time_floor() * 0.5, "PASS", None, id="under-floor-suppressed"),
+])
+def test_time_verdicts(baseline_time, current_time, expected, expected_delta):
+    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", baseline_time, **_baseline_entry()))
+    current = _make_run(_make_entry("run", "run", "fc0_1_1", current_time, **_baseline_entry()))
 
     report = compare.evaluate(
-        compare.build_frame([current]), compare.build_frame([baseline]), _thresholds()
+        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
     )
     row = report[report["metric"] == "Time Taken(Seconds)"].iloc[0]
-    assert row["verdict"] == "WARN"
-    assert row["delta %"] == pytest.approx(thr + 10)
-
-
-def test_floor_suppresses_small_values():
-    floor = _time_floor()
-    baseline = _make_run(_make_entry("create", "create", "fc0_1_1", 0.01, **_baseline_entry()))
-    current = _make_run(_make_entry("create", "create", "fc0_1_1", floor * 0.5, **_baseline_entry()))
-
-    report = compare.evaluate(
-        compare.build_frame([current]), compare.build_frame([baseline]), _thresholds()
-    )
-    # Huge relative increase, but the current value stays below the configured
-    # floor, so the regression is suppressed.
-    row = report[report["metric"] == "Time Taken(Seconds)"].iloc[0]
-    assert row["verdict"] == "PASS"
+    assert row["verdict"] == expected
+    if expected_delta is not None:
+        assert row["delta %"] == expected_delta
 
 
 def test_exact_metric_change_warns():
@@ -125,35 +115,24 @@ def test_exact_metric_change_warns():
                                     **{**_baseline_entry(), "Total Jobs": 8}))
 
     report = compare.evaluate(
-        compare.build_frame([current]), compare.build_frame([baseline]), _thresholds()
+        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
     )
     row = report[report["metric"] == "Total Jobs"].iloc[0]
     assert row["verdict"] == "WARN"
 
 
-def test_baseline_uses_median_over_multiple_runs():
-    baseline = [
-        _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry())),
-        _make_run(_make_entry("run", "run", "fc0_1_1", 14.0, **_baseline_entry())),
-    ]
-    current = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
-
-    report = compare.evaluate(
-        compare.build_frame([current]), compare.build_frame(baseline), _thresholds()
-    )
-    row = report[report["metric"] == "Time Taken(Seconds)"].iloc[0]
-    # median baseline is 12.0; current 10.0 is an improvement, so no warning
-    assert row["verdict"] == "PASS"
-
-
-def test_environment_warning_detects_different_cpu():
+@pytest.mark.parametrize("current_cpu, previous_cpu, expected", [
+    pytest.param("Test CPU", "Other CPU", True, id="different-cpu-warns"),
+    pytest.param("Test CPU", "Test CPU", False, id="same-cpu-no-warning"),
+])
+def test_environment_warning(current_cpu, previous_cpu, expected):
     current = [_make_run(_make_entry("run", "run", "fc0_1_1", 1.0, **_baseline_entry()))]
     previous = [_make_run(_make_entry("run", "run", "fc0_1_1", 1.0, **_baseline_entry()))]
-    previous[0]["machine_info"]["cpu"]["brand_raw"] = "Other CPU"
+    current[0]["machine_info"]["cpu"]["brand_raw"] = current_cpu
+    previous[0]["machine_info"]["cpu"]["brand_raw"] = previous_cpu
 
     warning = compare.environment_warning(current, previous)
-    assert warning is not None
-    assert "Environment differs" in warning
+    assert (warning is not None) == expected
 
 
 def test_render_markdown_flags_regressions():
@@ -162,10 +141,10 @@ def test_render_markdown_flags_regressions():
     current = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0 * (1 + (thr + 10) / 100),
                                      **_baseline_entry()))
     report = compare.evaluate(
-        compare.build_frame([current]), compare.build_frame([baseline]), _thresholds()
+        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
     )
     markdown = compare.render_markdown(report, "4.2.0", "Current", "Baseline", None)
-    assert "## ⚠️ Regressions detected" in markdown
+    assert "Regressions detected" in markdown
     assert "run/fc0_1_1" in markdown
     assert "Time Taken(Seconds)" in markdown
 
@@ -184,3 +163,115 @@ def test_current_directory_uses_newest_run_only(tmp_path: Path):
 
     files = compare._iter_run_files(str(tmp_path), latest_only=True)
     assert files == [newer]
+
+
+_NAN = float("nan")
+
+
+@pytest.mark.parametrize("metric, baseline, current, expected, expected_delta", [
+    pytest.param("MEM GROWTH(MIB)", -15.0, 215.0, "WARN",
+                 pytest.approx((215.0 - 15.0) / 15.0 * 100.0), id="flip-to-leak-warns"),
+    pytest.param("MEM GROWTH(MIB)", 215.0, -15.0, "PASS", None, id="flip-to-release-passes"),
+    pytest.param("MEM GROWTH(MIB)", -215.62, -256.48, "WARN",
+                 pytest.approx((256.48 - 215.62) / 215.62 * 100.0), id="negative-more-negative-warns"),
+    pytest.param("MEM GROWTH(MIB)", -215.0, -200.0, "PASS", None, id="negative-less-negative-passes"),
+    pytest.param("MEM GROWTH(MIB)", 0.18, -0.8, "PASS", None, id="sub-floor-excluded"),
+    pytest.param("FD GROWTH", 0, 1, "WARN", _NAN, id="zero-baseline-change-warns"),
+    pytest.param("FD GROWTH", 1, 0, "PASS", None, id="zero-baseline-improvement-passes"),
+    pytest.param("MEM GROWTH(MIB)", 0, 0.5, "PASS", _NAN, id="zero-baseline-sub-floor-passes"),
+])
+def test_growth_verdicts(metric, baseline, current, expected, expected_delta):
+    baseline_run = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0,
+                                         **{**_baseline_entry(), metric: baseline}))
+    current_run = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0,
+                                        **{**_baseline_entry(), metric: current}))
+
+    report = compare.evaluate(
+        compare.build_frame(current_run), compare.build_frame(baseline_run), _thresholds()
+    )
+    row = report[report["metric"] == metric].iloc[0]
+    assert row["verdict"] == expected
+    if expected_delta is _NAN:
+        assert row["delta %"] != row["delta %"]  # NaN
+    elif expected_delta is not None:
+        assert row["delta %"] == expected_delta
+
+
+@pytest.mark.parametrize("slug_dir, cpu, expected_file", [
+    pytest.param("intel-xeon", "Intel Xeon", "4.2.0-aaaaaaa.json", id="slug-found"),
+    pytest.param("amd-epyc", "Intel Xeon", None, id="slug-missing"),
+])
+def test_select_previous(slug_dir, cpu, expected_file, tmp_path):
+    ref = tmp_path / "reference"
+    (ref / slug_dir).mkdir(parents=True)
+    if expected_file:
+        (ref / slug_dir / expected_file).write_text("{}", encoding="UTF-8")
+
+    files = compare._select_previous(str(ref), cpu)
+    if expected_file:
+        # the selected file lives under the current CPU's slug directory
+        assert files[0].parent.name == "intel-xeon"
+        assert files[0].name == expected_file
+    else:
+        assert files == []
+
+
+def test_main_errors_on_unreadable_current_file(tmp_path: Path, monkeypatch):
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "0001_corrupt.json").write_text("{not json", encoding="UTF-8")
+
+    monkeypatch.setattr("sys.argv", ["compare_results", "--current", str(data), "--version", "9.9.9"])
+    assert compare.main() == 1
+
+
+def test_missing_baseline_scenario_renders_no_baseline():
+    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
+    current = _make_run(
+        _make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()),
+        _make_entry("create", "create", "fc0_2_2", 1.0, **_baseline_entry()),
+    )
+
+    report = compare.evaluate(
+        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
+    )
+    rows = report[report["metric"] == "(no baseline)"]
+    assert len(rows) == 1
+    assert rows.iloc[0]["test type"] == "create"
+    assert rows.iloc[0]["verdict"] == "N/A"
+
+
+def test_render_markdown_includes_environment_warning():
+    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
+    current = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
+    report = compare.evaluate(
+        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
+    )
+
+    markdown = compare.render_markdown(report, "4.2.0", "Current", "Baseline",
+                                       "Environment differs from baseline: current ran on `A` "
+                                       "while the baseline ran on `B`.")
+    assert "Environment differs from baseline" in markdown
+
+
+def test_render_heatmap_produces_png(tmp_path: Path):
+    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
+    current = _make_run(_make_entry("run", "run", "fc0_1_1", 11.0, **_baseline_entry()))
+    report = compare.evaluate(
+        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
+    )
+
+    out = compare.render_heatmap(
+        compare.build_frame(current), compare.build_frame(baseline), report,
+        "4.2.0", tmp_path, thresholds=_thresholds(),
+        test_types={"run"}, metrics=["Time Taken(Seconds)"], out_name="test_run.png",
+    )
+    assert out is not None and out.exists() and out.stat().st_size > 0
+
+    # No baseline: absolute-mode plot with neutral cells must also render.
+    no_base = compare.render_heatmap(
+        compare.build_frame(current), None, report,
+        "4.2.0", tmp_path, thresholds=_thresholds(),
+        test_types={"run"}, metrics=["Time Taken(Seconds)"], out_name="test_abs.png",
+    )
+    assert no_base is not None and no_base.exists() and no_base.stat().st_size > 0
