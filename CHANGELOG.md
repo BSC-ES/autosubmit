@@ -7,7 +7,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 **Bug fixes:**
 
 - Fix timeout guard is silently disabled for login/local jobs #3081
-- Fixed the Profiler reporting `MEMORY GROW` with the wrong unit when the growth was small relative to the final memory (e.g. ~0.5 MiB shown as 527 "MiB"). #3162
+- Fixed the Profiler reporting `MEMORY GROWTH` with the wrong unit when the growth was small relative to the final memory (e.g. ~0.5 MiB shown as 527 "MiB"). #3162
 
 **New Features:**
 
