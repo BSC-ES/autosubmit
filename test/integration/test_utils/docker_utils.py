@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Utilities for Docker."""
+
 import multiprocessing
 from getpass import getuser
 from os import environ
@@ -40,7 +41,6 @@ from test.integration.test_utils.ssh import (
 
 if TYPE_CHECKING:
     from docker.models.containers import Container, ExecResult
-    from pytest_mock import MockerFixture
     from pytest import MonkeyPatch
     from requests import Response
 
@@ -114,7 +114,7 @@ def get_containers_by_filter(filters: dict) -> list['Container']:
     GitHub Actions, for instance, where the ``ancestor`` attribute
     contains the image used.
 
-    E.g.,
+    E.g.
 
         {"ancestor": "giovtorres/slurm-docker:25.11.2-v0.1.5"}
 
@@ -150,7 +150,7 @@ def _create_git_container(git_repos_path: Path, http_port: int) -> DockerContain
 
     # The docker image ``githttpd/githttpd`` creates an HTTP server for Git
     # repositories, using the volume bound onto ``/opt/git-server`` as base
-    # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
+    # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}``.
     return container
 
 
@@ -194,7 +194,7 @@ def _create_svn_container(svn_repos_path: Path, http_port: int) -> DockerContain
 
     # The docker image ``elleflorio/svn-server`` creates an HTTP server for SVN
     # repositories, using the volume bound onto ``<TBC>`` as base
-    # for any subdirectory, the SVN URL becoming ``svn/{subdirectory-name}}``.
+    # for any subdirectory, the SVN URL becoming ``svn/{subdirectory-name}``.
     return container
 
 
@@ -269,6 +269,9 @@ def prepare_and_test_slurm_container(
 
     for authorized_keys_path in [Path('/root/.ssh/authorized_keys'), Path(f'/home/{user}/.ssh/authorized_keys')]:
         # noinspection PyProtectedMember
+        if not container._container:
+            raise ValueError('Missing container instance')
+        # noinspection PyProtectedMember
         exec_result = _write_authorized_keys(container._container, pubkey, authorized_keys_path)
         exit_code = exec_result.exit_code
 
@@ -292,16 +295,16 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
     container instance is created per test session (a singleton).
 
     Do not repeat Autosubmit experiment IDs. Do not reuse experiment folders.
-    Doing any of these, will result in pytest failures that i. do not contain
+    Doing any of these will result in pytest failures that i. do not contain
     any meaningful information in the logs, ii. nothing useful in the ASLOGS or
     experiment temporary logs, iii. you will have to figure out how to set a
     breakpoint and inspect what is inside the Slurm server.
 
-    Avoiding these risks will save you & other developers time debugging
+    Avoiding these risks will save you and other developers time debugging
     issues like this.
 
     :param ssh_port: The SSH port.
-    :return: an instance of a TestContainers container, with a docker container wrapped,
+    :return: An instance of a TestContainers container, with a docker container wrapped,
         and the SSH configuration file path.
     """
     docker_args = {
@@ -339,7 +342,7 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
 
 def get_slurm_container() -> tuple[DockerContainer, int]:
     """Get a running Slurm container and its SSH port."""
-    # ssh_port = int(container.ports['2222/tcp'][0]['HostPort'])  # type: ignore
+    # ssh_port = int(container.ports['2222/tcp'][0]['HostPort'])
     ssh_port = get_free_port()
     # noinspection PyProtectedMember
     container_instance = _create_slurm_container(ssh_port=ssh_port)
