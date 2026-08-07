@@ -75,6 +75,7 @@ readme = {file = "README_PIP.md"}
 
 [project.optional-dependencies]
 postgres = ["psycopg", "psycopg2"]
+ruff = ["ruff==0.16.1"]
 tests = [
     # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
     "mock",

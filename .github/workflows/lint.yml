@@ -13,6 +13,7 @@ permissions:
 jobs:
   ruff-changes-in-file:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     name: ruff run
 
     steps:
@@ -27,7 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: pip install -e .[ruff]
-      
+
       - name: Determine diff range
         id: range
         run: |
