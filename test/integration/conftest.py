@@ -406,19 +406,25 @@ def ssh_x11_mfa_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") 
         copy_content_from_containers(request, 'ssh_server', 'app/')
 
 
-@pytest.fixture(scope="function")
-def slurm_server(request, tmp_path, mocker) -> Generator["Container", Any, None]:
+@pytest.fixture(scope="session")
+def slurm_server(request, tmp_path_factory) -> Generator["Container", Any, None]:
     """Function-scoped fixture that creates a Slurm server container per test."""
+    mp = pytest.MonkeyPatch()
     # TODO: Needed? If so, explain why.
-    mocker.patch(
-        'autosubmit.platforms.platform.Platform.get_mp_context',
-        return_value=multiprocessing.get_context('fork')
+    mp.setattr(
+        "autosubmit.platforms.platform.Platform.get_mp_context",
+        lambda self: multiprocessing.get_context("fork"),
     )
-    container, ssh_port = get_slurm_container()
-    with container:
-        prepare_and_test_slurm_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
-        yield container.get_wrapped_container()
-        copy_content_from_containers(request, 'slurm_server', '/tmp/scratch/group/root/')
+    
+    ssh_dir = tmp_path_factory.mktemp("slurm_server") / "ssh"
+    try:
+        container, ssh_port = get_slurm_container()
+        with container:
+            prepare_and_test_slurm_container(container, ssh_port, ssh_dir, mp)
+            yield container.get_wrapped_container()
+            copy_content_from_containers(request, 'slurm_server', '/tmp/scratch/group/root/')
+    finally:
+        mp.undo()
 
 
 @pytest.fixture(autouse=True)

@@ -41,6 +41,7 @@ from test.integration.test_utils.ssh import (
 if TYPE_CHECKING:
     from docker.models.containers import Container, ExecResult
     from pytest_mock import MockerFixture
+    from pytest import MonkeyPatch
     from requests import Response
 
 __all__ = [
@@ -223,7 +224,7 @@ def get_svn_container(svn_repos_path: Path) -> tuple[DockerContainer, int]:
 
 
 def prepare_and_test_slurm_container(
-        container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: 'MockerFixture') -> None:
+        container: DockerContainer, ssh_port: int, ssh_path: Path, monkey_patch: 'MonkeyPatch') -> None:
     # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
     wait_for_logs(container, lambda logs: 'All services started' in logs)
 
@@ -280,7 +281,7 @@ def prepare_and_test_slurm_container(
 
     wait_for_ssh_port('localhost', ssh_port, timeout=30)
 
-    mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, mocker)
+    mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, monkey_patch)
 
 
 def _create_slurm_container(ssh_port: int) -> DockerContainer:
@@ -357,7 +358,7 @@ def _write_authorized_keys(container: 'Container', public_key: Path, authorized_
 
 
 def prepare_and_test_ssh_container(
-        container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: 'MockerFixture') -> None:
+        container: DockerContainer, ssh_port: int, ssh_path: Path, monkey_patch: 'MonkeyPatch') -> None:
     exec_result = container.exec('whoami')
     if exec_result.exit_code != 0:
         raise RuntimeError(f'Failed to run whoami on test container {container.get_wrapped_container().id}')
@@ -377,9 +378,11 @@ def prepare_and_test_ssh_container(
     if exit_code != 0:
         raise RuntimeError(f'Failed to write authorized_keys to test container {container.get_wrapped_container().id}')
 
-    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context',
-                 return_value = multiprocessing.get_context('fork'))
-    mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, mocker)
+    monkey_patch.setattr(
+        'autosubmit.platforms.platform.Platform.get_mp_context',
+        lambda *args, **kwargs: multiprocessing.get_context('fork')
+    )
+    mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, monkey_patch)
 
 
 def _create_ssh_container(ssh_port: int, mfa=False, x11=False) -> DockerContainer:

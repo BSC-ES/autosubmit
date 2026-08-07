@@ -33,7 +33,7 @@ from test.integration.test_utils.networking import wait_for_tcp_port
 
 if TYPE_CHECKING:
     from paramiko import SSHClient
-    from pytest_mock import MockerFixture
+    from pytest import MonkeyPatch
 
 __all__ = [
     'MakeSSHClientFixture',
@@ -104,14 +104,25 @@ def make_ssh_client(ssh_port: int, password: str | None, key: Union['Path', str]
     return ssh_client
 
 
-def mock_ssh_config_and_client(ssh_config_path: Path, ssh_port: int, password: str | None, mocker: 'MockerFixture') -> Any:
+def mock_ssh_config_and_client(
+        ssh_config_path: Path,
+        ssh_port: int,
+        password: str | None,
+        monkey_patch: 'MonkeyPatch'
+) -> None:
     ssh_config = paramiko.SSHConfig()
     with open(ssh_config_path, 'r') as f:
         ssh_config.parse(f)
     if password:
         ssh_client = make_ssh_client(ssh_port, password, None)
-        mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
-    return mocker.patch('autosubmit.platforms.paramiko_platform._load_ssh_config', return_value=ssh_config)
+        monkey_patch.setattr(
+            "autosubmit.platforms.paramiko_platform._create_ssh_client",
+            lambda *args, **kwargs: ssh_client,
+        )
+    monkey_patch.setattr(
+        "autosubmit.platforms.paramiko_platform._load_ssh_config",
+        lambda *args, **kwargs: ssh_config,
+    )
 
 
 def _generate_ssh_keypair(path: Path):
