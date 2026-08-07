@@ -97,7 +97,13 @@ _SHORT_METRICS = {
 
 
 def _allowed_metrics(test_type: str) -> set[str]:
-    """Return the metric names to report for the given test type."""
+    """Return the metric names to report for the given test type.
+
+    :param test_type: The test type (e.g., 'run', 'create', 'recovery').
+    :type test_type: str
+    :return: Set of metric names to report.
+    :rtype: set
+    """
     if test_type in _NO_GROWTH_TEST_TYPES:
         return set(METRIC_COLUMNS) - _GROWTH_METRICS
     return set(METRIC_COLUMNS)
@@ -107,7 +113,13 @@ _TABLE_COLUMNS = ["test type", "ID", "metric", "baseline", "current", "delta %",
 
 
 def _load_thresholds(path: Path) -> dict:
-    """Load the thresholds YAML file using the project's YAML parser."""
+    """Load the thresholds YAML file using the project's YAML parser.
+
+    :param path: Path to the thresholds YAML file.
+    :type path: Path
+    :return: Dictionary with the thresholds configuration.
+    :rtype: dict
+    """
     from ruamel.yaml import YAML
 
     yaml = YAML(typ="safe")
@@ -125,6 +137,13 @@ def _iter_run_files(path: str | None, latest_only: bool = False) -> list[Path]:
     When ``latest_only`` is set and ``path`` is a directory, only the most
     recently modified run file is returned. This is used for the ``--current``
     argument so the merged file of the latest run is the one compared.
+
+    :param path: Path to a benchmark run file or directory, or None.
+    :type path: str | None
+    :param latest_only: Whether to return only the most recent file.
+    :type latest_only: bool
+    :return: List of benchmark run file paths.
+    :rtype: list
     """
     if not path:
         return []
@@ -140,7 +159,13 @@ def _iter_run_files(path: str | None, latest_only: bool = False) -> list[Path]:
 
 
 def _load_runs(files: list[Path]) -> list[dict]:
-    """Load the raw JSON content of the given pytest-benchmark run files."""
+    """Load the raw JSON content of the given pytest-benchmark run files.
+
+    :param files: Benchmark run file paths to load.
+    :type files: list
+    :return: List of parsed benchmark run dictionaries.
+    :rtype: list
+    """
     runs = []
     for file in files:
         try:
@@ -152,14 +177,26 @@ def _load_runs(files: list[Path]) -> list[dict]:
 
 
 def _current_cpu(runs: list[dict]) -> str:
-    """Return the CPU ``brand_raw`` of the first run, or ``''`` when unknown."""
+    """Return the CPU ``brand_raw`` of the first run, or ``''`` when unknown.
+
+    :param runs: Benchmark run dictionaries.
+    :type runs: list
+    :return: CPU brand of the first run, or an empty string.
+    :rtype: str
+    """
     if not runs:
         return ""
     return (runs[0].get("machine_info", {}).get("cpu") or {}).get("brand_raw") or ""
 
 
 def _cpu_slug(brand_raw: str) -> str:
-    """Turn a CPU brand string into a directory-safe slug."""
+    """Turn a CPU brand string into a directory-safe slug.
+
+    :param brand_raw: CPU brand string.
+    :type brand_raw: str
+    :return: Directory-safe slug.
+    :rtype: str
+    """
     slug = re.sub(r"[^a-z0-9]+", "-", brand_raw.lower()).strip("-")
     return slug or "unknown-cpu"
 
@@ -171,6 +208,13 @@ def _select_previous(previous: str | None, current_cpu: str) -> list[Path]:
     (``.benchmarks/reference/<slug>/``). The subdirectory matching
     ``current_cpu`` is used; if none matches, no baseline is available for
     this CPU.
+
+    :param previous: Baseline run file or reference directory, or None.
+    :type previous: str | None
+    :param current_cpu: CPU brand of the current run.
+    :type current_cpu: str
+    :return: List of baseline run file paths.
+    :rtype: list
     """
     if not previous:
         return []
@@ -191,6 +235,11 @@ def build_frame(run: dict) -> pd.DataFrame:
     Each side of the comparison is one pytest-benchmark file: the workflow
     merges the BENCHMARK_RUNS sessions with merge_runs.py (per-scenario
     medians) and the baseline reference keeps one file per CPU.
+
+    :param run: Benchmark run dictionary to convert.
+    :type run: dict
+    :return: DataFrame indexed by (test type, ID).
+    :rtype: pd.DataFrame
     """
     records = []
     for entry in run.get("benchmarks", []):
@@ -222,7 +271,15 @@ def build_frame(run: dict) -> pd.DataFrame:
 
 
 def _safe_pct(current: float | None, previous: float | None) -> float | None:
-    """Return the percentage change current vs previous, or None when unknown."""
+    """Return the percentage change current vs previous, or None when unknown.
+
+    :param current: Current value.
+    :type current: float | None
+    :param previous: Baseline value.
+    :type previous: float | None
+    :return: Percentage change, or None when it cannot be computed.
+    :rtype: float | None
+    """
     if previous is None or current is None or pd.isna(previous) or previous == 0 or pd.isna(current):
         return None
     return (float(current) - float(previous)) / float(previous) * 100.0
@@ -237,7 +294,14 @@ def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: d
     growth metric going from -15 to +215 MiB is a regression even though the
     signed delta would read as an "improvement").
 
-    Returns a DataFrame with one row per (scenario, metric) pair.
+    :param current: Current run DataFrame indexed by (test type, ID).
+    :type current: pd.DataFrame
+    :param previous: Baseline DataFrame, or None when there is no baseline.
+    :type previous: pd.DataFrame | None
+    :param thresholds: Thresholds configuration dictionary.
+    :type thresholds: dict
+    :return: DataFrame with one row per (scenario, metric) pair.
+    :rtype: pd.DataFrame
     """
     metrics_cfg = thresholds.get("metrics", {})
     exact = set(thresholds.get("exact_metrics", [])) | set(EXACT_METRICS)
@@ -302,7 +366,15 @@ def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: d
 
 
 def environment_warning(current_runs: list[dict], previous_runs: list[dict]) -> str | None:
-    """Compare machine/environment info between current and baseline runs."""
+    """Compare machine/environment info between current and baseline runs.
+
+    :param current_runs: Benchmark runs of the current execution.
+    :type current_runs: list
+    :param previous_runs: Benchmark runs of the baseline.
+    :type previous_runs: list
+    :return: Warning message when the environments differ, or None.
+    :rtype: str | None
+    """
     if not current_runs or not previous_runs:
         return None
     cur = current_runs[0].get("machine_info", {})
@@ -317,7 +389,21 @@ def environment_warning(current_runs: list[dict], previous_runs: list[dict]) -> 
 
 def render_markdown(report: pd.DataFrame, version: str, current_label: str,
                     previous_label: str | None, env_warning: str | None) -> str:
-    """Render the report as a GitHub-flavored markdown summary."""
+    """Render the report as a GitHub markdown summary.
+
+    :param report: Evaluation report DataFrame.
+    :type report: pd.DataFrame
+    :param version: Autosubmit version, used in the report title.
+    :type version: str
+    :param current_label: Label of the current run.
+    :type current_label: str
+    :param previous_label: Label of the baseline, or None.
+    :type previous_label: str | None
+    :param env_warning: Environment warning message, or None.
+    :type env_warning: str | None
+    :return: Markdown summary of the report.
+    :rtype: str
+    """
     lines = [f"# Autosubmit Performance Metrics - Version {version}",
              "", f"- **Current:** {current_label}", f"- **Baseline:** {previous_label or 'None'}"]
     if env_warning:
@@ -351,7 +437,15 @@ def render_markdown(report: pd.DataFrame, version: str, current_label: str,
 
 
 def _metric_threshold(thresholds: dict, metric: str) -> float:
-    """Return the regression threshold (%) for a metric, with a sane fallback."""
+    """Return the regression threshold (%) for a metric, with a sane fallback.
+
+    :param thresholds: Thresholds configuration dictionary.
+    :type thresholds: dict
+    :param metric: Metric name.
+    :type metric: str
+    :return: Regression threshold as a percentage.
+    :rtype: float
+    """
     cfg = thresholds.get("metrics", {}).get(metric, {})
     thr = float(cfg.get("threshold", 15.0))
     return thr if thr > 0 else 15.0
@@ -362,6 +456,15 @@ def _text_color(rgba: np.ndarray, r: int, c: int) -> str:
 
     The cell color is composited over white at its alpha, then the luminance
     decides the text color so dark cells get white text and light cells black.
+
+    :param rgba: RGBA array of the rendered heatmap.
+    :type rgba: np.ndarray
+    :param r: Row index of the cell.
+    :type r: int
+    :param c: Column index of the cell.
+    :type c: int
+    :return: 'white' or 'black' text color.
+    :rtype: str
     """
     rgb = rgba[r, c, 0:3]
     alpha = float(rgba[r, c, 3])
@@ -371,7 +474,15 @@ def _text_color(rgba: np.ndarray, r: int, c: int) -> str:
 
 
 def _format_abs(metric: str, value: float) -> str:
-    """Format an absolute metric value for a heatmap cell (numbers only)."""
+    """Format an absolute metric value for a heatmap cell (numbers only).
+
+    :param metric: Metric name, which decides the number of decimals.
+    :type metric: str
+    :param value: Metric value.
+    :type value: float
+    :return: Formatted value string.
+    :rtype: str
+    """
     if metric == "Time Taken(Seconds)":
         return f"{value:.1f}"
     if metric in ("Historical DB Disk Usage(MiB)", "Job list DB Usage"):
@@ -395,6 +506,29 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     cells are uniformly neutral. Metrics excluded from a test type are left
     blank. ``test_types`` and ``metrics`` restrict which scenarios and metrics
     are drawn, so the run-only profiler metrics can live in their own plot.
+
+    :param current: Current run DataFrame indexed by (test type, ID).
+    :type current: pd.DataFrame
+    :param previous: Baseline DataFrame, or None.
+    :type previous: pd.DataFrame | None
+    :param report: Evaluation report DataFrame with the delta percentages.
+    :type report: pd.DataFrame
+    :param version: Autosubmit version, used in the plot title.
+    :type version: str
+    :param output_dir: Directory where the plot is written.
+    :type output_dir: Path
+    :param cpu_label: CPU label appended to the title, or None.
+    :type cpu_label: str | None
+    :param thresholds: Thresholds configuration dictionary.
+    :type thresholds: dict | None
+    :param test_types: Restrict which test types are drawn.
+    :type test_types: set | None
+    :param metrics: Restrict which metrics are drawn.
+    :type metrics: list | None
+    :param out_name: Output file name, defaults to ``summary_{version}.png``.
+    :type out_name: str | None
+    :return: Path of the saved plot, or None when nothing was drawn.
+    :rtype: Path | None
     """
     import matplotlib
 
@@ -404,7 +538,17 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     from matplotlib.patches import Rectangle
 
     class _DeadZoneNorm(Normalize):
-        """Diverging norm with a central neutral 'dead zone'."""
+        """Diverging norm with a central neutral 'dead zone'.
+
+        :param vmin: Minimum value of the color range.
+        :type vmin: float
+        :param vmax: Maximum value of the color range.
+        :type vmax: float
+        :param vcenter: Center value of the diverging scale.
+        :type vcenter: float
+        :param tolerance: Half-width of the neutral dead zone.
+        :type tolerance: float
+        """
 
         def __init__(self, vmin: float, vmax: float, vcenter: float = 0.0, tolerance: float = 3.0):
             super().__init__(vmin=vmin, vmax=vmax)
@@ -412,9 +556,21 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
             self.tolerance = float(tolerance)
 
         def _span(self) -> float:
+            """Return the distance from the center to the farthest bound.
+
+            :return: Maximum distance between the center and the bounds.
+            :rtype: float
+            """
             return max(self.vmax - self.vcenter, self.vcenter - self.vmin)
 
         def __call__(self, value, clip=None):
+            """Normalize values into the 0..1 color range with a dead zone.
+
+            :param value: Values to normalize.
+            :param clip: Whether to clip the values (kept for API parity).
+            :return: Normalized values in the 0..1 range.
+            :rtype: float
+            """
             v = np.clip(np.asarray(value, dtype=float), self.vmin, self.vmax)
             half = max((self._span() - self.tolerance) / 2.0, 1e-9)
             x = np.zeros_like(v)
@@ -425,6 +581,12 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
             return np.clip((x + 1.0) / 2.0, 0.0, 1.0)
 
         def inverse(self, value):
+            """Invert the normalization back to the original value range.
+
+            :param value: Normalized values in the 0..1 range.
+            :return: Values in the original range.
+            :rtype: float
+            """
             x = np.asarray(value, dtype=float) * 2.0 - 1.0
             half = max((self._span() - self.tolerance) / 2.0, 1e-9)
             return np.where(x >= 0,
@@ -559,7 +721,25 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
 def render_heatmaps(current: pd.DataFrame, previous: pd.DataFrame | None, report: pd.DataFrame,
                     version: str, output_dir: Path, cpu_label: str | None = None,
                     thresholds: dict | None = None) -> list[Path]:
-    """Render the two performance plots: `run` and the create/recovery/setstatus ones."""
+    """Render the two performance plots: `run` and the create/recovery/setstatus ones.
+
+    :param current: Current run DataFrame indexed by (test type, ID).
+    :type current: pd.DataFrame
+    :param previous: Baseline DataFrame, or None.
+    :type previous: pd.DataFrame | None
+    :param report: Evaluation report DataFrame with the delta percentages.
+    :type report: pd.DataFrame
+    :param version: Autosubmit version, used in the plot titles.
+    :type version: str
+    :param output_dir: Directory where the plots are written.
+    :type output_dir: Path
+    :param cpu_label: CPU label appended to the titles, or None.
+    :type cpu_label: str | None
+    :param thresholds: Thresholds configuration dictionary.
+    :type thresholds: dict | None
+    :return: List of paths of the saved plots.
+    :rtype: list
+    """
     paths = []
     for name, test_types, metrics in (
         (f"summary_{version}_run.png", _RUN_TEST_TYPES, _RUN_PLOT_METRICS),
@@ -574,6 +754,14 @@ def render_heatmaps(current: pd.DataFrame, previous: pd.DataFrame | None, report
 
 
 def main() -> int:
+    """Compare the current benchmark run against the baseline and render reports.
+
+    Exits with code 1 and an error message on stderr when there are no
+    readable runs under ``--current``. Returns 0 on success.
+
+    :return: Exit code, 0 on success and 1 on error.
+    :rtype: int
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--current", required=True, help="Current run file or directory of JSON runs.")
     parser.add_argument("--previous", default=None, help="Baseline run file or directory of JSON runs.")
