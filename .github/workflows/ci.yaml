@@ -12,7 +12,6 @@ on:
       - master
 permissions:
   contents: read
-  packages: read
 
 env:
   TESTCONTAINERS_RYUK_DISABLED: true
@@ -23,9 +22,6 @@ jobs:
       COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
     # needs: lint
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/bsc-es/autosubmit-ci:latest
-      options: --init
     timeout-minutes: 10
 
     strategy:
@@ -36,14 +32,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          # See: https://github.com/actions/setup-python#caching-packages-dependencies
+          cache: 'pip' # caching pip dependencies
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl graphviz rsync r-base
+
       - name: Install dependencies
         run: |
-          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
-          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
-
-      - name: Git setup
-        run: |
-          
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
 
       # NOTE: We used `--trace --full-trace` with pytest but had strange
       #       bugs in unit tests with py3.11:
@@ -51,9 +55,7 @@ jobs:
       #       - TypeError: 'traceback' object is not callable
       #       It appeared to be a bug in Python3.11, pdb, pytest-xdist.
       - name: Unit tests
-        run: |
-          git config --system --add safe.directory '*'
-          python${{ matrix.python-version }} -m pytest -n $(nproc)
+        run: pytest
 
       - name: Coverage report
         run: |
@@ -106,10 +108,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          # See: https://github.com/actions/setup-python#caching-packages-dependencies
+          cache: 'pip' # caching pip dependencies
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl git subversion graphviz rsync xvfb r-base
+
       - name: Install dependencies
         run: |
-          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
-          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
 
       - name: Set up Git
         run: |
@@ -118,26 +132,6 @@ jobs:
           git --version
           git config --global user.email "test@bsc.es"
           git config --global user.name "GitHub Actions"
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pre-pull Docker images from docker.py constants
-        run: |
-          set -e
-          echo "Extracting Docker images from test/integration/test_utils/docker.py..."
-          IMAGES=$(grep -oP "^[_A-Za-z0-9]+_IMAGE\s*=\s*['\"]\K[^'\"]+" test/integration/test_utils/docker.py)
-          echo "Found images:"
-          echo "$IMAGES"
-
-          for IMAGE in $IMAGES; do
-            echo "Pulling $IMAGE ..."
-            docker pull "$IMAGE" || echo "Warning: failed to pull $IMAGE, continuing..."
-          done
 
       # In GitHub Actions we run all the integration tests, including those that require
       # dependencies such as Docker (see `-m ''`, which means all markers). Read the
@@ -230,10 +224,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl graphviz rsync
+
       - name: Install dependencies
         run: |
-          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
-          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
 
       # Run regression tests
       - name: Regression tests
@@ -281,10 +285,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
         run: |
-          python${{ matrix.python-version }} -m pip install --upgrade pip packaging
-          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
+          python -m pip install --upgrade pip packaging
+          pip install --upgrade -e .[all]
 
       - name: Set up Git
         run: |
@@ -294,29 +303,7 @@ jobs:
           git config --global user.email "test@bsc.es"
           git config --global user.name "GitHub Actions"
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pre-pull Docker images from docker.py constants
-        run: |
-          set -e
-          echo "Extracting Docker images from test/integration/test_utils/docker.py..."
-          IMAGES=$(grep -oP "^[_A-Za-z0-9]+_IMAGE\s*=\s*['\"]\K[^'\"]+" test/integration/test_utils/docker.py)
-          echo "Found images:"
-          echo "$IMAGES"
-
-          for IMAGE in $IMAGES; do
-            echo "Pulling $IMAGE ..."
-            docker pull "$IMAGE" || echo "Warning: failed to pull $IMAGE, continuing..."
-          done
-
-      - name: Slurm integration tests
-        # Here, instead of `nproc` we use 3 to reduce the number of concurrent
-        # Slurm jobs as these are expensive tests.
+      - name: Integration tests
         run: |
           pytest -x \
             -n 3 \
@@ -390,10 +377,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl graphviz rsync
+
       - name: Install dependencies
         run: |
-          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
-          python${{ matrix.python-version }} -m pip install --upgrade -e .[all]
+          python -m pip install --upgrade pip packaging setuptools twine
+          pip install --upgrade -e .[all]
 
       # Run regression tests
       - name: Build docs
@@ -430,8 +427,6 @@ jobs:
     env:
       COVERAGE_PROCESS_START: ${{ github.workspace }}/.coveragerc
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/bsc-es/autosubmit-ci:latest
     timeout-minutes: 5
 
     strategy:
@@ -442,11 +437,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
         run: |
-          python${{ matrix.python-version }} -m pip install --upgrade pip packaging setuptools twine
+          python -m pip install --upgrade pip packaging setuptools twine
           # To validate CFF citation files.
-          python${{ matrix.python-version }} -m pip install cffconvert
+          python -m pip install cffconvert
 
       - name: Validate citation file
         run: |
