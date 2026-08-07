@@ -124,15 +124,8 @@ autosubmit = "autosubmit.scripts.autosubmit:main"
 
 [tool.setuptools]
 package-data = { "autosubmit" = [
-    "autosubmit/config/files/autosubmit.conf",
-    "autosubmit/config/files/expdef.conf",
-    "autosubmit/database/data/autosubmit.sql",
-    "autosubmit/config/conf/files/*",
-    "README",
-    "CHANGELOG",
-    "VERSION",
-    "LICENSE",
-    "docs/autosubmit.pdf"
+    "config/files/*.yml",
+    "database/data/*.sql",
 ] }
 include-package-data = true
 
@@ -173,6 +166,8 @@ ignore = [
     "RUF010"
 ]
 
+# NOTE: used to inspect dead code from time to time.
+# Done on demand, not part of the CI/CD pipeline.
 [tool.vulture]
 exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
 min_confidence = 70
