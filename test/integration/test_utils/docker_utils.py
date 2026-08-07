@@ -69,12 +69,14 @@ _SSH_DOCKER_IMAGE_X11_MFA = 'ghcr.io/bsc-es/linuxserverio-ssh-2fa-x11:latest'
 _SSH_DOCKER_PASSWORD = 'password'
 """Common password used in SSH containers; we mock the SSH Client of Paramiko to avoid hassle with keys."""
 
+# Mirrored from Docker Hub: giovtorres/slurm-docker:25.11.2-v0.1.7
 _SLURM_DOCKER_IMAGE = 'giovtorres/slurm-docker:25.11.2-v0.1.7'
 """The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
 
 # Mirrored from Docker Hub: githttpd/githttpd:latest
 _GIT_DOCKER_IMAGE = 'ghcr.io/bsc-es/githttpd:latest'
 """The Git image used for tests where Autosubmit needs to clone a repository."""
+# Mirrored from Docker Hub: elleflorio/svn-server:latest
 _SVN_DOCKER_IMAGE = 'elleflorio/svn-server:latest'
 """The SVN image used for tests where Autosubmit needs to clone a repository."""
 

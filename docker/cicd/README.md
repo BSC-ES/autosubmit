@@ -23,3 +23,12 @@ docker build -t ghcr.io/autosubmit-ci:latest .
 docker push autosubmit/autosubmit-ci:latest
 docker push ghcr.io/autosubmit-ci:latest
 ```
+
+## Sync Docker images
+
+To sync the Docker images required for the integration tests,
+from DockerHub to GitHub Container Registry:
+
+```bash
+$ ./sync_docker_images.sh
+```
