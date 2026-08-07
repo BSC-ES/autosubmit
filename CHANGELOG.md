@@ -7,6 +7,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 **Bug fixes:**
 
 - Fix timeout guard is silently disabled for login/local jobs #3081
+- Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 
 **New Features:**
 
