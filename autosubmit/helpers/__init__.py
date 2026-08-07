@@ -16,3 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Autosubmit Helpers."""
+
+from datetime import datetime, timezone
+
+LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
