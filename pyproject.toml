@@ -32,13 +32,13 @@ maintainers = [
 ]
 
 keywords = ["climate", "weather", "workflow", "HPC"]
-license = {file = "LICENSE"}
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 
 classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: GNU General Public License (GPL)",
     "Operating System :: POSIX :: Linux"
 ]
 
@@ -55,7 +55,6 @@ dependencies = [
     "py3dotplus==1.1.0",
     "numpy<3",
     "rocrate==0.15.1",
-    "configparser",
     "setproctitle",
     "invoke>=2.0",
     "SQLAlchemy~=2.0.23",
@@ -69,20 +68,17 @@ Homepage = "https://www.bsc.es/projects/earthscience/autosubmit/"
 Documentation = "https://autosubmit.readthedocs.io/"
 "Download Link" = "https://earth.bsc.es/wiki/doku.php?id=tools:autosubmit"
 
-[tool.setuptools.dynamic]
-version =  {file = "VERSION"}
-readme = {file = "README_PIP.md"}
-
 [project.optional-dependencies]
 postgres = ["psycopg", "psycopg2"]
-ruff = ["ruff==0.16.1"]
+lint = [
+    "ruff==0.16.1",
+]
 tests = [
     # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
     "mock",
     "pytest>=8.2,<9.2",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.16.1",
     "pytest-xdist",
     "testcontainers",
     "pytest-timeout",
@@ -117,15 +113,14 @@ docs = [
 all = [
     "autosubmit[tests]",
     "autosubmit[mypy]",
+    "autosubmit[lint]",
     "autosubmit[docs]",
     "autosubmit[postgres]",
     "autosubmit[benchmark]"
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["autosubmit*"]
-namespaces = true
+[project.scripts]
+autosubmit = "autosubmit.scripts.autosubmit:main"
 
 [tool.setuptools]
 package-data = { "autosubmit" = [
@@ -140,6 +135,15 @@ package-data = { "autosubmit" = [
     "docs/autosubmit.pdf"
 ] }
 include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
+readme = {file = "README_PIP.md"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["autosubmit*"]
+namespaces = true
 
 [tool.mypy]
 mypy_path = ["."]
@@ -160,14 +164,6 @@ module = [
 ignore_missing_imports = true
 follow_untyped_imports = true
 
-[tool.vulture]
-exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
-min_confidence = 70
-
-[project.entry-points.console_scripts]
-autosubmit = "autosubmit.scripts.autosubmit:main"
-
-
 [tool.ruff.lint]
 ignore = [
     "DTZ005",
@@ -176,3 +172,7 @@ ignore = [
     "FA102",
     "RUF010"
 ]
+
+[tool.vulture]
+exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
+min_confidence = 70

@@ -27,7 +27,7 @@ jobs:
           python-version: "3.10"
 
       - name: Install dependencies
-        run: pip install -e .[ruff]
+        run: pip install -e .[lint]
 
       - name: Determine diff range
         id: range
