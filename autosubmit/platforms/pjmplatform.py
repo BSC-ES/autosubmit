@@ -261,13 +261,9 @@ class PJMPlatform(ParamikoPlatform):
          This needs to be adapted to each scheduler, the default assumes that is being launched directly.
 
         :param script_name: name of the script to submit
-        :type script_name: str
         :param pre: command part to be placed before the script name, e.g. timeout, export, executable
-        :type pre: str
         :param post: command part to be placed after the script name, e.g. redirection of stdout and stderr
-        :type post: str
         :param x11_options: x11 options to run the script, if any
-        :type x11_options: str
         :return: command to submit a job
         """
         return f"{self._submit_command_name} --no-check-directory {script_name} {x11_options} {post} & echo $!"
