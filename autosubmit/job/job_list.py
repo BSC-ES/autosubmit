@@ -166,11 +166,10 @@ class JobList:
         raise AttributeError("job_list is a dynamic view and cannot be directly modified.")
 
     @property
-    def expid(self):
+    def expid(self) -> str:
         """Returns the experiment identifier
 
         :return: experiment's identifier
-        :rtype: str
         """
         return self._expid
 
@@ -458,7 +457,6 @@ class JobList:
         """Compute the differences between the current sections and the persistent sections in the database.
 
         :return: A dictionary mapping section names to their change type and details: 'removed', 'modified', or 'added'.
-        :rtype: Dict[str, Dict[str, Any]]
         """
         persistent_sections_data = self.load_sections()
         if not persistent_sections_data:
@@ -605,7 +603,6 @@ class JobList:
         """Build a list of dictionaries representing section data for database storage.
 
         :return: List of dictionaries, each representing a section's data.
-        :rtype: List[Dict[str, Any]]
         """
         experiment_section = self._as_conf.experiment_data.get("EXPERIMENT", {})
         sections = self._as_conf.jobs_data
@@ -764,11 +761,10 @@ class JobList:
         self.parameters = {}
         self._parameters = {}
 
-    def split_by_platform(self):
+    def split_by_platform(self) -> dict:
         """Splits the job list by platform name
 
         :return: job list per platform
-        :rtype: dict
         """
         job_list_per_platform = {}
         for job in self.job_list:
@@ -1270,16 +1266,16 @@ class JobList:
                 for ele in parsed_element:
                     if type(ele) is str and ele.lower() in ["natural", "none"]:
                         skip = True
-                    if skip and len(unified_filter[filter_type]) > 0:
-                        continue
-                    else:
-                        for ele in parsed_element:
-                            if extra_data:
-                                check_whole_string = str(ele) + extra_data + ","
-                            else:
-                                check_whole_string = str(ele) + ","
-                            if str(check_whole_string) not in unified_filter[filter_type]:
-                                unified_filter[filter_type] += check_whole_string
+                if skip and len(unified_filter[filter_type]) > 0:
+                    continue
+                else:
+                    for ele in parsed_element:
+                        if extra_data:
+                            check_whole_string = str(ele) + extra_data + ","
+                        else:
+                            check_whole_string = str(ele) + ","
+                        if str(check_whole_string) not in unified_filter[filter_type]:
+                            unified_filter[filter_type] += check_whole_string
         return unified_filter
 
     @staticmethod
@@ -1733,25 +1729,16 @@ class JobList:
         """Manage job dependencies for a given job and update the dependency graph.
 
         :param dic_jobs: Helper containing generated jobs and configuration.
-        :type dic_jobs: `DicJobs`
         :param job: Current job object being processed.
-        :type job: `Job`
         :param date_list: Ordered list of dates used by the workflow (YYYYMMDD strings).
-        :type date_list: List[str]
         :param member_list: Ordered list of members.
-        :type member_list: List[str]
         :param chunk_list: Ordered list of chunk indices.
-        :type chunk_list: List[int]
         :param dependencies_keys: Raw dependency keys as defined in the configuration. Keys may include special modifiers
             such as `+`, `-`, `*` or `?` and optional numeric distances (e.g., `SIM-1`, `CLEAN+2`).
-        :type dependencies_keys: Dict[str, Any]
         :param dependencies: Parsed mapping from original dependency key to `Dependency` objects.
-        :type dependencies: Dict[str, `Dependency`]
         :param graph: The NetworkX directed graph being populated with edges.
-        :type graph: `DiGraph`
 
         :return: A set with names of parent jobs considered problematic (e.g., edges added but parent missing/ambiguous).
-        :rtype: set[str]
 
         :raises ValueError: If dependency key parsing encounters an invalid numeric distance.
         :raises KeyError: If required sections are missing from `dic_jobs.as_conf.jobs_data`.
@@ -2021,7 +2008,7 @@ class JobList:
             dic_jobs.read_section(section, priority, default_job_type)
             priority += 1
 
-    def _create_sorted_dict_jobs(self, wrapper_jobs):
+    def _create_sorted_dict_jobs(self, wrapper_jobs: str) -> dict:
         """Creates a sorting of the jobs whose job.section is in wrapper_jobs, according to the
         following filters in order of importance:
         date, member, RUNNING, and chunk number; where RUNNING is defined in jobs_.yml
@@ -2032,12 +2019,8 @@ class JobList:
 
         :param wrapper_jobs: User defined job types in autosubmit_,conf [wrapper] section to
         be wrapped.
-        :type wrapper_jobs: String \n
         :return: Sorted Dictionary of List that represents the jobs included in the wrapping
         process.
-        :rtype: Dictionary Key: date, Value: (Dictionary Key: Member, Value: List of jobs that
-        belong to the date, member, and are ordered by chunk number if it is a chunk job otherwise
-        num_chunks from JOB TYPE (section)
         """
 
         # Dictionary Key: date, Value: (Dictionary Key: Member, Value: List)
@@ -2190,14 +2173,12 @@ class JobList:
 
         return filtered_jobs_fake_date_member, fake_original_job_map
 
-    def _get_date(self, date):
+    def _get_date(self, date: str) -> str:
         """Parses a user defined Date (from [experiment] DATELIST)
         to return a special String representation of that Date.
 
-        :param date: String representation of a date in format YYYYYMMdd. \n
-        :type date: String \n
-        :return: String representation of date according to format. \n
-        :rtype: String \n
+        :param date: String representation of a date in format YYYYYMMdd.
+        :return: String representation of date according to format.
         """
         date_format = ''
         if date.hour > 1:
@@ -2210,35 +2191,31 @@ class JobList:
     def __len__(self):
         return self.job_list.__len__()
 
-    def get_date_list(self):
+    def get_date_list(self) -> list:
         """Get inner date list.
 
         :return: date list
-        :rtype: list
         """
         return self._date_list
 
-    def get_member_list(self):
+    def get_member_list(self) -> list:
         """Get inner member list.
 
         :return: member list
-        :rtype: list
         """
         return self._member_list
 
-    def get_chunk_list(self):
+    def get_chunk_list(self) -> list:
         """Get inner chunk list.
 
         :return: chunk list
-        :rtype: list
         """
         return self._chunk_list
 
-    def get_job_list(self):
+    def get_job_list(self) -> list:
         """Get inner job list.
 
         :return: job list
-        :rtype: list
         """
         return self.job_list
 
@@ -2254,27 +2231,23 @@ class JobList:
     def copy_ordered_jobs_by_date_member(self):
         pass  # pragma: no cover
 
-    def get_ordered_jobs_by_date_member(self, wrapper_name: str):
+    def get_ordered_jobs_by_date_member(self, wrapper_name: str) -> dict | None:
         """Get the dictionary of jobs ordered according to wrapper's
         expression divided by date and member.
 
         :param wrapper_name: name of the wrapper
-        :type wrapper_name: str
         :return: dictionary of jobs ordered by date and member
-        :rtype: dict
         """
 
         if len(self._ordered_jobs_by_date_member) > 0:
             return self._ordered_jobs_by_date_member[wrapper_name]
 
-    def get_completed(self, platform=None, wrapper=False):
+    def get_completed(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of completed jobs
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: completed jobs
-        :rtype: list
         """
 
         completed_jobs = [job for job in self.job_list if (platform is None or
@@ -2283,14 +2256,12 @@ class JobList:
             return [job for job in completed_jobs if job.packed is False]
         return completed_jobs
 
-    def get_uncompleted(self, platform=None, wrapper=False):
+    def get_uncompleted(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of completed jobs.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: completed jobs
-        :rtype: list
         """
         uncompleted_jobs = [job for job in self.job_list if
                             (platform is None or job.platform.name == platform.name) and
@@ -2300,15 +2271,13 @@ class JobList:
             return [job for job in uncompleted_jobs if job.packed is False]
         return uncompleted_jobs
 
-    def get_submitted(self, platform=None, hold=False, wrapper=False):
+    def get_submitted(self, platform: Platform | None = None, hold: bool = False, wrapper: bool = False) -> list:
         """Returns a list of submitted jobs.
 
         :param wrapper:
         :param hold:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: submitted jobs
-        :rtype: list
         """
         submitted = []
         if hold:
@@ -2322,14 +2291,12 @@ class JobList:
             return [job for job in submitted if job.packed is False]
         return submitted
 
-    def get_running(self, platform=None, wrapper=False):
+    def get_running(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of jobs running.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: running jobs
-        :rtype: list
         """
         running = [job for job in self.job_list if (platform is None or
                                                     job.platform.name == platform.name) and job.status == Status.RUNNING]
@@ -2337,14 +2304,12 @@ class JobList:
             return [job for job in running if job.packed is False]
         return running
 
-    def get_queuing(self, platform=None, wrapper=False):
+    def get_queuing(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of jobs queuing.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: queuedjobs
-        :rtype: list
         """
         queuing = [job for job in self.job_list if (platform is None or
                                                     job.platform.name == platform.name) and job.status == Status.QUEUING]
@@ -2352,14 +2317,12 @@ class JobList:
             return [job for job in queuing if job.packed is False]
         return queuing
 
-    def get_failed(self, platform=None, wrapper=False):
+    def get_failed(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of failed jobs.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: failed jobs
-        :rtype: list
         """
         failed = [job for job in self.job_list if (platform is None or
                                                    job.platform.name == platform.name) and job.status == Status.FAILED]
@@ -2367,14 +2330,12 @@ class JobList:
             return [job for job in failed if job.packed is False]
         return failed
 
-    def get_unsubmitted(self, platform=None, wrapper=False):
+    def get_unsubmitted(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of unsubmitted jobs.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: all jobs
-        :rtype: list
         """
         unsubmitted = [job for job in self.job_list if (platform is None or
                                                         job.platform.name == platform.name) and (
@@ -2386,14 +2347,12 @@ class JobList:
         else:
             return unsubmitted
 
-    def get_all(self, platform=None, wrapper=False):
+    def get_all(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of all jobs.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: all jobs
-        :rtype: list
         """
         all_jobs = [job for job in self.job_list]
 
@@ -2458,14 +2417,13 @@ class JobList:
                                          "\nSecond filter ends with ';'."
                                          "\nThird filter must contain '['. ")
 
-    def get_job_related(self, select_jobs_by_name="", select_all_jobs_by_section="",
-                        filter_jobs_by_section="", two_step_start=True):
+    def get_job_related(self, select_jobs_by_name: str = "", select_all_jobs_by_section: str = "",
+                        filter_jobs_by_section: str = "", two_step_start: bool = True) -> list:
         """:param two_step_start:
         :param select_jobs_by_name: job name
         :param select_all_jobs_by_section: section name
         :param filter_jobs_by_section: section, date , member? , chunk?
         :return: jobs_list names
-        :rtype: list
         """
         ultimate_jobs_list = []
         jobs_filtered = []
@@ -2534,15 +2492,13 @@ class JobList:
         Log.debug(f"List of jobs filtered by TWO_STEP_START parameter:\n{[job.name for job in ultimate_jobs_list]}")
         return ultimate_jobs_list
 
-    def get_ready(self, platform=None, hold=False, wrapper=False):
+    def get_ready(self, platform: Platform | None = None, hold: bool = False, wrapper: bool = False) -> list:
         """Returns a list of ready jobs.
 
         :param wrapper:
         :param hold:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: ready jobs
-        :rtype: list
         """
         ready = [job for job in self.job_list if
                  (platform is None or platform == "" or job.platform.name == platform.name) and
@@ -2552,38 +2508,32 @@ class JobList:
             return [job for job in ready if job.packed is False]
         return ready
 
-    def get_prepared(self, platform=None):
+    def get_prepared(self, platform: Platform | None = None) -> list:
         """Returns a list of prepared jobs.
 
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: prepared jobs
-        :rtype: list
         """
         prepared = [job for job in self.job_list if (platform is None or
                                                      job.platform.name == platform.name) and job.status == Status.PREPARED]
         return prepared
 
-    def get_delayed(self, platform=None):
+    def get_delayed(self, platform: Platform | None = None) -> list:
         """Returns a list of delayed jobs.
 
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: delayed jobs
-        :rtype: list
         """
         delayed = [job for job in self.job_list if (platform is None or
                                                     job.platform.name == platform.name) and job.status == Status.DELAYED]
         return delayed
 
-    def get_waiting(self, platform=None, wrapper=False):
+    def get_waiting(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of jobs waiting.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: waiting jobs
-        :rtype: list
         """
         waiting_jobs = [job for job in self.job_list if (platform is None or
                                                          job.platform.name == platform.name) and job.status == Status.WAITING]
@@ -2591,36 +2541,30 @@ class JobList:
             return [job for job in waiting_jobs if job.packed is False]
         return waiting_jobs
 
-    def get_waiting_remote_dependencies(self, platform_type='slurm'):
+    def get_waiting_remote_dependencies(self, platform_type : str = 'slurm') -> list:
         """Returns a list of jobs waiting on slurm scheduler.
 
         :param platform_type: platform type
-        :type platform_type: str
         :return: waiting jobs
-        :rtype: list
         """
         waiting_jobs = [job for job in self.job_list if (
                 job.platform.type == platform_type.lower() and job.status == Status.WAITING)]
         return waiting_jobs
-    def get_held_jobs(self, platform=None):
+    def get_held_jobs(self, platform: Platform | None = None) -> list:
         """Returns a list of jobs in the platforms (Held).
 
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: jobs in platforms
-        :rtype: list
         """
         return [job for job in self.job_list if (platform is None or
                                                  job.platform.name == platform.name) and job.status == Status.HELD]
 
-    def get_unknown(self, platform=None, wrapper=False):
+    def get_unknown(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of jobs on unknown state.
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: unknown state jobs
-        :rtype: list
         """
         submitted = [job for job in self.job_list if (platform is None or
                                                       job.platform.name == platform.name) and job.status == Status.UNKNOWN]
@@ -2628,14 +2572,12 @@ class JobList:
             return [job for job in submitted if job.packed is False]
         return submitted
 
-    def get_in_queue(self, platform=None, wrapper=False):
+    def get_in_queue(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of jobs in the platforms (Submitted, Running, Queuing, Unknown,Held).
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: jobs in platforms
-        :rtype: list
         """
 
         in_queue = self.get_submitted(platform) + self.get_running(platform) + self.get_queuing(
@@ -2743,14 +2685,12 @@ class JobList:
             job.platform = None
             self.graph.remove_node(job.name)
 
-    def get_active(self, platform=None, wrapper=False):
+    def get_active(self, platform: Platform | None = None, wrapper: bool = False) -> list:
         """Returns a list of active jobs (In platforms queue + Ready).
 
         :param wrapper:
         :param platform: job platform
-        :type platform: HPCPlatform
         :return: active jobs
-        :rtype: list
         """
 
         active = (self.get_in_queue(platform) + self.get_ready(
@@ -2773,9 +2713,7 @@ class JobList:
         """Returns the job that its name matches parameter name.
 
         :parameter name: name to look for
-        :type name: str
         :return: found job
-        :rtype: job
         """
         for job in self.job_list:
             if job.name == name:
@@ -2828,15 +2766,10 @@ class JobList:
         instead of iterating the in-memory job list.
 
         :param section_list: List of sections to filter jobs by.
-        :type section_list: list
         :param banned_jobs: List of job names to exclude from the result. Defaults to an empty list.
-        :type banned_jobs: list, optional
         :param get_only_non_completed: If True, only non-completed jobs are included. Defaults to False.
-        :type get_only_non_completed: bool, optional
         :param status_filter: If set, only jobs with this status are included.
-        :type status_filter: str, optional
         :return: Set of job names matching the criteria.
-        :rtype: set[str]
         """
         if banned_jobs is None:
             banned_jobs = []
@@ -2851,35 +2784,31 @@ class JobList:
             status_filter=status_filter,
         )
 
-    def sort_by_name(self):
+    def sort_by_name(self) -> list:
         """Returns a list of jobs sorted by name.
 
         :return: jobs sorted by name
-        :rtype: list
         """
         return sorted(self.job_list, key=lambda k: k.name)
 
-    def sort_by_id(self):
+    def sort_by_id(self) -> list:
         """Returns a list of jobs sorted by id.
 
         :return: jobs sorted by ID
-        :rtype: list
         """
         return sorted(self.job_list, key=lambda k: k.id)
 
-    def sort_by_type(self):
+    def sort_by_type(self) -> list:
         """Returns a list of jobs sorted by type.
 
         :return: job sorted by type
-        :rtype: list
         """
         return sorted(self.job_list, key=lambda k: k.type)
 
-    def sort_by_status(self):
+    def sort_by_status(self) -> list:
         """Returns a list of jobs sorted by status.
 
         :return: job sorted by status
-        :rtype: list
         """
         return sorted(self.job_list, key=lambda k: k.status)
 
@@ -2910,7 +2839,6 @@ class JobList:
             subset necessary for continued execution.
         :param load_failed_jobs: If ``True``, include jobs in failed states when loading.
         :return: A list of loaded ``Job`` objects.
-        :rtype: List[Job]
         :raises Exception: If a database access error occurs while loading jobs.
         """
         nodes = self.dbmanager.load_jobs(full_load, load_failed_jobs, members=self.run_members)
@@ -2922,9 +2850,7 @@ class JobList:
         Loads a job by its name from the database.
 
         :param job_name: Name of the job to load.
-        :type job_name: str
         :return: The loaded job object or None if not found.
-        :rtype: Job or None
         """
         node = self.dbmanager.load_job_by_name(job_name)
         if node:
@@ -3067,11 +2993,10 @@ class JobList:
         return skip_by_section
 
     @property
-    def parameters(self):
+    def parameters(self) -> dict:
         """List of parameters common to all jobs
 
         :return: parameters
-        :rtype: dict
         """
         return self._parameters
 
@@ -3087,7 +3012,6 @@ class JobList:
         """Check if all parents of a job have the correct status for checkpointing.
 
         :returns: List of jobs that fulfill the special conditions for checkpointing.
-        :rtype: list[Job]
         """
         jobs_to_check: list[Job] = []
         for current_job in [current_job for current_job in self.job_list if
@@ -3122,13 +3046,9 @@ class JobList:
         """Count the number of completed and non-completed parent jobs for a given job.
 
         :param job: The job whose parent statuses are to be checked.
-        :type job: Job
         :param parents_edge_info: Dictionary or list containing information about the edges from parent jobs.
-        :type parents_edge_info: dict
         :param parents_nodes: Dictionary mapping parent job names to Job objects.
-        :type parents_nodes: dict
         :return A tuple containing two lists: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
-        :rtype: tuple[List[Job], List[Job]]
         """
         non_completed = []
         completed = []
@@ -3261,17 +3181,9 @@ class JobList:
                 all WAITING jobs with all parents COMPLETED
 
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         :param store_change: Whether to store changes after update.
-        :type store_change: bool, optional
         :param fromSetStatus: If called from set status.
-        :type fromSetStatus: bool, optional
-        :param submitter: Submitter object (unused).
-        :type submitter: object, optional
-        :param first_time: If this is the first run.
-        :type first_time: bool, optional
         :return: True if any job status was updated, False otherwise.
-        :rtype: bool
         """
         save_jobs = False
         if self.update_from_file(store_change):
@@ -3300,9 +3212,7 @@ class JobList:
         Check if the wrapper job for a given job is still running.
 
         :param job: The job to check.
-        :type job: Job
         :return: True if the wrapper job is still running, False otherwise.
-        :rtype: bool
         """
         job.packed = False
         if job.id and self.job_package_map and int(job.id) in self.job_package_map:
@@ -3323,9 +3233,7 @@ class JobList:
         Update failed jobs, retrying them if possible or marking as FAILED.
 
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         :return: True if any job status was updated, False otherwise.
-        :rtype: bool
         """
         save = False
         for job in [job for job in self.get_failed() if not self.is_wrapper_still_running(job)]:
@@ -3400,7 +3308,6 @@ class JobList:
         """Synchronize jobs with parents' completion status. If
 
         :return: True if any job status was updated, False otherwise.
-        :rtype: bool
         """
         save = False
         for job in self.get_completed():
@@ -3428,9 +3335,7 @@ class JobList:
         """Update jobs in WAITING or DELAYED status based on parent completion and delay timers.
 
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         :return: True if any job status was updated, False otherwise.
-        :rtype: bool
         """
         save = False
         for job in self.get_delayed():
@@ -3469,9 +3374,7 @@ class JobList:
         """Skip jobs that meet the skipping criteria.
 
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         :return: True if any job was skipped, False otherwise.
-        :rtype: bool
         """
         save = False
         jobs_to_skip = self.get_skippable_jobs(as_conf.get_wrapper_jobs())
@@ -3549,7 +3452,7 @@ class JobList:
 
     def save_wrappers(
             self,
-            scripts: Any,
+            scripts: list[Any],
             as_conf: Any,
             preview: bool = False
     ) -> None:
@@ -3557,13 +3460,8 @@ class JobList:
         Each wrapper is tagged with the current ``run_id`` for run-level isolation.
 
         :param scripts: List of job package objects to process.
-        :type scripts: List[Any]
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: Any
         :param preview: Whether to run in preview mode.
-        :type preview: bool
-        :return: None
-        :rtype: None
         """
 
         wrappers = []
@@ -3602,10 +3500,6 @@ class JobList:
         Only wrappers matching the current ``run_id`` are loaded.
 
         :param preview: If True, load wrappers in preview mode.
-        :type preview: bool
-
-        :return: None
-        :rtype: None
         """
         un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, self.job_list, run_id=self.run_id)
 
@@ -3660,9 +3554,7 @@ class JobList:
         """Return a dictionary representation of a WrapperJob and its inner jobs for database insertion.
 
         :param wrapper_job: The wrapper job instance to serialize.
-        :type wrapper_job: WrapperJob
         :return: tuple containing a dictionary of wrapper job attributes (including run_id) and a list of inner job dicts (each with run_id).
-        :rtype: tuple[Dict[str, Any], List[Dict[str, Any]]]
         """
         wrapper_info = {
             "name": wrapper_job.name,
@@ -3826,13 +3718,9 @@ class JobList:
         """Returns the string representation of the dependency tree of the Job List
 
         :param status_change: List of changes in the list, supplied in set status
-        :type status_change: dict
         :param nocolor: True if the result should not include color codes
-        :type nocolor: Boolean
         :param existing_list: External List of Jobs that will be printed, this excludes the inner list of jobs.
-        :type existing_list: List of Job Objects
         :return: String representation of the Job List
-        :rtype: String
         """
 
         # nocolor = True
@@ -3863,11 +3751,10 @@ class JobList:
                 result += "\nCannot find root."
         return result
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Returns the string representation of the class.
 
         :return: String representation.
-        :rtype: String
         """
         try:
             results = [f"## String representation of Job List [{len(self.jobs)}] ##"]
@@ -3886,21 +3773,17 @@ class JobList:
             return 'Job List object'
         return "\n".join(results)
 
-    def _recursion_print(self, job, level, visited: list = [], statusChange=None, nocolor=False):
+    def _recursion_print(self, job: "Job", level: int, visited: list = [], statusChange: list[str] | None = None,
+                         nocolor: bool = False) -> str:
         """Returns the list of children in a recursive way
         Traverses the dependency tree
 
         :param job: Job object
-        :type job: Job
         :param level: Level of the tree
-        :type level: int
         :param visited: List of visited jobs
-        :type visited: list
         :param statusChange: List of changes in the list, supplied in set status
-        :type statusChange: List of strings
 
         :return: parent + list of children
-        :rtype: String
         """
         result = ""
         if job.name not in visited:
@@ -3941,11 +3824,10 @@ class JobList:
 
         return result
 
-    def retrieve_symbols(self):
+    def retrieve_symbols(self) -> dict:
         """Retrieves dictionaries that map the collection of packages in the experiment
         to symbols for plotting. (Used by the autosubmit stats command).
         :return: Dictionary mapping package names to symbols.
-        :rtype: Dictionary
         """
         self.load_wrappers()
         package_to_symbol = {}
@@ -3960,27 +3842,21 @@ class JobList:
         return package_to_symbol
 
     @staticmethod
-    def retrieve_times(status_code, name, tmp_path, make_exception=False, job_times=None,
-                       seconds=False, job_data_collection: 'JobData | None' = None) -> None | JobRow:
+    def retrieve_times(status_code: int, name: str, tmp_path: str, make_exception: bool = False,
+                            job_times: dict | None = None, seconds: bool = False,
+                            job_data_collection: 'JobData | None' = None
+                       ) -> None | JobRow:
 
         """Retrieve job timestamps from database.
 
         :param status_code: Code of the Status of the job
-        :type status_code: Integer
         :param name: Name of the job
-        :type name: String
         :param tmp_path: Path to the tmp folder of the experiment
-        :type tmp_path: String
         :param make_exception: flag for testing purposes
-        :type make_exception: Boolean
         :param job_times: Detail from as_times.job_times for the experiment
-        :type job_times: Dictionary Key: job name, Value: 5-tuple (submit time, start time, finish time, status, detail id)
         :param seconds: seconds
-        :type seconds: bool
         :param job_data_collection: Collection of Jobs
-        :type job_data_collection: JobData
         :return: minutes the job has been queuing, minutes the job has been running, and the text that represents it
-        :rtype: JobRow
         """
         energy = 0
         seconds_queued = 0
@@ -4098,17 +3974,13 @@ class JobList:
                       0)
 
     @staticmethod
-    def _job_running_check(status_code, name, tmp_path):
+    def _job_running_check(status_code: int, name: str, tmp_path: str) -> tuple:
         """Receives job data and returns the data from its TOTAL_STATS file in an ordered way.
 
         :param status_code: Status of job
-        :type status_code: Integer
         :param name: Name of job
-        :type name: String
         :param tmp_path: Path to the tmp folder of the experiment
-        :type tmp_path: String
         :return: submit time, start time, end time, status
-        :rtype: 4-tuple in datetime format
         """
         # name = "a2d0_20161226_001_124_ARCHIVE"
         values = []
@@ -4188,8 +4060,6 @@ class JobList:
         """Recover job IDs and log names for completed, failed, and skipped jobs from experiment history.
 
         :param finished_jobs: Optional list of finished Job objects to recover data for.
-        :return: None
-        :rtype: None
         """
         jobs_ran_atleast_once = False
         if not finished_jobs:
@@ -4263,7 +4133,6 @@ class JobList:
         """Get a list of all wrapper job IDs from the database.
 
         :return: List of wrapper job IDs.
-        :rtype: List[int]
         """
         return [id for _, id in self.dbmanager.get_wrappers_id_from_db()]
 
