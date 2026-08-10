@@ -32,6 +32,7 @@ from pstats import SortKey
 from psutil import Process
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.helpers.utils import release_memory_to_os
 from autosubmit.log.log import AutosubmitCritical, Log
 
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
@@ -125,7 +126,7 @@ class Profiler:
 
         self._state = ProfilerState.STARTED
         self._profiler.enable()
-        gc.collect()
+        release_memory_to_os()
         self._mem_init = _get_current_memory()
 
         if self._trace_enabled and not tracemalloc.is_tracing():
@@ -138,7 +139,7 @@ class Profiler:
         :return: True if the maximum number of checkpoints has been reached, False otherwise.
         :rtype: bool
         """
-        gc.collect()
+        release_memory_to_os()
 
         self._mem_iteration.append(_get_current_memory())
         self._obj_iteration.append(_get_current_object_count())

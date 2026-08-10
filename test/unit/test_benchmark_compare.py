@@ -22,8 +22,11 @@ baseline and flags regressions, using synthetic runs built in-memory.
 """
 
 import importlib.util
+import os
+import time
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 _BENCH_DIR = Path(__file__).parents[2] / ".benchmarks"
@@ -78,17 +81,36 @@ def _baseline_entry(**overrides):
     return extra
 
 
-def test_no_baseline_renders_current_only():
-    run = _make_run(_make_entry("create", "create", "fc0_1_1", 0.7, **_baseline_entry()))
-    frame = compare.build_frame(run)
-    report = compare.evaluate(frame, None, _thresholds())
+def _evaluate_pair(baseline_time: float | None, current_time: float,
+                   test_type: str = "run", run_id: str = "fc0_1_1") -> pd.DataFrame:
+    """Build a current/baseline frame pair and evaluate them."""
+    current = _make_run(_make_entry(test_type, test_type, run_id, current_time, **_baseline_entry()))
+    if baseline_time is None:
+        return compare.evaluate(compare.build_frame(current), None, _thresholds())
+    baseline = _make_run(_make_entry(test_type, test_type, run_id, baseline_time, **_baseline_entry()))
+    return compare.evaluate(
+        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
+    )
 
-    assert not report.empty
-    assert (report["verdict"] == "N/A").all()
 
-    markdown = compare.render_markdown(report, "4.2.0", "Current", previous_label=None, env_warning=None)
-    assert "**Baseline:** None" in markdown
-    assert "No regressions detected" in markdown
+@pytest.mark.parametrize("baseline_time, current_time, previous_label, env_warning, expected", [
+    pytest.param(None, 0.7, None, None,
+                 ["**Baseline:** None", "No regressions detected"], id="no-baseline-current-only"),
+    pytest.param(10.0, 10.0 * (1 + (_time_threshold() + 10) / 100), "Baseline", None,
+                 ["Regressions detected", "run/fc0_1_1", "Time Taken(Seconds)"],
+                 id="flags-regressions"),
+    pytest.param(10.0, 10.0, "Baseline",
+                 "Environment differs from baseline: current ran on `A` "
+                 "while the baseline ran on `B`.",
+                 ["Environment differs from baseline"], id="includes-environment-warning"),
+])
+def test_render_markdown_variants(baseline_time, current_time, previous_label, env_warning, expected):
+    report = _evaluate_pair(baseline_time, current_time)
+
+    markdown = compare.render_markdown(report, "4.2.0", "Current",
+                                       previous_label=previous_label, env_warning=env_warning)
+    for fragment in expected:
+        assert fragment in markdown
 
 
 @pytest.mark.parametrize("baseline_time, current_time, expected, expected_delta", [
@@ -109,16 +131,23 @@ def test_time_verdicts(baseline_time, current_time, expected, expected_delta):
         assert row["delta %"] == expected_delta
 
 
-def test_exact_metric_change_warns():
-    baseline = _make_run(_make_entry("create", "create", "fc0_1_1", 0.7, **_baseline_entry()))
+@pytest.mark.parametrize("metric, baseline_val, current_val, expected", [
+    pytest.param("Total Jobs", 7, 8, "WARN", id="total-jobs-change-warns"),
+    pytest.param("Total Dependencies", 7, 8, "WARN", id="total-deps-change-warns"),
+    pytest.param("Total Jobs", 7, 7, "PASS", id="total-jobs-unchanged-passes"),
+    pytest.param("Total Dependencies", 7, 7, "PASS", id="total-deps-unchanged-passes"),
+])
+def test_exact_metric_change_warns(metric, baseline_val, current_val, expected):
+    baseline = _make_run(_make_entry("create", "create", "fc0_1_1", 0.7,
+                                     **{**_baseline_entry(), metric: baseline_val}))
     current = _make_run(_make_entry("create", "create", "fc0_1_1", 0.7,
-                                    **{**_baseline_entry(), "Total Jobs": 8}))
+                                    **{**_baseline_entry(), metric: current_val}))
 
     report = compare.evaluate(
         compare.build_frame(current), compare.build_frame(baseline), _thresholds()
     )
-    row = report[report["metric"] == "Total Jobs"].iloc[0]
-    assert row["verdict"] == "WARN"
+    row = report[report["metric"] == metric].iloc[0]
+    assert row["verdict"] == expected
 
 
 @pytest.mark.parametrize("current_cpu, previous_cpu, expected", [
@@ -135,25 +164,7 @@ def test_environment_warning(current_cpu, previous_cpu, expected):
     assert (warning is not None) == expected
 
 
-def test_render_markdown_flags_regressions():
-    thr = _time_threshold()
-    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
-    current = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0 * (1 + (thr + 10) / 100),
-                                     **_baseline_entry()))
-    report = compare.evaluate(
-        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
-    )
-    markdown = compare.render_markdown(report, "4.2.0", "Current", previous_label="Baseline",
-                                       env_warning=None)
-    assert "Regressions detected" in markdown
-    assert "run/fc0_1_1" in markdown
-    assert "Time Taken(Seconds)" in markdown
-
-
 def test_current_directory_uses_newest_run_only(tmp_path: Path):
-    import os
-    import time
-
     older = tmp_path / "0001_old.json"
     newer = tmp_path / "0002_new.json"
     older.write_text("{}", encoding="UTF-8")
@@ -242,40 +253,24 @@ def test_missing_baseline_scenario_renders_no_baseline():
     assert rows.iloc[0]["verdict"] == "N/A"
 
 
-def test_render_markdown_includes_environment_warning():
-    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
-    current = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
-    report = compare.evaluate(
-        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
-    )
-
-    markdown = compare.render_markdown(report, "4.2.0", "Current", previous_label="Baseline",
-                                       env_warning="Environment differs from baseline: current ran on `A` "
-                                       "while the baseline ran on `B`.")
-    assert "Environment differs from baseline" in markdown
-
-
-def test_render_heatmap_produces_png(tmp_path: Path):
-    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
+@pytest.mark.parametrize("has_baseline, out_name", [
+    pytest.param(True, "test_run.png", id="with-baseline"),
+    pytest.param(False, "test_abs.png", id="absolute-mode-no-baseline"),
+])
+def test_render_heatmap_produces_png(tmp_path: Path, has_baseline, out_name):
     current = _make_run(_make_entry("run", "run", "fc0_1_1", 11.0, **_baseline_entry()))
+    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0, **_baseline_entry()))
     report = compare.evaluate(
         compare.build_frame(current), compare.build_frame(baseline), _thresholds()
     )
+    previous = compare.build_frame(baseline) if has_baseline else None
 
     out = compare.render_heatmap(
-        compare.build_frame(current), compare.build_frame(baseline), report,
+        compare.build_frame(current), previous, report,
         "4.2.0", tmp_path, thresholds=_thresholds(),
-        test_types={"run"}, metrics=["Time Taken(Seconds)"], out_name="test_run.png",
+        test_types={"run"}, metrics=["Time Taken(Seconds)"], out_name=out_name,
     )
     assert out is not None and out.exists() and out.stat().st_size > 0
-
-    # No baseline: absolute-mode plot with neutral cells must also render.
-    no_base = compare.render_heatmap(
-        compare.build_frame(current), None, report,
-        "4.2.0", tmp_path, thresholds=_thresholds(),
-        test_types={"run"}, metrics=["Time Taken(Seconds)"], out_name="test_abs.png",
-    )
-    assert no_base is not None and no_base.exists() and no_base.stat().st_size > 0
 
 
 def _make_cross_run(run_mem: float, recovery_mem: float | None = None,
@@ -374,3 +369,20 @@ def test_render_heatmaps_produces_memory_plot(tmp_path: Path):
     assert "summary_4.2.0_run.png" in names
     assert "summary_4.2.0_create_recovery_setstatus.png" in names
     assert "summary_4.2.0_memory.png" in names
+
+
+def test_excluded_scenarios_skipped_in_evaluate_but_kept_for_memory():
+    entries = [
+        _make_entry("run", "run", "4m/2c/2s", 10.0, **{**_baseline_entry(), "Total Jobs": 7}),
+        _make_entry("run", "run", "10m/2c/75s", 10.0, **{**_baseline_entry(), "Total Jobs": 3000}),
+        _make_entry("setstatus", "setstatus", "10m/2c/75s·ftcs", 10.0,
+                    **{**_baseline_entry(), "Total Jobs": 3000}),
+    ]
+    current = compare.build_frame(_make_run(*entries))
+
+    report = compare.evaluate(current, None, _thresholds())
+    assert not any("10m/2c/75s" in rid for rid in report["ID"])
+
+    cross = compare.evaluate_cross_scenarios(current)
+    assert any("10m/2c/75s" in row["ID"] or row["ID"] == "10m/2c/75s" for row in cross.to_dict("records"))
+    assert compare._heaviest_scenario(current) == "10m/2c/75s"
