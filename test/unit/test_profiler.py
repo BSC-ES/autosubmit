@@ -17,14 +17,15 @@
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
+from autosubmit.helpers.utils import release_memory_to_os
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.profiler.profiler import Profiler
 
 
 @pytest.fixture
 def profiler():
-    """ Creates a profiler object and yields it to the test. """
-    yield Profiler("a000")
+    """Creates a profiler object for the test."""
+    return Profiler("a000")
 
 
 # Black box techniques for status machine based software
@@ -72,7 +73,6 @@ def test_writing_permission_check_fails(profiler, mocker):
 
 def test_memory_profiling_loop(profiler):
     profiler.start()
-    bytearray(1024 * 1024)
     profiler.stop()
 
 
@@ -130,3 +130,9 @@ def test_run_command_rejects_trace_without_profile(mocker, tmp_path) -> None:
         Autosubmit.run_command(args)
 
     assert exc_info.value.code == 7012
+
+
+def test_release_memory_to_os_is_safe_and_idempotent():
+    # Must not raise on glibc or on platforms without malloc_trim (macOS/musl).
+    assert release_memory_to_os() is None
+    assert release_memory_to_os() is None

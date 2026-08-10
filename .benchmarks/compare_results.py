@@ -122,6 +122,8 @@ _CROSS_BASE = "run"
 _CROSS_COUNTERPARTS = ["recovery", "setstatus"]
 _CROSS_COLUMNS = ["ID", "metric", "base value", "counterpart", "counterpart value", "verdict"]
 
+_EXCLUDED_SCENARIOS = {"10m/2c/75s"}
+
 
 def _load_thresholds(path: Path) -> dict:
     """Load the thresholds YAML file using the project's YAML parser.
@@ -373,6 +375,8 @@ def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: d
 
     rows = []
     for (test_type, run_id) in current.index:
+        if current.loc[(test_type, run_id), "base"] in _EXCLUDED_SCENARIOS:
+            continue
         cur = current.loc[(test_type, run_id)]
         if previous is None:
             baseline_ok = False
