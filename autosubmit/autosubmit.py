@@ -1129,6 +1129,7 @@ class Autosubmit:
                 aslogs_path = os.path.join(tmp_path, BasicConfig.LOCAL_ASLOG_DIR)
                 if not os.path.exists(exp_path):
                     if BasicConfig.DATABASE_BACKEND == 'sqlite':
+                        sys.tracebacklimit = 0
                         raise AutosubmitCritical("Experiment does not exist", 7012)
                     else:
                         # TODO: This needs #1352 issue, to have the workflow configuration fully

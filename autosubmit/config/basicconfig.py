@@ -19,7 +19,6 @@ import inspect
 import os
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Union
 
 
 class BasicConfig:
