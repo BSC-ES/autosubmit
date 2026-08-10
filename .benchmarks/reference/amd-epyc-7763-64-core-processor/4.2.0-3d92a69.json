@@ -1,0 +1,521 @@
+{
+  "machine_info": {
+    "node": "runnervmvrwv9",
+    "processor": "x86_64",
+    "machine": "x86_64",
+    "python_compiler": "GCC 13.3.0",
+    "python_implementation": "CPython",
+    "python_implementation_version": "3.11.15",
+    "python_version": "3.11.15",
+    "python_build": [
+      "main",
+      "Jun 16 2026 21:41:52"
+    ],
+    "release": "6.17.0-1020-azure",
+    "system": "Linux",
+    "cpu": {
+      "python_version": "3.11.15.final.0 (64 bit)",
+      "cpuinfo_version": [
+        9,
+        0,
+        0
+      ],
+      "cpuinfo_version_string": "9.0.0",
+      "arch": "X86_64",
+      "bits": 64,
+      "count": 4,
+      "arch_string_raw": "x86_64",
+      "vendor_id_raw": "AuthenticAMD",
+      "brand_raw": "AMD EPYC 7763 64-Core Processor",
+      "hz_advertised_friendly": "2.4454 GHz",
+      "hz_actual_friendly": "2.4454 GHz",
+      "hz_advertised": [
+        2445425000,
+        0
+      ],
+      "hz_actual": [
+        2445425000,
+        0
+      ],
+      "stepping": 1,
+      "model": 1,
+      "family": 25,
+      "flags": [
+        "3dnowext",
+        "3dnowprefetch",
+        "abm",
+        "adx",
+        "aes",
+        "aperfmperf",
+        "apic",
+        "arat",
+        "avx",
+        "avx2",
+        "bmi1",
+        "bmi2",
+        "clflush",
+        "clflushopt",
+        "clwb",
+        "clzero",
+        "cmov",
+        "cmp_legacy",
+        "constant_tsc",
+        "cpuid",
+        "cr8_legacy",
+        "cx16",
+        "cx8",
+        "de",
+        "decodeassists",
+        "erms",
+        "extd_apicid",
+        "f16c",
+        "flushbyasid",
+        "fma",
+        "fpu",
+        "fsgsbase",
+        "fsrm",
+        "fxsr",
+        "fxsr_opt",
+        "ht",
+        "hypervisor",
+        "invpcid",
+        "lahf_lm",
+        "lm",
+        "mca",
+        "mce",
+        "misalignsse",
+        "mmx",
+        "mmxext",
+        "movbe",
+        "msr",
+        "mtrr",
+        "nonstop_tsc",
+        "nopl",
+        "npt",
+        "nrip_save",
+        "nx",
+        "osvw",
+        "osxsave",
+        "pae",
+        "pat",
+        "pausefilter",
+        "pcid",
+        "pclmulqdq",
+        "pdpe1gb",
+        "pfthreshold",
+        "pge",
+        "pni",
+        "popcnt",
+        "pse",
+        "pse36",
+        "rdpid",
+        "rdpru",
+        "rdrand",
+        "rdrnd",
+        "rdseed",
+        "rdtscp",
+        "rep_good",
+        "sep",
+        "sha",
+        "sha_ni",
+        "smap",
+        "smep",
+        "sse",
+        "sse2",
+        "sse4_1",
+        "sse4_2",
+        "sse4a",
+        "ssse3",
+        "svm",
+        "syscall",
+        "topoext",
+        "tsc",
+        "tsc_known_freq",
+        "tsc_reliable",
+        "tsc_scale",
+        "umip",
+        "user_shstk",
+        "v_vmsave_vmload",
+        "vaes",
+        "vmcb_clean",
+        "vme",
+        "vmmcall",
+        "vpclmulqdq",
+        "xgetbv1",
+        "xsave",
+        "xsavec",
+        "xsaveerptr",
+        "xsaveopt",
+        "xsaves"
+      ],
+      "l3_cache_size": 524288,
+      "l2_cache_size": 1048576,
+      "l1_data_cache_size": 65536,
+      "l1_instruction_cache_size": 65536,
+      "l2_cache_line_size": 512,
+      "l2_cache_associativity": 6
+    }
+  },
+  "benchmarks": [
+    {
+      "name": "test_autosubmit_create_profile_metrics[4members_2chunks_2splits]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_create_profile_metrics[4members_2chunks_2splits]",
+      "stats": {
+        "median": 0.9016179790000933
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.02734375,
+        "ID": "4m/2c/2s",
+        "Job list DB Usage": 0.06640625,
+        "MEM GROWTH(MIB)": 2.92,
+        "Memory consumption(MiB)": 151.66,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 114.0,
+        "Total Jobs": 67.0,
+        "base": "4m/2c/2s",
+        "test type": "create"
+      }
+    },
+    {
+      "name": "test_autosubmit_create_profile_metrics[4members_2chunks_6splits]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_create_profile_metrics[4members_2chunks_6splits]",
+      "stats": {
+        "median": 1.1124849969999957
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.02734375,
+        "ID": "4m/2c/6s",
+        "Job list DB Usage": 0.1484375,
+        "MEM GROWTH(MIB)": 0.0546875,
+        "Memory consumption(MiB)": 156.36,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 370.0,
+        "Total Jobs": 195.0,
+        "base": "4m/2c/6s",
+        "test type": "create"
+      }
+    },
+    {
+      "name": "test_autosubmit_create_profile_metrics[10members_2chunks_75splits]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_create_profile_metrics[10members_2chunks_75splits]",
+      "stats": {
+        "median": 24.805615176000003
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.02734375,
+        "ID": "10m/2c/75s",
+        "Job list DB Usage": 3.76171875,
+        "MEM GROWTH(MIB)": 82.24,
+        "Memory consumption(MiB)": 240.0,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 11962.0,
+        "Total Jobs": 6003.0,
+        "base": "10m/2c/75s",
+        "test type": "create"
+      }
+    },
+    {
+      "name": "test_autosubmit_run_profile_metrics[4members_2chunks_2splits]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_run_profile_metrics[4members_2chunks_2splits]",
+      "stats": {
+        "median": 70.99702481600002
+      },
+      "extra_info": {
+        "FD GROWTH": 1.0,
+        "Historical DB Disk Usage(MiB)": 0.1171875,
+        "ID": "4m/2c/2s",
+        "Job list DB Usage": 0.1015625,
+        "MEM GROWTH(MIB)": -3.5,
+        "Memory consumption(MiB)": 229.96,
+        "OBJ GROWTH": 19223.0,
+        "Total Dependencies": 114.0,
+        "Total Jobs": 67.0,
+        "base": "4m/2c/2s",
+        "test type": "run"
+      }
+    },
+    {
+      "name": "test_autosubmit_run_profile_metrics[4members_2chunks_6splits]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_run_profile_metrics[4members_2chunks_6splits]",
+      "stats": {
+        "median": 185.73652681300007
+      },
+      "extra_info": {
+        "FD GROWTH": 0.0,
+        "Historical DB Disk Usage(MiB)": 0.30078125,
+        "ID": "4m/2c/6s",
+        "Job list DB Usage": 0.24609375,
+        "MEM GROWTH(MIB)": 0.224365234375,
+        "Memory consumption(MiB)": 228.26,
+        "OBJ GROWTH": 44075.0,
+        "Total Dependencies": 370.0,
+        "Total Jobs": 195.0,
+        "base": "4m/2c/6s",
+        "test type": "run"
+      }
+    },
+    {
+      "name": "test_autosubmit_run_profile_metrics[10members_2chunks_75splits]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_run_profile_metrics[10members_2chunks_75splits]",
+      "stats": {
+        "median": 30.982258253999987
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 2.34375,
+        "ID": "10m/2c/75s",
+        "Job list DB Usage": 3.87890625,
+        "MEM GROWTH(MIB)": -22.9,
+        "Memory consumption(MiB)": 252.35,
+        "OBJ GROWTH": 6334.0,
+        "Total Dependencies": 11962.0,
+        "Total Jobs": 6003.0,
+        "base": "10m/2c/75s",
+        "test type": "run"
+      }
+    },
+    {
+      "name": "test_autosubmit_recovery_profile_metrics[4members_2chunks_2splits]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_recovery_profile_metrics[4members_2chunks_2splits]",
+      "stats": {
+        "median": 1.208151953999959
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.02734375,
+        "ID": "4m/2c/2s",
+        "Job list DB Usage": 0.06640625,
+        "MEM GROWTH(MIB)": 0.05078125,
+        "Memory consumption(MiB)": 252.35,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 114.0,
+        "Total Jobs": 67.0,
+        "base": "4m/2c/2s",
+        "test type": "recovery"
+      }
+    },
+    {
+      "name": "test_autosubmit_recovery_profile_metrics[4members_2chunks_6splits]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_recovery_profile_metrics[4members_2chunks_6splits]",
+      "stats": {
+        "median": 1.3049908819998564
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.02734375,
+        "ID": "4m/2c/6s",
+        "Job list DB Usage": 0.1484375,
+        "MEM GROWTH(MIB)": 0.07421875,
+        "Memory consumption(MiB)": 252.42,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 370.0,
+        "Total Jobs": 195.0,
+        "base": "4m/2c/6s",
+        "test type": "recovery"
+      }
+    },
+    {
+      "name": "test_autosubmit_recovery_profile_metrics[10members_2chunks_75splits]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_recovery_profile_metrics[10members_2chunks_75splits]",
+      "stats": {
+        "median": 8.292675330000009
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.02734375,
+        "ID": "10m/2c/75s",
+        "Job list DB Usage": 3.765625,
+        "MEM GROWTH(MIB)": 0.3828125,
+        "Memory consumption(MiB)": 265.84,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 11962.0,
+        "Total Jobs": 6003.0,
+        "base": "10m/2c/75s",
+        "test type": "recovery"
+      }
+    },
+    {
+      "name": "test_autosubmit_setstatus_profile_metrics[4members_2chunks_2splits_ftcs]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_setstatus_profile_metrics[4members_2chunks_2splits_ftcs]",
+      "stats": {
+        "median": 0.8043567920000214
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.03125,
+        "ID": "4m/2c/2s\u00b7ftcs",
+        "Job list DB Usage": 0.06640625,
+        "MEM GROWTH(MIB)": 0.0,
+        "Memory consumption(MiB)": 265.82,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 114.0,
+        "Total Jobs": 67.0,
+        "base": "4m/2c/2s",
+        "test type": "setstatus"
+      }
+    },
+    {
+      "name": "test_autosubmit_setstatus_profile_metrics[4members_2chunks_2splits_ft]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_setstatus_profile_metrics[4members_2chunks_2splits_ft]",
+      "stats": {
+        "median": 0.9010238159999062
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.03125,
+        "ID": "4m/2c/2s\u00b7ft",
+        "Job list DB Usage": 0.06640625,
+        "MEM GROWTH(MIB)": 0.0,
+        "Memory consumption(MiB)": 265.82,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 114.0,
+        "Total Jobs": 67.0,
+        "base": "4m/2c/2s",
+        "test type": "setstatus"
+      }
+    },
+    {
+      "name": "test_autosubmit_setstatus_profile_metrics[4members_2chunks_2splits_fs]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_setstatus_profile_metrics[4members_2chunks_2splits_fs]",
+      "stats": {
+        "median": 0.9004388410000956
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.03125,
+        "ID": "4m/2c/2s\u00b7fs",
+        "Job list DB Usage": 0.06640625,
+        "MEM GROWTH(MIB)": 0.0,
+        "Memory consumption(MiB)": 265.82,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 114.0,
+        "Total Jobs": 67.0,
+        "base": "4m/2c/2s",
+        "test type": "setstatus"
+      }
+    },
+    {
+      "name": "test_autosubmit_setstatus_profile_metrics[4members_2chunks_2splits_fl]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_setstatus_profile_metrics[4members_2chunks_2splits_fl]",
+      "stats": {
+        "median": 0.937005513000031
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.03125,
+        "ID": "4m/2c/2s\u00b7fl",
+        "Job list DB Usage": 0.06640625,
+        "MEM GROWTH(MIB)": 0.0,
+        "Memory consumption(MiB)": 265.82,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 114.0,
+        "Total Jobs": 67.0,
+        "base": "4m/2c/2s",
+        "test type": "setstatus"
+      }
+    },
+    {
+      "name": "test_autosubmit_setstatus_profile_metrics[4members_2chunks_6splits_ftcs]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_setstatus_profile_metrics[4members_2chunks_6splits_ftcs]",
+      "stats": {
+        "median": 0.8679357629998776
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.03125,
+        "ID": "4m/2c/6s\u00b7ftcs",
+        "Job list DB Usage": 0.15625,
+        "MEM GROWTH(MIB)": 0.0,
+        "Memory consumption(MiB)": 265.82,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 370.0,
+        "Total Jobs": 195.0,
+        "base": "4m/2c/6s",
+        "test type": "setstatus"
+      }
+    },
+    {
+      "name": "test_autosubmit_setstatus_profile_metrics[4members_2chunks_6splits_ft]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_setstatus_profile_metrics[4members_2chunks_6splits_ft]",
+      "stats": {
+        "median": 1.7244465429998854
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.03125,
+        "ID": "4m/2c/6s\u00b7ft",
+        "Job list DB Usage": 0.1640625,
+        "MEM GROWTH(MIB)": 0.0,
+        "Memory consumption(MiB)": 265.82,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 370.0,
+        "Total Jobs": 195.0,
+        "base": "4m/2c/6s",
+        "test type": "setstatus"
+      }
+    },
+    {
+      "name": "test_autosubmit_setstatus_profile_metrics[4members_2chunks_6splits_fs]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_setstatus_profile_metrics[4members_2chunks_6splits_fs]",
+      "stats": {
+        "median": 1.715586094000173
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.03125,
+        "ID": "4m/2c/6s\u00b7fs",
+        "Job list DB Usage": 0.1640625,
+        "MEM GROWTH(MIB)": 0.0,
+        "Memory consumption(MiB)": 265.82,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 370.0,
+        "Total Jobs": 195.0,
+        "base": "4m/2c/6s",
+        "test type": "setstatus"
+      }
+    },
+    {
+      "name": "test_autosubmit_setstatus_profile_metrics[4members_2chunks_6splits_fl]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_setstatus_profile_metrics[4members_2chunks_6splits_fl]",
+      "stats": {
+        "median": 1.7348154330002217
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.03125,
+        "ID": "4m/2c/6s\u00b7fl",
+        "Job list DB Usage": 0.1640625,
+        "MEM GROWTH(MIB)": 0.0,
+        "Memory consumption(MiB)": 265.82,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 370.0,
+        "Total Jobs": 195.0,
+        "base": "4m/2c/6s",
+        "test type": "setstatus"
+      }
+    },
+    {
+      "name": "test_autosubmit_setstatus_profile_metrics[10members_2chunks_75splits_ftcs]",
+      "fullname": "test/integration/commands/test_performance.py::test_autosubmit_setstatus_profile_metrics[10members_2chunks_75splits_ftcs]",
+      "stats": {
+        "median": 10.590029055999935
+      },
+      "extra_info": {
+        "FD GROWTH": null,
+        "Historical DB Disk Usage(MiB)": 0.03125,
+        "ID": "10m/2c/75s\u00b7ftcs",
+        "Job list DB Usage": 3.84375,
+        "MEM GROWTH(MIB)": 0.0,
+        "Memory consumption(MiB)": 278.61,
+        "OBJ GROWTH": null,
+        "Total Dependencies": 11962.0,
+        "Total Jobs": 6003.0,
+        "base": "10m/2c/75s",
+        "test type": "setstatus"
+      }
+    }
+  ]
+}
