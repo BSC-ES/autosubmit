@@ -110,9 +110,12 @@ def mock_ssh_config_and_client(
         password: str | None,
         monkey_patch: 'MonkeyPatch'
 ) -> None:
-    ssh_config = paramiko.SSHConfig()
-    with open(ssh_config_path, 'r') as f:
-        ssh_config.parse(f)
+    def load_config(*args, **kwargs):
+        config = paramiko.SSHConfig()
+        with open(ssh_config_path) as f:
+            config.parse(f)
+        return config
+
     if password:
         ssh_client = make_ssh_client(ssh_port, password, None)
         monkey_patch.setattr(
@@ -121,7 +124,7 @@ def mock_ssh_config_and_client(
         )
     monkey_patch.setattr(
         "autosubmit.platforms.paramiko_platform._load_ssh_config",
-        lambda *args, **kwargs: ssh_config,
+        load_config,
     )
 
 
