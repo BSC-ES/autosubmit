@@ -17,6 +17,8 @@
 
 """Unit tests for ``autosubmit.database.tables``."""
 
+from datetime import datetime
+
 import pytest
 from sqlalchemy import MetaData
 
@@ -180,6 +182,18 @@ def test_registry_get_all_known_tables():
         table = registry.get(name)
         assert table is not None
         assert table.name == name
+
+
+@pytest.mark.parametrize("col_name", ["created", "modified"])
+def test_jobs_table_column_default_is_iso_format(col_name):
+    """Default lambda must return a string in ISO 8601 format with timezone."""
+    value = JobsTable.c[col_name].default.arg(None)
+    assert isinstance(value, str)
+    # ISO 8601 with timezone: "YYYY-MM-DDTHH:MM:SS±HH:MM"
+    assert "T" in value, f"Expected ISO 8601 'T' separator, got: {value!r}"
+    dt = datetime.fromisoformat(value)
+    assert dt.tzinfo is not None, f"Expected timezone-aware datetime, got: {value!r}"
+    assert dt.utcoffset() is not None
 
 
 # --- get_all_tables_by_name ---
