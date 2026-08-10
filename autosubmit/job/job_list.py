@@ -204,9 +204,7 @@ class JobList:
         """Deletes jobs that have no dependencies and are marked for deletion when edgeless."""
         # indices to delete
         for job in self.job_list[:]:
-            if (job.dependencies is not None and job.dependencies not in ["{}", "[]"] and
-                    ((len(job.dependencies) > 0 and not job.has_parents() and not job.has_children())
-                     and str(job.delete_when_edgeless).casefold() == "true".casefold())):
+            if job.dependencies and job.dependencies not in ["{}", "[]"] and len(job.dependencies) > 0 and job.edgeless() and job.delete_when_edgeless:
                 self.graph.remove_node(job.name)
 
     def generate(
@@ -790,9 +788,10 @@ class JobList:
             for job in jobs_gen:
                 self._apply_jobs_edge_info(job, dependencies)
 
-    def _deep_map_dependencies(self, section, jobs_data, option, dependency_list=(),
-                               strip_keys=True):
+    def _deep_map_dependencies(self, section, jobs_data, option, dependency_list: set | None = None, strip_keys=True):
         """Recursive function to map dependencies of dependencies"""
+        if dependency_list is None:
+            dependency_list = {}
         if section in dependency_list:
             return dependency_list
         dependency_list.add(section)
@@ -1251,7 +1250,7 @@ class JobList:
         elif filter_type == "CHUNKS_TO":
             value_list = self._chunk_list
         aux = str(filter_to.pop(filter_type, None))
-        if "all".casefold() not in unified_filter[filter_type].casefold() and aux:
+        if aux and "all" not in unified_filter[filter_type].casefold():
             if "," in aux:
                 split_aux_list = aux.split(",")
             else:
@@ -1271,16 +1270,16 @@ class JobList:
                 for ele in parsed_element:
                     if type(ele) is str and ele.lower() in ["natural", "none"]:
                         skip = True
-                if skip and len(unified_filter[filter_type]) > 0:
-                    continue
-                else:
-                    for ele in parsed_element:
-                        if extra_data:
-                            check_whole_string = str(ele) + extra_data + ","
-                        else:
-                            check_whole_string = str(ele) + ","
-                        if str(check_whole_string) not in unified_filter[filter_type]:
-                            unified_filter[filter_type] += check_whole_string
+                    if skip and len(unified_filter[filter_type]) > 0:
+                        continue
+                    else:
+                        for ele in parsed_element:
+                            if extra_data:
+                                check_whole_string = str(ele) + extra_data + ","
+                            else:
+                                check_whole_string = str(ele) + ","
+                            if str(check_whole_string) not in unified_filter[filter_type]:
+                                unified_filter[filter_type] += check_whole_string
         return unified_filter
 
     @staticmethod

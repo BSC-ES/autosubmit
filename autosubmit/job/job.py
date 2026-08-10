@@ -1375,6 +1375,15 @@ class Job:
         """
         return self.parents.__len__()
 
+    def edgeless(self):
+        """
+        Returns true if job has is edgless, else return false
+
+        :return: true if job has is edgless, otherwise return false
+        :rtype: bool
+        """
+        return not self.has_parents() and not self.has_children()
+
     def _get_from_stat(self, index: int, attempt: int) -> int:
         """
         Returns value from given row index position in STAT file associated to job.

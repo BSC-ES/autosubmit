@@ -17,11 +17,8 @@
 
 """Unit test utilities."""
 
-from __future__ import annotations
-
 import re
 from pathlib import Path
-from typing import Union
 
 XZ_MAGIC = "FD 37 7A 58 5A 00"
 GZIP_MAGIC = "1F 8B"
