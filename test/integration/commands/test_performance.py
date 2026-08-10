@@ -266,7 +266,6 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
     }
 
 
-# Shared benchmark scenarios.
 _SCENARIOS = [
     pytest.param("fc0 fc1 fc2 fc3", "2", "2",
                  marks=[pytest.mark.profile, pytest.mark.profilelong], id="4members_2chunks_2splits"),
