@@ -24,9 +24,6 @@ import pytest
 from autosubmit.profiler.profiler import Profiler
 
 
-# https://github.com/BSC-ES/autosubmit/issues/1332
-
-
 def _scenario_id(members: str, chunks: str, splits: str, filter_type: str | None = None) -> str:
     """Return the abbreviated scenario id shown in the reports and plots."""
     base = f"{len(members.split())}m/{chunks}c/{splits}s"
@@ -201,7 +198,8 @@ def _to_mib(value: str, unit: str) -> float:
     return amount / (1024 * 1024)  # B
 
 
-def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path: Path) -> dict:
+def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path: Path,
+                              base_id: str | None = None) -> dict:
     """Extract the profiler metrics from the latest profile report.
 
     The metrics are stored per-run in the pytest-benchmark ``extra_info`` so the
@@ -211,6 +209,8 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
     :param test_type: The type of run (e.g., 'create', 'run', 'recovery').
     :param run_id: Unique identifier for the test run.
     :param tmp_path: The temporary path for the experiment.
+    :param base_id: Scenario id without the setstatus filter suffix; defaults to
+        ``run_id`` (which already is the base id for non-setstatus runs).
     :rtype: dict
     :return: A dictionary with the profiler metrics.
     """
@@ -254,6 +254,7 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
     return {
         "test type": test_type,
         "ID": run_id,
+        "base": base_id or run_id,
         "Memory consumption(MiB)": float(memory_consumption) if memory_consumption else None,
         "Historical DB Disk Usage(MiB)": float(metadata_size),
         "Job list DB Usage": float(db_size),
@@ -265,24 +266,18 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
     }
 
 
-@pytest.mark.parametrize("members,chunks,splits",
-                         [
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "2",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "4",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "8",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15",
-                                          marks=[pytest.mark.profilelong])
-                         ],
-                         ids=[
-                             "4members_2chunks_2splits",
-                             "4members_2chunks_4splits",
-                             "4members_2chunks_8splits",
-                             "9members_2chunks_15splits"
-                         ],
-                         )
+# Shared benchmark scenarios.
+_SCENARIOS = [
+    pytest.param("fc0 fc1 fc2 fc3", "2", "2",
+                 marks=[pytest.mark.profile, pytest.mark.profilelong], id="4members_2chunks_2splits"),
+    pytest.param("fc0 fc1 fc2 fc3", "2", "6",
+                 marks=[pytest.mark.profile, pytest.mark.profilelong], id="4members_2chunks_6splits"),
+    pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8 fc9", "2", "75",
+                 marks=[pytest.mark.profilelong], id="10members_2chunks_75splits"),
+]
+
+
+@pytest.mark.parametrize("members,chunks,splits", _SCENARIOS)
 @pytest.mark.timeout(300)
 def test_autosubmit_create_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, members,
                                            chunks, splits):
@@ -303,16 +298,14 @@ def test_autosubmit_create_profile_metrics(benchmark, tmp_path: Path, autosubmit
                          [
                              pytest.param("fc0 fc1 fc2 fc3", "2", "2", 0, "run",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", 0, "run", marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", 0, "run", marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", 10, "run",
-                                          marks=[pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "6", 0, "run", marks=[pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8 fc9", "2", "75", 10, "run",
+                                           marks=[pytest.mark.profilelong]),
                          ],
                          ids=[
                              "4members_2chunks_2splits",
-                             "4members_2chunks_4splits",
-                             "4members_2chunks_8splits",
-                             "9members_2chunks_15splits_10iterations"
+                             "4members_2chunks_6splits",
+                             "10members_2chunks_75splits",
                          ],
                          )
 @pytest.mark.timeout(1800)
@@ -331,24 +324,7 @@ def test_autosubmit_run_profile_metrics(benchmark, tmp_path: Path, autosubmit_ex
     benchmark.extra_info.update(_collect_profiler_metrics(as_exp, test_type, current_id, tmp_path))
 
 
-@pytest.mark.parametrize("members,chunks,splits",
-                         [
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "2",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "4",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "8",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15",
-                                          marks=[pytest.mark.profilelong])
-                         ],
-                         ids=[
-                             "4members_2chunks_2splits",
-                             "4members_2chunks_4splits",
-                             "4members_2chunks_8splits",
-                             "9members_2chunks_15splits"
-                         ],
-                         )
+@pytest.mark.parametrize("members,chunks,splits", _SCENARIOS)
 @pytest.mark.timeout(600)
 def test_autosubmit_recovery_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, members, chunks,
                                              splits, slurm_server):
@@ -417,48 +393,27 @@ def do_setstatus(as_exp_, fl=None, ftcs=None, fs=None, ft=None, target="WAITING"
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
                              pytest.param("fc0 fc1 fc2 fc3", "2", "2", "fl",
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", "ftcs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", "ft",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", "fs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "4", "fl",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", "ftcs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", "ft",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", "fs",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "8", "fl",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", "ftcs",
-                                          marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", "ft",
-                                          marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", "fs",
-                                          marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "2", "15", "fl",
-                                          marks=[pytest.mark.profilelong])
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "6", "ftcs",
+                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "6", "ft",
+                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "6", "fs",
+                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "6", "fl",
+                                            marks=[pytest.mark.profile, pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8 fc9", "2", "75", "ftcs",
+                                           marks=[pytest.mark.profilelong]),
                          ],
                          ids=[
                              "4members_2chunks_2splits_ftcs",
                              "4members_2chunks_2splits_ft",
                              "4members_2chunks_2splits_fs",
                              "4members_2chunks_2splits_fl",
-                             "4members_2chunks_4splits_ftcs",
-                             "4members_2chunks_4splits_ft",
-                             "4members_2chunks_4splits_fs",
-                             "4members_2chunks_4splits_fl",
-                             "4members_2chunks_8splits_ftcs",
-                             "4members_2chunks_8splits_ft",
-                             "4members_2chunks_8splits_fs",
-                             "4members_2chunks_8splits_fl",
-                             "9members_2chunks_15splits_ftcs",
-                             "9members_2chunks_15splits_ft",
-                             "9members_2chunks_15splits_fs",
-                             "9members_2chunks_15splits_fl"
+                             "4members_2chunks_6splits_ftcs",
+                             "4members_2chunks_6splits_ft",
+                             "4members_2chunks_6splits_fs",
+                             "4members_2chunks_6splits_fl",
+                             "10members_2chunks_75splits_ftcs",
 
                          ],
                          )
@@ -468,6 +423,7 @@ def test_autosubmit_setstatus_profile_metrics(benchmark, tmp_path: Path, autosub
 
     test_type = "setstatus"
     current_id = _scenario_id(members, chunks, splits, filter_type)
+    base_id = _scenario_id(members, chunks, splits)
     yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
     as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=True)
     as_exp.as_conf.set_last_as_command('recovery')
@@ -494,4 +450,5 @@ def test_autosubmit_setstatus_profile_metrics(benchmark, tmp_path: Path, autosub
         prof.stop()
 
     benchmark.pedantic(_setstatus)
-    benchmark.extra_info.update(_collect_profiler_metrics(as_exp, test_type, current_id, tmp_path))
+    benchmark.extra_info.update(_collect_profiler_metrics(as_exp, test_type, current_id, tmp_path,
+                                                          base_id=base_id))

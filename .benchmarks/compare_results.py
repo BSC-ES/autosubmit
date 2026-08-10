@@ -22,10 +22,11 @@ Loads pytest-benchmark JSON runs (as saved by ``--benchmark-save``) and
 produces:
 
 - ``summary_{version}.md``: a comparison table between the current run and a
-  baseline, flagging regressions that exceed the configured thresholds.
-- ``summary_{version}_run.png`` and ``summary_{version}_create_recovery_setstatus.png``:
-  heatmaps of the run and the create/recovery/setstatus scenarios, current vs
-  baseline.
+  baseline, flagging regressions that exceed the configured thresholds, plus a
+  cross-scenario sanity check (run memory vs recovery/setstatus).
+- ``summary_{version}_run.png``, ``summary_{version}_create_recovery_setstatus.png``
+  and ``summary_{version}_memory.png``: heatmaps of the run, the
+  create/recovery/setstatus, and the memory scenarios, current vs baseline.
 
 Each side of the comparison is a single pytest-benchmark file: the workflow
 merges the BENCHMARK_RUNS sessions of a run into one file with per-scenario
@@ -85,6 +86,8 @@ _OTHER_TEST_TYPES = {"create", "recovery", "setstatus"}
 _RUN_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)", "MEM GROWTH(MIB)", "FD GROWTH", "OBJ GROWTH"]
 _OTHER_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)",
                        "Historical DB Disk Usage(MiB)", "Job list DB Usage"]
+_MEMORY_TEST_TYPES = {"create", "recovery", "run", "setstatus"}
+_MEMORY_PLOT_METRICS = ["Memory consumption(MiB)", "MEM GROWTH(MIB)"]
 _SHORT_METRICS = {
     "Time Taken(Seconds)": "Time (s)",
     "Memory consumption(MiB)": "Memory (MiB)",
@@ -110,6 +113,14 @@ def _allowed_metrics(test_type: str) -> set[str]:
 
 
 _TABLE_COLUMNS = ["test type", "ID", "metric", "baseline", "current", "delta %", "verdict"]
+
+# Cross-scenario sanity check: the run scenario must consume LESS memory than
+# its counterpart in the recovery scenario and in every setstatus variant of
+# the same experiment.
+_CROSS_CHECK_METRIC = "Memory consumption(MiB)"
+_CROSS_BASE = "run"
+_CROSS_COUNTERPARTS = ["recovery", "setstatus"]
+_CROSS_COLUMNS = ["ID", "metric", "base value", "counterpart", "counterpart value", "verdict"]
 
 
 def _load_thresholds(path: Path) -> dict:
@@ -149,9 +160,9 @@ def _iter_run_files(path: str | None, latest_only: bool = False) -> list[Path]:
         return []
     p = Path(path)
     if p.is_dir():
-        files = sorted(p.rglob("*.json"), key=lambda f: f.stat().st_mtime)
+        files = list(p.rglob("*.json"))
         if latest_only and files:
-            return [files[-1]]
+            return [max(files, key=lambda f: f.stat().st_mtime)]
         return files
     if p.is_file():
         return [p]
@@ -251,6 +262,7 @@ def build_frame(run: dict) -> pd.DataFrame:
         row = {
             "test type": test_type,
             "ID": run_id,
+            "base": extra["base"],
             "Time Taken(Seconds)": entry.get("stats", {}).get("median"),
         }
         for metric in METRIC_COLUMNS[1:]:
@@ -261,10 +273,7 @@ def build_frame(run: dict) -> pd.DataFrame:
         return pd.DataFrame(columns=_TABLE_COLUMNS)
 
     frame = pd.DataFrame(records)
-    numeric = [c for c in METRIC_COLUMNS if c not in EXACT_METRICS]
-    for col in numeric:
-        frame[col] = pd.to_numeric(frame[col], errors="coerce")
-    for col in EXACT_METRICS:
+    for col in METRIC_COLUMNS:
         frame[col] = pd.to_numeric(frame[col], errors="coerce")
 
     return frame.set_index(["test type", "ID"])
@@ -285,14 +294,70 @@ def _safe_pct(current: float | None, previous: float | None) -> float | None:
     return (float(current) - float(previous)) / float(previous) * 100.0
 
 
-def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: dict) -> pd.DataFrame:
-    """Compare current vs previous applying the configured thresholds.
+def _metric_verdict(test_type: str, run_id: str, metric: str, cur_val: float | None,
+                    prev_val: float | None, baseline_ok: bool, exact: set[str],
+                    metrics_cfg: dict) -> dict:
+    """Compute the report row for a single (scenario, metric) pair.
 
     Deltas are always computed on the absolute value of the measurement
     (``|current|`` vs ``|previous|``): a regression means the magnitude grew,
     which is well-defined even when values can be negative or cross zero (a
     growth metric going from -15 to +215 MiB is a regression even though the
     signed delta would read as an "improvement").
+
+    :param test_type: The test type of the scenario.
+    :type test_type: str
+    :param run_id: Scenario id.
+    :type run_id: str
+    :param metric: Metric name.
+    :type metric: str
+    :param cur_val: Current value of the metric.
+    :type cur_val: float | None
+    :param prev_val: Baseline value of the metric, or None.
+    :type prev_val: float | None
+    :param baseline_ok: Whether a baseline value is available.
+    :type baseline_ok: bool
+    :param exact: Set of exact metrics that must not change.
+    :type exact: set
+    :param metrics_cfg: Per-metric threshold configuration.
+    :type metrics_cfg: dict
+    :return: Report row dict, or None when there is no verdict (baseline present
+        but value missing for an exact metric).
+    :rtype: dict | None
+    """
+    if metric in exact:
+        if baseline_ok and prev_val is not None and not pd.isna(prev_val):
+            verdict = "WARN" if int(float(cur_val)) != int(float(prev_val)) else "PASS"
+            return {"test type": test_type, "ID": run_id, "metric": metric,
+                    "baseline": prev_val, "current": cur_val, "delta %": None, "verdict": verdict}
+        if not baseline_ok:
+            return {"test type": test_type, "ID": run_id, "metric": metric,
+                    "baseline": None, "current": cur_val, "delta %": None, "verdict": "N/A"}
+        return None
+
+    cfg = metrics_cfg.get(metric, {})
+    threshold = float(cfg.get("threshold", 15.0))
+    floor = float(cfg.get("floor", 0.0))
+    abs_prev = abs(prev_val) if prev_val is not None else None
+    pct = _safe_pct(abs(cur_val), abs_prev)
+
+    if not baseline_ok or prev_val is None or pd.isna(prev_val):
+        return {"test type": test_type, "ID": run_id, "metric": metric,
+                "baseline": prev_val, "current": cur_val, "delta %": pct, "verdict": "N/A"}
+
+    verdict = "PASS"
+    if (pct is not None and pct > threshold
+            or prev_val == 0 and cur_val != 0) and abs(float(cur_val)) >= floor:
+        # Either the relative change exceeds the threshold or the value moved
+        # away from an exact zero baseline (no finite delta, e.g. FD GROWTH
+        # going 0 -> 1): any magnitude above the floor warns.
+        verdict = "WARN"
+    return {"test type": test_type, "ID": run_id, "metric": metric,
+            "baseline": prev_val, "current": cur_val, "delta %": pct, "verdict": verdict}
+
+
+def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: dict) -> pd.DataFrame:
+    """Compare current vs previous applying the configured thresholds.
 
     :param current: Current run DataFrame indexed by (test type, ID).
     :type current: pd.DataFrame
@@ -310,8 +375,8 @@ def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: d
     for (test_type, run_id) in current.index:
         cur = current.loc[(test_type, run_id)]
         if previous is None:
-            prev = pd.Series(dtype=float)
             baseline_ok = False
+            prev = None
         elif (test_type, run_id) in previous.index:
             prev = previous.loc[(test_type, run_id)]
             baseline_ok = True
@@ -327,42 +392,65 @@ def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: d
             prev_val = prev.get(metric) if baseline_ok else None
             if cur_val is None or pd.isna(cur_val):
                 continue
-
-            if metric in exact:
-                if baseline_ok and prev_val is not None and not pd.isna(prev_val):
-                    cur_int = int(float(cur_val))
-                    prev_int = int(float(prev_val))
-                    verdict = "WARN" if cur_int != prev_int else "PASS"
-                    rows.append({"test type": test_type, "ID": run_id, "metric": metric,
-                                 "baseline": prev_val, "current": cur_val, "delta %": None, "verdict": verdict})
-                elif not baseline_ok:
-                    rows.append({"test type": test_type, "ID": run_id, "metric": metric,
-                                 "baseline": None, "current": cur_val, "delta %": None, "verdict": "N/A"})
-                continue
-
-            cfg = metrics_cfg.get(metric, {})
-            threshold = float(cfg.get("threshold", 15.0))
-            floor = float(cfg.get("floor", 0.0))
-            abs_prev = abs(prev_val) if prev_val is not None else None
-            pct = _safe_pct(abs(cur_val), abs_prev)
-
-            if not baseline_ok or prev_val is None or pd.isna(prev_val):
-                rows.append({"test type": test_type, "ID": run_id, "metric": metric,
-                             "baseline": prev_val, "current": cur_val, "delta %": pct, "verdict": "N/A"})
-                continue
-
-            verdict = "PASS"
-            if pct is not None and pct > threshold and abs(float(cur_val)) >= floor:
-                verdict = "WARN"
-            elif prev_val == 0 and cur_val != 0 and abs(float(cur_val)) >= floor:
-                # A measurable change from an exact zero baseline (e.g. FD
-                # GROWTH going 0 -> 1) has no finite delta, but it is a change:
-                # any magnitude above the floor warns.
-                verdict = "WARN"
-            rows.append({"test type": test_type, "ID": run_id, "metric": metric,
-                         "baseline": prev_val, "current": cur_val, "delta %": pct, "verdict": verdict})
+            row = _metric_verdict(test_type, run_id, metric, cur_val, prev_val, baseline_ok,
+                                  exact, metrics_cfg)
+            if row is not None:
+                rows.append(row)
 
     return pd.DataFrame(rows, columns=_TABLE_COLUMNS)
+
+
+def _heaviest_scenario(current: pd.DataFrame) -> str | None:
+    """Return the base scenario id with the highest ``Total Jobs``.
+
+    Used to pick which experiment the memory heatmap focuses on: the one that
+    generates the most jobs is the most memory-hungry.
+
+    :param current: Current run DataFrame indexed by (test type, ID).
+    :type current: pd.DataFrame
+    :return: The base id with the maximum Total Jobs, or None when unknown.
+    :rtype: str | None
+    """
+    jobs = pd.to_numeric(current.get("Total Jobs"), errors="coerce")
+    if jobs is None or jobs.dropna().empty:
+        return None
+    best = jobs.idxmax()
+    return current.loc[best, "base"]
+
+
+def evaluate_cross_scenarios(current: pd.DataFrame) -> pd.DataFrame:
+    """Compare a metric across test types for the same experiment.
+
+    :param current: Current run DataFrame indexed by (test type, ID).
+    :type current: pd.DataFrame
+    :return: DataFrame with one row per (scenario, counterpart) pair.
+    :rtype: pd.DataFrame
+    """
+    rows = []
+    if _CROSS_BASE not in current.index.get_level_values("test type"):
+        return pd.DataFrame(columns=_CROSS_COLUMNS)
+    for test_type in _CROSS_COUNTERPARTS:
+        sub = current[current.index.get_level_values("test type") == test_type]
+        for run_id in current.xs(_CROSS_BASE).index:
+            base_val = current.loc[(_CROSS_BASE, run_id), _CROSS_CHECK_METRIC]
+            if base_val is None or pd.isna(base_val):
+                continue
+            base_id = current.loc[(_CROSS_BASE, run_id), "base"]
+            candidates = [
+                (cid, val) for (_, cid), val in sub.loc[sub["base"] == base_id, _CROSS_CHECK_METRIC].items()
+                if val is not None and not pd.isna(val)
+            ]
+            if not candidates:
+                rows.append({"ID": base_id, "metric": _CROSS_CHECK_METRIC, "base value": base_val,
+                             "counterpart": test_type, "counterpart value": None, "verdict": "N/A"})
+                continue
+            for cid, cval in candidates:
+                verdict = "WARN" if float(base_val) >= float(cval) else "PASS"
+                label = cid if test_type == "setstatus" else test_type
+                rows.append({"ID": base_id, "metric": _CROSS_CHECK_METRIC, "base value": base_val,
+                             "counterpart": label, "counterpart value": cval,
+                             "verdict": verdict})
+    return pd.DataFrame(rows, columns=_CROSS_COLUMNS)
 
 
 def environment_warning(current_runs: list[dict], previous_runs: list[dict]) -> str | None:
@@ -387,8 +475,9 @@ def environment_warning(current_runs: list[dict], previous_runs: list[dict]) -> 
     return None
 
 
-def render_markdown(report: pd.DataFrame, version: str, current_label: str,
-                    previous_label: str | None, env_warning: str | None) -> str:
+def render_markdown(report: pd.DataFrame, version: str, current_label: str, *,
+                    previous_label: str | None, env_warning: str | None,
+                    cross_report: pd.DataFrame | None = None) -> str:
     """Render the report as a GitHub markdown summary.
 
     :param report: Evaluation report DataFrame.
@@ -401,18 +490,20 @@ def render_markdown(report: pd.DataFrame, version: str, current_label: str,
     :type previous_label: str | None
     :param env_warning: Environment warning message, or None.
     :type env_warning: str | None
+    :param cross_report: Cross-scenario check DataFrame, or None.
+    :type cross_report: pd.DataFrame | None
     :return: Markdown summary of the report.
     :rtype: str
     """
     lines = [f"# Autosubmit Performance Metrics - Version {version}",
              "", f"- **Current:** {current_label}", f"- **Baseline:** {previous_label or 'None'}"]
     if env_warning:
-        lines += ["", f"> ⚠️ {env_warning}"]
+        lines += ["", f"> {env_warning}"]
     lines.append("")
 
     warnings = report[report["verdict"] == "WARN"]
     if not warnings.empty:
-        lines.append("## ⚠️ Regressions detected")
+        lines.append("## Regressions detected")
         lines.append("")
         for _, row in warnings.iterrows():
             delta = f"{row['delta %']:+.1f}%" if pd.notna(row["delta %"]) else "changed"
@@ -420,7 +511,19 @@ def render_markdown(report: pd.DataFrame, version: str, current_label: str,
                          f"{row['baseline']:.2f} -> {row['current']:.2f} ({delta})")
         lines.append("")
     else:
-        lines.append("## ✔️ No regressions detected")
+        lines.append("## No regressions detected")
+        lines.append("")
+
+    if cross_report is not None and not cross_report.empty:
+        cross = cross_report.copy()
+        cross["base value"] = cross["base value"].map(lambda v: f"{v:.2f}" if pd.notna(v) else "-")
+        cross["counterpart value"] = cross["counterpart value"].map(lambda v: f"{v:.2f}" if pd.notna(v) else "-")
+        lines.append("## Cross-scenario checks")
+        lines.append("")
+        lines.append(f"`{_CROSS_BASE}` must consume less **{_CROSS_CHECK_METRIC}** than its "
+                     f"counterparts (`{'`/`'.join(_CROSS_COUNTERPARTS)}`).")
+        lines.append("")
+        lines.append(cross.to_markdown(index=False))
         lines.append("")
 
     for test_type, group in report.groupby("test type", sort=False):
@@ -494,6 +597,7 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
                    version: str, output_dir: Path, cpu_label: str | None = None,
                    thresholds: dict | None = None, test_types: set[str] | None = None,
                    metrics: list[str] | None = None,
+                   scenario_ids: set[str] | None = None,
                    out_name: str | None = None) -> Path | None:
     """Render a filled-cell grid for a subset of scenarios x metrics.
 
@@ -506,6 +610,8 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     cells are uniformly neutral. Metrics excluded from a test type are left
     blank. ``test_types`` and ``metrics`` restrict which scenarios and metrics
     are drawn, so the run-only profiler metrics can live in their own plot.
+    ``scenario_ids`` further restricts which base scenarios are drawn (matched
+    against the ``base`` column, so setstatus variants share their base id).
 
     :param current: Current run DataFrame indexed by (test type, ID).
     :type current: pd.DataFrame
@@ -525,6 +631,8 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     :type test_types: set | None
     :param metrics: Restrict which metrics are drawn.
     :type metrics: list | None
+    :param scenario_ids: Restrict which base scenarios are drawn.
+    :type scenario_ids: set | None
     :param out_name: Output file name, defaults to ``summary_{version}.png``.
     :type out_name: str | None
     :return: Path of the saved plot, or None when nothing was drawn.
@@ -602,7 +710,10 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
             continue
         mask = current.index.get_level_values("test type") == test_type
         rows = current.loc[mask].sort_values("Time Taken(Seconds)", ascending=True)
-        order.extend((test_type, run_id) for run_id in rows.index.get_level_values("ID"))
+        for run_id in rows.index.get_level_values("ID"):
+            if scenario_ids is not None and current.loc[(test_type, run_id), "base"] not in scenario_ids:
+                continue
+            order.append((test_type, run_id))
 
     if not metrics or not order:
         return None
@@ -721,7 +832,11 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
 def render_heatmaps(current: pd.DataFrame, previous: pd.DataFrame | None, report: pd.DataFrame,
                     version: str, output_dir: Path, cpu_label: str | None = None,
                     thresholds: dict | None = None) -> list[Path]:
-    """Render the two performance plots: `run` and the create/recovery/setstatus ones.
+    """Render the performance plots: `run`, create/recovery/setstatus, and memory.
+
+    The memory plot focuses on the heaviest scenario (the one with the most
+    jobs) across all four test types, so the memory behavior of a big run can
+    be compared against its recovery/setstatus/create counterparts.
 
     :param current: Current run DataFrame indexed by (test type, ID).
     :type current: pd.DataFrame
@@ -748,6 +863,15 @@ def render_heatmaps(current: pd.DataFrame, previous: pd.DataFrame | None, report
         out = render_heatmap(current, previous, report, version, output_dir,
                              cpu_label=cpu_label, thresholds=thresholds,
                              test_types=test_types, metrics=metrics, out_name=name)
+        if out is not None:
+            paths.append(out)
+
+    heaviest = _heaviest_scenario(current)
+    if heaviest:
+        out = render_heatmap(current, previous, report, version, output_dir,
+                             cpu_label=cpu_label, thresholds=thresholds,
+                             test_types=_MEMORY_TEST_TYPES, metrics=_MEMORY_PLOT_METRICS,
+                             scenario_ids={heaviest}, out_name=f"summary_{version}_memory.png")
         if out is not None:
             paths.append(out)
     return paths
@@ -808,12 +932,13 @@ def main() -> int:
 
     thresholds = _load_thresholds(Path(args.thresholds))
     report = evaluate(current_frame, previous_frame, thresholds)
+    cross_report = evaluate_cross_scenarios(current_frame)
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     prev_label = args.previous_label if previous_runs else None
-    baseline_cpu = _current_cpu(previous_runs) if previous_runs else ""
+    baseline_cpu = _current_cpu(previous_runs)
     if prev_label and baseline_cpu:
         prev_label = f"{prev_label} · {baseline_cpu}"
 
@@ -822,7 +947,9 @@ def main() -> int:
         note = f"No baseline yet for CPU `{current_cpu}` - this run establishes it (shown without comparison)."
         env_warning = f"{env_warning}\n\n{note}" if env_warning else note
 
-    markdown = render_markdown(report, args.version, args.current_label, prev_label, env_warning)
+    markdown = render_markdown(report, args.version, args.current_label,
+                               previous_label=prev_label, env_warning=env_warning,
+                               cross_report=cross_report)
     markdown_path = output_dir / f"summary_{args.version}.md"
     markdown_path.write_text(markdown, encoding="UTF-8")
     print(f"Saved performance comparison markdown to {markdown_path}")
@@ -833,10 +960,13 @@ def main() -> int:
         print(f"Saved performance comparison plot to {plot_path}")
 
     n_warnings = int((report["verdict"] == "WARN").sum())
+    cross_warnings = int((cross_report["verdict"] == "WARN").sum()) if not cross_report.empty else 0
     verdict = {
         "version": args.version,
         "regressions_detected": n_warnings > 0,
         "n_regressions": n_warnings,
+        "cross_checks_detected": cross_warnings > 0,
+        "n_cross_checks": len(cross_report),
         "n_scenarios": len(current_frame),
         "cpu": current_cpu,
         "cpu_slug": _cpu_slug(current_cpu) if current_cpu else "",

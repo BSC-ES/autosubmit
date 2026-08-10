@@ -407,6 +407,7 @@ jobs:
             const plotAlts = {
               [`summary_${version}_run.png`]: 'Run scenarios',
               [`summary_${version}_create_recovery_setstatus.png`]: 'Create / Recovery / Setstatus',
+              [`summary_${version}_memory.png`]: 'Memory scenarios',
             };
 
             const summary = fs.readFileSync(`${dir}/summary_${version}.md`, 'utf8');
@@ -519,6 +520,7 @@ jobs:
           echo ""
           echo "Plots saved to .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}_run.png"
           echo "             and .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}_create_recovery_setstatus.png"
+          echo "             and .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}_memory.png"
 
   update-baseline:
     needs: [report, metrics]
