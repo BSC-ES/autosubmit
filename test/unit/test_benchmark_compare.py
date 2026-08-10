@@ -40,7 +40,7 @@ def _make_entry(name: str, test_type: str, run_id: str, median: float, **extra) 
         "name": name,
         "fullname": name,
         "stats": {"median": median},
-        "extra_info": {"test type": test_type, "ID": run_id, **extra},
+        "extra_info": {"test type": test_type, "ID": run_id, "base": run_id.split("·", 1)[0], **extra},
     }
 
 
@@ -86,7 +86,7 @@ def test_no_baseline_renders_current_only():
     assert not report.empty
     assert (report["verdict"] == "N/A").all()
 
-    markdown = compare.render_markdown(report, "4.2.0", "Current", None, None)
+    markdown = compare.render_markdown(report, "4.2.0", "Current", previous_label=None, env_warning=None)
     assert "**Baseline:** None" in markdown
     assert "No regressions detected" in markdown
 
@@ -143,7 +143,8 @@ def test_render_markdown_flags_regressions():
     report = compare.evaluate(
         compare.build_frame(current), compare.build_frame(baseline), _thresholds()
     )
-    markdown = compare.render_markdown(report, "4.2.0", "Current", "Baseline", None)
+    markdown = compare.render_markdown(report, "4.2.0", "Current", previous_label="Baseline",
+                                       env_warning=None)
     assert "Regressions detected" in markdown
     assert "run/fc0_1_1" in markdown
     assert "Time Taken(Seconds)" in markdown
@@ -248,8 +249,8 @@ def test_render_markdown_includes_environment_warning():
         compare.build_frame(current), compare.build_frame(baseline), _thresholds()
     )
 
-    markdown = compare.render_markdown(report, "4.2.0", "Current", "Baseline",
-                                       "Environment differs from baseline: current ran on `A` "
+    markdown = compare.render_markdown(report, "4.2.0", "Current", previous_label="Baseline",
+                                       env_warning="Environment differs from baseline: current ran on `A` "
                                        "while the baseline ran on `B`.")
     assert "Environment differs from baseline" in markdown
 
@@ -275,3 +276,101 @@ def test_render_heatmap_produces_png(tmp_path: Path):
         test_types={"run"}, metrics=["Time Taken(Seconds)"], out_name="test_abs.png",
     )
     assert no_base is not None and no_base.exists() and no_base.stat().st_size > 0
+
+
+def _make_cross_run(run_mem: float, recovery_mem: float | None = None,
+                    setstatus_mems: dict | None = None) -> dict:
+    """Build a run file with run/recovery/setstatus scenarios of the same experiment."""
+    setstatus_mems = setstatus_mems or {}
+    entries = [_make_entry("run", "run", "4m/2c/2s", 10.0, **{**_baseline_entry(), "Memory consumption(MiB)": run_mem})]
+    if recovery_mem is not None:
+        entries.append(_make_entry("recovery", "recovery", "4m/2c/2s", 10.0,
+                                   **{**_baseline_entry(), "Memory consumption(MiB)": recovery_mem}))
+    for flt, mem in setstatus_mems.items():
+        entries.append(_make_entry(f"setstatus_{flt}", "setstatus", f"4m/2c/2s·{flt}", 10.0,
+                                   **{**_baseline_entry(), "Memory consumption(MiB)": mem}))
+    return _make_run(*entries)
+
+
+@pytest.mark.parametrize("run_mem, recovery_mem, setstatus_mems, expected", [
+    pytest.param(100.0, 120.0, {"ftcs": 110.0, "ft": 130.0, "fs": 105.0, "fl": 115.0},
+                 {"recovery": "PASS", "4m/2c/2s·ftcs": "PASS", "4m/2c/2s·ft": "PASS",
+                  "4m/2c/2s·fs": "PASS", "4m/2c/2s·fl": "PASS"}, id="all-pass"),
+    pytest.param(130.0, 120.0, {"ftcs": 110.0, "ft": 130.0, "fs": 105.0, "fl": 115.0},
+                 {"recovery": "WARN"}, id="recovery-warns"),
+    pytest.param(100.0, 120.0, {"ftcs": 110.0, "ft": 90.0, "fs": 105.0, "fl": 115.0},
+                 {"4m/2c/2s·ft": "WARN"}, id="setstatus-variant-warns"),
+    pytest.param(100.0, 120.0, {}, {"setstatus": "N/A"}, id="missing-setstatus"),
+])
+def test_cross_scenario_verdicts(run_mem, recovery_mem, setstatus_mems, expected):
+    run = _make_cross_run(run_mem=run_mem, recovery_mem=recovery_mem, setstatus_mems=setstatus_mems)
+    cross = compare.evaluate_cross_scenarios(compare.build_frame(run))
+
+    for counterpart, verdict in expected.items():
+        row = cross[cross["counterpart"] == counterpart].iloc[0]
+        assert row["verdict"] == verdict
+
+
+def test_cross_scenarios_no_run_type_returns_empty():
+    run = _make_run(_make_entry("create", "create", "4m/2c/2s", 10.0, **_baseline_entry()))
+    cross = compare.evaluate_cross_scenarios(compare.build_frame(run))
+
+    assert cross.empty
+
+
+def test_render_markdown_reports_cross_checks(tmp_path: Path):
+    run = _make_cross_run(run_mem=130.0, recovery_mem=120.0)
+    current = compare.build_frame(run)
+    report = compare.evaluate(current, None, _thresholds())
+    cross = compare.evaluate_cross_scenarios(current)
+
+    markdown = compare.render_markdown(report, "4.2.0", "Current", previous_label=None,
+                                       env_warning=None, cross_report=cross)
+    assert "Cross-scenario checks" in markdown
+    assert "Memory consumption(MiB)" in markdown
+    assert "No regressions detected" in markdown
+
+
+def test_render_heatmap_scenario_filter(tmp_path: Path):
+    entries = []
+    for tt, rid, mem in [("run", "4m/2c/2s", 100.0), ("run", "4m/2c/6s", 200.0),
+                         ("setstatus", "4m/2c/2s·ftcs", 110.0)]:
+        entries.append(_make_entry(tt, tt, rid, 10.0, **{**_baseline_entry(), "Memory consumption(MiB)": mem}))
+    current = compare.build_frame(_make_run(*entries))
+    report = compare.evaluate(current, None, _thresholds())
+
+    out = compare.render_heatmap(
+        current, None, report, "4.2.0", tmp_path, thresholds=_thresholds(),
+        test_types={"run", "setstatus"}, metrics=["Memory consumption(MiB)"],
+        scenario_ids={"4m/2c/2s"}, out_name="test_filtered.png",
+    )
+    assert out is not None and out.exists() and out.stat().st_size > 0
+
+
+def test_heaviest_scenario_picks_max_total_jobs():
+    entries = [
+        _make_entry("run", "run", "4m/2c/2s", 10.0, **{**_baseline_entry(), "Total Jobs": 7}),
+        _make_entry("run", "run", "10m/2c/150s", 10.0, **{**_baseline_entry(), "Total Jobs": 3000}),
+        _make_entry("setstatus", "setstatus", "10m/2c/150s·ftcs", 10.0,
+                    **{**_baseline_entry(), "Total Jobs": 3000}),
+    ]
+    current = compare.build_frame(_make_run(*entries))
+    assert compare._heaviest_scenario(current) == "10m/2c/150s"
+
+
+def test_render_heatmaps_produces_memory_plot(tmp_path: Path):
+    entries = []
+    for tt, rid, mem in [("run", "10m/2c/150s", 100.0), ("recovery", "10m/2c/150s", 120.0),
+                         ("create", "10m/2c/150s", 90.0),
+                         ("setstatus", "10m/2c/150s·ftcs", 110.0),
+                         ("setstatus", "10m/2c/150s·ft", 115.0)]:
+        entries.append(_make_entry(tt, tt, rid, 10.0,
+                                   **{**_baseline_entry(), "Memory consumption(MiB)": mem, "Total Jobs": 3000}))
+    current = compare.build_frame(_make_run(*entries))
+    report = compare.evaluate(current, None, _thresholds())
+
+    paths = compare.render_heatmaps(current, None, report, "4.2.0", tmp_path, thresholds=_thresholds())
+    names = {p.name for p in paths}
+    assert "summary_4.2.0_run.png" in names
+    assert "summary_4.2.0_create_recovery_setstatus.png" in names
+    assert "summary_4.2.0_memory.png" in names
