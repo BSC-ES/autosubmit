@@ -1,0 +1,49 @@
+# Autosubmit benchmark regression thresholds.
+#
+# For each metric, `threshold` is the maximum allowed relative increase (in %,
+# worse direction only) before the report flags a regression. `floor` is the
+# minimum absolute value of the current measurement required before the
+# threshold applies: tiny/zero values are dominated by noise, so they are not
+# judged.
+#
+# `exact_metrics` are deterministic values that must not change at all between
+# runs (e.g. the experiment structure).
+#
+# `plot` controls the performance plots: `delta_clip` is the color scale limit
+# (in %), and `delta_tolerance` is the neutral "dead zone" (any delta inside
+# this band renders neutral instead of red/blue).
+#
+# Initial values were calibrated against the variance observed in
+# .benchmarks/artifacts/performance-metrics-4.2.0.csv. Tune them after a few
+# benchmark cycles on the GitHub-hosted runner (wall-clock time and memory are
+# the noisiest metrics; the deterministic counters should never move).
+metrics:
+  Time Taken(Seconds):
+    threshold: 15.0
+    floor: 5.0 # exclude really quick commands
+  Memory consumption(MiB):
+    threshold: 10.0
+    floor: 50.0
+  Historical DB Disk Usage(MiB):
+    threshold: 10.0
+    floor: 1.0
+  Job list DB Usage:
+    threshold: 10.0
+    floor: 1.0
+  FD GROWTH:
+    threshold: 15.0
+    floor: 1.0
+  MEM GROWTH(MIB):
+    threshold: 15.0
+    floor: 2.0
+  OBJ GROWTH:
+    threshold: 15.0
+    floor: 1.0
+
+exact_metrics:
+  - Total Jobs
+  - Total Dependencies
+
+plot:
+  delta_clip: 25.0
+  delta_tolerance: 2.0
