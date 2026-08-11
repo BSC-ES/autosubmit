@@ -284,8 +284,9 @@ class AutosubmitConfig:
                 'USER:.*', content_to_mod).group(0)[1:], "USER: " + new_user)
             content_to_mod = content_to_mod.replace(re.search(
                 'USER_TO:.*', content_to_mod).group(0)[1:], "USER_TO: " + old_user)
-        open(self._platforms_parser_file, 'w').write(content)
-        open(self._platforms_parser_file, 'a').write(content_to_mod)
+        with open(self._platforms_parser_file, 'w') as file:
+            file.write(content)
+            file.write(content_to_mod)
 
     def show_messages(self) -> bool:
 
@@ -467,9 +468,8 @@ class AutosubmitConfig:
         :return: True if the section is found in at least one wrapper, False otherwise.
         """
         for wrapper_data in self.experiment_data.get("WRAPPERS", {}).values():
-            if isinstance(wrapper_data, dict):
-                if section in wrapper_data.get("JOBS_IN_WRAPPER", []):
-                    return True
+            if isinstance(wrapper_data, dict) and section in wrapper_data.get("JOBS_IN_WRAPPER", []):
+                return True
         return False
 
     @staticmethod
@@ -706,9 +706,8 @@ class AutosubmitConfig:
                 f_list.remove(file_to_load)
         for file_to_load in aux_filenames_to_load["POST"]:
             if file_to_load in self.current_loaded_files:
-                if file_to_load in self.current_loaded_files:
-                    f_list = filenames_to_load["POST"]
-                    f_list.remove(file_to_load)
+                f_list = filenames_to_load["POST"]
+                f_list.remove(file_to_load)
         return filenames_to_load
 
     def unify_conf(self, current_data: dict, new_data: dict) -> dict:
@@ -1310,21 +1309,19 @@ class AutosubmitConfig:
         wrappers_info = parser_data.get("WRAPPERS", {})
         if wrappers_info:
             self.check_wrapper_conf(wrappers_info)
-        if parser_data.get("MAIL", "") != "":
-            if str(parser_data["MAIL"].get("NOTIFICATIONS", "false")).lower() == "true":
-                mails = parser_data["MAIL"].get("TO", "")
-                if type(mails) is list:
-                    pass
-                elif "," in mails:
-                    mails = mails.split(',')
-                else:
-                    mails = mails.split(' ')
-                self.experiment_data["MAIL"]["TO"] = mails
+        if parser_data.get("MAIL", "") != "" and str(parser_data["MAIL"].get("NOTIFICATIONS", "false")).lower() == "true":
+            mails = parser_data["MAIL"].get("TO", "")
+            if type(mails) is list:
+                pass
+            elif "," in mails:
+                mails = mails.split(',')
+            else:
+                mails = mails.split(' ')
+            self.experiment_data["MAIL"]["TO"] = mails
 
-                for mail in self.experiment_data["MAIL"]["TO"]:
-                    if not self.is_valid_mail_address(mail):
-                        self.wrong_config["Autosubmit"] += [['mail',
-                                                             "invalid e-mail"]]
+            for mail in self.experiment_data["MAIL"]["TO"]:
+                if not self.is_valid_mail_address(mail):
+                    self.wrong_config["Autosubmit"] += [['mail', "invalid e-mail"]]
         if "Autosubmit" not in self.wrong_config:
             if not no_log:
                 Log.result('Autosubmit general sections OK')
@@ -1396,36 +1393,34 @@ class AutosubmitConfig:
             else:
                 # Tests conflict quick-patch.
                 with suppress(Exception):
-                    if self.ignore_file_path:
-                        if "SCRIPT" not in section_data:
-                            if not os.path.exists(os.path.join(self.get_project_dir(), section_file_path)):
-                                check_value = str(section_data.get('CHECK', True)).lower()
-                                if check_value != "false":
-                                    if check_value not in "on_submission":
-                                        self.wrong_config["Jobs"] += [
-                                            [section,
-                                             f"FILE {section_file_path} doesn't exist and check parameter is not set on_submission value"]]
-                                else:
-                                    self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} doesn't exist"]]
+                    if (self.ignore_file_path and "SCRIPT" not in section_data and
+                        not os.path.exists(os.path.join(self.get_project_dir(), section_file_path))):
+                        check_value = str(section_data.get('CHECK', True)).lower()
+                        if check_value != "false":
+                            if check_value not in "on_submission":
+                                self.wrong_config["Jobs"] += [
+                                    [section,
+                                     f"FILE {section_file_path} doesn't exist and check parameter is not set on_submission value"]]
+                        else:
+                            self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} doesn't exist"]]
 
             dependencies = section_data.get('DEPENDENCIES', '')
-            if dependencies != "":
-                if type(dependencies) is dict:
-                    for dependency, values in dependencies.items():
-                        if '-' in dependency:
-                            dependency = dependency.split('-')[0]
-                        elif '+' in dependency:
-                            dependency = dependency.split('+')[0]
-                        elif '*' in dependency:
-                            dependency = dependency.split('*')[0]
-                        elif '?' in dependency:
-                            dependency = dependency.split('?')[0]
-                        if '[' in dependency:
-                            dependency = dependency[:dependency.find('[')]
-                        if dependency.upper() not in parser["JOBS"].keys():
-                            self.warn_config["Jobs"].append(
-                                [section,
-                                 f"Dependency parameter is invalid, job {dependency} is not configured"])
+            if dependencies != "" and isinstance(dependencies, dict):
+                for dependency in dependencies.keys():
+                    if '-' in dependency:
+                        dependency = dependency.split('-')[0]
+                    elif '+' in dependency:
+                        dependency = dependency.split('+')[0]
+                    elif '*' in dependency:
+                        dependency = dependency.split('*')[0]
+                    elif '?' in dependency:
+                        dependency = dependency.split('?')[0]
+                    if '[' in dependency:
+                        dependency = dependency[:dependency.find('[')]
+                    if dependency.upper() not in parser["JOBS"]:
+                        self.warn_config["Jobs"].append(
+                            [section,
+                             f"Dependency parameter is invalid, job {dependency} is not configured"])
             rerun_dependencies = section_data.get('RERUN_DEPENDENCIES', "").upper()
             if rerun_dependencies:
                 for dependency in rerun_dependencies.split(' '):
@@ -1433,7 +1428,7 @@ class AutosubmitConfig:
                         dependency = dependency.split('-')[0]
                     if '[' in dependency:
                         dependency = dependency[:dependency.find('[')]
-                    if dependency not in parser["JOBS"].keys():
+                    if dependency not in parser["JOBS"]:
                         self.warn_config["Jobs"] += [
                             [section,
                              f"RERUN_DEPENDENCIES parameter is invalid, job {dependency} is not configured"]]
@@ -1441,10 +1436,9 @@ class AutosubmitConfig:
             if running_type not in ['once', 'date', 'member', 'chunk']:
                 self.wrong_config["Jobs"] += [[section,
                                                "Mandatory RUNNING parameter is invalid"]]
-        if "Jobs" not in self.wrong_config:
-            if not no_log:
-                Log.result('Jobs sections OK')
-                return True
+        if "Jobs" not in self.wrong_config and not no_log:
+            Log.result('Jobs sections OK')
+            return True
         return False
 
     def check_expdef_conf(self, no_log=False):
@@ -1567,10 +1561,10 @@ class AutosubmitConfig:
                     if not self.experiment_data["PLATFORMS"][platform_name].get('MAX_PROCESSORS', ""):
                         self.wrong_config["WRAPPERS"] += [[wrapper_name,
                                                            "MAX_PROCESSORS no exist in the horizontal-wrapper platform"]]
-                if 'vertical' in self.get_wrapper_type(wrapper_values):
-                    if not self.experiment_data.get("PLATFORMS", {}).get(platform_name, {}).get('MAX_WALLCLOCK', ""):
-                        self.wrong_config["WRAPPERS"] += [[wrapper_name,
-                                                           "MAX_WALLCLOCK no exist in the vertical-wrapper platform"]]
+                if ('vertical' in self.get_wrapper_type(wrapper_values) and
+                        not self.experiment_data.get("PLATFORMS", {}).get(platform_name, {}).get('MAX_WALLCLOCK', "")):
+                    self.wrong_config["WRAPPERS"] += [[wrapper_name,
+                                                       "MAX_WALLCLOCK no exist in the vertical-wrapper platform"]]
             if "WRAPPERS" not in self.wrong_config:
                 if not no_log:
                     Log.result('wrappers OK')
@@ -1751,7 +1745,7 @@ class AutosubmitConfig:
         if len(self.current_loaded_files) == 0:
             return True
         if self.experiment_data.get("CONFIG", {}).get("RELOAD_WHILE_RUNNING", True):
-            for file in self.current_loaded_files.keys():
+            for file in self.current_loaded_files:
                 if os.path.exists(file):
                     mod_time = os.path.getmtime(file)
                     if mod_time > self.current_loaded_files[file]:
@@ -1806,7 +1800,7 @@ class AutosubmitConfig:
                 self.experiment_data = starter_conf
             ###
             self.current_loaded_files.update(non_minimal_files)
-            if "AS_TEMP" in self.experiment_data.keys():
+            if "AS_TEMP" in self.experiment_data:
                 del self.experiment_data["AS_TEMP"]
             # IF expid and hpcarch are not defined, use the ones from the minimal.yml file
             self.deep_add_missing_starter_conf(self.experiment_data, starter_conf)
@@ -1848,7 +1842,7 @@ class AutosubmitConfig:
         elif not isinstance(user_defined, list):
             raise AutosubmitCritical("CONFIG.SAFE_PLACEHOLDERS must be a list of placeholders names or a string.")
 
-        for param in (p for p in user_defined if p not in self.default_parameters.keys()):
+        for param in (p for p in user_defined if p not in self.default_parameters):
             self.default_parameters[param] = f"%{param}%"
 
     def _add_autosubmit_dict(self) -> None:
@@ -1949,7 +1943,7 @@ class AutosubmitConfig:
         # If present, obtain the new value
         for key, val in current_data.items():
             if isinstance(val, collections.abc.Mapping):
-                if key not in last_run_data.keys():
+                if key not in last_run_data:
                     differences[key] = val
                 else:
                     if type(last_run_data[key]) is not dict:
@@ -1961,13 +1955,13 @@ class AutosubmitConfig:
                         if diff:
                             differences[key] = diff
             else:
-                if key not in last_run_data.keys() or last_run_data[key] != val:
+                if key not in last_run_data or last_run_data[key] != val:
                     differences[key] = val
         # Now check the keys that are in last_run_data but not in current_data
         # We don't want the old value
         for key, val in last_run_data.items():
             if isinstance(val, collections.abc.Mapping):
-                if key not in current_data.keys():
+                if key not in current_data:
                     differences[key] = val
                 else:
                     if type(current_data[key]) is dict and len(current_data[key]) == 0:
@@ -1975,7 +1969,7 @@ class AutosubmitConfig:
                         if diff:
                             differences[key] = diff
             else:
-                if key not in current_data.keys():
+                if key not in current_data:
                     differences[key] = val
         if not differences and level > 0:
             return None
@@ -1995,15 +1989,14 @@ class AutosubmitConfig:
         try:
             for key, val in current_data.items():
                 if isinstance(val, collections.abc.Mapping):
-                    if not last_run_data or key not in last_run_data.keys():
+                    if not last_run_data or key not in last_run_data:
                         changed = True
                         break
                     else:
                         changed = self.quick_deep_diff(last_run_data[key], val, changed)
-                else:
-                    if key not in last_run_data.keys() or str(last_run_data[key]).lower() != str(val).lower():
-                        changed = True
-                        break
+                elif key not in last_run_data or str(last_run_data[key]).lower() != str(val).lower():
+                    changed = True
+                    break
         except Exception:
             changed = True
         return changed
@@ -2016,7 +2009,7 @@ class AutosubmitConfig:
         :return:
         """
         for key in starter_conf.keys():
-            if key not in experiment_data.keys():
+            if key not in experiment_data:
                 experiment_data[key] = starter_conf[key]
             elif isinstance(starter_conf[key], collections.abc.Mapping):
                 experiment_data[key] = self.deep_add_missing_starter_conf(experiment_data[key], starter_conf[key])
@@ -2167,7 +2160,7 @@ class AutosubmitConfig:
         if project_submodules is False:
             return project_submodules
         if not isinstance(project_submodules, str):
-            raise ValueError('GIT.PROJECT_SUBMODULES must be false (bool) or a string')
+            raise TypeError('GIT.PROJECT_SUBMODULES must be false (bool) or a string')
         return project_submodules.split(" ")
 
     def get_fetch_single_branch(self) -> str:
@@ -2389,7 +2382,8 @@ class AutosubmitConfig:
         except Exception as e:
             Log.warning(f'Failed to set last Autosubmit command, using fallback: {str(e)}')
             content = f"AS_MISC: True\nAS_COMMAND: {command}\n"
-        open(misc, 'w').write(content)
+        with open(misc, 'w') as file:
+            file.write(content)
         os.chmod(misc, 0o755)
 
     def set_version(self, autosubmit_version):
@@ -2407,7 +2401,8 @@ class AutosubmitConfig:
         except Exception as e:
             Log.warning(f'Failed to set Autosubmit version, using fallback: {str(e)}')
             content = "CONFIG:\n  AUTOSUBMIT_VERSION: " + autosubmit_version + "\n"
-        open(version_file, 'w').write(content)
+        with open(version_file, 'w') as file:
+            file.write(content)
         os.chmod(version_file, 0o755)
 
     def get_version(self):
@@ -2478,9 +2473,11 @@ class AutosubmitConfig:
         :param sleep_time: value to set
         :type sleep_time: int
         """
-        content = open(self._conf_parser_file).read()
-        content = content.replace(re.search('SAFETYSLEEPTIME:.*', content).group(0), "SAFETYSLEEPTIME: %d" % sleep_time)
-        open(self._conf_parser_file, 'w').write(content)
+        with open(self._conf_parser_file) as content_in_file:
+            content = content_in_file.read()
+            content = content.replace(re.search('SAFETYSLEEPTIME:.*', content).group(0), f"SAFETYSLEEPTIME: {sleep_time:d}")
+            with open(self._conf_parser_file, 'w') as file:
+                file.write(content)
 
     def get_retrials(self):
         """Returns max number of retrials for job from autosubmit's config file.
@@ -2741,7 +2738,7 @@ class AutosubmitConfig:
         if not datelist or not chunks:
             return
 
-        if isinstance(datelist, str) or isinstance(datelist, int):
+        if isinstance(datelist, (str, int)):
             datelist = str(datelist).split()
 
         for section_name, section_data in self.jobs_data.items():
