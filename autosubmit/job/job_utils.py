@@ -16,17 +16,22 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import math
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from bscearth.utils.date import chunk_end_date, chunk_start_date, date2str
 
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_common import Status
+from autosubmit.job.notify import job_notify, wrapper_notify
 from autosubmit.log.log import AutosubmitCritical, Log
 
 if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job import Job, WrapperJob
     from autosubmit.job.job_list import JobList
+    from autosubmit.platforms.platform import Platform
 
 CALENDAR_UNITSIZE_ENUM = {
     "hour": 0,
@@ -602,3 +607,96 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status= str
             job.status = Status.KEY_TO_VALUE[target_status]
 
     job_list.save_jobs()
+
+
+def check_non_wrapped_jobs(
+    platforms_to_test: list["Platform"],
+    job_list: "JobList",
+    as_conf: "AutosubmitConfig",
+    expid: str,
+) -> None:
+    """Check the status of non-wrapped jobs and notify if there are changes.
+
+    :param platforms_to_test: list of platforms to check.
+    :param job_list: JobList object containing the jobs to check.
+    :param as_conf: AutosubmitConfig object containing the configuration of the experiment.
+    :param expid: Experiment identifier.
+    """
+    for p in platforms_to_test:
+        platform_jobs = [
+            job
+            for job in job_list.get_in_queue(p)
+            if job.id not in job_list.get_wrappers_id_from_db()
+        ]
+        if len(platform_jobs) == 0:
+            continue
+        Log.info(f"Checking {len(platform_jobs)} jobs for platform {p.name}")
+
+        p.check_all_jobs(platform_jobs, as_conf)
+        save = False
+        for job in platform_jobs:
+            if job.new_status != job.status:
+                job.update_status(as_conf)
+                save = True
+        if save:
+            job_list.save_jobs()
+
+        for job in platform_jobs:
+            if job.prev_status != job.status:
+                job_notify(as_conf, expid, job)
+
+
+def _manage_wrapper_job(as_conf: "AutosubmitConfig", job_list: "JobList", wrapper_job: "WrapperJob") -> "WrapperJob":
+    """ Function that checks the wrapper job status and updates it if necessary, and returns the wrapper job with the updated status.
+    :param as_conf: Autosubmit configuration
+    :param job_list: job_list object
+    :param wrapper_job: wrapper object
+    :return:  wrapper job with the updated status
+    """
+    save = False
+    check_wrapper_jobs_sleeptime = as_conf.get_wrapper_check_time()
+    Log.debug(f'WRAPPER CHECK TIME = {check_wrapper_jobs_sleeptime}')
+    # Setting prev_status as an easy way to check status change for inner jobs
+    if as_conf.get_notifications() == "true":
+        for inner_job in wrapper_job.job_list:
+            inner_job.prev_status = inner_job.status
+    check_wrapper = True
+    if wrapper_job.status == Status.RUNNING:
+        check_wrapper = timedelta.total_seconds(datetime.now(
+        ) - wrapper_job.checked_time) >= check_wrapper_jobs_sleeptime
+    if check_wrapper:
+        Log.debug(f'Checking Wrapper {str(wrapper_job.id)}')
+        wrapper_job.checked_time = datetime.now()
+        save |= wrapper_job.check_and_update_status(as_conf)
+        if save:
+            job_list.update_db_wrappers()
+            job_list.save_jobs()
+    return wrapper_job
+
+
+def check_wrappers(
+        as_conf: "AutosubmitConfig",
+        job_list: "JobList",
+        expid: str,
+) -> tuple[dict[str, list[list["Job"]]], dict[str, tuple[Status, Status]]]:
+    """Check wrappers and inner jobs status, and collect non-wrapped jobs to check.
+
+    :param as_conf: a AutosubmitConfig object
+    :param job_list: a JobList object
+    :param expid: a string with the experiment id
+    """
+    jobs_to_check: dict[str, list[list["Job"]]] = defaultdict(list)
+    job_changes_tracker: dict[str, tuple[Status, Status]] = {}
+
+    for active_wrapper in list(job_list.job_package_map.values()):
+        wrapper_job = _manage_wrapper_job(as_conf, job_list, active_wrapper)
+        wrapper_notify(as_conf, expid, wrapper_job)
+        if active_wrapper.status in [Status.FAILED, Status.COMPLETED]:
+            job_list.job_package_map.pop(active_wrapper.id, None)
+            job_list.packages_dict.pop(active_wrapper.name, None)
+
+    for job in job_list.get_job_list():
+        if job.id not in job_list.job_package_map and job.status != Status.FAILED:
+            jobs_to_check[job.platform_name].append([job, job.status])
+
+    return jobs_to_check, job_changes_tracker

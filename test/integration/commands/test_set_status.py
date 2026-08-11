@@ -16,6 +16,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from typing import TYPE_CHECKING
+
 import pytest
 from bscearth.utils.date import date2str
 
@@ -24,11 +26,16 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
 )
 from autosubmit.job.job_common import Status
+from autosubmit.job.job_list import load_job_list
+from autosubmit.job.manage import set_status
 from autosubmit.log.log import AutosubmitCritical
+
+if TYPE_CHECKING:
+    from integration.conftest import AutosubmitExperiment
 
 
 def reset(as_exp_, target="WAITING"):
-    job_list_ = as_exp_.autosubmit.load_job_list(
+    job_list_ = load_job_list(
         as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
         check_failed_jobs=True)
 
@@ -38,10 +45,10 @@ def reset(as_exp_, target="WAITING"):
 
 
 def do_setstatus(
-    as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=None, target="WAITING"
+    as_exp_: "AutosubmitExperiment", fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=None, target="WAITING"
 ):
     target = target.upper()
-    as_exp_.autosubmit.set_status(
+    set_status(
         as_exp_.expid,
         noplot=True,
         save=True,
@@ -59,7 +66,7 @@ def do_setstatus(
         check_wrapper=False,
         detail=False,
     )
-    return as_exp_.autosubmit.load_job_list(
+    return load_job_list(
         as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
         check_failed_jobs=True)
 
@@ -252,21 +259,21 @@ def test_set_status_multiple_chunk_filters_priority(
     db_manager.initialize()
 
     reset(as_exp, "WAITING")
-    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
+    mocked_warning = mocker.patch("autosubmit.job.manage.Log.warning")
 
     job_list_ = do_setstatus(
         as_exp,
         target="COMPLETED",
         **setstatus_kwargs,
     )
-    # highest priority is filter by chunk
+    # highest priority is filtered by chunk
     if expected_selector == "chunk":
         completed_jobs = [
             job.name
             for job in job_list_.get_job_list()
             if job.status == Status.COMPLETED and job.chunk == 1
         ]
-    # highest priority is filter by chunk split
+    # highest priority is filtered by chunk split
     elif expected_selector == "legacy_chunk":
         completed_jobs = [
             job.name
@@ -275,7 +282,7 @@ def test_set_status_multiple_chunk_filters_priority(
             and job.section == "LOCALJOB"
             and job.chunk == 1
         ]
-    # highest priority is filter by chunk split section
+    # highest priority is filtered by chunk split section
     elif expected_selector == "ftcs_specific":
         completed_jobs = [
             job.name
@@ -372,10 +379,10 @@ def test_set_status_filter_type_with_splits(as_exp, ft_filter, expected_jobs):
 @pytest.mark.parametrize(
     "ft_filter",
     [
-        ("DOES NOT EXIST [1]"),
-        (" "),
-        ("LOCALJOB [[2:3]"),
-        ("LOCALJOB [ANY]]"),
+        "DOES NOT EXIST [1]",
+        " ",
+        "LOCALJOB [[2:3]",
+        "LOCALJOB [ANY]]",
     ],
 )
 def test_set_status_filter_type_invalid_section_raises_validation_error(as_exp, ft_filter):
@@ -411,7 +418,7 @@ def test_set_status_filter_type_with_splits_invalid_split_logs_warning(as_exp, m
 
     reset(as_exp, "WAITING")
 
-    mocked_warning = mocker.patch("autosubmit.autosubmit.Log.warning")
+    mocked_warning = mocker.patch("autosubmit.job.manage.Log.warning")
 
     job_list_ = do_setstatus(
         as_exp,
@@ -558,7 +565,7 @@ def test_set_status_combined_any_tokens_do_nothing(as_exp):
         ("[20200101 [ fc0 [1] ] ],Any []", 9),
     ],
 )
-def test_set_status_ftcs(as_exp: object, ftcs_filter: str, expected_jobs: int):
+def test_set_status_ftcs(as_exp: "AutosubmitExperiment", ftcs_filter: str, expected_jobs: int):
     """Tests the setstatus command with various filters in an offline scenario.
 
     The conftest as_exp fixture has:
@@ -568,11 +575,8 @@ def test_set_status_ftcs(as_exp: object, ftcs_filter: str, expected_jobs: int):
     - Each job has 3 splits
 
     :param as_exp: The autosubmit experiment fixture.
-    :type as_exp: AutosubmitExperiment
     :param ftcs_filter: The filter to apply.
-    :type ftcs_filter: str
     :param expected_jobs: The expected number of jobs to be set to COMPLETED.
-    :type expected_jobs: int
     """
 
     db_manager = SqlAlchemyExperimentHistoryDbManager(
@@ -640,7 +644,7 @@ def test_set_status_noplot_calls_generate_output(as_exp, mocker, noplot):
         "autosubmit.monitor.monitor.Monitor.generate_output"
     )
 
-    as_exp.autosubmit.set_status(
+    set_status(
         as_exp.expid,
         noplot=noplot,
         save=True,

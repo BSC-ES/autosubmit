@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 from pathlib import Path
 from typing import Any
 
@@ -24,28 +25,98 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.database.tables import WrapperJobsTable
+from autosubmit.experiment.manage import create
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
 
 raw_job_list = [
-    {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
-     'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
-     'name': 'a01f_REMOTE_SETUP', 'packed': False, 'platform_name': None, 'priority': 1, 'ready_date': None,
-     'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_REMOTE_SETUP.cmd',
-     'section': 'REMOTE_SETUP', 'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None,
-     'status': 'WAITING', 'submit_time_timestamp': None, 'synchronize': None, 'updated_log': 0},
-    {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
-     'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
-     'name': 'a01f_LOCAL_SETUP', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
-     'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_LOCAL_SETUP.cmd', 'section': 'LOCAL_SETUP',
-     'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None, 'status': 'READY',
-     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': 0},
-    {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
-     'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
-     'name': 'a01f_20000101_fc0_INI', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
-     'remote_logs_err': None, 'remote_logs_out': None, 'script_name': 'a01f_20000101_fc0_INI.cmd', 'section': 'INI',
-     'split': -1, 'splits': -1, 'start_time': None, 'start_time_timestamp': None, 'status': 'WAITING',
-     'submit_time_timestamp': None, 'synchronize': None, 'updated_log': 0},
+    {
+        "chunk": None,
+        "current_checkpoint_step": 0,
+        "date": None,
+        "date_split": None,
+        "finish_time_timestamp": None,
+        "frequency": None,
+        "id": 0,
+        "local_logs_err": None,
+        "local_logs_out": None,
+        "max_checkpoint_step": 0,
+        "name": "a01f_REMOTE_SETUP",
+        "packed": False,
+        "platform_name": None,
+        "priority": 1,
+        "ready_date": None,
+        "remote_logs_err": None,
+        "remote_logs_out": None,
+        "script_name": "a01f_REMOTE_SETUP.cmd",
+        "section": "REMOTE_SETUP",
+        "split": -1,
+        "splits": -1,
+        "start_time": None,
+        "start_time_timestamp": None,
+        "status": "WAITING",
+        "submit_time_timestamp": None,
+        "synchronize": None,
+        "updated_log": 0,
+    },
+    {
+        "chunk": None,
+        "current_checkpoint_step": 0,
+        "date": None,
+        "date_split": None,
+        "finish_time_timestamp": None,
+        "frequency": None,
+        "id": 0,
+        "local_logs_err": None,
+        "local_logs_out": None,
+        "max_checkpoint_step": 0,
+        "name": "a01f_LOCAL_SETUP",
+        "packed": False,
+        "platform_name": None,
+        "priority": 0,
+        "ready_date": None,
+        "remote_logs_err": None,
+        "remote_logs_out": None,
+        "script_name": "a01f_LOCAL_SETUP.cmd",
+        "section": "LOCAL_SETUP",
+        "split": -1,
+        "splits": -1,
+        "start_time": None,
+        "start_time_timestamp": None,
+        "status": "READY",
+        "submit_time_timestamp": None,
+        "synchronize": None,
+        "updated_log": 0,
+    },
+    {
+        "chunk": None,
+        "current_checkpoint_step": 0,
+        "date": None,
+        "date_split": None,
+        "finish_time_timestamp": None,
+        "frequency": None,
+        "id": 0,
+        "local_logs_err": None,
+        "local_logs_out": None,
+        "max_checkpoint_step": 0,
+        "name": "a01f_20000101_fc0_INI",
+        "packed": False,
+        "platform_name": None,
+        "priority": 0,
+        "ready_date": None,
+        "remote_logs_err": None,
+        "remote_logs_out": None,
+        "script_name": "a01f_20000101_fc0_INI.cmd",
+        "section": "INI",
+        "split": -1,
+        "splits": -1,
+        "start_time": None,
+        "start_time_timestamp": None,
+        "status": "WAITING",
+        "submit_time_timestamp": None,
+        "synchronize": None,
+        "updated_log": 0,
+    },
     # {'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None, 'finish_time_timestamp': None,
     #  'frequency': None, 'id': 0, 'local_logs_err': None, 'local_logs_out': None, 'max_checkpoint_step': 0,
     #  'name': 'a01f_SIM', 'packed': False, 'platform_name': None, 'priority': 0, 'ready_date': None,
@@ -55,50 +126,58 @@ raw_job_list = [
 ]
 
 raw_graph_edges = [
-    {'completion_status': 'WAITING', 'e_from': 'a01f_REMOTE_SETUP', 'e_to': 'a01f_20000101_fc0_INI', 'from_step': 0,
-     'fail_ok': True, 'min_trigger_status': 'COMPLETED'},
-    {'completion_status': 'WAITING', 'e_from': 'a01f_LOCAL_SETUP', 'e_to': 'a01f_REMOTE_SETUP', 'from_step': 0,
-     'fail_ok': True, 'min_trigger_status': 'COMPLETED'},
-    {'completion_status': 'WAITING', 'e_from': 'a01f_20000101_fc0_INI', 'e_to': 'a01f_SIM', 'from_step': 0,
-     'fail_ok': True, 'min_trigger_status': 'COMPLETED'},
+    {
+        "completion_status": "WAITING",
+        "e_from": "a01f_REMOTE_SETUP",
+        "e_to": "a01f_20000101_fc0_INI",
+        "from_step": 0,
+        "fail_ok": True,
+        "min_trigger_status": "COMPLETED",
+    },
+    {
+        "completion_status": "WAITING",
+        "e_from": "a01f_LOCAL_SETUP",
+        "e_to": "a01f_REMOTE_SETUP",
+        "from_step": 0,
+        "fail_ok": True,
+        "min_trigger_status": "COMPLETED",
+    },
+    {
+        "completion_status": "WAITING",
+        "e_from": "a01f_20000101_fc0_INI",
+        "e_to": "a01f_SIM",
+        "from_step": 0,
+        "fail_ok": True,
+        "min_trigger_status": "COMPLETED",
+    },
 ]
 
 
 # --- Fixtures.
 
-@pytest.fixture(scope='function')
-def _expid(as_exp):
-    """
-    Creates a new expid and returns the EXPID
-    """
-    return as_exp.expid
 
-
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def as_exp(autosubmit_exp):
-    """
-    Creates a new expid and returns the EXPID
-    """
-    as_exp = autosubmit_exp(include_jobs=False)
-    return as_exp
+    """Creates a new expid and returns the EXPID."""
+    return autosubmit_exp(include_jobs=False)
 
 
 def _modify_data(expid, conf_dir, data) -> Path:
     data_path = conf_dir / f"{expid}.yml"
     yaml = YAML()
-    with data_path.open('w') as f:
+    with data_path.open("w") as f:
         yaml.dump(data, f)
     return data_path
 
 
 def _init_test(as_exp, conf_dir, data) -> Path:
-    for f in conf_dir.glob('*.yml'):
+    for f in conf_dir.glob("*.yml"):
         f.unlink()
 
     for f in (Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid / "db").glob("*.db"):
         f.unlink()
 
-    _modify_data(as_exp.expid, conf_dir, data)
+    return _modify_data(as_exp.expid, conf_dir, data)
 
 
 def _assert_exit_code(final_status: str, exit_code: int) -> None:
@@ -115,33 +194,26 @@ def _get_expected_job_names(
     once_sections: list[str],
     member_sections: list[str],
     date_sections: list[str],
-    chunk_sections: list[str]
+    chunk_sections: list[str],
 ) -> list[str]:
     """
     Generate expected job names based on experiment configuration and section types.
 
     :param expid: Experiment ID.
-    :type expid: str
     :param unified_data: Unified experiment configuration data.
-    :type unified_data: Dict[str, Any]
     :param once_sections: Sections that run only once per experiment.
-    :type once_sections: List[str]
     :param member_sections: Sections that run per member.
-    :type member_sections: List[str]
     :param date_sections: Sections that run per date.
-    :type date_sections: List[str]
     :param chunk_sections: Sections that run per chunk (date, member, chunk, split).
-    :type chunk_sections: List[str]
     :return: List of expected job names.
-    :rtype: List[str]
     """
-    dates = unified_data['EXPERIMENT']['DATELIST']
-    members = unified_data['EXPERIMENT']['MEMBERS']
-    chunks = int(unified_data['EXPERIMENT']['NUMCHUNKS'])
-    section_names = [section for section in unified_data.get('JOBS', {}).keys()]
+    dates = unified_data["EXPERIMENT"]["DATELIST"]
+    members = unified_data["EXPERIMENT"]["MEMBERS"]
+    chunks = int(unified_data["EXPERIMENT"]["NUMCHUNKS"])
+    section_names = [section for section in unified_data.get("JOBS", {})]
     job_names = []
     for section in section_names:
-        splits = unified_data['JOBS'][section].get('splits', None)
+        splits = unified_data["JOBS"][section].get("splits", None)
         if section in chunk_sections:
             if splits is not None:
                 splits = int(splits)
@@ -150,9 +222,13 @@ def _get_expected_job_names(
                     for chunk in range(1, chunks + 1):
                         if splits:
                             for split in range(1, splits + 1):
-                                job_names.append(f"{expid}_{str(date)}_{str(member)}_{str(chunk)}_{str(split)}_{section}".upper())
+                                job_names.append(
+                                    f"{expid}_{str(date)}_{str(member)}_{str(chunk)}_{str(split)}_{section}".upper()
+                                )
                         else:
-                            job_names.append(f"{expid}_{str(date)}_{str(member)}_{str(chunk)}_{section}".upper())
+                            job_names.append(
+                                f"{expid}_{str(date)}_{str(member)}_{str(chunk)}_{section}".upper()
+                            )
         elif section in once_sections:
             if splits is not None:
                 splits = int(splits)
@@ -166,17 +242,23 @@ def _get_expected_job_names(
                 for split in range(1, splits + 1) if splits else [None]:
                     for date in dates.split():
                         for member in members.split():
-                            job_names.append(f"{expid}_{str(date)}_{str(member)}_{str(split)}_{section}".upper())
+                            job_names.append(
+                                f"{expid}_{str(date)}_{str(member)}_{str(split)}_{section}".upper()
+                            )
             else:
                 for date in dates.split():
                     for member in members.split():
-                        job_names.append(f"{expid}_{str(date)}_{str(member)}_{section}".upper())
+                        job_names.append(
+                            f"{expid}_{str(date)}_{str(member)}_{section}".upper()
+                        )
         elif section in date_sections:
             if splits is not None:
                 splits = int(splits)
                 for split in range(1, splits + 1) if splits else [None]:
                     for date in dates.split():
-                        job_names.append(f"{expid}_{str(date)}_{str(split)}_{section}".upper())
+                        job_names.append(
+                            f"{expid}_{str(date)}_{str(split)}_{section}".upper()
+                        )
             else:
                 for date in dates.split():
                     job_names.append(f"{expid}_{str(date)}_{section}".upper())
@@ -194,32 +276,30 @@ def generate_job_list(as_conf, db_manager) -> JobList:
         job_list.add_job(job)
 
     for edge in raw_graph_edges:
-        if edge['e_from'] in job_list.graph and edge['e_to'] in job_list.graph:
-            job_list.graph.add_edge(edge['e_from'], edge['e_to'], from_step=edge['from_step'],
-                                    min_trigger_status=edge['min_trigger_status'],
-                                    completion_status=edge['completion_status'], fail_ok=edge['fail_ok'])
+        if edge["e_from"] in job_list.graph and edge["e_to"] in job_list.graph:
+            job_list.graph.add_edge(
+                edge["e_from"],
+                edge["e_to"],
+                from_step=edge["from_step"],
+                min_trigger_status=edge["min_trigger_status"],
+                completion_status=edge["completion_status"],
+                fail_ok=edge["fail_ok"],
+            )
     return job_list
 
 
 def _create_db_manager(schema: str | None = None) -> JobsDbManager:
+    assert schema
     db_path = Path(BasicConfig.LOCAL_ROOT_DIR) / schema / "db"
     db_path.mkdir(parents=True, exist_ok=True)
     return JobsDbManager(schema=schema)
 
 
 @pytest.mark.postgres
-@pytest.mark.parametrize(
-    'full_load',
-    [True, False]
-)
-def test_db_job_list_edges(
-        tmp_path: Path,
-        full_load: bool,
-        as_db: str,
-        _expid: str
-):
+@pytest.mark.parametrize("full_load", [True, False])
+def test_db_job_list_edges(tmp_path: Path, full_load: bool, as_db: str, as_exp):
 
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     raw_graph_edges_local = raw_graph_edges
 
@@ -236,26 +316,33 @@ def test_db_job_list_edges(
     assert len(loaded_edges) == len(raw_graph_edges_local)
 
     # order it
-    loaded_edges = sorted(loaded_edges, key=lambda x: (x['e_from'], x['e_to']))
-    raw_graph_edges_local = sorted(raw_graph_edges_local, key=lambda x: (x['e_from'], x['e_to']))
+    loaded_edges = sorted(loaded_edges, key=lambda x: (x["e_from"], x["e_to"]))
+    raw_graph_edges_local = sorted(
+        raw_graph_edges_local, key=lambda x: (x["e_from"], x["e_to"])
+    )
 
     for i, edge in enumerate(loaded_edges):
         # Check that the edge is a dict
         assert isinstance(edge, dict)
         # Check that the edge has the expected keys
-        assert set(edge.keys()) == {'e_from', 'e_to', 'from_step', 'min_trigger_status', 'completion_status',
-                                    'fail_ok'}
-        assert edge['e_from'] == raw_graph_edges_local[i]['e_from']
-        assert edge['e_to'] == raw_graph_edges_local[i]['e_to']
-        assert edge['from_step'] == raw_graph_edges_local[i]['from_step']
-        assert edge['min_trigger_status'] == raw_graph_edges_local[i]['min_trigger_status']
+        assert set(edge.keys()) == {
+            "e_from",
+            "e_to",
+            "from_step",
+            "min_trigger_status",
+            "completion_status",
+            "fail_ok",
+        }
+        assert edge["e_from"] == raw_graph_edges_local[i]["e_from"]
+        assert edge["e_to"] == raw_graph_edges_local[i]["e_to"]
+        assert edge["from_step"] == raw_graph_edges_local[i]["from_step"]
+        assert (
+            edge["min_trigger_status"] == raw_graph_edges_local[i]["min_trigger_status"]
+        )
 
 
 @pytest.mark.postgres
-@pytest.mark.parametrize(
-    'full_load',
-    [True, False]
-)
+@pytest.mark.parametrize("full_load", [True, False])
 def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmit_exp):
     as_exp = autosubmit_exp()
 
@@ -279,41 +366,60 @@ def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmi
         assert isinstance(job, dict)
         # Check that the job has the expected keys
         assert set(job.keys()) == {
-            'chunk', 'member', 'current_checkpoint_step', 'date', 'date_split', 'finish_time_timestamp', 'frequency',
-            'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
-            'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
-            'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
-            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats',
-            'wallclock', 'wrapper_type', 'retrials', 'log_recovery_call_count',
+            "chunk",
+            "member",
+            "current_checkpoint_step",
+            "date",
+            "date_split",
+            "finish_time_timestamp",
+            "frequency",
+            "id",
+            "local_logs_err",
+            "local_logs_out",
+            "max_checkpoint_step",
+            "name",
+            "packed",
+            "platform_name",
+            "priority",
+            "ready_date",
+            "remote_logs_err",
+            "remote_logs_out",
+            "script_name",
+            "section",
+            "split",
+            "splits",
+            "start_time",
+            "start_time_timestamp",
+            "status",
+            "submit_time_timestamp",
+            "synchronize",
+            "updated_log",
+            "created",
+            "modified",
+            "fail_count",
+            "updated_stats",
+            "wallclock",
+            "wrapper_type",
+            "retrials",
+            "log_recovery_call_count",
         }
 
 
 @pytest.mark.postgres
-@pytest.mark.parametrize(
-    'full_load',
-    [True, False]
-)
+@pytest.mark.parametrize("full_load", [True, False])
 def test_db_job_list_jobs_and_edges_together(
-        tmp_path: Path,
-        full_load: bool,
-        as_db: str,
-        as_exp: Any,
-        _expid: str
+    tmp_path: Path, full_load: bool, as_db: str, as_exp: Any
 ):
-    """
-    Test loading and saving both jobs and edges together with different full_load options.
+    """Test loading and saving both jobs and edges together with different full_load options.
 
     This test verifies that JobList's database manager can correctly save and load
     both jobs and graph edges in a coordinated way.
     :param tmp_path: Temporary directory path
-    :type tmp_path: Path
     :param full_load: Whether to perform a full load of jobs and edges
-    :type full_load: bool
-    :param _expid: Experiment ID fixture
-    :type _expid: str
+    :param as_exp: Autosubmit experiment.
     """
 
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     # Create and save original job list with jobs and edges
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -338,68 +444,105 @@ def test_db_job_list_jobs_and_edges_together(
     for job in loaded_jobs:
         assert isinstance(job, dict)
         assert set(job.keys()) == {
-            'chunk', 'member', 'current_checkpoint_step', 'date', 'date_split', 'finish_time_timestamp', 'frequency',
-            'id', 'local_logs_err', 'local_logs_out', 'max_checkpoint_step', 'name', 'packed', 'platform_name',
-            'priority', 'ready_date', 'remote_logs_err', 'remote_logs_out', 'script_name', 'section',
-            'split', 'splits', 'start_time', 'start_time_timestamp', 'status', 'submit_time_timestamp',
-            'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats',
-            'wallclock', 'wrapper_type', 'retrials', 'log_recovery_call_count',
+            "chunk",
+            "member",
+            "current_checkpoint_step",
+            "date",
+            "date_split",
+            "finish_time_timestamp",
+            "frequency",
+            "id",
+            "local_logs_err",
+            "local_logs_out",
+            "max_checkpoint_step",
+            "name",
+            "packed",
+            "platform_name",
+            "priority",
+            "ready_date",
+            "remote_logs_err",
+            "remote_logs_out",
+            "script_name",
+            "section",
+            "split",
+            "splits",
+            "start_time",
+            "start_time_timestamp",
+            "status",
+            "submit_time_timestamp",
+            "synchronize",
+            "updated_log",
+            "created",
+            "modified",
+            "fail_count",
+            "updated_stats",
+            "wallclock",
+            "wrapper_type",
+            "retrials",
+            "log_recovery_call_count",
         }
 
     for edge in loaded_edges:
         assert isinstance(edge, dict)
-        assert set(edge.keys()) == {'e_from', 'e_to', 'from_step', 'min_trigger_status', 'completion_status', 'fail_ok'}
+        assert set(edge.keys()) == {
+            "e_from",
+            "e_to",
+            "from_step",
+            "min_trigger_status",
+            "completion_status",
+            "fail_ok",
+        }
 
 
 @pytest.mark.postgres
-@pytest.mark.parametrize(
-    'full_load',
-    [True, False]
-)
+@pytest.mark.parametrize("full_load", [True, False])
 def test_select_latest_inner_jobs(
-        tmp_path: Path,
-        as_db: str,
-        full_load: bool,
-        _expid: str,
-        as_exp: Any,
+    tmp_path: Path,
+    as_db: str,
+    full_load: bool,
+    as_exp: Any,
 ):
-    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
 
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     job_list = generate_job_list(as_exp.as_conf, db_manager)
     job_list.save_jobs()
 
     # prepare wrapper
     package_name = "test_package"
-    wrapper_info_dict = [{
-        "name": package_name,
-        "id": 1,
-        "script_name": "wrapper_script.sh",
-        "status": 1,
-        "local_logs_out": None,
-        "local_logs_err": None,
-        "remote_logs_out": None,
-        "remote_logs_err": None,
-        "updated_log": 1,
-        "platform_name": "test_platform",
-        "wallclock": "01:00",
-        "num_processors": "4",
-        "type": 0,
-        "sections": None,
-        "method": None,
-        "run_id": None,
-    }]
+    wrapper_info_dict = [
+        {
+            "name": package_name,
+            "id": 1,
+            "script_name": "wrapper_script.sh",
+            "status": 1,
+            "local_logs_out": None,
+            "local_logs_err": None,
+            "remote_logs_out": None,
+            "remote_logs_err": None,
+            "updated_log": 1,
+            "platform_name": "test_platform",
+            "wallclock": "01:00",
+            "num_processors": "4",
+            "type": 0,
+            "sections": None,
+            "method": None,
+            "run_id": None,
+        }
+    ]
 
     inner_jobs_data = []
     for job in job_list.job_list[:3]:
-        inner_jobs_data.append({
-            "package_id": 1,
-            "package_name": package_name,
-            "job_name": job.name,
-            "timestamp": "2023-01-01T00:00:00",
-            "run_id": None,
-        })
+        inner_jobs_data.append(
+            {
+                "package_id": 1,
+                "package_name": package_name,
+                "job_name": job.name,
+                "timestamp": "2023-01-01T00:00:00",
+                "run_id": None,
+            }
+        )
 
     wrappers = [(wrapper_info_dict, inner_jobs_data)]
 
@@ -425,8 +568,7 @@ def test_select_latest_inner_jobs(
 
     # Test now with filtering by job name
     filtered_jobs = db_manager.select_latest_inner_jobs(
-        innerjobs_table,
-        [job_list.job_list[0].name]
+        innerjobs_table, [job_list.job_list[0].name]
     )
     assert len(filtered_jobs) == 1
     assert filtered_jobs[0]["job_name"] == job_list.job_list[0].name
@@ -437,20 +579,16 @@ def test_select_latest_inner_jobs(
 
 
 @pytest.mark.postgres
-@pytest.mark.parametrize(
-    'full_load',
-    [True, False]
-)
+@pytest.mark.parametrize("full_load", [True, False])
 def test_load_job_by_name(
-        tmp_path: Path,
-        full_load: bool,
-        as_db: str,
-        _expid: str,
-        as_exp: Any,
+    tmp_path: Path,
+    full_load: bool,
+    as_db: str,
+    as_exp: Any,
 ):
-    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
 
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     # Generate and save some jobs
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -459,37 +597,33 @@ def test_load_job_by_name(
     # this returns the raw tuple, convert to dict for easier testing
     job_selected = dict(db_manager.select_job_by_name("a01f_LOCAL_SETUP"))
     assert job_selected is not None
-    assert job_selected['name'] == "a01f_LOCAL_SETUP"
-    assert job_selected['section'] == "LOCAL_SETUP"
-    assert job_selected['status'] == "READY"
-    assert job_selected['script_name'] == "a01f_LOCAL_SETUP.cmd"
-    assert job_selected['priority'] == 0
+    assert job_selected["name"] == "a01f_LOCAL_SETUP"
+    assert job_selected["section"] == "LOCAL_SETUP"
+    assert job_selected["status"] == "READY"
+    assert job_selected["script_name"] == "a01f_LOCAL_SETUP.cmd"
+    assert job_selected["priority"] == 0
 
     job_load = db_manager.load_job_by_name("a01f_LOCAL_SETUP")
     assert job_load is not None
-    assert job_load['name'] == "a01f_LOCAL_SETUP"
-    assert job_load['section'] == "LOCAL_SETUP"
-    assert job_load['status'] == "READY"
-    assert job_load['script_name'] == "a01f_LOCAL_SETUP.cmd"
-    assert job_load['priority'] == 0
+    assert job_load["name"] == "a01f_LOCAL_SETUP"
+    assert job_load["section"] == "LOCAL_SETUP"
+    assert job_load["status"] == "READY"
+    assert job_load["script_name"] == "a01f_LOCAL_SETUP.cmd"
+    assert job_load["priority"] == 0
 
 
 @pytest.mark.postgres
-@pytest.mark.parametrize(
-    'preview',
-    [True, False]
-)
+@pytest.mark.parametrize("preview", [True, False])
 def test_load_wrapper(
-        tmp_path: Path,
-        preview: bool,
-        as_db: str,
-        _expid: str,
-        as_exp: Any,
+    tmp_path: Path,
+    preview: bool,
+    as_db: str,
+    as_exp: Any,
 ):
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
     exp_path / "db"
 
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     # Generate and save some jobs
     job_list = generate_job_list(as_exp.as_conf, db_manager)
@@ -499,143 +633,274 @@ def test_load_wrapper(
 
     # prepare wrapper
     package_name = "test_package"
-    wrapper_info_dict = [{
-        "name": package_name,
-        "id": 1,
-        "script_name": "wrapper_script.sh",
-        "status": 1,
-        "local_logs_out": None,
-        "local_logs_err": None,
-        "remote_logs_out": None,
-        "remote_logs_err": None,
-        "updated_log": 1,
-        "platform_name": "test_platform",
-        "wallclock": "01:00",
-        "num_processors": "4",
-        "type": 0,
-        "sections": None,
-        "method": None,
-        "run_id": None,
-    }]
+    wrapper_info_dict = [
+        {
+            "name": package_name,
+            "id": 1,
+            "script_name": "wrapper_script.sh",
+            "status": 1,
+            "local_logs_out": None,
+            "local_logs_err": None,
+            "remote_logs_out": None,
+            "remote_logs_err": None,
+            "updated_log": 1,
+            "platform_name": "test_platform",
+            "wallclock": "01:00",
+            "num_processors": "4",
+            "type": 0,
+            "sections": None,
+            "method": None,
+            "run_id": None,
+        }
+    ]
 
     inner_jobs_data = []
     for job in job_list.job_list[:3]:
-        inner_jobs_data.append({
-            "package_id": 1,
-            "package_name": package_name,
-            "job_name": job.name,
-            "timestamp": "2023-01-01T00:00:00",
-            "run_id": None,
-        })
+        inner_jobs_data.append(
+            {
+                "package_id": 1,
+                "package_name": package_name,
+                "job_name": job.name,
+                "timestamp": "2023-01-01T00:00:00",
+                "run_id": None,
+            }
+        )
 
     wrappers = [(wrapper_info_dict, inner_jobs_data)]
 
     db_manager.save_wrappers(wrappers, preview=preview)
 
-    un_mapped_wrapper_info, un_mapped_inner_jobs = db_manager.load_wrappers(preview=preview, job_list=job_list.job_list)
+    un_mapped_wrapper_info, un_mapped_inner_jobs = db_manager.load_wrappers(
+        preview=preview, job_list=job_list.job_list
+    )
     assert len(un_mapped_wrapper_info) == 1
     assert len(un_mapped_inner_jobs) == 3
     for wrapper in un_mapped_wrapper_info:
         wrapper = dict(wrapper)
-        assert wrapper['name'] == package_name
-        assert wrapper['script_name'] == "wrapper_script.sh"
-        assert wrapper['status'] == 1
-        assert wrapper['platform_name'] == "test_platform"
-        assert wrapper['wallclock'] == "01:00"
-        assert wrapper['num_processors'] == 4
-        assert wrapper['type'] == '0'
-        assert wrapper['updated_log'] > 0
-        assert wrapper['sections'] is None
-        assert wrapper['method'] is None
+        assert wrapper["name"] == package_name
+        assert wrapper["script_name"] == "wrapper_script.sh"
+        assert wrapper["status"] == 1
+        assert wrapper["platform_name"] == "test_platform"
+        assert wrapper["wallclock"] == "01:00"
+        assert wrapper["num_processors"] == 4
+        assert wrapper["type"] == "0"
+        assert wrapper["updated_log"] > 0
+        assert wrapper["sections"] is None
+        assert wrapper["method"] is None
     for inner_job in un_mapped_inner_jobs:
         inner_job = dict(inner_job)
-        assert inner_job['package_name'] == package_name
-        assert inner_job['timestamp'] == "2023-01-01T00:00:00"
-        assert inner_job['job_name'] in [job.name for job in job_list.job_list[:3]]
+        assert inner_job["package_name"] == package_name
+        assert inner_job["timestamp"] == "2023-01-01T00:00:00"
+        assert inner_job["job_name"] in [job.name for job in job_list.job_list[:3]]
 
 
 @pytest.mark.postgres
-def test_clear_unused_nodes(
-        tmp_path: Path,
-        as_db: str,
-        as_exp: Any,
-        _expid: str
-):
+def test_clear_unused_nodes(tmp_path: Path, as_db: str, as_exp: Any):
     """
     Test the clear_unused_nodes method which removes jobs from the database based on configuration differences.
 
     :param tmp_path: Temporary directory path
-    :type tmp_path: Path
     :param as_exp.as_conf: Fixture to create a test configuration
-    :type as_exp.as_conf: Callable
     """
-    Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
+    Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
 
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     job_list = generate_job_list(as_exp.as_conf, db_manager)
 
     test_jobs = [
-        Job(loaded_data={
-            'chunk': None, 'current_checkpoint_step': 0, 'date': None, 'date_split': None,
-            'frequency': None, 'id': 0, 'name': 'removed_section_job', 'section': 'REMOVED_SECTION',
-            'script_name': 'test.cmd', 'split': -1, 'splits': -1, 'status': 'WAITING',
-            'finish_time_timestamp': None, 'local_logs_err': None, 'local_logs_out': None,
-            'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
-            'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
-            'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': 0, 'member': None
-        }),
-        Job(loaded_data={
-            'chunk': 10, 'current_checkpoint_step': 0, 'date': "2000-01-01", 'date_split': None,
-            'frequency': None, 'id': 0, 'name': 'chunk_limit_job', 'section': 'MODIFIED_SECTION',
-            'script_name': 'test.cmd', 'split': -1, 'splits': -1, 'status': 'WAITING',
-            'finish_time_timestamp': None, 'local_logs_err': None, 'local_logs_out': None,
-            'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
-            'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
-            'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
-        }),
-        Job(loaded_data={
-            'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-01-01', 'date_split': None,
-            'frequency': None, 'id': 0, 'name': 'split_limit_job', 'section': 'MODIFIED_SECTION',
-            'script_name': 'test.cmd', 'split': 5, 'splits': 5, 'status': 'WAITING',
-            'finish_time_timestamp': None, 'local_logs_err': None, 'local_logs_out': None,
-            'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
-            'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
-            'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
-        }),
-        Job(loaded_data={
-            'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-12-31', 'date_split': None,
-            'frequency': None, 'id': 0, 'name': 'date_removed_job', 'section': 'MODIFIED_SECTION',
-            'script_name': 'test.cmd', 'split': 1, 'splits': 1, 'status': 'WAITING',
-            'finish_time_timestamp': None, 'local_logs_err': None, 'local_logs_out': None,
-            'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
-            'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
-            'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
-        }),
-        Job(loaded_data={
-            'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-01-01', 'date_split': None,
-            'frequency': None, 'id': 0, 'name': 'member_removed_job', 'section': 'MODIFIED_SECTION',
-            'script_name': 'test.cmd', 'split': 1, 'splits': 1, 'status': 'WAITING',
-            'finish_time_timestamp': None, 'local_logs_err': None, 'local_logs_out': None,
-            'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
-            'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
-            'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': 0, 'member': 'fc2'
-        }),
-        Job(loaded_data={
-            'chunk': 1, 'current_checkpoint_step': 0, 'date': '2000-01-01', 'date_split': None,
-            'frequency': None, 'id': 0, 'name': 'safe_job', 'section': 'MODIFIED_SECTION',
-            'script_name': 'test.cmd', 'split': 1, 'splits': 1, 'status': 'WAITING',
-            'finish_time_timestamp': None, 'local_logs_err': None, 'local_logs_out': None,
-            'max_checkpoint_step': 0, 'packed': False, 'platform_name': None, 'priority': 0,
-            'ready_date': None, 'remote_logs_err': None, 'remote_logs_out': None,
-            'start_time': None, 'start_time_timestamp': None, 'submit_time_timestamp': None,
-            'synchronize': None, 'updated_log': 0, 'member': 'fc0'
-        })
+        Job(
+            loaded_data={
+                "chunk": None,
+                "current_checkpoint_step": 0,
+                "date": None,
+                "date_split": None,
+                "frequency": None,
+                "id": 0,
+                "name": "removed_section_job",
+                "section": "REMOVED_SECTION",
+                "script_name": "test.cmd",
+                "split": -1,
+                "splits": -1,
+                "status": "WAITING",
+                "finish_time_timestamp": None,
+                "local_logs_err": None,
+                "local_logs_out": None,
+                "max_checkpoint_step": 0,
+                "packed": False,
+                "platform_name": None,
+                "priority": 0,
+                "ready_date": None,
+                "remote_logs_err": None,
+                "remote_logs_out": None,
+                "start_time": None,
+                "start_time_timestamp": None,
+                "submit_time_timestamp": None,
+                "synchronize": None,
+                "updated_log": 0,
+                "member": None,
+            }
+        ),
+        Job(
+            loaded_data={
+                "chunk": 10,
+                "current_checkpoint_step": 0,
+                "date": "2000-01-01",
+                "date_split": None,
+                "frequency": None,
+                "id": 0,
+                "name": "chunk_limit_job",
+                "section": "MODIFIED_SECTION",
+                "script_name": "test.cmd",
+                "split": -1,
+                "splits": -1,
+                "status": "WAITING",
+                "finish_time_timestamp": None,
+                "local_logs_err": None,
+                "local_logs_out": None,
+                "max_checkpoint_step": 0,
+                "packed": False,
+                "platform_name": None,
+                "priority": 0,
+                "ready_date": None,
+                "remote_logs_err": None,
+                "remote_logs_out": None,
+                "start_time": None,
+                "start_time_timestamp": None,
+                "submit_time_timestamp": None,
+                "synchronize": None,
+                "updated_log": 0,
+                "member": "fc0",
+            }
+        ),
+        Job(
+            loaded_data={
+                "chunk": 1,
+                "current_checkpoint_step": 0,
+                "date": "2000-01-01",
+                "date_split": None,
+                "frequency": None,
+                "id": 0,
+                "name": "split_limit_job",
+                "section": "MODIFIED_SECTION",
+                "script_name": "test.cmd",
+                "split": 5,
+                "splits": 5,
+                "status": "WAITING",
+                "finish_time_timestamp": None,
+                "local_logs_err": None,
+                "local_logs_out": None,
+                "max_checkpoint_step": 0,
+                "packed": False,
+                "platform_name": None,
+                "priority": 0,
+                "ready_date": None,
+                "remote_logs_err": None,
+                "remote_logs_out": None,
+                "start_time": None,
+                "start_time_timestamp": None,
+                "submit_time_timestamp": None,
+                "synchronize": None,
+                "updated_log": 0,
+                "member": "fc0",
+            }
+        ),
+        Job(
+            loaded_data={
+                "chunk": 1,
+                "current_checkpoint_step": 0,
+                "date": "2000-12-31",
+                "date_split": None,
+                "frequency": None,
+                "id": 0,
+                "name": "date_removed_job",
+                "section": "MODIFIED_SECTION",
+                "script_name": "test.cmd",
+                "split": 1,
+                "splits": 1,
+                "status": "WAITING",
+                "finish_time_timestamp": None,
+                "local_logs_err": None,
+                "local_logs_out": None,
+                "max_checkpoint_step": 0,
+                "packed": False,
+                "platform_name": None,
+                "priority": 0,
+                "ready_date": None,
+                "remote_logs_err": None,
+                "remote_logs_out": None,
+                "start_time": None,
+                "start_time_timestamp": None,
+                "submit_time_timestamp": None,
+                "synchronize": None,
+                "updated_log": 0,
+                "member": "fc0",
+            }
+        ),
+        Job(
+            loaded_data={
+                "chunk": 1,
+                "current_checkpoint_step": 0,
+                "date": "2000-01-01",
+                "date_split": None,
+                "frequency": None,
+                "id": 0,
+                "name": "member_removed_job",
+                "section": "MODIFIED_SECTION",
+                "script_name": "test.cmd",
+                "split": 1,
+                "splits": 1,
+                "status": "WAITING",
+                "finish_time_timestamp": None,
+                "local_logs_err": None,
+                "local_logs_out": None,
+                "max_checkpoint_step": 0,
+                "packed": False,
+                "platform_name": None,
+                "priority": 0,
+                "ready_date": None,
+                "remote_logs_err": None,
+                "remote_logs_out": None,
+                "start_time": None,
+                "start_time_timestamp": None,
+                "submit_time_timestamp": None,
+                "synchronize": None,
+                "updated_log": 0,
+                "member": "fc2",
+            }
+        ),
+        Job(
+            loaded_data={
+                "chunk": 1,
+                "current_checkpoint_step": 0,
+                "date": "2000-01-01",
+                "date_split": None,
+                "frequency": None,
+                "id": 0,
+                "name": "safe_job",
+                "section": "MODIFIED_SECTION",
+                "script_name": "test.cmd",
+                "split": 1,
+                "splits": 1,
+                "status": "WAITING",
+                "finish_time_timestamp": None,
+                "local_logs_err": None,
+                "local_logs_out": None,
+                "max_checkpoint_step": 0,
+                "packed": False,
+                "platform_name": None,
+                "priority": 0,
+                "ready_date": None,
+                "remote_logs_err": None,
+                "remote_logs_out": None,
+                "start_time": None,
+                "start_time_timestamp": None,
+                "submit_time_timestamp": None,
+                "synchronize": None,
+                "updated_log": 0,
+                "member": "fc0",
+            }
+        ),
     ]
 
     for job in test_jobs:
@@ -645,33 +910,31 @@ def test_clear_unused_nodes(
     # Verify all jobs are saved
     for job in test_jobs:
         loaded_job = db_manager.load_job_by_name(job.name)
-        assert loaded_job['name'] == job.name
+        assert loaded_job["name"] == job.name
 
     differences = {
-        'REMOVED_SECTION': {
-            'status': 'removed'
+        "REMOVED_SECTION": {"status": "removed"},
+        "MODIFIED_SECTION": {
+            "status": "modified",
+            "numchunks": 5,  # Jobs with chunk > 5 should be removed
+            "splits": 3,  # Jobs with split > 3 should be removed
+            "datelist": "20000101 20000201",  # Only these dates are allowed
+            "members": "fc0 fc1",  # Only these members are allowed
         },
-        'MODIFIED_SECTION': {
-            'status': 'modified',
-            'numchunks': 5,  # Jobs with chunk > 5 should be removed
-            'splits': 3,  # Jobs with split > 3 should be removed
-            'datelist': '20000101 20000201',  # Only these dates are allowed
-            'members': 'fc0 fc1'  # Only these members are allowed
-        }
     }
 
     db_manager.clear_unused_nodes(differences)
 
     jobs_should_be_deleted = [
-        'removed_section_job',  # Section removed
-        'chunk_limit_job',  # Chunk > 5
-        'split_limit_job',  # Split > 3
-        'date_removed_job',  # Date not in datelist
-        'member_removed_job',  # Member not in members list
+        "removed_section_job",  # Section removed
+        "chunk_limit_job",  # Chunk > 5
+        "split_limit_job",  # Split > 3
+        "date_removed_job",  # Date not in datelist
+        "member_removed_job",  # Member not in members list
     ]
 
     jobs_should_remain = [
-        'safe_job',
+        "safe_job",
     ]
 
     for job_name in jobs_should_be_deleted:
@@ -681,7 +944,7 @@ def test_clear_unused_nodes(
     for job_name in jobs_should_remain:
         loaded_job = db_manager.load_job_by_name(job_name)
         assert loaded_job is not None, f"Job {job_name} should not have been deleted"
-        assert loaded_job['name'] == job_name
+        assert loaded_job["name"] == job_name
 
 
 # -- Tests for detecting changes in dependencies -- #
@@ -812,7 +1075,7 @@ DEPENDENCIES_CHANGED_DATA = [
                 "DEPENDENCIES": "job-1",
                 "wallclock": "00:01",
                 "splits": 3,
-            }
+            },
         }
     },
     {
@@ -851,7 +1114,7 @@ DEPENDENCIES_CHANGED_DATA = [
                 "DEPENDENCIES": "job-1",
                 "wallclock": "00:01",
                 "splits": 3,
-            }
+            },
         }
     },
     {
@@ -890,7 +1153,7 @@ DEPENDENCIES_CHANGED_DATA = [
                 "DEPENDENCIES": "job-1",
                 "wallclock": "00:01",
                 "splits": 3,
-            }
+            },
         }
     },
     {
@@ -926,7 +1189,6 @@ DEPENDENCIES_CHANGED_DATA = [
         }
     },
     {
-
         "JOBS": {
             "hjob": {
                 "SCRIPT": "echo 'Hello World'",
@@ -969,7 +1231,7 @@ DEPENDENCIES_CHANGED_DATA = [
                 "DEPENDENCIES": "job-1",
                 "wallclock": "00:01",
                 "splits": 2,
-            }
+            },
         }
     },
     {
@@ -1008,7 +1270,7 @@ DEPENDENCIES_CHANGED_DATA = [
                 "DEPENDENCIES": "job-1",
                 "wallclock": "00:01",
                 "splits": 2,
-            }
+            },
         }
     },
     {
@@ -1047,7 +1309,7 @@ DEPENDENCIES_CHANGED_DATA = [
                 "DEPENDENCIES": "job-1",
                 "wallclock": "00:01",
                 "splits": 2,
-            }
+            },
         }
     },
     {
@@ -1086,9 +1348,9 @@ DEPENDENCIES_CHANGED_DATA = [
                 "DEPENDENCIES": "job-1",
                 "wallclock": "00:01",
                 "splits": 2,
-            }
+            },
         }
-    }
+    },
 ]
 
 DEPENDENCIES_IDS = [
@@ -1109,7 +1371,6 @@ DEPENDENCIES_IDS = [
     "running_type_change_date",
     "running_type_change_member",
     "running_type_change_once",
-
 ]
 
 
@@ -1117,19 +1378,15 @@ DEPENDENCIES_IDS = [
 @pytest.mark.parametrize(
     "changed_data",
     [
-        pytest.param(
-            DEPENDENCIES_CHANGED_DATA[i],
-            id=DEPENDENCIES_IDS[i]
-        )
+        pytest.param(DEPENDENCIES_CHANGED_DATA[i], id=DEPENDENCIES_IDS[i])
         for i in range(len(DEPENDENCIES_CHANGED_DATA))
-    ]
+    ],
 )
 def test_with_createcw_command_differences(
-        as_exp: Any,
-        changed_data: dict[str, Any],
-        tmp_path: Path,
-        as_db: str,
-        _expid: str,
+    as_exp: Any,
+    changed_data: dict[str, Any],
+    tmp_path: Path,
+    as_db: str,
 ) -> None:
     """
     Integration test to verify database updates.
@@ -1142,161 +1399,159 @@ def test_with_createcw_command_differences(
 
     """
     fixed_data = {
-        'CONFIG': {
-            'AUTOSUBMIT_VERSION': 4.2,
-            'MAXWAITINGJOBS': 100,
-            'TOTALJOBS': 100,
-            'SAFETYSLEEPTIME': 0,
-            'RETRIALS': 0,
+        "CONFIG": {
+            "AUTOSUBMIT_VERSION": 4.2,
+            "MAXWAITINGJOBS": 100,
+            "TOTALJOBS": 100,
+            "SAFETYSLEEPTIME": 0,
+            "RETRIALS": 0,
         },
-        'MAIL': {
-            'NOTIFICATIONS': False,
-            'TO': '',
+        "MAIL": {
+            "NOTIFICATIONS": False,
+            "TO": "",
         },
-        'STORAGE': {
-            'TYPE': f"{as_db}",
-            'COPY_REMOTE_LOGS': True,
+        "STORAGE": {
+            "TYPE": f"{as_db}",
+            "COPY_REMOTE_LOGS": True,
         },
-        'DEFAULT': {
-            'EXPID': _expid,
-            'HPCARCH': 'TEST_SLURM',
+        "DEFAULT": {
+            "EXPID": as_exp.expid,
+            "HPCARCH": "TEST_SLURM",
         },
-        'PROJECT': {
-            'PROJECT_TYPE': 'none',
-            'PROJECT_DESTINATION': '',
+        "PROJECT": {
+            "PROJECT_TYPE": "none",
+            "PROJECT_DESTINATION": "",
         },
-        'GIT': {
-            'PROJECT_ORIGIN': '',
-            'PROJECT_BRANCH': '',
-            'PROJECT_COMMIT': '',
-            'PROJECT_SUBMODULES': '',
-            'FETCH_SINGLE_BRANCH': True,
+        "GIT": {
+            "PROJECT_ORIGIN": "",
+            "PROJECT_BRANCH": "",
+            "PROJECT_COMMIT": "",
+            "PROJECT_SUBMODULES": "",
+            "FETCH_SINGLE_BRANCH": True,
         },
-        'SVN': {
-            'PROJECT_URL': '',
-            'PROJECT_REVISION': '',
+        "SVN": {
+            "PROJECT_URL": "",
+            "PROJECT_REVISION": "",
         },
-        'LOCAL': {
-            'PROJECT_PATH': '',
+        "LOCAL": {
+            "PROJECT_PATH": "",
         },
-        'PROJECT_FILES': {
-            'FILE_PROJECT_CONF': '',
-            'FILE_JOBS_CONF': '',
-            'JOB_SCRIPTS_TYPE': '',
+        "PROJECT_FILES": {
+            "FILE_PROJECT_CONF": "",
+            "FILE_JOBS_CONF": "",
+            "JOB_SCRIPTS_TYPE": "",
         },
-        'RERUN': {
-            'RERUN': False,
-            'RERUN_JOBLIST': '',
+        "RERUN": {
+            "RERUN": False,
+            "RERUN_JOBLIST": "",
         },
-        'PLATFORMS': {
-            'TEST_SLURM': {
-                'TYPE': 'slurm',
-                'ADD_PROJECT_TO_HOST': 'False',
-                'HOST': '127.0.0.1',
-                'MAX_WALLCLOCK': '48:00',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch',
-                'TEMP_DIR': '',
-                'USER': 'root',
-                'PROCESSORS': '1',
-                'MAX_PROCESSORS': '128',
-                'PROCESSORS_PER_NODE': '128',
+        "PLATFORMS": {
+            "TEST_SLURM": {
+                "TYPE": "slurm",
+                "ADD_PROJECT_TO_HOST": "False",
+                "HOST": "127.0.0.1",
+                "MAX_WALLCLOCK": "48:00",
+                "PROJECT": "group",
+                "QUEUE": "gp_debug",
+                "SCRATCH_DIR": "/tmp/scratch",
+                "TEMP_DIR": "",
+                "USER": "root",
+                "PROCESSORS": "1",
+                "MAX_PROCESSORS": "128",
+                "PROCESSORS_PER_NODE": "128",
             }
         },
-        'WRAPPERS': {
-            'WRAPPERV': {
-                'TYPE': 'vertical',
-                'JOBS_IN_WRAPPER': "vjob"
-            },
-            'WRAPPERH': {
-                'TYPE': 'horizontal',
-                'JOBS_IN_WRAPPER': "hjob"
-            },
-            'WRAPPERVH': {
-                'TYPE': 'vertical-horizontal',
-                'JOBS_IN_WRAPPER': "vhjob"
-            },
-            'WRAPPERHV': {
-                'TYPE': 'horizontal-vertical',
-                'JOBS_IN_WRAPPER': "hvjob"
-            },
-        }
+        "WRAPPERS": {
+            "WRAPPERV": {"TYPE": "vertical", "JOBS_IN_WRAPPER": "vjob"},
+            "WRAPPERH": {"TYPE": "horizontal", "JOBS_IN_WRAPPER": "hjob"},
+            "WRAPPERVH": {"TYPE": "vertical-horizontal", "JOBS_IN_WRAPPER": "vhjob"},
+            "WRAPPERHV": {"TYPE": "horizontal-vertical", "JOBS_IN_WRAPPER": "hvjob"},
+        },
     }
     mutable_experiment_wrappers = {
-        'EXPERIMENT': {
-            'DATELIST': '20000101 20010101',
-            'MEMBERS': 'fc0 fc1',
-            'CHUNKSIZEUNIT': 'month',
-            'CHUNKSIZE': '4',
-            'NUMCHUNKS': '2',
-            'CHUNKINI': '',
-            'CALENDAR': 'standard',
+        "EXPERIMENT": {
+            "DATELIST": "20000101 20010101",
+            "MEMBERS": "fc0 fc1",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": "4",
+            "NUMCHUNKS": "2",
+            "CHUNKINI": "",
+            "CALENDAR": "standard",
         },
     }
     mutable_jobs = {
-        'JOBS': {
-            'job': {
-                'SCRIPT': 'echo "Hello World"',
-                'DEPENDENCIES': 'job-1',
-                'RUNNING': 'chunk',
-                'wallclock': '00:01',
-                'splits': 2,
+        "JOBS": {
+            "job": {
+                "SCRIPT": 'echo "Hello World"',
+                "DEPENDENCIES": "job-1",
+                "RUNNING": "chunk",
+                "wallclock": "00:01",
+                "splits": 2,
             },
-            'vjob': {
-                'SCRIPT': 'echo "Hello World"',
-                'DEPENDENCIES': 'vjob-1',
-                'RUNNING': 'chunk',
-                'wallclock': '00:01',
-                'splits': 2,
+            "vjob": {
+                "SCRIPT": 'echo "Hello World"',
+                "DEPENDENCIES": "vjob-1",
+                "RUNNING": "chunk",
+                "wallclock": "00:01",
+                "splits": 2,
             },
-            'hjob': {
-                'SCRIPT': 'echo "Hello World"',
-                'DEPENDENCIES': 'hjob-1',
-                'RUNNING': 'chunk',
-                'wallclock': '00:01',
-                'splits': 2,
+            "hjob": {
+                "SCRIPT": 'echo "Hello World"',
+                "DEPENDENCIES": "hjob-1",
+                "RUNNING": "chunk",
+                "wallclock": "00:01",
+                "splits": 2,
             },
-            'vhjob': {
-                'SCRIPT': 'echo "Hello World"',
-                'DEPENDENCIES': 'vhjob-1',
-                'RUNNING': 'chunk',
-                'wallclock': '00:01',
-                'splits': 2,
+            "vhjob": {
+                "SCRIPT": 'echo "Hello World"',
+                "DEPENDENCIES": "vhjob-1",
+                "RUNNING": "chunk",
+                "wallclock": "00:01",
+                "splits": 2,
             },
-            'hvjob': {
-                'SCRIPT': 'echo "Hello World"',
-                'DEPENDENCIES': 'hvjob-1',
-                'RUNNING': 'chunk',
-                'wallclock': '00:01',
-                'splits': 2,
+            "hvjob": {
+                "SCRIPT": 'echo "Hello World"',
+                "DEPENDENCIES": "hvjob-1",
+                "RUNNING": "chunk",
+                "wallclock": "00:01",
+                "splits": 2,
             },
-
         }
     }
-    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
-    conf_dir = exp_path / 'conf'
-    unified_data: dict[str, dict] = fixed_data | mutable_experiment_wrappers | mutable_jobs
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / as_exp.expid
+    conf_dir = exp_path / "conf"
+    unified_data: dict[str, dict] = (
+        fixed_data | mutable_experiment_wrappers | mutable_jobs
+    )
     _init_test(as_exp, conf_dir, unified_data)
-    db_manager = _create_db_manager(schema=_expid)
-    exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=True, check_wrappers=True)
+    db_manager = _create_db_manager(schema=as_exp.expid)
+    exit_code = create(
+        as_exp.expid, noplot=True, hide=False, force=True, check_wrappers=True
+    )
     _assert_exit_code("SUCCESS", exit_code)
     once_sections = []
     member_sections = []
     date_sections = []
     chunk_sections = []
-    for section in unified_data.get('JOBS', {}):
-        if unified_data['JOBS'][section].get('RUNNING', '').lower() == 'once':
+    for section in unified_data.get("JOBS", {}):
+        if unified_data["JOBS"][section].get("RUNNING", "").lower() == "once":
             once_sections.append(section)
-        elif unified_data['JOBS'][section].get('RUNNING', '').lower() == 'member':
+        elif unified_data["JOBS"][section].get("RUNNING", "").lower() == "member":
             member_sections.append(section)
-        elif unified_data['JOBS'][section].get('RUNNING', '').lower() == 'date':
+        elif unified_data["JOBS"][section].get("RUNNING", "").lower() == "date":
             date_sections.append(section)
         else:
             chunk_sections.append(section)
-    expected_job_names = _get_expected_job_names(as_exp.expid, unified_data, once_sections, member_sections, date_sections, chunk_sections)
+    expected_job_names = _get_expected_job_names(
+        as_exp.expid,
+        unified_data,
+        once_sections,
+        member_sections,
+        date_sections,
+        chunk_sections,
+    )
     db_jobs = db_manager.load_jobs(full_load=True)
-    db_jobs = {job['name'].upper(): job for job in db_jobs}
+    db_jobs = {job["name"].upper(): job for job in db_jobs}
 
     db_jobs_names = set(db_jobs.keys())
     expected_job_names_set = set(expected_job_names)
@@ -1309,25 +1564,34 @@ def test_with_createcw_command_differences(
     new_data: dict[str, dict] = unified_data | changed_data
     _modify_data(as_exp.expid, conf_dir, new_data)
 
-    exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=False, check_wrappers=True)
+    exit_code = create(
+        as_exp.expid, noplot=True, hide=False, force=False, check_wrappers=True
+    )
     _assert_exit_code("SUCCESS", exit_code)
     once_sections = []
     member_sections = []
     date_sections = []
     chunk_sections = []
 
-    for section in new_data.get('JOBS', {}):
-        if new_data['JOBS'][section].get('RUNNING', '').lower() == 'once':
+    for section in new_data.get("JOBS", {}):
+        if new_data["JOBS"][section].get("RUNNING", "").lower() == "once":
             once_sections.append(section)
-        elif new_data['JOBS'][section].get('RUNNING', '').lower() == 'member':
+        elif new_data["JOBS"][section].get("RUNNING", "").lower() == "member":
             member_sections.append(section)
-        elif new_data['JOBS'][section].get('RUNNING', '').lower() == 'date':
+        elif new_data["JOBS"][section].get("RUNNING", "").lower() == "date":
             date_sections.append(section)
         else:
             chunk_sections.append(section)
-    expected_job_names = _get_expected_job_names(as_exp.expid, new_data, once_sections, member_sections, date_sections, chunk_sections)
+    expected_job_names = _get_expected_job_names(
+        as_exp.expid,
+        new_data,
+        once_sections,
+        member_sections,
+        date_sections,
+        chunk_sections,
+    )
     db_jobs = db_manager.load_jobs(full_load=True)
-    db_jobs = {job['name'].upper(): job for job in db_jobs}
+    db_jobs = {job["name"].upper(): job for job in db_jobs}
 
     db_jobs_names = set(db_jobs.keys())
     expected_job_names_set = set(expected_job_names)
@@ -1337,11 +1601,11 @@ def test_with_createcw_command_differences(
     assert len(unexpected_in_db) == 0, f"Unexpected jobs in DB: {unexpected_in_db}"
 
 
-def _wrapper_info(name: str, id: int, status: int = 1, **overrides) -> dict[str, Any]:
+def _wrapper_info(name: str, _id: int, status: int = 1, **overrides) -> dict[str, Any]:
     """Helper to build a wrapper_info dict with defaults matching WrapperInfoTable."""
     info = {
         "name": name,
-        "id": id,
+        "id": _id,
         "script_name": f"{name}.sh",
         "status": status,
         "local_logs_out": None,
@@ -1362,7 +1626,12 @@ def _wrapper_info(name: str, id: int, status: int = 1, **overrides) -> dict[str,
     return info
 
 
-def _inner_job(package_id: int, package_name: str, job_name: str, timestamp: str = "2023-01-01T00:00:00") -> dict[str, Any]:
+def _inner_job(
+    package_id: int,
+    package_name: str,
+    job_name: str,
+    timestamp: str = "2023-01-01T00:00:00",
+) -> dict[str, Any]:
     return {
         "package_id": package_id,
         "package_name": package_name,
@@ -1374,12 +1643,11 @@ def _inner_job(package_id: int, package_name: str, job_name: str, timestamp: str
 
 @pytest.mark.postgres
 def test_clear_wrappers(
-        tmp_path: Path,
-        as_db: str,
-        _expid: str,
-        as_exp: Any,
+    tmp_path: Path,
+    as_db: str,
+    as_exp: Any,
 ):
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     wrapper_info = [_wrapper_info("pkg_a", 1)]
     inner_jobs = [_inner_job(1, "pkg_a", "j1"), _inner_job(1, "pkg_a", "j2")]
@@ -1397,20 +1665,22 @@ def test_clear_wrappers(
 
 
 @pytest.mark.postgres
-@pytest.mark.parametrize("packages,initial_status,new_status", [
-    ([{"id": 1, "name": "pkg_a"}], 1, 5),
-    ([{"id": 1, "name": "pkg_a"}, {"id": 2, "name": "pkg_b"}], 1, 5),
-])
+@pytest.mark.parametrize(
+    "packages,initial_status,new_status",
+    [
+        ([{"id": 1, "name": "pkg_a"}], 1, 5),
+        ([{"id": 1, "name": "pkg_a"}, {"id": 2, "name": "pkg_b"}], 1, 5),
+    ],
+)
 def test_update_wrapper_status(
-        tmp_path: Path,
-        as_db: str,
-        _expid: str,
-        as_exp: Any,
-        packages: list,
-        initial_status: int,
-        new_status: int,
+    tmp_path: Path,
+    as_db: str,
+    as_exp: Any,
+    packages: list,
+    initial_status: int,
+    new_status: int,
 ):
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     for pkg in packages:
         wrapper_info = [_wrapper_info(pkg["name"], pkg["id"], status=initial_status)]
@@ -1423,17 +1693,18 @@ def test_update_wrapper_status(
     info, _ = db_manager.load_wrappers(preview=False)
     for wrapper in info:
         wrapper = dict(wrapper)
-        assert wrapper["status"] == new_status, f"Expected status {new_status} for {wrapper['name']}, got {wrapper['status']}"
+        assert wrapper["status"] == new_status, (
+            f"Expected status {new_status} for {wrapper['name']}, got {wrapper['status']}"
+        )
 
 
 @pytest.mark.postgres
 def test_get_wrappers_id_from_db(
-        tmp_path: Path,
-        as_db: str,
-        _expid: str,
-        as_exp: Any,
+    tmp_path: Path,
+    as_db: str,
+    as_exp: Any,
 ):
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     ids = db_manager.get_wrappers_id_from_db()
     assert ids == []
@@ -1453,12 +1724,11 @@ def test_get_wrappers_id_from_db(
 
 @pytest.mark.postgres
 def test_save_wrappers_empty(
-        tmp_path: Path,
-        as_db: str,
-        _expid: str,
-        as_exp: Any,
+    tmp_path: Path,
+    as_db: str,
+    as_exp: Any,
 ):
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     db_manager.save_wrappers([])
 
@@ -1469,16 +1739,16 @@ def test_save_wrappers_empty(
 
 @pytest.mark.postgres
 def test_save_wrappers_multiple_wrapper_infos(
-        tmp_path: Path,
-        as_db: str,
-        _expid: str,
-        as_exp: Any,
+    tmp_path: Path,
+    as_db: str,
+    as_exp: Any,
 ):
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     wrapper_infos = [_wrapper_info("pkg_a", 1), _wrapper_info("pkg_b", 2)]
     inner_jobs = [
-        _inner_job(1, "pkg_a", "j1"), _inner_job(1, "pkg_a", "j2"),
+        _inner_job(1, "pkg_a", "j1"),
+        _inner_job(1, "pkg_a", "j2"),
         _inner_job(2, "pkg_b", "j3"),
     ]
     db_manager.save_wrappers([(wrapper_infos, inner_jobs)], preview=False)
@@ -1490,12 +1760,11 @@ def test_save_wrappers_multiple_wrapper_infos(
 
 @pytest.mark.postgres
 def test_save_wrappers_integrity_error_logged(
-        tmp_path: Path,
-        as_db: str,
-        _expid: str,
-        as_exp: Any,
+    tmp_path: Path,
+    as_db: str,
+    as_exp: Any,
 ):
-    db_manager = _create_db_manager(schema=_expid)
+    db_manager = _create_db_manager(schema=as_exp.expid)
 
     wrapper_info = [_wrapper_info("pkg_a", 1)]
     inner_jobs = [_inner_job(1, "pkg_a", "j1")]

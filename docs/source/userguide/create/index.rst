@@ -138,7 +138,8 @@ Example:
 Profiling experiment creation
 ------------------------------
 
-You can profile the experiment creation process to analyze performance. To enable profiling, add the ``--profile`` (or ``-p``) flag to your ``autosubmit create`` command:
+You can profile the experiment creation process to analyze performance.
+To enable profiling, add the ``--profile`` flag to your ``autosubmit create`` command:
 
 .. code-block:: bash
 
