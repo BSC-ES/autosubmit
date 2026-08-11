@@ -163,6 +163,8 @@ def _prepare_run(
 
     if recover:
         Log.info("Recovering job_list")
+    # Check if the user has launch autosubmit run with -rom option.
+    allowed_members = AutosubmitHelper.get_allowed_members(run_only_members, as_conf)
     try:
         job_list = load_job_list(
             expid,
@@ -172,6 +174,7 @@ def _prepare_run(
             submitter=submitter,
             check_failed_jobs=True,
             run_mode=False,
+            run_members=allowed_members,
         )
 
     except OSError as e:
@@ -220,12 +223,10 @@ def _prepare_run(
     job_list.save_jobs()
     as_conf.save()
     # Before starting main loop, setup historical database tables and main information
-    # Check if the user has launch autosubmit run with -rom option ( previously named -rm )
-    allowed_members = AutosubmitHelper.get_allowed_members(run_only_members, as_conf)
+    # Check if the user has launch autosubmit run with -rom option ( previously named -rm ).
+    # run_members was already applied in load_job_list before generating the
+    # graph, so only report the restriction here.
     if allowed_members:
-        # Set allowed members after checks have been performed.
-        # This triggers the setter and main logic of the -rm feature.
-        job_list.run_members = allowed_members
         Log.result(
             f"Only jobs with member value in {str(allowed_members)} or no member will be allowed in this "
             f"run. Also, those jobs already SUBMITTED, QUEUING, or RUNNING will be allowed to complete and"
@@ -583,7 +584,7 @@ def _process_historical_data_iteration(job_list, job_changes_tracker, expid):
     exp_history = ExperimentHistory(expid)
     if len(job_changes_tracker) > 0:
         exp_history.process_job_list_changes_to_experiment_totals(
-            job_list.get_job_list()
+            job_list.get_job_list(), status_counts=job_list.get_status_counts()
         )
         database_backup(expid)
 
