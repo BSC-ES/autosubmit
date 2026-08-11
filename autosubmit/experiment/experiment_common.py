@@ -147,8 +147,7 @@ def _delete_experiment(expid: str, force: bool) -> None:
     try:
         ExperimentDetails(expid).delete_details()
     except Exception as e:
-        Log.warning(f'Failed to delete DB details for experiment {expid}: {str(e)}')
-        raise
+        raise AutosubmitCritical(f'Failed to delete DB details for experiment {expid}: {str(e)}')
 
     try:
         _delete_expid(expid, force)
