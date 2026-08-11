@@ -1,4 +1,4 @@
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 
 # This file is part of Autosubmit.
 
@@ -19,43 +19,54 @@
 
 from pathlib import Path
 
+import pytest
+
+from autosubmit.profiler.profiler import Profiler
+from autosubmit.workflow.manage import run
+
 
 def check_profile(expid: str, run_tmpdir: str) -> bool:
-    """
-    Initialize the run, writing the jobs.yml file and creating the experiment.
-    """
+    """Initialise the run, writing the jobs.yml file and creating the experiment."""
     # write jobs_data
     profile_path = Path(f"{run_tmpdir}/{expid}/tmp/profile/")
-    if profile_path.exists():
-        return True
-    return False
+    return bool(profile_path.exists())
 
 
-def test_run_profile(autosubmit_exp, tmp_path):
-    as_exp = autosubmit_exp(experiment_data={
-        'JOBS': {
-            'job': {
-                'SCRIPT': 'echo "Hello World with id=Success"',
-                'PLATFORM': 'local',
-                'RUNNING': 'once'
-            }
-        },
-        'PROJECT': {
-            'TYPE': 'local',
-            'PROJECT_DESTINATION': 'local_project'
-        },
-        'LOCAL': {
-            'PROJECT_PATH': str(tmp_path)
+@pytest.mark.parametrize(
+    "trace_enabled,max_checkpoints",
+    [
+        (False, 0),
+        (True, 1),
+        (False, 2),
+        (True, 0),
+    ],
+)
+def test_run_profile(trace_enabled, max_checkpoints, autosubmit_exp, tmp_path):
+    as_exp = autosubmit_exp(
+        experiment_data={
+            "JOBS": {
+                "job": {
+                    "SCRIPT": 'echo "Hello World with id=Success"',
+                    "PLATFORM": "local",
+                    "RUNNING": "once",
+                }
+            },
+            "PROJECT": {"TYPE": "local", "PROJECT_DESTINATION": "local_project"},
+            "LOCAL": {"PROJECT_PATH": str(tmp_path)},
         }
-    })
+    )
     # Run the experiment
     # TODO: In the future, we should be able to remove the MISC files, and
     #       instead either carry the state in the code via objects/decorators,
     #       etc., or use the DB to know what was the last command used -- if
     #       that is needed.
-    as_exp.autosubmit._check_ownership_and_set_last_command(
-        as_exp.as_conf,
-        as_exp.expid,
-        'run')
-    as_exp.autosubmit.run_experiment(expid=as_exp.expid, profile=True)
+    as_exp.as_conf.set_last_as_command("run")
+    profiler = Profiler(
+        as_exp.expid, trace_enabled=trace_enabled, max_checkpoints=max_checkpoints
+    )
+    profiler.start()
+    try:
+        run(expid=as_exp.expid)
+    finally:
+        profiler.stop()
     assert check_profile(as_exp.expid, as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)

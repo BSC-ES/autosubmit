@@ -22,6 +22,7 @@ from textwrap import dedent
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.workflow.manage import inspect
 
 
 def _get_script_files_path() -> Path:
@@ -182,7 +183,7 @@ def _write_test_files(expid, local_root_dir: Path):
     ('slurm', 'horizontal_vertical'),
     ('slurm', 'vertical_horizontal')
 ])
-def test_scheduler_job_types(scheduler, job_type, autosubmit, autosubmit_exp: Callable) -> None:
+def test_scheduler_job_types(scheduler, job_type, autosubmit_exp: Callable) -> None:
     """
     Test that the default parameters are correctly set in the scheduler files.
 
@@ -202,7 +203,7 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit, autosubmit_exp: Ca
 
     exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, expid)
 
-    autosubmit.inspect(
+    inspect(
         expid,
         check_wrapper=True,
         force=True,

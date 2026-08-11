@@ -1,8 +1,10 @@
 ### 4.2.0: Minor release
 
-This is a minor release of Autosubmit that introduces significant changes in the management of jobs and dependencies. 
-The main highlight of this release is the introduction of a new database backend for the joblist using SQLAlchemy, which allows for better scalability in handling large workflows.
-This release also includes several bug fixes and enhancements to improve the overall user experience.
+This is a minor release of Autosubmit that introduces significant changes in the
+management of jobs and dependencies. The main highlight of this release is the
+introduction of a new database backend for the joblist using SQLAlchemy, which
+allows for better scalability in handling large workflows. This release also includes
+several bug fixes and enhancements to improve the overall user experience.
 
 **Bug fixes:**
 
@@ -15,6 +17,8 @@ This release also includes several bug fixes and enhancements to improve the ove
 - Added support for PostgreSQL as a database backend, in addition to the default SQLite. This provides users with more options for database management.
 - Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
 - [enhancement] Allow recovery to update current running/ready jobs #1251
+- `autosubmit` Bash autocomplete #1227 #3171
+- Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
 
 **Migration from `job_list.pkl` to Database**
 
@@ -37,6 +41,11 @@ This release also includes several bug fixes and enhancements to improve the ove
 - Enforce connection pool usage when using PostgreSQL as database backend #2973
 - Auto-detect git default branch when `-b` flag not specified #3101
 - Removed `files` arguments from autosubmit sub-commands, and moved code to upgrade scripts out of `autosubmit.py` #2711
+- `autosubmit.py` file was deleted and its 5K lines of code were moved into separated files #973 #1046 #3171 #3172
+- `autosubmit --help` now shows better description, and lists available subcommands #3171
+- The documentation of CLI commands are synced automatically with the Sphinx docs #3171 #1344
+- Most `autosubmit` sub-commands now support the `--profiler`` to run with cProfile #1094 #3171
+- Every command now prints traceability information (AS/Python version, Linux, user name, ...) #2795 #3171
 
 ### 4.1.17: Bug fixes and enhancements
 

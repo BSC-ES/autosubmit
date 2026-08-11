@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -14,7 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
 
 import pytest
 
@@ -48,13 +47,21 @@ def test_get_engine_sqlite(mocker):
 @pytest.mark.postgres
 def test_get_engine_postgres(mocker):
     mocker.patch(
-        "autosubmit.config.basicconfig.BasicConfig.DATABASE_BACKEND", "postgres"
+        "autosubmit.config.basicconfig.BasicConfig.DATABASE_BACKEND",
+        "postgres",
     )
+    mocker.patch(
+        "autosubmit.config.basicconfig.BasicConfig.DATABASE_CONN_URL",
+        "postgresql://user:pass@localhost:5432/autosubmit",
+    )
+
     engine = get_engine(db_path="dummy_path")
+
     assert engine.name == "postgresql"
 
-    # Singleton behavior: subsequent calls should return the same instance
+    # Singleton behaviour: subsequent calls should return the same instance
     engine2 = get_engine(db_path="dummy_path")
+
     assert engine is engine2
 
 
