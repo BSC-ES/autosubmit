@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -14,119 +14,450 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Unit tests for the Autosubmit profiler."""
+
+from types import SimpleNamespace
+
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.log.log import AutosubmitCritical
-from autosubmit.profiler.profiler import Profiler
-
-
-@pytest.fixture
-def profiler():
-    """ Creates a profiler object and yields it to the test. """
-    yield Profiler("a000")
-
-
-# Black box techniques for status machine based software
-#
-#   O--->__init__----> start
-#                           |
-#                           |
-#                         stop (----> report) --->0
-
-# Transition coverage
-def test_transitions(profiler):
-    # __init__ -> start
-    profiler.start()
-
-    profiler.iteration_checkpoint(0, 0)
-
-    # start -> stop
-    profiler.stop()
-
-
-def test_transitions_fail_cases(profiler):
-    # __init__ -> stop
-    with pytest.raises(AutosubmitCritical):
-        profiler.stop()
-
-    # start -> start
-    profiler.start()
-    with pytest.raises(AutosubmitCritical):
-        profiler.start()
-
-    # stop -> stop
-    profiler.stop()
-    with pytest.raises(AutosubmitCritical):
-        profiler.stop()
-
-
-# White box tests
-def test_writing_permission_check_fails(profiler, mocker):
-    mocker.patch("os.access", return_value=False)
-
-    profiler.start()
-    with pytest.raises(AutosubmitCritical):
-        profiler.stop()
-
-
-def test_memory_profiling_loop(profiler):
-    profiler.start()
-    bytearray(1024 * 1024)
-    profiler.stop()
-
-
-@pytest.mark.parametrize(
-    "argv, expected_profile, expected_trace, expected_max_iter",
-    [
-        (["autosubmit", "run", "a000"], False, False, 0),
-        (["autosubmit", "run", "a000", "--profile"], True, False, 0),
-        (["autosubmit", "run", "a000", "--profile", "--profile_max_iterations", "3"], True, False, 3),
-        (["autosubmit", "run", "a000", "--profile", "--trace"], True, True, 0),
-    ],
+from autosubmit.profiler.profiler import (
+    Profiler,
+    ProfilerState,
+    _generate_title,
+    _get_current_memory,
+    _get_current_object_count,
+    _get_current_open_fds,
 )
-def test_run_command_forwards_profile_arguments(
-        argv: list[str],
-        expected_profile: bool,
-        expected_trace: bool,
-        expected_max_iter: int,
-        mocker,
-) -> None:
-    mocker.patch("sys.argv", argv)
-    mocked_run = mocker.patch(
-        "autosubmit.autosubmit.Autosubmit.run_experiment",
-        return_value=0,
+
+
+def test_profiler_initial_state():
+    """Test that a newly created profiler is stopped.
+
+    The profiler should start in the ``STOPPED`` state, with no checkpoints
+    recorded and no maximum checkpoint limit configured.
+    """
+    profiler = Profiler("a001")
+
+    assert profiler.stopped
+    assert not profiler.started
+    assert profiler._expid == "a001"
+    assert profiler.max_checkpoints == 0
+    assert profiler.checkpoints == 0
+
+
+def test_profiler_start(mocker):
+    """Test starting the profiler.
+
+    :param mocker: Pytest mocker fixture used to replace the profiler,
+        memory, and garbage collection operations.
+    """
+    profiler = Profiler("a001")
+
+    mocked_profile = mocker.patch.object(profiler._profiler, "enable")
+    mocked_memory = mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=12345,
     )
-    mocker.patch("autosubmit.autosubmit.Autosubmit._init_logs", return_value=None)
+    mocked_gc = mocker.patch("autosubmit.profiler.profiler.gc.collect")
 
-    status, args = Autosubmit.parse_args()
+    profiler.start()
 
-    assert status == 0
-    assert args is not None
+    assert profiler.started
+    assert not profiler.stopped
+    assert profiler._state == ProfilerState.STARTED
+    assert profiler._mem_init == 12345
 
-    Autosubmit.run_command(args)
-
-    mocked_run.assert_called_once_with(
-        "a000",
-        None,
-        None,
-        None,
-        expected_profile,
-        expected_trace,
-        expected_max_iter,
-    )
+    mocked_profile.assert_called_once()
+    mocked_memory.assert_called_once()
+    mocked_gc.assert_called_once()
 
 
-def test_run_command_rejects_trace_without_profile(mocker, tmp_path) -> None:
-    mocker.patch("sys.argv", ["autosubmit", "run", "a000", "--trace"])
-    mocker.patch("autosubmit.autosubmit.Autosubmit._init_logs", return_value=None)
+def test_profiler_start_twice_raises(mocker):
+    """Test that starting an already started profiler raises an error.
 
-    status, args = Autosubmit.parse_args()
+    The profiler should raise ``AutosubmitCritical`` with error code 7074
+    when ``start()`` is called while profiling is already active.
+    """
+    profiler = Profiler("a001")
 
-    assert status == 0
-    assert args is not None
+    mocker.patch.object(profiler._profiler, "enable")
+
+    profiler.start()
 
     with pytest.raises(AutosubmitCritical) as exc_info:
-        Autosubmit.run_command(args)
+        profiler.start()
 
-    assert exc_info.value.code == 7012
+    assert exc_info.value.code == 7074
+    assert "already started" in exc_info.value.message
+
+
+def test_profiler_stop_before_start_raises():
+    """Test that stopping a profiler that has not been started raises an error.
+
+    The profiler should raise ``AutosubmitCritical`` with error code 7074
+    when ``stop()`` is called before profiling has started.
+    """
+    profiler = Profiler("a001")
+
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        profiler.stop()
+
+    assert exc_info.value.code == 7074
+    assert "was not running" in exc_info.value.message
+
+
+def test_profiler_stop(mocker):
+    """Test stopping a running profiler.
+
+    The profiler should disable the underlying ``cProfile`` profiler,
+    generate the profiling report, and transition to the ``STOPPED`` state.
+
+    :param mocker: Pytest mocker fixture used to replace profiler,
+        memory, report, and garbage collection operations.
+    """
+    profiler = Profiler("a001")
+
+    mocked_enable = mocker.patch.object(profiler._profiler, "enable")
+    mocked_disable = mocker.patch.object(profiler._profiler, "disable")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=20000,
+    )
+    mocked_report = mocker.patch.object(profiler, "_report")
+    mocked_gc = mocker.patch("autosubmit.profiler.profiler.gc.collect")
+
+    profiler.start()
+
+    # start() performs one garbage collection.
+    assert mocked_gc.call_count == 1
+
+    profiler.stop()
+
+    assert profiler.stopped
+    assert not profiler.started
+    mocked_enable.assert_called_once()
+    mocked_disable.assert_called_once()
+    mocked_report.assert_called_once()
+
+    # stop() must not perform another garbage collection.
+    assert mocked_gc.call_count == 1
+
+
+def test_iteration_checkpoint_records_values(mocker):
+    """Test that an iteration checkpoint records all expected metrics.
+
+    A checkpoint should record memory usage, object count, file descriptor
+    information, and the number of loaded jobs and edges.
+
+    :param mocker: Pytest mocker fixture used to provide deterministic
+        metric values and disable garbage collection.
+    """
+    profiler = Profiler("a001")
+
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch.object(profiler._profiler, "disable")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=1000,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_object_count",
+        return_value=200,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds",
+        return_value=10,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds_names",
+        return_value=["[fd=1] stdout"],
+    )
+    mocker.patch("autosubmit.profiler.profiler.gc.collect")
+
+    profiler.start()
+
+    result = profiler.iteration_checkpoint(
+        loaded_jobs=25,
+        loaded_edges=40,
+    )
+
+    assert result is False
+
+    assert len(profiler._mem_iteration) == 1
+    assert profiler._mem_iteration[0] < 1000
+
+    assert profiler._obj_iteration == [200]
+    assert profiler._fd_iteration == [10]
+    assert profiler._fd_names_iteration == [["[fd=1] stdout"]]
+    assert profiler._jobs_iteration == [25]
+    assert profiler._edges_iteration == [40]
+
+
+def test_iteration_checkpoint_respects_max_checkpoints(mocker):
+    """Test that the maximum checkpoint limit is respected.
+
+    The profiler should return ``True`` once the number of checkpoints
+    exceeds the configured maximum.
+
+    :param mocker: Pytest mocker fixture used to provide deterministic
+        metric values and disable garbage collection.
+    """
+    profiler = Profiler("a001", max_checkpoints=2)
+
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch.object(profiler._profiler, "disable")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=1000,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_object_count",
+        return_value=200,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds",
+        return_value=10,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds_names",
+        return_value=[],
+    )
+    mocker.patch("autosubmit.profiler.profiler.gc.collect")
+
+    profiler.start()
+
+    assert profiler.iteration_checkpoint(10, 20) is False
+    assert profiler.checkpoints == 1
+
+    assert profiler.iteration_checkpoint(11, 21) is False
+    assert profiler.checkpoints == 2
+
+    assert profiler.iteration_checkpoint(12, 22) is True
+    assert profiler.checkpoints == 3
+
+
+def test_calculate_grow():
+    """Test calculation of memory, object, and file descriptor growth.
+
+    Growth between consecutive checkpoints should be calculated correctly,
+    as well as the total growth between the first and last checkpoints.
+    """
+    profiler = Profiler("a001")
+
+    profiler._mem_iteration = [100, 150, 180]
+    profiler._obj_iteration = [10, 15, 21]
+    profiler._fd_iteration = [4, 5, 7]
+
+    profiler._calculate_grow()
+
+    assert profiler._mem_grow == [50, 30]
+    assert profiler._obj_grow == [5, 6]
+    assert profiler._fd_grow == [1, 2]
+
+    assert profiler._mem_total_grow == 80
+    assert profiler._obj_total_grow == 11
+    assert profiler._fd_total_grow == 3
+
+
+def test_calculate_grow_uses_fourth_checkpoint_for_objects_and_fds():
+    """Test growth calculation after the fourth checkpoint.
+
+    Object and file descriptor growth should use the fourth checkpoint as
+    the baseline when more than three checkpoints have been recorded.
+    Memory growth continues to use the first checkpoint as its baseline.
+    """
+    profiler = Profiler("a001")
+
+    profiler._mem_iteration = [100, 150, 180, 200, 250]
+    profiler._obj_iteration = [10, 15, 21, 30, 42]
+    profiler._fd_iteration = [4, 5, 7, 8, 11]
+    profiler.checkpoints = 4
+
+    profiler._calculate_grow()
+
+    assert profiler._mem_total_grow == 150
+    assert profiler._obj_total_grow == 12
+    assert profiler._fd_total_grow == 3
+
+
+def test_format_top_allocations_empty():
+    """Test formatting when no allocation statistics are available.
+
+    :return: An empty string should be returned when there are no
+        allocation statistics.
+    """
+    profiler = Profiler("a001")
+
+    assert profiler._format_top_allocations([]) == ""
+
+
+def test_format_top_allocations():
+    """Test formatting of tracemalloc allocation statistics.
+
+    The formatted output should contain the source location, allocation
+    size, and number of allocated blocks.
+    """
+    profiler = Profiler("a001")
+
+    frame = SimpleNamespace(
+        filename="/tmp/example.py",
+        lineno=42,
+    )
+    stat = SimpleNamespace(
+        traceback=[frame],
+        size_diff=2048,
+        count_diff=3,
+    )
+
+    result = profiler._format_top_allocations([stat])
+
+    assert "Top allocation deltas:" in result
+    assert "/tmp/example.py:42" in result
+    assert "+2.0 KiB" in result
+    assert "(+3 blocks)" in result
+
+
+def test_generate_title():
+    """Test generation of an 80-character profiling report title.
+
+    :return: The generated title should contain two separator lines and
+        a centered title.
+    """
+    result = _generate_title("Test Title")
+
+    lines = result.splitlines()
+
+    assert len(lines) == 3
+    assert lines[0] == "=" * 80
+    assert lines[1] == "Test Title".center(80)
+    assert lines[2] == "=" * 80
+
+
+def test_get_current_memory(mocker):
+    """Test retrieval of the current process memory usage.
+
+    :param mocker: Pytest mocker fixture used to replace ``psutil.Process``.
+    """
+    mocked_process = mocker.patch(
+        "autosubmit.profiler.profiler.Process",
+    )
+    mocked_process.return_value.memory_info.return_value.rss = 123456
+
+    result = _get_current_memory()
+
+    assert result == 123456
+    mocked_process.assert_called_once()
+
+
+def test_get_current_object_count(mocker):
+    """Test retrieval of the number of tracked Python objects.
+
+    :param mocker: Pytest mocker fixture used to replace
+        ``gc.get_objects()``.
+    """
+    mocker.patch(
+        "autosubmit.profiler.profiler.gc.get_objects",
+        return_value=[object(), object(), object()],
+    )
+
+    assert _get_current_object_count() == 3
+
+
+def test_get_current_open_fds_num_fds(mocker):
+    """Test retrieval of open file descriptors using ``num_fds``.
+
+    This is the normal code path on platforms where ``psutil.Process``
+    provides the ``num_fds`` method.
+
+    :param mocker: Pytest mocker fixture used to replace
+        ``psutil.Process``.
+    """
+    mocked_process = mocker.patch(
+        "autosubmit.profiler.profiler.Process",
+    )
+    mocked_process.return_value.num_fds.return_value = 7
+
+    assert _get_current_open_fds() == 7
+
+
+def test_get_current_open_fds_num_handles(mocker):
+    """Test retrieval of open handles using ``num_handles``.
+
+    This covers the fallback used on platforms where ``num_fds`` is not
+    available.
+
+    :param mocker: Pytest mocker fixture used to replace
+        ``psutil.Process``.
+    """
+    mocked_process = mocker.patch(
+        "autosubmit.profiler.profiler.Process",
+    )
+
+    del mocked_process.return_value.num_fds
+
+    mocked_process.return_value.num_handles.return_value = 9
+
+    assert _get_current_open_fds() == 9
+
+
+def test_trace_enabled_starts_tracemalloc(mocker):
+    """Test that trace-enabled profiling starts ``tracemalloc``.
+
+    When allocation tracing is enabled and ``tracemalloc`` is not already
+    running, starting the profiler should start allocation tracing.
+
+    :param mocker: Pytest mocker fixture used to replace ``tracemalloc``,
+        memory, and garbage collection operations.
+    """
+    profiler = Profiler("a001", trace_enabled=True)
+
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.is_tracing",
+        return_value=False,
+    )
+    mocked_start = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.start",
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=1000,
+    )
+    mocker.patch("autosubmit.profiler.profiler.gc.collect")
+
+    profiler.start()
+
+    mocked_start.assert_called_once()
+    assert profiler.started
+
+
+def test_trace_enabled_stops_tracemalloc(mocker):
+    """Test that trace-enabled profiling stops ``tracemalloc`` on shutdown.
+
+    When allocation tracing is enabled and ``tracemalloc`` is running,
+    stopping the profiler should stop allocation tracing after generating
+    the report.
+
+    :param mocker: Pytest mocker fixture used to replace ``tracemalloc``,
+        memory, and garbage collection operations.
+    """
+    profiler = Profiler("a001", trace_enabled=True)
+
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch.object(profiler._profiler, "disable")
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.is_tracing",
+        return_value=True,
+    )
+    mocked_stop = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.stop",
+    )
+    mocker.patch.object(profiler, "_report")
+
+    profiler.start()
+    profiler.stop()
+
+    mocked_stop.assert_called_once()
+    assert profiler.stopped

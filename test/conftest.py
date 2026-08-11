@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -26,22 +26,17 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
-from autosubmit.config.basicconfig import BasicConfig, generate_dirs
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.install import create_required_directories
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
     from _pytest.tmpdir import TempPathFactory
+
+    # noinspection PyProtectedMember
     from py._path.local import LocalPath  # type: ignore
     from pytest import FixtureRequest
 
-
-@pytest.fixture(scope='module')
-def autosubmit() -> Autosubmit:
-    """Create an instance of ``Autosubmit``.
-
-    Useful when you need ``Autosubmit`` but do not need any experiments."""
-    return Autosubmit()
 
 
 @pytest.fixture
@@ -122,8 +117,8 @@ def local(prepare_test):
 
 @pytest.fixture(scope='function', autouse=True)
 def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest',
-                            autosubmit: Autosubmit, monkeypatch) -> None:
-    """Initialize the ``autosubmit.rc`` file for each test, automatically.
+                            monkeypatch) -> None:
+    """Initialise the ``autosubmit.rc`` file for each test, automatically.
 
     This function should populate enough information so ``BasicConfig.read()``
     works without the need of any mocking.
@@ -167,7 +162,7 @@ def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest',
     monkeypatch.setenv('AUTOSUBMIT_CONFIGURATION', str(autosubmitrc))
 
     BasicConfig.read()
-    generate_dirs()
+    create_required_directories()
 
 
 @pytest.fixture
@@ -235,3 +230,16 @@ def avoid_long_sleep_time(session_mocker):
     session_mocker.patch('time.sleep', side_effect=my_sleep)
 
 
+@pytest.fixture(scope='function')
+def experiment_config_fixture(session_mocker):
+    # TODO: There are unit and regression tests that fail without this fixture.
+    #  Those tests are good candidates to be rewritten or made into integration
+    #  tests without mocks.
+    session_mocker.patch(
+        'autosubmit.experiment.manage.get_experiment_description',
+        return_value=[['test experiment']]
+    )
+    session_mocker.patch(
+        "autosubmit.database.db_common.get_experiment_description",
+        return_value=[["test experiment"]],
+    )

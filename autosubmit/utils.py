@@ -15,13 +15,21 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from collections.abc import Callable
 from pathlib import Path
 
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
+
+__all__ = [
+    "as_conf_default_values",
+    "create_json",
+    "expand_values",
+    "get_chunks",
+    "get_members",
+]
 
 
 def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", minimal_configuration: bool = False,
@@ -80,23 +88,6 @@ def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", 
 
             yaml.dump(yaml_data, as_conf_file)
 
-def separate_section_entries(filter_entries: str) -> list[str]:
-    """Separate section entries with optional splits separated by comma into a list.
-
-    :param filter_entries: string with the entries separated by comma
-    :return: list of entries
-    """
-    text = filter_entries.strip()
-    if not text:
-        return []
-
-    entries = []
-    for entry in text.split(","):
-        entry = entry.strip()
-        if not entry:
-            continue
-        entries.append(entry.upper())
-    return entries
 
 def expand_values(raw_value: str, known_values: list[str]) -> set[str]:
     """Expand ranges, colon, dash, space-separated values.
@@ -126,57 +117,100 @@ def expand_values(raw_value: str, known_values: list[str]) -> set[str]:
     return expanded_values
 
 
-def apply_job_filters(
-    job_list,  # should be type JobList, avoid circular imports
-    base_job_names: set[str],
-    filter_section: str | None,
-    filter_chunk: str | None,
-    filter_status: str | None,
-    filter_list: str | None,
-    filter_sections_splits_fn: Callable,
-    filter_chunks_fn: Callable,
-    status_from_str_fn: Callable,
-) -> set[str]:
-    """Apply filters and return selected job names.
+def get_chunks(text: list[dict[str, str]]) -> list[str]:
+    """Function to get a list of chunks from JSON.
 
-    All provided filters are combined using intersection (AND). Jobs must match all filters.
-    :param job_list: job list object
-    :param base_job_names: set of job names before filtering
-    :param filter_section: section filter
-    :param filter_chunk: chunk filter
-    :param filter_status: status filter
-    :param filter_list: list filter
-    :param filter_sections_splits_fn: function to filter sections and splits
-    :param filter_chunks_fn: function to filter chunks
-    :param status_from_str_fn: function to convert status from string
-    :return: set of selected job names
+    :param text: JSON member definition
+    :return: list of chunks
     """
-    jobs_scope = job_list.get_job_list()
-    selected_job_names = set(base_job_names)
+    data = []
+    for element in text:
+        if element.find("-") != -1:
+            numbers = element.split("-")
+            for count in range(int(numbers[0]), int(numbers[1]) + 1):
+                data.append(str(count))
+        else:
+            data.append(element)
 
-    if filter_section:
-        ft_entries = separate_section_entries(filter_section)
-        if not (len(ft_entries) == 1 and ft_entries[0].upper() == "ANY"):
-            section_filtered_jobs = filter_sections_splits_fn(ft_entries, jobs_scope)
-            selected_job_names &= {
-                job.name for job in jobs_scope if job in section_filtered_jobs
-            }
+    return data
 
-    if filter_chunk:
-        chunk_filtered_jobs = filter_chunks_fn(job_list, filter_chunk)
-        selected_job_names &= {job.name for job in chunk_filtered_jobs}
 
-    if filter_status:
-        status_list = filter_status.split()
-        if not (len(status_list) == 1 and status_list[0].upper() == "ANY"):
-            allowed_statuses = {status_from_str_fn(s) for s in status_list}
-            selected_job_names &= {
-                job.name for job in jobs_scope if job.status in allowed_statuses
-            }
+def get_members(text: str) -> list[dict[str, str]]:
+    """Function to get a list of members from JSON.
 
-    if filter_list:
-        jobs = filter_list.split()
-        if not (len(jobs) == 1 and jobs[0].upper() == "ANY"):
-            selected_job_names &= {job.name for job in jobs_scope if job.name in jobs}
+    :param text: JSON member definition.
+    :return: list of members
+    """
+    count = 0
+    data = []
+    # noinspection PyUnusedLocal
+    for element in text:
+        if count % 2 == 0:
+            ms = {"m": text[count], "cs": get_chunks(text[count + 1])}
+            data.append(ms)
+            count += 1
+        else:
+            count += 1
 
-    return selected_job_names
+    return data
+
+
+def create_json(text: str):
+    """Function to parse rerun specification from JSON format.
+
+    :param text: text to parse
+    :type text: str
+    :return: parsed output
+    """
+    import json
+
+    from pyparsing import nestedExpr
+
+    count = 0
+    data = []
+
+    # text = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 16651101 [ fc0 [1-30 31 32] ] ]"
+
+    def parse_date(datestring):
+        result = []
+        startindex = datestring.find("(")
+        endindex = datestring.find(")")
+        if startindex > 0 and endindex > 0:
+            try:
+                startstring = datestring[:startindex]
+                startrange = datestring[startindex + 1 :].split("-")[0]
+                endrange = datestring[startindex:-1].split("-")[1]
+                startday = int(startrange[-2:])
+                endday = int(endrange[-2:])
+
+                frommonth = int(startrange[:2])
+                tomonth = int(endrange[:2])
+
+                for i in range(frommonth, tomonth + 1):
+                    for j in range(startday, endday + 1):
+                        result.append(startstring + f"{i:.2d}" + f"{j:.2d}")
+            except Exception as exp:
+                raise AutosubmitCritical(
+                    f"Autosubmit couldn't parse your input format. Exception: {exp}"
+                )
+
+        else:
+            result = [datestring]
+        return result
+
+    out = nestedExpr("[", "]").parseString(text).asList()
+
+    # noinspection PyUnusedLocal
+    for element in out[0]:
+        if count % 2 == 0:
+            datelist = parse_date(out[0][count])
+            for item in datelist:
+                sd = {"sd": item, "ms": get_members(out[0][count + 1])}
+                data.append(sd)
+            count += 1
+        else:
+            count += 1
+
+    sds = {"sds": data}
+    result = json.dumps(sds)
+    return result

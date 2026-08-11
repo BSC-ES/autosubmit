@@ -31,30 +31,30 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import update_experiment_description_version
-from autosubmit.experiment.experiment_common import check_ownership
+from autosubmit.experiment.utils import check_ownership
 from autosubmit.helpers.version import get_version
 from autosubmit.log.log import Log
 
-__all__ = [
-    'ini_to_yaml',
-    'upgrade_scripts'
-]
+__all__ = ["ini_to_yaml", "upgrade_scripts"]
 
-_LISTS_REGEX = re.compile(r"""
+_LISTS_REGEX = re.compile(
+    r"""
     =\s*                 # equals sign + optional spaces
     \[                   # opening bracket
     (?P<content>         # capture group "content"
         [^]]*            # anything except closing bracket
     )
     ]                    # closing bracket
-""", re.VERBOSE | re.IGNORECASE)
+""",
+    re.VERBOSE | re.IGNORECASE,
+)
 """Regex to match patterns like '= [bla]', '= [a, b, c]'."""
 
 
 def _replace_list(match):
     """Convert '= [a, b]' by ='= "a, b"'."""
     content = match.group("content").strip()
-    return f"= \"{content}\""
+    return f'= "{content}"'
 
 
 def _update_dict(config_obj: ConfigObj) -> dict[str, Any]:
@@ -120,7 +120,9 @@ def ini_to_yaml(ini_file: Path) -> Path:
     """
     yaml_file_path = ini_file.with_suffix(".yml")
     if yaml_file_path.exists():
-        Log.debug(f'AS3 conf file {ini_file} not upgraded. YAML file already exists: {yaml_file_path}')
+        Log.debug(
+            f"AS3 conf file {ini_file} not upgraded. YAML file already exists: {yaml_file_path}"
+        )
         return yaml_file_path
 
     # Read the file name from the command line argument
@@ -140,7 +142,7 @@ def ini_to_yaml(ini_file: Path) -> Path:
         stringify=True,
         list_values=False,
         interpolation=False,
-        unrepr=False
+        unrepr=False,
     )
 
     yaml_dict = _update_dict(config_dict)
@@ -151,43 +153,53 @@ def ini_to_yaml(ini_file: Path) -> Path:
         yaml_dict = {"JOBS": yaml_dict}
 
     yaml_file_path = ini_file.with_suffix(".yml")
-    with open(yaml_file_path, 'w', encoding=encoding) as yaml_file:
+    with open(yaml_file_path, "w", encoding=encoding) as yaml_file:
         YAML().dump(yaml_dict, yaml_file)
     return yaml_file_path
 
 
-def upgrade_scripts(expid: str, files: list[str] | None = None) -> bool:
+def upgrade_scripts(expid: str, files: str) -> bool:
     """Upgrade scripts from Autosubmit 3 to 4."""
-    files_or_extension_patterns: tuple[str, ...] = tuple(files) if files else ("*.conf", "*.CONF")
+    files_or_extension_patterns: tuple[str, ...] = (
+        tuple(files) if files else ("*.conf", "*.CONF")
+    )
 
     Log.info("Checking if experiment exists...")
-    check_ownership(expid, raise_error=True)
+    check_ownership(expid)
     as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
     as_conf.reload(force_load=True)
     as_conf.check_conf_files()
     as_conf.load_parameters()
 
     exp_conf_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf"
-    conf_files = {f for pattern in files_or_extension_patterns for f in exp_conf_dir.rglob(pattern)}
+    conf_files = {
+        f
+        for pattern in files_or_extension_patterns
+        for f in exp_conf_dir.rglob(pattern)
+    }
 
     # TODO: Use tqdm to show the user the progress?
     # Convert conf files into YAML files.
-    Log.info(f"Upgrading AS3 {len(conf_files)} conf files (.conf) to AS 4 YAML (.yml)...")
+    Log.info(
+        f"Upgrading AS3 {len(conf_files)} conf files (.conf) to AS 4 YAML (.yml)..."
+    )
     yaml_files = []
     for conf_file in conf_files:
-        Log.debug(f'Upgrading AS3 conf file {conf_file} to AS4 YAML')
+        Log.debug(f"Upgrading AS3 conf file {conf_file} to AS4 YAML")
         try:
             yaml_file = ini_to_yaml(conf_file)
             yaml_files.append(yaml_file)
         except Exception as e:
-            Log.warning(f'Failed to upgrade AS3 conf file {conf_file}: {e}')
+            Log.warning(f"Failed to upgrade AS3 conf file {conf_file}: {e}")
 
     warnings = []
     substituted = []
 
     # Adjust placeholders.
     exp_conf_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / expid / "conf"
-    Log.info(f"Fixing placeholder variables (%_%) inside the new {len(yaml_files)} YAML files")
+    Log.info(
+        f"Fixing placeholder variables (%_%) inside the new {len(yaml_files)} YAML files"
+    )
     for yaml_file in yaml_files:
         template_path = exp_conf_dir / Path(yaml_file).name
         try:
@@ -195,9 +207,13 @@ def upgrade_scripts(expid: str, files: list[str] | None = None) -> bool:
             if w != "":
                 warnings.append(f"Warnings for: {template_path.name}\n{w}\n")
             if s != "":
-                substituted.append(f"Variables changed for: {template_path.name}\n{s}\n")
+                substituted.append(
+                    f"Variables changed for: {template_path.name}\n{s}\n"
+                )
         except Exception as e:
-            Log.printlog(f"Failed to fix placeholders in the new AS4 YAML file {template_path}: {str(e)}")
+            Log.warning(
+                f"Failed to fix placeholders in the new AS4 YAML file {template_path}: {str(e)}"
+            )
 
     # We now must have new YAML files. Let's reload them.
     as_conf.reload(force_load=True)
@@ -209,32 +225,40 @@ def upgrade_scripts(expid: str, files: list[str] | None = None) -> bool:
     template_path = Path()
 
     Log.info("Looking for %_% variables inside templates")
-    for section, value in as_conf.jobs_data.items():
+    for value in as_conf.jobs_data.values():
         try:
             template_path = exp_project_dir / Path(value.get("FILE", ""))
             w, s = _fix_placeholders(template_path, as_conf)
             if w != "":
                 warnings.append(f"Warnings for: {template_path.name}\n{w}\n")
             if s != "":
-                substituted.append(f"Variables changed for: {template_path.name}\n{s}\n")
+                substituted.append(
+                    f"Variables changed for: {template_path.name}\n{s}\n"
+                )
         except Exception as e:
-            Log.printlog(f"Failed to fix placeholders in template file {template_path}: {str(e)}")
+            Log.warning(
+                f"Failed to fix placeholders in template file {template_path}: {str(e)}"
+            )
 
     if substituted:
         Log.printlog("\n".join(substituted), Log.RESULT)
     if warnings:
-        Log.printlog("\n".join(warnings), Log.ERROR)
+        Log.error("\n".join(warnings))
 
     # Commit.
     as_version = get_version()
-    Log.info(f"Changing experiment {expid} version from {as_conf.get_version()} to {as_version}")
+    Log.info(
+        f"Changing experiment {expid} version from {as_conf.get_version()} to {as_version}"
+    )
     as_conf.set_version(as_version)
     update_experiment_description_version(expid, version=as_version)
 
     return True
 
 
-def _fix_placeholders(template_or_script_path: Path, as_conf: AutosubmitConfig) -> tuple[list[str], list[str]]:
+def _fix_placeholders(
+    template_or_script_path: Path, as_conf: AutosubmitConfig
+) -> tuple[list[str], list[str]]:
     """Adjusts Autosubmit 3 placeholders to the new format in Autosubmit 4.
 
     All variables are made upper case.
@@ -252,12 +276,16 @@ def _fix_placeholders(template_or_script_path: Path, as_conf: AutosubmitConfig) 
         Log.warning(f"Skipping template not found: {template_or_script_path}")
         return warnings, success
 
-    with open(template_or_script_path, 'r', encoding=locale.getlocale()[1]) as f:
+    with open(template_or_script_path, "r", encoding=locale.getlocale()[1]) as f:
         template_or_script_content = f.read()
     # TODO: quite sure this is duplicating work done in the config module, we
     #       can reuse the same code.
     # Look for %_%, and make them all uppercase (Autosubmit 4 default format)
-    variables = re.findall('%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)', template_or_script_content, flags=re.IGNORECASE)
+    variables = re.findall(
+        "%(?<!%%)[a-zA-Z0-9_.-]+%(?!%%)",
+        template_or_script_content,
+        flags=re.IGNORECASE,
+    )
     variables = [variable[1:-1].upper() for variable in variables]
     results: dict[str, set] = {}
     # Change format
@@ -282,22 +310,33 @@ def _fix_placeholders(template_or_script_path: Path, as_conf: AutosubmitConfig) 
         if len(new_key_list) > 1:
             if "JOBS" not in new_key_list[0] and "PLATFORMS" not in new_key_list:
                 warnings.append(
-                    f"Duplicate variable found: {key} to {new_key}. Adjust your script to use one of these.")
+                    f"Duplicate variable found: {key} to {new_key}. Adjust your script to use one of these."
+                )
         else:
             new_key = new_key.pop().upper()
             success.append(f"Translated {key} to {new_key}")
-            template_or_script_content = re.sub('%(?<!%%)' + key + '%(?!%%)', new_key, template_or_script_content,
-                                                flags=re.IGNORECASE)
+            template_or_script_content = re.sub(
+                "%(?<!%%)" + key + "%(?!%%)",
+                new_key,
+                template_or_script_content,
+                flags=re.IGNORECASE,
+            )
     # Deletes unused keys from confs
-    if 'autosubmit' in template_or_script_path.name.lower():
-        template_or_script_content = re.sub('(?m)^( )*(EXPID:)( )*[a-zA-Z0-9._-]*(\n)*', "", template_or_script_content,
-                                            flags=re.IGNORECASE)
+    if "autosubmit" in template_or_script_path.name.lower():
+        template_or_script_content = re.sub(
+            "(?m)^( )*(EXPID:)( )*[a-zA-Z0-9._-]*(\n)*",
+            "",
+            template_or_script_content,
+            flags=re.IGNORECASE,
+        )
     # Write the final result
     with open(template_or_script_path, "w") as f:
         f.write(template_or_script_content)
 
     if not warnings and not success:
-        Log.result(f"Completed check for {template_or_script_path}.\nNo %_% variables found.")
+        Log.result(
+            f"Completed check for {template_or_script_path}.\nNo %_% variables found."
+        )
     else:
         Log.result(f"Completed check for {template_or_script_path}")
 

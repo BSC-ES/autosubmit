@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from collections.abc import Callable
-from getpass import getuser
 from pathlib import Path
 from shutil import rmtree
 
@@ -24,14 +23,15 @@ import pytest
 from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
 
-from autosubmit.autosubmit import Autosubmit
+from autosubmit.experiment.manage import describe
+from autosubmit.scripts.describe import main
 
 
-def _experiment_data(hpcarch: str = 'ARM') -> dict:
+def _experiment_data(hpcarch: str = "ARM") -> dict:
     """Build experiment data from the shared fake jobs/platforms fixtures."""
     files_dir = Path(__file__).resolve().parents[1] / "files"
     return {
-        'DEFAULT': {'HPCARCH': hpcarch},
+        "DEFAULT": {"HPCARCH": hpcarch},
         **YAML().load(files_dir / "fake-jobs.yml"),
         **YAML().load(files_dir / "fake-platforms.yml"),
     }
@@ -42,85 +42,85 @@ def _location_lines(mocked_log) -> list:
     return [
         call.args[0]
         for call in mocked_log.result.mock_calls
-        if call.args and call.args[0].startswith('Location: ')
+        if call.args and call.args[0].startswith("Location: ")
     ]
 
 
 @pytest.mark.parametrize(
-    'expid_count,spaces,unknown',
+    "expid_count,spaces,unknown",
     [
-        (2, True, False),   # Valid expids, space-separated.
+        (2, True, False),  # Valid expids, space-separated.
         (2, False, False),  # Valid expids, comma-separated.
-        (1, True, False),   # A single expid.
-        (None, True, True), # An expid not in the database.
-        (0, True, True),    # Empty input.
-    ]
+        (1, True, False),  # A single expid.
+        (None, True, True),  # An expid not in the database.
+        (0, True, True),  # Empty input.
+    ],
 )
 def test_describe(
-        expid_count: int | None,
-        spaces: bool,
-        unknown: bool,
-        autosubmit_exp: Callable,
-        mocker: MockerFixture,
-        get_next_expid: Callable[[], str]) -> None:
+    expid_count: int | None,
+    spaces: bool,
+    unknown: bool,
+    autosubmit_exp: Callable,
+    mocker: MockerFixture,
+    get_next_expid: Callable[[], str],
+) -> None:
     """``describe`` enumerates experiments from the database; expids not
     found there are reported via ``Log.warning`` and not described.
     """
     # describe reads the database; autosubmit_exp creates it on first call.
     autosubmit_exp(experiment_data=_experiment_data())
 
-    input_list = ''
+    input_list = ""
     exps = []
     if expid_count is None:
-        input_list = 'zzzz'  # An expid not registered in the database.
+        input_list = "zzzz"  # An expid not registered in the database.
     elif expid_count > 0:
         expids = [get_next_expid() for _ in range(expid_count)]
         exps = [autosubmit_exp(e, experiment_data=_experiment_data()) for e in expids]
-        input_list = (' ' if spaces else ',').join(expids)
+        input_list = (" " if spaces else ",").join(expids)
 
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-    Autosubmit.describe(input_experiment_list=input_list, get_from_user='')
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
+    describe(input_experiment_list=input_list, get_from_user="")
 
     if unknown:
         assert not _location_lines(mocked_log)
     else:
         locations = _location_lines(mocked_log)
         for exp in exps:
-            assert f'Location: {exp.exp_path}' in locations
+            assert f"Location: {exp.exp_path}" in locations
 
 
 def test_describe_unknown_expid_warns(
-        autosubmit_exp: Callable, mocker: MockerFixture) -> None:
+    autosubmit_exp: Callable, mocker: MockerFixture
+) -> None:
     """An expid not in the database is warned about and skipped (#1110)."""
     autosubmit_exp(experiment_data=_experiment_data())
 
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-    Autosubmit.describe(input_experiment_list='zzzz', get_from_user='')
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
+    describe(input_experiment_list="zzzz", get_from_user="")
 
     assert mocked_log.warning.called
     assert not _location_lines(mocked_log)
 
 
 def test_describe_unknown_expids_emit_single_warning(
-        autosubmit_exp: Callable,
-        mocker: MockerFixture,
-        get_next_expid: Callable[[], str]) -> None:
+    autosubmit_exp: Callable, mocker: MockerFixture, get_next_expid: Callable[[], str]
+) -> None:
     """Multiple unknown expids are reported in one batched warning."""
     expid = get_next_expid()
     autosubmit_exp(expid, experiment_data=_experiment_data())
 
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-    Autosubmit.describe(input_experiment_list=f'zzzz,yyyy,{expid}', get_from_user='')
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
+    describe(input_experiment_list=f"zzzz,yyyy,{expid}", get_from_user="")
 
     assert mocked_log.warning.call_count == 1
     warning_msg = mocked_log.warning.call_args[0][0]
-    assert 'zzzz' in warning_msg and 'yyyy' in warning_msg
+    assert "zzzz" in warning_msg and "yyyy" in warning_msg
 
 
 def test_describe_archived_experiment(
-        autosubmit_exp: Callable,
-        mocker: MockerFixture,
-        get_next_expid: Callable[[], str]) -> None:
+    autosubmit_exp: Callable, mocker: MockerFixture, get_next_expid: Callable[[], str]
+) -> None:
     """``describe`` falls back to the database snapshot when an
     experiment's files are missing, e.g. archived (#2717).
     """
@@ -128,32 +128,35 @@ def test_describe_archived_experiment(
     exp = autosubmit_exp(expid, experiment_data=_experiment_data())
     rmtree(exp.exp_path)  # Simulate archiving: remove files, keep the DB row.
 
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-    Autosubmit.describe(input_experiment_list=expid, get_from_user='')
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
+    describe(input_experiment_list=expid, get_from_user="")
 
     assert mocked_log.info.called
     described = [
         call.args[0]
         for call in mocked_log.result.mock_calls
-        if call.args and call.args[0].startswith('Describing ')
+        if call.args and call.args[0].startswith("Describing ")
     ]
-    assert f'Describing {expid}' in described
+    assert f"Describing {expid}" in described
 
 
-def test_run_command_describe(autosubmit_exp: Callable, autosubmit, mocker):
+def test_run_command_describe(autosubmit_exp: Callable, mocker):
     """Run ``describe`` through ``Autosubmit.run_command`` to also exercise
-    log initialization and log levels.
+    log initialisation and log levels.
 
     `Ref <https://github.com/BSC-ES/autosubmit/issues/2412>`_.
     """
-    exp = autosubmit_exp(experiment_data=_experiment_data(hpcarch='TEST_SLURM'))
+    exp = autosubmit_exp(experiment_data=_experiment_data(hpcarch="TEST_SLURM"))
 
-    mocker.patch('sys.argv', ['autosubmit', '-lc', 'ERROR', '-lf', 'WARNING', 'describe', exp.expid])
-    _, args = autosubmit.parse_args()
-    assert args
-    output = autosubmit.run_command(args=args)
+    mocked_describe = mocker.patch(
+        "autosubmit.experiment.manage.describe",
+        return_value=object(),
+    )
 
-    assert getuser() == output[0]
+    result = main(exp.expid, "--user", "kinow")  # type: ignore
+
+    assert result == 0
+    mocked_describe.assert_called_once_with(exp.expid, "kinow")
 
 
 @pytest.mark.parametrize("user", ["", "*"])
@@ -165,9 +168,9 @@ def test_describe_current_user(
     """Current user aliases resolve correctly."""
     exp = autosubmit_exp(experiment_data=_experiment_data())
 
-    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
 
-    Autosubmit.describe(input_experiment_list=exp.expid, get_from_user=user)
+    describe(input_experiment_list=exp.expid, get_from_user=user)
 
     assert mocked_log.result.called
     assert f"Location: {exp.exp_path}" in _location_lines(mocked_log)
@@ -177,12 +180,12 @@ def test_describe_skip_other_user(autosubmit_exp, get_next_expid, mocker):
     """Experiments owned by another user are skipped."""
     exp = autosubmit_exp(experiment_data=_experiment_data())
 
-    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
     fake_owner = mocker.Mock()
     fake_owner.pw_name = "someone_else"
-    mocker.patch("autosubmit.autosubmit.pwd.getpwuid", return_value=fake_owner)
+    mocker.patch("autosubmit.experiment.manage.pwd.getpwuid", return_value=fake_owner)
 
-    Autosubmit.describe(input_experiment_list=exp.expid, get_from_user="current_user")
+    describe(input_experiment_list=exp.expid, get_from_user="current_user")
 
     assert not _location_lines(mocked_log)
 
@@ -191,7 +194,7 @@ def test_describe_uid_without_user(autosubmit_exp, mocker):
     """UID without passwd entry falls back to numeric id."""
     exp = autosubmit_exp(experiment_data=_experiment_data())
 
-    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
 
     owner = mocker.Mock()
     owner.pw_name = "current"
@@ -203,10 +206,12 @@ def test_describe_uid_without_user(autosubmit_exp, mocker):
         raise KeyError
 
     fake.calls = 0
-    mocker.patch("autosubmit.autosubmit.pwd.getpwuid", side_effect=fake)
+    mocker.patch("autosubmit.experiment.manage.pwd.getpwuid", side_effect=fake)
 
-    Autosubmit.describe(input_experiment_list=exp.expid, get_from_user="current")
-    mocked_log.warning.assert_any_call("The user does not exist anymore in the system, using id instead")
+    describe(input_experiment_list=exp.expid, get_from_user="current")
+    mocked_log.warning.assert_any_call(
+        "The user does not exist anymore in the system, using id instead"
+    )
 
 
 def test_describe_archived_without_snapshot(autosubmit_exp, mocker):
@@ -215,12 +220,12 @@ def test_describe_archived_without_snapshot(autosubmit_exp, mocker):
 
     rmtree(exp.exp_path)
 
-    details = mocker.patch("autosubmit.autosubmit.ExperimentDetails")
+    details = mocker.patch("autosubmit.experiment.manage.ExperimentDetails")
     details.return_value.get_details.return_value = None
 
-    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
 
-    Autosubmit.describe(exp.expid)
+    describe(exp.expid)
 
     assert mocked_log.printlog.call_count == 1
 
@@ -250,24 +255,25 @@ def test_describe_ignore_owner_lookup_errors(
 ):
     """Owner lookup failures are ignored."""
     exp = autosubmit_exp(experiment_data=_experiment_data())
-
-    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+    
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
     monkeypatch.setattr(
-        "autosubmit.autosubmit.pwd.getpwuid",
+        "autosubmit.experiment.manage.pwd.getpwuid",
         lambda *_: (_ for _ in ()).throw(exception),
     )
 
-    Autosubmit.describe(input_experiment_list=exp.expid, get_from_user="some-user")
+    describe(input_experiment_list=exp.expid, get_from_user="some-user")
     assert f"Location: {exp.exp_path}" in _location_lines(mocked_log)
 
 
 def test_describe_ignore_owner_stat_errors(autosubmit_exp, mocker, monkeypatch):
     """Missing folder ownership information does not prevent describing."""
-    exp = autosubmit_exp(experiment_data=_experiment_data())
-    mocked_log = mocker.patch("autosubmit.autosubmit.Log")
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
     monkeypatch.setattr(Path, "is_dir", lambda *_: True)
 
     original_stat = Path.stat
+
+    exp = autosubmit_exp(experiment_data=_experiment_data())
 
     def failing_stat(path: Path, *args, **kwargs):
         if path == exp.exp_path:
@@ -276,7 +282,7 @@ def test_describe_ignore_owner_stat_errors(autosubmit_exp, mocker, monkeypatch):
 
     monkeypatch.setattr(Path, "stat", failing_stat)
 
-    Autosubmit.describe(
+    describe(
         input_experiment_list=exp.expid,
         get_from_user="some-user",
     )
