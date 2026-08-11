@@ -27,10 +27,10 @@ from typing import Any, Protocol
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.install import install
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
@@ -57,9 +57,7 @@ class AutosubmitConfigFactory(Protocol):
 
 @pytest.fixture(scope="function")
 def autosubmit_config(
-        request: pytest.FixtureRequest,
-        tmp_path: Path,
-        autosubmit: Autosubmit
+    request: pytest.FixtureRequest, tmp_path: Path
 ) -> AutosubmitConfigFactory:
     """Return a factory for ``AutosubmitConfig`` objects.
 
@@ -101,7 +99,7 @@ def autosubmit_config(
         # FIXME: (BRUNO) Do we really need postgres here in the unit tests conftest?
         is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
         if is_postgres or not Path(BasicConfig.DB_PATH).exists():
-            autosubmit.install()
+            install()
 
         exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid)
         # <expid>/tmp/
@@ -266,16 +264,6 @@ def next_job_id() -> Callable[[], int]:
         return job_id
 
     return _next_job_id
-
-
-@pytest.fixture(scope='session', autouse=True)
-def experiment_config_fixture(session_mocker):
-    # TODO: There are unit tests that fail without this fixture. Those unit tests are good candidates
-    #       to be rewritten or made into integration tests without mocks.
-    session_mocker.patch(
-        'autosubmit.config.configcommon.get_experiment_description',
-        return_value=[['test experiment']]
-    )
 
 
 @pytest.fixture

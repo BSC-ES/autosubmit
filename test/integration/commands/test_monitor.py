@@ -20,8 +20,8 @@ from pathlib import Path
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
-
-from .conftest import wrapped_jobs
+from autosubmit.workflow.manage import monitor
+from test.integration.commands.conftest import wrapped_jobs
 
 
 def new_as_exp(autosubmit_exp, general_data, experiment_data, wrapper_type: str, structure: dict, sizes: dict):
@@ -104,7 +104,7 @@ def test_monitor(autosubmit_exp, wrapper_type, min_trigger_status, from_step, ge
 
     # TODO: For now we will just check that the pdf is generated without any autosubmit error.
     # TODO: Show in the -d option, the wrapped jobs
-    as_exp.autosubmit.monitor(
+    monitor(
         as_exp.expid,
         hide=True,  # disables the open() of the pdf after generation
         group_by=None,

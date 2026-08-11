@@ -12,6 +12,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
+import os
 import traceback
 from time import time
 
@@ -24,6 +25,7 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
     ExperimentHistoryDatabaseManager,
     create_experiment_history_db_manager,
 )
+from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
 from autosubmit.history.strategies import (
@@ -496,3 +498,35 @@ class ExperimentHistory:
         :rtype: int
         """
         return self.manager.update_job_data_values(job_name, fail_count, start, finish)
+
+
+def get_historical_database(expid, job_list, as_conf):
+    """Get the historical database for the experiment.
+
+    :param expid: a string with the experiment id
+    :param job_list: a JobList object
+    :param as_conf: a AutosubmitConfig object
+    :return: an experiment history object
+    """
+    exp_history = None
+    try:
+        # Historical Database: Can create a new run if there is a difference in the number of jobs or if the current run does not exist.
+        exp_history = ExperimentHistory(expid)
+        exp_history.initialize_database()
+        run_dc = exp_history.process_status_changes(job_list.get_job_list(), as_conf.get_chunk_size_unit(),
+                                                    as_conf.get_chunk_size(),
+                                                    current_config=as_conf.get_full_config_as_json())
+        job_list.run_id = run_dc.run_id if run_dc else None
+        # TODO: Restore database backup after 4.2.0 joblist? https://github.com/BSC-ES/autosubmit/issues/3179
+        # Autosubmit.database_backup(expid)
+    except Exception:
+        Log.warning(f"Couldn't access the historical database for experiment {expid}")
+
+    try:
+        ExperimentStatus(expid).set_as_running()
+    except Exception as e:
+        # Connection to status database ec_earth.db can fail.
+        # API worker will fix the status.
+        Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
+                  f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
+    return exp_history

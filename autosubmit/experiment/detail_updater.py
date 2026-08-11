@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -17,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Code to manage experiment details in databases."""
+
 import datetime
 import pwd
 import sqlite3
@@ -32,6 +32,14 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_id
 from autosubmit.database.session import get_engine
 from autosubmit.database.tables import TableRegistry
+
+__all__ = [
+    "LOCAL_TZ",
+    "ExperimentDetails",
+    "ExperimentDetailsRepository",
+    "ExperimentDetailsSQLAlchemyRepository",
+    "ExperimentDetailsSQLiteRepository",
+]
 
 LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
 

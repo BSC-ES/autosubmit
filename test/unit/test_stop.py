@@ -21,14 +21,15 @@ from itertools import chain
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.workflow.manage import stop
 
 """This file contains tests for the ``autosubmit stop`` command."""
 
 
-def test_invalid_target_status(autosubmit):
+def test_invalid_target_status():
     """Test when the target status is invalid."""
     with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.stop('a000', status='banana')
+        stop('a000', status='banana')
 
     assert 'Invalid status' in str(cm.value.message)
 
@@ -41,51 +42,51 @@ def test_invalid_target_status(autosubmit):
         '1'
     ]
 )
-def test_invalid_current_status(autosubmit, current_status):
+def test_invalid_current_status(current_status):
     """Test when the current status is invalid."""
     with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.stop('a000', current_status=current_status)
+        stop('a000', current_status=current_status)
 
     assert 'Invalid status -fs' in str(cm.value.message)
 
 
-def test_pid_not_found(autosubmit, mocker):
+def test_pid_not_found(mocker):
     """Test when ``process_id`` returns ``None``."""
     mocked_process_id = mocker.patch('autosubmit.helpers.processes.process_id')
     mocked_process_id.return_value = None
 
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    mocked_log = mocker.patch('autosubmit.workflow.manage.Log')
 
-    autosubmit.stop('a000', current_status='waiting', force_all=True)
+    stop('a000', current_status='waiting', force_all=True)
 
     assert mocked_log.info.call_count == 1
     assert 'was not running' in mocked_log.info.call_args_list[0][0][0]
 
 
 @pytest.mark.parametrize('pid', [-1, 0, 1])
-def test_ignored_pids(pid, autosubmit, mocker):
+def test_ignored_pids(pid, mocker):
     """Test that we do not kill pids lower than init(1)."""
     mocked_process_id = mocker.patch('autosubmit.helpers.processes.process_id')
     mocked_process_id.return_value = pid
 
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    mocked_log = mocker.patch('autosubmit.workflow.manage.Log')
 
-    autosubmit.stop('a000', current_status='waiting', force_all=True)
+    stop('a000', current_status='waiting', force_all=True)
 
     assert mocked_log.info.call_count == 1
     assert 'was not running' in mocked_log.info.call_args_list[0][0][0]
 
 
-def test_os_kill_fails(autosubmit, mocker):
+def test_os_kill_fails(mocker):
     """Test that if ``os.kill`` fails the code aborts."""
     mocked_process_id = mocker.patch('autosubmit.helpers.processes.process_id')
     mocked_process_id.return_value = 1984
 
     mocked_kill = mocker.patch('os.kill', side_effect=OSError('chough'))
 
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    mocked_log = mocker.patch('autosubmit.workflow.manage.Log')
 
-    autosubmit.stop('a000', current_status='waiting', force=True, force_all=True)
+    stop('a000', current_status='waiting', force=True, force_all=True)
 
     kill_signal = mocked_kill.call_args_list[0][0][1]
     assert kill_signal == signal.SIGKILL
@@ -94,7 +95,7 @@ def test_os_kill_fails(autosubmit, mocker):
     assert 'An error occurred while stopping the autosubmit process' in mocked_log.warning.call_args_list[0][0][0]
 
 
-def test_stop_expids_no_cancel(autosubmit, mocker):
+def test_stop_expids_no_cancel(mocker):
     """Test that we can kill an expid without job cancellations."""
     expids = 'a000'
     cancel = False
@@ -103,15 +104,15 @@ def test_stop_expids_no_cancel(autosubmit, mocker):
     mocked_process_id.side_effect = [42, None]
 
     mocker.patch(
-        'autosubmit.autosubmit.Autosubmit.prepare_run',
+        'autosubmit.workflow.manage._prepare_run',
         return_value=[None, None, None, None, None, None, None]
     )
     mocked_cancel_jobs = mocker.patch('autosubmit.job.job_utils.cancel_jobs')
 
     mocked_kill = mocker.patch('os.kill')
-    mocked_sleep = mocker.patch('autosubmit.autosubmit.sleep')
+    mocked_sleep = mocker.patch('autosubmit.workflow.manage.sleep')
 
-    autosubmit.stop(
+    stop(
         expids,
         force=True,
         all_expids=False,
@@ -138,7 +139,7 @@ def test_stop_expids_no_cancel(autosubmit, mocker):
         ['t001, o001', ["N", "1"], 0]
     ]
 )
-def test_stop_expids_force_all(autosubmit, mocker, expids: str, user_input: list[str], expected_killed: int):
+def test_stop_expids_force_all(mocker, expids: str, user_input: list[str], expected_killed: int):
     """Test that we ask the user for input before stopping experiments."""
     force_all = False
 
@@ -147,10 +148,10 @@ def test_stop_expids_force_all(autosubmit, mocker, expids: str, user_input: list
 
     mocked_kill = mocker.patch('os.kill')
 
-    mocked_input = mocker.patch('autosubmit.autosubmit.input')
+    mocked_input = mocker.patch('autosubmit.workflow.manage.input')
     mocked_input.side_effect = user_input
 
-    autosubmit.stop(
+    stop(
         expids,
         force=True,
         all_expids=False,
@@ -180,7 +181,7 @@ def test_stop_expids_force_all(autosubmit, mocker, expids: str, user_input: list
         'three with commas'
     ]
 )
-def test_stop_expids(autosubmit, mocker, expids: str, num_expids: int, cancel: bool, sleep: bool):
+def test_stop_expids(mocker, expids: str, num_expids: int, cancel: bool, sleep: bool):
     """Test that we can successfully stop by expids"""
     # We test here with ``all_expids`` (i.e. return from ``ps`` output) and without (i.e. from cmd line args).
     for all_expids in [False, True]:
@@ -207,20 +208,20 @@ def test_stop_expids(autosubmit, mocker, expids: str, num_expids: int, cancel: b
             # being called once for each expid.
             returned_pids.extend(chain.from_iterable(zip(returned_pids, [None for _ in range(num_expids)])))
             # And then we mock ``sleep`` because it does not make sense to sleep in this test.
-            mocked_sleep = mocker.patch('autosubmit.autosubmit.sleep')
+            mocked_sleep = mocker.patch('autosubmit.workflow.manage.sleep')
         else:
             returned_pids.extend([None for _ in range(num_expids)])
 
         mocked_process_id.side_effect = returned_pids
 
         mocker.patch(
-            'autosubmit.autosubmit.Autosubmit.prepare_run',
+            'autosubmit.workflow.manage._prepare_run',
             return_value=[None, None, None, None, None, None, None]
         )
         mocked_cancel_jobs = mocker.patch('autosubmit.job.job_utils.cancel_jobs')
 
         mocked_kill = mocker.patch('os.kill')
-        autosubmit.stop(
+        stop(
             expids,
             force=False,
             all_expids=all_expids,

@@ -19,8 +19,8 @@
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.manage import create
 from autosubmit.log.log import AutosubmitCritical
 
 _EXPID = "t000"
@@ -30,9 +30,9 @@ _EXPID = "t000"
 def test_create_git_clone_disables_remote_git_on_platform_error(mocker, tmp_path):
     """Test that when an ``AutosubmitCritical`` happens when copying git code, it uses ``LOCAL`` platform."""
     mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
-    mocker.patch("autosubmit.autosubmit.check_ownership")
+    mocker.patch("autosubmit.scripts._validation.check_ownership")
 
-    lock = mocker.patch("autosubmit.autosubmit.Lock")
+    lock = mocker.patch("autosubmit.experiment.manage.Lock")
     lock.return_value.__enter__.return_value.flush = mocker.Mock()
     lock.return_value.__enter__.return_value.fileno.return_value = 1
 
@@ -43,17 +43,17 @@ def test_create_git_clone_disables_remote_git_on_platform_error(mocker, tmp_path
 
     as_conf.check_conf_files.side_effect = AutosubmitCritical("stop test", 7014)
 
-    mocker.patch("autosubmit.autosubmit.AutosubmitConfig", return_value=as_conf)
+    mocker.patch("autosubmit.experiment.manage.AutosubmitConfig", return_value=as_conf)
     as_conf.reload.return_value = None
 
     mocker.patch(
-        "autosubmit.autosubmit.ParamikoSubmitter",
+        "autosubmit.experiment.manage.ParamikoSubmitter",
         side_effect=AutosubmitCritical("platform error", 6000),
     )
-    clone = mocker.patch("autosubmit.autosubmit.clone_repository", return_value=True)
+    clone = mocker.patch("autosubmit.experiment.manage.clone_repository", return_value=True)
 
     with pytest.raises(AutosubmitCritical, match="stop test"):
-        Autosubmit.create(_EXPID, noplot=True, hide=True)
+        create(_EXPID, noplot=True, hide=True)
 
     clone.assert_called_once_with(as_conf, False)
 
@@ -61,9 +61,9 @@ def test_create_git_clone_disables_remote_git_on_platform_error(mocker, tmp_path
 def test_create_git_clone_disables_remote_git_on_missing_platform(mocker, tmp_path):
     """Test that when a ``KeyError`` happens when copying git code, it uses ``LOCAL`` platform."""
     mocker.patch.object(BasicConfig, "LOCAL_ROOT_DIR", str(tmp_path))
-    mocker.patch("autosubmit.autosubmit.check_ownership")
+    mocker.patch("autosubmit.scripts._validation.check_ownership")
 
-    lock = mocker.patch("autosubmit.autosubmit.Lock")
+    lock = mocker.patch("autosubmit.experiment.manage.Lock")
     lock.return_value.__enter__.return_value.flush = mocker.Mock()
     lock.return_value.__enter__.return_value.fileno.return_value = 1
 
@@ -74,17 +74,17 @@ def test_create_git_clone_disables_remote_git_on_missing_platform(mocker, tmp_pa
 
     as_conf.check_conf_files.side_effect = AutosubmitCritical("stop test", 7014)
 
-    mocker.patch("autosubmit.autosubmit.AutosubmitConfig", return_value=as_conf)
+    mocker.patch("autosubmit.experiment.manage.AutosubmitConfig", return_value=as_conf)
 
     as_conf.reload.return_value = None
 
     submitter = mocker.Mock()
     submitter.platforms = {}
 
-    mocker.patch("autosubmit.autosubmit.ParamikoSubmitter", return_value=submitter)
-    clone = mocker.patch("autosubmit.autosubmit.clone_repository", return_value=True)
+    mocker.patch("autosubmit.experiment.manage.ParamikoSubmitter", return_value=submitter)
+    clone = mocker.patch("autosubmit.experiment.manage.clone_repository", return_value=True)
 
     with pytest.raises(AutosubmitCritical, match="stop test"):
-        Autosubmit.create(_EXPID, noplot=True, hide=True)
+        create(_EXPID, noplot=True, hide=True)
 
     clone.assert_called_once_with(as_conf, False)

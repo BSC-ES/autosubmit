@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+# noinspection PyProtectedMember
+from autosubmit.log import _global_log_name
 from autosubmit.log.log import (
     AutosubmitCritical,
     AutosubmitError,
@@ -413,3 +415,14 @@ def test_compress_xz(tmp_path: Path):
     # Cover nonexistent path
     with pytest.raises(FileNotFoundError):
         find_uncompressed_files(str(tmp_path.joinpath("nonexistent_path")))
+
+
+def test_global_log_name():
+    """Test the global log name for a command.
+
+    The command can be any string, but where this is used, it is
+    expected to be a global command (considered global, or with
+    multiple experiment identifiers)."""
+    assert _global_log_name("archive", []) == "archive"
+    assert _global_log_name("delete", ["a001"]) == "delete_a001"
+    assert _global_log_name("jacaranda", ["a001", "a002"]) == "jacaranda_a001_a002"

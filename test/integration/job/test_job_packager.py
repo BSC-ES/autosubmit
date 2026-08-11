@@ -36,7 +36,7 @@ class CreatePackagerFixture(Protocol):
 
 
 @pytest.fixture
-def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
+def create_packager(autosubmit_exp, local) -> CreatePackagerFixture:
     def _job_packager(experiment_data: dict | None, total_jobs: int | None = 20) -> JobPackager:
         local.total_jobs = total_jobs
 

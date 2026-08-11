@@ -80,7 +80,7 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: st
 
 
 def check_experiment_ownership(
-        expid: str, basic_config: BasicConfig, raise_error=False, logger: Log | None = None
+        expid: str, basic_config: type[BasicConfig], raise_error=False, logger: Log | None = None
 ) -> tuple[bool, bool, str]:
     # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available
     my_user_id = os.getuid()

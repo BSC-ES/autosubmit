@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -24,7 +24,7 @@ import socket as _socket
 import sys
 import tracemalloc
 from contextlib import suppress
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from pstats import SortKey
@@ -35,28 +35,49 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
 
 _UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
+"""File size units."""
 
 
-class ProfilerState(Enum):
-    """Enumeration of profiler states"""
+class ProfilerState(str, Enum):
+    """Enumeration of profiler states."""
+
     STOPPED = "stopped"
+    """Profiler stopped."""
+
     STARTED = "started"
+    """Profiler started."""
+
+
+def _now() -> str:
+    """Return a UTC timestamp.
+
+    The value returned is in the format year, month, day, hour, minute,
+    and second, with a dash between the date and time.
+    """
+    return datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
 
 
 class Profiler:
     """Class to profile the execution of experiments."""
 
-    def __init__(self, expid: str, trace_enabled: bool = False, max_checkpoints: int = 0):
-        """Initialize the profiler with an experiment ID.
+    def __init__(
+        self,
+        *,
+        subcommand: str,
+        expid: str | None,
+        trace_enabled: bool = False,
+        max_checkpoints: int = 0,
+    ):
+        """Initialise the profiler.
 
-        :param expid: The experiment identifier.
-        :type expid: str
-        :param trace_enabled:
-        :type trace_enabled: bool
-        :param max_checkpoints:
-        :type max_checkpoints: int
+        :param subcommand: Autosubmit command being profiled.
+        :param expid: Experiment identifier.
+        :param trace_enabled: Whether allocation tracing is enabled.
+        :param max_checkpoints: Maximum number of iteration checkpoints.
+            A value of zero means unlimited.
         """
         self._profiler = cProfile.Profile()
+        self._subcommand = subcommand
         self._expid = expid
 
         # Memory profiling variables
@@ -86,6 +107,7 @@ class Profiler:
         self._edges_iteration: list = []
 
         # Allocation tracing
+        self._trace_started = False
         self._trace_enabled = trace_enabled
         self._trace_snapshots: list = []
         self._trace_stats_by_iter: list = []
@@ -102,7 +124,6 @@ class Profiler:
         """Check if the profiler is in the started state.
 
         :return: True if profiler is started, False otherwise.
-        :rtype: bool
         """
         return self._state == ProfilerState.STARTED
 
@@ -111,7 +132,6 @@ class Profiler:
         """Check if the profiler is in the stopped state.
 
         :return: True if profiler is stopped, False otherwise.
-        :rtype: bool
         """
         return self._state == ProfilerState.STOPPED
 
@@ -121,22 +141,29 @@ class Profiler:
         :raises AutosubmitCritical: If the profiler was already started.
         """
         if self.started:
-            raise AutosubmitCritical('The profiling process was already started.', 7074)
+            raise AutosubmitCritical(
+                "The profiling process was already started.",
+                7074,
+            )
 
-        self._state = ProfilerState.STARTED
         self._profiler.enable()
+
         gc.collect()
         self._mem_init = _get_current_memory()
 
         if self._trace_enabled and not tracemalloc.is_tracing():
             tracemalloc.start()
+            self._trace_started = True
+
+        self._state = ProfilerState.STARTED
+
 
     def iteration_checkpoint(self, loaded_jobs: int, loaded_edges: int) -> bool:
         """Record metrics at the checkpoint of an iteration.
+
         :param loaded_jobs: The number of jobs loaded in the current iteration.
         :param loaded_edges: The number of edges loaded in the current iteration.
         :return: True if the maximum number of checkpoints has been reached, False otherwise.
-        :rtype: bool
         """
         gc.collect()
 
@@ -171,11 +198,15 @@ class Profiler:
         :raises AutosubmitCritical: If the profiler was not running.
         """
         if not self.started or self.stopped:
-            raise AutosubmitCritical('Cannot stop the profiler because it was not running.', 7074)
+            raise AutosubmitCritical(
+                "Cannot stop the profiler because it was not running.",
+                7074,
+            )
 
         self._profiler.disable()
+
         if self._mem_iteration:
-            self._mem_init = self._mem_iteration[0]  # Remove the initial memory value from the iteration list
+            self._mem_init = self._mem_iteration[0]
             self._mem_final = self._mem_iteration[-1]
             self._calculate_grow()
         else:
@@ -184,8 +215,10 @@ class Profiler:
         self._report()
         self._state = ProfilerState.STOPPED
 
-        if self._trace_enabled and tracemalloc.is_tracing():
+        # Only stop tracemalloc if this Profiler instance started it.
+        if self._trace_started and tracemalloc.is_tracing():
             tracemalloc.stop()
+            self._trace_started = False
 
     def _calculate_grow(self) -> None:
         """Calculate total growth metrics for objects and file descriptors."""
@@ -211,7 +244,6 @@ class Profiler:
         """Append growth metrics to the report.
 
         :return: The updated report string with growth metrics.
-        :rtype: str
         """
         report = ""
         for i in range(len(self._mem_iteration[1:-1])):
@@ -248,7 +280,6 @@ class Profiler:
 
         :param snapshot: The current tracemalloc snapshot.
         :return: A list of tracemalloc StatisticDiff entries.
-        :rtype: list
         """
         if not self._trace_snapshots:
             return []
@@ -257,7 +288,7 @@ class Profiler:
         if self.checkpoints > 3:
             self._obj_by_iter.append(gc.get_objects())
             if len(self._obj_by_iter) >= 2:
-                prev_objs = set(id(obj) for obj in self._obj_by_iter[-2])
+                prev_objs = {id(obj) for obj in self._obj_by_iter[-2]}
                 diff = [tracemalloc.get_object_traceback(obj) for obj in self._obj_by_iter[-1] if
                         id(obj) not in prev_objs]
                 # only unique tracebacks
@@ -279,7 +310,6 @@ class Profiler:
 
         :param stats: Allocation delta statistics.
         :return: A formatted string for the report.
-        :rtype: str
         """
         if not stats:
             return ""
@@ -293,93 +323,132 @@ class Profiler:
             )
         return "".join(lines)
 
+    @property
+    def file_name(self) -> str:
+        """Return the name of the profiler report file.
+
+        :return: Name of the profiler report file.
+        """
+        if self._expid:
+            return f"{self._expid}_{self._subcommand}_profile_{_now()}.prof"
+
+        return f"{self._subcommand}_profile_{_now()}.prof"
+
+    @property
+    def report_path(self) -> Path:
+        """Return the path of the profiler report.
+
+        :return: Path of the profiler report.
+        """
+        if self._expid:
+            return Path(
+                BasicConfig.LOCAL_ROOT_DIR,
+                self._expid,
+                "tmp",
+                "profile",
+            )
+
+        return Path(
+            BasicConfig.GLOBAL_LOG_DIR,
+            "profile",
+        )
+
     def _report(self) -> None:
         """Print the final report to stdout, log, and filesystem.
 
         :raises AutosubmitCritical: If the report directory is not writable.
         """
         # Create the profiler path if it does not exist
-        report_path = Path(BasicConfig.LOCAL_ROOT_DIR, self._expid, "tmp", "profile")
-        report_path.mkdir(parents=True, exist_ok=True)
-        report_path.chmod(0o755)
-        if not os.access(report_path, os.W_OK):  # Check for write access
+        self.report_path.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        self.report_path.chmod(0o755)
+
+        if not os.access(self.report_path, os.W_OK):
             raise AutosubmitCritical(
-                f'Directory {report_path} not writable. Please check permissions.', 7012)
+                f"Directory {self.report_path} not writable. Please check permissions.",
+                7012,
+            )
 
-        stream = io.StringIO()
-        date_time = datetime.now().strftime('%Y%m%d-%H%M%S')
+        with io.StringIO() as stream:
+            # Generate function-by-function profiling results
+            sort_by = SortKey.CUMULATIVE
+            stats = pstats.Stats(self._profiler, stream=stream)  # generate statistics
+            stats.strip_dirs().sort_stats(sort_by).print_stats()  # format and save in the stream
 
-        # Generate function-by-function profiling results
-        sort_by = SortKey.CUMULATIVE
-        stats = pstats.Stats(self._profiler, stream=stream)  # generate statistics
-        stats.strip_dirs().sort_stats(sort_by).print_stats()  # format and save in the stream
+            # Create and save report
+            report = "\n".join([
+                _generate_title("Time & Calls Profiling"),
+                "",
+                stream.getvalue(),
+                ""
+            ])
+            # Generate memory profiling results
+            if self._mem_grow and self._obj_grow and self._fd_grow:
+                report += "\n" + _generate_title("Memory, object and file descriptor by iteration") + "\n"
+                report += self._report_grow()
+            report += "\n" + _generate_title("Overall Memory, Object and File Descriptor Growth") + "\n"
 
-        # Create and save report
-        report = "\n".join([
-            _generate_title("Time & Calls Profiling"),
-            "",
-            stream.getvalue(),
-            ""
-        ])
-        # Generate memory profiling results
-        if self._mem_grow and self._obj_grow and self._fd_grow:
-            report += "\n" + _generate_title("Memory, object and file descriptor by iteration") + "\n"
-            report += self._report_grow()
-        report += "\n" + _generate_title("Overall Memory, Object and File Descriptor Growth") + "\n"
+            mem_total: float = self._mem_final - self._mem_init  # memory in Bytes
+            absolute_mem_total = abs(mem_total)
+            mem_init = self._mem_init
+            mem_final = self._mem_final
+            unit = 0
+            # reduces the value to its most suitable unit
+            while absolute_mem_total >= 1024 and unit <= len(_UNITS):
+                unit += 1
+                absolute_mem_total /= 1024
+                mem_total /= 1024
+            unit = 0
+            while mem_init >= 1024 and unit <= len(_UNITS):
+                unit += 1
+                mem_init /= 1024
+            unit = 0
+            while mem_final >= 1024 and unit <= len(_UNITS):
+                unit += 1
+                mem_final /= 1024
+            report += f"\nMEMORY GROW: {mem_total:.2f} {_UNITS[unit]}."
+            report += f"\nINITIAL MEMORY: {mem_init:.2f} {_UNITS[unit]}."
+            report += f"\nFINAL MEMORY: {mem_final:.2f} {_UNITS[unit]}."
+            if self._obj_grow and self._fd_grow:
+                report += f"\nOBJECTS GROW: {self._obj_total_grow} objects."
+                report += f"\nFILE DESCRIPTORS GROW: {self._fd_total_grow} file descriptors.\n"
 
-        mem_total: float = self._mem_final - self._mem_init  # memory in Bytes
-        absolute_mem_total = abs(mem_total)
-        mem_init = self._mem_init
-        mem_final = self._mem_final
-        unit = 0
-        # reduces the value to its most suitable unit
-        while absolute_mem_total >= 1024 and unit <= len(_UNITS):
-            unit += 1
-            absolute_mem_total /= 1024
-            mem_total /= 1024
-        unit = 0
-        while mem_init >= 1024 and unit <= len(_UNITS):
-            unit += 1
-            mem_init /= 1024
-        unit = 0
-        while mem_final >= 1024 and unit <= len(_UNITS):
-            unit += 1
-            mem_final /= 1024
-        report += f"\nMEMORY GROW: {mem_total:.2f} {_UNITS[unit]}."
-        report += f"\nINITIAL MEMORY: {mem_init:.2f} {_UNITS[unit]}."
-        report += f"\nFINAL MEMORY: {mem_final:.2f} {_UNITS[unit]}."
-        if self._obj_grow and self._fd_grow:
-            report += f"\nOBJECTS GROW: {self._obj_total_grow} objects."
-            report += f"\nFILE DESCRIPTORS GROW: {self._fd_total_grow} file descriptors.\n"
+            # final list of fds opened.
+            fd_names = _get_current_open_fds_names()
+            report += "\nFINAL OPEN FILE DESCRIPTORS:\n"
+            for fd in fd_names:
+                report += f"  {fd}\n"
 
-        # final list of fds opened.
-        fd_names = _get_current_open_fds_names()
-        report += "\nFINAL OPEN FILE DESCRIPTORS:\n"
-        for fd in fd_names:
-            report += f"  {fd}\n"
+            if self._trace_enabled:
+                report += "\n\nUnique object tracebacks between iterations:\n"
+                for traceback in self._obj_diffs_between_iter:
+                    report += f"{traceback}\n"
+            report = report.replace('{', '{{').replace('}', '}}')
+            Log.info(report)
 
-        if self._trace_enabled:
-            report += "\n\nUnique object tracebacks between iterations:\n"
-            for traceback in self._obj_diffs_between_iter:
-                report += f"{traceback}\n"
-        report = report.replace('{', '{{').replace('}', '}}')
-        Log.info(report)
+            report_file_path = self.report_path / self.file_name
+            stats.dump_stats(report_file_path)
 
-        stats.dump_stats(Path(report_path, f"{self._expid}_profile_{date_time}.prof"))
-        with open(Path(report_path, f"{self._expid}_profile_{date_time}.txt"),
-                  'w', encoding='UTF-8') as report_file:
-            report_file.write(report)
+            report_log_path = report_file_path.with_suffix(".txt")
 
-        Log.info(f"[INFO] You can also find report and prof files at {report_path}\n")
+            report_log_path.write_text(
+                report,
+                encoding="UTF-8",
+            )
+
+            Log.info(
+                f"You can also find the report and profiler files at "
+                f"{report_log_path}\n"
+            )
 
 
 def _generate_title(title="") -> str:
     """Generate a title banner with the specified text.
 
     :param title: The title to display in the banner.
-    :type title: str
     :return: The banner with the specified title.
-    :rtype: str
     """
     max_len = 80
     separator = "=" * max_len
@@ -391,7 +460,6 @@ def _get_current_memory() -> int:
     """Return the current memory consumption of the process in Bytes.
 
     :return: The current memory used by the process in Bytes.
-    :rtype: int
     """
     return Process(os.getpid()).memory_info().rss
 
@@ -400,16 +468,14 @@ def _get_current_object_count() -> int:
     """Return total number of tracked Python objects.
 
     :return: The count of all tracked objects.
-    :rtype: int
     """
     return len(gc.get_objects())
 
 
-def _get_current_open_fds() -> int:
+def _get_current_open_fds() -> int | None:
     """Return count of open file descriptors.
 
     :return: The number of open file descriptors or handles.
-    :rtype: int
     """
 
     proc = Process(os.getpid())
@@ -417,6 +483,7 @@ def _get_current_open_fds() -> int:
         return proc.num_fds()
     if hasattr(proc, "num_handles"):
         return proc.num_handles()
+    return None
 
 
 def _get_fd_connection_map(proc: Process) -> dict:
@@ -425,9 +492,7 @@ def _get_fd_connection_map(proc: Process) -> dict:
     Handles inet (TCP/UDP) and Unix domain sockets.
 
     :param proc: The psutil Process to inspect.
-    :type proc: Process
     :return: A dict mapping fd integer -> descriptive connection string.
-    :rtype: dict
     """
     fd_to_conn: dict = {}
     with suppress(Exception):
@@ -454,11 +519,8 @@ def _get_pipe_direction(pid: int, fd_num: int) -> str:
     """Return the access direction of a pipe file descriptor by reading fdinfo.
 
     :param pid: The process ID.
-    :type pid: int
     :param fd_num: The file descriptor number to inspect.
-    :type fd_num: int
     :return: One of 'read', 'write', or 'unknown'.
-    :rtype: str
     """
     with suppress(OSError), open(f"/proc/{pid}/fdinfo/{fd_num}") as f:
         for line in f:
@@ -476,7 +538,6 @@ def _get_current_open_fds_names() -> list:
     and labels stdin/stdout/stderr by fd number.
 
     :return: A list of annotated FD descriptor strings.
-    :rtype: list
     """
     pid = os.getpid()
     fd_dir = f"/proc/{pid}/fd"

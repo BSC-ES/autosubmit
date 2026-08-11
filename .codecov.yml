@@ -28,4 +28,4 @@ flag_management:
     carryforward: true
 
 # turn off comments to pull requests
-comment: false
+comment: true
