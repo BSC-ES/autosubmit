@@ -15,61 +15,79 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical
+
 
 @pytest.mark.parametrize(
     "experiment_data",
     [
         {
-            'TEST_SLURM': {
-                'FDB_COPY_BIN': '%"CURRENT_FDB_COPY_BIN%/fdb-copy',
-                'FDB_LIST_BIN': '%^CURRENT_FDB_LIST_BIN%/fdb-list',
-            },
-        }, {
-            'TEST_SLURM': {
-                'FDB_COPY_BIN': '%CURRENT_FDB_COPY_BIN%/fdb-copy',
-                'FDB_LIST_BIN': '%CURRENT_FDB_LIST_BIN%/fdb-list',
-            },
-        }, {
-            'TEST_SLURM': {
-                'FDB_COPY_BIN': '%CURRENT_FDB_CPY_BIN%/fdb-copy',
-                'FDB_LIST_BIN': '%CURRENT_FDB_LIST_BIN%/fdb-list',
+            "TEST_SLURM": {
+                "FDB_COPY_BIN": '%"CURRENT_FDB_COPY_BIN%/fdb-copy',
+                "FDB_LIST_BIN": "%^CURRENT_FDB_LIST_BIN%/fdb-list",
             },
         },
         {
-            'TEST_SLURM': {
-                'TESTS': '%"CURRENT_TESTS%/fdb-copy',
-                'FDB_DICT_BIN': 'TEST_FOLDER/%^CURRENT_FDB_DICT_BIN%/fdb-list',
+            "TEST_SLURM": {
+                "FDB_COPY_BIN": "%CURRENT_FDB_COPY_BIN%/fdb-copy",
+                "FDB_LIST_BIN": "%CURRENT_FDB_LIST_BIN%/fdb-list",
             },
-        }, {
-            'TEST_SLURM': {
-                'FDB_COPY_BIN': 'TEST/%CURRENT_FDB_COPY_BIN%/fdb-copy',
-                'FDB_LIST_BIN': 'TEST/%CURRENT_FDB_LIST_BIN%/fdb-list',
+        },
+        {
+            "TEST_SLURM": {
+                "FDB_COPY_BIN": "%CURRENT_FDB_CPY_BIN%/fdb-copy",
+                "FDB_LIST_BIN": "%CURRENT_FDB_LIST_BIN%/fdb-list",
             },
-        }, {
-            'TEST_SLURM': {
-                'FDB_LIST_BIN': 'TEST/%current_FDB_LIST_BIN%/fdb-list',
-            }
-        }, {
-            'TEST_SLURM': {
-                'fdb_list_bin': 'TEST/%current_FDB_LIST_BIN%/fdb-list',
+        },
+        {
+            "TEST_SLURM": {
+                "TESTS": '%"CURRENT_TESTS%/fdb-copy',
+                "FDB_DICT_BIN": "TEST_FOLDER/%^CURRENT_FDB_DICT_BIN%/fdb-list",
+            },
+        },
+        {
+            "TEST_SLURM": {
+                "FDB_COPY_BIN": "TEST/%CURRENT_FDB_COPY_BIN%/fdb-copy",
+                "FDB_LIST_BIN": "TEST/%CURRENT_FDB_LIST_BIN%/fdb-list",
+            },
+        },
+        {
+            "TEST_SLURM": {
+                "FDB_LIST_BIN": "TEST/%current_FDB_LIST_BIN%/fdb-list",
             }
         },
         {
-            'SCRIPT': '%current_script%'
+            "TEST_SLURM": {
+                "fdb_list_bin": "TEST/%current_FDB_LIST_BIN%/fdb-list",
+            }
         },
+        {"SCRIPT": "%current_script%"},
     ],
-    ids=["Special Dynamic Variable", "Dynamic Variable", "Multiple Dynamic Variable",
-         "Special Dynamic Variable With Reference", "Dynamic Variable With Reference",
-         "Oneliner Dynamic Variable With Reference", "Scripts lower/upper", "Scripts upper/lower"
+    ids=[
+        "Special Dynamic Variable",
+        "Dynamic Variable",
+        "Multiple Dynamic Variable",
+        "Special Dynamic Variable With Reference",
+        "Dynamic Variable With Reference",
+        "Oneliner Dynamic Variable With Reference",
+        "Scripts lower/upper",
+        "Scripts upper/lower",
     ],
 )
-def test_infinite_loop_dynamic_variable(autosubmit_config, general_data, experiment_data):
-    as_conf = autosubmit_config('t000', {
-            'PLATFORMS': experiment_data,
-        })
+def test_infinite_loop_dynamic_variable(
+    autosubmit_config, general_data, experiment_data
+):
+    as_conf = autosubmit_config(
+        "t000",
+        {
+            "PLATFORMS": experiment_data,
+        },
+    )
     with pytest.raises(AutosubmitCritical) as ac:
-        as_conf.experiment_data = as_conf.deep_add_missing_starter_conf(general_data, as_conf.experiment_data)
+        as_conf.experiment_data = as_conf.deep_add_missing_starter_conf(
+            general_data, as_conf.experiment_data
+        )
     assert "causing infinite recursion during evaluation" in ac.value.message
