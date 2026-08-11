@@ -15,23 +15,22 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from collections import namedtuple
+import pytest
 
-from autosubmit.autosubmit import Autosubmit
-from autosubmit.scripts.autosubmit import main
+from autosubmit.helpers.version import get_version
+from autosubmit.scripts.autosubmit import _autosubmit
 
 
-def test_autosubmit_script_main(mocker, autosubmit_config):
+def test_autosubmit_script_main(mocker):
     """Test that the autosubmit script exit code.
 
     It must exit with the same value returned by the ``main`` function.
     """
-    as_conf = autosubmit_config('a000', {})
-    mocker.patch('sys.argv', ['autosubmit', '-v'])
-    mocker.patch('autosubmit.autosubmit.BasicConfig', as_conf.basic_config)
-    as_log = mocker.patch('autosubmit.autosubmit.Log')
-    exit_code = main()
-    assert as_log.info.call_args[0][0] == Autosubmit.autosubmit_version
+    as_log = mocker.patch("autosubmit.scripts.autosubmit.Log")
+    args = ["-v"]
+    exit_code = _autosubmit(args)
+
+    assert as_log.info.call_args[0][0] == get_version()
     assert exit_code == 0
 
 
@@ -42,25 +41,21 @@ def test_autosubmit_script_readme(mocker, autosubmit_config):
     will be fixed in the near future. This test can stay just to make
     sure the command is working (it was not when this test was written).
     """
-    as_conf = autosubmit_config('a000', {})
-    mocker.patch('sys.argv', ['autosubmit', 'readme'])
-    mocker.patch('autosubmit.autosubmit.BasicConfig', as_conf.basic_config)
-    mock_log_info = mocker.patch("autosubmit.autosubmit.Log.info")
-    exit_code = main()
+    as_conf = autosubmit_config("a000", {})
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig", as_conf.basic_config)
+    mock_log_info = mocker.patch("autosubmit.log.log.Log.info")
+    args = ["readme"]
+    exit_code = _autosubmit(args)
     logged_text = " ".join(str(call) for call in mock_log_info.call_args_list)
     assert "lightweight" in logged_text
     assert exit_code == 0
 
 
 def test_autosubmit_script_error_raised(mocker):
-    command = 'inspect'
-    expid = 'fail'
-    mocker.patch('sys.argv', ['autosubmit', command, expid])
-    mocker.patch('autosubmit.scripts.autosubmit.exit_from_error', return_value=127)
+    command = "inspect"
+    expid = "fail"
 
-    Args = namedtuple('Args', ['command', 'expid'])
-    args = Args(command, expid)
-    mocker.patch('autosubmit.scripts.autosubmit.Autosubmit.parse_args', return_value=(0, args))
-    mocker.patch('autosubmit.scripts.autosubmit.Autosubmit.run_command', side_effect=ValueError)
-    exit_code = main()
-    assert exit_code == 127
+    args = [command, expid]
+    with pytest.raises(SystemExit) as cm:
+        _autosubmit(args)
+    assert cm.value.code == 1

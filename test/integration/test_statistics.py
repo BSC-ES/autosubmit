@@ -1,14 +1,29 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 from collections.abc import Callable
 from unittest.mock import MagicMock
 
 from pytest_mock import MockerFixture
 
-from autosubmit.autosubmit import Autosubmit
+from autosubmit.workflow.manage import statistics
 
 
-def test_stats_get_params(
-    autosubmit_exp: Callable, autosubmit: Autosubmit, mocker: MockerFixture
-) -> None:
+def test_stats_get_params(autosubmit_exp: Callable, mocker: MockerFixture) -> None:
     """
     Test that the statistics generator receives the correct parameters from the jobs, including platform information.
     """
@@ -39,7 +54,7 @@ def test_stats_get_params(
     mock_monitor.generate_output_stats = mock_gen_stats
     mocker.patch("autosubmit.monitor.monitor.Monitor", return_value=mock_monitor)
 
-    autosubmit.statistics(
+    statistics(
         expid=FAKE_EXPID,
         filter_type="SIM",
         filter_period=None,

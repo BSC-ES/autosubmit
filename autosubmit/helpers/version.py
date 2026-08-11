@@ -15,14 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from functools import cache
 from importlib.metadata import version
 from pathlib import Path
 
-__all__ = [
-    'get_version'
-]
+__all__ = ["get_version"]
 
 
+@cache
 def get_version() -> str:
     """Get the Autosubmit version.
 
@@ -33,11 +33,17 @@ def get_version() -> str:
     If it fails to locate it, it will tru to find the latest
     version using ``importlib``. This may return a version from
     the installed libraries instead -- beware.
+
+    The version found is cached throughout the execution of the program,
+    as the version is not supposed to change once it is read once from
+    the file system.
+
+    :return: The current Autosubmit CLI version.
     """
     # Get the version number from the relevant file. If not, from autosubmit package
     this_path = Path(__file__).parent
     root_path = this_path.parents[1]
-    version_file_path = root_path / 'VERSION'
+    version_file_path = root_path / "VERSION"
 
     if version_file_path.is_file():
         with open(version_file_path) as f:

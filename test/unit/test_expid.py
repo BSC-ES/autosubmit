@@ -22,8 +22,9 @@ from contextlib import contextmanager
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.database import db_common
+from autosubmit.experiment.manage import expid_fn
+from autosubmit.install import install
 from autosubmit.log.log import AutosubmitCritical
 
 
@@ -49,7 +50,7 @@ def build_db_mock(current_experiment_id, mock_db_common, mocker):
     ('', does_not_raise()),
     ('test', pytest.raises(AutosubmitCritical))
 ], ids=['success', 'fail'])
-def test_expid(copy_id, expected, tmp_path, autosubmit_config, monkeypatch, autosubmit) -> None:
+def test_expid_fn(copy_id, expected, tmp_path, autosubmit_config, monkeypatch) -> None:
     """
     Function to test if the autosubmit().expid generates the paths and expid properly
 
@@ -57,10 +58,10 @@ def test_expid(copy_id, expected, tmp_path, autosubmit_config, monkeypatch, auto
     :param tmp_path: Path
     :return: None
     """
-    autosubmit.install()
+    install()
     monkeypatch.setattr(db_common, 'TIMEOUT', 1)
     with expected:
-        expid = Autosubmit.expid("Test", copy_id=copy_id)
+        expid = expid_fn("Test", copy_id=copy_id)
         # The `describe` call was removed here due to describe now needing the db, which conflicts with mock.
         path = tmp_path / expid
         assert path.exists()
@@ -73,7 +74,7 @@ def test_expid(copy_id, expected, tmp_path, autosubmit_config, monkeypatch, auto
 )
 def test_expid_missing_description(description):
     with pytest.raises(AutosubmitCritical) as cm:
-        Autosubmit.expid(description, '', '', False, False)
+        expid_fn(description, '', '', False, False)
 
     assert "experiment description" in str(cm.value)
 
@@ -84,6 +85,6 @@ def test_expid_missing_description(description):
 )
 def test_expid_missing_hpc(hpc):
     with pytest.raises(AutosubmitCritical) as cm:
-        Autosubmit.expid('test', hpc, '', False, False)
+        expid_fn('test', hpc, '', False, False)
 
     assert "provide an HPC" in str(cm.value)

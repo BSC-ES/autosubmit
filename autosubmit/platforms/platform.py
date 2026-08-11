@@ -69,14 +69,18 @@ def recover_platform_job_logs_wrapper(
     """Wrapper function to recover platform job logs.
 
     :param platform: The platform object responsible for managing the connection and job recovery.
-    :param recovery_queue: A multiprocessing queue used to store jobs for recovery.
+    :param recovery_queue: A multiprocessing queue is used to store jobs for recovery.
     :param worker_event: An event to signal work availability.
-    :param cleanup_event: An event to signal cleanup operations.
+    :param cleanup_event: An event to signal clean-up operations.
     :param as_conf: The Autosubmit configuration object containing experiment data.
-    :type as_conf: AutosubmitConfig
-    :return: None
-    :rtype: None
     """
+    # Ignore SIGINT (CTRL+C) in the log recovery child process.
+    # Since SIGINT is delivered to the entire process group, ignoring it here prevents
+    # a KeyboardInterrupt traceback in this subprocess, allowing the main process to
+    # orchestrate a graceful shutdown via the shared clean-up event.
+    import signal
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
     platform.recovery_queue = recovery_queue
     platform.work_event = worker_event
     platform.cleanup_event = cleanup_event
@@ -96,8 +100,8 @@ def recover_platform_job_logs_wrapper(
     }
     _init_logs_log_process(as_conf, platform.name)
     platform.recover_platform_job_logs(as_conf)
-    # Exit userspace after manually closing ssh sockets, recommended for child processes,
-    # the queue() and shared signals should be in charge of the main process.
+    # Exit userspace after manually closing ssh sockets, recommended for child processes.
+    # The queue() and shared signals should be in charge of the main process.
     _exit(0)
 
 

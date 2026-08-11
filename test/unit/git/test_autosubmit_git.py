@@ -23,6 +23,7 @@ from subprocess import CalledProcessError
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.manage import copy_code
 from autosubmit.git.autosubmit_git import (
     check_unpushed_changes,
     clone_repository,
@@ -200,11 +201,11 @@ def test_submodules_false_disables_submodules(mocker, autosubmit_config):
             },
         }
     }], ids=["Git clone without type defined", "Git clone with the correct type defined"])
-def test_copy_code(autosubmit_config, config, mocker, autosubmit):
+def test_copy_code(autosubmit_config, config, mocker):
     expid = 'random-id'
     as_conf = autosubmit_config(expid, config)
-    mocker.patch('autosubmit.autosubmit.clone_repository', return_value=True)
-    assert autosubmit._copy_code(as_conf, expid, "git", True)
+    mocker.patch('autosubmit.experiment.manage.clone_repository', return_value=True)
+    assert copy_code(as_conf, expid, "git", True)
 
 
 def test_clone_repository_falls_back_to_local_platform(autosubmit_config, mocker) -> None:

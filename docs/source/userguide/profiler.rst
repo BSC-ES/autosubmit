@@ -8,65 +8,32 @@
 autosubmit.profiler
 ===================
 
-.. important:: If you only want to use the profiler built into the Autosubmit commands, simpler
-      user-oriented guides are available for :ref:`run<run_profiling>`,
-      :ref:`create<create_profiling>`, and :ref:`monitor<monitor_profiling>`.
+.. important::
+
+   If you only want to use the profiler built into the Autosubmit commands, simpler
+   user-oriented guides are available for :ref:`run<run_profiling>`,
+   :ref:`create<create_profiling>`, and :ref:`monitor<monitor_profiling>`.
 
 ######################################
 The Autosubmit's profiler
 ######################################
 
-Autosubmit integrates a profiler that allows developers to easily measure the performance of entire 
-functions or specific code fragments.
+Autosubmit integrates a profiler that allows developers to measure the execution time and resource
+usage of Autosubmit commands.
 
-The profiler generates a comprehensive report with enough information to detect bottleneck functions 
-during the execution of experiments, as well as information about the total memory consumed.
+The profiler generates a report with information about function calls and cumulative execution time,
+as well as process memory, Python object counts, file descriptors, and, optionally, Python memory
+allocation differences between iterations.
 
-It mainly uses the ``cProfile`` library to make the report, so this module inherits its deterministic 
-profiling and reasonable overhead features. However, it also limits profiling to a single thread, so 
-please, do not use it on concurrent code. For memory profiling, it uses ``psutil``.
+It mainly uses the cProfile library for deterministic execution-time profiling. Memory usage is
+measured using the process resident set size (RSS) provided by psutil. File descriptors are
+also monitored when supported by the operating system.
 
-.. caution::
-      This profiler was originally designed to be used in the ``autosubmit run`` command, so using
-      it in other functions may produce unexpected results or errors. Now, its usage has been
-      extended to ``autosubmit create`` and ``monitor``.
-      
-      The profiler instantiation requires an ``<EXPID>``, and not all the functions in Autosubmit use it.
-      This can be bypassed using another string, but keep in mind that there is no error handling in
-      this case.
-
-How to profile a function or a specific code fragment?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Depending on the Autosubmit function you want to profile, you must add a ``--profile`` argument to the
-parser. The ``autosubmit run``, ``create`` and ``monitor`` subcommands already support it. It is
-recommended that the default value of this flag always be ``False``, to ensure that the profiler does
-not interfere with the normal execution in an unwanted way. You will need to add something like this to
-your parser:
-
-.. code-block:: python
-
-      subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
-      help='Prints performance parameters of the execution of this experiment.')
-
-The function must receive the flag as argument to control the execution of the profiler. If the flag
-has value ``True``, you should proceed as follows:
-
-1. Instantiate a **Profiler(EXPID)** object. Specifying the ``<EXPID>`` is mandatory.
-
-2. Run the profiler by calling the **start()** function of the instantiated object, at the beginning
-   of the function or code fragment you want to evaluate. The measurement will start instantly.
-
-3. Execute the **stop()** function of the profiler at the end of the function or code fragment to be
-   evaluated. The process of taking measurements will stop instantly. The report will be generated
-   automatically and the files will be stored in the ``<EXPID>/tmp/profile`` directory.
-
-.. important:: Make sure, if necessary, that the call to `stop()` is always made, even if the
-      Autosubmit code fails, in order to get the performance report.
-
+The profiler is intended for command-line profiling and measures the process in which it is running.
+It does not provide per-thread profiling.
 
 The most relevant functions of the profiler, in detail
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 .. digraph:: foo
    :name: status_diagram
@@ -100,16 +67,44 @@ The most relevant functions of the profiler, in detail
    { rank = same; ENTRY init start }
    { rank = same; stop report EXIT }
 
-* The **start()** function: Starts taking measures, both of execution times thanks to ``cProfile``, and
-  memory thanks to ``psutil``. It also manages errors to avoid illegal transitions between states.
+* The **start()** function: Starts collecting execution-time and resource-usage measurements.
+  It records the initial process memory usage and starts ``cProfile``. If allocation tracing is
+  enabled, it also starts ``tracemalloc``.
 
-* The **stop()** function: Same as the previous function, but terminating the taking of measurements.
-  It will call the report function automatically.
+* The **iteration_checkpoint()** function: Records memory, Python object count, file descriptors,
+  and the number of loaded jobs and edges for a completed iteration. When allocation tracing is
+  enabled, it also records the largest positive Python allocation differences since the previous
+  checkpoint. A maximum number of checkpoints can be configured.
 
-* The **_report()** function: It is private, and its purpose is to generate the final performance
-  report and storing it properly. It will print the report to the console output and log it at the same time.
-  In addition, it will generate two files in the directory chosen when instantiating the Profiler
-  object, a ``.txt`` file with the same report shown on screen, and a ``.prof`` file with the report
-  generated by ``pstats``. The ``.prof`` file can be manipulated with the appropriate tools. Our
+* The **stop()** function: Stops the execution-time profiler, records the final memory usage, and
+  generates the profiling report automatically.
+
+* The **_report()** function: It is private, and its purpose is to generate and store the final
+  profiling report. It prints the report to the console and log and generates two files: a ``.txt``
+  file containing the human-readable report and a ``.prof`` file containing the data generated by
+  ``pstats``. The ``.prof`` file can be manipulated with appropriate profiling tools. Our
   recommendation is to open it with `SnakeViz <https://jiffyclub.github.io/snakeviz/>`_, a graphical
-  library that will interpret the data for you and display it in an interactive web interface.
+  library that interprets the profiling data and displays it in an interactive web interface.
+
+The report contains the following information:
+
+* **Time & Calls Profiling**: Function call counts and execution times, sorted by cumulative time.
+
+* **Iteration metrics**: Memory, Python object count, file-descriptor count, loaded jobs, and loaded
+  edges for each recorded iteration. Memory, object, and file-descriptor deltas are shown between
+  consecutive checkpoints.
+
+* **Overall growth**: Initial and final process RSS, together with overall object and file-descriptor
+  growth. The object and file-descriptor growth uses the third iteration as the startup baseline when
+  at least three checkpoints are available.
+
+* **File descriptor details**: When available, the report lists final file descriptors and identifies
+  changes between iterations. On Linux, files, pipes, and sockets are displayed using information
+  from ``/proc`` and ``psutil``.
+
+* **Allocation details**: When allocation tracing is enabled, the report includes the largest positive
+  ``tracemalloc`` allocation differences between checkpoints.
+
+The profiler can optionally enable allocation tracing with ``tracemalloc``. This provides additional
+information about Python allocations but introduces additional profiling overhead. Object traceback
+information is limited to Autosubmit code and is collected only after the initial startup checkpoints.

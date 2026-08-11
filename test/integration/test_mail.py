@@ -15,18 +15,14 @@
 # You should have received a copy of the GNU General Public License 
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>. 
 
-from collections.abc import Callable, Generator
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
-from test.integration.test_utils.docker_utils import (
-    get_mail_container,
-    get_mailhog_messages,
-    prepare_and_test_mail_container,
-)
+from test.integration.test_utils.docker_utils import get_mailhog_messages
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
@@ -46,44 +42,6 @@ def _find_email_by_subject(search_text: str, emails) -> Any:
         ),
         None,
     )
-
-
-@pytest.fixture
-def fake_smtp_server() -> Generator[tuple[int, str], None, None]:
-    """Start a fake SMTP server container.
-    :return: A tuple with the SMTP port, and the SMTP test server API base URL """
-    container, smtp_port, api_base = get_mail_container()
-    with container:
-        prepare_and_test_mail_container(container)
-
-        yield smtp_port, api_base
-        # requests.delete(f"{api_base}/api/v2/messages")
-
-
-@pytest.fixture
-def configured_mail(
-        fake_smtp_server: tuple[int, str]
-) -> Callable[['AutosubmitExperiment'], tuple[int, str]]:
-    """Factory that points an experiment's ``BasicConfig`` at the fake SMTP server.
-
-    Usage::
-
-        smtp_port, api_base = configured_mail(exp)
-
-    Mutates ``BasicConfig`` class attributes (``exp.as_conf.basic_config`` is
-    the class itself, not an instance). Auto-revert is not performed; rely on
-    every consumer re-assigning before reading, as the rest of this module does.
-    Inbox is fresh for free since ``fake_smtp_server`` is function-scoped.
-    """
-    smtp_port, api_base = fake_smtp_server
-
-    def _configure(autosubmit_experiment: 'AutosubmitExperiment') -> tuple[int, str]:
-        basic_config = autosubmit_experiment.as_conf.basic_config
-        basic_config.MAIL_FROM = 'notifier@localhost'
-        basic_config.SMTP_SERVER = f'127.0.0.1:{smtp_port}'
-        return smtp_port, api_base
-
-    return _configure
 
 
 @pytest.fixture

@@ -18,6 +18,7 @@
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.manage import create
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
 )
@@ -37,7 +38,7 @@ def test_create_noplot_calls_generate_output(as_exp, mocker, noplot):
         "autosubmit.monitor.monitor.Monitor.generate_output"
     )
 
-    as_exp.autosubmit.create(
+    create(
         as_exp.expid,
         noplot=noplot,
         hide=True,
@@ -59,7 +60,7 @@ def test_create_cw_calls_generate_scripts_andor_wrappers_without_plt(
     population.
     """
     mock_gen = mocker.patch(
-        "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers"
+        "autosubmit.experiment.manage.generate_scripts_andor_wrappers"
     )
 
     exp_data = {
@@ -92,7 +93,7 @@ def test_create_cw_calls_generate_scripts_andor_wrappers_without_plt(
 
     exp = autosubmit_exp(experiment_data=config_data, include_jobs=False, create=True)
 
-    exp.autosubmit.create(
+    create(
         exp.expid,
         noplot=True,
         hide=True,
@@ -197,7 +198,7 @@ def test_create_cw_totaljobs_cases(
     exp = autosubmit_exp(experiment_data=config_data, include_jobs=False, create=False)
 
     spy_warning = mocker.spy(Log, "warning")
-    exp.autosubmit.create(
+    create(
         exp.expid,
         noplot=True,
         hide=True,

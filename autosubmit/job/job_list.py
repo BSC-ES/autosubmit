@@ -25,23 +25,27 @@ import traceback
 from contextlib import suppress
 from pathlib import Path
 from time import localtime, mktime, strftime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
+from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_utils import Dependency
 from autosubmit.log.log import AutosubmitCritical, Log
-from autosubmit.monitor.diagram import JobData
 from autosubmit.platforms.platform import Platform
+
+if TYPE_CHECKING:
+    from autosubmit.monitor.diagram import JobData
 
 
 class JobList:
@@ -4290,3 +4294,70 @@ class JobList:
 
     def get_failed_from_db(self):
         return self.dbmanager.get_failed_job_data()
+
+
+def load_job_list(
+    expid,
+    as_conf,
+    monitor=False,
+    new=True,
+    full_load=True,
+    submitter=None,
+    check_failed_jobs=False,
+    run_mode=False,
+) -> JobList:
+    """Load the JobList for a given experiment.
+
+    :param expid: experiment id
+    :param as_conf: autosubmit configuration
+    :param monitor: whether to monitor the experiment or not
+    :param new: whether to create a new job list or not
+    :param full_load: whether to load all job data or not
+    :param submitter: submitter to be used
+    :param check_failed_jobs: whether to check failed jobs or not
+    :param run_mode: whether to load the job list in run mode or not
+    :return: JobList object
+    """
+    rerun = as_conf.get_rerun()
+    job_list = JobList(
+        expid, as_conf, YAMLParserFactory(), run_mode=run_mode, submitter=submitter
+    )
+    date_list = as_conf.get_date_list()
+    date_format = ""
+    if as_conf.get_chunk_size_unit() == ChunkUnit.HOUR:
+        date_format = "H"
+    for date in date_list:
+        if date.hour > 1:
+            date_format = "H"
+        if date.minute > 1:
+            date_format = "M"
+    wrapper_jobs = {}
+    for wrapper_section, wrapper_data in as_conf.experiment_data.get(
+        "WRAPPERS", {}
+    ).items():
+        if isinstance(wrapper_data, dict):
+            wrapper_jobs[wrapper_section] = wrapper_data.get("JOBS_IN_WRAPPER", [])
+
+    job_list.generate(
+        as_conf,
+        date_list,
+        as_conf.get_member_list(),
+        as_conf.get_num_chunks(),
+        as_conf.get_chunk_ini(),
+        as_conf.experiment_data,
+        date_format,
+        as_conf.get_retrials(),
+        as_conf.get_default_job_type(),
+        new=new,
+        full_load=full_load,
+        check_failed_jobs=check_failed_jobs,
+        monitor=monitor,
+    )
+
+    if str(rerun).lower() == "true":
+        rerun_jobs = as_conf.get_rerun_jobs()
+        job_list.rerun(rerun_jobs, as_conf, monitor=monitor)
+    else:
+        job_list.remove_rerun_only_jobs()
+
+    return job_list

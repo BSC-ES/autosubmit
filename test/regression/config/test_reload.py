@@ -34,22 +34,11 @@ PROFILE = False
 """Enable/disable profiling ( speed up the tests )."""
 
 as_conf_content: dict[str, Any] = {
-    "job": {
-        "FOR": {
-            "NAME": "%var%"
-        },
-        "path": "TOFILL"
-    },
+    "job": {"FOR": {"NAME": "%var%"}, "path": "TOFILL"},
     "test": "variableX",
     "test2": "variableY",
     "test3": "variableZ",
-    "var": [
-        "%hola%",
-        "%test%",
-        "%test2%",
-        "%test3%",
-        "variableW"
-    ],
+    "var": ["%hola%", "%test%", "%test2%", "%test3%", "variableW"],
     "DEFAULT": {
         "EXPID": "a000",
         "HPCARCH": "local",
@@ -58,21 +47,19 @@ as_conf_content: dict[str, Any] = {
                 "%job_variableX.path%",
                 "%job_variableY.path%",
                 "%job_variableZ.path%",
-                "%job_variableW.path%"
-
+                "%job_variableW.path%",
             ]
-        }
+        },
     },
-    "Jobs": {
-        "test": {
-            "file": "test.sh"
-        }
-    }
+    "Jobs": {"test": {"file": "test.sh"}},
 }
 
 
-def prepare_custom_config_tests(default_yaml_file: dict[str, Any], project_yaml_files: dict[str, dict[str, str]],
-                                temp_folder: Path) -> dict[str, Any]:
+def prepare_custom_config_tests(
+    default_yaml_file: dict[str, Any],
+    project_yaml_files: dict[str, dict[str, str]],
+    temp_folder: Path,
+) -> dict[str, Any]:
     """Prepare custom configuration tests by creating necessary YAML files.
 
     :param default_yaml_file: Default YAML file content.
@@ -111,21 +98,36 @@ def deep_check_all_keys_uppercase(data: dict) -> bool:
     return True
 
 
-@pytest.mark.parametrize("default_yaml_file, project_yaml_files, expected_data",
-                         [(as_conf_content,
-                           {"/variableX/test.yml": {"varX": "a_test"},
-                            "/variableY/test.yml": {"varY": "a_test"},
-                            "/variableZ/test.yml": {"varZ": "%test3%"},
-                            "/variableW/test.yml": {"varW": "%varZ%"}},
-                           {"VARX": "a_test",
-                            "VARY": "a_test",
-                            "VARZ": "variableZ",
-                            "VARW": "variableZ",
-                            "JOB_VARIABLEX_PATH": "variableX/test.yml",
-                            "JOB_VARIABLEY_PATH": "variableY/test.yml"})])
-def test_custom_config_for(temp_folder: Path, default_yaml_file: dict[str, Any],
-                           project_yaml_files: dict[str, dict[str, str]], expected_data: dict[str, str],
-                           mocker) -> None:
+@pytest.mark.parametrize(
+    "default_yaml_file, project_yaml_files, expected_data",
+    [
+        (
+            as_conf_content,
+            {
+                "/variableX/test.yml": {"varX": "a_test"},
+                "/variableY/test.yml": {"varY": "a_test"},
+                "/variableZ/test.yml": {"varZ": "%test3%"},
+                "/variableW/test.yml": {"varW": "%varZ%"},
+            },
+            {
+                "VARX": "a_test",
+                "VARY": "a_test",
+                "VARZ": "variableZ",
+                "VARW": "variableZ",
+                "JOB_VARIABLEX_PATH": "variableX/test.yml",
+                "JOB_VARIABLEY_PATH": "variableY/test.yml",
+            },
+        )
+    ],
+)
+def test_custom_config_for(
+    temp_folder: Path,
+    default_yaml_file: dict[str, Any],
+    project_yaml_files: dict[str, dict[str, str]],
+    expected_data: dict[str, str],
+    mocker,
+    experiment_config_fixture,
+) -> None:
     """
     Test custom configuration and "FOR" for the given YAML files.
 
@@ -140,8 +142,10 @@ def test_custom_config_for(temp_folder: Path, default_yaml_file: dict[str, Any],
     :param mocker: Mocker fixture for patching.
     :type mocker: Any
     """
-    mocker.patch('pathlib.Path.exists', return_value=True)
-    default_yaml_file = prepare_custom_config_tests(default_yaml_file, project_yaml_files, temp_folder)
+    mocker.patch("pathlib.Path.exists", return_value=True)
+    default_yaml_file = prepare_custom_config_tests(
+        default_yaml_file, project_yaml_files, temp_folder
+    )
     prepare_yaml_files(default_yaml_file, temp_folder)
     as_conf = AutosubmitConfig("test")
     as_conf.conf_folder_yaml = Path(temp_folder)
@@ -151,8 +155,12 @@ def test_custom_config_for(temp_folder: Path, default_yaml_file: dict[str, Any],
         assert temp_folder / file_name in as_conf.current_loaded_files.keys()
     assert as_conf.experiment_data["VARX"] == expected_data["VARX"]
     assert as_conf.experiment_data["VARY"] == expected_data["VARY"]
-    assert as_conf.experiment_data["JOB_VARIABLEX"]["PATH"] == str(temp_folder / expected_data["JOB_VARIABLEX_PATH"])
-    assert as_conf.experiment_data["JOB_VARIABLEY"]["PATH"] == str(temp_folder / expected_data["JOB_VARIABLEY_PATH"])
+    assert as_conf.experiment_data["JOB_VARIABLEX"]["PATH"] == str(
+        temp_folder / expected_data["JOB_VARIABLEX_PATH"]
+    )
+    assert as_conf.experiment_data["JOB_VARIABLEY"]["PATH"] == str(
+        temp_folder / expected_data["JOB_VARIABLEY_PATH"]
+    )
     assert as_conf.experiment_data["VARZ"] == expected_data["VARZ"]
     assert as_conf.experiment_data["VARW"] == expected_data["VARW"]
 
@@ -163,9 +171,9 @@ def test_custom_config_for(temp_folder: Path, default_yaml_file: dict[str, Any],
 @pytest.fixture()
 def prepare_basic_config(temp_folder):
     basic_conf = BasicConfig()
-    BasicConfig.DB_DIR = (temp_folder / "DestinE_workflows")
+    BasicConfig.DB_DIR = temp_folder / "DestinE_workflows"
     BasicConfig.DB_FILE = "as_times.db"
-    BasicConfig.LOCAL_ROOT_DIR = (temp_folder / "DestinE_workflows")
+    BasicConfig.LOCAL_ROOT_DIR = temp_folder / "DestinE_workflows"
     BasicConfig.LOCAL_TMP_DIR = "tmp"
     BasicConfig.LOCAL_ASLOG_DIR = "ASLOGS"
     BasicConfig.LOCAL_PROJ_DIR = "proj"
@@ -201,14 +209,20 @@ def check_differences(data1: dict, data2: dict) -> list:
     return differences
 
 
-def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any, monkeypatch) -> None:
+def test_destine_workflows(
+    temp_folder: Path,
+    mocker,
+    prepare_basic_config: Any,
+    monkeypatch,
+    experiment_config_fixture,
+) -> None:
     """Test the Destination Earth workflow (a1q2) hardcoded until CI/CD."""
     profiler = cProfile.Profile()
     monkeypatch.setenv("AS_ENV_PLATFORMS_PATH", "test")
     monkeypatch.setenv("AS_ENV_SSH_CONFIG_PATH", "test2")
     monkeypatch.setenv("SUDO_USER", "dummy")
     expid = "a000"  # TODO parametrize
-    mocker.patch.object(BasicConfig, 'read', return_value=True)
+    mocker.patch.object(BasicConfig, "read", return_value=True)
     current_script_location = Path(__file__).resolve().parent
     experiments_root = Path(f"{current_script_location}/DestinE_workflows")
 
@@ -228,10 +242,11 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any,
     assert len(as_conf.current_loaded_files) > 1
     # Load reference files
     reference_experiment_data_path = Path(
-        f"{current_script_location}/DestinE_workflows/{expid}/ref/experiment_data.yml")
+        f"{current_script_location}/DestinE_workflows/{expid}/ref/experiment_data.yml"
+    )
 
-    with reference_experiment_data_path.open('r') as f:
-        yaml_loader = YAML(typ='safe')
+    with reference_experiment_data_path.open("r") as f:
+        yaml_loader = YAML(typ="safe")
         reference_experiment_data = yaml_loader.load(f)
 
     # Skip some data that depends on the environment
@@ -249,9 +264,13 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any,
     list_of_differences = check_differences(parameters, parameters_ref)
     basic_parameters = BasicConfig().props()
     # TODO Reference File has to be updated
-    list_of_differences = [(key, value, reference) for key, value, reference in list_of_differences if
-                           key not in basic_parameters and not isinstance(value, MagicMock) and not key.startswith(
-                               "HPC")]
+    list_of_differences = [
+        (key, value, reference)
+        for key, value, reference in list_of_differences
+        if key not in basic_parameters
+        and not isinstance(value, MagicMock)
+        and not key.startswith("HPC")
+    ]
 
     if list_of_differences:
         print("\n")
@@ -266,12 +285,14 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any,
     parameters = as_conf.deep_parameters_export(as_conf.experiment_data)
 
     # Check that all parameters are being substituted
-    parameters_values = ' '.join(map(str, parameters.values()))
+    parameters_values = " ".join(map(str, parameters.values()))
     placeholders = re.findall(r"%\w+%", parameters_values)
-    substituted_during_update_parameters = ['%HPCARCH%', '%HPCLOGDIR%', '%HPCROOTDIR%']
+    substituted_during_update_parameters = ["%HPCARCH%", "%HPCLOGDIR%", "%HPCROOTDIR%"]
     placeholders_in_parameters = [
-        placeholder for placeholder in placeholders if
-        placeholder.strip("%") in parameters.keys() and placeholder not in substituted_during_update_parameters
+        placeholder
+        for placeholder in placeholders
+        if placeholder.strip("%") in parameters.keys()
+        and placeholder not in substituted_during_update_parameters
     ]
 
     assert not placeholders_in_parameters
@@ -292,13 +313,13 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any,
     assert list_of_differences == []
 
     if PROFILE:
-        stats = pstats.Stats(profiler).sort_stats('cumtime')
+        stats = pstats.Stats(profiler).sort_stats("cumtime")
         stats.print_stats()
 
 
 @pytest.mark.parametrize("custom_section", ["PRE", "POST"])
 def test_override_immutable_variables_in_custom_config(
-    temp_folder: Path, mocker, custom_section: str
+    temp_folder: Path, mocker, custom_section: str, experiment_config_fixture
 ) -> None:
     """Test that immutable variables (DEFAULT.EXPID) cannot be overridden
     by custom configuration files.

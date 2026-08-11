@@ -48,6 +48,7 @@ from autosubmit.platforms.wrappers.wrapper_builder import (
     PythonWrapperBuilder,
     SrunVerticalHorizontalWrapperBuilder,
 )
+from autosubmit.scheduler import check_deadlock
 
 """Tests for wrappers."""
 
@@ -2299,7 +2300,7 @@ def test_process_not_wrappeable_packages_no_more_remaining_jobs(setup, not_wrapp
             "strict_one_job", "mixed_one_job", "flexible_one_job"])
 def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wrappeable_package_info,
                                                                    packages_to_submit, max_jobs_to_submit, expected,
-                                                                   unparsed_policy, autosubmit, autosubmit_config):
+                                                                   unparsed_policy, autosubmit_config):
     job_packager, vertical_package = setup
     job_list = JobList("t000", job_packager._as_config, YAMLParserFactory())
     if unparsed_policy == "mixed_failed":
@@ -2336,9 +2337,9 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
             not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
     if unparsed_policy in ["strict", "mixed", "strict_one_job", "mixed_one_job"]:
         with pytest.raises(AutosubmitCritical):
-            autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
+            check_deadlock(job_packager.wrappers_with_error, False, job_list)
     else:
-        autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
+        check_deadlock(job_packager.wrappers_with_error, False, job_list)
     assert result == expected
 
 
