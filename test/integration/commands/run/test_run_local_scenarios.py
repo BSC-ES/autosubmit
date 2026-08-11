@@ -14,7 +14,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+import sqlite3
 import sys
+from datetime import datetime, timedelta
 from multiprocessing import Process
 from pathlib import Path
 from textwrap import dedent
@@ -33,8 +35,44 @@ from test.integration.commands.run.conftest import (
     _assert_files_recovered,
     _check_db_fields,
     _check_files_recovered,
+    run_in_thread,
 )
 from test.integration.test_utils.misc import wait_locker
+
+
+def _job_data_db(expid: str) -> Path:
+    """Return the path to an experiment historical database file."""
+    return Path(BasicConfig.LOCAL_ROOT_DIR) / 'metadata/data' / f'job_data_{expid}.db'
+
+
+def _get_last_run_row(expid: str) -> sqlite3.Row:
+    """Return the latest ``experiment_run`` row of an experiment historical database."""
+    with sqlite3.connect(_job_data_db(expid)) as conn:
+        conn.row_factory = sqlite3.Row
+        return conn.execute("SELECT * FROM experiment_run ORDER BY run_id DESC LIMIT 1").fetchone()
+
+
+def _count_job_data_entries(expid: str) -> int:
+    """Return the number of rows in the ``job_data`` table of an experiment."""
+    with sqlite3.connect(_job_data_db(expid)) as conn:
+        return conn.execute("SELECT COUNT(*) FROM job_data").fetchone()[0]
+
+
+def _bounded_poll_sleep(max_polls: int = 100):
+    """Return a ``sleep`` replacement that raises ``TimeoutError`` after ``max_polls`` calls.
+
+    Used to bound the ``handle_start_after`` poll loop in the tests: if the
+    monitored experiment never satisfies the completion condition, the poll
+    stops after ``max_polls`` iterations and the running thread finishes.
+    """
+    state = {"polls": 0}
+
+    def _sleep(_):
+        state["polls"] += 1
+        if state["polls"] > max_polls:
+            raise TimeoutError("start_after monitor never triggered")
+
+    return _sleep
 
 # -- Tests
 
@@ -66,7 +104,7 @@ from test.integration.test_utils.misc import wait_locker
             PLATFORM: LOCAL
             RUNNING: chunk
             wallclock: 00:01
-            retrials: 2  
+            retrials: 2
 
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
 
@@ -91,7 +129,7 @@ from test.integration.test_utils.misc import wait_locker
         CHUNKSIZE: '1'
         CHUNKUNIT: 'month'
         DATELIST: "20000101"
-        
+
     JOBS:
         job:
             SCRIPT: |
@@ -181,7 +219,7 @@ def test_run_uninterrupted(
                 PLATFORM: LOCAL
                 RUNNING: chunk
                 wallclock: 00:01
-                retrials: 2  
+                retrials: 2
 
         """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
 ], ids=["Success", "Failure"])
@@ -736,6 +774,248 @@ def test_run_uninterrupted_get_call_options(
         pytest.fail(e_msg + str(e))
 
 
+@pytest.mark.timeout(35)
+@pytest.mark.parametrize("run_mode, members, num_chunks, expected_db_entries", [
+    ("start_time", None, 1, 1),
+    ("start_time", None, 3, 3),
+    ("start_after", None, 1, 1),
+    ("start_after", None, 3, 3),
+    ("run_only_members", "fc0 fc1", 1, 1),
+    ("run_only_members", "fc0 fc1", 3, 3),
+], ids=[
+    "start_time-1chunk",
+    "start_time-3chunks",
+    "start_after-1chunk",
+    "start_after-3chunks",
+    "run_only_members-1chunk",
+    "run_only_members-3chunks",
+])
+def test_run_with_run_modes(
+        autosubmit_exp,
+        general_data,
+        prepare_scratch,
+        run_mode: str,
+        members: str | None,
+        num_chunks: int,
+        expected_db_entries: int,
+        monkeypatch,
+):
+    """Test the different ``autosubmit run`` trigger/filter flags.
+
+    - ``-st`` / ``--start_time``: the run waits until the given time.
+    - ``-sa`` / ``--start_after``: the run starts when the given experiment completes.
+    - ``-rom`` / ``--run_only_members``: only the given members are submitted.
+
+    Each mode is exercised with 1- and 3-chunk workflows so the run-totals and
+    member-filtering logic is covered for different job counts.
+    """
+    yaml = YAML(typ='rt')
+    jobs_data = dedent(f"""\
+    EXPERIMENT:
+        NUMCHUNKS: '{num_chunks}'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World"
+                sleep 1
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+    """)
+    experiment_data = yaml.load(jobs_data)
+    if members:
+        experiment_data["EXPERIMENT"]["MEMBERS"] = members
+
+    as_exp = autosubmit_exp(experiment_data=general_data | experiment_data, include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
+    as_exp.as_conf.set_last_as_command('run')
+
+    if run_mode == "start_time":
+        monkeypatch.setattr("autosubmit.helpers.autosubmit_helper.sleep", lambda _: None)
+        start_time = (datetime.now() + timedelta(seconds=3)).strftime("%Y-%m-%d %H:%M:%S")
+        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid, start_time=start_time)
+        _assert_exit_code("COMPLETED", exit_code)
+    elif run_mode == "run_only_members":
+        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid, run_only_members="fc0")
+        _assert_exit_code("COMPLETED", exit_code)
+    elif run_mode == "start_after":
+        # Experiment A finishes first; experiment B is launched waiting for A's
+        # completion via `start_after=A`.
+        as_exp_a = autosubmit_exp(
+            experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+        prepare_scratch(expid=as_exp_a.expid)
+        as_exp_a.as_conf.set_last_as_command('run')
+        exit_code_a = as_exp_a.autosubmit.run_experiment(expid=as_exp_a.expid)
+        _assert_exit_code("COMPLETED", exit_code_a)
+        # Speed up the `handle_start_after` poll (sleeps 60s per iteration) and
+        # bound it so the thread does not leak if B never starts.
+        monkeypatch.setattr("autosubmit.helpers.autosubmit_helper.sleep", _bounded_poll_sleep())
+        # Avoid hanging the test if B can't start after A finishes
+        thread, result, _ = run_in_thread(
+            as_exp.autosubmit.run_experiment, expid=as_exp.expid, start_after=as_exp_a.expid)
+        thread.join(timeout=15)
+        assert not thread.is_alive(), "Experiment B never started after experiment A finished"
+        assert result["exception"] is None
+        exit_code = result["exit_code"]
+        _assert_exit_code("COMPLETED", exit_code)
+        last_run_a = _get_last_run_row(as_exp_a.expid)
+        assert last_run_a is not None
+        assert last_run_a["finish"] > 0
+        assert last_run_a["total"] > 0
+        assert last_run_a["total"] == last_run_a["completed"]
+    else:
+        raise AssertionError(f"Unknown run_mode: {run_mode}")
+
+    # Check and display results
+    run_tmpdir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+    db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
+    _assert_db_fields(db_check_list)
+
+
+@pytest.mark.parametrize("scenario", ["failed_job", "not_completed"])
+def test_start_after_does_not_start(
+        autosubmit_exp,
+        general_data,
+        prepare_scratch,
+        scenario: str,
+        monkeypatch,
+):
+    """B must NOT start when experiment A did not complete all its jobs.
+
+    ``handle_start_after`` only triggers once A's run is finished
+    (``finish > 0``) and all its jobs reached a terminal state
+    (``total == completed + suspended``). If A has a failed job, or it was
+    interrupted before completing, B must keep waiting.
+    """
+    yaml = YAML(typ='rt')
+    if scenario == "failed_job":
+        jobs_data = dedent("""\
+        EXPERIMENT:
+            NUMCHUNKS: '1'
+        JOBS:
+            job:
+                SCRIPT: |
+                    d_echo "Hello World with id=FAILED"
+                PLATFORM: LOCAL
+                RUNNING: chunk
+                wallclock: 00:01
+                retrials: 1
+        """)
+    else:  # not_completed
+        # job2 depends on job1. job1 sleeps long enough so that job2 never runs
+        # before the run is interrupted.
+        jobs_data = dedent("""\
+        EXPERIMENT:
+            NUMCHUNKS: '1'
+        JOBS:
+            job:
+                SCRIPT: |
+                    sleep 60
+                PLATFORM: LOCAL
+                RUNNING: chunk
+                wallclock: 00:05
+            job2:
+                SCRIPT: |
+                    echo "Hello World with id=NOT_RUN"
+                DEPENDENCIES:
+                    job:
+                PLATFORM: LOCAL
+                RUNNING: chunk
+                wallclock: 00:01
+        """)
+
+    as_exp_a = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp_a.expid)
+    as_exp_a.as_conf.set_last_as_command('run')
+
+    if scenario == "failed_job":
+        exit_code_a = as_exp_a.autosubmit.run_experiment(expid=as_exp_a.expid)
+        _assert_exit_code("FAILED", exit_code_a)
+    else:  # not_completed
+        # Run A in a child process and interrupt it while job1 is still running,
+        # so job2 (dependent on job1) never runs. `Autosubmit.stop` cannot be
+        # used here: it matches processes by their `autosubmit run <expid>`
+        # command line, which does not apply to a Python-call child process.
+        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp_a.expid)
+        lock_file = exp_path / BasicConfig.LOCAL_TMP_DIR / 'autosubmit.lock'
+        process = Process(target=as_exp_a.autosubmit.run_experiment, args=(as_exp_a.expid,))
+        process.start()
+        wait_locker(lock_file, expect_locked=True, timeout=60)
+        process.terminate()
+        process.join(timeout=30)
+        if process.is_alive():
+            process.kill()
+            process.join()
+        wait_locker(lock_file, expect_locked=False, timeout=60)
+
+    # A's run must not be finalized: `finish` is only set on a successful run,
+    # which is why B can never satisfy the start_after condition.
+    last_run_a = _get_last_run_row(as_exp_a.expid)
+    assert last_run_a is not None
+    assert last_run_a["finish"] == 0
+    if scenario == "not_completed":
+        assert last_run_a["completed"] < last_run_a["total"]
+
+    # B waits for A and must never start.
+    as_exp_b = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp_b.expid)
+    as_exp_b.as_conf.set_last_as_command('run')
+    # Speed up and bound the `handle_start_after` poll so the thread finishes.
+    monkeypatch.setattr("autosubmit.helpers.autosubmit_helper.sleep", _bounded_poll_sleep())
+    thread, result, _ = run_in_thread(
+        as_exp_b.autosubmit.run_experiment, expid=as_exp_b.expid, start_after=as_exp_a.expid)
+    thread.join(timeout=15)
+    # B never started: its run did not complete and no job was submitted.
+    assert result["exception"] is not None, "B started even though A did not complete all its jobs"
+    assert _count_job_data_entries(as_exp_b.expid) == 0
+
+
+def test_run_only_members_invalid_member(autosubmit_exp, general_data, prepare_scratch):
+    """An invalid member in ``-rom`` must fail before the run starts."""
+    yaml = YAML(typ='rt')
+    jobs_data = dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+        MEMBERS: 'fc0 fc1'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World"
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+    """)
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
+    as_exp.as_conf.set_last_as_command('run')
+
+    with pytest.raises(AutosubmitCritical, match="do not exist"):
+        as_exp.autosubmit.run_experiment(expid=as_exp.expid, run_only_members="nonexistent")
+
+
+def test_start_after_inexistent_experiment(autosubmit_exp, general_data, prepare_scratch):
+    """``start_after`` pointing to a non-existent experiment must not block the run."""
+    yaml = YAML(typ='rt')
+    jobs_data = dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World"
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+    """)
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
+    as_exp.as_conf.set_last_as_command('run')
+
+    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid, start_after="a000")
+
+    _assert_exit_code("COMPLETED", exit_code)
+
+
 @pytest.mark.parametrize("jobs_data, expected_db_entries, final_status, wrapper_type", [
     # Failure
     (dedent("""\
@@ -750,7 +1030,7 @@ def test_run_uninterrupted_get_call_options(
             PLATFORM: local
             RUNNING: chunk
             wallclock: 00:01
-            retrials: 1  
+            retrials: 1
     """), (2 + 1) * 2, "FAILED", "simple"),  # No wrappers, simple type
 ], ids=["Force Failure -> Correct it -> Completed"])
 def test_run_failed_set_to_ready_on_new_run(

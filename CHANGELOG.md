@@ -8,6 +8,9 @@ This release also includes several bug fixes and enhancements to improve the ove
 
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
+- Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
+- Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
+- Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
 
 **New Features:**
 

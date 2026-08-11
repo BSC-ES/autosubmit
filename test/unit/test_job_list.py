@@ -108,6 +108,21 @@ def test_save_jobs(as_conf, setup_job_list, tmp_path):
     assert len(db_edges) == len(job_list.graph.edges)
 
 
+def test_get_status_counts(as_conf, setup_job_list, tmp_path):
+    """get_status_counts counts jobs from the DB, including jobs not in memory."""
+    _jobs, _edges, job_list = setup_job_list
+    job_list.save_jobs()
+    counts = job_list.get_status_counts()
+    assert counts["COMPLETED"] == 1  # job1
+    assert counts["RUNNING"] == 1  # job2
+    assert counts["FAILED"] == 1  # job4
+    assert counts["QUEUING"] == 0
+    assert counts["SUBMITTED"] == 0
+    assert counts["SUSPENDED"] == 0
+    # READY (job3) and WAITING (job5, job6) still count.
+    assert counts["TOTAL"] == 6
+
+
 @pytest.mark.parametrize(
     "full_load,load_failed_jobs",
     [
