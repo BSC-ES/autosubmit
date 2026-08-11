@@ -17,6 +17,9 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
 - Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295 (thanks @elliot1377)
 - Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
+- Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
+- Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
+- Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
 
 **New Features:**
 
