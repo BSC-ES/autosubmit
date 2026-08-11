@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
@@ -336,7 +336,7 @@ def test_get_summary_as_list(statistics: Statistics, summary_as_list: list[str],
     statistics.calculate_summary()
     summary_as_list = statistics.summary_list
 
-    assert summary_as_list == summary_as_list
+    assert summary_as_list
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
