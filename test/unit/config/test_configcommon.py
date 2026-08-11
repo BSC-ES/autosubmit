@@ -81,7 +81,7 @@ def test_get_submodules_true_not_valid_value(autosubmit_config: 'AutosubmitConfi
             'PROJECT_SUBMODULES': True
         }
     })
-    with pytest.raises(ValueError) as cm:
+    with pytest.raises(TypeError) as cm:
         as_conf.get_submodules_list()
 
     assert str(cm.value) == 'GIT.PROJECT_SUBMODULES must be false (bool) or a string'
