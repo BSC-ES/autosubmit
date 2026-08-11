@@ -20,7 +20,6 @@
 import locale
 import re
 import shutil
-from collections import defaultdict
 from io import StringIO
 from pathlib import Path
 from typing import Any
@@ -32,7 +31,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import update_experiment_description_version
-from autosubmit.experiment.experiment_common import check_ownership
+from autosubmit.experiment.utils import check_ownership
 from autosubmit.helpers.version import get_version
 from autosubmit.log.log import Log
 
@@ -157,7 +156,7 @@ def ini_to_yaml(ini_file: Path) -> Path:
     return yaml_file_path
 
 
-def upgrade_scripts(expid: str, files: list[str] | None = None) -> bool:
+def upgrade_scripts(expid: str, files: str) -> bool:
     """Upgrade scripts from Autosubmit 3 to 4."""
     files_or_extension_patterns: tuple[str, ...] = tuple(files) if files else ("*.conf", "*.CONF")
 
@@ -210,7 +209,7 @@ def upgrade_scripts(expid: str, files: list[str] | None = None) -> bool:
     template_path = Path()
 
     Log.info("Looking for %_% variables inside templates")
-    for section, value in as_conf.jobs_data.items():
+    for value in as_conf.jobs_data.values():
         try:
             template_path = exp_project_dir / Path(value.get("FILE", ""))
             w, s = _fix_placeholders(template_path, as_conf)

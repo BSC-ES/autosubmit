@@ -25,10 +25,10 @@ dynamic = ["version", "readme"]
 description = "Autosubmit is a Python-based workflow manager to create, manage and monitor complex tasks involving different substeps, such as scientific computational experiments. These workflows may involve multiple computing systems for their completion, from HPCs to post-processing clusters or workstations. Autosubmit can orchestrate all the tasks integrating the workflow by managing their dependencies, interfacing with all the platforms involved, and handling eventual errors."
 requires-python = ">=3.10,<3.13"
 authors = [
-  { name="The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
+    { name = "The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email = "support-autosubmit@bsc.es" },
 ]
 maintainers = [
-  { name="The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
+    { name = "The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email = "support-autosubmit@bsc.es" },
 ]
 
 keywords = ["climate", "weather", "workflow", "HPC"]
@@ -130,8 +130,8 @@ package-data = { "autosubmit" = [
 include-package-data = true
 
 [tool.setuptools.dynamic]
-version = {file = "VERSION"}
-readme = {file = "README_PIP.md"}
+version = { file = "VERSION" }
+readme = { file = "README_PIP.md" }
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -157,13 +157,46 @@ module = [
 ignore_missing_imports = true
 follow_untyped_imports = true
 
+[project.entry-points."autosubmit.command"]
+archive = "autosubmit.scripts.archive:main"
+catlog = "autosubmit.scripts.catlog:main"
+changelog = "autosubmit.scripts.changelog:main"
+clean = "autosubmit.scripts.clean:main"
+configure = "autosubmit.scripts.configure:main"
+create = "autosubmit.scripts.create:main"
+dbfix = "autosubmit.scripts.dbfix:main"
+delete = "autosubmit.scripts.delete:main"
+describe = "autosubmit.scripts.describe:main"
+expid = "autosubmit.scripts.expid:main"
+inspect = "autosubmit.scripts.inspect:main"
+install = "autosubmit.scripts.install:main"
+manpages = "autosubmit.scripts.manpages:main"
+migrate = "autosubmit.scripts.migrate:main"
+monitor = "autosubmit.scripts.monitor:main"
+provenance = "autosubmit.scripts.provenance:main"
+readme = "autosubmit.scripts.readme:main"
+recovery = "autosubmit.scripts.recovery:main"
+refresh = "autosubmit.scripts.refresh:main"
+report = "autosubmit.scripts.report:main"
+run = "autosubmit.scripts.run:main"
+setstatus = "autosubmit.scripts.setstatus:main"
+sqlitefix = "autosubmit.scripts.sqlitefix:main"
+stats = "autosubmit.scripts.stats:main"
+stop = "autosubmit.scripts.stop:main"
+testcase = "autosubmit.scripts.testcase:main"
+unarchive = "autosubmit.scripts.unarchive:main"
+updatedescrip = "autosubmit.scripts.updatedescrip:main"
+updateversion = "autosubmit.scripts.updateversion:main"
+upgrade = "autosubmit.scripts.upgrade:main"
+
 [tool.ruff.lint]
 ignore = [
     "DTZ005",
     "E501",
     "F401",
     "FA102",
-    "RUF010"
+    "RUF010",
+    "UP037"
 ]
 
 # NOTE: used to inspect dead code from time to time.

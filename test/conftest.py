@@ -27,7 +27,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
-from autosubmit.config.basicconfig import BasicConfig, generate_dirs
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.install import create_required_directories
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
@@ -123,7 +124,7 @@ def local(prepare_test):
 @pytest.fixture(scope='function', autouse=True)
 def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest',
                             autosubmit: Autosubmit, monkeypatch) -> None:
-    """Initialize the ``autosubmit.rc`` file for each test, automatically.
+    """Initialise the ``autosubmit.rc`` file for each test, automatically.
 
     This function should populate enough information so ``BasicConfig.read()``
     works without the need of any mocking.
@@ -167,7 +168,7 @@ def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest',
     monkeypatch.setenv('AUTOSUBMIT_CONFIGURATION', str(autosubmitrc))
 
     BasicConfig.read()
-    generate_dirs()
+    create_required_directories()
 
 
 @pytest.fixture
