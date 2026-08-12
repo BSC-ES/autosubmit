@@ -266,7 +266,7 @@ class PJMPlatform(ParamikoPlatform):
         :param x11_options: x11 options to run the script, if any
         :return: command to submit a job
         """
-        return f"{self._submit_command_name} --no-check-directory {script_name} {x11_options} {post} & echo $!"
+        return f"{pre} {self._submit_cmd} --no-check-directory {script_name} {post}"
 
     def wrapper_header(self, **kwargs):
         wr_header = textwrap.dedent(f"""
