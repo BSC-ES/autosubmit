@@ -207,7 +207,7 @@ class PJMPlatform(ParamikoPlatform):
     def get_job_id_by_job_name_cmd(self, job_name):
         if job_name[-1] == ",":
             job_name = job_name[:-1]
-        return f'pjstat -v --choose jid,st,ermsg --filter \"jnam={job_name}\"'
+        return f"pjstat -v --choose jid,st,ermsg --filter \"jnam={job_name}\""
 
     def parse_queue_reason(self, output, job_id):
         # split() is used to remove the trailing whitespace but also \t and multiple spaces
@@ -232,7 +232,7 @@ class PJMPlatform(ParamikoPlatform):
         :param x11_options: x11 options to run the script, if any
         :return: command to submit a job
         """
-        return f"{self._submit_command_name} --no-check-directory {script_name} {x11_options} {post}"
+        return f"{pre} {self._submit_cmd} --no-check-directory {script_name} {post}"
 
     def wrapper_header(self, **kwargs):
         wr_header = textwrap.dedent(f"""
