@@ -152,3 +152,71 @@ def test_is_deadlock(packager, mocker, any_simple, queue_len, jobs_config, not_w
         not_wrappeable_package_info=not_wrappable,
         built_packages_tmp=built,
     ) is expected
+
+
+class _FakeWrappedPackage:
+    """Minimal stand-in for a built wrapper package carrying the static limit flag."""
+
+    def __init__(self, jobs, static_limit_reached=False, static_limit_reason=None, policy="flexible"):
+        self.jobs = jobs
+        self.jobs_lists = [jobs]
+        self.wrapper_policy = policy
+        self.wrapper_type = "vertical"
+        self.static_limit_reached = static_limit_reached
+        self.static_limit_reason = static_limit_reason
+
+
+_WRAPPER_LIMITS = {"real_min": 10, "min_v": 1, "min_h": 1}
+
+
+@pytest.mark.parametrize("num_jobs, static_limit, policy, failed, remaining_blocked, expected_submitted", [
+    (6, True, "flexible", False, False, True),
+    (3, False, "flexible", False, False, False),
+    (6, True, "strict", False, False, False),
+    (6, True, "mixed", False, False, False),
+    (6, True, "strict", True, False, False),
+    (12, False, "flexible", False, False, True),
+    (4, False, "flexible", False, True, True),
+], ids=[
+    "flexible-below-min-static-limit-submits",
+    "flexible-below-min-waits",
+    "strict-below-min-static-limit-waits",
+    "mixed-below-min-static-limit-waits",
+    "strict-below-min-failed-innerjobs-waits",
+    "meets-min-submits",
+    "flexible-below-min-remaining-blocked-submits",
+])
+def test_check_packages_respect_wrapper_policy_static_limit(
+        packager, mocker, num_jobs, static_limit, policy, failed, remaining_blocked, expected_submitted):
+    packager.current_wrapper_section = "WRAPPER_A"
+    jobs = [Job(f"job{i}", i, Status.READY, 0) for i in range(num_jobs)]
+    for job in jobs:
+        job.section = "SECTION_A"
+        job.fail_count = 1 if failed else 0
+    package = _FakeWrappedPackage(jobs, static_limit, "MAX_WALLCLOCK" if static_limit else None, policy=policy)
+    packager._jobs_list.get_jobs_by_section.return_value = []
+    mocker.patch.object(JobPackager, "check_real_package_wrapper_limits", return_value=(len(jobs), 1, True))
+    mocker.patch.object(JobPackager, "_remaining_blocked_by_package", return_value=remaining_blocked)
+    mocker.patch.object(JobPackager, "is_deadlock", return_value=False)
+    packages, _ = packager.check_packages_respect_wrapper_policy(
+        [package], [], 5, _WRAPPER_LIMITS)
+    assert (len(packages) == 1) is expected_submitted
+
+
+def test_below_min_static_limit_logs_warning(packager, mocker):
+    packager.current_wrapper_section = "WRAPPER_A"
+    jobs = [Job(f"job{i}", i, Status.READY, 0) for i in range(6)]
+    for job in jobs:
+        job.section = "SECTION_A"
+    package = _FakeWrappedPackage(jobs, True, "MAX_WALLCLOCK")
+    packager._jobs_list.get_jobs_by_section.return_value = []
+    mocker.patch.object(JobPackager, "check_real_package_wrapper_limits", return_value=(6, 1, True))
+    mocker.patch.object(JobPackager, "_remaining_blocked_by_package", return_value=False)
+    mocker.patch.object(JobPackager, "is_deadlock", return_value=False)
+    warn = mocker.patch("autosubmit.log.log.Log.warning")
+    packager.check_packages_respect_wrapper_policy([package], [], 5, _WRAPPER_LIMITS)
+    warn.assert_called_once()
+    message = warn.call_args[0][0]
+    assert "WRAPPER_A" in message
+    assert "MAX_WALLCLOCK" in message
+    assert "below the configured minimum of 10" in message

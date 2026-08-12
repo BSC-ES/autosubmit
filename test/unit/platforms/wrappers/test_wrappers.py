@@ -33,7 +33,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistencePkl
-from autosubmit.job.job_packager import JobPackager
+from autosubmit.job.job_packager import JobPackager, JobPackagerHorizontal, JobPackagerVerticalMixed
 from autosubmit.job.job_packages import JobPackageHorizontal, JobPackageHorizontalVertical, \
     JobPackageVerticalHorizontal, JobPackageSimple
 from autosubmit.job.job_packages import JobPackageVertical
@@ -2540,3 +2540,245 @@ def test_packages_below_min_section_not_exhausted(
     )
     assert len(pkgs) == expected_len
     assert remaining == expected_remaining
+
+
+def _chained_jobs(num_splits, job_wallclock):
+    """Build a chained workflow: each WRAPPED split depends on the UPSTREAM split and the previous WRAPPED split."""
+    date, member, chunk = "20150101", "fc0", 1
+    upstream = {}
+    wrapped = {}
+    for split in range(1, num_splits + 1):
+        job = Job(f"UPSTREAM_{date}_{member}_{chunk}_{split}", split, Status.WAITING, 0)
+        job.section = "UPSTREAM"
+        job.wallclock = "02:00"
+        job.date, job.member, job.chunk, job.split = date, member, chunk, split
+        if split > 1:
+            job.add_parent(upstream[split - 1])
+        upstream[split] = job
+    for split in range(1, num_splits + 1):
+        job = Job(f"WRAPPED_{date}_{member}_{chunk}_{split}", 1000 + split, Status.WAITING, 0)
+        job.section = "WRAPPED"
+        job.wallclock = job_wallclock
+        job.date, job.member, job.chunk, job.split = date, member, chunk, split
+        job.add_parent(upstream[split])
+        if split > 1:
+            job.add_parent(wrapped[split - 1])
+        wrapped[split] = job
+    return upstream, wrapped
+
+
+@pytest.mark.parametrize(
+    "num_splits, job_wallclock, max_wallclock, upstream_done, expected_packed, expected_reason",
+    [
+        (15, "00:20", "02:00", 6, 6, None),
+        (15, "00:20", "02:00", 7, 6, "MAX_WALLCLOCK"),
+        (15, "00:20", "02:00", 15, 6, "MAX_WALLCLOCK"),
+        (15, "00:20", "10:00", 15, 15, "MAX_WRAPPED"),
+        (5, "00:20", "00:20", 5, 1, "MAX_WALLCLOCK"),
+        (10, "00:20", None, 5, 5, None),
+    ],
+    ids=[
+        "at-wallclock-limit-no-flag",
+        "wallclock-capped",
+        "wallclock-capped-all-upstream-done",
+        "max-v-reached",
+        "single-job-fits",
+        "blocked-by-parents-no-flag",
+    ],
+)
+def test_vertical_package_static_limit(
+        num_splits, job_wallclock, max_wallclock, upstream_done, expected_packed, expected_reason):
+    """The vertical packager sets the static limit flag when wallclock/max bounds prevent packing more."""
+    upstream, wrapped = _chained_jobs(num_splits, job_wallclock)
+    for split in range(1, upstream_done + 1):
+        upstream[split].status = Status.COMPLETED
+    wrapped[1].status = Status.READY
+    dict_jobs = {"20150101": {"fc0": [wrapped[split] for split in range(1, num_splits + 1)]}}
+    wrapper_limits = {"max": num_splits, "max_v": num_splits, "max_by_section": {"WRAPPED": num_splits}}
+    packager = JobPackagerVerticalMixed(
+        dict_jobs, wrapped[1], [wrapped[1]], "00:00", num_splits, wrapper_limits, max_wallclock)
+    with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
+        jobs_list = packager.build_vertical_package(wrapped[1], [None] * 6)
+    assert len(jobs_list) == expected_packed
+    assert packager.static_limit_reached is (expected_reason is not None)
+    assert packager.static_limit_reason == expected_reason
+
+
+@pytest.mark.parametrize(
+    "max_processors, per_job_processors, num_jobs, max_h, expected_packed, expected_reason",
+    [
+        (112, 1, 6, 100, 6, None),
+        (10, 4, 6, 100, 2, "MAX_PROCESSORS"),
+        (999, 1, 8, 3, 3, "MAX_WRAPPED"),
+    ],
+    ids=["all-fit", "processors-capped", "max-h-capped"],
+)
+def test_horizontal_package_static_limit(
+        max_processors, per_job_processors, num_jobs, max_h, expected_packed, expected_reason):
+    """The horizontal packager sets the static limit flag when processors/max bounds prevent packing more."""
+    jobs = []
+    for index in range(num_jobs):
+        job = Job(f"H_{index}", index, Status.READY, 0)
+        job.section = "H"
+        job.wallclock = "00:10"
+        job.nodes = 1
+        job.processors = str(per_job_processors)
+        job.tasks = 1
+        jobs.append(job)
+    wrapper_limits = {"max": 100, "max_h": max_h, "max_by_section": {"H": 100}}
+    packager = JobPackagerHorizontal(jobs, max_processors, wrapper_limits, 100, 112)
+    with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
+        package = packager.build_horizontal_package(wrapper_info=[None] * 6)
+    assert len(package) == expected_packed
+    assert packager.static_limit_reached is (expected_reason is not None)
+    assert packager.static_limit_reason == expected_reason
+
+
+class _FakeVerticalPackage:
+    def __init__(self, jobs, configuration=None, wrapper_section="WRAPPERS", wrapper_info=None, **kwargs):
+        self.jobs = list(jobs)
+        self.jobs_lists = [list(jobs)]
+        self.wrapper_policy = wrapper_info[1] if wrapper_info else "flexible"
+        self.wrapper_type = wrapper_info[0] if wrapper_info else "vertical"
+        self.static_limit_reached = False
+        self.static_limit_reason = None
+
+
+class _FakeSimplePackage:
+    def __init__(self, jobs):
+        self.jobs = jobs
+
+
+def _chained_workflow_jobs(num_splits=15, job_wallclock="00:20", platform=None):
+    """Build the jobs of a chained workflow: WRAPPED splits depend on UPSTREAM splits, plus a running OTHER job."""
+    date, member, chunk = "20150101", "fc0", 1
+    jobs = []
+    upstream = {}
+    wrapped = {}
+    for split in range(1, num_splits + 1):
+        job = Job(f"UPSTREAM_{date}_{member}_{chunk}_{split}", split, Status.WAITING, 0)
+        job.section = "UPSTREAM"
+        job.wallclock = "02:00"
+        job.date, job.member, job.chunk, job.split = date, member, chunk, split
+        job.nodes = 1
+        job.processors = "1"
+        job.tasks = 1
+        job.total_jobs = 100
+        job.max_waiting_jobs = 100
+        job.platform = platform
+        if split > 1:
+            job.add_parent(upstream[split - 1])
+        upstream[split] = job
+        jobs.append(job)
+    for split in range(1, num_splits + 1):
+        job = Job(f"WRAPPED_{date}_{member}_{chunk}_{split}", 1000 + split, Status.WAITING, 0)
+        job.section = "WRAPPED"
+        job.wallclock = job_wallclock
+        job.date, job.member, job.chunk, job.split = date, member, chunk, split
+        job.nodes = 1
+        job.processors = "1"
+        job.tasks = 1
+        job.total_jobs = 100
+        job.max_waiting_jobs = 100
+        job.platform = platform
+        job.add_parent(upstream[split])
+        if split > 1:
+            job.add_parent(wrapped[split - 1])
+        wrapped[split] = job
+        jobs.append(job)
+    running_job = Job("OTHER_20150101_fc0_1_1", 5000, Status.RUNNING, 0)
+    running_job.section = "OTHER"
+    running_job.wallclock = "01:00"
+    running_job.date, running_job.member, running_job.chunk, running_job.split = date, member, chunk, 1
+    running_job.nodes = 1
+    running_job.processors = "1"
+    running_job.tasks = 1
+    running_job.platform = platform
+    jobs.append(running_job)
+    return jobs, upstream, wrapped
+
+
+@pytest.mark.parametrize("upstream_done, expected_packages, expected_jobs, expected_reason", [
+    (6, 0, None, None),
+    (7, 1, 6, "MAX_WALLCLOCK"),
+], ids=["below-min-waits", "static-limit-capped-submits"])
+def test_build_packages_below_min_static_limit_submits(
+        mocker, upstream_done, expected_packages, expected_jobs, expected_reason):
+    """A wrapper capped below the minimum by a static limit is submitted instead of stalling."""
+    as_conf = MagicMock()
+    as_conf.experiment_data = {
+        "JOBS": {
+            "UPSTREAM": {"RUNNING": "chunk", "WALLCLOCK": "02:00", "SPLITS": "auto"},
+            "WRAPPED": {"RUNNING": "chunk", "WALLCLOCK": "00:20", "SPLITS": "auto"},
+        },
+        "WRAPPERS": {
+            "WRAPPER_WRAPPED": {
+                "TYPE": "vertical",
+                "JOBS_IN_WRAPPER": ["WRAPPED"],
+                "MIN_WRAPPED": 10,
+                "MAX_WRAPPED": 15,
+            }
+        },
+    }
+    as_conf.jobs_data = as_conf.experiment_data["JOBS"]
+    as_conf.get_wrapper_type.return_value = "vertical"
+    as_conf.get_wrapper_policy.return_value = "flexible"
+    as_conf.get_wrapper_method.return_value = "ASThread"
+    as_conf.get_wrapper_jobs.return_value = ["WRAPPED"]
+    as_conf.get_extensible_wallclock.return_value = 0
+    as_conf.get_wrapper_machinefiles.return_value = "GENERAL"
+
+    platform = MagicMock()
+    platform.name = "TEST_PLATFORM"
+    platform.allow_wrappers = True
+    platform.allow_python_jobs = True
+    platform.max_waiting_jobs = 100
+    platform.total_jobs = 100
+    platform.max_wallclock = "02:00"
+    platform.max_processors = 112
+    platform.processors_per_node = 112
+    platform.worker_events = []
+    platform.type = "SLURM"
+
+    jobs, upstream, wrapped = _chained_workflow_jobs(platform=platform)
+    for split in range(1, upstream_done + 1):
+        upstream[split].status = Status.COMPLETED
+    wrapped[1].status = Status.READY
+
+    job_list = MagicMock()
+    job_list._job_list = jobs
+    job_list.jobs_to_run_first = []
+    job_list.get_ready.return_value = [job for job in jobs if job.status == Status.READY]
+    job_list.get_in_queue.return_value = [job for job in jobs if job.status == Status.RUNNING]
+    job_list.get_submitted.return_value = []
+    job_list.get_running.return_value = [job for job in jobs if job.status == Status.RUNNING]
+    job_list.get_queuing.return_value = []
+    job_list.get_unknown.return_value = []
+    job_list.get_held_jobs.return_value = []
+    job_list.get_prepared.return_value = []
+    job_list.get_delayed.return_value = []
+    ordered = {"20150101": {"fc0": [wrapped[split] for split in range(1, 16)]}}
+    job_list.get_ordered_jobs_by_date_member.return_value = ordered
+    job_list.get_jobs_by_section.side_effect = lambda sl, banned=None, get_only_non_completed=False: [
+        job for job in jobs if job.section.upper() in sl and (banned is None or job.name not in banned)
+        and (not get_only_non_completed or job.status != Status.COMPLETED)]
+
+    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value={})
+    mocker.patch("autosubmit.job.job_packager.JobPackageVertical", _FakeVerticalPackage)
+    mocker.patch("autosubmit.job.job_packager.JobPackageSimple", _FakeSimplePackage)
+    mocker.patch("autosubmit.job.job_packager.JobPackageSimpleWrapped", _FakeSimplePackage)
+    warn = mocker.patch("autosubmit.log.log.Log.warning")
+
+    packager = JobPackager(as_conf, platform, job_list)
+    packages = packager.build_packages()
+
+    assert len(packages) == expected_packages
+    if expected_packages:
+        package = packages[0]
+        assert len(package.jobs) == expected_jobs
+        assert package.static_limit_reached is True
+        assert package.static_limit_reason == expected_reason
+        warn.assert_called_once()
+        assert expected_reason in warn.call_args[0][0]
+    else:
+        warn.assert_not_called()
