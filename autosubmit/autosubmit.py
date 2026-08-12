@@ -39,9 +39,10 @@ from importlib.metadata import version
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import cast, Generator, Optional, Union, TYPE_CHECKING
+from typing import cast, Generator, Iterable, Optional, Union, TYPE_CHECKING
 
 from bscearth.utils.date import date2str
+import paramiko
 from portalocker import Lock
 from portalocker.exceptions import BaseLockException
 from pyparsing import nestedExpr
@@ -2206,6 +2207,7 @@ class Autosubmit:
                     for job in job_list.get_job_list():
                         loaded_edges += len(job.children)
                 job_changes_tracker = dict()
+                Autosubmit.refresh_log_recovery_process(platforms_to_test, as_conf)
 
                 pending_logs = job_list.recover_logs()
                 while pending_logs:
@@ -2896,7 +2898,7 @@ class Autosubmit:
         return True
 
     @staticmethod
-    def online_recovery(as_conf: AutosubmitConfig, platforms: list[ParamikoPlatform], job_list: JobList,
+    def online_recovery(as_conf: AutosubmitConfig, platforms: Iterable[ParamikoPlatform], job_list: JobList,
                         offline: bool = False) -> list[str]:
         """Return a list of completed job names recovered from the given platforms.
 
@@ -2924,8 +2926,18 @@ class Autosubmit:
                 else:
                     raise AutosubmitCritical(f"Couldn't connect to platform {p.name} during recovery: {message}", 7050)
             else:
-                # Fetch completed jobs from platform
-                completed_jobnames.update(p.get_completed_job_names())
+                # Fetch completed jobs from platform.
+                try:
+                    completed_jobnames.update(p.get_completed_job_names())
+                except (AutosubmitError, OSError, paramiko.SSHException) as e:
+                    if offline:
+                        Log.warning(
+                            f"Platform {p.name} failed to report completed jobs, "
+                            f"proceeding with offline recovery for this platform: {e}")
+                        completed_jobnames.update(job_list.recover_all_completed_jobs_from_exp_history(p))
+                    else:
+                        raise AutosubmitCritical(
+                            f"Couldn't fetch completed jobs from platform {p.name} during recovery: {e}", 7050)
 
         return list(completed_jobnames)
 
@@ -3003,13 +3015,13 @@ class Autosubmit:
         submitter.load_platforms(as_conf)
         platforms = submitter.platforms
 
-        platforms_to_test: list['ParamikoPlatform'] = list()
+        platforms_to_test: set['ParamikoPlatform'] = set()
         for job in job_list.get_job_list():
             job.submitter = submitter
             if not job.platform_name:
                 job.platform_name = hpcarch
             job.platform = platforms[job.platform_name]
-            platforms_to_test.append(job.platform)
+            platforms_to_test.add(job.platform)
 
         completed_jobnames = Autosubmit.online_recovery(as_conf, platforms_to_test, job_list, offline)
         current_active_jobs = job_list.get_in_queue()

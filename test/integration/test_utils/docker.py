@@ -129,7 +129,7 @@ def _create_git_container(git_repos_path: Path, http_port: int) -> DockerContain
 
     docker_container = DockerContainer(
         image=_GIT_DOCKER_IMAGE,
-        remove=True,
+        auto_remove=True,
         **docker_args
     )
 
@@ -173,7 +173,7 @@ def _create_svn_container(svn_repos_path: Path, http_port: int) -> DockerContain
 
     docker_container = DockerContainer(
         image=_SVN_DOCKER_IMAGE,
-        remove=True,
+        auto_remove=True,
         **docker_args
     )
 
@@ -304,7 +304,7 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
 
     docker_container = DockerContainer(
         image=_SLURM_DOCKER_IMAGE,
-        remove=True,
+        auto_remove=True,
         hostname='slurmctl',
         **docker_args
     )
@@ -390,7 +390,7 @@ def _create_ssh_container(ssh_port: int, mfa=False, x11=False) -> DockerContaine
 
     docker_container = DockerContainer(
         image=ssh_image,
-        remove=True,
+        auto_remove=True,
         hostname='openssh-server',
         **docker_args
     ).with_env('TZ', 'Etc/UTC') \
@@ -432,7 +432,7 @@ def prepare_and_test_mail_container(container: DockerContainer) -> None:
 
 
 def _create_mail_container(smtp_port: int, api_port: int) -> DockerContainer:
-    docker_container = DockerContainer(image="mailhog/mailhog", remove=True) \
+    docker_container = DockerContainer(image="mailhog/mailhog", auto_remove=True) \
         .with_bind_ports(1025, smtp_port) \
         .with_bind_ports(8025, api_port)
     return docker_container

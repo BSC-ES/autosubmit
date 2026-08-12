@@ -2264,6 +2264,19 @@ def test_datestr_to_epoch():
     assert result == expected
 
 
+@pytest.mark.parametrize("value,expected", [
+    (None, False),
+    (0, False),
+    ("", False),
+    ("0", False),
+    ("garbage", False),
+    ("20250101120000", True),
+], ids=["none", "zero", "empty", "zero-str", "garbage", "valid"])
+def test_has_valid_submit_time(value, expected):
+    job = Job("dummy", 1, Status.WAITING, 0)
+    job.submit_time_timestamp = value
+    assert job.has_valid_submit_time() is expected
+
 
 def test_update_submit_time_on_db(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
