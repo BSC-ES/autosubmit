@@ -201,6 +201,30 @@ class JobsDbManager(DbManager):
         failed_job_list_size = self.count_where(table.name, {'status': "FAILED"})
         return job_list_size, complete_job_list_size, failed_job_list_size
 
+    def get_job_status_counts(self) -> dict[str, int]:
+        """Return the number of jobs per status from the jobs table (current state of the workflow).
+
+        Keys follow the same convention as
+        ``ExperimentHistory.get_status_counts_from_job_list``: COMPLETED,
+        FAILED, QUEUING, SUBMITTED, RUNNING, SUSPENDED and TOTAL. Statuses
+        without jobs are zero-filled, and jobs in any other status (e.g.
+        READY, WAITING) only count toward TOTAL.
+
+        :return: Dictionary mapping status name to the number of jobs in that status.
+        :rtype: Dict[str, int]
+        """
+        table: Table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        with self._get_engine(table.name).connect() as conn:
+            rows = conn.execute(
+                select(table.c.status, func.count()).group_by(table.c.status)
+            )
+            counts = {status: count for status, count in rows}
+        statuses = ["COMPLETED", "FAILED", "QUEUING", "SUBMITTED", "RUNNING", "SUSPENDED"]
+        result = {status: counts.get(status, 0) for status in statuses}
+        result["TOTAL"] = sum(counts.values())
+        return result
+
     def select_job_names_by_sections(
             self,
             sections: list[str],

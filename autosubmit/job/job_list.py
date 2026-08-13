@@ -2274,10 +2274,7 @@ class JobList:
             SUSPENDED and TOTAL.
         :rtype: dict[str, int]
         """
-        statuses = ["COMPLETED", "FAILED", "QUEUING", "SUBMITTED", "RUNNING", "SUSPENDED"]
-        counts = {status: self.dbmanager.count_where("jobs", {"status": status}) for status in statuses}
-        counts["TOTAL"] = self.dbmanager.count("jobs")
-        return counts
+        return self.dbmanager.get_job_status_counts()
 
     def get_date_format(self):
         date_format = ''

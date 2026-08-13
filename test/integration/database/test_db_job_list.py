@@ -23,7 +23,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
-from autosubmit.database.tables import WrapperJobsTable
+from autosubmit.database.tables import JobsTable, WrapperJobsTable
 from autosubmit.job.job import Job
 from autosubmit.job.job_list import JobList
 
@@ -286,6 +286,45 @@ def test_db_job_list_jobs(tmp_path: Path, full_load: bool, as_db: str, autosubmi
             'synchronize', 'updated_log', 'created', 'modified', 'fail_count', 'updated_stats',
             'wallclock', 'wrapper_type', 'retrials', 'log_recovery_call_count',
         }
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize(
+    'final_statuses,expected',
+    [
+        ({}, {"COMPLETED": 0, "FAILED": 0, "QUEUING": 0, "SUBMITTED": 0, "RUNNING": 0, "SUSPENDED": 0, "TOTAL": 3}),
+        (
+            {"a01f_REMOTE_SETUP": "COMPLETED", "a01f_LOCAL_SETUP": "SUSPENDED"},
+            {"COMPLETED": 1, "FAILED": 0, "QUEUING": 0, "SUBMITTED": 0, "RUNNING": 0, "SUSPENDED": 1, "TOTAL": 3},
+        ),
+        (
+            {"a01f_REMOTE_SETUP": "FAILED", "a01f_LOCAL_SETUP": "RUNNING"},
+            {"COMPLETED": 0, "FAILED": 1, "QUEUING": 0, "SUBMITTED": 0, "RUNNING": 1, "SUSPENDED": 0, "TOTAL": 3},
+        ),
+    ],
+    ids=[
+        'default statuses',
+        'completed and suspended',
+        'failed and running'
+    ]
+)
+def test_db_job_list_status_counts(tmp_path: Path, as_db: str, autosubmit_exp,
+                                   final_statuses: dict[str, str], expected: dict[str, int]):
+    as_exp = autosubmit_exp()
+
+    db_manager = _create_db_manager(as_exp.expid)
+
+    # Empty jobs table
+    assert db_manager.get_job_status_counts() == {
+        "COMPLETED": 0, "FAILED": 0, "QUEUING": 0, "SUBMITTED": 0, "RUNNING": 0, "SUSPENDED": 0, "TOTAL": 0}
+
+    job_list = generate_job_list(as_exp.as_conf, db_manager)
+    job_list.save_jobs()
+
+    for job_name, status in final_statuses.items():
+        db_manager.update_where(JobsTable.name, {'status': status}, {'name': job_name})
+
+    assert db_manager.get_job_status_counts() == expected
 
 
 @pytest.mark.postgres

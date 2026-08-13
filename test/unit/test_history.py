@@ -22,6 +22,7 @@ import traceback
 from collections import namedtuple
 from pathlib import Path
 from shutil import copy2
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
@@ -88,6 +89,74 @@ def test_update_counts_uses_provided_status_counts():
     assert run_dc.completed == 3
     assert run_dc.total == 3
     exp_history.manager.update_experiment_run_dc_by_id.assert_called_once_with(run_dc)
+
+
+@pytest.fixture
+def exp_history():
+    """An ExperimentHistory instance without database/manager initialization."""
+    return ExperimentHistory.__new__(ExperimentHistory)
+
+
+@pytest.mark.parametrize(
+    'current_run_dc,expected',
+    [
+        (0, True),
+        (None, True),
+        (SimpleNamespace(pending_create=1), True),
+        (SimpleNamespace(pending_create=0), False),
+        (SimpleNamespace(pending_create=None), False),
+    ],
+    ids=[
+        'no runs registered',
+        'no run at all',
+        'marked as pending_create',
+        'unmarked',
+        'null marker'
+    ]
+)
+def test_should_we_create_a_new_run(exp_history, current_run_dc, expected):
+    """A new run is opened only when there is no previous run or it is marked as pending_create."""
+    assert exp_history.should_we_create_a_new_run(current_run_dc) is expected
+
+
+@pytest.mark.parametrize(
+    'value,current_pending,expected_calls,expected_value',
+    [
+        (1, 0, 1, 1),
+        (1, 1, 0, None),
+        (0, 1, 1, 0),
+        (0, 0, 0, None),
+    ],
+    ids=[
+        'marks a clean run',
+        'already marked is idempotent',
+        'clears a marked run',
+        'already clean is idempotent'
+    ]
+)
+def test_set_pending_create(mocker, exp_history, value, current_pending, expected_calls, expected_value):
+    """set_pending_create updates the current run only when the flag must change."""
+    run_dc = mocker.Mock(pending_create=current_pending)
+    exp_history.manager = mocker.Mock()
+    exp_history.manager.get_experiment_run_dc_with_max_id_or_none.return_value = run_dc
+
+    exp_history.set_pending_create(value)
+
+    exp_history.manager.get_experiment_run_dc_with_max_id_or_none.assert_called_once_with()
+    assert exp_history.manager.update_experiment_run_dc_by_id.call_count == expected_calls
+    if expected_calls:
+        assert run_dc.pending_create == expected_value
+        exp_history.manager.update_experiment_run_dc_by_id.assert_called_once_with(run_dc)
+
+
+def test_set_pending_create_without_run_does_nothing(mocker, exp_history):
+    """set_pending_create does nothing when there is no run yet."""
+    exp_history.manager = mocker.Mock()
+    exp_history.manager.get_experiment_run_dc_with_max_id_or_none.return_value = None
+
+    exp_history.set_pending_create(1)
+
+    exp_history.manager.update_experiment_run_dc_by_id.assert_not_called()
 
 
 
@@ -157,48 +226,6 @@ class TestExperimentHistory:
         expected_ids_differences = [90, 101]
         for item in built_differences:
             assert item[3] in expected_ids_differences
-
-    def test_get_date_member_count(self):
-        exp_history = ExperimentHistory("tt00")
-        exp_history.initialize_database()
-        dm_count = exp_history._get_date_member_completed_count(self.job_list)
-        assert dm_count > 0
-
-    def test_should_we_create_new_run(self):
-        exp_history = ExperimentHistory("tt00")
-        exp_history.initialize_database()
-        CHANGES_COUNT = 1
-        TOTAL_COUNT = 6
-        current_experiment_run_dc = exp_history.manager.get_experiment_run_dc_with_max_id()
-        current_experiment_run_dc.total = TOTAL_COUNT
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size)
-        assert should_we is False
-        TOTAL_COUNT_DIFF = 5
-        current_experiment_run_dc.total = TOTAL_COUNT_DIFF
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size)
-        assert should_we is True
-        CHANGES_COUNT = 5
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size)
-        assert should_we is True
-        CHANGES_COUNT = 1
-        current_experiment_run_dc.total = TOTAL_COUNT
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size * 20)
-        assert should_we is True
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size)
-        assert should_we is False
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           "day", current_experiment_run_dc.chunk_size)
-        assert should_we is True
 
     def test_status_counts(self):
         exp_history = ExperimentHistory("tt00")
@@ -530,3 +557,28 @@ def test_update_submit_time_returns_none_when_not_found(tmp_path, monkeypatch):
 
     loaded = exp_history.get_finish_data_dc(JOB_NAME, fail_count=1)
     assert loaded is None, "No record should exist for fail_count=1"
+
+
+@pytest.mark.parametrize(
+    'pending_create,expected',
+    [
+        (0, 0),
+        (1, 1),
+    ],
+    ids=['clean run', 'marked run']
+)
+def test_experiment_run_data_class_pending_create(pending_create, expected):
+    """ExperimentRun carries pending_create, defaulting to 0 for new runs."""
+    from autosubmit.history.data_classes.experiment_run import ExperimentRun
+    from autosubmit.history.database_managers.database_models import ExperimentRunRow
+
+    run = ExperimentRun(run_id=1)
+    assert run.pending_create == 0
+
+    row = ExperimentRunRow(run_id=2, created="now", modified="now", start=1, finish=0,
+                           chunk_unit="NA", chunk_size=0, completed=0, total=1, failed=0,
+                           queuing=0, running=0, submitted=0, suspended=0, metadata="",
+                           pending_create=pending_create)
+    loaded = ExperimentRun.from_model(row)
+    assert loaded.pending_create == expected
+    assert loaded.run_id == 2

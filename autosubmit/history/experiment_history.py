@@ -320,7 +320,7 @@ class ExperimentHistory:
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def process_status_changes(self, job_list: "list[Job] | None" = None, chunk_unit: str = "NA", chunk_size: int = 0,
-                               current_config: str = "", create: bool = False,
+                               current_config: str = "",
                                status_counts: "dict[str, int] | None" = None) -> ExperimentRun | None:
         """ Detect status differences between job_list and current job_data rows, and update. Creates a new run if necessary.
 
@@ -332,8 +332,6 @@ class ExperimentHistory:
         :type chunk_size: int
         :param current_config: the experiment configuration as a JSON string.
         :type current_config: str
-        :param create: whether a new run must be created regardless of changes.
-        :type create: bool
         :param status_counts: optional pre-computed status counts (e.g. from the
             complete jobs database, which includes jobs unloaded from memory).
             When omitted they are computed from ``job_list``.
@@ -350,9 +348,7 @@ class ExperimentHistory:
                 current_experiment_run_dc = 0
                 update_these_changes = []
                 # ("no runs")
-            should_create_new_run = self.should_we_create_a_new_run(job_list, len(update_these_changes),
-                                                                    current_experiment_run_dc, chunk_unit, chunk_size,
-                                                                    create)
+            should_create_new_run = self.should_we_create_a_new_run(current_experiment_run_dc)
             if len(update_these_changes) > 0 and not should_create_new_run:
                 self.manager.update_many_job_data_change_status(update_these_changes)
             if should_create_new_run:
@@ -388,23 +384,32 @@ class ExperimentHistory:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
-    def should_we_create_a_new_run(self, job_list: "list[Job]", changes_count: int, current_experiment_run_dc,
-                                   new_chunk_unit: str, new_chunk_size: int, create: bool = False) -> bool:
-        if create:
-            return True
-        elif not create and self.expid[0].lower() != "t":
-            if len(job_list) != current_experiment_run_dc.total:
-                return True
-            if changes_count > int(self._get_date_member_completed_count(job_list)):
-                return True
-        return self._chunk_config_has_changed(current_experiment_run_dc, new_chunk_unit, new_chunk_size)
+    def should_we_create_a_new_run(self, current_experiment_run_dc) -> bool:
+        """Return whether a new run must be created instead of resuming the current one.
 
-    def _chunk_config_has_changed(self, current_exp_run_dc, new_chunk_unit, new_chunk_size):
-        if not current_exp_run_dc:
+        A new run is opened when there is no previous run, or when the current
+        run is marked as ``pending_create`` (set by ``autosubmit create``).
+        Otherwise the current run is resumed with the same run id.
+        """
+        if not current_experiment_run_dc:
             return True
-        if current_exp_run_dc.chunk_unit != new_chunk_unit or current_exp_run_dc.chunk_size != new_chunk_size:
-            return True
-        return False
+        return bool(getattr(current_experiment_run_dc, "pending_create", 0))
+
+    def set_pending_create(self, value: int) -> None:
+        """Mark (1) or clear (0) the ``pending_create`` flag of the current run.
+
+        Setting it makes the next run open a new run id (used by
+        ``autosubmit create``); clearing it makes the next run resume the
+        current one (used by ``autosubmit recovery -s``). Does nothing when
+        there is no run yet or the flag already has the requested value.
+        """
+        try:
+            current_run_dc = self.manager.get_experiment_run_dc_with_max_id_or_none()
+            if current_run_dc and current_run_dc.pending_create != value:
+                current_run_dc.pending_create = value
+                self.manager.update_experiment_run_dc_by_id(current_run_dc)
+        except Exception as exp:
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def update_counts_on_experiment_run_dc(self, experiment_run_dc, job_list: "list[Job] | None" = None,
                                            status_counts: "dict[str, int] | None" = None) -> ExperimentRun:
@@ -508,12 +513,6 @@ class ExperimentHistory:
             return max(max_counter, job_data_dc.counter + 1)
         else:
             return max_counter
-
-    def _get_date_member_completed_count(self, job_list: "list[Job] | None" = None) -> int:
-        """ Each item in the job_list must have attributes: date, member, status_str. """
-        job_list = job_list if job_list else []
-        return sum(1 for job in job_list if
-                   job.date is not None and job.member is not None and job.status_str == HUtils.SupportedStatus.COMPLETED)
 
     def get_status_counts_from_job_list(self, job_list: "list[Job] | None" = None) -> "dict[str, int]":
         """Return dict with keys COMPLETED, FAILED, QUEUING, SUBMITTED, RUNNING, SUSPENDED, TOTAL."""

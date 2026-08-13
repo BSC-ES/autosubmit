@@ -43,7 +43,7 @@ from autosubmit.history.database_managers.database_manager import (
 )
 from autosubmit.log.log import Log
 
-CURRENT_DB_VERSION = 21  # Update this if you change the database schema
+CURRENT_DB_VERSION = 22  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
 DB_VERSION_SCHEMA_CHANGES = 12
 DEFAULT_DB_VERSION = 10
@@ -105,7 +105,8 @@ class ExperimentHistoryDbManager(DatabaseManager):
             running INTEGER NOT NULL,
             submitted INTEGER NOT NULL,
             suspended INTEGER NOT NULL DEFAULT 0,
-            metadata TEXT
+            metadata TEXT,
+            pending_create INTEGER NOT NULL DEFAULT 1
             );
             ''')
         self.create_table_query = textwrap.dedent(
@@ -191,6 +192,10 @@ class ExperimentHistoryDbManager(DatabaseManager):
         # Version 20
         self.version_schema_changes.extend([
             "ALTER TABLE job_data ADD COLUMN fail_count INTEGER NOT NULL DEFAULT 0"
+        ])
+        # Version 21
+        self.version_schema_changes.extend([
+            "ALTER TABLE experiment_run ADD COLUMN pending_create INTEGER NOT NULL DEFAULT 1"
         ])
 
     def create_historical_database(self):
@@ -353,12 +358,13 @@ class ExperimentHistoryDbManager(DatabaseManager):
         statement = ''' INSERT INTO experiment_run(created, modified, start, finish,
                 chunk_unit, chunk_size, completed, total,
                 failed, queuing, running,
-                submitted, suspended, metadata) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
+                submitted, suspended, metadata, pending_create) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
         arguments = (
             HUtils.get_current_datetime(), HUtils.get_current_datetime(), experiment_run.start, experiment_run.finish,
             experiment_run.chunk_unit, experiment_run.chunk_size, experiment_run.completed, experiment_run.total,
             experiment_run.failed, experiment_run.queuing, experiment_run.running,
-            experiment_run.submitted, experiment_run.suspended, experiment_run.metadata)
+            experiment_run.submitted, experiment_run.suspended, experiment_run.metadata,
+            experiment_run.pending_create)
         return self.insert_statement_with_arguments(self.historicaldb_file_path, statement, arguments)
 
     def update_many_job_data_change_status(self, changes):
@@ -400,12 +406,13 @@ class ExperimentHistoryDbManager(DatabaseManager):
         """
         statement = ''' UPDATE experiment_run SET finish=?, chunk_unit=?, chunk_size=?, completed=?, total=?,
                 failed=?, queuing=?, running=?, submitted=?,
-                suspended=?, modified=? WHERE run_id=? '''
+                suspended=?, metadata=?, pending_create=?, modified=? WHERE run_id=? '''
         arguments = (experiment_run_dc.finish, experiment_run_dc.chunk_unit, experiment_run_dc.chunk_size,
                      experiment_run_dc.completed, experiment_run_dc.total,
                      experiment_run_dc.failed, experiment_run_dc.queuing, experiment_run_dc.running,
                      experiment_run_dc.submitted,
-                     experiment_run_dc.suspended, HUtils.get_current_datetime(), experiment_run_dc.run_id)
+                     experiment_run_dc.suspended, experiment_run_dc.metadata, experiment_run_dc.pending_create,
+                     HUtils.get_current_datetime(), experiment_run_dc.run_id)
         self.execute_statement_with_arguments_on_dbfile(self.historicaldb_file_path, statement, arguments)
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
@@ -711,7 +718,8 @@ class SqlAlchemyExperimentHistoryDbManager:
                 running=experiment_run_dc.running,
                 submitted=experiment_run_dc.submitted,
                 suspended=experiment_run_dc.suspended,
-                metadata=experiment_run_dc.metadata
+                metadata=experiment_run_dc.metadata,
+                pending_create=experiment_run_dc.pending_create
             )
         )
         with self.engine.connect() as conn, conn.begin():
@@ -734,6 +742,8 @@ class SqlAlchemyExperimentHistoryDbManager:
                 running=experiment_run_dc.running,
                 submitted=experiment_run_dc.submitted,
                 suspended=experiment_run_dc.suspended,
+                metadata=experiment_run_dc.metadata,
+                pending_create=experiment_run_dc.pending_create,
                 modified=HUtils.get_current_datetime()
             )
         )

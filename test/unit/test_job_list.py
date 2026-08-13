@@ -108,19 +108,36 @@ def test_save_jobs(as_conf, setup_job_list, tmp_path):
     assert len(db_edges) == len(job_list.graph.edges)
 
 
-def test_get_status_counts(as_conf, setup_job_list, tmp_path):
-    """get_status_counts counts jobs from the DB, including jobs not in memory."""
+@pytest.mark.parametrize(
+    'updates,expected',
+    [
+        (
+            {},
+            {"COMPLETED": 1, "FAILED": 1, "QUEUING": 0, "SUBMITTED": 0, "RUNNING": 1, "SUSPENDED": 0, "TOTAL": 6},
+        ),
+        (
+            {"job3": "COMPLETED", "job5": "SUSPENDED"},
+            {"COMPLETED": 2, "FAILED": 1, "QUEUING": 0, "SUBMITTED": 0, "RUNNING": 1, "SUSPENDED": 1, "TOTAL": 6},
+        ),
+        (
+            {"job1": "FAILED"},
+            {"COMPLETED": 0, "FAILED": 2, "QUEUING": 0, "SUBMITTED": 0, "RUNNING": 1, "SUSPENDED": 0, "TOTAL": 6},
+        ),
+    ],
+    ids=[
+        'default statuses',
+        'completed and suspended',
+        'all keys zero-filled'
+    ]
+)
+def test_get_status_counts(as_conf, setup_job_list, tmp_path, updates, expected):
+    """get_status_counts counts jobs from the DB, including jobs not in memory,
+    and always returns the full key set with zero-filled counters."""
     _jobs, _edges, job_list = setup_job_list
     job_list.save_jobs()
-    counts = job_list.get_status_counts()
-    assert counts["COMPLETED"] == 1  # job1
-    assert counts["RUNNING"] == 1  # job2
-    assert counts["FAILED"] == 1  # job4
-    assert counts["QUEUING"] == 0
-    assert counts["SUBMITTED"] == 0
-    assert counts["SUSPENDED"] == 0
-    # READY (job3) and WAITING (job5, job6) still count.
-    assert counts["TOTAL"] == 6
+    for job_name, status in updates.items():
+        job_list.dbmanager.update_where("jobs", {"status": status}, {"name": job_name})
+    assert job_list.get_status_counts() == expected
 
 
 @pytest.mark.parametrize(

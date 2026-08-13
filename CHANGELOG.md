@@ -8,7 +8,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
-- Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
+- Fixed experiment_run table  #3178
 - Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
 - Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
 
@@ -18,7 +18,6 @@ This release also includes several bug fixes and enhancements to improve the ove
 - Added support for PostgreSQL as a database backend, in addition to the default SQLite. This provides users with more options for database management.
 - Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
 - [enhancement] Allow recovery to update current running/ready jobs #1251
-
 **Migration from `job_list.pkl` to Database**
 
 - All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted in significant changes to the code.
@@ -40,6 +39,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 - Enforce connection pool usage when using PostgreSQL as database backend #2973
 - Auto-detect git default branch when `-b` flag not specified #3101
 - Removed `files` arguments from autosubmit sub-commands, and moved code to upgrade scripts out of `autosubmit.py` #2711
+- Changed `--start-after`  to read the new jobs database directly and reports the percentage of total jobs completed #3151
 
 ### 4.1.17: Bug fixes and enhancements
 

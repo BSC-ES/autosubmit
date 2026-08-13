@@ -87,6 +87,7 @@ ExperimentRunTable = Table(
     Column("submitted", Integer, nullable=False),
     Column("suspended", Integer, nullable=False, default=0),
     Column("metadata", Text),
+    Column("pending_create", Integer, nullable=False, default=1),
 )
 
 DetailsTable = Table(

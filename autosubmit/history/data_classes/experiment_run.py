@@ -23,7 +23,7 @@ class ExperimentRun:
   """
   Class that represents an experiment run
   """
-  def __init__(self, run_id, created=None, modified=None, start=0, finish=0, chunk_unit="NA", chunk_size=0, completed=0, total=0, failed=0, queuing=0, running=0, submitted=0, suspended=0, metadata=""):
+  def __init__(self, run_id, created=None, modified=None, start=0, finish=0, chunk_unit="NA", chunk_size=0, completed=0, total=0, failed=0, queuing=0, running=0, submitted=0, suspended=0, metadata="", pending_create=0):
     self.run_id = run_id
     self.created = get_current_datetime_if_none(created) 
     self.modified = get_current_datetime_if_none(modified) # Added on DB 16
@@ -38,7 +38,8 @@ class ExperimentRun:
     self.failed = failed
     self.total = total
     self.suspended = suspended
-    self.metadata = metadata    
+    self.metadata = metadata
+    self.pending_create = pending_create
 
   @classmethod
   def from_model(cls, row):
@@ -59,5 +60,6 @@ class ExperimentRun:
     experiment_run.submitted = row.submitted
     experiment_run.suspended = row.suspended
     experiment_run.metadata = row.metadata
+    experiment_run.pending_create = row.pending_create
     return experiment_run
   

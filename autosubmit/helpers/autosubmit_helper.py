@@ -17,12 +17,14 @@
 
 import datetime
 import sys
+from pathlib import Path
 from time import sleep
-from typing import Any, Union
+from typing import Any
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database.db_common import check_experiment_exists
-from autosubmit.history.experiment_history import ExperimentHistory
+from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.log.log import AutosubmitCritical, Log
 
 
@@ -78,25 +80,31 @@ def handle_start_after(start_after: str, expid: str) -> None:
         if not check_experiment_exists(start_after, error_on_inexistence=False):
             Log.warning(f"Experiment {start_after} does not exist. Ignoring the start_after trigger.")
             return
-        # Historical Database: We use the historical database to retrieve the current progress
-        # data of the supplied expid (start_after)
-        exp_history = ExperimentHistory(start_after)
-        if exp_history.is_header_ready() is False:
+        # Jobs Database: We use the jobs database to retrieve the current progress
+        # data of the supplied expid (start_after), as it reflects the current state of the workflow
+        jobs_db = JobsDbManager(start_after)
+        if BasicConfig.DATABASE_BACKEND == "sqlite" and not Path(
+                BasicConfig.LOCAL_ROOT_DIR, start_after, "db", "job_list.db").exists():
             Log.critical(
-                f"Experiment {start_after} is running a database version which is not supported by the completion "
-                f"trigger function. An updated DB version is needed.")
+                f"Experiment {start_after} has no jobs database yet, the completion trigger "
+                f"function needs an experiment run with a current Autosubmit version.")
             return
         Log.info(f"Autosubmit will start monitoring experiment {start_after}. When the number of completed jobs plus "
                  f"suspended jobs becomes equal to the total number of jobs of experiment {start_after}, experiment "
                  f"{expid} will start. Querying every 60 seconds. Status format "
                  f"Completed/Queuing/Running/Suspended/Failed.")
-        while current_run := exp_history.manager.get_experiment_run_dc_with_max_id():
-            if (current_run.finish > 0 and current_run.total > 0
-                    and current_run.total == current_run.completed + current_run.suspended):
+        while True:
+            status_counts = jobs_db.get_job_status_counts()
+            total = status_counts["TOTAL"]
+            completed = status_counts["COMPLETED"]
+            suspended = status_counts["SUSPENDED"]
+            if total > 0 and completed + suspended == total:
                 break
+            percentage = round((completed + suspended) / total * 100, 2) if total > 0 else 0.0
             sys.stdout.write(
-                f"\rExperiment {start_after} ({current_run.total} total jobs) status {current_run.completed}/"
-                f"{current_run.queuing}/{current_run.running}/{current_run.suspended}/{current_run.failed}")
+                f"\rExperiment {start_after} ({total} total jobs, {percentage}% completed) status "
+                f"{completed}/{status_counts['QUEUING']}/{status_counts['RUNNING']}/"
+                f"{suspended}/{status_counts['FAILED']}")
             sys.stdout.flush()
             # Update every 60 seconds
             sleep(60)

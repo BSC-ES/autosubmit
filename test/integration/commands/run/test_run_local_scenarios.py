@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from multiprocessing import Process
 from pathlib import Path
 from textwrap import dedent
+from time import sleep, time
 
 import pytest
 from ruamel.yaml import YAML
@@ -941,6 +942,11 @@ def test_start_after_does_not_start(
         process = Process(target=as_exp_a.autosubmit.run_experiment, args=(as_exp_a.expid,))
         process.start()
         wait_locker(lock_file, expect_locked=True, timeout=60)
+        # Wait until A registers its run: ``autosubmit create`` no longer
+        # creates a run, it is opened at the start of the first real run.
+        deadline = time() + 60
+        while _get_last_run_row(as_exp_a.expid) is None and time() < deadline:
+            sleep(0.5)
         process.terminate()
         process.join(timeout=30)
         if process.is_alive():

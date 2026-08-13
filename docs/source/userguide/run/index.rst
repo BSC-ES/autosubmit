@@ -173,9 +173,9 @@ To start an experiment after another experiment is finished, use the command:
 
 *<EXPIDB>* is the experiment identifier of the experiment you are waiting for before your experiment starts.
 
-.. warning:: Both experiments must be using Autosubmit version `3.13.0` or later.
+Then, your terminal will show the current status of the experiment you are waiting for, including the percentage of total jobs completed. The status format is ``COMPLETED/QUEUING/RUNNING/SUSPENDED/FAILED``.
 
-Then, your terminal will show the current status of the experiment you are waiting for. The status format is ``COMPLETED/QUEUING/RUNNING/SUSPENDED/FAILED``.
+.. note:: The completion trigger reads the jobs database (``job_list.db``) of the experiment you are waiting for, so both experiments must be run with an Autosubmit version that uses this database.
 
 This functionality can be used together with other options supplied by the `run` command.
 

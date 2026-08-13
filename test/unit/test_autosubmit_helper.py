@@ -19,7 +19,6 @@
 
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Union
 
 import pytest
 
@@ -95,54 +94,58 @@ def test_get_allowed_members(
 
 
 @pytest.mark.parametrize(
-    'time,header_skip,experiment_exists',
+    'experiment_exists,db_backend,db_file_exists,status_counts',
     [
-        (_EXPID, False, False),
-        ('04-00-00', False, False),
-        ('04-00-00', False, True),
-        ('04:00:00', True, False),
-        ('04:00:00', True, True),
+        (False, 'sqlite', False, {}),
+        (True, 'postgresql', False, [
+            {"COMPLETED": 2, "FAILED": 0, "QUEUING": 3, "SUBMITTED": 0, "RUNNING": 0, "SUSPENDED": 0, "TOTAL": 5},
+            {"COMPLETED": 5, "FAILED": 0, "QUEUING": 0, "SUBMITTED": 0, "RUNNING": 0, "SUSPENDED": 0, "TOTAL": 5},
+        ]),
+        (True, 'sqlite', True, [{"COMPLETED": 3, "FAILED": 0, "QUEUING": 0, "SUBMITTED": 0, "RUNNING": 0,
+                                 "SUSPENDED": 2, "TOTAL": 5}]),
+        (True, 'sqlite', False, {}),
     ],
     ids=[
-        'expid instead of time',
-        'wrong format hours',
-        'right format hours',
-        'fulldate wrong format',
-        'fulldate wrong format false'
+        'experiment does not exist',
+        'polls until completed',
+        'completed plus suspended',
+        'missing jobs database'
     ]
 )
-def test_handle_start_after(mocker, autosubmit_config: Callable, time: str,
-                             header_skip: bool, experiment_exists: bool):
-    """Test the function handle_start_time inside autosubmit_helper"""
-    autosubmit_helper = mocker.patch('autosubmit.helpers.autosubmit_helper.check_experiment_exists')
-    mock_experiment_history = mocker.patch('autosubmit.helpers.autosubmit_helper.ExperimentHistory')
-    mocked_sleep = mocker.patch('autosubmit.helpers.autosubmit_helper.sleep')
+def test_handle_start_after(mocker, capsys, experiment_exists: bool,
+                            db_backend: str, db_file_exists: bool, status_counts):
+    """Test the function handle_start_after inside autosubmit_helper."""
+    mocked_warning = mocker.patch.object(helper.Log, 'warning')
+    mocked_critical = mocker.patch.object(helper.Log, 'critical')
+    mocker.patch('autosubmit.helpers.autosubmit_helper.check_experiment_exists',
+                 return_value=experiment_exists)
+    mocked_sleep = mocker.patch('autosubmit.helpers.autosubmit_helper.sleep', return_value=0)
+    mocker.patch('autosubmit.helpers.autosubmit_helper.BasicConfig.DATABASE_BACKEND', db_backend)
+    mocker.patch('autosubmit.helpers.autosubmit_helper.Path.exists', return_value=db_file_exists)
 
-    autosubmit_config(_EXPID, experiment_data={})
-    experiment_history = mocker.Mock()
-    experiment_history2 = mocker.Mock()
+    mocked_jobs_db = mocker.Mock()
+    if isinstance(status_counts, list):
+        mocked_jobs_db.get_job_status_counts.side_effect = status_counts
+    else:
+        mocked_jobs_db.get_job_status_counts.return_value = status_counts
+    mocker.patch('autosubmit.helpers.autosubmit_helper.JobsDbManager', return_value=mocked_jobs_db)
 
-    attr: str
-    for attr in ['finish', 'total', 'completed', 'suspended', 'queuing', 'running', 'failed']:
-        setattr(experiment_history, attr, 0)
-        setattr(experiment_history2, attr, 1)
+    helper.handle_start_after(_EXPID, _EXPID)
 
-    experiment_history.total = 1
-    experiment_history.__bool__ = lambda _: True
-
-    experiment_history2.total = 2
-    experiment_history2.__bool__ = lambda _: True
-
-    mocked_exp_history = mocker.Mock()
-    mocked_exp_history.manager.get_experiment_run_dc_with_max_id.side_effect = [experiment_history, experiment_history2,
-                                                                                None]
-    mocked_exp_history.is_header_ready.return_value = header_skip
-    mock_experiment_history.return_value = mocked_exp_history
-
-    autosubmit_helper.return_value = experiment_exists
-    mocked_sleep.return_value = 0
-
-    helper.handle_start_after(time, _EXPID)
-    if header_skip is True and experiment_exists is True:
-        assert mocked_exp_history.manager.get_experiment_run_dc_with_max_id.called
-    assert mocked_sleep.has_been_called()
+    if not experiment_exists:
+        mocked_jobs_db.get_job_status_counts.assert_not_called()
+        mocked_warning.assert_called_once_with(
+            f"Experiment {_EXPID} does not exist. Ignoring the start_after trigger.")
+    elif db_backend == 'sqlite' and not db_file_exists:
+        mocked_jobs_db.get_job_status_counts.assert_not_called()
+        mocked_critical.assert_called_once()
+        assert "has no jobs database" in mocked_critical.call_args[0][0]
+    else:
+        assert mocked_jobs_db.get_job_status_counts.called
+        first_poll = status_counts[0] if isinstance(status_counts, list) else status_counts
+        first_done = first_poll["COMPLETED"] + first_poll["SUSPENDED"]
+        if first_poll["TOTAL"] > first_done:
+            assert mocked_sleep.called
+            out = capsys.readouterr().out
+            assert f"({first_poll['TOTAL']} total jobs" in out
+            assert f"{first_done / first_poll['TOTAL'] * 100:.1f}% completed" in out
