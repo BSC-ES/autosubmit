@@ -2105,7 +2105,7 @@ class Autosubmit:
         """
         Autosubmit.exit = False
         status_tracker = ExperimentStatus(expid)
-        experiment_status: Optional[Models.RunningStatus] = None
+        experiment_status: Models.RunningStatus | None = None
         heartbeat_monitor = status_tracker.heartbeat_monitor(interval_seconds=120)
         # Start profiling if the flag has been used
         if profile:

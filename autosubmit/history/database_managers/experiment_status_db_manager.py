@@ -289,7 +289,7 @@ class SqlAlchemyExperimentStatusDbManager:
         self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
         self.update_heartbeat(experiment.name)
 
-    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusStatusRow | None:
+    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None:
         experiment_row = self.get_experiment_row_by_expid(expid)
         return self.get_experiment_status_row_by_exp_id(experiment_row.id)
 

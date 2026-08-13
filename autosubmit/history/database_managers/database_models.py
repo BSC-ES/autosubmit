@@ -37,7 +37,7 @@ PragmaVersion = collections.namedtuple('PragmaVersion', ['version'])
 MaxCounter = collections.namedtuple('MaxCounter', ['maxcounter'])
 
 
-class RunningStatus(str, Enum):
+class RunningStatus:
     RUNNING = "RUNNING"
     NOT_RUNNING = "NOT RUNNING"
     ARCHIVED = "ARCHIVED"
