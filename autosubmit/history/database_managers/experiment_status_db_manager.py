@@ -20,8 +20,6 @@ from pathlib import Path
 from typing import Protocol, cast
 
 from sqlalchemy import delete, func, inspect, insert, select, text, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable
 
 import autosubmit.history.utils as HUtils
@@ -310,7 +308,6 @@ class SqlAlchemyExperimentStatusDbManager:
         )
         with self.engine.connect() as conn:
             with conn.begin():
-                # NOTE: SQLite == rowcount(), PG == rowcount. Intriguing.
                 row_count = conn.execute(query).rowcount
         return row_count
 
