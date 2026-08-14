@@ -140,7 +140,7 @@ def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, use_sql
     # Test methods
     # Create as RUNNING
     experiment = ExperimentRow(id=1, name=options["expid"], autosubmit_version="4.1.10", description="test")
-    database_manager.create_experiment_status_as_running(experiment)
+    database_manager.create_exp_status(experiment.id, experiment.name, "RUNNING")
 
     exp_status: ExperimentStatusRow = (database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id))
     assert exp_status.status == "RUNNING"
@@ -151,38 +151,9 @@ def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, use_sql
     assert exp_status.status == "NOT RUNNING"
 
     # Set back to RUNNING
-    database_manager.set_existing_experiment_status_as_running(exp_status.name)
+    database_manager.update_exp_status(exp_status.name, "RUNNING")
     exp_status: ExperimentStatusRow = (database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id))
     assert exp_status.status == "RUNNING"
-
-
-@pytest.mark.docker
-@pytest.mark.postgres
-def test_get_experiment_status_row_by_expid(
-    tmp_path: "LocalPath", as_db: str, autosubmit_exp, get_next_expid
-):
-    """Test that get_experiment_status_row_by_expid() retrieves the correct row for a given experiment ID, and raises an error if the experiment ID is not found."""
-    expid = get_next_expid()
-    options = {"expid": expid}
-
-    is_sqlalchemy = as_db == "sqlite"
-    if is_sqlalchemy:
-        options["db_dir_path"] = tmp_path
-        options["local_root_dir_path"] = tmp_path
-        options["main_db_name"] = "tests.db"
-
-    database_manager = create_experiment_status_db_manager(as_db, **options)
-
-    # An error as there is no such experiment ID in the database
-    with pytest.raises(ValueError):
-        database_manager.get_experiment_status_row_by_expid(expid)
-
-    # Create the experiment, it will have status 'NOT RUNNING' in the experiment_status table
-    exp = autosubmit_exp(expid=expid, include_jobs=True)
-    experiment_status_row = database_manager.get_experiment_status_row_by_expid(
-        exp.expid
-    )
-    assert experiment_status_row and experiment_status_row.status == "NOT RUNNING"
 
 
 @pytest.mark.docker
@@ -318,7 +289,8 @@ def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", as_db: st
     experiment = experiments[0]
     exp_id = experiment.id
     # Act
-    database_manager.create_experiment_status_as_running(experiment)
+    database_manager.create_exp_status(experiment.id, experiment.name, "RUNNING")
+    database_manager.update_heartbeat(experiment.name)
     before = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     # Assert
     assert before is not None
@@ -354,7 +326,7 @@ def test_concurrent_heartbeat_updates(tmp_path: "LocalPath", as_db: str, autosub
 
     # Create status rows for experiments
     for experiment in experiments:
-        database_manager.create_experiment_status_as_running(experiment)
+        database_manager.create_exp_status(experiment.id, experiment.name, "RUNNING")
 
     # Mock update_heartbeat to synchronize concurrent calls
     original_update_heartbeat = database_manager.update_heartbeat
@@ -411,8 +383,9 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(
 
     experiment = experiments[0]
     exp_id = experiment.id
-    
-    database_manager.create_experiment_status_as_running(experiment)
+
+    database_manager.create_exp_status(experiment.id, experiment.name, "RUNNING")
+    database_manager.update_heartbeat(experiment.name)
 
     # Get initial status (RUNNING with last_heartbeat set)
     exp_status = database_manager.get_experiment_status_row_by_exp_id(exp_id)

@@ -77,8 +77,8 @@ class ExperimentStatusDbManager(DatabaseManager):
         self.execute_statement_on_dbfile(
             self._as_times_file_path,
             '''DELETE FROM experiment_status
-               WHERE rowid NOT IN (
-                   SELECT MAX(rowid)
+               WHERE exp_id NOT IN (
+                   SELECT MAX(exp_id)
                    FROM experiment_status
                    GROUP BY name
                );'''
@@ -102,20 +102,6 @@ class ExperimentStatusDbManager(DatabaseManager):
         current_columns = [row[1] for row in self.get_from_statement(path, query)]
         return column_name in current_columns
 
-    def set_existing_experiment_status_as_running(self, expid: str) -> None:
-        """ Set the experiment_status row as running. """
-        self.update_exp_status(expid, Models.RunningStatus.RUNNING)
-
-    def create_experiment_status_as_running(self, experiment: Models.ExperimentRow) -> None:
-        """ Create a new experiment_status row for the Models.Experiment item."""
-        self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
-        self.update_heartbeat(experiment.name)
-
-    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None:
-        """Get Models.ExperimentRow by expid."""
-        experiment_row = self.get_experiment_row_by_expid(expid)
-        return self.get_experiment_status_row_by_exp_id(experiment_row.id)
-
     def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow:
         """Get the experiment from ecearth.db by expid as Models.ExperimentRow."""
         statement = self.get_built_select_statement("experiment", "name=?")
@@ -136,20 +122,32 @@ class ExperimentStatusDbManager(DatabaseManager):
         return Models.ExperimentStatusRow(*current_rows[0])
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int:
-        """Create experiment status."""
-        statement = ''' INSERT INTO experiment_status(exp_id, name,
-        status, seconds_diff, modified) VALUES(?,?,?,?,?) '''
+        """Upsert a new experiment status row in the database. If the row already exists, it will be updated."""
+        statement = """
+            INSERT INTO experiment_status(exp_id, name, status, seconds_diff, modified)
+            VALUES(?, ?, ?, ?, ?)
+            ON CONFLICT(exp_id) DO UPDATE SET
+                name = excluded.name,
+                status = excluded.status,
+                seconds_diff = excluded.seconds_diff,
+                modified = excluded.modified
+        """
         arguments = (exp_id, expid, status, 0, HUtils.get_current_datetime())
-        return self.insert_statement_with_arguments(self._as_times_file_path, statement, arguments)
+        return self.insert_statement_with_arguments(
+            self._as_times_file_path, statement, arguments
+        )
 
     def update_exp_status(self, expid: str, status="RUNNING") -> None:
         """
         Update status, seconds_diff, modified in experiment_status.
         """
         now = HUtils.get_current_datetime()
-        statement = ''' UPDATE experiment_status SET status = ?, 
-        seconds_diff = ?, modified = ?, last_heartbeat = CASE WHEN ? = ? THEN ? ELSE last_heartbeat END
-        WHERE name = ?''' 
+        statement = '''
+            UPDATE experiment_status SET status = ?,
+            seconds_diff = ?, modified = ?,
+            last_heartbeat = CASE WHEN ? = ? THEN ? ELSE last_heartbeat END
+            WHERE name = ?
+        '''
         arguments = (status, 0, now, status, Models.RunningStatus.RUNNING, now, expid)
         self.execute_statement_with_arguments_on_dbfile(
             self._as_times_file_path, statement, arguments)
@@ -182,12 +180,6 @@ class ExperimentStatusDbManager(DatabaseManager):
             self._as_times_file_path, statement, arguments)
 
 class ExperimentStatusDatabaseManager(Protocol):
-
-    def set_existing_experiment_status_as_running(self, expid: str) -> None: ...
-
-    def create_experiment_status_as_running(self, experiment: Models.ExperimentRow) -> None: ...
-
-    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None: ...
 
     def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow: ...
 
@@ -281,17 +273,6 @@ class SqlAlchemyExperimentStatusDbManager:
             column["name"] == column_name
             for column in inspector.get_columns("experiment_status")
         )
-
-    def set_existing_experiment_status_as_running(self, expid):
-        self.update_exp_status(expid, Models.RunningStatus.RUNNING)
-
-    def create_experiment_status_as_running(self, experiment):
-        self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
-        self.update_heartbeat(experiment.name)
-
-    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None:
-        experiment_row = self.get_experiment_row_by_expid(expid)
-        return self.get_experiment_status_row_by_exp_id(experiment_row.id)
 
     def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow:
         query = (

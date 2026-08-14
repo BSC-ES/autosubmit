@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 # This file is part of Autosubmit.
 
 # Autosubmit is free software: you can redistribute it and/or modify
