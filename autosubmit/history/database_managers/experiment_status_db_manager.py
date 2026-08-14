@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -19,7 +19,7 @@ import textwrap
 from pathlib import Path
 from typing import Protocol, cast
 
-from sqlalchemy import delete, func, inspect, select, text, update
+from sqlalchemy import delete, func, inspect, insert, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable
@@ -122,15 +122,13 @@ class ExperimentStatusDbManager(DatabaseManager):
         return Models.ExperimentStatusRow(*current_rows[0])
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int:
-        """Upsert a new experiment status row in the database. If the row already exists, it will be updated."""
+        """Insert a new experiment status row in the database.
+        
+        Raises IntegrityError if a row with the same exp_id already exists.
+        """
         statement = """
             INSERT INTO experiment_status(exp_id, name, status, seconds_diff, modified)
             VALUES(?, ?, ?, ?, ?)
-            ON CONFLICT(exp_id) DO UPDATE SET
-                name = excluded.name,
-                status = excluded.status,
-                seconds_diff = excluded.seconds_diff,
-                modified = excluded.modified
         """
         arguments = (exp_id, expid, status, 0, HUtils.get_current_datetime())
         return self.insert_statement_with_arguments(
@@ -297,13 +295,11 @@ class SqlAlchemyExperimentStatusDbManager:
         return Models.ExperimentStatusRow(*row)
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int:
-        """Upsert a new experiment status row in the database. If the row already exists, it will be updated."""
-        if BasicConfig.DATABASE_BACKEND == "postgres":
-            _insert_fn = pg_insert
-        else:
-            _insert_fn = sqlite_insert
+        """Insert a new experiment status row in the database. 
+        Raises IntegrityError if a row with the same exp_id already exists.
+        """
         query = (
-            _insert_fn(ExperimentStatusTable)
+            insert(ExperimentStatusTable)
             .values(
                 exp_id=exp_id,
                 name=expid,
@@ -311,24 +307,15 @@ class SqlAlchemyExperimentStatusDbManager:
                 seconds_diff=0,
                 modified=HUtils.get_current_datetime(),
             )
-            .on_conflict_do_update(
-                index_elements=[ExperimentStatusTable.c.exp_id],  # type: ignore
-                set_={
-                    "name": expid,
-                    "status": status,
-                    "seconds_diff": 0,
-                    "modified": HUtils.get_current_datetime(),
-                },
-            )
         )
         with self.engine.connect() as conn:
             with conn.begin():
-                result = conn.execute(query)
                 # NOTE: SQLite == rowcount(), PG == rowcount. Intriguing.
-                row_count = result.rowcount() if callable(result.rowcount) else result.rowcount
+                row_count = conn.execute(query).rowcount
         return row_count
 
     def update_exp_status(self, expid: str, status=Models.RunningStatus.RUNNING) -> None:
+        """Update the status of an existing experiment."""
         now = HUtils.get_current_datetime()
         query = (
             update(ExperimentStatusTable).

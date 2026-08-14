@@ -350,8 +350,8 @@ def test_concurrent_heartbeat_updates(tmp_path: "LocalPath", as_db: str, autosub
         thread2.result()
 
     # Verify all experiments have heartbeats
-    for i in range(exp_count):
-        exp_status = database_manager.get_experiment_status_row_by_exp_id(i + 1)
+    for experiment in experiments:
+        exp_status = database_manager.get_experiment_status_row_by_exp_id(experiment.id)
         assert exp_status is not None
         assert exp_status.last_heartbeat is not None
 
@@ -453,10 +453,11 @@ def test_set_exp_status_creates_running_with_heartbeat(
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_set_exp_status_logs_warning(
-    tmp_path: "LocalPath", as_db: str, mocker
+    tmp_path: "LocalPath", as_db: str, mocker, get_next_expid
 ):
     """Test lookup failure behavior: direct lookup raises, status setter logs warning."""
-    options = {"expid": "a000"}
+    expid = get_next_expid()
+    options = {"expid": expid}
 
     if as_db == "sqlite":
         options["db_dir_path"] = tmp_path
@@ -471,10 +472,10 @@ def test_set_exp_status_logs_warning(
 
     # Calling directly get_exp_row_by_expid raises a ValueError
     with pytest.raises(ValueError):
-        database_manager.get_experiment_row_by_expid("a000")
+        database_manager.get_experiment_row_by_expid(expid)
 
     # set_exp_status catches the ValueError and logs a warning
-    database_manager.set_exp_status("a000", "RUNNING")
+    database_manager.set_exp_status(expid, "RUNNING")
 
     warning_mock.assert_called_once()
-    assert "Experiment a000 not found when trying to set status" in warning_mock.call_args[0][0]
+    assert f"Experiment {expid} not found when trying to set status" in warning_mock.call_args[0][0]
