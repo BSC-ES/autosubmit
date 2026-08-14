@@ -41,6 +41,7 @@ class ExperimentHeartBeatMonitor:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._ping_lock = threading.Lock()
+        self._last_ping_failed = False
 
     def __enter__(self) -> "ExperimentHeartBeatMonitor":
         self.start()
@@ -56,17 +57,29 @@ class ExperimentHeartBeatMonitor:
             self.ping()
 
     def ping(self) -> bool:
-        """Ping the heartbeat to update the last_heartbeat timestamp in the database."""
+        """Ping the heartbeat to update the last_heartbeat timestamp in the database.
+
+        Only the first failure is logged, so a continuous failure does not spam
+        the log messages on every interval.
+        """
         # Use lock to prevent concurrent updates of the heartbeat, prevent race conditions
         with self._ping_lock:
             try:
                 self._status_tracker.update_heartbeat()
-                return True
             except Exception as exc:
-                Log.warning(
-                    f"Failed to update heartbeat for experiment {self._status_tracker.expid}: {exc}"
-                )
+                if not self._last_ping_failed:
+                    Log.warning(
+                        f"Failed to update heartbeat for experiment {self._status_tracker.expid}: {exc}"
+                    )
+                self._last_ping_failed = True
                 return False
+            else:
+                if self._last_ping_failed:
+                    Log.info(
+                        f"Heartbeat recovered for experiment {self._status_tracker.expid}."
+                    )
+                self._last_ping_failed = False
+                return True
 
     def start(self) -> bool:
         """Start the background thread that updates the heartbeat.
@@ -205,12 +218,7 @@ class ExperimentStatus:
         self.manager.set_exp_status(self.expid, Models.RunningStatus.ARCHIVED)
     
     def update_heartbeat(self) -> None:
-        """
-        Updates the heartbeat of the experiment in experiment_status of as_times.db.
-        Creates the database, table and row if necessary.
-        
-        :return: None
-        """
+        """Refresh the heartbeat timestamp for the experiment in as_times.db."""
         self.manager.update_heartbeat(self.expid)
     
     def heartbeat_monitor(self, interval_seconds: int = 120) -> ExperimentHeartBeatMonitor:

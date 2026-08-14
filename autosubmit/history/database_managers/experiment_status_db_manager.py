@@ -137,7 +137,7 @@ class ExperimentStatusDbManager(DatabaseManager):
             self._as_times_file_path, statement, arguments
         )
 
-    def update_exp_status(self, expid: str, status="RUNNING") -> None:
+    def update_exp_status(self, expid: str, status=Models.RunningStatus.RUNNING) -> None:
         """
         Update status, seconds_diff, modified in experiment_status.
         """
@@ -189,7 +189,7 @@ class ExperimentStatusDatabaseManager(Protocol):
 
     def set_exp_status(self, expid: str, status: str) -> None: ...
 
-    def update_exp_status(self, expid: str, status="RUNNING") -> None: ...
+    def update_exp_status(self, expid: str, status=Models.RunningStatus.RUNNING) -> None: ...
 
     def update_heartbeat(self, expid: str) -> None: ...
 
@@ -328,7 +328,7 @@ class SqlAlchemyExperimentStatusDbManager:
                 row_count = result.rowcount() if callable(result.rowcount) else result.rowcount
         return row_count
 
-    def update_exp_status(self, expid: str, status="RUNNING") -> None:
+    def update_exp_status(self, expid: str, status=Models.RunningStatus.RUNNING) -> None:
         now = HUtils.get_current_datetime()
         query = (
             update(ExperimentStatusTable).
