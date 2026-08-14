@@ -22,7 +22,7 @@ import os
 import sqlite3
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Connection, delete, func, insert, select, update
 from sqlalchemy.schema import CreateTable

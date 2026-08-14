@@ -24,7 +24,7 @@ from getpass import getuser
 from itertools import permutations, product
 from pathlib import Path
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from ruamel.yaml import YAML

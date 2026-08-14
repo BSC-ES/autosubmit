@@ -19,6 +19,8 @@ import traceback
 import threading
 from typing import Optional
 
+from typing_extensions import Self
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.database_manager import (
@@ -43,7 +45,7 @@ class ExperimentHeartBeatMonitor:
         self._ping_lock = threading.Lock()
         self._last_ping_failed = False
 
-    def __enter__(self) -> "ExperimentHeartBeatMonitor":
+    def __enter__(self) -> Self:
         self.start()
         return self
 

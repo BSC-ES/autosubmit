@@ -163,6 +163,7 @@ ignore = [
     "ASYNC221",
     "S110",
     "BLE001",
+    "B005",
     "B006",
     "B017",
     "C403",
@@ -197,6 +198,7 @@ ignore = [
     "PLR1711",
     "PLW0127",
     "PLW1510",
+    "PERF102",
     "UP004",
     "UP006",
     "UP007",
@@ -220,7 +222,8 @@ ignore = [
     "FURB192",
     "TRY002",
     "TRY004",
-    "TRY201"
+    "TRY201",
+    "TRY203"
 ]
 
 # NOTE: used to inspect dead code from time to time.
