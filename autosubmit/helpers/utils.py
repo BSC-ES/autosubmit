@@ -422,16 +422,9 @@ def build_and_connect_platform(
         plat.user = platform_config.get("USER", "")
         plat.scratch = platform_config.get("SCRATCH_DIR", "")
         plat.temp_dir = platform_config.get("TEMP_DIR", "")
-        plat.root_dir = str(
-            Path(plat.scratch)
-            / (
-                plat.project
-                if hasattr(plat, "project") and plat.project
-                else section_project
-            )
-            / (plat.user if hasattr(plat, "user") and plat.user else "")
-            / expid
-        )
+        user = plat.user if hasattr(plat, "user") and plat.user else ""
+        project = plat.project if hasattr(plat, "project") and plat.project else section_project
+        plat.root_dir = str(Path(plat.scratch) / project / user / expid)
 
         with suppress(Exception):
             plat.update_cmds()

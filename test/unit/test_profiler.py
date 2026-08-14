@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 import pytest
 
+from autosubmit.autosubmit import Autosubmit
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.profiler.profiler import Profiler
 

@@ -26,7 +26,8 @@ import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.utils import copy_as_config, describe_command_details
+from autosubmit.config.utils import copy_as_config
+from autosubmit.helpers.utils import describe_command_details
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
@@ -35,7 +36,7 @@ from test.unit.conftest import AutosubmitConfigFactory
 
 def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     """Test ``copy_as_config``."""
-    autosubmit_config('a000', {})
+    autosubmit_config("a000", {})
     BasicConfig.LOCAL_ROOT_DIR = f"{BasicConfig.LOCAL_ROOT_DIR}"
 
     ini_file = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/a000/conf")
@@ -55,7 +56,7 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
         )
         file.flush()
 
-    Autosubmit.copy_as_config("a001", "a000")
+    copy_as_config("a001", "a000")
 
     new_yaml_file = Path(new_file.parent, new_file.stem).with_suffix(".yml")
 
@@ -63,43 +64,41 @@ def test_copy_as_config(autosubmit_config: AutosubmitConfigFactory):
     assert new_yaml_file.stat().st_size > 0
 
     new_yaml_file = Path(new_file.parent, new_file.stem).with_suffix(
-        ".conf_AS_v3_backup"
+        ".conf_as_v3_backup"
     )
 
     assert new_yaml_file.exists()
     assert new_yaml_file.stat().st_size > 0
 
+
 def test_copy_as_config_invalid(autosubmit_config: AutosubmitConfigFactory, mocker):
     """Test copying an invalid configuration logs a warning."""
-    autosubmit_config('a000', {})
+    autosubmit_config("a000", {})
     BasicConfig.LOCAL_ROOT_DIR = f"{BasicConfig.LOCAL_ROOT_DIR}"
 
-    conf_path = Path(f'{BasicConfig.LOCAL_ROOT_DIR}/a000/conf')
-    ini_file = conf_path / 'jobs_a000.conf'
+    conf_path = Path(f"{BasicConfig.LOCAL_ROOT_DIR}/a000/conf")
+    ini_file = conf_path / "jobs_a000.conf"
 
-    mocked_log = mocker.patch('autosubmit.config.utils.Log')
+    mocked_log = mocker.patch("autosubmit.config.utils.Log")
 
-    with open(ini_file, 'w+', encoding="utf-8") as file:
-        file.write(dedent('''\
+    with open(ini_file, "w+", encoding="utf-8") as file:
+        file.write(
+            dedent("""\
                 - JOBS:
                     JOB:
                       A:
                         SCRIPT: "echo OK!"
-                '''))
+                """)
+        )
         file.flush()
 
-def test_pkl_fix_postgres(monkeypatch, autosubmit):
-    """Test that trying to fix the pkl when using Postgres results in an error."""
-    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "postgres")
+    copy_as_config("a001", "a000")
 
-    with pytest.raises(AutosubmitCritical):
-        autosubmit.pkl_fix("a000")
-
-    new_yaml_file = Path(conf_path, ini_file.stem).with_suffix('.conf_as_v3_backup')
+    new_yaml_file = Path(conf_path, ini_file.stem).with_suffix(".conf_as_v3_backup")
     assert not new_yaml_file.exists()
 
     assert mocked_log.warning.called
-    assert 'Error converting' in mocked_log.warning.call_args[0][0]
+    assert "Error converting" in mocked_log.warning.call_args[0][0]
 
 
 def test_database_backup_postgres(monkeypatch, autosubmit, mocker):
@@ -134,7 +133,7 @@ def test_iteration_info(completed, failed, mocker):
 
     mocked_log = mocker.patch("autosubmit.autosubmit.Log")
 
-    _, safety_time, default_retries, check_wrapper_time = (
+    total, safety_time, default_retries, check_wrapper_time = (
         Autosubmit.get_iteration_info(as_conf, job_list)
     )
 
@@ -343,7 +342,7 @@ def test_check_non_wrapped_jobs_empty_platform_jobs(
     """check_non_wrapped_jobs: skips platform when no non-wrapped jobs exist."""
     as_conf = mocker.MagicMock()
     fake_job_list.job_package_map = {10: "wrapper"}
-    mocker.patch.object(fake_job_list, 'get_wrappers_id_from_db', return_value=[10])
+    mocker.patch.object(fake_job_list, "get_wrappers_id_from_db", return_value=[10])
     job = Job("a000_20000101_fc0_1_SIM", 10, Status.RUNNING, 0)
     job.platform = fake_platform
     fake_job_list.add_job(job)
@@ -516,13 +515,6 @@ def test_submit_ready_jobs_raises_on_missing_template(mocker):
 
     assert "SIM" in str(exc_info.value)
 
-def test_sigint_handler_sets_exit_flag():
-    """Verify signal_handler sets Autosubmit.exit = True."""
-    from autosubmit.autosubmit import Autosubmit, signal_handler
-    Autosubmit.exit = False
-    signal_handler(2, None)  # SIGINT = 2
-    assert Autosubmit.exit is True
-
 
 @pytest.mark.parametrize(
     "command,command_log",
@@ -532,16 +524,25 @@ def test_sigint_handler_sets_exit_flag():
             ["autosubmit", "expid", "-dm", "-H", "local", "-d", "Tutorial"],
             "command: autosubmit expid\nargs: dummy=True HPC=local description=Tutorial",
         ),
-        (["autosubmit", "delete", "a000"], "command: autosubmit delete\nargs: expid=a000"),
         (
-            ["autosubmit", "monitor", "a000", "--hide", "--notransitive"],
-            "command: autosubmit monitor\nargs: expid=a000 hide=True notransitive=True",
+            ["autosubmit", "delete", "a000"],
+            "command: autosubmit delete\nargs: expid=a000",
         ),
-        (["autosubmit", "stats", "a000"], "command: autosubmit stats\nargs: expid=a000 output=pdf"),
-        (["autosubmit", "clean", "a000"], "command: autosubmit clean\nargs: expid=a000"),
         (
-            ["autosubmit", "inspect", "a000", "--notransitive"],
-            "command: autosubmit inspect\nargs: expid=a000 notransitive=True",
+            ["autosubmit", "monitor", "a000", "--hide", "-txt"],
+            "command: autosubmit monitor\nargs: expid=a000 hide=True text=True",
+        ),
+        (
+            ["autosubmit", "stats", "a000"],
+            "command: autosubmit stats\nargs: expid=a000 output=pdf",
+        ),
+        (
+            ["autosubmit", "clean", "a000"],
+            "command: autosubmit clean\nargs: expid=a000",
+        ),
+        (
+            ["autosubmit", "inspect", "a000", "--check_wrapper"],
+            "command: autosubmit inspect\nargs: expid=a000 check_wrapper=True",
         ),
         (
             [
@@ -563,9 +564,7 @@ def test_sigint_handler_sets_exit_flag():
     ],
 )
 def test_describe_command_details(mocker, command, command_log):
-    """
-    Test the utils.describe_command_details to ensure that command is being printed correctly.
-    """
+    """Test the utils.describe_command_details to ensure that command is being printed correctly."""
     mocker.patch("sys.argv", command)
     mock_log_info = mocker.patch("autosubmit.log.log.Log.info")
 

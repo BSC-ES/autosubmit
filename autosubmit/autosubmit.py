@@ -4874,10 +4874,8 @@ class Autosubmit:
         selected_chunk_filters = [name for name, value in provided_chunk_filters if value]
         if len(selected_chunk_filters) > 1:
             Log.warning(
-                "Multiple chunk filters provided (%s). Using -fc first, then -ftc, and finally -ftcs."
-                " Use only one of them to avoid ambiguity."
-                % ", ".join(selected_chunk_filters)
-                )
+                "Multiple chunk filters provided ({}). Using -fc first, then -ftc, and finally -ftcs."
+                " Use only one of them to avoid ambiguity.".format(", ".join(selected_chunk_filters))
             )
         # keep retro-compatibility with legacy filters while prioritizing -fc, then -ftc, and finally -ftcs
         filter_chunk_section_split = filter_chunks or filter_type_chunk or filter_type_chunk_split
