@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -17,7 +17,6 @@
 
 import threading
 from pathlib import Path
-from typing import Union
 
 from sqlalchemy import Engine, NullPool
 from sqlalchemy import create_engine as sqlalchemy_create_engine
@@ -43,7 +42,7 @@ def _resolve_engine(connection_url: str) -> Engine:
 class PostgreSQLEngineSingleton:
     """Singleton class to manage a single instance of the PostgreSQL engine."""
 
-    _instance: Engine = None
+    _instance: Engine | None = None
     _lock: threading.Lock = threading.Lock()
 
     @classmethod
@@ -54,6 +53,14 @@ class PostgreSQLEngineSingleton:
                 connection_url = BasicConfig.DATABASE_CONN_URL
                 cls._instance = _resolve_engine(connection_url)
         return cls._instance
+
+    @classmethod
+    def reset(cls) -> None:
+        """Dispose the cached engine, if any, so a new one is built on next use."""
+        with cls._lock:
+            if cls._instance is not None:
+                cls._instance.dispose()
+                cls._instance = None
 
 
 def get_engine(db_path: str | Path) -> Engine:

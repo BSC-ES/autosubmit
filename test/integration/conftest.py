@@ -39,6 +39,7 @@ from testcontainers.core.container import DockerContainer  # type: ignore
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.database.session import PostgreSQLEngineSingleton
 from autosubmit.experiment.experiment_common import next_experiment_id
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
@@ -540,6 +541,8 @@ def as_db(request: "FixtureRequest", autosubmit: Autosubmit, tmp_path: "LocalPat
         raise ValueError(f'Unsupported database backend: {backend}')
 
     BasicConfig.read()
+    if backend == 'postgres':
+        PostgreSQLEngineSingleton.reset()
     # TODO: check which functions call as_db twice or if this is used in
     #  combination other fixture that calls autosubmit.install)
     with suppress(AutosubmitCritical):
