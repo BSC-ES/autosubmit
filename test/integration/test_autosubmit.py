@@ -442,7 +442,7 @@ def test_stop_sets_exit_flag(autosubmit_exp, mocker):
     """stop: sets Autosubmit.exit to True for the given experiment."""
     exp = autosubmit_exp()
     mocker.patch('builtins.input', return_value='y')
-    mocker.patch('autosubmit.helpers.processes.process_id', return_value=0)
+    mocker.patch('autosubmit.autosubmit.process_id', return_value=0)
     original = Autosubmit.exit
     try:
         Autosubmit.exit = False

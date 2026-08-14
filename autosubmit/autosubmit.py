@@ -39,7 +39,7 @@ from contextlib import suppress
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Union, cast
+from typing import TYPE_CHECKING, cast
 
 from bscearth.utils.date import date2str
 from portalocker import Lock
@@ -48,7 +48,6 @@ from pyparsing import nestedExpr
 from ruamel.yaml import YAML
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
-from autosubmit.helpers.processes import process_id
 import autosubmit.statistics.utils as StatisticsUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -80,6 +79,7 @@ from autosubmit.git.autosubmit_git import (
     is_git_repo,
 )
 from autosubmit.helpers.enums import ChunkUnit
+from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
 from autosubmit.helpers.version import get_version
 from autosubmit.history.database_managers.experiment_history_db_manager import (
@@ -5431,7 +5431,7 @@ class Autosubmit:
         :param force_yes: force yes answer to prompts
         :type force_yes: bool
         """
-        from autosubmit.helpers.processes import process_id, retrieve_expids
+        from autosubmit.helpers.processes import retrieve_expids
         from autosubmit.job.job_utils import cancel_jobs
 
         if status not in Status.VALUE_TO_KEY.values():

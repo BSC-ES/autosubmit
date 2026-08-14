@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -55,6 +55,8 @@ class DatabaseManager(metaclass=ABCMeta):
     def _create_database_file(self, path):
         # type : (str) -> None
         """ creates a database files with full permissions """
+        # FIXME: umask is never restored. Every file 
+        # created after this will also lose umask filtering (too permissive).
         os.umask(0)
         if not Path(path).parent.exists():
             Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -66,28 +68,43 @@ class DatabaseManager(metaclass=ABCMeta):
         # type : (str, str) -> None
         """ Executes a statement on a database file specified by path. """
         conn = self.get_connection(path)
-        cursor = conn.cursor()
-        cursor.execute(statement)
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(statement)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def execute_statement_with_arguments_on_dbfile(self, path, statement, arguments):
         # type : (str, str, Tuple) -> None
         """ Executes a statement with arguments on a database file specified by path. """
         conn = self.get_connection(path)
-        cursor = conn.cursor()
-        cursor.execute(statement, arguments)
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(statement, arguments)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def execute_many_statement_with_arguments_on_dbfile(self, path, statement, arguments_list):
         # type : (str, str, List[Tuple]) -> None
         """ Executes many statements from a list of arguments specified by a path. """
         conn = self.get_connection(path)
-        cursor = conn.cursor()
-        cursor.executemany(statement, arguments_list)
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.executemany(statement, arguments_list)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def execute_many_statements_on_dbfile(self, path, statements):
         # type : (str, List[str]) -> None
@@ -107,35 +124,42 @@ class DatabaseManager(metaclass=ABCMeta):
         # type : (str, str) -> List[Tuple]
         """ Get the rows from a statement with no arguments """
         conn = self.get_connection(path)
-        conn.text_factory = str
-        cursor = conn.cursor()
-        cursor.execute(statement)
-        statement_rows = cursor.fetchall()
-        conn.close()
-        return statement_rows
+        try:
+            conn.text_factory = str
+            cursor = conn.cursor()
+            cursor.execute(statement)
+            return cursor.fetchall()
+        finally:
+            conn.close()
 
     def get_from_statement_with_arguments(self, path, statement, arguments):
         # type : (str, str, Tuple) -> List[Tuple]
         """ Get the rows from a statement with arguments """
         conn = self.get_connection(path)
-        conn.text_factory = str
-        cursor = conn.cursor()
-        cursor.execute(statement, arguments)
-        statement_rows = cursor.fetchall()
-        conn.close()
-        return statement_rows
+        try:
+            conn.text_factory = str
+            cursor = conn.cursor()
+            cursor.execute(statement, arguments)
+            return cursor.fetchall()
+        finally:
+            conn.close()
 
     def insert_statement_with_arguments(self, path, statement, arguments):
         # type : (str, str, Tuple) -> int
         """ Insert statement with arguments into path """
         conn = self.get_connection(path)
-        conn.text_factory = str
-        cursor = conn.cursor()
-        cursor.execute(statement, arguments)
-        lastrow_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return lastrow_id
+        try:
+            conn.text_factory = str
+            cursor = conn.cursor()
+            cursor.execute(statement, arguments)
+            lastrow_id = cursor.lastrowid
+            conn.commit()
+            return lastrow_id
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def get_built_select_statement(self, table_name, conditions=None):
         # type : (str, namedtuple, str) -> str
