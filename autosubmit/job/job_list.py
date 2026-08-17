@@ -2483,7 +2483,9 @@ class JobList(object):
         :param store_change: if True, renames the update file to avoid reloading it at the next iteration
         :return: True if an update file was found (and attempted to process), False otherwise
         """
-        update_path = Path(self._persistence_path, self._update_file)
+        legacy_update_path = Path(self._persistence_path, self._update_file)
+        status_update_path = Path(BasicConfig.LOCAL_ROOT_DIR, self.expid, "status", self._update_file)
+        update_path = status_update_path if status_update_path.exists() else legacy_update_path
         if not update_path.exists():
             return False
         Log.info(f"Loading updated list: {update_path}")
@@ -2508,8 +2510,8 @@ class JobList(object):
             job.status = status
             job.fail_count = 0
         if store_change:
-            moved_path = Path(self._persistence_path,
-                              self._update_file + "_" + strftime("%Y%m%d_%H%M", localtime()))
+            moved_path = Path(update_path.parent,
+                              update_path.name + "_" + strftime("%Y%m%d_%H%M", localtime()))
             try:
                 move(update_path, moved_path)
             except OSError as e:

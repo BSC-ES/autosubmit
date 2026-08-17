@@ -674,8 +674,14 @@ def job_list(as_exp):
     return as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
 
 
-def _write_update_file(job_list, *lines):
-    update_file = Path(job_list._persistence_path) / job_list._update_file
+def _update_file_path(job_list, in_status=False):
+    if in_status:
+        return Path(BasicConfig.LOCAL_ROOT_DIR, job_list.expid, "status", job_list._update_file)
+    return Path(job_list._persistence_path, job_list._update_file)
+
+
+def _write_update_file(job_list, *lines, in_status=False):
+    update_file = _update_file_path(job_list, in_status=in_status)
     update_file.parent.mkdir(parents=True, exist_ok=True)
     update_file.write_text("\n".join(lines) + "\n")
     return update_file
@@ -694,11 +700,12 @@ def _status_id(status):
     (True, False),
     (False, True),
 ], ids=["moves-file", "keeps-file"])
-def test_update_from_file_applies_status_and_handles_file(job_list, store_change, file_kept, new_status):
+@pytest.mark.parametrize("in_status", [False, True], ids=["pkl", "status"])
+def test_update_from_file_applies_status_and_handles_file(job_list, store_change, file_kept, new_status, in_status):
     job = job_list.get_job_list()[0]
     job.status = Status.READY if new_status == Status.WAITING else Status.WAITING
     job.fail_count = 2
-    update_file = _write_update_file(job_list, f"{job.name} {_status_token(new_status)}")
+    update_file = _write_update_file(job_list, f"{job.name} {_status_token(new_status)}", in_status=in_status)
 
     result = job_list.update_from_file(store_change=store_change)
 
@@ -723,10 +730,11 @@ def test_update_from_file_applies_status_and_handles_file(job_list, store_change
     ("{job_lower} completed", Status.COMPLETED, None),
 ], ids=["blank", "whitespace", "missing-status", "invalid-status", "invalid-status-lowercase",
         "unknown-job", "valid", "valid-lowercase-status", "valid-lowercase-job", "valid-all-lowercase"])
-def test_update_from_file_handles_lines(job_list, mocker, line, expected_status, expected_warning):
+@pytest.mark.parametrize("in_status", [False, True], ids=["pkl", "status"])
+def test_update_from_file_handles_lines(job_list, mocker, line, expected_status, expected_warning, in_status):
     job = job_list.get_job_list()[0]
     job.status = Status.WAITING
-    _write_update_file(job_list, line.format(job=job.name, job_lower=job.name.lower()))
+    _write_update_file(job_list, line.format(job=job.name, job_lower=job.name.lower()), in_status=in_status)
     mock_warning = mocker.patch("autosubmit.job.job_list.Log.warning")
 
     result = job_list.update_from_file()
@@ -744,8 +752,9 @@ def test_update_from_file_handles_lines(job_list, mocker, line, expected_status,
     (b"", True),
     (b"\xff\xfe\x00", False),
 ], ids=["valid", "empty", "unreadable"])
-def test_update_from_file_moves_file_after_attempt(job_list, mocker, content, read_ok):
-    update_file = _write_update_file(job_list, "placeholder")
+@pytest.mark.parametrize("in_status", [False, True], ids=["pkl", "status"])
+def test_update_from_file_moves_file_after_attempt(job_list, mocker, content, read_ok, in_status):
+    update_file = _write_update_file(job_list, "placeholder", in_status=in_status)
     update_file.write_bytes(content)
     mock_warning = mocker.patch("autosubmit.job.job_list.Log.warning")
 
@@ -755,6 +764,20 @@ def test_update_from_file_moves_file_after_attempt(job_list, mocker, content, re
     assert mock_warning.called is (not read_ok)
     assert not update_file.exists()
     assert len(list(update_file.parent.glob(job_list._update_file + "_*"))) == 1
+
+
+def test_update_from_file_prefers_status_location(job_list):
+    job = job_list.get_job_list()[0]
+    job.status = Status.WAITING
+    pkl_file = _write_update_file(job_list, f"{job.name} WAITING", in_status=False)
+    status_file = _write_update_file(job_list, f"{job.name} COMPLETED", in_status=True)
+
+    result = job_list.update_from_file(store_change=False)
+
+    assert result is True
+    assert job.status == Status.COMPLETED
+    assert pkl_file.exists()
+    assert status_file.exists()
 
 
 @pytest.mark.parametrize("store_change, expected", [
