@@ -1037,6 +1037,40 @@ def test_change_status_handles_send_command_failure_gracefully(
 
 
 @pytest.mark.parametrize(
+    "invalid_id",
+    [0, None, ""],
+    ids=["zero", "none", "empty"],
+)
+def test_change_status_skips_cancel_for_invalid_job_id(
+        invalid_id,
+        multi_platform_setup: dict,
+) -> None:
+    """Test that active jobs with an invalid job id are not cancelled but still change status."""
+    platforms = multi_platform_setup["platforms"]
+    sent = multi_platform_setup["sent"]
+
+    jobs = [
+        _make_job(f"job_{name}", invalid_id, Status.RUNNING, platform)
+        for name, platform in platforms.items()
+    ]
+
+    changes = Autosubmit.change_status(
+        final="FAILED",
+        final_status=Status.FAILED,
+        final_list=jobs,
+        save=True,
+        definitive_platforms=list(platforms.keys()),
+        platforms=platforms,
+    )
+
+    for job in jobs:
+        assert job.status == Status.FAILED
+        assert job.name in changes
+    for platform_name in ("local", "ps", "slurm"):
+        assert sent[platform_name] == []
+
+
+@pytest.mark.parametrize(
     "stat_status, scheduler_status, finished_time, io_safe_wait, now, expected_status, expected_finished_time, expect_warning",
     [
         (Status.COMPLETED, Status.RUNNING, 100.0, 5, 200.0, Status.COMPLETED, None, False),

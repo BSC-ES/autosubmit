@@ -3196,7 +3196,10 @@ class WrapperJob(Job):
         if not over_wallclock:
             return False
 
-        self.platform.cancel_jobs([self.id])
+        if not self.id:
+            Log.warning(f"Skipping cancellation of wrapper job [{self.name}] with invalid ID: {self.id}")
+        else:
+            self.platform.cancel_jobs([self.id])
         self.new_status = Status.FAILED
         for inner_job in self.job_list:
             if inner_job.new_status == Status.RUNNING:

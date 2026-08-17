@@ -155,6 +155,35 @@ def test_cancel_jobs(create_job_list):
 
 
 @pytest.mark.parametrize(
+    'invalid_id',
+    [0, None, ''],
+    ids=['zero', 'none', 'empty'],
+)
+def test_cancel_jobs_skips_invalid_ids(invalid_id, create_job_list):
+    """Test that jobs without a valid id are skipped in the cancel command but still change status."""
+    target_status = 'FAILED'
+    job_list = create_job_list([
+        {
+            'status': Status.KEY_TO_VALUE['RUNNING']
+        },
+        {
+            'status': Status.KEY_TO_VALUE['RUNNING']
+        },
+    ])
+
+    jobs = job_list.get_job_list()
+    jobs[0].id = invalid_id
+    jobs[1].id = 'valid-job'
+
+    cancel_jobs(job_list, [Status.KEY_TO_VALUE['RUNNING'], Status.KEY_TO_VALUE['QUEUING']], target_status)
+
+    jobs[0].platform.cancel_jobs.assert_not_called()
+    jobs[1].platform.cancel_jobs.assert_called_once_with(['valid-job'])
+    for job in jobs:
+        assert job.status == Status.KEY_TO_VALUE[target_status]
+
+
+@pytest.mark.parametrize(
     "data,result",
     [
         (

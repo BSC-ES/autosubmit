@@ -647,13 +647,18 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status=Opti
         jobs_by_platform.setdefault(job.platform, []).append(job)
 
     for platform, jobs in jobs_by_platform.items():
-        job_ids = [str(job.id) for job in jobs]
-        Log.info(f'Cancelling jobs {", ".join(job_ids)} on platform {platform.name}')
+        for job in jobs:
+            if not job.id:
+                Log.warning(f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
 
-        try:
-            platform.cancel_jobs(job_ids)
-        except Exception as e:
-            Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform.name}: {str(e)}")
+        job_ids = [str(job.id) for job in jobs if job.id]
+        if job_ids:
+            Log.info(f'Cancelling jobs {", ".join(job_ids)} on platform {platform.name}')
+
+            try:
+                platform.cancel_jobs(job_ids)
+            except Exception as e:
+                Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform.name}: {str(e)}")
 
         for job in jobs:
             Log.info(f"Changing status of job {job.name} to {target_status}")

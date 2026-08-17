@@ -2818,8 +2818,12 @@ class JobList(object):
                                             related_job.date, related_job.date_format)):
                                     try:
                                         if job.status == Status.QUEUING:
-                                            job.platform.send_command(job.platform.cancel_cmd +
-                                                                      " " + str(job.id), ignore_log=True)
+                                            if not job.id:
+                                                Log.warning(
+                                                    f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+                                            else:
+                                                job.platform.send_command(job.platform.cancel_cmd +
+                                                                          " " + str(job.id), ignore_log=True)
                                     except Exception:
                                         pass  # jobid finished already
                                     job.status = Status.SKIPPED
@@ -2832,8 +2836,12 @@ class JobList(object):
                                         date2str(related_job.date, related_job.date_format)):
                                     try:
                                         if job.status == Status.QUEUING:
-                                            job.platform.send_command(job.platform.cancel_cmd +
-                                                                      " " + str(job.id), ignore_log=True)
+                                            if not job.id:
+                                                Log.warning(
+                                                    f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+                                            else:
+                                                job.platform.send_command(job.platform.cancel_cmd +
+                                                                          " " + str(job.id), ignore_log=True)
                                     except Exception:
                                         pass  # job_id finished already
                                     job.status = Status.SKIPPED

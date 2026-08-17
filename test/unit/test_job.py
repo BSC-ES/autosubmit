@@ -2948,3 +2948,74 @@ def test_check_wrapper_wallclock_and_handle(mocker, inner_over, wrapper_over, in
     else:
         assert result is False
         wrapper.platform.cancel_jobs.assert_not_called()
+
+
+@pytest.mark.parametrize("invalid_id", [0, None, ""], ids=["zero", "none", "empty"])
+def test_check_wrapper_wallclock_skips_cancel_for_invalid_id(mocker, invalid_id):
+    """_check_wrapper_wallclock_and_handle: a wrapper without a valid job id is failed without a cancel command."""
+    inner = Job("inner", 2, Status.RUNNING, 0)
+    inner.new_status = Status.RUNNING
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
+    wrapper.id = invalid_id
+    mocker.patch.object(wrapper, "_check_inner_job_wallclock", return_value=True)
+    mocker.patch.object(wrapper, "is_over_wallclock", return_value=True)
+    result = wrapper._check_wrapper_wallclock_and_handle()
+    assert result is True
+    wrapper.platform.cancel_jobs.assert_not_called()
+    assert wrapper.new_status == Status.FAILED
+    assert inner.new_status == Status.FAILED
+
+
+@pytest.mark.parametrize("invalid_id", [0, None, ""], ids=["zero", "none", "empty"])
+def test_update_list_skips_cancel_for_invalid_job_id(tmp_path, mocker, invalid_id):
+    """update_list: queued skippable jobs without a valid id are skipped in the cancel command."""
+    BasicConfig.LOCAL_ROOT_DIR = str(tmp_path)
+    BasicConfig.LOCAL_TMP_DIR = "tmp"
+
+    config = mocker.MagicMock()
+    job_list = JobList("t000", config, YAMLParserFactory(), JobListPersistencePkl())
+
+    platform = mocker.MagicMock()
+    platform.cancel_cmd = "kill -2"
+    platform.serial_platform = platform
+    platform.send_command = mocker.MagicMock()
+
+    def _make_skippable_job(name, chunk, job_id):
+        job = Job(name, job_id, Status.QUEUING, 0)
+        job._platform = platform
+        job.running = "chunk"
+        job.chunk = chunk
+        job.member = "fc0"
+        job.date = datetime(2020, 1, 1)
+        job.date_format = "S"
+        return job
+
+    job_1 = _make_skippable_job("job_1", 1, invalid_id)
+    job_2 = _make_skippable_job("job_2", 2, "42")
+    job_3 = _make_skippable_job("job_3", 3, invalid_id)
+
+    job_list._job_list = [job_1, job_2, job_3]
+    job_list.update_from_file = mocker.MagicMock(return_value=False)
+    job_list.check_special_status = mocker.MagicMock(return_value=[])
+    job_list.get_completed = mocker.MagicMock(return_value=[])
+    job_list.get_delayed = mocker.MagicMock(return_value=[])
+    job_list.get_waiting = mocker.MagicMock(return_value=[])
+    job_list.get_ready = mocker.MagicMock(return_value=[])
+    job_list.update_two_step_jobs = mocker.MagicMock()
+    job_list.get_skippable_jobs = mocker.MagicMock(
+        return_value={"dummy_section": [job_1, job_2, job_3]}
+    )
+    log_mock = mocker.patch("autosubmit.job.job_list.Log")
+
+    job_list.update_list(config, store_change=False, first_time=True)
+
+    assert platform.send_command.call_count == 1
+    assert platform.send_command.call_args.args[0] == "kill -2 42"
+    assert platform.send_command.call_args.kwargs == {"ignore_log": True}
+    assert job_1.status == Status.SKIPPED
+    assert job_2.status == Status.SKIPPED
+    assert job_3.status == Status.QUEUING
+    invalid_id_warnings = [
+        call for call in log_mock.warning.call_args_list if "invalid ID" in call.args[0]
+    ]
+    assert len(invalid_id_warnings) == 1

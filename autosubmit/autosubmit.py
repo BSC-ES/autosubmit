@@ -4671,7 +4671,10 @@ class Autosubmit:
                     )
                     Log.error(f"Job [{job.name}] status will remain as {Status.VALUE_TO_KEY[job.status]}.")
                     continue
-                batch_cancel_commands[job.platform.name].append(f"{job.platform.cancel_cmd} {job.id}; ")
+                if not job.id:
+                    Log.warning(f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+                else:
+                    batch_cancel_commands[job.platform.name].append(f"{job.platform.cancel_cmd} {job.id}; ")
 
             performed_changes[job.name] = f"{Status.VALUE_TO_KEY[job.status]} -> {final}"
             job.status = final_status
