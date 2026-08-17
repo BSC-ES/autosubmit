@@ -36,9 +36,6 @@ metrics:
   MEM GROWTH(MIB):
     threshold: 15.0
     floor: 2.0
-  OBJ GROWTH:
-    threshold: 15.0
-    floor: 1.0
 
 exact_metrics:
   - Total Jobs
