@@ -808,3 +808,44 @@ def test_recovery_filters_apply_to_active_jobs(as_exp, mocker):
 
     # only active jobs with section LOCALJOB should be recovered
     assert set(completed_jobs) == set(active_jobs)
+
+
+@pytest.mark.docker
+@pytest.mark.ssh
+def test_recovery_online_against_ssh_docker(as_exp, ssh_server):
+    """Run ``Autosubmit.recovery`` (``offline=False``) against the SSH Docker container.
+
+    Regression/repro for the ``SSHException: Key-exchange timed out waiting for
+    key negotiation`` crash that happens inside ``Autosubmit.recovery`` ->
+    ``online_recovery`` -> ``get_completed_job_names`` -> ``send_command`` when the
+    SSH transport gets stuck in key negotiation and Autosubmit never detects and
+    replaces it. This test exercises the exact failing path: ``online_recovery``
+    -> ``test_connection`` -> ``get_completed_job_names`` -> ``send_command``.
+    Before the fix, a transport stuck in key negotiation would raise
+    ``SSHException`` and crash the whole recovery. This test verifies the flow
+    completes without that crash.
+    """
+    as_exp.as_conf.set_last_as_command('recovery')
+
+    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    for job in job_list.get_job_list():
+        job.status = Status.WAITING
+    job_list.save()
+
+    log_dir = f"/tmp/scratch/group/{getuser()}/{as_exp.expid}/LOG_{as_exp.expid}"
+    ssh_server.exec_run(['bash', '-c', f'mkdir -p {log_dir} && touch {log_dir}/dummy_COMPLETED'])
+
+    result = as_exp.autosubmit.recovery(
+        as_exp.expid,
+        noplot=True,
+        save=True,
+        all_jobs=True,
+        hide=True,
+        group_by=None,
+        expand=[],
+        expand_status=[],
+        detail=False,
+        force=False,
+        offline=False,
+    )
+    assert result is True

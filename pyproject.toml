@@ -84,7 +84,7 @@ tests = [
     "pytest-mock",
     "ruff==0.15.20",
     "pytest-xdist",
-    "testcontainers",
+    "testcontainers>=4.15.0",
     "pytest-timeout",
     "roc-validator",
     "types-requests",

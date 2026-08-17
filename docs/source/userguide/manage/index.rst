@@ -392,7 +392,10 @@ If Autosubmit finds the above file, it will process it. You can check that the p
 if you see that the file name has changed to:
 ::
 
-    update_list_<EXPID>_<DATE>_<TIME>.txt
+    updated_list_<EXPID>.txt_<YYYYMMDD_HHMM>
+
+.. note:: Job names and statuses are case-insensitive, e.g. ``ready`` and ``READY`` work the same. If a line cannot be
+    read (unknown job or wrong status), Autosubmit skips it with a warning and keeps processing the rest of the file.
 
 .. note:: A running instance of Autosubmit will check the existence of the above file after checking already submitted jobs.
     It may take some time, depending on the setting ``SAFETYSLEEPTIME``.

@@ -388,6 +388,7 @@ To add a new platform, open the ``platforms_<EXPID>.yml`` file and add:
             MAX_WAITING_JOBS: <N>
             TOTAL_JOBS: <N>
             CUSTOM_DIRECTIVES: "[ 'my_directive' ]"
+            CLEAR_TO_SEND_TIMEOUT: 180 # optional; seconds to wait for a busy login server
 
 
 This will create a platform named *new_platform*. The options specified are all required:
@@ -474,6 +475,9 @@ There are some other parameters that you may need to specify:
     * - ``LOG_RECOVERY_QUEUE_SIZE``
       - A memory-consumption optimization for the recovery of logs.
          Default: ``max(100,TOTAL_JOBS) * 2``, in case of issues with the recovery of logs, you can increase this value.
+    * - ``CLEAR_TO_SEND_TIMEOUT``
+      - How long Autosubmit waits for the login server when it is busy. Raise it if you see "key-exchange timed out" errors.
+         Default: ``180``.
 
 .. _request-exclusivity-reservation:
 

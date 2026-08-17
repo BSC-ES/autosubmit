@@ -16,6 +16,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from pathlib import Path
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
@@ -661,3 +663,130 @@ def test_set_status_noplot_calls_generate_output(as_exp, mocker, noplot):
         mock_generate_output.assert_not_called()
     else:
         mock_generate_output.assert_called_once()
+
+
+VALID_STATUSES = [Status.READY, Status.COMPLETED, Status.WAITING,
+                  Status.SUSPENDED, Status.FAILED, Status.UNKNOWN]
+
+
+@pytest.fixture
+def job_list(as_exp):
+    return as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+
+
+def _update_file_path(job_list, in_status=False):
+    if in_status:
+        return Path(BasicConfig.LOCAL_ROOT_DIR, job_list.expid, "status", job_list._update_file)
+    return Path(job_list._persistence_path, job_list._update_file)
+
+
+def _write_update_file(job_list, *lines, in_status=False):
+    update_file = _update_file_path(job_list, in_status=in_status)
+    update_file.parent.mkdir(parents=True, exist_ok=True)
+    update_file.write_text("\n".join(lines) + "\n")
+    return update_file
+
+
+def _status_token(status):
+    return Status.VALUE_TO_KEY[status]
+
+
+def _status_id(status):
+    return _status_token(status).lower()
+
+
+@pytest.mark.parametrize("new_status", VALID_STATUSES, ids=_status_id)
+@pytest.mark.parametrize("store_change, file_kept", [
+    (True, False),
+    (False, True),
+], ids=["moves-file", "keeps-file"])
+@pytest.mark.parametrize("in_status", [False, True], ids=["pkl", "status"])
+def test_update_from_file_applies_status_and_handles_file(job_list, store_change, file_kept, new_status, in_status):
+    job = job_list.get_job_list()[0]
+    job.status = Status.READY if new_status == Status.WAITING else Status.WAITING
+    job.fail_count = 2
+    update_file = _write_update_file(job_list, f"{job.name} {_status_token(new_status)}", in_status=in_status)
+
+    result = job_list.update_from_file(store_change=store_change)
+
+    assert result is True
+    assert job.status == new_status
+    assert job.fail_count == 0
+    assert update_file.exists() is file_kept
+    if not file_kept:
+        assert len(list(update_file.parent.glob(job_list._update_file + "_*"))) == 1
+
+
+@pytest.mark.parametrize("line, expected_status, expected_warning", [
+    ("", None, None),
+    ("   ", None, None),
+    ("{job}", None, None),
+    ("{job} BADSTATUS", None, "Invalid status 'BADSTATUS'"),
+    ("{job} badstatus", None, "Invalid status 'badstatus'"),
+    ("unknown_job COMPLETED", None, None),
+    ("{job} COMPLETED", Status.COMPLETED, None),
+    ("{job} completed", Status.COMPLETED, None),
+    ("{job_lower} COMPLETED", Status.COMPLETED, None),
+    ("{job_lower} completed", Status.COMPLETED, None),
+], ids=["blank", "whitespace", "missing-status", "invalid-status", "invalid-status-lowercase",
+        "unknown-job", "valid", "valid-lowercase-status", "valid-lowercase-job", "valid-all-lowercase"])
+@pytest.mark.parametrize("in_status", [False, True], ids=["pkl", "status"])
+def test_update_from_file_handles_lines(job_list, mocker, line, expected_status, expected_warning, in_status):
+    job = job_list.get_job_list()[0]
+    job.status = Status.WAITING
+    _write_update_file(job_list, line.format(job=job.name, job_lower=job.name.lower()), in_status=in_status)
+    mock_warning = mocker.patch("autosubmit.job.job_list.Log.warning")
+
+    result = job_list.update_from_file()
+
+    assert result is True
+    assert job.status == (expected_status if expected_status is not None else Status.WAITING)
+    if expected_warning:
+        assert any(expected_warning in call.args[0] for call in mock_warning.call_args_list)
+    else:
+        assert not mock_warning.called
+
+
+@pytest.mark.parametrize("content, read_ok", [
+    (b"unknown_job COMPLETED\n", True),
+    (b"", True),
+    (b"\xff\xfe\x00", False),
+], ids=["valid", "empty", "unreadable"])
+@pytest.mark.parametrize("in_status", [False, True], ids=["pkl", "status"])
+def test_update_from_file_moves_file_after_attempt(job_list, mocker, content, read_ok, in_status):
+    update_file = _write_update_file(job_list, "placeholder", in_status=in_status)
+    update_file.write_bytes(content)
+    mock_warning = mocker.patch("autosubmit.job.job_list.Log.warning")
+
+    result = job_list.update_from_file()
+
+    assert result is True
+    assert mock_warning.called is (not read_ok)
+    assert not update_file.exists()
+    assert len(list(update_file.parent.glob(job_list._update_file + "_*"))) == 1
+
+
+def test_update_from_file_prefers_status_location(job_list):
+    job = job_list.get_job_list()[0]
+    job.status = Status.WAITING
+    pkl_file = _write_update_file(job_list, f"{job.name} WAITING", in_status=False)
+    status_file = _write_update_file(job_list, f"{job.name} COMPLETED", in_status=True)
+
+    result = job_list.update_from_file(store_change=False)
+
+    assert result is True
+    assert job.status == Status.COMPLETED
+    assert pkl_file.exists()
+    assert status_file.exists()
+
+
+@pytest.mark.parametrize("store_change, expected", [
+    (True, True),
+    (False, False),
+], ids=["saves", "does-not-save"])
+def test_update_list_save_follows_store_change(job_list, as_exp, store_change, expected):
+    job = job_list.get_job_list()[0]
+    job.status = Status.WAITING
+    _write_update_file(job_list, f"{job.name} COMPLETED")
+
+    assert job_list.update_list(as_exp.as_conf, store_change=store_change) is expected

@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import paramiko
 from getpass import getuser
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -1036,6 +1037,40 @@ def test_change_status_handles_send_command_failure_gracefully(
 
 
 @pytest.mark.parametrize(
+    "invalid_id",
+    [0, None, ""],
+    ids=["zero", "none", "empty"],
+)
+def test_change_status_skips_cancel_for_invalid_job_id(
+        invalid_id,
+        multi_platform_setup: dict,
+) -> None:
+    """Test that active jobs with an invalid job id are not cancelled but still change status."""
+    platforms = multi_platform_setup["platforms"]
+    sent = multi_platform_setup["sent"]
+
+    jobs = [
+        _make_job(f"job_{name}", invalid_id, Status.RUNNING, platform)
+        for name, platform in platforms.items()
+    ]
+
+    changes = Autosubmit.change_status(
+        final="FAILED",
+        final_status=Status.FAILED,
+        final_list=jobs,
+        save=True,
+        definitive_platforms=list(platforms.keys()),
+        platforms=platforms,
+    )
+
+    for job in jobs:
+        assert job.status == Status.FAILED
+        assert job.name in changes
+    for platform_name in ("local", "ps", "slurm"):
+        assert sent[platform_name] == []
+
+
+@pytest.mark.parametrize(
     "stat_status, scheduler_status, finished_time, io_safe_wait, now, expected_status, expected_finished_time, expect_warning",
     [
         (Status.COMPLETED, Status.RUNNING, 100.0, 5, 200.0, Status.COMPLETED, None, False),
@@ -1104,3 +1139,92 @@ def test_resolve_stat_status(
         mock_log.warning.assert_called_once()
     else:
         mock_log.warning.assert_not_called()
+
+
+@pytest.mark.parametrize('exc', [
+    paramiko.SSHException('Key-exchange timed out waiting for key negotiation'),
+    ConnectionError('Connection aborted by remote host'),
+    TimeoutError('timed out'),
+], ids=['ssh_exception', 'connection_error', 'timeout_error'])
+def test_send_command_raises_clean_error_without_retry_on_transport_issue(mocker, paramiko_platform, exc):
+    platform = paramiko_platform
+    mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+    mocker.patch.object(platform, 'exec_command', side_effect=exc)
+    mock_restore = mocker.patch.object(platform, 'restore_connection')
+
+    with pytest.raises(AutosubmitError) as cm:
+        platform.send_command('find . -name "*_COMPLETED"')
+
+    assert cm.value.code == 6005
+    assert 'SSH transport issue' in cm.value.message
+    assert str(exc) in cm.value.message
+    mock_restore.assert_not_called()
+
+
+@pytest.mark.parametrize('active', [True, False], ids=['wedged_active', 'transport_dead'])
+def test_exec_command_reconnects_on_ssh_exception(mocker, paramiko_platform, active):
+    platform = paramiko_platform
+    mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+
+    platform.connected = True
+    transport = mocker.Mock()
+    transport.active = active
+    platform.transport = transport
+
+    stdin, stdout, stderr = mocker.Mock(), mocker.Mock(), mocker.Mock()
+    chan_ok = mocker.Mock()
+    chan_ok.exec_command.return_value = None
+    chan_ok.makefile.side_effect = [stdin, stdout]
+    chan_ok.makefile_stderr.return_value = stderr
+
+    chan_wedged = mocker.Mock()
+    chan_wedged.exec_command.side_effect = paramiko.SSHException(
+        'Key-exchange timed out waiting for key negotiation')
+
+    transport.open_session.side_effect = [chan_wedged, chan_ok]
+
+    mock_restore = mocker.patch.object(platform, 'restore_connection')
+    mock_restore.side_effect = lambda *args: setattr(transport, 'active', True)
+
+    result = platform.exec_command('find . -name "*_COMPLETED"')
+
+    assert result == (stdin, stdout, stderr)
+    assert transport.open_session.call_count == 2
+    mock_restore.assert_called_once_with(None)
+
+
+@pytest.mark.parametrize('configured,expected', [
+    (None, 180.0),
+    (180, 180.0),
+    (300, 300.0),
+    ('120', 120.0),
+    ('300.5', 300.5),
+], ids=['default', 'int_180', 'int_300', 'string_120', 'string_300_5'])
+def test_connect_sets_clear_to_send_timeout(mocker, paramiko_platform, configured, expected):
+    platform = paramiko_platform
+    if configured is not None:
+        platform.name = 'TEST'
+        platform.config = {'PLATFORMS': {'TEST': {'CLEAR_TO_SEND_TIMEOUT': configured}}}
+    platform.host = 'localhost'
+    platform.user = getuser()
+    platform.two_factor_auth = False
+
+    mocker.patch.object(platform, '_init_local_x11_display')
+    mocker.patch('autosubmit.platforms.paramiko_platform._get_user_config_file',
+                 return_value=Path('/tmp/ssh_config'))
+    ssh_config = mocker.Mock()
+    ssh_config.lookup.return_value = {'hostname': 'localhost', 'port': 22}
+    mocker.patch('autosubmit.platforms.paramiko_platform._load_ssh_config', return_value=ssh_config)
+    transport = mocker.Mock()
+    ssh_client = mocker.Mock()
+    ssh_client.get_transport.return_value = transport
+    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+    mocker.patch.object(platform, 'agent_auth', return_value=True)
+    sftp = mocker.Mock()
+    sftp.get_channel.return_value = mocker.Mock()
+    mocker.patch('autosubmit.platforms.paramiko_platform.paramiko.SFTPClient.from_transport', return_value=sftp)
+    mocker.patch.object(platform, 'spawn_log_retrieval_process')
+
+    platform.connect(None)
+
+    assert transport.clear_to_send_timeout == expected

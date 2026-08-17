@@ -2833,6 +2833,16 @@ class Job(object):
         """Convert a date string in the format YYYYMMDDHHMMSS to epoch time."""
         return int(datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S").timestamp())
 
+    def has_valid_submit_time(self) -> bool:
+        """Whether the submit time can be used for log recovery."""
+        if not self.submit_time_timestamp:
+            return False
+        try:
+            self._datestr_to_epoch(str(self.submit_time_timestamp))
+        except ValueError:
+            return False
+        return True
+
     def write_end_time(self, completed, count=-1):
         """Writes end timestamp to TOTAL_STATS file and jobs_data.db
         :param completed: True if the job has been completed, False otherwise
@@ -3186,7 +3196,10 @@ class WrapperJob(Job):
         if not over_wallclock:
             return False
 
-        self.platform.cancel_jobs([self.id])
+        if not self.id:
+            Log.warning(f"Skipping cancellation of wrapper job [{self.name}] with invalid ID: {self.id}")
+        else:
+            self.platform.cancel_jobs([self.id])
         self.new_status = Status.FAILED
         for inner_job in self.job_list:
             if inner_job.new_status == Status.RUNNING:
