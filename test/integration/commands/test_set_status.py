@@ -715,13 +715,18 @@ def test_update_from_file_applies_status_and_handles_file(job_list, store_change
     ("   ", None, None),
     ("{job}", None, None),
     ("{job} BADSTATUS", None, "Invalid status 'BADSTATUS'"),
+    ("{job} badstatus", None, "Invalid status 'badstatus'"),
     ("unknown_job COMPLETED", None, None),
     ("{job} COMPLETED", Status.COMPLETED, None),
-], ids=["blank", "whitespace", "missing-status", "invalid-status", "unknown-job", "valid"])
+    ("{job} completed", Status.COMPLETED, None),
+    ("{job_lower} COMPLETED", Status.COMPLETED, None),
+    ("{job_lower} completed", Status.COMPLETED, None),
+], ids=["blank", "whitespace", "missing-status", "invalid-status", "invalid-status-lowercase",
+        "unknown-job", "valid", "valid-lowercase-status", "valid-lowercase-job", "valid-all-lowercase"])
 def test_update_from_file_handles_lines(job_list, mocker, line, expected_status, expected_warning):
     job = job_list.get_job_list()[0]
     job.status = Status.WAITING
-    _write_update_file(job_list, line.format(job=job.name))
+    _write_update_file(job_list, line.format(job=job.name, job_lower=job.name.lower()))
     mock_warning = mocker.patch("autosubmit.job.job_list.Log.warning")
 
     result = job_list.update_from_file()

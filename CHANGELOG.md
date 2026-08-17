@@ -41,6 +41,10 @@
 - Fixed `CPU per task` for new version of autosubmit #2897
 - Fixed issue overwritting expid config variables with the ones from the github repo #2877
 - Fixed inspect infinite loop when PLATFORMS.TOTALJOBS or PLATFORMS.MAX_WAITING_JOBS is set to 0 #2749
+- Fewer "key-exchange timed out" errors on busy cluster login servers. Autosubmit now waits longer and recovers by itself.
+- `recovery` no longer stops when a platform can't say which jobs finished; offline it falls back to its own records.
+- The `updated_list_<EXPID>.txt` status file is now friendlier: bad lines are skipped with a warning, job names and statuses are case-insensitive, and it can't break your run.
+- Autosubmit no longer gets stuck on logs of jobs whose info was lost after an interrupted run.
 
 **Enhancements:**
 
@@ -86,6 +90,7 @@
 - Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
 - Changed JOBS_IN_WRAPPER unknown job from critical error to warning #3006
 - Added ``ECACCESS_RETRIES`` platform config key to configure SSL retries for ecaccess platforms. Defaults to 100 #3059
+- New `CLEAR_TO_SEND_TIMEOUT` platform setting: how long to wait for a busy login server. Default: 180 seconds.
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

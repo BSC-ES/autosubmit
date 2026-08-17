@@ -64,7 +64,6 @@ class JobList(object):
         self._expid = expid
         self._config = config
         self._parser_factory = parser_factory
-        self._stat_val = Status()
         self._parameters = []
         self._date_list = []
         self._member_list = []
@@ -2497,12 +2496,13 @@ class JobList(object):
             parts = line.split()
             if len(parts) < 2:
                 continue
-            job = self.get_job_by_name(parts[0])
+            # TODO: For 4.2 change this into db call as the job may not be loaded
+            # Case-insensitive change
+            job = next((j for j in self._job_list if j.name.upper() == parts[0].upper()), None)
             if not job:
                 continue
-            try:
-                status = self._stat_val.retval(parts[1])
-            except AttributeError:
+            status = Status.KEY_TO_VALUE.get(parts[1].upper())
+            if status is None:
                 Log.warning(f"Invalid status '{parts[1]}' for job '{parts[0]}' in {self._update_file}, skipping it")
                 continue
             job.status = status
