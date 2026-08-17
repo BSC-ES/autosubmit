@@ -75,7 +75,6 @@ def _baseline_entry(**overrides):
         "Total Dependencies": 7,
         "FD GROWTH": None,
         "MEM GROWTH(MIB)": 0,
-        "OBJ GROWTH": None,
     }
     extra.update(overrides)
     return extra
@@ -371,7 +370,7 @@ def test_render_heatmaps_produces_memory_plot(tmp_path: Path):
     assert "summary_4.2.0_memory.png" in names
 
 
-def test_excluded_scenarios_skipped_in_evaluate_but_kept_for_memory():
+def test_heavy_scenario_in_report_but_excluded_from_heatmaps():
     entries = [
         _make_entry("run", "run", "4m/2c/2s", 10.0, **{**_baseline_entry(), "Total Jobs": 7}),
         _make_entry("run", "run", "10m/2c/75s", 10.0, **{**_baseline_entry(), "Total Jobs": 3000}),
@@ -381,8 +380,41 @@ def test_excluded_scenarios_skipped_in_evaluate_but_kept_for_memory():
     current = compare.build_frame(_make_run(*entries))
 
     report = compare.evaluate(current, None, _thresholds())
-    assert not any("10m/2c/75s" in rid for rid in report["ID"])
+    assert any("10m/2c/75s" in rid for rid in report["ID"])
+    assert not report[report["ID"] == "10m/2c/75s"].empty
+    assert not report[report["ID"] == "10m/2c/75s·ftcs"].empty
 
     cross = compare.evaluate_cross_scenarios(current)
     assert any("10m/2c/75s" in row["ID"] or row["ID"] == "10m/2c/75s" for row in cross.to_dict("records"))
     assert compare._heaviest_scenario(current) == "10m/2c/75s"
+
+    run_order = compare._plot_order(current, compare._RUN_TEST_TYPES,
+                                    excluded_scenarios=compare._EXCLUDED_SCENARIOS)
+    assert [rid for _, rid in run_order] == ["4m/2c/2s"]
+    memory_order = compare._plot_order(current, compare._MEMORY_TEST_TYPES,
+                                       scenario_ids={"10m/2c/75s"})
+    assert any(rid == "10m/2c/75s" for _, rid in memory_order)
+
+
+@pytest.mark.parametrize("test_types,excluded,scenario_ids,expected_bases", [
+    (compare._RUN_TEST_TYPES, compare._EXCLUDED_SCENARIOS, None, {"4m/2c/2s", "4m/2c/6s"}),
+    (compare._OTHER_TEST_TYPES, compare._EXCLUDED_SCENARIOS, None, {"4m/2c/2s"}),
+    (compare._MEMORY_TEST_TYPES, None, {"10m/2c/75s"}, {"10m/2c/75s"}),
+    (compare._RUN_TEST_TYPES, None, None, {"4m/2c/2s", "4m/2c/6s", "10m/2c/75s"}),
+])
+def test_plot_order_includes_or_excludes_heavy_scenario(test_types, excluded, scenario_ids, expected_bases):
+    entries = [
+        _make_entry("run", "run", "4m/2c/2s", 2.0, **_baseline_entry()),
+        _make_entry("run", "run", "4m/2c/6s", 6.0, **_baseline_entry()),
+        _make_entry("run", "run", "10m/2c/75s", 75.0,
+                    **{**_baseline_entry(), "Total Jobs": 3000}),
+        _make_entry("setstatus", "setstatus", "4m/2c/2s·ftcs", 1.0, **_baseline_entry()),
+        _make_entry("setstatus", "setstatus", "10m/2c/75s·ftcs", 1.0,
+                    **{**_baseline_entry(), "Total Jobs": 3000}),
+        _make_entry("create", "create", "4m/2c/2s", 1.0, **_baseline_entry()),
+    ]
+    current = compare.build_frame(_make_run(*entries))
+
+    order = compare._plot_order(current, test_types, scenario_ids=scenario_ids,
+                                excluded_scenarios=excluded)
+    assert {current.loc[(tt, rid), "base"] for tt, rid in order} == expected_bases

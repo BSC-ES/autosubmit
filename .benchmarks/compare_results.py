@@ -70,12 +70,11 @@ METRIC_COLUMNS = [
     "Job list DB Usage",
     "FD GROWTH",
     "MEM GROWTH(MIB)",
-    "OBJ GROWTH",
 ] + EXACT_METRICS
 
 # Profiler growth metrics are only meaningful for the `run` scenarios;
 # elsewhere they are absent or dominated by noise, so they are excluded.
-_GROWTH_METRICS = {"FD GROWTH", "MEM GROWTH(MIB)", "OBJ GROWTH"}
+_GROWTH_METRICS = {"FD GROWTH", "MEM GROWTH(MIB)"}
 _NO_GROWTH_TEST_TYPES = {"create", "recovery", "setstatus"}
 
 # The performance plots are split in two: the `run` scenarios carry the
@@ -83,7 +82,7 @@ _NO_GROWTH_TEST_TYPES = {"create", "recovery", "setstatus"}
 # time/memory/db.
 _RUN_TEST_TYPES = {"run"}
 _OTHER_TEST_TYPES = {"create", "recovery", "setstatus"}
-_RUN_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)", "MEM GROWTH(MIB)", "FD GROWTH", "OBJ GROWTH"]
+_RUN_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)", "MEM GROWTH(MIB)", "FD GROWTH"]
 _OTHER_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)",
                        "Historical DB Disk Usage(MiB)", "Job list DB Usage"]
 _MEMORY_TEST_TYPES = {"create", "recovery", "run", "setstatus"}
@@ -93,7 +92,6 @@ _SHORT_METRICS = {
     "Memory consumption(MiB)": "Memory (MiB)",
     "MEM GROWTH(MIB)": "MEM growth (MiB)",
     "FD GROWTH": "FD growth",
-    "OBJ GROWTH": "Obj growth",
     "Historical DB Disk Usage(MiB)": "Hist DB (KiB)",
     "Job list DB Usage": "Job DB (KiB)",
 }
@@ -375,8 +373,6 @@ def evaluate(current: pd.DataFrame, previous: pd.DataFrame | None, thresholds: d
 
     rows = []
     for (test_type, run_id) in current.index:
-        if current.loc[(test_type, run_id), "base"] in _EXCLUDED_SCENARIOS:
-            continue
         cur = current.loc[(test_type, run_id)]
         if previous is None:
             baseline_ok = False
@@ -597,11 +593,48 @@ def _format_abs(metric: str, value: float) -> str:
     return f"{value:.0f}"
 
 
+def _plot_order(current: pd.DataFrame, test_types: set[str],
+                scenario_ids: set[str] | None = None,
+                excluded_scenarios: set[str] | None = None) -> list[tuple[str, str]]:
+    """Return the (test type, run ID) rows to draw, ordered by speed.
+
+    Scenarios are sorted by ``Time Taken(Seconds)`` within each test type.
+    ``scenario_ids`` whitelists the base scenarios to draw and
+    ``excluded_scenarios`` removes base scenarios from the plot.
+
+    :param current: Current run DataFrame indexed by (test type, ID).
+    :type current: pd.DataFrame
+    :param test_types: Restrict which test types are drawn.
+    :type test_types: set
+    :param scenario_ids: Only draw these base scenarios, or None for all.
+    :type scenario_ids: set | None
+    :param excluded_scenarios: Base scenarios to skip, or None for none.
+    :type excluded_scenarios: set | None
+    :return: Ordered list of (test type, run ID) pairs.
+    :rtype: list
+    """
+    order = []
+    for test_type in current.index.get_level_values("test type").unique():
+        if test_type not in test_types:
+            continue
+        mask = current.index.get_level_values("test type") == test_type
+        rows = current.loc[mask].sort_values("Time Taken(Seconds)", ascending=True)
+        for run_id in rows.index.get_level_values("ID"):
+            base = current.loc[(test_type, run_id), "base"]
+            if scenario_ids is not None and base not in scenario_ids:
+                continue
+            if excluded_scenarios and base in excluded_scenarios:
+                continue
+            order.append((test_type, run_id))
+    return order
+
+
 def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report: pd.DataFrame,
                    version: str, output_dir: Path, cpu_label: str | None = None,
                    thresholds: dict | None = None, test_types: set[str] | None = None,
                    metrics: list[str] | None = None,
                    scenario_ids: set[str] | None = None,
+                   excluded_scenarios: set[str] | None = None,
                    out_name: str | None = None) -> Path | None:
     """Render a filled-cell grid for a subset of scenarios x metrics.
 
@@ -616,6 +649,7 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     are drawn, so the run-only profiler metrics can live in their own plot.
     ``scenario_ids`` further restricts which base scenarios are drawn (matched
     against the ``base`` column, so setstatus variants share their base id).
+    ``excluded_scenarios`` drops base scenarios from the plot entirely.
 
     :param current: Current run DataFrame indexed by (test type, ID).
     :type current: pd.DataFrame
@@ -637,6 +671,8 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     :type metrics: list | None
     :param scenario_ids: Restrict which base scenarios are drawn.
     :type scenario_ids: set | None
+    :param excluded_scenarios: Base scenarios to skip, or None.
+    :type excluded_scenarios: set | None
     :param out_name: Output file name, defaults to ``summary_{version}.png``.
     :type out_name: str | None
     :return: Path of the saved plot, or None when nothing was drawn.
@@ -708,16 +744,8 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     thresholds = thresholds or {}
     test_types = test_types or set(current.index.get_level_values("test type").unique())
     metrics = [c for c in (metrics or []) if current[c].notna().any()]
-    order = []
-    for test_type in current.index.get_level_values("test type").unique():
-        if test_type not in test_types:
-            continue
-        mask = current.index.get_level_values("test type") == test_type
-        rows = current.loc[mask].sort_values("Time Taken(Seconds)", ascending=True)
-        for run_id in rows.index.get_level_values("ID"):
-            if scenario_ids is not None and current.loc[(test_type, run_id), "base"] not in scenario_ids:
-                continue
-            order.append((test_type, run_id))
+    order = _plot_order(current, test_types, scenario_ids=scenario_ids,
+                        excluded_scenarios=excluded_scenarios)
 
     if not metrics or not order:
         return None
@@ -866,7 +894,8 @@ def render_heatmaps(current: pd.DataFrame, previous: pd.DataFrame | None, report
     ):
         out = render_heatmap(current, previous, report, version, output_dir,
                              cpu_label=cpu_label, thresholds=thresholds,
-                             test_types=test_types, metrics=metrics, out_name=name)
+                             test_types=test_types, metrics=metrics, out_name=name,
+                             excluded_scenarios=_EXCLUDED_SCENARIOS)
         if out is not None:
             paths.append(out)
 
