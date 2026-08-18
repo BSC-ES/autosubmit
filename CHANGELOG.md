@@ -6,7 +6,7 @@
 - `recovery` no longer stops when a platform can't say which jobs finished; offline it falls back to its own records.
 - The `updated_list_<EXPID>.txt` status file is now friendlier: bad lines are skipped with a warning, job names and statuses are case-insensitive, and it can't break your run.
 - Autosubmit no longer gets stuck on logs of jobs whose info was lost after an interrupted run.
-- Relaunching a finished job from the `updated_list` file now correctly reset some variables used to download the logs
+- Relaunching a finished job from the `updated_list` file now correctly resets some variables used to download the logs
 
 **Enhancements:**
 
@@ -18,7 +18,7 @@
 - `setstatus` and `updated_list` no longer let you put a job into an
   in-progress state like submitted, queuing, or running. Autosubmit manages
   those states on its own.
-- QOL: `updated_list` and `setstatus` now calls the same functions to manage status.
+- QOL: `updated_list` and `setstatus` now call the same functions to manage status.
 
 ### 4.1.17: Submission and Job Tracking Overhaul, Bug Fixes, and Enhancements                                                                                                                                                               
 
