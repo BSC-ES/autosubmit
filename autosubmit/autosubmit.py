@@ -1786,7 +1786,6 @@ class Autosubmit:
                 job_list.update_db_wrappers()
                 job_list.save_jobs()
 
-
         return wrapper_job
 
     @staticmethod
@@ -2144,15 +2143,18 @@ class Autosubmit:
                 except Exception as e:
                     # Connection to status database ec_earth.db can fail.
                     # API worker will fix the status.
-                    Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
-                            f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
+                    Log.debug(
+                        f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
+                        f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}",
+                        7003,
+                    )
 
                 # create a heartbeat monitor thread to update the experiment status in the database every 2 minutes
                 if not heartbeat_monitor.start():
                     Log.warning(
                         f"Heartbeat monitor could not start for experiment {expid}. Experiment status updates may not work."
                     )
-                
+
                 if git_operational_check_enabled:
                     Log.debug('Checking for dirty local Git repository')
                     check_unpushed_changes(expid, as_conf)
@@ -2206,7 +2208,6 @@ class Autosubmit:
                         if stop_event and stop_event.is_set():
                             Autosubmit.exit = True
                             experiment_status = Models.RunningStatus.NOT_RUNNING
-
 
                         # TODO fix in another PR, this is a workaround to avoid having missmatching job_list and platform experiment_data
                         if as_conf.needs_reload():
@@ -2378,7 +2379,7 @@ class Autosubmit:
                     status_tracker.set_status(Models.RunningStatus.NOT_RUNNING)
             except Exception as e:
                 Log.warning(f"Autosubmit couldn't update the final experiment status for {expid}: {str(e)}", 7003)
-            
+
             if profiler:
                 profiler.stop()
 
@@ -2387,8 +2388,6 @@ class Autosubmit:
             if len(job_list.get_failed_from_db()) > 0:
                 return 1
         return 0
-
-
 
     @staticmethod
     def save_historical_edges(expid):
@@ -3758,7 +3757,7 @@ class Autosubmit:
         """
         if process_id(expid) is not None:
             raise AutosubmitCritical("Ensure no processes are running in the experiment directory", 7076)
-        
+
         exp_folder = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
 
         if not noclean:
@@ -4109,7 +4108,7 @@ class Autosubmit:
                     Log.result("\nJob list created successfully")
                     Log.warning(
                         "Remember to MODIFY the MODEL config files!")
-                    
+
                     ExperimentStatus(expid).set_as_not_running()
 
                     fh.flush()

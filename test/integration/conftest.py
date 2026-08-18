@@ -541,7 +541,7 @@ def as_db(request: "FixtureRequest", autosubmit: Autosubmit, tmp_path: "LocalPat
         raise ValueError(f'Unsupported database backend: {backend}')
 
     BasicConfig.read()
-    if backend == 'postgres':
+    if backend == "postgres":
         PostgreSQLEngineSingleton.reset()
     # TODO: check which functions call as_db twice or if this is used in
     #  combination other fixture that calls autosubmit.install)

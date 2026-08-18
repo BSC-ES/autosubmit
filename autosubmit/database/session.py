@@ -56,7 +56,7 @@ class PostgreSQLEngineSingleton:
 
     @classmethod
     def reset(cls) -> None:
-        """Dispose the cached engine, if any, so a new one is built on next use."""
+        """Dispose the cached engine if it exists, so a new one is built on next use."""
         with cls._lock:
             if cls._instance is not None:
                 cls._instance.dispose()
