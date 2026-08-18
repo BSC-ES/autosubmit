@@ -2137,19 +2137,15 @@ class Autosubmit:
                 as_conf_config = as_conf.experiment_data.get('CONFIG', {})
                 git_operational_check_enabled = as_conf_config.get('GIT_OPERATIONAL_CHECK_ENABLED', True)
 
-                # set experiment as running in the experiment_status database
                 try:
                     status_tracker.set_as_running()
                 except Exception as e:
-                    # Connection to status database ec_earth.db can fail.
-                    # API worker will fix the status.
                     Log.debug(
                         f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
                         f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}",
                         7003,
                     )
 
-                # create a heartbeat monitor thread to update the experiment status in the database every 2 minutes
                 if not heartbeat_monitor.start():
                     Log.warning(
                         f"Heartbeat monitor could not start for experiment {expid}. Experiment status updates may not work."
@@ -2199,8 +2195,6 @@ class Autosubmit:
                 job_list.load_wrappers()
                 while job_list.continue_run():
                     try:
-
-                        # force the heatbeat update at the beginning of each iteration
                         heartbeat_monitor.ping()
                         if profiler is not None:
                             Autosubmit.exit = profiler.iteration_checkpoint(loaded_jobs, loaded_edges)
@@ -2361,8 +2355,10 @@ class Autosubmit:
                 else:
                     Log.info("ROCRATE not present in experiment YAML configuration. No RO-Crate archive created.")
         except BaseLockException:
-            # Multiple instances of autosubmit running the same experiment or previous instance didn't release the lock file
-            # In both cases, we don't want to overwrite the status of the experiment to avoid errors with the API and GUI
+            # Multiple instances of autosubmit running the same experiment 
+            # or previous instance didn't release the lock file
+            # In both cases, we don't want to overwrite the status 
+            # of the experiment to avoid errors with the API and GUI
             raise
         except AutosubmitCritical:
             experiment_status = Models.RunningStatus.NOT_RUNNING
