@@ -199,405 +199,437 @@ class Autosubmit:
         try:
             BasicConfig.read()
             parser = MyParser(
-                description='Main executable for autosubmit. ')
-            parser.add_argument('-v', '--version', dest='version', action='store_true')
+                description='Autosubmit is an open-source workflow manager for scientific computing on HPC platforms.')
+            parser.add_argument('-v', '--version', dest='version', action='store_true',
+                                help="Show the Autosubmit version and exit")
 
             log_levels = ('NO_LOG', 'INFO', 'WARNING', 'DEBUG', 'ERROR')
             parser.add_argument('-lf', '--logfile', choices=log_levels, default='DEBUG', type=str,
-                                help="sets file's log level.")
+                                help="Log level for the file log")
             parser.add_argument('-lc', '--logconsole', choices=log_levels, default='WARNING', type=str,
-                                help="sets console's log level")
+                                help="Log level for the console log")
 
             subparsers = parser.add_subparsers(dest='command')
             # Run
             subparser = subparsers.add_parser(
-                'run', description="runs specified experiment")
-            subparser.add_argument('expid', help='experiment identifier')
+                'run',
+                help="Run an experiment",
+                description="Run an experiment. Submits jobs to the configured HPC platforms and monitors them until completion.")
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             subparser.add_argument('-st', '--start_time', required=False,
-                                   help='Sets the starting time for this experiment')
+                                   help='Time at which the experiment should start')
             subparser.add_argument('-sa', '--start_after', required=False,
-                                   help='Sets a experiment expid which completion will trigger the start of this experiment.')
+                                   help='Experiment whose completion triggers the start of this one')
             subparser.add_argument('-rom', '--run_only_members', required=False,
-                                   help='Sets members allowed on this run.')
+                                   help='Members allowed on this run')
             subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
-                                   help='Prints performance parameters of the execution of this command.')
+                                   help='Print performance metrics for this command')
             subparser.add_argument('-t', '--trace', action='store_true', default=False, required=False,
-                                   help='Enables trace output for profiling (requires --profile).')
+                                   help='Enable trace output for profiling (requires --profile)')
             subparser.add_argument('-pm', '--profile_max_iterations', type=int, default=0, required=False,
-                                   help='Optional maximum number of iterations for the profiler (0 = no hard cap).')
+                                   help='Maximum number of iterations for the profiler (0 = no cap)')
             # Expid
             subparser = subparsers.add_parser(
-                'expid', description="Creates a new experiment")
+                'expid',
+                help="Create a new experiment",
+                description="Create a new experiment. The experiment can be a copy of an existing one, a minimal configuration bootstrapped from a git repository, or a dummy experiment for testing.")
             group_experiment_types = subparser.add_mutually_exclusive_group()
             group_experiment_types.add_argument('-op', '--operational', action='store_true',
-                                                help='creates a new experiment with operational experiment id')
+                                                help='Create the experiment with an operational identifier')
             group_experiment_types.add_argument('-ev', '--evaluation', action='store_true',
-                                                help='creates a new experiment with evaluation experiment id')
+                                                help='Create the experiment with an evaluation identifier')
             group_experiment_types.add_argument('-t', '--testcase', action='store_true',
-                                                help='creates a new experiment with testcase experiment id')
+                                                help='Create the experiment with a test case identifier')
             group = subparser.add_mutually_exclusive_group()
             group.add_argument('-dm', '--dummy', action='store_true',
-                               help='creates a new experiment with default values, usually for testing')
+                               help='Create an experiment with default values (for testing)')
             group.add_argument('-min', '--minimal_configuration', action='store_true',
-                               help='creates a new experiment with minimal configuration, usually combined with -repo')
+                               help='Create an experiment with minimal configuration (usually combined with --git_repo)')
             group.add_argument('-fs', '--filter_status', type=str,
                                choices=('Any', 'READY', 'COMPLETED',
                                         'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
-                               help='Select the original status to filter the list of jobs')
+                               help='Status to filter the job list on')
             subparser.add_argument(
-                '-y', '--copy', help='makes a copy of the specified experiment')
+                '-y', '--copy', help='Copy the specified experiment')
             subparser.add_argument('-repo', '--git_repo', type=str, default="", required=False,
-                                   help='sets a git repository for the experiment')
+                                   help='Git repository to use for the experiment')
             subparser.add_argument('-b', '--git_branch', type=str, default="", required=False,
-                                   help='sets a git branch for the experiment')
+                                   help='Git branch to use for the experiment')
             subparser.add_argument('-conf', '--git_as_conf', type=str, default="", required=False,
-                                   help='sets the git path to as_conf')
+                                   help='Path within the git repository to the Autosubmit configuration')
             subparser.add_argument('-local', '--use_local_minimal', required=False, action="store_true",
-                                   help='uses local minimal file instead of git')
+                                   help='Use a local minimal file instead of a git repository')
 
             subparser.add_argument('-H', '--HPC', required=False, default="local",
-                                   help='specifies the HPC to use for the experiment')
+                                   help='HPC platform to run the experiment on')
             subparser.add_argument('-d', '--description', type=str, required=True,
-                                   help='sets a description for the experiment to store in the database.')
+                                   help='Description of the experiment, stored in the database')
 
             # Delete
             subparser = subparsers.add_parser(
-                'delete', description="delete specified experiment")
-            subparser.add_argument('expid', help='experiment identifiers separated by commas',
+                'delete',
+                help="Delete one or more experiments",
+                description="Delete one or more experiments and free their identifiers.")
+            subparser.add_argument('expid', help='One or more experiment identifiers, comma-separated',
                                    nargs='?')
             subparser.add_argument(
-                '-f', '--force', action='store_true', help='deletes experiment without confirmation')
+                '-f', '--force', action='store_true', help='Delete without confirmation')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             # Monitor
             subparser = subparsers.add_parser(
-                'monitor', description="plots specified experiment")
-            subparser.add_argument('expid', help='experiment identifier')
+                'monitor',
+                help="Plot the current status of an experiment",
+                description="Plot the current status of an experiment as a workflow graph or a text summary.")
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument('-o', '--output', choices=('pdf', 'png', 'ps', 'svg', 'txt'),
-                                   help='chooses type of output for generated plot')  # Default -o value comes from .yml
+                                   help='Output format for the generated plot')  # Default -o value comes from .yml
             subparser.add_argument('-group_by', choices=('date', 'member', 'chunk', 'split', 'automatic'), default=None,
-                                   help='Groups the jobs automatically or by date, member, chunk or split')
+                                   help='Group jobs by date, member, chunk, split, or automatically')
             subparser.add_argument('-expand', type=str,
-                                   help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
-                                        'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
+                                   help='Dates/members/chunks to expand. Default = "Any". '
+                                        'Format: LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument(
-                '-expand_status', type=str, help='Select the stat uses to be expanded')
+                '-expand_status', type=str, help='Statuses to expand')
             subparser.add_argument('--hide_groups', action='store_true',
-                                   default=False, help='Hides the groups from the plot')
+                                   default=False, help='Hide the groups from the plot')
             subparser.add_argument('-cw', '--check_wrapper', action='store_true',
-                                   default=False, help='Generate possible wrapper in the current workflow')
+                                   default=False, help='Preview the wrapper that would be generated for the current workflow')
             group2 = subparser.add_mutually_exclusive_group(required=False)
             subparser.add_argument('-fl', '--list', type=str,
-                               help='Supply the list of job names to be filtered. Default = "Any". '
-                                    'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
+                               help='Job names to filter on. Default = "Any". '
+                                    'Format: LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
             subparser.add_argument('-fc', '--filter_chunks', type=str,
-                               help='Supply the list of chunks to filter the list of jobs. Default = "Any". '
-                                    'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
+                               help='Chunks to filter on. Default = "Any". '
+                                    'Format: LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument('-fs', '--filter_status', type=str,
                                choices=('Any', 'READY', 'COMPLETED',
                                         'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
-                               help='Select the original status to filter the list of jobs')
+                               help='Job status to filter on')
             subparser.add_argument('-ft', '--filter_type', type=str,
-                               help='Select the job type to filter the list of jobs')
+                               help='Job type to filter on')
             subparser.add_argument('--hide', action='store_true', default=False,
-                                   help='hides plot window')
+                                   help='Hide the plot window')
             group2.add_argument('-txt', '--text', action='store_true', default=False,
-                                help='Generates only txt status file')
+                                help='Generate only a text status file')
 
             group2.add_argument('-txtlog', '--txt_logfiles', action='store_true', default=False,
-                                help='Generates only txt status file(AS < 3.12b behaviour)')
+                                help='Generate only a text status file (Autosubmit < 3.12b behaviour)')
 
             # subparser.add_argument('-d', '--detail', action='store_true',
             #                        default=False, help='Shows Job List view in terminal')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
-                                   help='Prints performance parameters of the execution of this command.')
+                                   help='Print performance metrics for this command')
 
             # Stats
             subparser = subparsers.add_parser(
-                'stats', description="plots statistics for specified experiment")
-            subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('-ft', '--filter_type', type=str, help='Select the job type to filter '
-                                                                          'the list of jobs')
+                'stats',
+                help="Plot statistics for an experiment",
+                description="Plot statistics for an experiment, optionally filtered by job type or time period.")
+            subparser.add_argument('expid', help='Experiment identifier')
+            subparser.add_argument('-ft', '--filter_type', type=str,
+                                   help='Job type to filter on')
             subparser.add_argument('-fp', '--filter_period', type=int,
-                                   help='Select the period to filter jobs from current time to the past in'
-                                        'number of hours back (must be greater than 0)')
+                                   help='Time window in hours (from now backwards) to filter jobs on. '
+                                        'Must be greater than 0.')
             subparser.add_argument('-o', '--output', choices=('pdf', 'png', 'ps', 'svg'), default='pdf',
-                                   help='type of output for generated plot')
+                                   help='Output format for the generated plot')
             subparser.add_argument('--section_summary', action='store_true', default=False,
-                                   help='Includes section summary in the plot')
+                                   help='Include a section summary in the plot')
             subparser.add_argument('--jobs_summary', action='store_true', default=False,
-                                   help='Includes jobs summary in the plot')
+                                   help='Include a jobs summary in the plot')
             subparser.add_argument('--hide', action='store_true', default=False,
-                                   help='hides plot window')
+                                   help='Hide the plot window')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             # Clean
             subparser = subparsers.add_parser(
-                'clean', description="clean specified experiment")
-            subparser.add_argument('expid', help='experiment identifier')
+                'clean',
+                help="Clean project, plot, and stats files for an experiment",
+                description="Clean project files, old plots, and old statistics files for an experiment.")
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument(
-                '-pr', '--project', action="store_true", help='clean project')
+                '-pr', '--project', action="store_true", help='Clean the project files')
             subparser.add_argument('-p', '--plot', action="store_true",
-                                   help='clean plot, only 2 last will remain')
+                                   help='Clean plot files, keeping the two most recent')
             subparser.add_argument('-s', '--stats', action="store_true",
-                                   help='clean stats, only last will remain')
+                                   help='Clean statistics files, keeping the most recent')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             # Recovery
-            subparser = subparsers.add_parser('recovery', description="recover specified experiment")
-            subparser.add_argument('expid', type=str, help='experiment identifier')
+            subparser = subparsers.add_parser(
+                'recovery',
+                help="Recover an experiment from remote platforms",
+                description="Recover an experiment by synchronizing job status from the remote platforms.")
+            subparser.add_argument('expid', type=str, help='Experiment identifier')
             plot_group = subparser.add_mutually_exclusive_group(required=False)
             plot_group.add_argument(
                 "-np",
                 "--noplot",
                 action="store_true",
                 dest="noplot",
-                help="omit plot (default)",
+                help="Skip generating the plot (default)",
             )
             plot_group.add_argument(
                 "-plt",
                 "--plot",
                 action="store_false",
                 dest="noplot",
-                help="generate plot",
+                help="Generate the plot",
             )
             subparser.set_defaults(noplot=True)
             subparser.add_argument(
                 "--all",
                 action="store_true",
                 default=False,
-                help="Get completed files to synchronize pkl",
+                help="Retrieve completed files to synchronize the pkl",
             )
             subparser.add_argument(
                 "-fl",
                 "--list",
                 type=str,
-                help='Supply the list of job names to be recovered. Default = "Any". '
-                     'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
+                help='Job names to recover. Default = "Any". '
+                     'Format: LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
             )
             subparser.add_argument(
                 "-fc",
                 "--filter_chunks",
                 type=str,
-                help='Supply the list of chunks to be recovered. Default = "Any". '
-                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+                help='Chunks to recover. Default = "Any". '
+                     'Format: LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
             )
             subparser.add_argument(
                 "-fs",
                 "--filter_status",
                 type=str,
                 choices=('Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
-                help='Select the status (one or more) of jobs to be recovered. Default = "Any". '
-                     "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
+                help='Job statuses to recover. Default = "Any". '
+                     "Valid values: Any, READY, COMPLETED, WAITING, SUSPENDED, FAILED, UNKNOWN.",
             )
             subparser.add_argument(
                 "-ft",
                 "--filter_type",
                 type=str,
-                help='Select the job type and split to be recovered. Default split = "Any". '
-                     'LIST = "LOCALJOB [5-10] SIM"',
+                help='Job type and split to recover. Default split = "Any". '
+                     'Format: LIST = "LOCALJOB [5-10] SIM"',
             )
             subparser.add_argument(
                 '-s', '--save', action="store_true", default=False, help='Save changes to disk')
             subparser.add_argument(
-                '--hide', action='store_true', default=False, help='hides plot window')
+                '--hide', action='store_true', default=False, help='Hide the plot window')
             subparser.add_argument(
                 '-group_by', choices=('date', 'member', 'chunk', 'split', 'automatic'), default=None,
-                help='Groups the jobs automatically or by date, member, chunk or split'
+                help='Group jobs by date, member, chunk, split, or automatically'
             )
             subparser.add_argument(
                 '-expand', type=str,
-                help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
-                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
-            subparser.add_argument('-expand_status', type=str, help='Select the statuses to be expanded')
+                help='Dates/members/chunks to expand. Default = "Any". '
+                     'Format: LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
+            subparser.add_argument('-expand_status', type=str, help='Statuses to expand')
             subparser.add_argument(
                 '-nl', '--no_recover_logs', action='store_true', default=False,
                 help='Disable logs recovery (deprecated)'
             )
             subparser.add_argument(
-                '-d', '--detail', action='store_true', default=False, help='Show Job List view in terminal')
+                '-d', '--detail', action='store_true', default=False, help='Show the job list in the terminal')
             subparser.add_argument(
-                '-f', '--force', action='store_true', default=False, help='Cancel active jobs ')
+                '-f', '--force', action='store_true', default=False, help='Cancel active jobs')
             subparser.add_argument(
-                '-v', '--update_version', action='store_true', default=False, help='Update experiment version')
+                '-v', '--update_version', action='store_true', default=False, help='Update the experiment version')
             subparser.add_argument('-off', '--offline', action='store_true',
-                                   default=False, help='Offline recovery')
+                                   default=False, help='Run recovery in offline mode')
 
             # Migrate
             subparser = subparsers.add_parser(
-                'migrate', description="Migrate experiments from current user to another")
-            subparser.add_argument('expid', help='experiment identifier')
+                'migrate',
+                help="Migrate an experiment between users",
+                description="Migrate an experiment from the current user to another user. Runs in two phases: offer, then pickup.")
+            subparser.add_argument('expid', help='Experiment identifier')
             group = subparser.add_mutually_exclusive_group(required=True)
             group.add_argument('-o', '--offer', action="store_true",
-                               default=False, help='Offer experiment')
+                               default=False, help='Offer the experiment for pickup')
             group.add_argument('-p', '--pickup', action="store_true",
-                               default=False, help='Pick-up released experiment')
+                               default=False, help='Pick up an experiment that was offered')
             subparser.add_argument('-r', '--onlyremote', action="store_true",
-                                   default=False, help='Only moves remote files')
+                                   default=False, help='Only move remote files')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             # Inspect
             subparser = subparsers.add_parser(
-                'inspect', description="Generate all .cmd files")
-            subparser.add_argument('expid', help='experiment identifier')
+                'inspect',
+                help="Generate all .cmd files for an experiment",
+                description="Generate all .cmd files for an experiment without submitting any jobs.")
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument(
-                '-f', '--force', action="store_true", help='Overwrite all cmd')
+                '-f', '--force', action="store_true", help='Overwrite all .cmd files')
             subparser.add_argument('-cw', '--check_wrapper', action='store_true',
-                                   default=False, help='Generate possible wrapper in the current workflow')
+                                   default=False, help='Preview the wrapper that would be generated for the current workflow')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             subparser.add_argument(
-                '-q', '--quick', action="store_true", help='Only checks one job per each section')
+                '-q', '--quick', action="store_true", help='Check only one job per section')
 
             subparser.add_argument('-fl', '--list', type=str,
-                               help='Supply the list of job names to be filtered. Default = "Any". '
-                                    'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
+                               help='Job names to filter on. Default = "Any". '
+                                    'Format: LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"')
             subparser.add_argument('-fc', '--filter_chunks', type=str,
-                               help='Supply the list of chunks to filter the list of jobs. Default = "Any". '
-                                    'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
+                               help='Chunks to filter on. Default = "Any". '
+                                    'Format: LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument('-fs', '--filter_status', type=str,
                                choices=('Any', 'READY', 'COMPLETED',
                                         'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN'),
-                               help='Select the original status to filter the list of jobs')
+                               help='Job status to filter on')
             subparser.add_argument('-ft', '--filter_type', type=str,
-                               help='Select the job type to filter the list of jobs')
+                               help='Job type to filter on')
 
             # Describe
             subparser = subparsers.add_parser(
-                'describe', description="Show details for specified experiment")
+                'describe',
+                help="Show details for one or more experiments",
+                description="Show details for one or more experiments, including their description and owner.")
             subparser.add_argument('expid',
-                                   help='experiment identifier, can be a list of expid separated by comma or spaces',
+                                   help='One or more experiment identifiers, comma- or space-separated',
                                    default="*", nargs="?")
-            subparser.add_argument('-u', '--user', help='username, default is current user or listed expid',
-                                   default=""),
+            subparser.add_argument('-u', '--user',
+                                   help='Username whose experiments to show (defaults to the current user)',
+                                   default="")
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
 
             # Report
             subparser = subparsers.add_parser(
-                'report', description="Show metrics.. ")
-            subparser.add_argument('expid', help='experiment identifier')
+                'report',
+                help="Generate a metrics report for an experiment",
+                description="Generate a metrics report for an experiment, optionally using a custom template.")
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument(
-                '-t', '--template', type=str, help='Supply the metric template.')
+                '-t', '--template', type=str, help='Path to the metric template file')
             subparser.add_argument('-all', '--show_all_parameters', action='store_true',
-                                   default=False, help='Writes a file containing all parameters')
+                                   default=False, help='Write a file containing all parameters')
             subparser.add_argument(
-                '-fp', '--folder_path', type=str, help='Allows to select a non-default folder.')
+                '-fp', '--folder_path', type=str, help='Non-default folder to write the report to')
             subparser.add_argument(
                 '-p', '--placeholders', default=False, action='store_true',
-                help='disables the substitution of placeholders by -')
+                help='Disable placeholder substitution (leave placeholders as -)')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             # Create
             subparser = subparsers.add_parser(
-                'create', description="create specified experiment joblist")
-            subparser.add_argument('expid', help='experiment identifier')
+                'create',
+                help="Create the job list for an experiment",
+                description="Create the job list for an experiment based on its configuration.")
+            subparser.add_argument('expid', help='Experiment identifier')
             plot_group = subparser.add_mutually_exclusive_group(required=False)
             plot_group.add_argument(
                 "-np",
                 "--noplot",
                 action="store_true",
                 dest="noplot",
-                help="omit plot (default)",
+                help="Skip generating the plot (default)",
             )
             plot_group.add_argument(
                 "-plt",
                 "--plot",
                 action="store_false",
                 dest="noplot",
-                help="generate plot",
+                help="Generate the plot",
             )
             subparser.set_defaults(noplot=True)
             subparser.add_argument('--hide', action='store_true', default=False,
-                                   help='hides plot window')
+                                   help='Hide the plot window')
             subparser.add_argument('-d', '--detail', action='store_true',
-                                   default=False, help='Show Job List view in terminal')
+                                   default=False, help='Show the job list in the terminal')
             subparser.add_argument('-o', '--output', choices=('pdf', 'png', 'ps', 'svg', 'txt'),
-                                   help='chooses type of output for generated plot')  # Default -o value comes from .conf
+                                   help='Output format for the generated plot')  # Default -o value comes from .conf
             subparser.add_argument('-group_by', choices=('date', 'member', 'chunk', 'split', 'automatic'), default=None,
-                                   help='Groups the jobs automatically or by date, member, chunk or split')
+                                   help='Group jobs by date, member, chunk, split, or automatically')
             subparser.add_argument('-expand', type=str,
-                                   help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
-                                        'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
+                                   help='Dates/members/chunks to expand. Default = "Any". '
+                                        'Format: LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"')
             subparser.add_argument(
-                '-expand_status', type=str, help='Select the statuses to be expanded')
+                '-expand_status', type=str, help='Statuses to expand')
             subparser.add_argument('-cw', '--check_wrapper', action='store_true',
-                                   default=False, help='Generate possible wrapper in the current workflow')
+                                   default=False, help='Preview the wrapper that would be generated for the current workflow')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             subparser.add_argument('-p', '--profile', action='store_true', default=False, required=False,
-                                   help='Prints performance parameters of the execution of this command.')
+                                   help='Print performance metrics for this command')
             subparser.add_argument(
-                '-f', '--force', action='store_true', default=False, help='force regenerate job_list')
+                '-f', '--force', action='store_true', default=False, help='Force regeneration of the job list')
             # Configure
             subparser = subparsers.add_parser(
                 "configure",
-                description="configure database and path for autosubmit. It "
-                            "can be done at machine, user or local level.",
+                help="Configure Autosubmit's database and paths",
+                description="Configure Autosubmit's database and paths. Can be applied at machine, user, or local level.",
             )
             subparser.add_argument(
-                '--advanced', action="store_true", help="Open advanced configuration of autosubmit")
+                '--advanced', action="store_true", help="Open the advanced configuration wizard")
             subparser.add_argument(
                 "--database-backend",
                 choices=("sqlite", "postgres"),
                 default="sqlite",
-                help="Select the database backend to use. Default is sqlite.",
+                help="Database backend to use (default: sqlite)",
             )
             subparser.add_argument(
                 "--database-conn-url", default=None,
-                help="Database connection URL string. Required for postgres backend."
+                help="Database connection URL. Required for the postgres backend."
             )
             subparser.add_argument(
                 "-db",
                 "--databasepath",
                 default=None,
-                help="path to SQLite database. Defaults to $HOME/autosubmit if not supplied. "
-                     "Required for SQLite backend.",
+                help="Path to the SQLite database directory (defaults to $HOME/autosubmit). "
+                     "Required for the SQLite backend.",
             )
             subparser.add_argument(
-                '-dbf', '--databasefilename', default=None, help='database filename')
-            subparser.add_argument('-lr', '--localrootpath', default=None, help='path to store experiments. Defaults to $HOME/autosubmit if not supplied')
-            subparser.add_argument('-pc', '--platformsconfpath', default=None, help='path to platforms.yml file to '
-                                                                                    'use by default. Optional')
-            subparser.add_argument('-jc', '--jobsconfpath', default=None, help='path to jobs.yml file to use by '
-                                                                               'default. Optional')
+                '-dbf', '--databasefilename', default=None, help='Database filename')
+            subparser.add_argument('-lr', '--localrootpath', default=None,
+                                   help='Path where experiments are stored (defaults to $HOME/autosubmit)')
+            subparser.add_argument('-pc', '--platformsconfpath', default=None,
+                                   help='Path to the default platforms.yml file (optional)')
+            subparser.add_argument('-jc', '--jobsconfpath', default=None,
+                                   help='Path to the default jobs.yml file (optional)')
             subparser.add_argument(
-                '-sm', '--smtphostname', default=None, help='SMTP server hostname. Optional')
+                '-sm', '--smtphostname', default=None, help='SMTP server hostname for notifications (optional)')
             subparser.add_argument(
-                '-mf', '--mailfrom', default=None, help='Notifications sender address. Optional')
+                '-mf', '--mailfrom', default=None, help='Sender address for notification emails (optional)')
             group = subparser.add_mutually_exclusive_group()
             group.add_argument('--all', action="store_true",
-                               help='configure for all users')
-            group.add_argument('--local', action="store_true", help='configure only for using Autosubmit from this '
-                                                                    'path')
+                               help='Configure for all users')
+            group.add_argument('--local', action="store_true",
+                               help='Configure only for using Autosubmit from the current path')
 
             # Install
             subparsers.add_parser(
-                'install', description='install database for autosubmit on the configured folder')
+                'install',
+                help="Install the Autosubmit database",
+                description='Install the Autosubmit database in the configured folder.')
 
             # Set status
             subparser = subparsers.add_parser(
-                "setstatus", description="sets job status for an experiment"
+                "setstatus",
+                help="Set the status of jobs in an experiment",
+                description="Set the status of one or more jobs in an experiment.",
             )
-            subparser.add_argument("expid", help="experiment identifier")
+            subparser.add_argument("expid", help="Experiment identifier")
             plot_group = subparser.add_mutually_exclusive_group(required=False)
             plot_group.add_argument(
                 "-np",
                 "--noplot",
                 action="store_true",
                 dest="noplot",
-                help="omit plot (default)",
+                help="Skip generating the plot (default)",
             )
             plot_group.add_argument(
                 "-plt",
                 "--plot",
                 action="store_false",
                 dest="noplot",
-                help="generate plot",
+                help="Generate the plot",
             )
             subparser.set_defaults(noplot=True)
             subparser.add_argument(
@@ -619,81 +651,81 @@ class Autosubmit:
                     "HELD",
                 ),
                 required=True,
-                help="Supply the target status",
+                help="Target status to set",
             )
             subparser.add_argument(
                 "-v",
                 "--update_version",
                 action="store_true",
                 default=False,
-                help="Update experiment version",
+                help="Update the experiment version",
             )
             subparser.add_argument(
                 "-fl",
                 "--list",
                 type=str,
-                help='Supply the list of job names to be changed. Default = "Any". '
-                     'LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
+                help='Job names to change. Default = "Any". '
+                     'Format: LIST = "b037_20101101_fc3_21_sim b037_20111101_fc4_26_sim"',
             )
             subparser.add_argument(
                 "-fc",
                 "--filter_chunks",
                 type=str,
-                help='Supply the list of chunks to change the status. Default = "Any". '
-                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+                help='Chunks whose status to change. Default = "Any". '
+                     'Format: LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
             )
             subparser.add_argument(
                 "-fs",
                 "--filter_status",
                 type=str,
-                help="Select the status (one or more) to filter the list of jobs."
-                     "Valid values = ['Any', 'READY', 'COMPLETED', 'WAITING', 'SUSPENDED', 'FAILED', 'UNKNOWN']",
+                help="Statuses to filter on. "
+                     "Valid values: Any, READY, COMPLETED, WAITING, SUSPENDED, FAILED, UNKNOWN.",
             )
             subparser.add_argument(
                 "-ft",
                 "--filter_type",
                 type=str,
-                help='Select the job type and split to filter the list of jobs. Default split = "Any". '
-                     'LIST = "LOCALJOB [5-10] SIM"',
+                help='Job type and split to filter on. Default split = "Any". '
+                     'Format: LIST = "LOCALJOB [5-10] SIM"',
             )
             subparser.add_argument(
                 "-ftc",
                 "--filter_type_chunk",
                 type=str,
-                help='[Deprecated] Equivalent behaviour can be achieved by combining -ft and -fc. \
-                               Supply the list of chunks to change the status. Default = "Any". When the member name "all" is set, all the chunks \
-                               selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
-                                   chunks 1 for all the members will be updated. Follow the format: '
-                     '"[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+                help='[Deprecated] Equivalent behaviour can be achieved by combining -ft and -fc. '
+                     'Chunks whose status to change. Default = "Any". When the member name "all" is set, '
+                     'the selected chunks will be updated for all members. Example: all [1] updates chunk 1 '
+                     'for all members. '
+                     'Format: "[ 19601101 [ fc0 [1 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
             )
             subparser.add_argument(
                 "-ftcs",
                 "--filter_type_chunk_split",
                 type=str,
-                help='[Deprecated] Equivalent behaviour can be achieved by combining -ft and -fc. \
-                                Supply the list of chunks & splits to change the status. Default = "Any". When the member name "all" is set, all the chunks \
-                                           selected from for that member will be updated for all the members. Example: all [1], will have as a result that the \
-                                               chunks 1 for all the members will be updated. Follow the format: '
-                     '"[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
+                help='[Deprecated] Equivalent behaviour can be achieved by combining -ft and -fc. '
+                     'Chunks and splits whose status to change. Default = "Any". When the member name "all" is set, '
+                     'the selected chunks will be updated for all members. Example: all [1] updates chunk 1 '
+                     'for all members. '
+                     'Format: "[ 19601101 [ fc0 [1 [1 2] 2 3 4] Any [1] ] 19651101 [ fc0 [16-30] ] ],SIM,SIM2,SIM3"',
             )
 
             subparser.add_argument(
-                "--hide", action="store_true", default=False, help="hides plot window"
+                "--hide", action="store_true", default=False, help="Hide the plot window"
             )
             subparser.add_argument(
                 "-group_by",
                 choices=("date", "member", "chunk", "split", "automatic"),
                 default=None,
-                help="Groups the jobs automatically or by date, member, chunk or split",
+                help="Group jobs by date, member, chunk, split, or automatically",
             )
             subparser.add_argument(
                 "-expand",
                 type=str,
-                help='Supply the list of dates/members/chunks to filter the list of jobs. Default = "Any". '
-                     'LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
+                help='Dates/members/chunks to expand. Default = "Any". '
+                     'Format: LIST = "[ 19601101 [ fc0 [1 2 3 4] fc1 [1] ] 19651101 [ fc0 [16-30] ] ]"',
             )
             subparser.add_argument(
-                "-expand_status", type=str, help="Select the statuses to be expanded"
+                "-expand_status", type=str, help="Statuses to expand"
             )
             subparser.add_argument(
                 "-nt",
@@ -707,159 +739,190 @@ class Autosubmit:
                 "--check_wrapper",
                 action="store_true",
                 default=False,
-                help="Generate possible wrapper in the current workflow",
+                help="Preview the wrapper that would be generated for the current workflow",
             )
             subparser.add_argument(
                 "-d",
                 "--detail",
                 action="store_true",
                 default=False,
-                help="Generate detailed view of changes",
+                help="Generate a detailed view of the changes",
             )
 
             # Test Case
             subparser = subparsers.add_parser(
-                'testcase', description='create test case experiment')
+                'testcase',
+                help="Create a test case experiment",
+                description='Create a test case experiment, optionally as a copy of an existing one or with minimal configuration.')
             group = subparser.add_mutually_exclusive_group()
             group.add_argument(
-                '-y', '--copy', help='makes a copy of the specified experiment')
+                '-y', '--copy', help='Copy the specified experiment')
             group.add_argument('-min', '--minimal_configuration', action='store_true',
-                               help='creates a new experiment with minimal configuration, usually combined with -repo')
+                               help='Create an experiment with minimal configuration (usually combined with --git_repo)')
             subparser.add_argument(
-                '-d', '--description', required=True, help='description of the test case')
-            subparser.add_argument('-c', '--chunks', help='chunks to run')
-            subparser.add_argument('-m', '--member', help='member to run')
-            subparser.add_argument('-s', '--stardate', help='stardate to run')
+                '-d', '--description', required=True, help='Description of the test case')
+            subparser.add_argument('-c', '--chunks', help='Chunks to run')
+            subparser.add_argument('-m', '--member', help='Member to run')
+            subparser.add_argument('-s', '--stardate', help='Startdate to run')
             subparser.add_argument(
-                '-H', '--HPC', required=True, help='HPC to run experiment on it')
+                '-H', '--HPC', required=True, help='HPC platform to run the experiment on')
 
             subparser.add_argument('-repo', '--git_repo', type=str, default="", required=False,
-                                   help='sets a git repository for the experiment')
+                                   help='Git repository to use for the experiment')
             subparser.add_argument('-b', '--git_branch', type=str, default="", required=False,
-                                   help='sets a git branch for the experiment')
+                                   help='Git branch to use for the experiment')
             subparser.add_argument('-conf', '--git_as_conf', type=str, default="", required=False,
-                                   help='sets the git path to as_conf')
+                                   help='Path within the git repository to the Autosubmit configuration')
             subparser.add_argument('-local', '--use_local_minimal', required=False, action="store_true",
-                                   help='uses local minimal file instead of git')
+                                   help='Use a local minimal file instead of a git repository')
 
             # Database Fix
             subparser = subparsers.add_parser(
-                'dbfix', description='tries to fix a corrupted jobs database')
-            subparser.add_argument('expid', help='experiment identifier')
+                'dbfix',
+                help="Fix a corrupted jobs database",
+                description='Attempt to fix a corrupted jobs database for an experiment.')
+            subparser.add_argument('expid', help='Experiment identifier')
 
             # sqlite Fix
             # TODO job_list_to_db change fix command ( or remove )
             subparser = subparsers.add_parser(
-                'sqlitefix', description='restore the backup of your sqlite')
-            subparser.add_argument('expid', help='experiment identifier')
+                'sqlitefix',
+                help="Restore the SQLite backup for an experiment",
+                description='Restore the backup of the SQLite database for an experiment.')
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument(
                 "-f",
                 "--force",
                 action="store_true",
-                help="force restore without confirmation",
+                help="Restore without confirmation",
             )
 
             # Update Description
             subparser = subparsers.add_parser(
-                'updatedescrip', description="Updates the experiment's description.")
-            subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('description', help='New description.')
+                'updatedescrip',
+                help="Update the description of an experiment",
+                description="Update the description of an experiment in the database.")
+            subparser.add_argument('expid', help='Experiment identifier')
+            subparser.add_argument('description', help='New description for the experiment')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             # Test
             subparser = subparsers.add_parser(
-                'test', description='test experiment')
-            subparser.add_argument('expid', help='experiment identifier')
+                'test',
+                help="Run a test experiment",
+                description='Run a test experiment with the specified chunks, member, and startdate.')
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument(
-                '-c', '--chunks', required=True, help='chunks to run')
-            subparser.add_argument('-m', '--member', help='member to run')
-            subparser.add_argument('-s', '--stardate', help='stardate to run')
+                '-c', '--chunks', required=True, help='Chunks to run')
+            subparser.add_argument('-m', '--member', help='Member to run')
+            subparser.add_argument('-s', '--stardate', help='Startdate to run')
             subparser.add_argument(
-                '-H', '--HPC', help='HPC to run experiment on it')
+                '-H', '--HPC', help='HPC platform to run the experiment on')
             subparser.add_argument(
-                '-b', '--branch', help='branch of git to run (or revision from subversion)')
+                '-b', '--branch', help='Git branch to run (or subversion revision)')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             # Refresh
             subparser = subparsers.add_parser(
-                'refresh', description='refresh project directory for an experiment')
-            subparser.add_argument('expid', help='experiment identifier')
+                'refresh',
+                help="Refresh the project directory for an experiment",
+                description='Refresh the project directory for an experiment from its configured source.')
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument('-mc', '--model_conf', default=False, action='store_true',
-                                   help='overwrite model conf file')
+                                   help='Overwrite the model conf file')
             subparser.add_argument('-jc', '--jobs_conf', default=False, action='store_true',
-                                   help='overwrite jobs conf file')
+                                   help='Overwrite the jobs conf file')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             # Update Version
             subparser = subparsers.add_parser(
-                'updateversion', description='refresh experiment version')
-            subparser.add_argument('expid', help='experiment identifier')
+                'updateversion',
+                help="Update the recorded Autosubmit version of an experiment",
+                description='Update the Autosubmit version recorded for an experiment to match the currently installed one.')
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             # Provenance
             subparser = subparsers.add_parser(
-                'provenance', description='Produce provenance for autosubmit')
-            subparser.add_argument('expid', help='experiment identifier')
+                'provenance',
+                help="Produce provenance information for an experiment",
+                description='Produce provenance information for an experiment, optionally as an RO-Crate file.')
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument('--rocrate', action='store_true', default=False,
                                    help='Produce an RO-Crate file')
             # Archive
             subparser = subparsers.add_parser(
-                'archive', description='archives an experiment')
-            subparser.add_argument('expid', help='experiment identifier')
+                'archive',
+                help="Archive an experiment",
+                description='Archive an experiment as a compressed tarball.')
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument('-nclean', '--noclean', default=False, action='store_true',
-                                   help='Avoid Cleaning of experiment folder')
+                                   help='Do not clean the experiment folder after archiving')
             subparser.add_argument('-uc', '--uncompress', default=False, action='store_true',
-                                   help='Only does a container without compress')
+                                   help='Create a tar container without compression')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             subparser.add_argument('--rocrate', action='store_true', default=False,
                                    help='Produce an RO-Crate file')
             # Unarchive
             subparser = subparsers.add_parser(
-                'unarchive', description='unarchive an experiment')
-            subparser.add_argument('expid', help='experiment identifier')
+                'unarchive',
+                help="Unarchive an experiment",
+                description='Unarchive a previously archived experiment.')
+            subparser.add_argument('expid', help='Experiment identifier')
             subparser.add_argument('-nclean', '--noclean', default=False, action='store_true',
-                                   help='Avoid Cleaning of experiment folder')
+                                   help='Do not clean the experiment folder after unarchiving')
             subparser.add_argument('-uc', '--uncompressed', default=False, action='store_true',
-                                   help='Extract files of the tar file without gzip compression')
+                                   help='Extract files from a tar without gzip decompression')
             subparser.add_argument('-v', '--update_version', action='store_true',
-                                   default=False, help='Update experiment version')
+                                   default=False, help='Update the experiment version')
             subparser.add_argument('--rocrate', action='store_true', default=False,
                                    help='Unarchive an RO-Crate file')
             # update proj files
-            subparser = subparsers.add_parser('upgrade', description='Updates autosubmit 3 proj files to autosubmit 4')
-            subparser.add_argument('expid', help='experiment identifier')
-            subparser.add_argument('-f', '--files', nargs='+', type=str, help='list of files')
+            subparser = subparsers.add_parser(
+                'upgrade',
+                help="Upgrade Autosubmit 3 project files to Autosubmit 4",
+                description='Upgrade Autosubmit 3 project files to the Autosubmit 4 format.')
+            subparser.add_argument('expid', help='Experiment identifier')
+            subparser.add_argument('-f', '--files', nargs='+', type=str, help='List of files to upgrade')
             # Readme
-            subparsers.add_parser('readme', description='show readme')
+            subparsers.add_parser('readme',
+                                  help="Show the README",
+                                  description='Show the Autosubmit README.')
 
             # Changelog
-            subparsers.add_parser('changelog', description='show changelog')
+            subparsers.add_parser('changelog',
+                                  help="Show the changelog",
+                                  description='Show the Autosubmit changelog.')
 
             # Cat-log
             subparser = subparsers.add_parser(
-                'cat-log', description='View workflow and job logs.')
+                'cat-log',
+                help="View workflow and job logs",
+                description='View workflow and job logs, either the full contents or a live tail.')
             subparser.add_argument('-f', '--file', default=None, action='store', metavar='FILE',
-                                   help='Workflow or Job log file. Options are o(output), j(job), e(error), s(status). Default o(output).')
+                                   help='Log file to view. Options: o (output), j (job), e (error), s (status). Default: o.')
             subparser.add_argument('-m', '--mode', default=None, action='store', metavar='MODE',
-                                   help='Mode. Options are c(cat), t(tail). Default is c(cat).')
+                                   help='Viewing mode. Options: c (cat), t (tail). Default: c.')
             subparser.add_argument('-i', '--inspect', default=False, action='store_true',
-                                   help='Read job files generated by the inspect subcommand.')
+                                   help='Read job files generated by the inspect subcommand')
             subparser.add_argument('ID', metavar='ID',
-                                   help='An ID of a Workflow (eg a000) or a Job (eg a000_20220401_fc0_1_1_APPLICATION).')
+                                   help='ID of a workflow (e.g. a000) or a job (e.g. a000_20220401_fc0_1_1_APPLICATION)')
 
             # stop
             subparser = subparsers.add_parser(
-                'stop', description='Completely stops an autosubmit run process')
+                'stop',
+                help="Stop one or more running Autosubmit processes",
+                description='Completely stop one or more Autosubmit run processes.')
             group = subparser.add_mutually_exclusive_group(required=True)
-            group.add_argument('expid', help='experiment identifiers separated by commas',
+            group.add_argument('expid', help='One or more experiment identifiers, comma-separated',
                                nargs='?')
             subparser.add_argument('-f', '--force', default=False, action='store_true',
-                                   help='Forces to stop autosubmit process, equivalent to kill -9')
+                                   help='Force stop the process (equivalent to kill -9)')
             group.add_argument('-a', '--all', default=False, action='store_true',
-                               help='Stop all current running autosubmit processes, will ask for confirmation unless -y is used')
+                               help='Stop all running Autosubmit processes (asks for confirmation unless -y is used)')
             group.add_argument('-fa', '--force_all', default=False, action='store_true',
-                               help='Stop all current running autosubmit processes')
+                               help='Stop all running Autosubmit processes without confirmation')
             subparser.add_argument(
                 "-y",
                 "--yes",
@@ -868,11 +931,11 @@ class Autosubmit:
                 help="Automatically answer yes to prompts",
             )
             subparser.add_argument('-c', '--cancel', action=CancelAction, default=False, nargs=0,
-                                   help='Orders to the schedulers to stop active jobs.')
+                                   help='Order the schedulers to stop active jobs')
             subparser.add_argument('-fs', '--filter_status', type=str, default="SUBMITTED, QUEUING, RUNNING",
-                                   help='Select the status (one or more) to filter the list of jobs.')
+                                   help='Statuses to filter on when cancelling jobs')
             subparser.add_argument('-t', '--target', type=str, default="FAILED", metavar='STATUS',
-                                   help='Final status of killed jobs. Default is FAILED.')
+                                   help='Final status for cancelled jobs (default: FAILED)')
             args, unknown = parser.parse_known_args()
             if args.version:
                 Log.info(Autosubmit.autosubmit_version)
