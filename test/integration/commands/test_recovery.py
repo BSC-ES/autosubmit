@@ -775,24 +775,14 @@ def test_recovery_filters_apply_to_active_jobs(as_exp, mocker):
         job.name for job in job_list.get_job_list() if job.section == "LOCALJOB"
     ][:2]
 
-    as_exp.autosubmit.set_status(
-        as_exp.expid,
-        noplot=True,
-        save=True,
-        final="RUNNING",  # change to active status
-        filter_list=" ".join(active_jobs),
-        filter_chunks=None,
-        filter_status=None,
-        filter_section=None,
-        filter_type_chunk=None,
-        filter_type_chunk_split=None,
-        hide=False,
-        group_by=None,
-        expand=[],
-        expand_status=[],
-        check_wrapper=False,
-        detail=False,
-    )
+    submitter = ParamikoSubmitter(as_conf=as_exp.as_conf)
+    hpcarch = as_exp.as_conf.get_platform()
+    for job in job_list.get_job_list():
+        job.platform_name = as_exp.as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper() or hpcarch
+        job.platform = submitter.platforms[job.platform_name]
+        if job.name in active_jobs:
+            job.status = Status.RUNNING
+    job_list.save()
 
     job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
     mocker.patch(

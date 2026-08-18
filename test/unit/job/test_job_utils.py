@@ -31,6 +31,7 @@ from autosubmit.job.job_utils import (
     calendar_unitsize_getlowersize,
     calendar_unitsize_isgreater,
     cancel_jobs,
+    change_jobs_status,
     get_split_size_unit,
     is_leap_year,
 )
@@ -181,6 +182,84 @@ def test_cancel_jobs_skips_invalid_ids(invalid_id, create_job_list):
     jobs[1].platform.cancel_jobs.assert_called_once_with(['valid-job'])
     for job in jobs:
         assert job.status == Status.KEY_TO_VALUE[target_status]
+
+
+@pytest.mark.parametrize(
+    "current_status, new_status, cancel_active, applied, cancel_expected",
+    [
+        (Status.RUNNING, Status.WAITING, True, True, True),
+        (Status.RUNNING, Status.COMPLETED, True, True, True),
+        (Status.COMPLETED, Status.WAITING, True, True, False),
+        (Status.RUNNING, Status.WAITING, False, True, False),
+        (Status.RUNNING, Status.QUEUING, True, False, False),
+        (Status.WAITING, Status.RUNNING, True, False, False),
+    ],
+    ids=["active->rerunnable", "active->final", "completed->rerunnable", "cancel-disabled",
+         "active->active-rejected", "waiting->active-rejected"],
+)
+def test_change_jobs_status_cancel(current_status, new_status, cancel_active, applied, cancel_expected, mocker):
+    """Test when the platform cancel is dispatched and when an active target status is rejected."""
+    job = _create_job_mock({"name": "job", "status": current_status}, mocker)
+    job.id = "123"
+
+    changes = change_jobs_status([(job, new_status)], cancel_active=cancel_active)
+
+    if applied:
+        job.apply_status.assert_called_once_with(new_status)
+        assert changes == {"job": f"{Status.VALUE_TO_KEY[current_status]} -> {Status.VALUE_TO_KEY[new_status]}"}
+    else:
+        job.apply_status.assert_not_called()
+        assert changes == {}
+    if cancel_expected:
+        job.platform.cancel_jobs.assert_called_once_with(["123"])
+    else:
+        job.platform.cancel_jobs.assert_not_called()
+
+
+def test_change_jobs_status_batches_cancel_per_platform(mocker):
+    """Test that cancels for jobs on the same platform are dispatched in a single call."""
+    platform = mocker.MagicMock()
+    jobs = []
+    for i in range(2):
+        job = _create_job_mock({"name": f"job{i}", "status": Status.RUNNING}, mocker)
+        job.id = str(i)
+        job.platform = platform
+        jobs.append(job)
+
+    change_jobs_status([(jobs[0], Status.WAITING), (jobs[1], Status.WAITING)])
+
+    platform.cancel_jobs.assert_called_once_with(["0", "1"])
+
+
+@pytest.mark.parametrize(
+    "invalid_id",
+    [0, None, ""],
+    ids=["zero", "none", "empty"],
+)
+def test_change_jobs_status_skips_cancel_for_invalid_id(invalid_id, mocker):
+    """Test that jobs with an invalid id are not cancelled but still change status."""
+    job = _create_job_mock({"name": "job", "status": Status.RUNNING}, mocker)
+    job.id = invalid_id
+
+    changes = change_jobs_status([(job, Status.WAITING)])
+
+    job.platform.cancel_jobs.assert_not_called()
+    job.apply_status.assert_called_once_with(Status.WAITING)
+    assert job.name in changes
+
+
+def test_change_jobs_status_keeps_applying_status_on_cancel_failure(mocker):
+    """Test that a platform error while cancelling does not prevent the status change."""
+    job = _create_job_mock({"name": "job", "status": Status.RUNNING}, mocker)
+    job.id = "123"
+    job.platform.cancel_jobs.side_effect = ValueError("connection lost")
+    mock_warning = mocker.patch("autosubmit.job.job_utils.Log.warning")
+
+    changes = change_jobs_status([(job, Status.WAITING)])
+
+    job.apply_status.assert_called_once_with(Status.WAITING)
+    assert job.name in changes
+    assert mock_warning.call_count == 1
 
 
 @pytest.mark.parametrize(
