@@ -1,3 +1,25 @@
+### 4.1.17.1: Large experiments support: ssh-recovery and updated_list
+
+**Bug fixes:**
+
+- Fewer "key-exchange timed out" errors on busy cluster login servers. Autosubmit now waits longer and recovers by itself.
+- `recovery` no longer stops when a platform can't say which jobs finished; offline it falls back to its own records.
+- The `updated_list_<EXPID>.txt` status file is now friendlier: bad lines are skipped with a warning, job names and statuses are case-insensitive, and it can't break your run.
+- Autosubmit no longer gets stuck on logs of jobs whose info was lost after an interrupted run.
+- Relaunching a finished job from the `updated_list` file now correctly reset some variables used to download the logs
+
+**Enhancements:**
+
+
+- New `CLEAR_TO_SEND_TIMEOUT` platform setting: how long to wait for a busy login server. Default: 180 seconds.
+- When you change the status of a job that is still running, Autosubmit stops
+  it on the cluster first and then applies the change. No more accidental
+  duplicate runs.
+- `setstatus` and `updated_list` no longer let you put a job into an
+  in-progress state like submitted, queuing, or running. Autosubmit manages
+  those states on its own.
+- QOL: `updated_list` and `setstatus` now calls the same functions to manage status.
+
 ### 4.1.17: Submission and Job Tracking Overhaul, Bug Fixes, and Enhancements                                                                                                                                                               
 
 **Bug fixes:**
@@ -41,10 +63,7 @@
 - Fixed `CPU per task` for new version of autosubmit #2897
 - Fixed issue overwritting expid config variables with the ones from the github repo #2877
 - Fixed inspect infinite loop when PLATFORMS.TOTALJOBS or PLATFORMS.MAX_WAITING_JOBS is set to 0 #2749
-- Fewer "key-exchange timed out" errors on busy cluster login servers. Autosubmit now waits longer and recovers by itself.
-- `recovery` no longer stops when a platform can't say which jobs finished; offline it falls back to its own records.
-- The `updated_list_<EXPID>.txt` status file is now friendlier: bad lines are skipped with a warning, job names and statuses are case-insensitive, and it can't break your run.
-- Autosubmit no longer gets stuck on logs of jobs whose info was lost after an interrupted run.
+
 
 **Enhancements:**
 
@@ -90,7 +109,7 @@
 - Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
 - Changed JOBS_IN_WRAPPER unknown job from critical error to warning #3006
 - Added ``ECACCESS_RETRIES`` platform config key to configure SSL retries for ecaccess platforms. Defaults to 100 #3059
-- New `CLEAR_TO_SEND_TIMEOUT` platform setting: how long to wait for a busy login server. Default: 180 seconds.
+
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 

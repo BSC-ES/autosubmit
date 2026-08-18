@@ -44,6 +44,7 @@ from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency
 from autosubmit.job.job_utils import transitive_reduction
+from autosubmit.job.job_utils import change_jobs_status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.monitor.diagram import JobData
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
@@ -2480,6 +2481,10 @@ class JobList(object):
     def update_from_file(self, store_change: bool = True) -> bool:
         """Updates jobs list on the fly from an update file.
 
+        Active jobs (QUEUING/RUNNING/SUBMITTED) are cancelled on their platform before any
+        status change (when the platform is reachable), and active statuses cannot be set
+        as a target.
+
         :param store_change: if True, renames the update file to avoid reloading it at the next iteration
         :return: True if an update file was found (and attempted to process), False otherwise
         """
@@ -2494,21 +2499,36 @@ class JobList(object):
             lines = update_path.read_text(encoding="utf-8").splitlines()
         except (OSError, UnicodeDecodeError) as e:
             Log.warning(f"Could not read the update file {update_path}: {e}")
+        jobs_by_name: dict[str, Job] = {}
+        for job in self._job_list:
+            jobs_by_name.setdefault(job.name.upper(), job)
+        job_status_pairs = []
         for line in lines:
             parts = line.split()
             if len(parts) < 2:
                 continue
             # TODO: For 4.2 change this into db call as the job may not be loaded
             # Case-insensitive change
-            job = next((j for j in self._job_list if j.name.upper() == parts[0].upper()), None)
+            job = jobs_by_name.get(parts[0].upper())
             if not job:
                 continue
             status = Status.KEY_TO_VALUE.get(parts[1].upper())
             if status is None:
                 Log.warning(f"Invalid status '{parts[1]}' for job '{parts[0]}' in {self._update_file}, skipping it")
                 continue
-            job.status = status
-            job.fail_count = 0
+            if status in Status.ACTIVE:
+                Log.warning(f"Status '{parts[1]}' for job '{parts[0]}' is active and cannot be set "
+                            f"from {self._update_file}, skipping it")
+                continue
+            elif job.status in Status.ACTIVE:
+                platform = getattr(job, "platform", None)
+                if platform is None or not platform.connected:
+                    Log.warning(f"Cannot change status of active job [{job.name}] because the connection to its "
+                                f"platform [{getattr(platform, 'name', 'unknown')}] is not available, skipping it")
+                    continue
+            job_status_pairs.append((job, status))
+        if job_status_pairs:
+            change_jobs_status(job_status_pairs)
         if store_change:
             moved_path = Path(update_path.parent,
                               update_path.name + "_" + strftime("%Y%m%d_%H%M", localtime()))

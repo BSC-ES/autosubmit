@@ -43,6 +43,10 @@ class Status:
                     'QUEUING': 3, 'RUNNING': 4, 'COMPLETED': 5, 'HELD': 6, 'PREPARED': 7, 'SKIPPED': 8, 'DELAYED': 9}
     LOGICAL_ORDER = [ "SUSPENDED", "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED",
                      "FAILED", "UNKNOWN", "COMPLETED"]
+    # Statuses with a job running on the platform that must be cancelled before leaving them.
+    ACTIVE = (SUBMITTED, QUEUING, RUNNING)
+    # Statuses that will be scheduled again: per-attempt state must be reset when entering them.
+    RE_RUNNABLE = (WAITING, READY, DELAYED, PREPARED, SUSPENDED)
 
     def retval(self, value):
         return getattr(self, value)

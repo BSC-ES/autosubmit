@@ -865,7 +865,6 @@ def test_change_status_sends_batch_cancel_per_platform(
         final_list=all_jobs,
         save=True,
         definitive_platforms=list(platforms.keys()),
-        platforms=platforms,
     )
 
     assert len(changes) == jobs_per_platform * len(platforms)
@@ -911,7 +910,6 @@ def test_change_status_applies_status_to_all_jobs(
         final_list=jobs,
         save=False,
         definitive_platforms=[],
-        platforms={},
     )
 
     for job in jobs:
@@ -937,7 +935,6 @@ def test_change_status_skips_jobs_already_at_final_status(
         final_list=jobs,
         save=False,
         definitive_platforms=[],
-        platforms={},
     )
 
     assert changes == {}
@@ -967,7 +964,6 @@ def test_change_status_skips_active_job_with_unreachable_platform(
         final_list=jobs,
         save=True,
         definitive_platforms=[],  # no platform reachable
-        platforms=platforms,
     )
 
     assert changes == {}
@@ -993,7 +989,6 @@ def test_change_status_no_cancel_when_save_is_false(
         final_list=jobs,
         save=False,
         definitive_platforms=list(platforms.keys()),
-        platforms=platforms,
     )
 
     for job in jobs:
@@ -1027,7 +1022,6 @@ def test_change_status_handles_send_command_failure_gracefully(
         final_list=jobs,
         save=True,
         definitive_platforms=list(platforms.keys()),
-        platforms=platforms,
     )
 
     assert len(changes) == len(platforms)
@@ -1060,7 +1054,6 @@ def test_change_status_skips_cancel_for_invalid_job_id(
         final_list=jobs,
         save=True,
         definitive_platforms=list(platforms.keys()),
-        platforms=platforms,
     )
 
     for job in jobs:
