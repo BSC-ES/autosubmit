@@ -2733,7 +2733,7 @@ class AutosubmitConfig:
         if not datelist or not chunks:
             return
 
-        if isinstance(datelist, str) or isinstance(datelist, int):
+        if isinstance(datelist, (str, int)):
             datelist = str(datelist).split()
 
         for section_name, section_data in self.jobs_data.items():
