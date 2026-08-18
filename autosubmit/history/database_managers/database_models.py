@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 # This file is part of Autosubmit.
 
 # Autosubmit is free software: you can redistribute it and/or modify
@@ -18,6 +18,8 @@
 
 import collections
 
+from enum import Enum
+
 JobDataRow = collections.namedtuple('JobDataRow', ['id', 'counter', 'job_name', 'created', 'modified', 'submit', 'start', 'finish',
                                                    'status', 'rowtype', 'ncpus', 'wallclock', 'qos', 'energy', 'date', 'section', 'member',
                                                    'chunk', 'last', 'platform', 'job_id', 'extra_data', 'nnodes', 'run_id', 'MaxRSS', 'AveRSS',
@@ -29,7 +31,7 @@ ExperimentRunRow = collections.namedtuple('ExperimentRunRow', [
     'run_id', 'created', 'modified', 'start', 'finish', 'chunk_unit', 'chunk_size', 'completed', 'total', 'failed', 'queuing', 'running', 'submitted', 'suspended', 'metadata'])
 
 ExperimentStatusRow = collections.namedtuple(
-    'ExperimentStatusRow', ['exp_id', 'name', 'status', 'seconds_diff', 'modified'])
+  'ExperimentStatusRow', ['exp_id', 'name', 'status', 'seconds_diff', 'modified', 'last_heartbeat'])
 
 ExperimentRow = collections.namedtuple('ExperimentRow', ["id", "name", "autosubmit_version", "description"])
 
@@ -37,9 +39,12 @@ PragmaVersion = collections.namedtuple('PragmaVersion', ['version'])
 MaxCounter = collections.namedtuple('MaxCounter', ['maxcounter'])
 
 
-class RunningStatus:
+class RunningStatus(str, Enum):
+    """Enum representing the possible status of an experiment."""
     RUNNING = "RUNNING"
     NOT_RUNNING = "NOT RUNNING"
+    ARCHIVED = "ARCHIVED"
+    DELETED = "DELETED"
 
 
 class RowType:

@@ -29,7 +29,7 @@ from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 from bscearth.utils.date import parse_date
 from pyparsing import nested_expr
@@ -2733,7 +2733,7 @@ class AutosubmitConfig:
         if not datelist or not chunks:
             return
 
-        if isinstance(datelist, str) or isinstance(datelist, int):
+        if isinstance(datelist, (str, int)):
             datelist = str(datelist).split()
 
         for section_name, section_data in self.jobs_data.items():
