@@ -17,7 +17,6 @@
 
 import threading
 from pathlib import Path
-from typing import Union
 
 from sqlalchemy import Engine, NullPool
 from sqlalchemy import create_engine as sqlalchemy_create_engine

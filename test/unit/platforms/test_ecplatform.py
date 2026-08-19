@@ -22,7 +22,6 @@
 import datetime
 import subprocess
 from pathlib import Path
-from typing import Union
 
 import pytest
 from _pytest._py.path import LocalPath

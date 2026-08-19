@@ -16,7 +16,7 @@
 # along with Autosubmit. If not, see <http://www.gnu.org/licenses/>.
 
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any
 
 from autosubmit.log.log import Log
 

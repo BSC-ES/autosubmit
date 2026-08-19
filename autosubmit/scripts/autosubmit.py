@@ -20,11 +20,9 @@
 import argparse
 import traceback
 from contextlib import suppress
-from os import _exit
 
 # noinspection PyProtectedMember
 from pathlib import Path
-from typing import Union
 
 from portalocker.exceptions import BaseLockException
 

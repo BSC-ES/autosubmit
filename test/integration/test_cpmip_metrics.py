@@ -23,10 +23,7 @@ from typing import Any
 import pytest
 from ruamel.yaml import YAML
 
-from test.integration.test_mail import (
-    configured_mail,
-    fake_smtp_server,
-)
+from test.integration.test_mail import configured_mail
 from test.integration.test_utils.docker_utils import get_mailhog_messages
 
 # The experiment runs one SIM chunk of exactly one calendar year, so simulated
