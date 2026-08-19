@@ -17,8 +17,6 @@
 
 """Unit tests for the wrapper_factory module."""
 
-from typing import Union
-
 import pytest
 
 from autosubmit.platforms.slurmplatform import SlurmPlatform
