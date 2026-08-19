@@ -20,6 +20,7 @@
 import argparse
 import traceback
 from contextlib import suppress
+from os import _exit  # noqa: F401  # Patched by lockfile tests.
 
 # noinspection PyProtectedMember
 from pathlib import Path
