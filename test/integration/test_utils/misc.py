@@ -19,7 +19,6 @@
 
 from pathlib import Path
 from time import sleep, time
-from typing import TYPE_CHECKING
 
 from portalocker import AlreadyLocked, Lock, LockException
 

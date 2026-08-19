@@ -161,7 +161,6 @@ follow_untyped_imports = true
 ignore = [
     "DTZ005",
     "E501",
-    "F401",
     "FA102",
     "RUF010"
 ]

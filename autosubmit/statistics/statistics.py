@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/
 
 from datetime import datetime, timedelta
-from typing import Union
 
 from autosubmit.job.job import Job
 from autosubmit.statistics.jobs_stat import JobStat

@@ -35,7 +35,6 @@ from autosubmit.database.db_common import (
     open_conn,
 )
 from autosubmit.database.db_manager import DbManager
-from autosubmit.database.session import get_engine
 from autosubmit.database.tables import DBVersionTable, ExperimentTable
 from autosubmit.log.log import AutosubmitCritical
 
