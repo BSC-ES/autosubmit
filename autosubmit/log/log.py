@@ -20,7 +20,7 @@ import os
 import sys
 from datetime import datetime
 from time import sleep
-from typing import Any, Union, cast
+from typing import Any, cast
 
 
 class AutosubmitError(Exception):

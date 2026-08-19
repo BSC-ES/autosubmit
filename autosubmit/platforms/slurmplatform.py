@@ -25,7 +25,7 @@ import re
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Any, Union
+from typing import Any
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode

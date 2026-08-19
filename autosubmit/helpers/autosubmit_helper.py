@@ -18,7 +18,7 @@
 import datetime
 import sys
 from time import sleep
-from typing import Any, Union
+from typing import Any
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database.db_common import check_experiment_exists
