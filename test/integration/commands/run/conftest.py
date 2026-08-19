@@ -29,7 +29,7 @@ import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 from threading import Event, Thread
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 

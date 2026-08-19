@@ -9,7 +9,7 @@
 from html import escape
 from pathlib import Path
 from shutil import copy, move
-from typing import Optional, cast
+from typing import cast
 
 from docutils import nodes
 from docutils.nodes import Element, Node
