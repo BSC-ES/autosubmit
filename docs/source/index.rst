@@ -38,25 +38,18 @@ Autosubmit Workflow Manager
    /devguide/index
 
 .. toctree::
-   :caption: Database Documentation
+   :caption: Module Documentation
    :maxdepth: 1
    :hidden:
 
-   /database/index
-
+   /moduledoc/index
+   
 .. toctree::
    :caption: Troubleshooting
    :maxdepth: 1
    :hidden:
 
    /troubleshooting/index
-
-.. toctree::
-   :caption: Module Documentation
-   :maxdepth: 1
-   :hidden:
-
-   /moduledoc/index
 
 .. toctree::
    :caption: media

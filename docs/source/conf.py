@@ -232,8 +232,8 @@ html_sidebars = {
     "**": ["sidebar-nav-bs"],
     "qstartguide/index": [], 
     "installation/index": [],
-    "database/index": [], 
-    "devguide/platforms/index": [],             
+    "database/index": [],
+    "media/index": []              
 }
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
