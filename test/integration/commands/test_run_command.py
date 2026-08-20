@@ -265,20 +265,23 @@ def test_run_command_plot_behavior(
     mocker: "MockerFixture",
     get_next_expid: Callable[[], str],
 ):
-    """Test the plot behavior of the setstatus, create and recovery commands."""
+    """Test the plot behaviour of the ``setstatus``, ``create`` and ``recovery`` commands."""
     exp, args, command = set_up_test(get_next_expid(), command, autosubmit_exp, mocker)
     has_both_plot_flags = "-np" in command and "-plt" in command
 
     if has_both_plot_flags:
         assert args is None
-        return
+    else:
+        assert args is not None
 
-    assert args is not None
+        # We don't need to actually test xdg-open.
+        mocker.patch("autosubmit.monitor.monitor._display_file")
+        mocker.patch("autosubmit.monitor.monitor._display_file_xdg")
 
-    if "create" in command:
-        assert exp.autosubmit.run_command(args=args) == 0
-    elif "setstatus" in command or "recovery" in command:
-        assert exp.autosubmit.run_command(args=args)
+        if "create" in command:
+            assert exp.autosubmit.run_command(args=args) == 0
+        elif "setstatus" in command or "recovery" in command:
+            assert exp.autosubmit.run_command(args=args)
 
 
 @pytest.mark.parametrize(

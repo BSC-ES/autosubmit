@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  TESTCONTAINERS_RYUK_DISABLED: true
+
 jobs:
   test-unit:
     env:
@@ -52,11 +55,7 @@ jobs:
       #       - TypeError: 'traceback' object is not callable
       #       It appeared to be a bug in Python3.11, pdb, pytest-xdist.
       - name: Unit tests
-        run: |
-          pytest \
-            -n $(nproc) \
-            --verbose --verbosity="2" \
-            test/unit -m "not postgres and not profile and not profilelong"
+        run: pytest
 
       - name: Coverage report
         run: |
