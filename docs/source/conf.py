@@ -148,7 +148,7 @@ html_theme = 'pydata_sphinx_theme'
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
-    'header_links_before_dropdown': 5,
+    'header_links_before_dropdown': 6,
     'show_nav_level': 2,
     'use_edit_page_button': True,
     'icon_links': [
@@ -230,7 +230,8 @@ html_sidebars = {
     "**": ["sidebar-nav-bs"],
     "qstartguide/index": [], 
     "installation/index": [],
-    "database/index": [],              
+    "database/index": [],
+    "media/index": []              
 }
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
