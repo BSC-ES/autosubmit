@@ -38,25 +38,18 @@ Autosubmit Workflow Manager
    /devguide/index
 
 .. toctree::
-   :caption: Database Documentation
+   :caption: Module Documentation
    :maxdepth: 1
    :hidden:
 
-   /database/index
-
+   /moduledoc/index
+   
 .. toctree::
    :caption: Troubleshooting
    :maxdepth: 1
    :hidden:
 
    /troubleshooting/index
-
-.. toctree::
-   :caption: Module Documentation
-   :maxdepth: 1
-   :hidden:
-
-   /moduledoc/index
 
 .. toctree::
    :caption: media
@@ -70,7 +63,9 @@ Autosubmit Workflow Manager
    <div>
         <div class="row gap-4">
             <div class="col d-flex flex-column justify-content-center">
-                <h1 class="fw-bold">Autosubmit</h1>
+            <img src="_static/Logo.svg" class="logo__image only-light"/>
+            <img src="_static/Logo.svg" class="logo__image only-dark pst-js-only"/>
+               <h1 class="visually-hidden">Autosubmit</h1>
                 <p>
                      Autosubmit is an open source Python <strong>experiment and workflow
                      manager</strong> used to manage complex workflows on Cloud and HPC

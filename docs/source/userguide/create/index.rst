@@ -33,7 +33,7 @@ Examples:
     # Create dummy experiment for testing
     autosubmit expid -dm -d "dummy test"
 
-Configuring Default Platforms
+Configuring default platforms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If you have an ``autosubmitrc`` or ``.autosubmitrc`` file in your home directory, you can configure a default platforms file that will be used as a template for new experiments.
@@ -76,7 +76,7 @@ Examples:
     autosubmit expid -y a0b1 -H ithaca -d "Copy of experiment a0b1"
 
     # Copy with custom configuration path
-    autosubmit expid -y a0b1 -p "/esarchive/autosubmit/genericFiles/conf" \
+    autosubmit expid -y a0b1 -c "/esarchive/autosubmit/genericFiles/conf" \
                      -H marenostrum4 -d "Modified copy of a0b1"
 
 .. warning:: You can only copy experiments created with Autosubmit 3.11 or above.

@@ -10,9 +10,9 @@ This section contains some examples on how to develop a new project.
 
 All files, with the exception of user-defined scripts, are located in the ``<expid>/conf`` directory.
 
-Configuration files are written in ``yaml`` format. In the other hand, the user-defined scripts are written in ``bash/python or R`` format.
+Configuration files are written in ``yaml`` format. On the other hand, the user-defined scripts are written in ``bash/python or R`` format.
 
-To configure the experiment, edit ``autosubmit_<EXPID>.yml``, ``expdef_<EXPID>.yml``, ``jobs_<EXPID>.yml`` , ``platforms_<EXPID>.yml`` and ``proj_<EXPID>.yml``` in the ``conf`` folder of the experiment.
+To configure the experiment, edit ``autosubmit_<EXPID>.yml``, ``expdef_<EXPID>.yml``, ``jobs_<EXPID>.yml`` , ``platforms_<EXPID>.yml`` and ``proj_<EXPID>.yml`` in the ``conf`` folder of the experiment.
 
 Expdef configuration
 ====================
@@ -54,13 +54,13 @@ Expdef configuration
         # List of members that can be included in this run. Optional.
         # RUN_ONLY_MEMBERS: fc0 fc1 fc2 fc3 fc4
         # RUN_ONLY_MEMBERS: fc[0-4]
-        RUN_ONLY_MEMBERS :
+        RUN_ONLY_MEMBERS:
 
     rerun:
         # Is a rerun or not? [Default: Do set FALSE]. BOOLEAN: TRUE, FALSE
         RERUN: FALSE
         # If RERUN: TRUE then supply the list of jobs to rerun
-        RERUN_JOBLIST :
+        RERUN_JOBLIST:
 
     project:
         # Select project type. STRING: git, svn, local, none
@@ -77,19 +77,19 @@ Expdef configuration
         # help: {'master' (default), 'develop', 'v3.1b', ...}
         PROJECT_BRANCH: develop
         # type: STRING, default: leave empty, help: if model branch is a TAG leave empty
-        PROJECT_COMMIT :
+        PROJECT_COMMIT:
 
     # If PROJECT_TYPE is not svn, no need to change
     svn:
         # type: STRING, help: 'https://svn.ec-earth.org/ecearth3'
-        PROJECT_URL :
+        PROJECT_URL:
         # Select revision number. NUMERIC: 1778
-        PROJECT_REVISION :
+        PROJECT_REVISION:
 
     # If PROJECT_TYPE is not local, no need to change
     local:
         # type: STRING, help: /foo/bar/ecearth
-        PROJECT_PATH :
+        PROJECT_PATH:
 
         # If PROJECT_TYPE is none, no need to change
     project_files:
@@ -108,10 +108,10 @@ Autosubmit configuration
     config:
         # Experiment identifier
         # No need to change
-        EXPID :
+        EXPID:
         # No need to change.
         # Autosubmit version identifier
-        AUTOSUBMIT_VERSION :
+        AUTOSUBMIT_VERSION:
         # Default maximum number of jobs to be waiting in any platform
         # Default: 3
         MAXWAITINGJOBS: 3
@@ -120,21 +120,21 @@ Autosubmit configuration
         # Default: 6
         TOTALJOBS: 6
         # Time (seconds) between connections to the HPC queue scheduler to poll already submitted jobs status
-        # Default:10
+        # Default: 10
         SAFETYSLEEPTIME: 10
         # Time (seconds) before ending the run to retrieve the last logs.
-        # Default:180
+        # Default: 180
         LAST_LOGS_TIMEOUT: 180
-        # Number of retries if a job fails. Can ve override at job level
-        # Default:0
-        RETRIALS:0
+        # Number of retries if a job fails. Can be overridden at job level
+        # Default: 0
+        RETRIALS: 0
         ##  Allows to put a delay between retries, of retries if a job fails. If not specified, it will be static
-        # DELAY_RETRY_TIME:11
-        # DELAY_RETRY_TIME:+11 # will wait 11,22,33,44...
-        # DELAY_RETRY_TIME:*11 # will wait 11,110,1110,11110...
+        # DELAY_RETRY_TIME: 11
+        # DELAY_RETRY_TIME: +11 # will wait 11,22,33,44...
+        # DELAY_RETRY_TIME: *11 # will wait 11,110,1110,11110...
         # Default output type for CREATE, MONITOR, SET STATUS, RECOVERY. Available options: pdf, svg, png, ps, txt
-        # Default:pdf
-        OUTPUT:pdf
+        # Default: pdf
+        OUTPUT: pdf
         WRAPPERS_WALLCLOCK: 48:00  # Default max_wallclock for wrappers before getting killed
         JOB_WALLCLOCK: 24:00  # Default max_wallclock for jobs before getting killed
         LOG_RECOVERY_CONSOLE_LEVEL: "DEBUG"  # Default log level for console output for the log recovery process.
@@ -255,10 +255,10 @@ The experiment project contains the scripts specified in ``jobs_<EXPID>.yml`` an
 
 To configure experiment project parameters for the experiment, edit ``proj_<EXPID>.yml``.
 
-*proj_<EXPID>.yml* contains:
+``proj_<EXPID>.yml`` contains:
     - The project dependant experiment variables that Autosubmit will substitute in the scripts to be run.
 
-.. warning:: The ``proj_<EXPID>.yml`` has to be defined in INI style so it should has section headers. At least one.
+.. warning:: The ``proj_<EXPID>.yml`` has to be defined in INI style so it should have section headers. At least one.
 
 Example:
 ::
@@ -466,8 +466,8 @@ Example:
         # Set timestep (in sec) w.r.t resolution. NUMERIC: 3600 (ORCA1), 3600 (ORCA025)
         PISCES_timestep: 3600
 
-Proj configuration:: Full example
----------------------------------
+Proj configuration: Full example
+--------------------------------
 
 This section contains a full example of a valid proj file with a valid user script.
 
@@ -498,7 +498,7 @@ Write your original script in the user project directory:
     (...)
 
 
-Final script, which is generated by `autosubmit run` or ``autosubmit inspect``
+Final script, which is generated by ``autosubmit run`` or ``autosubmit inspect``
 
     cat <experiments_directory>/<EXPID>/tmp/remote_setup.cmd
 
@@ -518,7 +518,7 @@ Final script, which is generated by `autosubmit run` or ``autosubmit inspect``
 Detailed platform configuration
 -------------------------------
 
-In this section, we describe the platform configuration using `-QOS` and also `PARTITION`
+In this section, we describe the platform configuration using ``-QOS`` and also ``PARTITION``
 
     vi <expid>/conf/platform_<EXPID>.yml
 
@@ -534,7 +534,7 @@ In this section, we describe the platform configuration using `-QOS` and also `P
             SCRATCH_DIR: /gpfs/scratch
 
         marenostrum4:
-            # Queue type. Options: ps, SLURM, eceaccess
+            # Queue type. Options: ps, SLURM, ecaccess
             TYPE: slurm
             HOST: mn1.bsc.es,mn2.bsc.es,mn3.bsc.es
             PROJECT: bsc32
@@ -612,11 +612,11 @@ In this section, we describe the platform configuration using `-QOS` and also `P
 
 .. warning::
 
-    The ``SERIAL_QUEUE`` and ``QUEUE`` field are used for specify a -QOS.
-    For specify a partition, you must use ``PARTITION``.
-    For specify the memory usage you must use ``MEMORY`` but only in jobs.yml.
+    The ``SERIAL_QUEUE`` and ``QUEUE`` field are used to specify a -QOS.
+    To specify a partition, you must use ``PARTITION``.
+    To specify the memory usage you must use ``MEMORY`` but only in jobs.yml.
 
-The custom directives can be used for multiple parameters at the same time using the follow syntax.
+The custom directives can be used for multiple parameters at the same time using the following syntax.
 
     vi <expid>/conf/platform_<EXPID>.yml
 
@@ -647,7 +647,7 @@ The custom directives can be used for multiple parameters at the same time using
             PROCESSORS_PER_NODE: 40
 
 Controlling the number of active concurrent tasks in an experiment
-----------------------------------------------------------------------
+------------------------------------------------------------------
 
 In some cases, you may want to control the number of concurrent tasks/jobs that can be active in an experiment.
 
@@ -662,9 +662,9 @@ To set the maximum number of concurrent tasks/jobs, you can use the ``TOTAL_JOBS
     # Controls the maximum number of submitted and waiting tasks
     MAX_WAITING_JOBS: 10
 
-To control the number of jobs included in a wrapper, you can use the `MAX_WRAPPED_JOBS` and `MIN_WRAPPED_JOBS` variables in the ``conf/autosubmit_<EXPID>.yml`` file.
+To control the number of jobs included in a wrapper, you can use the ``MAX_WRAPPED_JOBS`` and ``MIN_WRAPPED_JOBS`` variables in the ``conf/autosubmit_<EXPID>.yml`` file.
 
-Note that a wrapped job is counted as a single job regardless of the number of tasks it contains. Therefore, `TOTAL_JOBS` and `MAX_WAITING_JOBS` won't have an impact inside a wrapper.
+Note that a wrapped job is counted as a single job regardless of the number of tasks it contains. Therefore, ``TOTAL_JOBS`` and ``MAX_WAITING_JOBS`` won't have an impact inside a wrapper.
 
     vi <expid>/conf/autosubmit_<EXPID>.yml
 
@@ -680,12 +680,13 @@ Note that a wrapped job is counted as a single job regardless of the number of t
             MAX_WRAPPED_H: 99999 # Same as above but only for the horizontal packages.
             MAX_WRAPPED_V: 99999 # Same as above but only for the vertical packages.
 
-- **MAX_WRAPPED** can be defined in ``jobs_<EXPID>.yml`` in order to limit the number of jobs wrapped for the corresponding job section
-    - If not defined, it considers the **MAX_WRAPPED** defined under wrapper: in ``autosubmit_<EXPID>.yml``
-        - If **MAX_WRAPPED** is not defined, then the max_wallclock of the platform will be final factor.
-- **MIN_WRAPPED** can be defined in ``autosubmit_<EXPID>.yml`` in order to limit the minimum number of jobs that a wrapper can contain
-    - If not defined, it considers that **MIN_WRAPPED** is 2.
-    - If **POLICY** is flexible and it is not possible to wrap **MIN_WRAPPED** or more tasks, these tasks will be submitted as individual jobs, as long as the condition is not satisfied.
-    - If **POLICY** is mixed and there are failed jobs inside a wrapper, these jobs will be submitted as individual jobs.
-    - If **POLICY** is strict and it is not possible to wrap **MIN_WRAPPED** or more tasks, these tasks will not be submitted until there are enough tasks to build a package.
+- ``MAX_WRAPPED`` can be defined in ``jobs_<EXPID>.yml`` in order to limit the number of jobs wrapped for the corresponding job section
+    - If not defined, it considers the ``MAX_WRAPPED`` defined under wrapper: in ``autosubmit_<EXPID>.yml``
+        - If ``MAX_WRAPPED`` is not defined, then the ``MAX_WALLCLOCK`` of the platform will be final factor.
+- ``MIN_WRAPPED`` can be defined in ``autosubmit_<EXPID>.yml`` in order to limit the minimum number of jobs that a wrapper can contain
+    - If not defined, it considers that ``MIN_WRAPPED`` is 2.
+    - If ``POLICY`` is flexible and it is not possible to wrap ``MIN_WRAPPED`` or more tasks, these tasks will be submitted as individual jobs, as long as the condition is not satisfied.
+    - If ``POLICY`` is mixed and there are failed jobs inside a wrapper, these jobs will be submitted as individual jobs.
+    - If ``POLICY`` is strict and it is not possible to wrap ``MIN_WRAPPED`` or more tasks, these tasks will not be submitted until there are enough tasks to build a package.
     - strict and mixed policies can cause **deadlocks**.
+    
