@@ -19,10 +19,9 @@ import os
 from pathlib import Path
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.experiment.manage import expid_fn
+from autosubmit.experiment.manage import create, expid_fn
 from autosubmit.experiment.utils import create_required_folders
 from autosubmit.install import install
-from autosubmit.workflow.manage import create
 
 
 def create_database(env):
