@@ -74,13 +74,15 @@ def test_profiler_start(mocker):
     mocked_gc.assert_called_once()
 
 
-def test_profiler_start_twice_raises():
+def test_profiler_start_twice_raises(mocker):
     """Test that starting an already started profiler raises an error.
 
     The profiler should raise ``AutosubmitCritical`` with error code 7074
     when ``start()`` is called while profiling is already active.
     """
     profiler = Profiler("a001")
+
+    mocker.patch.object(profiler._profiler, "enable")
 
     profiler.start()
 
@@ -117,9 +119,8 @@ def test_profiler_stop(mocker):
     """
     profiler = Profiler("a001")
 
-    profiler.start()
-
-    mocker.patch.object(profiler._profiler, "disable")
+    mocked_enable = mocker.patch.object(profiler._profiler, "enable")
+    mocked_disable = mocker.patch.object(profiler._profiler, "disable")
     mocker.patch(
         "autosubmit.profiler.profiler._get_current_memory",
         return_value=20000,
@@ -127,12 +128,21 @@ def test_profiler_stop(mocker):
     mocked_report = mocker.patch.object(profiler, "_report")
     mocked_gc = mocker.patch("autosubmit.profiler.profiler.gc.collect")
 
+    profiler.start()
+
+    # start() performs one garbage collection.
+    assert mocked_gc.call_count == 1
+
     profiler.stop()
 
     assert profiler.stopped
     assert not profiler.started
+    mocked_enable.assert_called_once()
+    mocked_disable.assert_called_once()
     mocked_report.assert_called_once()
-    mocked_gc.assert_not_called()
+
+    # stop() must not perform another garbage collection.
+    assert mocked_gc.call_count == 1
 
 
 def test_iteration_checkpoint_records_values(mocker):
@@ -146,8 +156,8 @@ def test_iteration_checkpoint_records_values(mocker):
     """
     profiler = Profiler("a001")
 
-    profiler.start()
-
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch.object(profiler._profiler, "disable")
     mocker.patch(
         "autosubmit.profiler.profiler._get_current_memory",
         return_value=1000,
@@ -165,6 +175,8 @@ def test_iteration_checkpoint_records_values(mocker):
         return_value=["[fd=1] stdout"],
     )
     mocker.patch("autosubmit.profiler.profiler.gc.collect")
+
+    profiler.start()
 
     result = profiler.iteration_checkpoint(
         loaded_jobs=25,
@@ -194,8 +206,8 @@ def test_iteration_checkpoint_respects_max_checkpoints(mocker):
     """
     profiler = Profiler("a001", max_checkpoints=2)
 
-    profiler.start()
-
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch.object(profiler._profiler, "disable")
     mocker.patch(
         "autosubmit.profiler.profiler._get_current_memory",
         return_value=1000,
@@ -213,6 +225,8 @@ def test_iteration_checkpoint_respects_max_checkpoints(mocker):
         return_value=[],
     )
     mocker.patch("autosubmit.profiler.profiler.gc.collect")
+
+    profiler.start()
 
     assert profiler.iteration_checkpoint(10, 20) is False
     assert profiler.checkpoints == 1
@@ -399,6 +413,7 @@ def test_trace_enabled_starts_tracemalloc(mocker):
     """
     profiler = Profiler("a001", trace_enabled=True)
 
+    mocker.patch.object(profiler._profiler, "enable")
     mocker.patch(
         "autosubmit.profiler.profiler.tracemalloc.is_tracing",
         return_value=False,
@@ -426,12 +441,11 @@ def test_trace_enabled_stops_tracemalloc(mocker):
     the report.
 
     :param mocker: Pytest mocker fixture used to replace ``tracemalloc``,
-        the profiler's report generation, and the underlying profiler.
+        memory, and garbage collection operations.
     """
     profiler = Profiler("a001", trace_enabled=True)
 
-    profiler.start()
-
+    mocker.patch.object(profiler._profiler, "enable")
     mocker.patch.object(profiler._profiler, "disable")
     mocker.patch(
         "autosubmit.profiler.profiler.tracemalloc.is_tracing",
@@ -442,6 +456,7 @@ def test_trace_enabled_stops_tracemalloc(mocker):
     )
     mocker.patch.object(profiler, "_report")
 
+    profiler.start()
     profiler.stop()
 
     mocked_stop.assert_called_once()
