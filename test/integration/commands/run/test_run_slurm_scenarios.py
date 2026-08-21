@@ -30,8 +30,10 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.manage import create
 from autosubmit.helpers.utils import build_and_connect_platform
 from autosubmit.log.log import AutosubmitCritical, Log
+from autosubmit.workflow.manage import inspect, monitor, run
 from test.integration.commands.run.conftest import (
     _assert_db_fields,
     _assert_exit_code,
@@ -166,7 +168,7 @@ def test_run_interrupted(
 
     for _ in range(3):
         as_thread, _, stop_event = run_in_thread(
-            as_exp.autosubmit.run_experiment,
+            run,
             expid=as_exp.expid
         )
 
@@ -178,7 +180,7 @@ def test_run_interrupted(
 
         assert not as_thread.is_alive(), "Autosubmit thread did not stop as expected."
 
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    exit_code = run(expid=as_exp.expid)
 
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
@@ -203,7 +205,7 @@ PROJECT:
     PROJECT_TYPE: local
     PROJECT_DIRECTORY: local_project
 LOCAL:
-    PROJECT_PATH: "tofill"
+    PROJECT_PATH: "to_fill"
 JOBS:
     job:
         FILE:
@@ -230,7 +232,7 @@ PROJECT:
     PROJECT_TYPE: local
     PROJECT_DIRECTORY: local_project
 LOCAL:
-    PROJECT_PATH: "tofill"
+    PROJECT_PATH: "to_fill"
 JOBS:
     job:
         FILE:
@@ -266,7 +268,7 @@ def test_run_with_additional_files(
 ):
     yaml = YAML(typ='rt')
     project_path = Path(tmp_path) / "org_templates"
-    jobs_data = jobs_data.replace("tofill", str(project_path))
+    jobs_data = jobs_data.replace("to_fill", str(project_path))
     project_path.mkdir(parents=True, exist_ok=True)
 
     (project_path / "test.sh").write_text('echo "main script."\n')
@@ -290,9 +292,9 @@ def test_run_with_additional_files(
 
     if final_status == "FAILED":
         with pytest.raises(AutosubmitCritical):
-            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+            run(expid=as_exp.expid)
     else:
-        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        exit_code = run(expid=as_exp.expid)
         _assert_exit_code(final_status, exit_code)
         project_remote_path = f"/tmp/scratch/group/root/{as_exp.expid}/LOG_{as_exp.expid}"
         for additional_filename in ["additional1.sh", "additional2.sh"]:
@@ -542,7 +544,7 @@ def test_wrapper_config(
         mocker.patch.object(Log, "warning")
         autosubmit_exp(experiment_data=experiment_data | wrappers, include_jobs=False, create=True,
                        wrapper=True)
-        Log.warning.assert_any_call(
+        Log.warning.assert_any_call(  # type: ignore
             "JOBS_IN_WRAPPER in WRAPPERS.WRAPPER contains job: 1 that is not defined in JOBS section"
         )
     else:
@@ -550,10 +552,10 @@ def test_wrapper_config(
 
         if run_type == "run":
             as_exp.as_conf.set_last_as_command('run')
-            as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+            run(expid=as_exp.expid)
         else:
             as_exp.as_conf.set_last_as_command('inspect')
-            as_exp.autosubmit.inspect(
+            inspect(
                 expid=as_exp.expid,
                 lst=None,  # type: ignore
                 check_wrapper=True,
@@ -561,7 +563,7 @@ def test_wrapper_config(
                 filter_chunks=None,  # type: ignore
                 filter_section=None,  # type: ignore
                 filter_status=None,  # type: ignore
-                quick=True if run_type == "quick-inspect" else False
+                quick=run_type == "quick-inspect"
             )
         templates_dir = Path(tmp_path) / as_exp.expid / "tmp"
         asthread_files = list(templates_dir.rglob("*ASThread*"))
@@ -717,7 +719,7 @@ def test_run_uninterrupted_multiple_vertical_wrappers(
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
     as_conf.set_last_as_command('run')
 
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    exit_code = run(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
@@ -776,7 +778,7 @@ def test_run_interrupted_multiple_vertical_wrappers(
 
     # First run: interrupt after 3 seconds
     as_thread, _result, stop_event = run_in_thread(
-        as_exp.autosubmit.run_experiment,
+        run,
         expid=as_exp.expid
     )
 
@@ -789,7 +791,7 @@ def test_run_interrupted_multiple_vertical_wrappers(
     assert not as_thread.is_alive(), "Autosubmit thread did not stop as expected."
 
     # Second run: resume until completion
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    exit_code = run(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
@@ -826,7 +828,7 @@ def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture
     exp.as_conf.set_last_as_command('inspect')
 
     # Inspect
-    exp.autosubmit.inspect(
+    inspect(
         expid=exp.expid,
         lst=None,  # type: ignore
         check_wrapper=True,
@@ -874,7 +876,7 @@ def test_monitor_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture
                                              }
                                          } | general_data, include_jobs=False, create=True)
     exp.as_conf.set_last_as_command('monitor')
-    exp.autosubmit.monitor(
+    monitor(
         expid=exp.expid,
         file_format="txt",
         lst=None,  # type: ignore
@@ -1002,15 +1004,15 @@ def test_rerun_expid(
     as_conf.set_last_as_command('run')
 
     # First run
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    exit_code = run(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
-    as_exp.autosubmit.create(
+    create(
         expid=as_exp.expid, noplot=True, hide=False, force=False, check_wrappers=False
     )
 
     # Rerun
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    exit_code = run(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
@@ -1201,7 +1203,7 @@ def test_run_interrupted_destine_like(
 
     for attempt in range(5):
         as_thread, _result, stop_event = run_in_thread(
-            as_exp.autosubmit.run_experiment,
+            run,
             expid=as_exp.expid
         )
 
@@ -1214,7 +1216,7 @@ def test_run_interrupted_destine_like(
         assert not as_thread.is_alive(), f"Autosubmit thread did not stop as expected (attempt {attempt + 1})."
 
     # Second run: resume until completion
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    exit_code = run(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
@@ -1270,7 +1272,7 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
     if run_mode in ["inspect", "inspect_monitor_run"]:
         # 1. Inspect with -cw
         as_conf.set_last_as_command('inspect')
-        as_exp.autosubmit.inspect(
+        inspect(
             expid=as_exp.expid,
             lst=None,  # type: ignore
             check_wrapper=True,
@@ -1290,7 +1292,7 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
     if run_mode in ["monitor", "inspect_monitor_run"]:
         # 2. Monitor with -cw
         as_conf.set_last_as_command('monitor')
-        as_exp.autosubmit.monitor(
+        monitor(
             expid=as_exp.expid,
             file_format="txt",
             lst=None,  # type: ignore
@@ -1310,7 +1312,7 @@ def test_inspect_monitor_run_uninterrupted_destine_like(
 
     if run_mode in ["run_only", "inspect_monitor_run"]:
         as_conf.set_last_as_command('run')
-        exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+        exit_code = run(expid=as_exp.expid)
         _assert_exit_code(final_status, exit_code)
 
         db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid, wrapper_type)
@@ -1360,14 +1362,14 @@ def test_recover_stale_row(
     }
     as_exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False, create=True)
     as_exp.as_conf.set_last_as_command('run')
-    as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    run(expid=as_exp.expid)
     db_path = Path(BasicConfig.JOBDATA_DIR) / f"job_data_{as_exp.expid}.db"
     with sqlite3.connect(db_path) as conn:
         for fc in wrong_data:
             conn.execute("UPDATE job_data SET start=0 WHERE fail_count=?", (fc,))
         conn.commit()
     as_exp.as_conf.set_last_as_command('run')
-    as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    run(expid=as_exp.expid)
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
@@ -1621,7 +1623,7 @@ def test_run_uninterrupted(
     as_conf.set_last_as_command('run')
 
     # Run the experiment
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    exit_code = run(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
     # Check and display results
@@ -1637,9 +1639,8 @@ def test_run_uninterrupted(
             for job_name in value:
                 for job_counter in value[job_name]:
                     for check_name, value_ in value[job_name][job_counter].items():
-                        if not value_:
-                            if check_name != "empty_fields":
-                                e_msg += f"{job_name}_run_number_{job_counter} field: {check_name}: {value_}\n"
+                        if not value_ and check_name != "empty_fields":
+                            e_msg += f"{job_name}_run_number_{job_counter} field: {check_name}: {value_}\n"
 
     for check, value in files_check_list.items():
         if not value:

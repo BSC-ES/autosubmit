@@ -15,18 +15,14 @@
 # You should have received a copy of the GNU General Public License 
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>. 
 
-from collections.abc import Callable, Generator
-from typing import TYPE_CHECKING, Any, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
-from test.integration.test_utils.docker_utils import (
-    get_mail_container,
-    get_mailhog_messages,
-    prepare_and_test_mail_container,
-)
+from test.integration.test_utils.docker_utils import get_mailhog_messages
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
@@ -46,18 +42,6 @@ def _find_email_by_subject(search_text: str, emails) -> Any:
         ),
         None,
     )
-
-
-@pytest.fixture
-def fake_smtp_server() -> Generator[tuple[int, str], None, None]:
-    """Start a fake SMTP server container.
-    :return: A tuple with the SMTP port, and the SMTP test server API base URL """
-    container, smtp_port, api_base = get_mail_container()
-    with container:
-        prepare_and_test_mail_container(container)
-
-        yield smtp_port, api_base
-        # requests.delete(f"{api_base}/api/v2/messages")
 
 
 @pytest.fixture
