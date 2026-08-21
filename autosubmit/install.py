@@ -27,10 +27,11 @@ from autosubmit.database.db_common import create_db
 from autosubmit.helpers.utils import get_rc_path
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
-__all__ = ["create_required_directories", "install"]
+__all__ = ["configure", "create_required_directories", "install"]
 
 
 _DEFAULT_DIRECTORY_MODE = 0o775
+"""Default permissions mode for Linux files."""
 
 
 def _get_required_directories() -> dict[Path, int]:
@@ -143,6 +144,8 @@ def install() -> bool:
     return _create_database()
 
 
+# TODO: configure needs some refactoring -- complex logic, exceptions can be better handled,
+#       duplicating code that exists/existed elsewhere...
 def configure(
     advanced,
     database_path,

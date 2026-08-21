@@ -57,7 +57,7 @@ class RunOptions(ExpidOptions):
     start_time: str
     start_after: str
     run_only_members: str
-    trace: bool
+    profile_trace: bool
     profile_max_iterations: int
 
 
@@ -83,15 +83,13 @@ def args_parser() -> ArgumentParser:
         help="Sets members allowed on this run.",
     )
     parser.add_argument(
-        "-t",
-        "--trace",
+        "--profile_trace",
         action="store_true",
         default=False,
         required=False,
         help="Enables trace output for profiling (requires --profile).",
     )
     parser.add_argument(
-        "-pm",
         "--profile_max_iterations",
         type=int,
         default=0,
@@ -104,7 +102,7 @@ def args_parser() -> ArgumentParser:
 
 def _validate(_: str, opts: RunOptions):
     # noinspection PyProtectedMember
-    if opts.trace and not opts._profiler:
+    if opts.profile_trace and not opts._profiler:
         Log.error(
             "Tracing is only available with profiling. Please add --profile flag to run with tracing."
         )
@@ -122,6 +120,7 @@ def main(opts: RunOptions) -> int | bool | None:
         opts.start_after,
         opts.run_only_members,
         opts._profiler,
-        opts.trace,
+        opts.profile_trace,
         opts.profile_max_iterations,
+        None,
     )

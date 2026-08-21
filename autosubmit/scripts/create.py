@@ -35,13 +35,13 @@ Examples:
 
 from argparse import ArgumentParser
 
+from autosubmit.experiment.manage import create
 from autosubmit.scripts._args import (
     ExpidOptions,
     create_argparse_parser,
 )
 from autosubmit.scripts._cli_function import cli_function
 from autosubmit.scripts._validation import validate_expid
-from autosubmit.workflow.manage import create
 
 
 class CreateOptions(ExpidOptions):

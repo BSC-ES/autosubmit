@@ -17,116 +17,216 @@
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.scripts.autosubmit import _autosubmit, get_arg_parser
 
 
-@pytest.mark.parametrize(
-    'command,args',
-    [
-        ('create', ['--fail-this-command-please-sir']),
-        ('versioning', []),
-        ('', [])
-    ],
-    ids=[
-        'Invalid args for create',
-        'Invalid subcommand',
-        'No command provided'
-    ]
-)
-def test_invalid_commands(command, args, mocker):
-    """Test invalid usages of the ``autosubmit`` command and subcommands."""
-    mocker.patch('sys.argv', [command] + args)
-    status, args = Autosubmit.parse_args()
+def test_invalid_top_level_argument():
+    """Test that argparse rejects an unknown top-level argument."""
+    parser = get_arg_parser()
 
-    assert not args and status != 0
+    with pytest.raises(SystemExit) as exc_info:
+        parser.parse_args(["--fail-this-command-please-sir"])
+
+    assert exc_info.value.code == 2
 
 
-@pytest.mark.parametrize(
-    "exception,raised,status",
-    [
-        (SystemExit, None, 1),
-        (BaseException, AutosubmitCritical, None),
-        (ValueError, AutosubmitCritical, None),
-    ],
-    ids=[
-        "SystemExit raised for invalid args",
-        "AutosubmitCritical raised for BaseException",
-        "AutosubmitCritical raised for ValueError",
-    ],
-)
-def test_exceptions_raised(exception: BaseException, raised: BaseException, status: int | None, mocker):
-    """Test exceptions being raised (for whatever reason) when running commands."""
-    mocker.patch('autosubmit.autosubmit.MyParser', side_effect=exception)
+def test_no_command_shows_help(mocker):
+    """Test that running Autosubmit without a command displays help."""
+    mock_help = mocker.patch("autosubmit.scripts.autosubmit.cli_help")
 
-    if raised:
-        with pytest.raises(raised):
-            Autosubmit.parse_args()
-            print('OK')
-    else:
-        assert status
-        status_returned, _ = Autosubmit.parse_args()
-        assert status_returned == status
-
-
-@pytest.mark.parametrize(
-    "command",
-    ["setstatus", "monitor", "recovery", "inspect"],
-    ids=["setstatus", "monitor", "recovery", "inspect"],
-)
-def test_combined_filters_parsed_for_commands(mocker, command):
-    """Test combined filters parse correctly for multiple commands."""
-    base_args = [
-        "autosubmit",
-        command,
-        "a000",
-        "-fl",
-        "a000_20200101_fc0_1_1_LOCALJOB",
-        "-fc",
-        "[20200101 [ fc0 [1] ] ]",
-        "-ft",
-        "LOCALJOB",
-        "-fs",
-        "WAITING",
-    ]
-
-    # setstatus requires target status (-t)
-    if command == "setstatus":
-        base_args += ["-t", "READY"]
-
-    mocker.patch("sys.argv", base_args)
-    status, args = Autosubmit.parse_args()
+    status = _autosubmit([])
 
     assert status == 0
-    assert args.command == command
-    assert args.list == "a000_20200101_fc0_1_1_LOCALJOB"
-    assert args.filter_chunks == "[20200101 [ fc0 [1] ] ]"
-    assert args.filter_type == "LOCALJOB"
-    assert args.filter_status == "WAITING"
+    mock_help.assert_called_once_with()
+
+
+def test_invalid_subcommand(mocker):
+    """Test that an unknown subcommand is rejected by the top-level parser."""
+    mock_help = mocker.patch("autosubmit.scripts.autosubmit.cli_help")
+
+    with pytest.raises(SystemExit) as exc_info:
+        _autosubmit(["versioning"])
+
+    assert exc_info.value.code == 2
+    mock_help.assert_not_called()
+
+
+def test_top_level_version(mocker):
+    """Test that the top-level version option exits successfully."""
+    mock_version = mocker.patch("autosubmit.scripts.autosubmit.cli_version")
+
+    status = _autosubmit(["--version"])
+
+    assert status == 0
+    mock_version.assert_called_once_with()
+
+
+def test_top_level_help(mocker):
+    """Test that the top-level help option exits successfully."""
+    mock_help = mocker.patch("autosubmit.scripts.autosubmit.cli_help")
+
+    status = _autosubmit(["--help"])
+
+    assert status == 0
+    mock_help.assert_called_once_with()
 
 
 @pytest.mark.parametrize(
-    "command",
-    ["setstatus", "monitor", "recovery", "inspect"],
-    ids=["setstatus", "monitor", "recovery", "inspect"],
+    "arguments",
+    [
+        ["-h"],
+        ["--help"],
+    ],
+    ids=[
+        "short-help",
+        "long-help",
+    ],
 )
-def test_command_accepts_section_splits_in_ft(mocker, command):
-    """Test command accepts section/split syntax in ``-ft``."""
-    base_args = [
-        "autosubmit",
-        command,
-        "a000",
-        "-ft",
-        "LOCALJOB [ 1 2 5-8 ]",
-    ]
+def test_help_aliases(mocker, arguments):
+    """Test that both help aliases are accepted."""
+    mock_help = mocker.patch("autosubmit.scripts.autosubmit.cli_help")
 
-    # setstatus requires target status (-t)
-    if command == "setstatus":
-        base_args += ["-t", "READY"]
-
-    mocker.patch("sys.argv", base_args)
-    status, args = Autosubmit.parse_args()
+    status = _autosubmit(arguments)
 
     assert status == 0
-    assert args.command == command
-    assert args.filter_type == "LOCALJOB [ 1 2 5-8 ]"
+    mock_help.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["-v"],
+        ["--version"],
+    ],
+    ids=[
+        "short-version",
+        "long-version",
+    ],
+)
+def test_version_aliases(mocker, arguments):
+    """Test that both version aliases are accepted."""
+    mock_version = mocker.patch("autosubmit.scripts.autosubmit.cli_version")
+
+    status = _autosubmit(arguments)
+
+    assert status == 0
+    mock_version.assert_called_once_with()
+
+
+def test_subcommand_arguments_are_forwarded(mocker):
+    """Test that arguments after the subcommand are passed to the command."""
+    entry_point = mocker.Mock()
+    commands = {"create": entry_point}
+
+    mocker.patch(
+        "autosubmit.scripts.autosubmit.get_commands",
+        return_value=commands,
+    )
+    mocker.patch(
+        "autosubmit.scripts.autosubmit.BasicConfig.read",
+    )
+    execute_cmd = mocker.patch(
+        "autosubmit.scripts.autosubmit.execute_cmd",
+        return_value=0,
+    )
+
+    status = _autosubmit(
+        [
+            "create",
+            "a000",
+            "--project",
+        ]
+    )
+
+    assert status == 0
+    execute_cmd.assert_called_once_with(
+        entry_point,
+        "a000",
+        "--project",
+    )
+
+
+def test_top_level_options_are_parsed_before_subcommand(mocker):
+    """Test that global options can appear before the subcommand."""
+    entry_point = mocker.Mock()
+    commands = {"create": entry_point}
+
+    mocker.patch(
+        "autosubmit.scripts.autosubmit.get_commands",
+        return_value=commands,
+    )
+    mocker.patch(
+        "autosubmit.scripts.autosubmit.BasicConfig.read",
+    )
+    execute_cmd = mocker.patch(
+        "autosubmit.scripts.autosubmit.execute_cmd",
+        return_value=0,
+    )
+
+    status = _autosubmit(
+        [
+            "-lc",
+            "DEBUG",
+            "create",
+            "a000",
+        ]
+    )
+
+    assert status == 0
+    execute_cmd.assert_called_once_with(
+        entry_point,
+        "a000",
+    )
+
+
+def test_subcommand_exit_code_is_returned(mocker):
+    """Test that the subcommand exit code is propagated."""
+    entry_point = mocker.Mock()
+    commands = {"create": entry_point}
+
+    mocker.patch(
+        "autosubmit.scripts.autosubmit.get_commands",
+        return_value=commands,
+    )
+    mocker.patch(
+        "autosubmit.scripts.autosubmit.BasicConfig.read",
+    )
+    mocker.patch(
+        "autosubmit.scripts.autosubmit.execute_cmd",
+        return_value=42,
+    )
+
+    assert _autosubmit(["create"]) == 42
+
+
+def test_invalid_subcommand_argument_is_handled_by_subcommand(mocker):
+    """Test that subcommand-specific invalid arguments reach the subcommand."""
+    entry_point = mocker.Mock()
+    commands = {"create": entry_point}
+
+    mocker.patch(
+        "autosubmit.scripts.autosubmit.get_commands",
+        return_value=commands,
+    )
+    mocker.patch(
+        "autosubmit.scripts.autosubmit.BasicConfig.read",
+    )
+
+    execute_cmd = mocker.patch(
+        "autosubmit.scripts.autosubmit.execute_cmd",
+        side_effect=SystemExit(2),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        _autosubmit(
+            [
+                "create",
+                "--fail-this-command-please-sir",
+            ]
+        )
+
+    assert exc_info.value.code == 2
+    execute_cmd.assert_called_once_with(
+        entry_point,
+        "--fail-this-command-please-sir",
+    )
