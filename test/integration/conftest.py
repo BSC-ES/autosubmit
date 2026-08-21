@@ -36,22 +36,24 @@ from sqlalchemy import create_engine
 from testcontainers.community.postgres import PostgresContainer  # type: ignore
 from testcontainers.core.container import DockerContainer  # type: ignore
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.experiment.experiment_common import next_experiment_id
+from autosubmit.experiment.manage import create as create_fn
+from autosubmit.experiment.manage import expid_fn
+from autosubmit.experiment.utils import next_experiment_id
+from autosubmit.install import configure, install
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
-
-# noinspection PyProtectedMember
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.integration.test_utils.docker_utils import (
     get_git_container,
+    get_mail_container,
     get_slurm_container,
     get_ssh_container,
     get_svn_container,
     prepare_and_test_git_container,
+    prepare_and_test_mail_container,
     prepare_and_test_slurm_container,
     prepare_and_test_ssh_container,
     prepare_and_test_svn_container,
@@ -78,7 +80,6 @@ _PG_DATABASE = 'autosubmit_test'
 class AutosubmitExperiment:
     """This holds information about an experiment created by Autosubmit."""
     expid: str
-    autosubmit: Autosubmit
     as_conf: AutosubmitConfig
     exp_path: Path
     tmp_dir: Path
@@ -132,7 +133,6 @@ def get_next_expid(tmp_path_factory: "TempPathFactory") -> Callable[[], str]:
 
 @pytest.fixture
 def autosubmit_exp(
-        autosubmit: Autosubmit,
         request: "FixtureRequest",
         tmp_path: "LocalPath",
         mocker: "MockerFixture",
@@ -169,7 +169,7 @@ def autosubmit_exp(
             experiment_data = {}
 
         is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
-        autosubmit.configure(
+        configure(
             advanced=False,
             database_path=BasicConfig.DB_DIR if not is_postgres else "",  # type: ignore
             database_filename=BasicConfig.DB_FILE if not is_postgres else "",  # type: ignore
@@ -184,12 +184,12 @@ def autosubmit_exp(
             database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
         )
         if not Path(BasicConfig.DB_PATH).exists() and not is_postgres:
-            autosubmit.install()
+            install()
 
         if not expid:
             expid = get_next_expid()
 
-        mocker.patch('autosubmit.experiment.experiment_common.db_common.last_name_used', return_value=expid)
+        mocker.patch('autosubmit.experiment.manage.db_common.last_name_used', return_value=expid)
         operational = expid.startswith('o')
         evaluation = expid.startswith('e')
         testcase = expid.startswith('t')
@@ -218,7 +218,7 @@ def autosubmit_exp(
         kwargs.setdefault("evaluation", evaluation)
         kwargs.setdefault("use_local_minimal", False)
 
-        expid = autosubmit.expid(**kwargs)
+        expid = expid_fn(**kwargs)
         exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
 
         conf_dir = exp_path / "conf"
@@ -291,14 +291,13 @@ def autosubmit_exp(
         submit_platform_script.touch(exist_ok=True)
 
         if create:
-            autosubmit.create(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
+            create_fn(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
             config.set_last_as_command('create')
         else:
             config.set_last_as_command('expid')
 
         return AutosubmitExperiment(
             expid=expid,
-            autosubmit=autosubmit,
             as_conf=config,
             exp_path=exp_path,
             tmp_dir=exp_tmp_dir,
@@ -479,9 +478,9 @@ def use_sqlalchemy(request):
 
 
 @pytest.fixture(params=['postgres', 'sqlite'])
-def as_db(request: "FixtureRequest", autosubmit: Autosubmit, tmp_path: "LocalPath", postgres_server: "DockerContainer",
+def as_db(request: "FixtureRequest", tmp_path: "LocalPath", postgres_server: "DockerContainer",
           autosubmit_exp, monkeypatch):
-    """A parametrized fixture that creates the autosubmitrc file for databases.
+    """A parametrised fixture that creates the autosubmitrc file for databases.
 
     Works with sqlite and postgres.
 
@@ -514,7 +513,7 @@ def as_db(request: "FixtureRequest", autosubmit: Autosubmit, tmp_path: "LocalPat
 
         # Create a new DB to run the current test completely isolated from others.
         # We use the test name, minus the [params], appending the current nanoseconds
-        # instead to distinguish parametrized tests too -- really isolated.
+        # instead to distinguish parametrised tests too -- really isolated.
         from sqlalchemy import create_engine, text
         engine = create_engine(f'postgresql://{user}:{password}@localhost:{port}/postgres')
         with engine.connect() as conn:
@@ -543,7 +542,7 @@ def as_db(request: "FixtureRequest", autosubmit: Autosubmit, tmp_path: "LocalPat
     # TODO: check which functions call as_db twice or if this is used in
     #  combination other fixture that calls autosubmit.install)
     with suppress(AutosubmitCritical):
-        autosubmit.install()
+        install()
 
     return backend
 
@@ -598,3 +597,15 @@ def copy_content_from_containers(request, log_name, path_to_docker=""):
             target_path.mkdir(parents=True, exist_ok=True)
             with open(target_path/f"{request.node.name}.tar.gz",'w') as f:
                 f.buffer.write(file_object.read())
+
+
+@pytest.fixture
+def fake_smtp_server() -> Generator[tuple[int, str], None, None]:
+    """Start a fake SMTP server container.
+    :return: A tuple with the SMTP port, and the SMTP test server API base URL """
+    container, smtp_port, api_base = get_mail_container()
+    with container:
+        prepare_and_test_mail_container(container)
+
+        yield smtp_port, api_base
+        # requests.delete(f"{api_base}/api/v2/messages")

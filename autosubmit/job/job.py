@@ -119,6 +119,34 @@ PERSISTENT_ATTRIBUTES = (
 )
 
 
+def get_job_status(status: str) -> int | None:
+    """Convert job status from text to integer code.
+
+    :param status: Status text.
+    :return: The integer status value.
+    """
+    status = status.upper()
+    if status == "READY":
+        return Status.READY
+    elif status == "COMPLETED":
+        return Status.COMPLETED
+    elif status == "WAITING":
+        return Status.WAITING
+    elif status == "HELD":
+        return Status.HELD
+    elif status == "SUSPENDED":
+        return Status.SUSPENDED
+    elif status == "FAILED":
+        return Status.FAILED
+    elif status == "RUNNING":
+        return Status.RUNNING
+    elif status == "QUEUING":
+        return Status.QUEUING
+    elif status == "UNKNOWN":
+        return Status.UNKNOWN
+    return None
+
+
 # This decorator contains groups of parameters, with each
 # parameter described. This is only for parameters which
 # are not properties of Job. Otherwise, please use the

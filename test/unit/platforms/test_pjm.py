@@ -113,7 +113,7 @@ def create_packages(as_conf, pjm_platform):
 
 
 @pytest.fixture
-def remote_platform(autosubmit_config, autosubmit):
+def remote_platform(autosubmit_config):
     as_conf = autosubmit_config("a000", {
         'DEFAULT': {
             'HPCARCH': 'ARM'

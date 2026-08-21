@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 from typing import Any
 from unittest.mock import patch
 
@@ -123,7 +124,7 @@ def test_save_jobs(as_conf, setup_job_list, tmp_path):
         "no_full_load_no_failed"
     ]
 )
-def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool, load_failed_jobs, autosubmit) -> None:
+def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool, load_failed_jobs) -> None:
     """
     Test loading the job list with different full_load options.
 
@@ -259,7 +260,7 @@ def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(m
     dic_mock.read_section.assert_any_call('fake-section-2', 1, Language.BASH)
 
 
-def test_run_only_selected_members(setup_job_list, as_conf, autosubmit):
+def test_run_only_selected_members(setup_job_list, as_conf):
     """
     Test that only jobs with members in the run_members list are loaded. ( autosubmit run $expid -rom --run_only_members)
     """
@@ -684,5 +685,3 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     job_list.add_job(Job("test_job", "1", Status.COMPLETED, 0))
 
     job_list.recover_last_data()
-
-

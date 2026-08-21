@@ -23,14 +23,13 @@ from typing import Any
 import pytest
 from ruamel.yaml import YAML
 
-from test.integration.test_mail import (
-    configured_mail,
-    fake_smtp_server,
-)
+from autosubmit.workflow.manage import run
+from test.integration.test_mail import configured_mail
 from test.integration.test_utils.docker_utils import get_mailhog_messages
 
 # The experiment runs one SIM chunk of exactly one calendar year, so simulated
-# years equals 1.0. Processors is fixed to keep CPU-hour metrics deterministic.
+# years equals 1.0. The Processors setting is fixed to keep CPU-hour metrics
+# deterministic.
 SIM_PROCESSORS = 2
 SIM_SIMULATED_YEARS = 1.0
 
@@ -71,19 +70,18 @@ def _experiment_data(thresholds: dict, notifications: str = "true") -> dict:
         },
     }
 
-
 def _run_experiment(autosubmit_exp, configure_mail, thresholds: dict, notifications: str = "true"):
     """Create a fresh experiment, wire mail config, and run it to completion."""
     exp = autosubmit_exp(experiment_data=_experiment_data(thresholds, notifications))
     _, api_base = configure_mail(exp)
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
+    exp.as_conf.set_last_as_command("run")
 
-    exit_code = exp.autosubmit.run_experiment(exp.expid)
+    exit_code = run(exp.expid)
     assert exit_code == 0, f"autosubmit run exited with {exit_code}"
     return exp, api_base
 
 
-def _find_sim_stat_file(exp) -> Path:
+def _find_sim_stat_file(exp) -> Any:
     """Locate the SIM job stat file written by the (single) successful chunk."""
     stat_file = next((exp.exp_path / "tmp").glob(f"{exp.expid}_*_SIM_STAT_0"), None)
     assert stat_file is not None, "SIM stat file was not recovered"
@@ -178,8 +176,14 @@ def _assert_violation_email(email: dict[str, Any], expid: str, job_name: str,
         "no_violation_and_notifications_off",
     ],
 )
-def test_cpmip_notification(autosubmit_exp, configured_mail, slurm_server,  # noqa: F811
-                             thresholds, notifications, expected_inbox_count):
+def test_cpmip_notification(
+    autosubmit_exp,
+    configured_mail,
+    slurm_server,  # noqa: F811
+    thresholds,
+    notifications,
+    expected_inbox_count,
+):
     """Cover every (violation, notifications-enabled) combination in one place."""
     exp, api_base = _run_experiment(
         autosubmit_exp, configured_mail, thresholds, notifications=notifications

@@ -27,6 +27,9 @@ test/htmlcov
 dockerfiles/id_rsa*
 dockerfiles/authorized_keys
 
+# Manual pages
+man/
+
 venv/
 .ipynb_checkpoints
 .atl

@@ -136,14 +136,14 @@ def fn_wrapper(database_fn, queue, *args):
 
 def save_experiment(name: str, description: str | None, version: str | None):
     """
-    Stores experiment in database. Anti-lock version.  
+    Stores experiment in database. Anti-lock version.
 
     :param version:
     :type version: str
     :param name: experiment's name
     :type name: str
     :param description: experiment's description
-    :type description: str    
+    :type description: str
     """
     fn = _save_experiment
     if BasicConfig.DATABASE_BACKEND == 'postgres':
@@ -168,7 +168,7 @@ def get_experiment_expids(expids: list[str] | None = None) -> set[str]:
     Get the expids of all experiments in the database, or only the requested ones.
 
     :param expids: optional list of expids to look up. When provided,
-        only those that exist in the database are returned. 
+        only those that exist in the database are returned.
         When ``None`` (default), all expids in the database are returned.
     :return: a set of experiment expids.
     :rtype: set[str]
@@ -207,8 +207,8 @@ def get_experiment_expids(expids: list[str] | None = None) -> set[str]:
 
 
 def check_experiment_exists(name, error_on_inexistence=True):
-    """ 
-    Checks if exist an experiment with the given name. Anti-lock version.  
+    """
+    Checks if exist an experiment with the given name. Anti-lock version.
 
     :param error_on_inexistence: if True, adds an error log if experiment does not exist
     :type error_on_inexistence: bool
@@ -262,14 +262,11 @@ def update_experiment_description_version(
     return result
 
 
-def get_autosubmit_version(expid):
-    """
-    Get the minimum autosubmit version needed for the experiment. Anti-lock version.
+def get_autosubmit_version(expid: str) -> str | None:
+    """Get the minimum autosubmit version needed for the experiment. Anti-lock version.
 
     :param expid: Experiment name
-    :type expid: str
     :return: If experiment exists returns the autosubmit version for it, if not returns None
-    :rtype: str
     """
     fn = _get_autosubmit_version
     if BasicConfig.DATABASE_BACKEND == 'postgres':
@@ -291,7 +288,7 @@ def get_autosubmit_version(expid):
 
 def last_name_used(test=False, operational=False, evaluation=False):
     """
-    Gets last experiment identifier used. Anti-lock version.  
+    Gets last experiment identifier used. Anti-lock version.
 
     :param test: flag for test experiments
     :type test: bool
@@ -474,13 +471,13 @@ def _update_experiment_description_version(name, description=None, version=None)
     """
     Updates the experiment's description and/or version
 
-    :param name: experiment name (expid)  
-    :rtype name: str  
-    :param description: experiment new description  
-    :rtype description: str  
-    :param version: experiment autosubmit version  
-    :rtype version: str  
-    :return: If description has been update, True; otherwise, False.  
+    :param name: experiment name (expid)
+    :rtype name: str
+    :param description: experiment new description
+    :rtype description: str
+    :param version: experiment autosubmit version
+    :rtype version: str
+    :return: If description has been update, True; otherwise, False.
     :rtype: bool
     """
     check_db()

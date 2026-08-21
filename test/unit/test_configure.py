@@ -14,16 +14,19 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
 
+from autosubmit.install import configure
+
 
 @pytest.mark.parametrize("suffix", ["", "/", "//"])
-def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
+def test_configure(mocker, tmp_path, suffix: str) -> None:
     # To update ``Path.home`` appending the provided suffix.
-    mocker.patch("autosubmit.autosubmit.get_rc_path").return_value = Path(
+    mocker.patch("autosubmit.install.get_rc_path").return_value = Path(
         str(tmp_path) + suffix, ".autosubmitrc"
     )
 
@@ -32,7 +35,7 @@ def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
     db_path = tmp_path / "database"
     lr_path = tmp_path / "experiments"
 
-    autosubmit.configure(
+    configure(
         advanced=False,
         database_path=str(db_path),
         database_filename=database_filename,
@@ -76,10 +79,10 @@ def test_configure(mocker, tmp_path, suffix: str, autosubmit) -> None:
 
 
 @pytest.mark.parametrize("suffix", ["", "/", "//"])
-def test_configure_advanced(mocker, tmp_path, suffix: str, autosubmit) -> None:
+def test_configure_advanced(mocker, tmp_path, suffix: str) -> None:
     """Test the advanced configuration options."""
     # To update ``Path.home`` appending the provided suffix.
-    mocker.patch("autosubmit.autosubmit.get_rc_path").return_value = Path(
+    mocker.patch("autosubmit.install.get_rc_path").return_value = Path(
         str(tmp_path) + suffix, ".autosubmitrc"
     )
 
@@ -96,7 +99,7 @@ def test_configure_advanced(mocker, tmp_path, suffix: str, autosubmit) -> None:
     platforms_conf.write_text("# Platforms configuration\n")
     jobs_conf.write_text("# Jobs configuration\n")
 
-    autosubmit.configure(
+    configure(
         advanced=True,
         database_path=str(db_path),
         database_filename=database_filename,
@@ -147,16 +150,16 @@ def test_configure_advanced(mocker, tmp_path, suffix: str, autosubmit) -> None:
         assert file.read() == expected
 
 
-def test_configure_does_not_create_directories(mocker, tmp_path, autosubmit) -> None:
+def test_configure_does_not_create_directories(mocker, tmp_path) -> None:
     """configure must not create directories. Moved to install"""
-    mocker.patch("autosubmit.autosubmit.get_rc_path").return_value = (
+    mocker.patch("autosubmit.install.get_rc_path").return_value = (
         tmp_path / ".autosubmitrc"
     )
 
     db_path = tmp_path / "database"
     lr_path = tmp_path / "experiments"
 
-    autosubmit.configure(
+    configure(
         advanced=False,
         database_path=str(db_path),
         database_filename="autosubmit.db",

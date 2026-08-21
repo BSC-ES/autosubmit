@@ -17,6 +17,15 @@
 
 import datetime
 
+__all__ = [
+    "bcolors",
+    "increase_wallclock_by_chunk",
+    "parse_output_number",
+    "separate_section_entries",
+    "Status",
+    "Type",
+]
+
 
 class Status:
     """
@@ -157,3 +166,22 @@ def increase_wallclock_by_chunk(current, increase, chunk):
     except Exception:
         # print(exp)
         return current
+
+
+def separate_section_entries(filter_entries: str) -> list[str]:
+    """Separate section entries with optional splits separated by comma into a list.
+
+    :param filter_entries: string with the entries separated by comma
+    :return: list of entries
+    """
+    text = filter_entries.strip()
+    if not text:
+        return []
+
+    entries = []
+    for entry in text.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        entries.append(entry.upper())
+    return entries
