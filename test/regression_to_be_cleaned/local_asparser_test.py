@@ -5,9 +5,10 @@ It only run within my home desktop computer. It is not run in the CI. Eventually
 Just to be sure that the autosubmit.config work as expected if there are changes.
 """
 
-import subprocess
 import os
+import subprocess
 from pathlib import Path
+
 BIN_PATH = '../../bin'
 
 
@@ -32,46 +33,8 @@ def perform_test(expid):
         exit(0)
     report_file = output.decode("UTF-8").split("list of all parameters has been written on ")[1]
     report_file = report_file.split(".txt")[0] + ".txt"
-    list_of_parameters_to_find = """
-DEFAULT.CUSTOM_CONFIG.PRE
-DEFAULT.CUSTOM_CONFIG.POST
-DIRECTORIES.INDIR
-DIRECTORIES.OUTDIR
-DIRECTORIES.TESTDIR
-TESTKEY
-TESTKEY-TWO
-TESTKEY-LEVANTE
-PLATFORMS.LEVANTE-LOGIN.USER
-PLATFORMS.LEVANTE-LOGIN.PROJECT
-PLATFORMS.LEVANTE.USER
-PLATFORMS.LEVANTE.PROJECT
-DIRECTORIES.TEST_FILE
-PROJECT.PROJECT_TYPE
-PROJECT.PROJECT_DESTINATION
-TOCHANGE
-TOLOAD
-TOLOAD2
-CONFIG.AUTOSUBMIT_VERSION
-    """.split("\n")
-    expected_output ="""
-DIRECTORIES.INDIR=my-updated-indir
-DIRECTORIES.OUTDIR=from_main
-DIRECTORIES.TEST_FILE=from_main
-DIRECTORIES.TESTDIR=another-dir
-TESTKEY=abcd
-TESTKEY-TWO=HPCARCH is levante
-TESTKEY-LEVANTE=L-abcd
-PLATFORMS.LEVANTE-LOGIN.USER=b382351
-PLATFORMS.LEVANTE-LOGIN.PROJECT=bb1153
-PLATFORMS.LEVANTE.USER=b382351
-PLATFORMS.LEVANTE.PROJECT=bb1153
-PROJECT.PROJECT_TYPE=none
-PROJECT.PROJECT_DESTINATION=auto-icon
-TOCHANGE=frominclude
-TOLOAD=from_testfile2
-TOLOAD2=from_version
-CONFIG.AUTOSUBMIT_VERSION=4.0.0b
-    """.split("\n")
+    list_of_parameters_to_find = ["", "DEFAULT.CUSTOM_CONFIG.PRE", "DEFAULT.CUSTOM_CONFIG.POST", "DIRECTORIES.INDIR", "DIRECTORIES.OUTDIR", "DIRECTORIES.TESTDIR", "TESTKEY", "TESTKEY-TWO", "TESTKEY-LEVANTE", "PLATFORMS.LEVANTE-LOGIN.USER", "PLATFORMS.LEVANTE-LOGIN.PROJECT", "PLATFORMS.LEVANTE.USER", "PLATFORMS.LEVANTE.PROJECT", "DIRECTORIES.TEST_FILE", "PROJECT.PROJECT_TYPE", "PROJECT.PROJECT_DESTINATION", "TOCHANGE", "TOLOAD", "TOLOAD2", "CONFIG.AUTOSUBMIT_VERSION", "    "]
+    expected_output =["", "DIRECTORIES.INDIR=my-updated-indir", "DIRECTORIES.OUTDIR=from_main", "DIRECTORIES.TEST_FILE=from_main", "DIRECTORIES.TESTDIR=another-dir", "TESTKEY=abcd", "TESTKEY-TWO=HPCARCH is levante", "TESTKEY-LEVANTE=L-abcd", "PLATFORMS.LEVANTE-LOGIN.USER=b382351", "PLATFORMS.LEVANTE-LOGIN.PROJECT=bb1153", "PLATFORMS.LEVANTE.USER=b382351", "PLATFORMS.LEVANTE.PROJECT=bb1153", "PROJECT.PROJECT_TYPE=none", "PROJECT.PROJECT_DESTINATION=auto-icon", "TOCHANGE=frominclude", "TOLOAD=from_testfile2", "TOLOAD2=from_version", "CONFIG.AUTOSUBMIT_VERSION=4.0.0b", "    "]
     if Path(report_file).exists():
         print("OK: report file exists")
     else:

@@ -20,12 +20,12 @@ import datetime
 import math
 import os
 import re
+import time
 import traceback
 from contextlib import suppress
 from pathlib import Path
-import time
-from time import strftime, localtime, mktime
-from typing import List, Dict, Tuple, Any, Set, Union
+from time import localtime, mktime, strftime
+from typing import Any
 
 from bscearth.utils.date import date2str, parse_date
 from networkx import DiGraph
@@ -44,7 +44,7 @@ from autosubmit.monitor.diagram import JobData
 from autosubmit.platforms.platform import Platform
 
 
-class JobList(object):
+class JobList:
     """Class to manage the list of jobs to be run by autosubmit"""
 
     def __init__(self, expid, config, parser_factory, run_mode=False, disable_save=False, submitter=None):
@@ -58,18 +58,18 @@ class JobList(object):
         self._date_list = []
         self._member_list = []
         self._chunk_list = []
-        self._dic_jobs = dict()
-        self.packages_dict = dict()
-        self._ordered_jobs_by_date_member = dict()
+        self._dic_jobs = {}
+        self.packages_dict = {}
+        self._ordered_jobs_by_date_member = {}
         self.dependency_map = None
-        self.job_package_map = dict()
+        self.job_package_map = {}
         self.sections_checked = set()
         self._run_members = None
-        self.jobs_to_run_first = list()
-        self.rerun_job_list = list()
+        self.jobs_to_run_first = []
+        self.rerun_job_list = []
         self.graph = DiGraph()
-        self.depends_on_previous_chunk = dict()
-        self.depends_on_previous_split = dict()
+        self.depends_on_previous_chunk = {}
+        self.depends_on_previous_split = {}
         self.path_to_logs = Path(BasicConfig.LOCAL_ROOT_DIR,
                                  self.expid, BasicConfig.LOCAL_TMP_DIR, f'LOG_{self.expid}')
         self.dbmanager = JobsDbManager(schema=self.expid)
@@ -146,7 +146,7 @@ class JobList(object):
         raise AttributeError("graph_dict is a dynamic view and cannot be directly modified.")
 
     @property
-    def job_list(self) -> List[Job]:
+    def job_list(self) -> list[Job]:
         """Dynamically return a list of all 'job' attributes from the graph nodes."""
         try:
             return [data['job'] for _, data in self.graph.nodes(data=True)]
@@ -179,7 +179,7 @@ class JobList(object):
         return self._run_members
 
     @run_members.setter
-    def run_members(self, members: Union[str, list[str]] | None) -> None:
+    def run_members(self, members: str | list[str] | None) -> None:
         """Normalize and store members supplied as a string or list.
 
         :param members: Members to run, provided as a list or a comma/space separated string.
@@ -213,11 +213,11 @@ class JobList(object):
     def generate(
             self,
             as_conf: AutosubmitConfig,
-            date_list: List[str],
-            member_list: List[str],
+            date_list: list[str],
+            member_list: list[str],
             num_chunks: int,
             chunk_ini: int,
-            parameters: Dict[str, Any],
+            parameters: dict[str, Any],
             date_format: str,
             default_retrials: int,
             default_job_type: str,
@@ -299,11 +299,11 @@ class JobList(object):
     def _initialize_workflow_parameters(
             self,
             as_conf: AutosubmitConfig,
-            date_list: List[str],
-            member_list: List[str],
+            date_list: list[str],
+            member_list: list[str],
             num_chunks: int,
             chunk_ini: int,
-            parameters: Dict[str, Any],
+            parameters: dict[str, Any],
             date_format: str,
             default_retrials: int,
     ) -> None:
@@ -394,7 +394,7 @@ class JobList(object):
 
     def _add_job_node_with_platform(
             self,
-            node: Dict[str, Any],
+            node: dict[str, Any],
             connect_to_platform: bool = True,
     ) -> None:
         """Add a job node to the graph and ensure the platform name is set.
@@ -444,7 +444,7 @@ class JobList(object):
                 "Differences found in sections, the whole graph will be updated accordingly. This may take a while.")
         return False if not differences else True
 
-    def remove_outdated_information_from_database(self, differences: Dict[str, Any]) -> None:
+    def remove_outdated_information_from_database(self, differences: dict[str, Any]) -> None:
         """Removes outdated information from the database based on the differences found in sections.
 
         :param differences: Dictionary containing the differences in sections.
@@ -475,7 +475,7 @@ class JobList(object):
         persistent_names = set(persistent_sections)
         current_names = set(current_sections)
 
-        differences: Dict[str, Dict[str, Any]] = {}
+        differences: dict[str, dict[str, Any]] = {}
 
         for section_name in persistent_names - current_names:
             differences[section_name] = {"status": "removed"}
@@ -514,7 +514,7 @@ class JobList(object):
         return [dict(raw_row) for raw_row in self.dbmanager.load_sections_data()]
 
     def _create_and_add_jobs(
-            self, show_log: bool, default_job_type: str, date_list: List[str], member_list: List[str]) -> None:
+            self, show_log: bool, default_job_type: str, date_list: list[str], member_list: list[str]) -> None:
         """Creates and adds jobs to the workflow graph.
         :param show_log: If True, shows log messages during job creation.
         :param default_job_type: Default job type for jobs.
@@ -643,7 +643,7 @@ class JobList(object):
         Log.info("Saving sections...")
         self.dbmanager.save_sections_data(self.build_sections_data_to_store())
 
-    def load_inner_jobs_by_section(self, inner_sections: list[str]) -> List[Job]:
+    def load_inner_jobs_by_section(self, inner_sections: list[str]) -> list[Job]:
         if not self.disable_save:
             already_loaded = {n for n in self.graph.nodes
                              if self.graph.nodes[n]['job'].status != Status.COMPLETED}
@@ -674,7 +674,7 @@ class JobList(object):
                 str(e),
             )
 
-    def load_wrappable_jobs_by_section(self, section: str, loaded_tracker: Set[str]) -> None:
+    def load_wrappable_jobs_by_section(self, section: str, loaded_tracker: set[str]) -> None:
         """Load non-completed jobs from a section whose cross-section parents are all COMPLETED.
 
         Skips jobs already in memory or tracked. Tracks newly loaded names
@@ -727,6 +727,7 @@ class JobList(object):
         if job.parents or not self.dbmanager:
             return
         from sqlalchemy import select
+
         from autosubmit.database.tables import ExperimentStructureTable
         structure_table = self.dbmanager.table_registry.get(ExperimentStructureTable.name)
         self.dbmanager.create_table(structure_table.name)
@@ -772,7 +773,7 @@ class JobList(object):
         :return: job list per platform
         :rtype: dict
         """
-        job_list_per_platform = dict()
+        job_list_per_platform = {}
         for job in self.job_list:
             if job.platform_name not in job_list_per_platform:
                 job_list_per_platform[job.platform_name] = []
@@ -846,8 +847,8 @@ class JobList(object):
         jobs_data = dic_jobs.experiment_data.get("JOBS", {})
         problematic_jobs = {}
         # map dependencies
-        self.dependency_map = dict()
-        self.dependency_map_with_distances = dict()
+        self.dependency_map = {}
+        self.dependency_map_with_distances = {}
 
         for section in jobs_data:
             self.dependency_map[section] = self._deep_map_dependencies(section,
@@ -869,9 +870,9 @@ class JobList(object):
 
         for job_section in jobs_data:
             # Changes when all jobs of a section are added
-            self.depends_on_previous_chunk = dict()
-            self.depends_on_previous_split = dict()
-            self.depends_on_previous_special_section = dict()
+            self.depends_on_previous_chunk = {}
+            self.depends_on_previous_split = {}
+            self.depends_on_previous_special_section = {}
             self.actual_job_depends_on_previous_chunk = False
             self.actual_job_depends_on_previous_member = False
             # No changes, no need to recalculate dependencies
@@ -930,7 +931,7 @@ class JobList(object):
     @staticmethod
     def _manage_dependencies(dependencies_keys: dict, dic_jobs: DicJobs) -> dict[Any, Dependency]:
         parameters = dic_jobs.experiment_data["JOBS"]
-        dependencies = dict()
+        dependencies = {}
         for key in list(dependencies_keys):
             distance = None
             splits = None
@@ -1141,7 +1142,7 @@ class JobList(object):
             filters = [{}]
         return filters
 
-    def _check_dates(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_dates(self, relationships: dict, current_job: Job) -> {}:
         """Check if the current_job_value is included in the filter_from and retrieve filter_to value
 
         :param relationships: Remaining filters to apply.
@@ -1156,7 +1157,7 @@ class JobList(object):
                 filters_to_apply_m = self._check_members({"MEMBERS_FROM": (
                     filter.pop("MEMBERS_FROM"))}, current_job)
                 if len(filters_to_apply_m) > 0:
-                    filters_to_apply[i].update(filters_to_apply_m)
+                    filter.update(filters_to_apply_m)
             # Will enter chunks_from, and obtain [{DATES_TO: "20020201", MEMBERS_TO: "fc2",
             # CHUNKS_TO: "ALL", SPLITS_TO: "2"]
             if "CHUNKS_FROM" in filter:
@@ -1164,20 +1165,20 @@ class JobList(object):
                     filter.pop("CHUNKS_FROM"))}, current_job)
                 if len(filters_to_apply_c) > 0 and (type(filters_to_apply_c) is not list or (
                         type(filters_to_apply_c) is list and len(filters_to_apply_c[0]) > 0)):
-                    filters_to_apply[i].update(filters_to_apply_c)
+                    filter.update(filters_to_apply_c)
             # IGNORED
             if "SPLITS_FROM" in filter:
                 filters_to_apply_s = self._check_splits({"SPLITS_FROM": (
                     filter.pop("SPLITS_FROM"))}, current_job)
                 if len(filters_to_apply_s) > 0:
-                    filters_to_apply[i].update(filters_to_apply_s)
+                    filter.update(filters_to_apply_s)
         # Unify filters from all filters_from where the current job is included to
         # have a single SET of filters_to
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         # {DATES_TO: "20020201", MEMBERS_TO: "fc2", CHUNKS_TO: "ALL", SPLITS_TO: "2"}
         return filters_to_apply
 
-    def _check_members(self, relationships: Dict, current_job: Job) -> Dict:
+    def _check_members(self, relationships: dict, current_job: Job) -> dict:
         """Check if the current_job_value is included in the filter_from and retrieve filter_to value
 
         :param relationships: Remaining filters to apply.
@@ -1191,16 +1192,16 @@ class JobList(object):
                 filters_to_apply_c = self._check_chunks({"CHUNKS_FROM": (
                     filter_.pop("CHUNKS_FROM"))}, current_job)
                 if len(filters_to_apply_c) > 0:
-                    filters_to_apply[i].update(filters_to_apply_c)
+                    filter_.update(filters_to_apply_c)
             if "SPLITS_FROM" in filter_:
                 filters_to_apply_s = self._check_splits({"SPLITS_FROM": (
                     filter_.pop("SPLITS_FROM"))}, current_job)
                 if len(filters_to_apply_s) > 0:
-                    filters_to_apply[i].update(filters_to_apply_s)
+                    filter_.update(filters_to_apply_s)
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
-    def _check_chunks(self, relationships: Dict, current_job: Job) -> {}:
+    def _check_chunks(self, relationships: dict, current_job: Job) -> {}:
         """Check if the current_job_value is included in the filter_from and retrieve filter_to value
 
         :param relationships: Remaining filters to apply.
@@ -1215,7 +1216,7 @@ class JobList(object):
                 filters_to_apply_s = self._check_splits({"SPLITS_FROM": (
                     filter.pop("SPLITS_FROM"))}, current_job)
                 if len(filters_to_apply_s) > 0:
-                    filters_to_apply[i].update(filters_to_apply_s)
+                    filter.update(filters_to_apply_s)
         filters_to_apply = self._unify_to_filters(filters_to_apply)
         return filters_to_apply
 
@@ -1390,7 +1391,7 @@ class JobList(object):
     def add_special_conditions(
             self,
             job: Job,
-            special_conditions: Dict[str, Any],
+            special_conditions: dict[str, Any],
             parent: Job
     ) -> None:
         """
@@ -1406,8 +1407,7 @@ class JobList(object):
         min_trigger_status = special_conditions.get("MIN_TRIGGER_STATUS", "COMPLETED")
         from_step = int(special_conditions.get("FROM_STEP", 0))
         fail_ok = special_conditions.get("FAIL_OK", False)
-        job.max_checkpoint_step = from_step if from_step > int(job.max_checkpoint_step) else int(
-            job.max_checkpoint_step)
+        job.max_checkpoint_step = max(int(job.max_checkpoint_step), from_step)
         self.graph.edges[parent.name, job.name].update(min_trigger_status=min_trigger_status, from_step=from_step,
                                                        fail_ok=fail_ok)
 
@@ -1416,7 +1416,7 @@ class JobList(object):
         :param job: The job to which edge information is applied.
         :param dependencies: A dictionary of dependencies associated with the job.
         """
-        filters_to_apply_by_section = dict()
+        filters_to_apply_by_section = {}
         for key, dependency in dependencies.items():
             filters_to_apply = self._filter_current_job(job, copy.deepcopy(dependency.relationships))
             if "MIN_TRIGGER_STATUS" in filters_to_apply:
@@ -1435,7 +1435,7 @@ class JobList(object):
                     parents_by_section[self.graph.nodes[parent]['job'].section] = set()
                 (parents_by_section[self.graph.nodes[parent]['job'].section].add(self.graph.nodes[parent]['job']))
         for key, list_of_parents in parents_by_section.items():
-            special_conditions = dict()
+            special_conditions = {}
             min_trigger_status = filters_to_apply_by_section[key].get("MIN_TRIGGER_STATUS", "COMPLETED")
             # "?" marks a weak dependency, here we're removing it from the name. ex: "STATUS: COMPLETED?" ( maybe this is already done in the as_conf)
             min_trigger_status = min_trigger_status if "?" != min_trigger_status[-1] else min_trigger_status[:-1]
@@ -1742,11 +1742,11 @@ class JobList(object):
             self,
             dic_jobs: DicJobs,
             job: Job,
-            date_list: List[str],
-            member_list: List[str],
-            chunk_list: List[int],
-            dependencies_keys: Dict[str, Any],
-            dependencies: Dict[str, Dependency],
+            date_list: list[str],
+            member_list: list[str],
+            chunk_list: list[int],
+            dependencies_keys: dict[str, Any],
+            dependencies: dict[str, Dependency],
             graph: DiGraph,
     ) -> set[str]:
         """Manage job dependencies for a given job and update the dependency graph.
@@ -1927,13 +1927,13 @@ class JobList(object):
     @staticmethod
     def _calculate_dependency_metadata(
             chunk: int | None,
-            chunk_list: List[int],
+            chunk_list: list[int],
             member: str | None,
-            member_list: List[str],
+            member_list: list[str],
             date: str | None,
-            date_list: List[str],
+            date_list: list[str],
             dependency: Any
-    ) -> Tuple[bool, Tuple[int | None, str | None, str | None]]:
+    ) -> tuple[bool, tuple[int | None, str | None, str | None]]:
         """Compute the target chunk, member, and date for a dependency with a +/- distance.
 
         Compute the target chunk, member, and date for a dependency that specifies a
@@ -2063,14 +2063,14 @@ class JobList(object):
         # Dictionary Key: date, Value: (Dictionary Key: Member, Value: List)
         job = None
 
-        dict_jobs = dict()
+        dict_jobs = {}
         for date in self._date_list:
-            dict_jobs[date] = dict()
+            dict_jobs[date] = {}
             for member in self._member_list:
-                dict_jobs[date][member] = list()
+                dict_jobs[date][member] = []
         num_chunks = len(self._chunk_list)
 
-        sections_running_type_map = dict()
+        sections_running_type_map = {}
         if wrapper_jobs is not None and len(str(wrapper_jobs)) > 0:
             # TODO: Removing this causes unit tests to fail, need to investigate why in another PR
             if type(wrapper_jobs) is not list:
@@ -2136,7 +2136,7 @@ class JobList(object):
                         # OR num_chunks
 
                         # Bringing back original job if identified
-                        for idx in range(0, len(jobs_to_sort)):
+                        for idx in range(len(jobs_to_sort)):
                             # Test if it is a fake job
                             if jobs_to_sort[idx] in fake_original_job_map:
                                 fake_job = jobs_to_sort[idx]
@@ -2152,7 +2152,7 @@ class JobList(object):
                         previous_job = job
 
         # sort jobs
-        for date in dict_jobs.keys():
+        for date in dict_jobs:
             for member in dict_jobs[date].keys():
                 dict_jobs[date][member].sort(
                     key=lambda job: (int(job.chunk) if sections_running_type_map.get(
@@ -2175,7 +2175,7 @@ class JobList(object):
         :rtype fake_original_job_map: Dictionary Key: Job Object, Value: Job Object
         """
         filtered_jobs_fake_date_member = []
-        fake_original_job_map = dict()
+        fake_original_job_map = {}
 
         import copy
         for job in filtered_jobs_list:
@@ -2330,7 +2330,7 @@ class JobList(object):
         :return: submitted jobs
         :rtype: list
         """
-        submitted = list()
+        submitted = []
         if hold:
             submitted = [job for job in self.job_list if (platform is None or
                                                           job.platform.name == platform.name) and job.status == Status.SUBMITTED
@@ -2515,7 +2515,7 @@ class JobList(object):
             section_dates = ""
             section_chunks = ""
             section_members = ""
-            jobs_final = list()
+            jobs_final = []
             for complete_filter_by_section in filter_jobs_by_section.split(','):
                 section_list = complete_filter_by_section.split('[')
                 section_name = section_list[0].strip('[]')
@@ -2903,7 +2903,7 @@ class JobList(object):
         """
         return sorted(self.job_list, key=lambda k: k.status)
 
-    def save_jobs(self, jobs_to_save: List[Job] | None = None, reset_log_counters: bool = False):
+    def save_jobs(self, jobs_to_save: list[Job] | None = None, reset_log_counters: bool = False):
         """Persists the job list
         :param jobs_to_save: Optional list of jobs to save. If None, saves all jobs in the job list.
         :param reset_log_counters: If True, resets the log counters for the jobs being saved. Defaults to False.
@@ -2966,7 +2966,7 @@ class JobList(object):
             self.dbmanager.save_edges(self.graph_dict)
             Log.info("Edges saved.")
 
-    def load_edges(self, job_list, full_load=False) -> Dict[str, Any]:
+    def load_edges(self, job_list, full_load=False) -> dict[str, Any]:
         """Loads the job edges"""
         return self.dbmanager.load_edges(job_list, full_load)
 
@@ -3064,7 +3064,7 @@ class JobList(object):
                         Log.result(f"Updated job '{job_name}' to status '{status_str}'")
                     except (ValueError, AttributeError) as e:
                         Log.warning(f"Invalid status '{status_str}' for job '{job_name}' (line {line_num}): {e}")
-        except (IOError, OSError) as e:
+        except OSError as e:
             Log.warning(f"Failed to read update file {self._update_file_path}: {e}")
 
         if store_change:
@@ -3078,7 +3078,7 @@ class JobList(object):
                          (job.status == Status.QUEUING or job.status == Status.RUNNING or
                           job.status == Status.COMPLETED or job.status == Status.READY) and
                          jobs_in_wrapper.find(job.section) == -1]
-        skip_by_section = dict()
+        skip_by_section = {}
         for job in job_list_skip:
             if job.section not in skip_by_section:
                 skip_by_section[job.section] = [job]
@@ -3138,7 +3138,7 @@ class JobList(object):
             job: Job,
             parents_edge_info: dict,
             parents_nodes: dict
-    ) -> Tuple[List[Job], List[Job]]:
+    ) -> tuple[list[Job], list[Job]]:
         """Count the number of completed and non-completed parent jobs for a given job.
 
         :param job: The job whose parent statuses are to be checked.
@@ -3164,9 +3164,7 @@ class JobList(object):
                 non_completed.append(parent)
             # COMPLETED or SKIPPED
             elif p_status in [Status.COMPLETED, Status.SKIPPED]:
-                if edge_status in [Status.COMPLETED, Status.SKIPPED]:
-                    completed.append(parent)
-                elif edge_status == Status.FAILED and fail_ok or (job.current_checkpoint_step >= from_step > 0):
+                if edge_status in [Status.COMPLETED, Status.SKIPPED] or edge_status == Status.FAILED and fail_ok or (job.current_checkpoint_step >= from_step > 0):
                     completed.append(parent)
                 elif Status.VALUE_TO_KEY.get(edge_status, '') in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW:
                     # COMPLETED/SKIPPED parent has surpassed any intermediate success-workflow status trigger.
@@ -3187,9 +3185,7 @@ class JobList(object):
             # RUNNING
             elif p_status == Status.RUNNING:
                 if edge_status == Status.RUNNING:
-                    if job.current_checkpoint_step >= from_step > 0:
-                        completed.append(parent)
-                    elif from_step == 0:
+                    if job.current_checkpoint_step >= from_step > 0 or from_step == 0:
                         completed.append(parent)
                     else:
                         non_completed.append(parent)
@@ -3242,7 +3238,7 @@ class JobList(object):
                             time.sleep(1)
         return len(jobs_to_recover) > 0
 
-    def _update_db_edges_completion_status(self, finished_parents: List[Job], non_finished_parents: List[Job],
+    def _update_db_edges_completion_status(self, finished_parents: list[Job], non_finished_parents: list[Job],
                                            child: Job) -> None:
         """ Update the completion status of edges in the database.
 
@@ -3401,7 +3397,7 @@ class JobList(object):
                 save = True
         return save
 
-    def _handle_special_checkpoint_jobs(self) -> Tuple[bool, bool]:
+    def _handle_special_checkpoint_jobs(self) -> tuple[bool, bool]:
         """Set jobs that fulfill special checkpoint conditions to READY.
 
         Return a tuple with two booleans: (save_jobs, save_edges).
@@ -3632,11 +3628,11 @@ class JobList(object):
         un_mapped_wrapper_info, un_mapped_inner_jobs = self.dbmanager.load_wrappers(preview, self.job_list, run_id=self.run_id)
 
         # Build a dictionary of wrapper info indexed by wrapper name
-        wrappers_info: Dict[str, dict] = {
+        wrappers_info: dict[str, dict] = {
             dict(wrapper)['name']: dict(wrapper) for wrapper in un_mapped_wrapper_info
         }
         # Group inner jobs by package id
-        inner_jobs_by_package: Dict[str, list] = {}
+        inner_jobs_by_package: dict[str, list] = {}
         for job in un_mapped_inner_jobs:
             if job['package_name'] not in inner_jobs_by_package:
                 inner_jobs_by_package[job['package_name']] = []
@@ -3678,7 +3674,7 @@ class JobList(object):
 
             self.job_package_map[int(wrapper_job.id)] = wrapper_job
 
-    def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> Tuple[Dict[str, Any], List[str]]:
+    def _wrapper_job_dict(self, wrapper_job: 'WrapperJob') -> tuple[dict[str, Any], list[str]]:
         """Return a dictionary representation of a WrapperJob and its inner jobs for database insertion.
 
         :param wrapper_job: The wrapper job instance to serialize.
@@ -3874,7 +3870,7 @@ class JobList(object):
         for job in all_jobs:
             if len(job.parents) == 0:
                 roots.append(job)
-        visited = list()
+        visited = []
         # print(root)
         # root exists
         for root in roots:
@@ -3897,7 +3893,7 @@ class JobList(object):
             roots = [job for job in self.get_all()
                      if len(job.parents) == 0
                      and job is not None and len(str(job)) > 0]
-            visited = list()
+            visited = []
             # root exists
             for root in roots:
                 if root is not None and len(str(root)) > 0:
@@ -3970,7 +3966,7 @@ class JobList(object):
         :rtype: Dictionary
         """
         self.load_wrappers()
-        package_to_symbol = dict()
+        package_to_symbol = {}
         i = 0
         for package_name, wrapped_job in self.packages_dict.items():
             if i % 2 == 0:
@@ -3983,7 +3979,7 @@ class JobList(object):
 
     @staticmethod
     def retrieve_times(status_code, name, tmp_path, make_exception=False, job_times=None,
-                       seconds=False, job_data_collection: 'JobData | None' = None) -> Union[None, JobRow]:
+                       seconds=False, job_data_collection: 'JobData | None' = None) -> None | JobRow:
 
         """Retrieve job timestamps from database.
 
@@ -4026,9 +4022,9 @@ class JobList(object):
                         # Test if start time does not make sense
                         if t_start >= t_finish:
                             if job_times:
-                                _, c_start, c_finish, _, _ = job_times.get(
+                                _, c_start, _c_finish, _, _ = job_times.get(
                                     name, (0, t_start, t_finish, 0, 0))
-                                t_start = c_start if t_start > c_start else t_start
+                                t_start = min(t_start, c_start)
                                 job_data.start = t_start
 
                         if seconds is False:
@@ -4082,7 +4078,7 @@ class JobList(object):
                 if job_times and status_code not in [Status.READY,
                                                      Status.WAITING, Status.SUSPENDED]:
                     if name in job_times:
-                        submit_time, start_time, finish_time, status, detail_id = job_times[
+                        submit_time, start_time, finish_time, status, _detail_id = job_times[
                             name]
                         seconds_running = finish_time - start_time
                         seconds_queued = start_time - submit_time
@@ -4095,7 +4091,7 @@ class JobList(object):
                     finish_time = 0
 
         except Exception:
-            Log.debug((traceback.format_exc()))
+            Log.debug(traceback.format_exc())
             return None
 
         seconds_queued = seconds_queued * (-1) if seconds_queued < 0 else seconds_queued
@@ -4134,7 +4130,7 @@ class JobList(object):
         :rtype: 4-tuple in datetime format
         """
         # name = "a2d0_20161226_001_124_ARCHIVE"
-        values = list()
+        values = []
         status_from_job = str(Status.VALUE_TO_KEY[status_code])
         now = datetime.datetime.now()
         submit_time = now
@@ -4241,7 +4237,7 @@ class JobList(object):
                 job.updated_log = job.fail_count
 
     def _get_jobs_by_name(self, status: list[int] | None = None, platform: Platform = None,
-                          return_only_names=False) -> Union[List[str], List["Job"]]:
+                          return_only_names=False) -> list[str] | list["Job"]:
         """Return jobs filtered by status and/or platform as names or Job objects.
 
         :param status: Optional list of job statuses to filter by.
@@ -4265,7 +4261,7 @@ class JobList(object):
         :return: Set of completed job names.
         """
 
-        job_names: Union[list[str], list[Job]] = self._get_jobs_by_name(platform=platform, return_only_names=True)
+        job_names: list[str] | list[Job] = self._get_jobs_by_name(platform=platform, return_only_names=True)
         if job_names:
             exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
             jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
@@ -4282,7 +4278,7 @@ class JobList(object):
             if wrappers:
                 self.dbmanager.update_wrapper_status(wrappers)
 
-    def get_wrappers_id_from_db(self) -> List[int]:
+    def get_wrappers_id_from_db(self) -> list[int]:
         """Get a list of all wrapper job IDs from the database.
 
         :return: List of wrapper job IDs.

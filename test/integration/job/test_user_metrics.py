@@ -16,10 +16,10 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for ``autosubmit.job.user_metrics``."""
-from sqlalchemy import select
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import select
 
 from autosubmit.job.metrics_processor import UserMetricRepository
 

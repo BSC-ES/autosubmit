@@ -1,6 +1,5 @@
 import pytest
 
-
 # Moved from unit tests to integration tests as it builds jobs and platforms using YAML data, without mocks.
 # It also touchs more than one module, making it more of an integration test.
 # Probabily we could move other tests from unit to integration for the same reason.

@@ -18,7 +18,9 @@
 import os
 
 from autosubmit.history import utils as HUtils
-from autosubmit.history.database_managers.database_manager import DEFAULT_HISTORICAL_LOGS_DIR
+from autosubmit.history.database_managers.database_manager import (
+  DEFAULT_HISTORICAL_LOGS_DIR,
+)
 
 
 class Logging:
@@ -40,11 +42,11 @@ class Logging:
       print("Logging failed. Please report it to the developers.")  
     
   def build_message(self, main_msg, traceback_msg):
-    return "{0} :: {1} :: {2}\n".format(HUtils.get_current_datetime(), main_msg, traceback_msg)
+    return f"{HUtils.get_current_datetime()} :: {main_msg} :: {traceback_msg}\n"
 
   def _make_log_directory_if_not_exists(self):
     if not os.path.exists(self.historiclog_dir_path):
       os.makedirs(self.historiclog_dir_path)
 
   def get_log_file_path(self):     
-    return os.path.join(self.historiclog_dir_path,"{}_log.txt".format(self.expid))
+    return os.path.join(self.historiclog_dir_path,f"{self.expid}_log.txt")

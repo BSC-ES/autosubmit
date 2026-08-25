@@ -19,7 +19,10 @@ from collections import namedtuple
 
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
-from autosubmit.history.strategies import PlatformInformationHandler, TwoDimWrapperDistributionStrategy
+from autosubmit.history.strategies import (
+    PlatformInformationHandler,
+    TwoDimWrapperDistributionStrategy,
+)
 
 job_dc = namedtuple("Job", ["job_name", "date", "member", "status_str", "children", "children_list"])
 

@@ -142,6 +142,6 @@ class DatabaseManager(metaclass=ABCMeta):
         """ Build and return a SELECT statement with the same fields as the model. Requires that the table is associated with a model (namedtuple). """
         model = Models.table_name_to_model[table_name]
         if conditions:
-            return "SELECT {0} FROM {1} WHERE {2}".format(HUtils.get_fields_as_comma_str(model), table_name, conditions)
+            return f"SELECT {HUtils.get_fields_as_comma_str(model)} FROM {table_name} WHERE {conditions}"
         else:
-            return "SELECT {0} FROM {1}".format(HUtils.get_fields_as_comma_str(model), table_name)
+            return f"SELECT {HUtils.get_fields_as_comma_str(model)} FROM {table_name}"

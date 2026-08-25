@@ -18,19 +18,26 @@
 """Contains code to manage a database via SQLAlchemy."""
 import datetime
 from pathlib import Path
-from typing import Any, List, Dict, TYPE_CHECKING, Union, Tuple, Set
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import and_, or_, not_, func, select, exists, update
+from sqlalchemy import and_, exists, func, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
-from autosubmit.database.tables import ExperimentStructureTable, PreviewWrapperJobsTable, WrapperJobsTable, \
-    PreviewWrapperInfoTable, WrapperInfoTable, SectionsStructureTable
-from autosubmit.database.tables import JobsTable, Table
+from autosubmit.database.tables import (
+    ExperimentStructureTable,
+    JobsTable,
+    PreviewWrapperInfoTable,
+    PreviewWrapperJobsTable,
+    SectionsStructureTable,
+    Table,
+    WrapperInfoTable,
+    WrapperJobsTable,
+)
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
+
 
 def _edge_satisfied(
     parent_status: str,
@@ -61,9 +68,7 @@ def _edge_satisfied(
             return True
         return False
     elif parent_status == 'RUNNING':
-        if min_trigger_status == 'RUNNING' and child_checkpoint_step >= from_step > 0:
-            return True
-        elif min_trigger_status in ('COMPLETED', 'SKIPPED', 'FAILED'):
+        if min_trigger_status == 'RUNNING' and child_checkpoint_step >= from_step > 0 or min_trigger_status in ('COMPLETED', 'SKIPPED', 'FAILED'):
             return True
     elif parent_status == min_trigger_status:
         return True
@@ -95,12 +100,12 @@ class JobsDbManager(DbManager):
             persistence_full_path = Path(Path(BasicConfig.LOCAL_ROOT_DIR, schema, "db"), Path("job_list.db"))
         else:
             persistence_full_path = None
-        super().__init__(get_connection_url(persistence_full_path), schema)
+        super().__init__(persistence_full_path, schema)
         self._ACTIVE_STATUSES = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
         self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
-    def save_jobs(self, job_list: List["Job"], reset_log_counters: bool = False) -> None:
+    def save_jobs(self, job_list: list["Job"], reset_log_counters: bool = False) -> None:
         """Save the job list to the database.
 
         Log columns are excluded from the upsert to preserve data written by
@@ -150,8 +155,8 @@ class JobsDbManager(DbManager):
             self,
             full_load: bool = False,
             load_failed_jobs: bool = False,
-            members: List[Any] | None = None
-    ) -> List[Dict[str, Any]]:
+            members: list[Any] | None = None
+    ) -> list[dict[str, Any]]:
         """Return a  list of jobs loaded from the database.
 
         Load jobs according to the requested mode.
@@ -184,7 +189,7 @@ class JobsDbManager(DbManager):
         job = self.select_job_by_name(job_name)
         return dict(job) if job else None
 
-    def get_job_list_size(self) -> Tuple[int, int, int]:
+    def get_job_list_size(self) -> tuple[int, int, int]:
         """
         Return the number of jobs in the database.
         """
@@ -198,11 +203,11 @@ class JobsDbManager(DbManager):
 
     def select_job_names_by_sections(
             self,
-            sections: List[str],
-            exclude_names: Set[str] | None = None,
+            sections: list[str],
+            exclude_names: set[str] | None = None,
             exclude_completed: bool = False,
             status_filter: str | None = None,
-    ) -> Set[str]:
+    ) -> set[str]:
         """Return job names from DB filtered by section, status and exclusion.
 
         :param sections: List of section names to filter by.
@@ -225,7 +230,7 @@ class JobsDbManager(DbManager):
             rows = conn.execute(select(table.c.name).select_from(table).where(condition))
             return {row[0] for row in rows.fetchall()}
 
-    def count_remaining_jobs_in_sections(self, sections: List[str], exclude_names: List[str]) -> int:
+    def count_remaining_jobs_in_sections(self, sections: list[str], exclude_names: list[str]) -> int:
         """Count non-completed jobs in sections, excluding given names.
 
         :param sections: List of section names.
@@ -244,7 +249,7 @@ class JobsDbManager(DbManager):
             return row.scalar()
 
     def count_non_completed_parents_not_in_memory(
-            self, remaining_names: Set[str], loaded_names: Set[str]) -> int:
+            self, remaining_names: set[str], loaded_names: set[str]) -> int:
         """Count non-completed parents of remaining jobs that are not in memory.
 
         :param remaining_names: Set of remaining job names.
@@ -275,7 +280,7 @@ class JobsDbManager(DbManager):
             return row.scalar()
 
     def remaining_blocked_by_package(
-            self, remaining_names: Set[str], package_names: Set[str]) -> bool:
+            self, remaining_names: set[str], package_names: set[str]) -> bool:
         """Check if remaining jobs are blocked by having unsatisfied parents.
 
         Returns True only when all non-COMPLETED parents of remaining jobs
@@ -309,7 +314,7 @@ class JobsDbManager(DbManager):
             )
             return row.scalar() == 0
 
-    def select_all_jobs(self) -> List[dict[str, Any]]:
+    def select_all_jobs(self) -> list[dict[str, Any]]:
         """
         Return the whole job list from the database (without edges).
         """
@@ -318,7 +323,7 @@ class JobsDbManager(DbManager):
         job_list = self.select_all_with_columns(table.name)
         return [dict(job) for job in job_list]
 
-    def select_jobs_by_section(self, section: str) -> List[dict[str, Any]]:
+    def select_jobs_by_section(self, section: str) -> list[dict[str, Any]]:
         """
         Return the jobs from the database that belong to a specific section.
         """
@@ -330,9 +335,9 @@ class JobsDbManager(DbManager):
 
     def select_loadable_inner_jobs(
             self,
-            sections: List[str],
-            already_loaded_names: Set[str],
-    ) -> List[tuple[tuple[str, Any]]]:
+            sections: list[str],
+            already_loaded_names: set[str],
+    ) -> list[tuple[tuple[str, Any]]]:
         """Return non-completed jobs in sections whose cross-section parents are all COMPLETED.
 
         Uses a single SQL query with NOT EXISTS to find jobs whose
@@ -376,8 +381,8 @@ class JobsDbManager(DbManager):
     def select_active_jobs(
             self,
             include_failed: bool = False,
-            members: List[Any] | None = None
-    ) -> List[Union[str, Any]]:
+            members: list[Any] | None = None
+    ) -> list[str | Any]:
         table: Table = self.table_registry.get(JobsTable.name)
         structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
         self.create_table(table.name)
@@ -409,7 +414,7 @@ class JobsDbManager(DbManager):
             columns = table.c.keys()
             return [tuple(zip(columns, row)) for row in rows]
 
-    def select_finished_jobs_needing_log_recovery(self) -> List[Dict[str, Any]]:
+    def select_finished_jobs_needing_log_recovery(self) -> list[dict[str, Any]]:
         """Return COMPLETED/FAILED jobs whose updated_log <= fail_count."""
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)
@@ -420,9 +425,9 @@ class JobsDbManager(DbManager):
         return [dict(job) for job in self.select_where_with_columns(table, condition)]
     def select_children_jobs(
             self,
-            job_list: List[Union[str, Any]],
-            members: List[Any] | None = None
-    ) -> List[Union[str, Any]]:
+            job_list: list[str | Any],
+            members: list[Any] | None = None
+    ) -> list[str | Any]:
         """
         Select child jobs from the database, optionally filtered by members.
 
@@ -475,7 +480,7 @@ class JobsDbManager(DbManager):
                 )
                 child_checkpoint = {r.name: (r.current_checkpoint_step or 0) for r in cp_rows}
 
-                all_edges: Dict[str, list] = {}
+                all_edges: dict[str, list] = {}
                 for row in rows:
                     all_edges.setdefault(row.e_to, []).append(row)
 
@@ -521,7 +526,7 @@ class JobsDbManager(DbManager):
 
         return job_list
 
-    def save_edges(self, graph: List[Dict[str, Any]]) -> None:
+    def save_edges(self, graph: list[dict[str, Any]]) -> None:
         """Save the experiment structure into the database."""
         table: Table = self.table_registry.get(ExperimentStructureTable.name)
 
@@ -580,7 +585,7 @@ class JobsDbManager(DbManager):
                     updated = True
         return updated
 
-    def load_edges(self, job_list: List[dict[str, Any]] = None, full_load: bool = True, remove_unused_edges: bool = True) -> List[dict[str, Any]]:
+    def load_edges(self, job_list: list[dict[str, Any]] | None = None, full_load: bool = True, remove_unused_edges: bool = True) -> list[dict[str, Any]]:
         table: Table = self.table_registry.get(ExperimentStructureTable.name)
 
         self.create_table(table.name)
@@ -593,7 +598,7 @@ class JobsDbManager(DbManager):
             graph = self.select_edges(job_list)
         return graph
 
-    def select_edges(self, job_list: List[dict[str, Any]] | None = None, only_parents: bool = False) -> List[dict[str, Any]]:
+    def select_edges(self, job_list: list[dict[str, Any]] | None = None, only_parents: bool = False) -> list[dict[str, Any]]:
         """Return edges from the database, optionally filtered by job list.
 
         :param job_list: Optional list of jobs to filter edges by. If None, all edges are returned.
@@ -614,7 +619,7 @@ class JobsDbManager(DbManager):
 
         return [dict(edge) for edge in graph]
 
-    def delete_unused_edges(self, graph: List[dict[str, Any]]) -> None:
+    def delete_unused_edges(self, graph: list[dict[str, Any]]) -> None:
         """
         Delete unused edges from the database.
         """
@@ -642,7 +647,7 @@ class JobsDbManager(DbManager):
     # At this point, we already built the wrappers, so we can save them in the database.
     def save_wrappers(
             self,
-            wrappers: Tuple[List[Dict[str, Any]], List[Dict[str, Any]]],
+            wrappers: tuple[list[dict[str, Any]], list[dict[str, Any]]],
             preview: bool = False,
             run_id: int | None = None
     ) -> None:
@@ -733,7 +738,7 @@ class JobsDbManager(DbManager):
         self.drop_table(jobs_table.name)
         self.drop_table(experiment_structure_table.name)
 
-    def save_sections_data(self, sections_data: List[Dict[str, Any]]) -> None:
+    def save_sections_data(self, sections_data: list[dict[str, Any]]) -> None:
         """
         Save the section data to the database.
 
@@ -755,7 +760,7 @@ class JobsDbManager(DbManager):
         section_data = self.select_all_with_columns(section_structure_table.name)
         return section_data
 
-    def clear_unused_nodes(self, differences: Dict[str, Dict[str, Any]]) -> None:
+    def clear_unused_nodes(self, differences: dict[str, dict[str, Any]]) -> None:
         """
         Remove jobs from the database that are no longer needed based on section differences.
 
@@ -763,7 +768,7 @@ class JobsDbManager(DbManager):
         :type differences: Dict[str, Dict[str, Any]]
         """
         jobs_table: Table = self.table_registry.get(JobsTable.name)
-        jobs_to_delete: Set[str] = set()
+        jobs_to_delete: set[str] = set()
 
         for section_name, section_diff in differences.items():
             raw_list = self.select_where_with_columns(jobs_table, {'section': section_name})
@@ -779,7 +784,7 @@ class JobsDbManager(DbManager):
         if jobs_to_delete:
             self.delete_where(JobsTable.name, {'name': list(jobs_to_delete)})
 
-    def _should_delete_job(self, job: Dict[str, Any], section_diff: Dict[str, Any]) -> bool:
+    def _should_delete_job(self, job: dict[str, Any], section_diff: dict[str, Any]) -> bool:
         """
         Determine if a job should be deleted based on section differences.
 
@@ -886,7 +891,7 @@ class JobsDbManager(DbManager):
             values = {'status': Status.VALUE_TO_KEY[int(package['status'])]}
             self.update_where(wrapper_info_table.name, values, where)
 
-    def get_wrappers_id_from_db(self) -> List[int]:
+    def get_wrappers_id_from_db(self) -> list[int]:
         """
         Get the IDs of all wrapper jobs in the database.
 

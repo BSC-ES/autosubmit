@@ -16,10 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from getpass import getuser
-from psutil import ZombieProcess
-from typing import List
 
 import pytest
+from psutil import ZombieProcess
 
 from autosubmit.helpers.processes import process_id, retrieve_expids
 
@@ -60,7 +59,7 @@ def _create_process(mocker, expid, username: str | None = None, command='run', p
         'Two expids, none are valid, so none is retrieved',
     ]
 )
-def test_retrieve_expids(mocker, expids: List[str], expected_retrieved: int, username: str | None):
+def test_retrieve_expids(mocker, expids: list[str], expected_retrieved: int, username: str | None):
     """Test the retrieval of experiment IDs.
 
     Test that given we are given N expids, and mock our way to have N processes

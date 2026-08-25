@@ -8,6 +8,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 
 - Fixed `DELAY_RETRY_TIME` not matching the documented `+N` and `*N` delay sequences #3138
 - Fix timeout guard is silently disabled for login/local jobs #3081
+- Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 
 **New Features:**
 
@@ -34,6 +35,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 
 - **Database Method Enhancements**: Support for both PostgreSQL and SQLite with optimized save/load mechanisms. Improved wrapper data storage and load.
 - **Testing Efforts**: Tests have been added for every rework to enhance reliability, with a particular effort on integration tests.
+- Enforce connection pool usage when using PostgreSQL as database backend #2973
 - Auto-detect git default branch when `-b` flag not specified #3101
 - Removed `files` arguments from autosubmit sub-commands, and moved code to upgrade scripts out of `autosubmit.py` #2711
 

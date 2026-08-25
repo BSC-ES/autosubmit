@@ -15,15 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import pytest
-from bscearth.utils.date import parse_date, date2str
 from random import randrange
 
+import pytest
+from bscearth.utils.date import date2str, parse_date
+
+from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
-from autosubmit.config.yamlparser import YAMLParserFactory
 
 
 def _create_dummy_job(name, status, date=None, member=None, chunk=None, split=None):
@@ -71,10 +72,7 @@ def job_list(autosubmit_config, tmp_path):
 
 
 def test_group_by_date(job_list, mocker):
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101': Status.WAITING, '19000202': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101': Status.WAITING, '19000202': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101'], 'expid_19000101_m2_INI': ['19000101'],
         'expid_19000202_m1_INI': ['19000202'], 'expid_19000202_m2_INI': ['19000202'],
 
@@ -92,7 +90,7 @@ def test_group_by_date(job_list, mocker):
         'expid_19000101_m2_1_CLEAN': ['19000101'], 'expid_19000101_m2_2_CLEAN': ['19000101'],
         'expid_19000202_m1_1_CLEAN': ['19000202'], 'expid_19000202_m1_2_CLEAN': ['19000202'],
         'expid_19000202_m2_1_CLEAN': ['19000202'], 'expid_19000202_m2_2_CLEAN': ['19000202']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -110,11 +108,8 @@ def test_group_by_date(job_list, mocker):
 
 
 def test_group_by_member(job_list, mocker):
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101_m1': Status.WAITING, '19000101_m2': Status.WAITING,
-                             '19000202_m1': Status.WAITING, '19000202_m2': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1': Status.WAITING, '19000101_m2': Status.WAITING,
+                              '19000202_m1': Status.WAITING, '19000202_m2': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101_m1'], 'expid_19000101_m2_INI': ['19000101_m2'],
         'expid_19000202_m1_INI': ['19000202_m1'], 'expid_19000202_m2_INI': ['19000202_m2'],
 
@@ -138,7 +133,7 @@ def test_group_by_member(job_list, mocker):
         'expid_19000202_m1_1_CLEAN': ['19000202_m1'], 'expid_19000202_m1_2_CLEAN': ['19000202_m1'],
         'expid_19000202_m2_1_CLEAN': ['19000202_m2'],
         'expid_19000202_m2_2_CLEAN': ['19000202_m2']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -156,13 +151,10 @@ def test_group_by_member(job_list, mocker):
 
 
 def test_group_by_chunk(job_list, mocker):
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101_m1_1': Status.WAITING, '19000101_m1_2': Status.WAITING,
-                             '19000101_m2_1': Status.WAITING, '19000101_m2_2': Status.WAITING,
-                             '19000202_m1_1': Status.WAITING, '19000202_m1_2': Status.WAITING,
-                             '19000202_m2_1': Status.WAITING, '19000202_m2_2': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1_1': Status.WAITING, '19000101_m1_2': Status.WAITING,
+                              '19000101_m2_1': Status.WAITING, '19000101_m2_2': Status.WAITING,
+                              '19000202_m1_1': Status.WAITING, '19000202_m1_2': Status.WAITING,
+                              '19000202_m2_1': Status.WAITING, '19000202_m2_2': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_1_SIM': ['19000101_m1_1'], 'expid_19000101_m1_2_SIM': ['19000101_m1_2'],
         'expid_19000101_m2_1_SIM': ['19000101_m2_1'],
         'expid_19000101_m2_2_SIM': ['19000101_m2_2'],
@@ -183,7 +175,7 @@ def test_group_by_chunk(job_list, mocker):
         'expid_19000202_m1_1_CLEAN': ['19000202_m1_1'], 'expid_19000202_m1_2_CLEAN': ['19000202_m1_2'],
         'expid_19000202_m2_1_CLEAN': ['19000202_m2_1'],
         'expid_19000202_m2_2_CLEAN': ['19000202_m2_2']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -210,9 +202,7 @@ def test_group_by_split(job_list, mocker):
                         Status.WAITING, date, member, chunk, split)
                     job_list.add_job(job)
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {
+    groups_dict = {'status': {
         'expid_19000101_m1_1_CMORATM': Status.WAITING,
         'expid_19000101_m1_2_CMORATM': Status.WAITING,
         'expid_19000101_m2_1_CMORATM': Status.WAITING,
@@ -221,9 +211,7 @@ def test_group_by_split(job_list, mocker):
         'expid_19000202_m1_2_CMORATM': Status.WAITING,
         'expid_19000202_m2_1_CMORATM': Status.WAITING,
         'expid_19000202_m2_2_CMORATM': Status.WAITING,
-    }
-
-    groups_dict['jobs'] = {
+    }, 'jobs': {
         'expid_19000101_m1_1_1_CMORATM': ['expid_19000101_m1_1_CMORATM'],
         'expid_19000101_m1_1_2_CMORATM': ['expid_19000101_m1_1_CMORATM'],
         'expid_19000101_m1_2_1_CMORATM': ['expid_19000101_m1_2_CMORATM'],
@@ -240,7 +228,7 @@ def test_group_by_split(job_list, mocker):
         'expid_19000202_m2_1_2_CMORATM': ['expid_19000202_m2_1_CMORATM'],
         'expid_19000202_m2_2_1_CMORATM': ['expid_19000202_m2_2_CMORATM'],
         'expid_19000202_m2_2_2_CMORATM': ['expid_19000202_m2_2_CMORATM']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -252,10 +240,7 @@ def test_group_by_split(job_list, mocker):
 
 
 def test_automatic_grouping_all(job_list, mocker):
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101': Status.WAITING, '19000202': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101': Status.WAITING, '19000202': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101'], 'expid_19000101_m2_INI': ['19000101'],
         'expid_19000202_m1_INI': ['19000202'], 'expid_19000202_m2_INI': ['19000202'],
 
@@ -279,7 +264,7 @@ def test_automatic_grouping_all(job_list, mocker):
         'expid_19000202_m1_1_CLEAN': ['19000202'], 'expid_19000202_m1_2_CLEAN': ['19000202'],
         'expid_19000202_m2_1_CLEAN': ['19000202'],
         'expid_19000202_m2_2_CLEAN': ['19000202']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -304,10 +289,7 @@ def test_automatic_grouping_not_ini(job_list, mocker):
     job_list.get_job_by_name('expid_19000202_m1_INI').status = Status.READY
     job_list.get_job_by_name('expid_19000202_m2_INI').status = Status.READY
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101': Status.WAITING, '19000202': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101': Status.WAITING, '19000202': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_1_SIM': ['19000101'], 'expid_19000101_m1_2_SIM': ['19000101'],
         'expid_19000101_m2_1_SIM': ['19000101'],
         'expid_19000101_m2_2_SIM': ['19000101'],
@@ -328,7 +310,7 @@ def test_automatic_grouping_not_ini(job_list, mocker):
         'expid_19000202_m1_1_CLEAN': ['19000202'], 'expid_19000202_m1_2_CLEAN': ['19000202'],
         'expid_19000202_m2_1_CLEAN': ['19000202'],
         'expid_19000202_m2_2_CLEAN': ['19000202']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -355,10 +337,7 @@ def test_automatic_grouping_splits(job_list, mocker):
                         Status.WAITING, date, member, chunk, split)
                     job_list.add_job(job)
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101': Status.WAITING, '19000202': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101': Status.WAITING, '19000202': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101'], 'expid_19000101_m2_INI': ['19000101'],
         'expid_19000202_m1_INI': ['19000202'], 'expid_19000202_m2_INI': ['19000202'],
 
@@ -399,7 +378,7 @@ def test_automatic_grouping_splits(job_list, mocker):
         'expid_19000202_m2_1_2_CMORATM': ['19000202'],
         'expid_19000202_m2_2_1_CMORATM': ['19000202'],
         'expid_19000202_m2_2_2_CMORATM': ['19000202']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -437,10 +416,7 @@ def test_automatic_grouping_different_status_member(job_list, mocker):
 
     job_list.get_job_by_name('expid_19000101_m2_2_SIM').status = Status.READY
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101_m1': Status.COMPLETED, '19000202': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1': Status.COMPLETED, '19000202': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101_m1'],
 
         'expid_19000101_m1_1_SIM': ['19000101_m1'], 'expid_19000101_m1_2_SIM': ['19000101_m1'],
@@ -457,7 +433,7 @@ def test_automatic_grouping_different_status_member(job_list, mocker):
         'expid_19000202_m1_1_CLEAN': ['19000202'], 'expid_19000202_m1_2_CLEAN': ['19000202'],
         'expid_19000202_m2_1_CLEAN': ['19000202'],
         'expid_19000202_m2_2_CLEAN': ['19000202']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -492,10 +468,7 @@ def test_automatic_grouping_different_status_chunk(job_list, mocker):
 
     job_list.get_job_by_name('expid_19000101_m2_2_SIM').status = Status.READY
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101_m1_1': Status.COMPLETED, '19000202': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1_1': Status.COMPLETED, '19000202': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_1_SIM': ['19000101_m1_1'],
         'expid_19000202_m1_1_SIM': ['19000202'], 'expid_19000202_m1_2_SIM': ['19000202'],
         'expid_19000202_m2_1_SIM': ['19000202'],
@@ -510,7 +483,7 @@ def test_automatic_grouping_different_status_chunk(job_list, mocker):
         'expid_19000202_m1_1_CLEAN': ['19000202'], 'expid_19000202_m1_2_CLEAN': ['19000202'],
         'expid_19000202_m2_1_CLEAN': ['19000202'],
         'expid_19000202_m2_2_CLEAN': ['19000202']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -545,11 +518,8 @@ def test_group_by_member_expand_running(job_list, mocker):
 
     job_list.get_job_by_name('expid_19000101_m2_2_SIM').status = Status.READY
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101_m1': Status.READY, '19000202_m1': Status.WAITING,
-                             '19000202_m2': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1': Status.READY, '19000202_m1': Status.WAITING,
+                              '19000202_m2': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101_m1'], 'expid_19000202_m1_INI': ['19000202_m1'],
         'expid_19000202_m2_INI': ['19000202_m2'],
 
@@ -567,7 +537,7 @@ def test_group_by_member_expand_running(job_list, mocker):
         'expid_19000202_m1_1_CLEAN': ['19000202_m1'], 'expid_19000202_m1_2_CLEAN': ['19000202_m1'],
         'expid_19000202_m2_1_CLEAN': ['19000202_m2'],
         'expid_19000202_m2_2_CLEAN': ['19000202_m2']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -602,12 +572,9 @@ def test_group_by_chunk_expand_failed_running(job_list, mocker):
 
     job_list.get_job_by_name('expid_19000101_m2_2_SIM').status = Status.READY
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101_m1_2': Status.READY, '19000101_m2_2': Status.READY,
-                             '19000202_m1_1': Status.WAITING, '19000202_m1_2': Status.WAITING,
-                             '19000202_m2_1': Status.WAITING, '19000202_m2_2': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1_2': Status.READY, '19000101_m2_2': Status.READY,
+                              '19000202_m1_1': Status.WAITING, '19000202_m1_2': Status.WAITING,
+                              '19000202_m2_1': Status.WAITING, '19000202_m2_2': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_2_SIM': ['19000101_m1_2'],
         'expid_19000101_m2_2_SIM': ['19000101_m2_2'],
         'expid_19000202_m1_1_SIM': ['19000202_m1_1'], 'expid_19000202_m1_2_SIM': ['19000202_m1_2'],
@@ -625,7 +592,7 @@ def test_group_by_chunk_expand_failed_running(job_list, mocker):
         'expid_19000202_m1_1_CLEAN': ['19000202_m1_1'], 'expid_19000202_m1_2_CLEAN': ['19000202_m1_2'],
         'expid_19000202_m2_1_CLEAN': ['19000202_m2_1'],
         'expid_19000202_m2_2_CLEAN': ['19000202_m2_2']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -661,10 +628,7 @@ def test_group_by_member_expand(job_list, mocker):
 
     job_list.get_job_by_name('expid_19000101_m2_2_SIM').status = Status.READY
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101_m1': Status.READY}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1': Status.READY}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101_m1'],
 
         'expid_19000101_m1_1_SIM': ['19000101_m1'], 'expid_19000101_m1_2_SIM': ['19000101_m1'],
@@ -672,7 +636,7 @@ def test_group_by_member_expand(job_list, mocker):
         'expid_19000101_m1_1_POST': ['19000101_m1'], 'expid_19000101_m1_2_POST': ['19000101_m1'],
 
         'expid_19000101_m1_1_CLEAN': ['19000101_m1'], 'expid_19000101_m1_2_CLEAN': ['19000101_m1'],
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -710,10 +674,7 @@ def test_group_by_member_expand_and_running(job_list, mocker):
 
     job_list.get_job_by_name('expid_19000202_m1_1_SIM').status = Status.RUNNING
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101_m1': Status.READY}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1': Status.READY}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101_m1'],
 
         'expid_19000101_m1_1_SIM': ['19000101_m1'], 'expid_19000101_m1_2_SIM': ['19000101_m1'],
@@ -721,7 +682,7 @@ def test_group_by_member_expand_and_running(job_list, mocker):
         'expid_19000101_m1_1_POST': ['19000101_m1'], 'expid_19000101_m1_2_POST': ['19000101_m1'],
 
         'expid_19000101_m1_1_CLEAN': ['19000101_m1'], 'expid_19000101_m1_2_CLEAN': ['19000101_m1'],
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -760,11 +721,8 @@ def test_group_by_chunk_expand(job_list, mocker):
     job_list.get_job_by_name('expid_19000101_m2_1_POST').status = Status.COMPLETED
     job_list.get_job_by_name('expid_19000101_m2_1_CLEAN').status = Status.RUNNING
 
-    groups_dict = dict()
-
-    groups_dict['status'] = {'19000101_m1_1': Status.FAILED, '19000101_m1_2': Status.READY,
-                             '19000101_m2_1': Status.RUNNING, '19000202_m2_2': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1_1': Status.FAILED, '19000101_m1_2': Status.READY,
+                              '19000101_m2_1': Status.RUNNING, '19000202_m2_2': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_1_SIM': ['19000101_m1_1'], 'expid_19000101_m1_2_SIM': ['19000101_m1_2'],
         'expid_19000101_m2_1_SIM': ['19000101_m2_1'],
         'expid_19000202_m2_2_SIM': ['19000202_m2_2'],
@@ -776,7 +734,7 @@ def test_group_by_chunk_expand(job_list, mocker):
         'expid_19000101_m1_1_CLEAN': ['19000101_m1_1'], 'expid_19000101_m1_2_CLEAN': ['19000101_m1_2'],
         'expid_19000101_m2_1_CLEAN': ['19000101_m2_1'],
         'expid_19000202_m2_2_CLEAN': ['19000202_m2_2']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -799,12 +757,10 @@ def test_synchronize_member_group_member(job_list, mocker):
 
             job_list.add_job(job)
 
-    groups_dict = dict()
-    groups_dict['status'] = {'19000101_m1': Status.WAITING,
-                             '19000101_m2': Status.WAITING,
-                             '19000202_m1': Status.WAITING,
-                             '19000202_m2': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1': Status.WAITING,
+                              '19000101_m2': Status.WAITING,
+                              '19000202_m1': Status.WAITING,
+                              '19000202_m2': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101_m1'], 'expid_19000101_m2_INI': ['19000101_m2'],
         'expid_19000202_m1_INI': ['19000202_m1'],
         'expid_19000202_m2_INI': ['19000202_m2'],
@@ -833,7 +789,7 @@ def test_synchronize_member_group_member(job_list, mocker):
         'expid_19000101_2_ASIM': ['19000101_m1', '19000101_m2'],
         'expid_19000202_1_ASIM': ['19000202_m1', '19000202_m2'],
         'expid_19000202_2_ASIM': ['19000202_m1', '19000202_m2']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -855,12 +811,10 @@ def test_synchronize_member_group_chunk(job_list, mocker):
 
             job_list.add_job(job)
 
-    groups_dict = dict()
-    groups_dict['status'] = {'19000101_m1_1': Status.WAITING, '19000101_m1_2': Status.WAITING,
-                             '19000101_m2_1': Status.WAITING, '19000101_m2_2': Status.WAITING,
-                             '19000202_m1_1': Status.WAITING, '19000202_m1_2': Status.WAITING,
-                             '19000202_m2_1': Status.WAITING, '19000202_m2_2': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1_1': Status.WAITING, '19000101_m1_2': Status.WAITING,
+                              '19000101_m2_1': Status.WAITING, '19000101_m2_2': Status.WAITING,
+                              '19000202_m1_1': Status.WAITING, '19000202_m1_2': Status.WAITING,
+                              '19000202_m2_1': Status.WAITING, '19000202_m2_2': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_1_SIM': ['19000101_m1_1'], 'expid_19000101_m1_2_SIM': ['19000101_m1_2'],
         'expid_19000101_m2_1_SIM': ['19000101_m2_1'],
         'expid_19000101_m2_2_SIM': ['19000101_m2_2'],
@@ -886,7 +840,7 @@ def test_synchronize_member_group_chunk(job_list, mocker):
         'expid_19000101_2_ASIM': ['19000101_m1_2', '19000101_m2_2'],
         'expid_19000202_1_ASIM': ['19000202_m1_1', '19000202_m2_1'],
         'expid_19000202_2_ASIM': ['19000202_m1_2', '19000202_m2_2']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -908,10 +862,8 @@ def test_synchronize_member_group_date(job_list):
 
             job_list.add_job(job)
 
-    groups_dict = dict()
-    groups_dict['status'] = {'19000101': Status.WAITING,
-                             '19000202': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101': Status.WAITING,
+                              '19000202': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101'], 'expid_19000101_m2_INI': ['19000101'],
         'expid_19000202_m1_INI': ['19000202'],
         'expid_19000202_m2_INI': ['19000202'],
@@ -938,7 +890,7 @@ def test_synchronize_member_group_date(job_list):
 
         'expid_19000101_1_ASIM': ['19000101'], 'expid_19000101_2_ASIM': ['19000101'],
         'expid_19000202_1_ASIM': ['19000202'], 'expid_19000202_2_ASIM': ['19000202']
-    }
+    }}
 
     job_grouping = JobGrouping('date', job_list.get_job_list(), job_list)
     assert job_grouping.group_jobs() == groups_dict
@@ -955,12 +907,10 @@ def test_synchronize_date_group_member(job_list, mocker):
 
         job_list.add_job(job)
 
-    groups_dict = dict()
-    groups_dict['status'] = {'19000101_m1': Status.WAITING,
-                             '19000101_m2': Status.WAITING,
-                             '19000202_m1': Status.WAITING,
-                             '19000202_m2': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101_m1': Status.WAITING,
+                              '19000101_m2': Status.WAITING,
+                              '19000202_m1': Status.WAITING,
+                              '19000202_m2': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101_m1'], 'expid_19000101_m2_INI': ['19000101_m2'],
         'expid_19000202_m1_INI': ['19000202_m1'],
         'expid_19000202_m2_INI': ['19000202_m2'],
@@ -987,7 +937,7 @@ def test_synchronize_date_group_member(job_list, mocker):
 
         'expid_1_ASIM': ['19000101_m1', '19000101_m2', '19000202_m1', '19000202_m2'],
         'expid_2_ASIM': ['19000101_m1', '19000101_m2', '19000202_m1', '19000202_m2']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -1022,36 +972,38 @@ def test_synchronize_date_group_chunk(job_list, mocker):
 
         job_list.add_job(job)
 
-    groups_dict = dict()
-    groups_dict['status'] = {'19000101_m1_1': Status.WAITING, '19000101_m1_2': Status.WAITING,
-                             '19000101_m2_1': Status.WAITING, '19000101_m2_2': Status.WAITING,
-                             '19000202_m1_1': Status.WAITING, '19000202_m1_2': Status.WAITING,
-                             '19000202_m2_1': Status.WAITING, '19000202_m2_2': Status.WAITING}
-    groups_dict['jobs'] = {
-        'expid_19000101_m1_1_SIM': ['19000101_m1_1'], 'expid_19000101_m1_2_SIM': ['19000101_m1_2'],
-        'expid_19000101_m2_1_SIM': ['19000101_m2_1'],
-        'expid_19000101_m2_2_SIM': ['19000101_m2_2'],
-        'expid_19000202_m1_1_SIM': ['19000202_m1_1'], 'expid_19000202_m1_2_SIM': ['19000202_m1_2'],
-        'expid_19000202_m2_1_SIM': ['19000202_m2_1'],
-        'expid_19000202_m2_2_SIM': ['19000202_m2_2'],
+    groups_dict = {
+                'status': {
+                        '19000101_m1_1': Status.WAITING, '19000101_m1_2': Status.WAITING,
+                        '19000101_m2_1': Status.WAITING, '19000101_m2_2': Status.WAITING,
+                        '19000202_m1_1': Status.WAITING, '19000202_m1_2': Status.WAITING,
+                        '19000202_m2_1': Status.WAITING, '19000202_m2_2': Status.WAITING
+                    }, 'jobs': {
+                        'expid_19000101_m1_1_SIM': ['19000101_m1_1'], 'expid_19000101_m1_2_SIM': ['19000101_m1_2'],
+                        'expid_19000101_m2_1_SIM': ['19000101_m2_1'],
+                        'expid_19000101_m2_2_SIM': ['19000101_m2_2'],
+                        'expid_19000202_m1_1_SIM': ['19000202_m1_1'], 'expid_19000202_m1_2_SIM': ['19000202_m1_2'],
+                        'expid_19000202_m2_1_SIM': ['19000202_m2_1'],
+                        'expid_19000202_m2_2_SIM': ['19000202_m2_2'],
 
-        'expid_19000101_m1_1_POST': ['19000101_m1_1'], 'expid_19000101_m1_2_POST': ['19000101_m1_2'],
-        'expid_19000101_m2_1_POST': ['19000101_m2_1'],
-        'expid_19000101_m2_2_POST': ['19000101_m2_2'],
-        'expid_19000202_m1_1_POST': ['19000202_m1_1'], 'expid_19000202_m1_2_POST': ['19000202_m1_2'],
-        'expid_19000202_m2_1_POST': ['19000202_m2_1'],
-        'expid_19000202_m2_2_POST': ['19000202_m2_2'],
+                        'expid_19000101_m1_1_POST': ['19000101_m1_1'], 'expid_19000101_m1_2_POST': ['19000101_m1_2'],
+                        'expid_19000101_m2_1_POST': ['19000101_m2_1'],
+                        'expid_19000101_m2_2_POST': ['19000101_m2_2'],
+                        'expid_19000202_m1_1_POST': ['19000202_m1_1'], 'expid_19000202_m1_2_POST': ['19000202_m1_2'],
+                        'expid_19000202_m2_1_POST': ['19000202_m2_1'],
+                        'expid_19000202_m2_2_POST': ['19000202_m2_2'],
 
-        'expid_19000101_m1_1_CLEAN': ['19000101_m1_1'], 'expid_19000101_m1_2_CLEAN': ['19000101_m1_2'],
-        'expid_19000101_m2_1_CLEAN': ['19000101_m2_1'],
-        'expid_19000101_m2_2_CLEAN': ['19000101_m2_2'],
-        'expid_19000202_m1_1_CLEAN': ['19000202_m1_1'], 'expid_19000202_m1_2_CLEAN': ['19000202_m1_2'],
-        'expid_19000202_m2_1_CLEAN': ['19000202_m2_1'],
-        'expid_19000202_m2_2_CLEAN': ['19000202_m2_2'],
+                        'expid_19000101_m1_1_CLEAN': ['19000101_m1_1'], 'expid_19000101_m1_2_CLEAN': ['19000101_m1_2'],
+                        'expid_19000101_m2_1_CLEAN': ['19000101_m2_1'],
+                        'expid_19000101_m2_2_CLEAN': ['19000101_m2_2'],
+                        'expid_19000202_m1_1_CLEAN': ['19000202_m1_1'], 'expid_19000202_m1_2_CLEAN': ['19000202_m1_2'],
+                        'expid_19000202_m2_1_CLEAN': ['19000202_m2_1'],
+                        'expid_19000202_m2_2_CLEAN': ['19000202_m2_2'],
 
-        'expid_1_ASIM': ['19000101_m1_1', '19000101_m2_1', '19000202_m1_1', '19000202_m2_1'],
-        'expid_2_ASIM': ['19000101_m1_2', '19000101_m2_2', '19000202_m1_2', '19000202_m2_2'],
-    }
+                        'expid_1_ASIM': ['19000101_m1_1', '19000101_m2_1', '19000202_m1_1', '19000202_m2_1'],
+                        'expid_2_ASIM': ['19000101_m1_2', '19000101_m2_2', '19000202_m1_2', '19000202_m2_2'],
+                    }
+                }
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])
@@ -1087,10 +1039,8 @@ def test_synchronize_date_group_date(job_list, mocker):
 
         job_list.add_job(job)
 
-    groups_dict = dict()
-    groups_dict['status'] = {'19000101': Status.WAITING,
-                             '19000202': Status.WAITING}
-    groups_dict['jobs'] = {
+    groups_dict = {'status': {'19000101': Status.WAITING,
+                              '19000202': Status.WAITING}, 'jobs': {
         'expid_19000101_m1_INI': ['19000101'], 'expid_19000101_m2_INI': ['19000101'],
         'expid_19000202_m1_INI': ['19000202'],
         'expid_19000202_m2_INI': ['19000202'],
@@ -1116,7 +1066,7 @@ def test_synchronize_date_group_date(job_list, mocker):
         'expid_19000202_m2_2_CLEAN': ['19000202'],
 
         'expid_1_ASIM': ['19000101', '19000202'], 'expid_2_ASIM': ['19000101', '19000202']
-    }
+    }}
 
     job_list.get_date_list = mocker.Mock(return_value=['19000101', '19000202'])
     job_list.get_member_list = mocker.Mock(return_value=['m1', 'm2'])

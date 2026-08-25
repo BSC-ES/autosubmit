@@ -17,16 +17,26 @@
 
 """Contains code to manage a database via SQLAlchemy."""
 from pathlib import Path
-from typing import Any, cast, List, Dict, Union
+from typing import Any, cast
 
-from sqlalchemy import Engine, delete, func, insert, select, ClauseElement, desc, inspect, text
+from sqlalchemy import (
+    ClauseElement,
+    Engine,
+    delete,
+    desc,
+    func,
+    insert,
+    inspect,
+    select,
+    text,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.schema import CreateTable, CreateSchema, DropTable
+from sqlalchemy.schema import CreateSchema, CreateTable, DropTable
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
-from autosubmit.database.tables import TableRegistry, GENERALTABLES, Table
+from autosubmit.database.tables import GENERALTABLES, Table, TableRegistry
 
 
 class DbManager:
@@ -36,24 +46,17 @@ class DbManager:
     as Postgres, Mongo, MySQL, etc.
     """
 
-    def __init__(self, connection_url: str, schema: str | None = None, historical: bool | None = False) -> None:
+    def __init__(self, db_path: str, schema: str | None = None, historical: bool | None = False) -> None:
         self.engine = None
         self.engine_historical = None
         if BasicConfig.DATABASE_BACKEND == "sqlite":
             if historical:
-                self.engine_historical = session.create_engine(connection_url)
-                if self.engine_historical.url.database and not Path(self.engine_historical.url.database).exists():
-                    Path(self.engine_historical.url.database).touch()
-                    Path(self.engine_historical.url.database).chmod(0o775)
+                self.engine_historical = session.get_engine(db_path)
             else:
-                self.engine = session.create_engine(connection_url)
-                # make file
-                if self.engine.url.database and not Path(self.engine.url.database).exists():
-                    Path(self.engine.url.database).touch()
-                    Path(self.engine.url.database).chmod(0o775)
+                self.engine = session.get_engine(db_path)
         else:
             # Postgres is unified
-            self.engine: Engine = session.create_engine(connection_url)
+            self.engine: Engine = session.get_engine(db_path)
             self.engine_historical = self.engine
 
         self.schema = schema if BasicConfig.DATABASE_BACKEND != "sqlite" else None
@@ -116,7 +119,7 @@ class DbManager:
             row = conn.execute(query).first()
             return row.tuple() if row else None
 
-    def select_all_with_columns(self, table_name: str) -> List[tuple[tuple[str, Any]]]:
+    def select_all_with_columns(self, table_name: str) -> list[tuple[tuple[str, Any]]]:
         """Select rows from a table. Return a list of hasheable tuples."""
         table = self.table_registry.get(table_name)
         with self._get_engine(table_name).connect() as conn:
@@ -127,8 +130,8 @@ class DbManager:
     def select_where_with_columns(
             self,
             table: "Table",
-            where: Union[dict[str, Any], ClauseElement] | None = None
-    ) -> List[tuple[tuple[str, Any]]]:
+            where: dict[str, Any] | ClauseElement | None = None
+    ) -> list[tuple[tuple[str, Any]]]:
         """Select rows from a table with specific columns. Return a list of hashable tuples.
 
         :param table: Table object or table name to select from.
@@ -171,7 +174,7 @@ class DbManager:
             result = conn.execute(delete(table))
             return result.rowcount
 
-    def delete_where(self, table_name: str, where: Union[dict[str, Any], ClauseElement] | None) -> int:
+    def delete_where(self, table_name: str, where: dict[str, Any] | ClauseElement | None) -> int:
         """Delete rows from a table where the specified conditions are met.
         Supports both equality and 'IN' queries for list values.
 
@@ -201,8 +204,8 @@ class DbManager:
             result = conn.execute(query)
         return result.rowcount
 
-    def upsert_many(self, table_name: str, data: List[Dict[str, Any]], conflict_cols: List[str],
-                     exclude_cols: List[str] | None = None, batch_size: int = 1000) -> int:
+    def upsert_many(self, table_name: str, data: list[dict[str, Any]], conflict_cols: list[str],
+                     exclude_cols: list[str] | None = None, batch_size: int = 1000) -> int:
         """Perform an upsert (update or insert) operation.
         First delete the affected rows
         then insert the new data.
@@ -285,8 +288,8 @@ class DbManager:
     def select_latest_inner_jobs(
             self,
             innerjobs_table: Table,
-            job_names: List[str] | None = None
-    ) -> List[Dict[str, object]]:
+            job_names: list[str] | None = None
+    ) -> list[dict[str, object]]:
         """
         Select the row with the latest timestamp for each job_name from the inner jobs table.
         If job_names is provided, filter only those job_names.
@@ -309,7 +312,7 @@ class DbManager:
             result = conn.execute(query)
             return [dict(row) for row in result.mappings().all()]
 
-    def select_last_with_columns(self, table_name: str, columns: List[str] | None = None) -> Dict[str, Any] | None:
+    def select_last_with_columns(self, table_name: str, columns: list[str] | None = None) -> dict[str, Any] | None:
         """Return the latest row from a table ordered by descending update time.
 
         :param table_name: Name of the table to select from.

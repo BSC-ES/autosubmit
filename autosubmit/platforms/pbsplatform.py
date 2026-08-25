@@ -67,7 +67,7 @@ class PBSPlatform(ParamikoPlatform):
         self.job_status: dict = {'COMPLETED': ['FINISH'], 'RUNNING': ['RUNNING'],
                                  'QUEUING': ['QUEUED', 'BEGUN', 'HELD'],
                                  'FAILED': ['EXITING']}
-        self._pathdir = "\$HOME/LOG_" + self.expid
+        self._pathdir = r"\$HOME/LOG_" + self.expid
         self._allow_arrays: bool = False
         self.update_cmds()
         self.config: dict = config
@@ -131,7 +131,7 @@ class PBSPlatform(ParamikoPlatform):
         try:
             # Test if remote_path exists
             self._ftpChannel.chdir(self.remote_log_dir)
-        except IOError as io_err:
+        except OSError as io_err:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
                     Log.debug(f'{self.remote_log_dir} has been created on {self.host}.')
@@ -297,7 +297,7 @@ class PBSPlatform(ParamikoPlatform):
         """
         return self.remote_log_dir
 
-    def parse_all_jobs_output(self, output: str, job_id: str) -> str:  # noqa
+    def parse_all_jobs_output(self, output: str, job_id: str) -> str:
         """Filter one or more status of a specific Job ID.
 
         :param output: Output of the status of the jobs.
@@ -340,7 +340,7 @@ class PBSPlatform(ParamikoPlatform):
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
 
-    def get_check_all_jobs_cmd(self, jobs_id: str) -> str:  # noqa
+    def get_check_all_jobs_cmd(self, jobs_id: str) -> str:
         """Generate qstat command for all the jobs passed down.
 
         :param jobs_id: ID of one or more jobs.
@@ -380,7 +380,7 @@ class PBSPlatform(ParamikoPlatform):
         if isinstance(reason, list):
             # convert reason to str
             return ''.join(reason)
-        return reason  # noqa F501
+        return reason
 
 
 
@@ -418,7 +418,7 @@ class PBSPlatform(ParamikoPlatform):
         :return: True if the file exists, False otherwise
         :rtype: bool
         """
-        # noqa TODO check the sleeptime retrials of these function, previously it was waiting a lot of time
+
         file_exist = False
         retries = 0
         while not file_exist and retries < max_retries:
@@ -427,7 +427,7 @@ class PBSPlatform(ParamikoPlatform):
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), src))
                 file_exist = True
-            except IOError:  # File doesn't exist, retry in sleeptime
+            except OSError:  # File doesn't exist, retry in sleeptime
                 sleep(sleeptime)
                 retries = retries + 1
             except Exception as e:

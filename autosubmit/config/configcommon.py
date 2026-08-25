@@ -25,10 +25,11 @@ import shutil
 import subprocess
 import traceback
 from collections import defaultdict
+from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterable, Union
+from typing import Any, Union
 
 from bscearth.utils.date import parse_date
 from pyparsing import nested_expr
@@ -39,11 +40,11 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_utils import calendar_chunk_section
-from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.platform_type import PlatformType
 
 
-class AutosubmitConfig(object):
+class AutosubmitConfig:
     """Class to handle experiment configuration coming from a file or database.
 
     :param expid: experiment identifier
@@ -58,7 +59,7 @@ class AutosubmitConfig(object):
         self.basic_config = basic_config
         self.basic_config.read()
         if not Path(BasicConfig.LOCAL_ROOT_DIR, expid).exists():
-            raise IOError(f"Experiment {expid} does not exist")
+            raise OSError(f"Experiment {expid} does not exist")
         self.parser_factory = parser_factory
         self.experiment_data = {}
         self.last_experiment_data = {}
@@ -67,7 +68,7 @@ class AutosubmitConfig(object):
         self.current_loaded_files: dict = {}
         self.conf_folder_yaml = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "conf")
         if not Path(BasicConfig.LOCAL_ROOT_DIR, expid, "conf").exists():
-            raise IOError(f"Experiment {expid}/conf does not exist")
+            raise OSError(f"Experiment {expid}/conf does not exist")
         self.wrong_config = defaultdict(list)
         self.warn_config = defaultdict(list)
         self.dynamic_variables: dict = {}
@@ -178,9 +179,9 @@ class AutosubmitConfig(object):
     def get_section(
             self,
             section: list[str],
-            d_value: Union[str, Any] = "",
+            d_value: str | Any = "",
             must_exists=False
-    ) -> Union[str, dict, numbers.Number]:
+    ) -> str | dict | numbers.Number:
         """Gets any section.
 
         If it does not exist in the dictionary it returns ``d_value``, or and error if it must exist.
@@ -200,7 +201,7 @@ class AutosubmitConfig(object):
         section_str = str(section[0])
         for sect in section[1:]:
             section_str += "." + str(sect)
-        current_level: Union[str, dict] = self.experiment_data.get(section[0], "")
+        current_level: str | dict = self.experiment_data.get(section[0], "")
         for param in section[1:]:
             if current_level:
                 if type(current_level) is dict:
@@ -311,7 +312,7 @@ class AutosubmitConfig(object):
             raise AutosubmitCritical(message, 7014)
         return True
 
-    def deep_normalize(self, data: Union[dict[str, Any], collections.abc.Mapping]) -> dict[str, Any]:
+    def deep_normalize(self, data: dict[str, Any] | collections.abc.Mapping) -> dict[str, Any]:
         """Normalize a nested dictionary or similar mapping to uppercase.
 
         This function recursively iterates through a dictionary, converting all keys to uppercase.
@@ -324,7 +325,7 @@ class AutosubmitConfig(object):
         :return: A new dictionary with all keys normalized to uppercase.
         :rtype: dict[str, Any]
         """
-        normalized_data = dict()
+        normalized_data = {}
         with suppress(Exception):
             for key, val in data.items():
                 normalized_key = str(key).upper()
@@ -348,7 +349,7 @@ class AutosubmitConfig(object):
         """
         if not isinstance(unified_config, collections.abc.Mapping):
             unified_config = {}
-        for key in new_dict.keys():
+        for key in new_dict:
             if key not in unified_config:
                 unified_config[key] = ""
         for key, val in new_dict.items():
@@ -363,7 +364,7 @@ class AutosubmitConfig(object):
                     if current_list != val:
                         unified_config[key] = val
             else:
-                unified_config[key] = new_dict[key]
+                unified_config[key] = val
         return unified_config
 
     def normalize_variables(self, data: dict, must_exists: bool, raise_exception: bool = False) -> dict:
@@ -550,7 +551,7 @@ class AutosubmitConfig(object):
                 data_fixed["JOBS"][job]["WALLCLOCK"] = ":".join(wallclock.split(":")[:2])
 
     @staticmethod
-    def _normalize_dependencies(dependencies: Union[str, dict]) -> dict:
+    def _normalize_dependencies(dependencies: str | dict) -> dict:
         """Normalize the dependencies to a consistent format.
 
         This function takes a string or dictionary of dependencies and normalizes them to a dictionary format.
@@ -586,7 +587,7 @@ class AutosubmitConfig(object):
         return aux_dependencies
 
     @staticmethod
-    def _normalize_files(files: Union[str, list[str]]) -> list[str]:
+    def _normalize_files(files: str | list[str]) -> list[str]:
         if type(files) is not list:
             if ',' in files:
                 files = files.split(",")
@@ -675,8 +676,8 @@ class AutosubmitConfig(object):
         filenames_to_load = self.get_yaml_filenames_to_load(yaml_folder, ignore_minimal)
         return self.load_custom_config(current_data, filenames_to_load)
 
-    def parse_custom_conf_directive(self, custom_conf_directive: Union[str, dict] | None):
-        filenames_to_load = dict()
+    def parse_custom_conf_directive(self, custom_conf_directive: str | dict | None):
+        filenames_to_load = {}
         filenames_to_load["PRE"] = []
         filenames_to_load["POST"] = []
         if custom_conf_directive is not None:
@@ -762,7 +763,6 @@ class AutosubmitConfig(object):
                     for key, value in for_sections.items():
                         if key != "NAME":
                             last_data_section[key] = value[name_index]
-                            pass
                 except IndexError as e:
                     Log.printlog(f"A job has an issue related to a FOR configuration. \n Please revise that the"
                                  f" number of elements matches, or if there is an unintended indentation."
@@ -837,7 +837,7 @@ class AutosubmitConfig(object):
 
     def substitute_dynamic_variables(
             self,
-            parameters: dict[str, Any] = None,
+            parameters: dict[str, Any] | None = None,
             max_deep: int = 25,
             dict_keys_type: str = '',
             in_the_end: bool = False,
@@ -889,7 +889,7 @@ class AutosubmitConfig(object):
         :returns: A tuple containing the dynamic variables, the regex pattern, and the start index.
         :rtype: tuple
         """
-        return copy.deepcopy(self.dynamic_variables), "%[a-zA-Z0-9_.-]*(\^\^|,,)?%", 1
+        return copy.deepcopy(self.dynamic_variables), r"%[a-zA-Z0-9_.-]*(\^\^|,,)?%", 1
 
     def _process_dynamic_variables(
             self,
@@ -998,7 +998,7 @@ class AutosubmitConfig(object):
         for i, key in enumerate(filter(None, keys)):
             matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
             if in_the_end and "^" in key:
-                pattern_special_variables = "%\^[a-zA-Z0-9_.-]*(\^\^|,,)?%"
+                pattern_special_variables = r"%\^[a-zA-Z0-9_.-]*(\^\^|,,)?%"
                 matches.extend(list(re.finditer(pattern_special_variables, key, flags=re.IGNORECASE))[::-1])
             for match in matches:
                 value = self._get_substituted_value(key, match, parameters, start_long, dict_keys_type)
@@ -1117,7 +1117,7 @@ class AutosubmitConfig(object):
                 self.special_dynamic_variables[long_key + key] = val
             if key == "FOR":
                 # special case: check dynamic variables in the for loop
-                for for_section, for_values in data[key].items():
+                for for_section, for_values in val.items():
                     if len(for_values) == 0:
                         raise AutosubmitCritical(f"Empty for loop in section {long_key + key}", 7014)
                     if not isinstance(for_values[0], dict):
@@ -1159,7 +1159,7 @@ class AutosubmitConfig(object):
         self.warn_config = defaultdict(list)
         try:
             self.reload(force_load)
-        except IOError as e:
+        except OSError as e:
             raise AutosubmitError("I/O Issues with config files", 6016, str(e))
         except (AutosubmitCritical, AutosubmitError):
             raise
@@ -1336,9 +1336,7 @@ class AutosubmitConfig(object):
         """Checks experiment's platforms configuration file."""
         parser_data = self.experiment_data.get("PLATFORMS", {})
         main_platform_found = False
-        if self.hpcarch.lower() == PlatformType.LOCAL:
-            main_platform_found = True
-        elif self.ignore_undefined_platforms:
+        if self.hpcarch.lower() == PlatformType.LOCAL or self.ignore_undefined_platforms:
             main_platform_found = True
         for section in parser_data:
             section_data = parser_data[section]
@@ -1957,7 +1955,7 @@ class AutosubmitConfig(object):
                 else:
                     if type(last_run_data[key]) is not dict:
                         differences[key] = val
-                    elif len(last_run_data[key]) == 0 and len(last_run_data[key]) == len(current_data[key]):
+                    elif len(last_run_data[key]) == 0 and len(last_run_data[key]) == len(val):
                         continue
                     else:
                         diff = self.detailed_deep_diff(last_run_data[key], val, level)
@@ -2031,7 +2029,7 @@ class AutosubmitConfig(object):
         The resultant format will be Section.{subsections1...subsectionN} = Value.
         In other words, it plain the dictionary into one level.
         """
-        parameters_dict = dict()
+        parameters_dict = {}
         stack = [(data.copy(), '')]
 
         while stack:
@@ -2050,7 +2048,7 @@ class AutosubmitConfig(object):
         # NOTE: at the moment this is the only bit of data loaded. If we need to load more,
         #       it might be a good idea to think about a. better organizing the data layout,
         #       b. using a single query instead of multiple, c. caching.
-        experiment_description: Union[str, list[list[str]]] = get_experiment_description(self.expid)
+        experiment_description: str | list[list[str]] = get_experiment_description(self.expid)
         if experiment_description and experiment_description[0] and experiment_description[0][0]:
             experiment_description = experiment_description[0][0]
         else:
@@ -2149,7 +2147,7 @@ class AutosubmitConfig(object):
         """
         return self.get_section(['GIT', 'REMOTE_CLONE_ROOT'], "")
 
-    def get_submodules_list(self) -> Union[list[str], bool]:
+    def get_submodules_list(self) -> list[str] | bool:
         """
         Returns submodules list from experiment's config file.
         Default is --recursive.
@@ -2157,7 +2155,7 @@ class AutosubmitConfig(object):
         :return: submodules to load
         :rtype: Union[list[str], bool]
         """
-        project_submodules: Union[str, bool] = self.get_section(['GIT', 'PROJECT_SUBMODULES'], "")
+        project_submodules: str | bool = self.get_section(['GIT', 'PROJECT_SUBMODULES'], "")
         if project_submodules is False:
             return project_submodules
         if not isinstance(project_submodules, str):
@@ -2232,7 +2230,7 @@ class AutosubmitConfig(object):
         :return: experiment's startdates
         :rtype: list
         """
-        date_list = list()
+        date_list = []
         date_value = str(self.get_section(['EXPERIMENT', 'DATELIST'], "20220401"))
         # Allows to use the old format for define a list.
         if type(date_value) is not list:
@@ -2308,7 +2306,7 @@ class AutosubmitConfig(object):
         :return: experiment's members
         :rtype: list
         """
-        member_list = list()
+        member_list = []
         string = str(self.get_section(['EXPERIMENT', 'MEMBERS'], "") if run_only is False else self.get_section(
             ['EXPERIMENT', 'RUN_ONLY_MEMBERS'], ""))
         if not string:
@@ -2718,12 +2716,12 @@ class AutosubmitConfig(object):
                     parser.data = parser.load(f)
                     if parser.data is None:
                         parser.data = {}
-            except IOError:
+            except OSError:
                 parser.data = {}
                 return parser
             except Exception as exp:
                 raise Exception(
-                    "{}\n This file and the correctness of its content are necessary.".format(str(exp)))
+                    f"{str(exp)}\n This file and the correctness of its content are necessary.")
         return parser
 
     def calculate_auto_splits(self):

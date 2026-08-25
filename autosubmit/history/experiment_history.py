@@ -20,13 +20,19 @@ import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.database_managers.experiment_history_db_manager import create_experiment_history_db_manager, \
-    ExperimentHistoryDatabaseManager
+from autosubmit.history.database_managers.experiment_history_db_manager import (
+    ExperimentHistoryDatabaseManager,
+    create_experiment_history_db_manager,
+)
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
-from autosubmit.history.strategies import PlatformInformationHandler, SingleAssociationStrategy, \
-    StraightWrapperAssociationStrategy, \
-    TwoDimWrapperDistributionStrategy, GeneralizedWrapperDistributionStrategy
+from autosubmit.history.strategies import (
+    GeneralizedWrapperDistributionStrategy,
+    PlatformInformationHandler,
+    SingleAssociationStrategy,
+    StraightWrapperAssociationStrategy,
+    TwoDimWrapperDistributionStrategy,
+)
 from autosubmit.log.log import Log
 
 SECONDS_WAIT_PLATFORM = 60
@@ -220,7 +226,7 @@ class ExperimentHistory:
         try:
             job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
             if not job_data_dc_last:
-                raise Exception("Job {0} has not been found in the database.".format(job_name))
+                raise Exception(f"Job {job_name} has not been found in the database.")
             job_data_dc_last.start = start
             job_data_dc_last.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
             job_data_dc_last.status = status
@@ -249,7 +255,7 @@ class ExperimentHistory:
         try:
             job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
             if not job_data_dc_last:
-                raise Exception("Job {0} has not been found in the database.".format(job_name))
+                raise Exception(f"Job {job_name} has not been found in the database.")
             job_data_dc_last.finish = finish if finish > 0 else int(time())
             job_data_dc_last.status = status
             job_data_dc_last.job_id = job_id

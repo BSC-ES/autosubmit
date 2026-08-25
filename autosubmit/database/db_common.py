@@ -697,7 +697,7 @@ def _get_sqlalchemy_conn() -> Connection:
     can use a context-manager and keep the previous behaviour
     intact.
     """
-    return session.create_engine(BasicConfig.DATABASE_CONN_URL).connect()
+    return session.get_engine(db_path=Path(BasicConfig.DB_PATH)).connect()
 
 
 def _create_db_pg() -> bool:
@@ -724,12 +724,11 @@ def _create_db_pg() -> bool:
     ]
 
     try:
-        with _get_sqlalchemy_conn() as conn:
-            with conn.begin():
-                for table in tables_to_create:
-                    conn.execute(CreateTable(table, if_not_exists=True))
-                conn.execute(delete(tables.DBVersionTable))
-                conn.execute(insert(tables.DBVersionTable).values({"version": 1}))
+        with _get_sqlalchemy_conn() as conn, conn.begin():
+            for table in tables_to_create:
+                conn.execute(CreateTable(table, if_not_exists=True))
+            conn.execute(delete(tables.DBVersionTable))
+            conn.execute(insert(tables.DBVersionTable).values({"version": 1}))
     except Exception as exc:
         raise AutosubmitCritical(f"Database can not be created: {str(exc)}", 7004, str(exc))
 
@@ -761,7 +760,7 @@ def _check_experiment_exists_sqlalchemy(name: str, error_on_inexistence=True) ->
     if row is None:
         if error_on_inexistence:
             raise AutosubmitCritical(
-                'The experiment name "{0}" does not exist yet!!!'.format(name), 7005
+                f'The experiment name "{name}" does not exist yet!!!', 7005
             )
         # FIXME: what if this is issued from another server/VM?
         if Path(BasicConfig.LOCAL_ROOT_DIR, name).exists():
@@ -800,9 +799,8 @@ def _update_experiment_description_version_sqlalchemy(
         vals["autosubmit_version"] = version
     query = query.values(vals)
 
-    with _get_sqlalchemy_conn() as conn:
-        with conn.begin():
-            result = conn.execute(query)
+    with _get_sqlalchemy_conn() as conn, conn.begin():
+        result = conn.execute(query)
 
     if result.rowcount == 0:
         raise AutosubmitCritical(f"Update on experiment {name} failed.", 7005)
@@ -822,7 +820,7 @@ def _get_autosubmit_version_sqlalchemy(expid) -> str:
 
 
 def _last_name_used_sqlalchemy(test=False, operational=False, evaluation=False) -> str:
-    condition: 'ColumnElement[bool]'
+    condition: ColumnElement[bool]
     if test:
         condition = tables.ExperimentTable.c.name.like("t%")
     elif operational:
@@ -902,28 +900,6 @@ def _get_experiment_id_sqlalchemy(name: str) -> int:
         raise AutosubmitCritical(f'The experiment "{name}" does not exist', 7005)
 
     return int(row[0])
-
-
-def get_connection_url(db_path: Union['Path', str] | None = None) -> str:
-    """Return a SQLAlchemy connection URL."""
-    if isinstance(db_path, str):
-        Log.warning("The 'db_path' parameter should be a Path object, not a string. Converting it to Path.")
-        db_path = Path(db_path)
-
-    if BasicConfig.DATABASE_BACKEND == "postgres":
-        return BasicConfig.DATABASE_CONN_URL
-
-    if not db_path:
-        raise ValueError('For SQLite databases you MUST provide a database file.')
-
-    if not db_path.exists():
-        if not db_path.parent.exists():
-            db_path.parent.mkdir(parents=True, exist_ok=True)
-            db_path.parent.chmod(0o770)
-        db_path.touch()
-        db_path.chmod(0o770)
-
-    return f'sqlite:///{str(db_path.resolve())}'
 
 
 def check_db_path(db_path: Path | None, must_exists: bool = True) -> bool:

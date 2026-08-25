@@ -17,18 +17,17 @@
 
 """Integration tests for ``autosubmit run`` command."""
 
+import time
 from contextlib import nullcontext as does_not_raise
 from os import R_OK, W_OK
 from typing import TYPE_CHECKING
 
 import pytest
-import time
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-
 from autosubmit.database.db_common import get_experiment_description
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -37,8 +36,9 @@ from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.platform import Platform
 
 if TYPE_CHECKING:
-    from test.integration.conftest import AutosubmitExperimentFixture
     from contextlib import AbstractContextManager
+
+    from test.integration.conftest import AutosubmitExperimentFixture
 
 
 def test__init_logs_config_file_not_found(autosubmit, autosubmit_exp, mocker, monkeypatch):
@@ -421,7 +421,7 @@ def test_prepare_run_returns_tuple(autosubmit_exp):
     exp = autosubmit_exp(include_jobs=True)
     result = Autosubmit.prepare_run(exp.expid, check_scripts=False)
     assert len(result) == 7
-    job_list, submitter, exp_history, host, as_conf, platforms_to_test, recover = result
+    job_list, submitter, exp_history, _host, _as_conf, _platforms_to_test, recover = result
     assert job_list is not None
     assert submitter is not None
     assert exp_history is not None
@@ -433,7 +433,7 @@ def test_prepare_run_returns_tuple_with_recover(autosubmit_exp):
     exp = autosubmit_exp(include_jobs=True)
     result = Autosubmit.prepare_run(exp.expid, check_scripts=False, recover=True)
     assert len(result) == 7
-    job_list, submitter, exp_history, host, as_conf, platforms_to_test, recover = result
+    job_list, submitter, exp_history, _host, _as_conf, _platforms_to_test, recover = result
     assert job_list is not None
     assert submitter is not None
     assert exp_history is None

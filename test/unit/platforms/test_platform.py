@@ -24,7 +24,7 @@ import pytest
 from autosubmit.log.log import Log
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.platform import recover_platform_job_logs_wrapper
-from test.unit.test_job import TestJob, FakeBasicConfig
+from test.unit.test_job import FakeBasicConfig, TestJob
 
 _EXPID = 't000'
 

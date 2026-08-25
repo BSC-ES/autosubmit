@@ -15,12 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 from typing import Any
+from unittest.mock import patch
 
 import datetime
 import networkx
 import pytest
 from sqlalchemy import create_engine
-from unittest.mock import patch
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import _edge_satisfied
@@ -30,8 +30,8 @@ from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.template import Language
+from test._oldschema import old_experiment_run_table, old_job_data_table
 from test.unit.conftest import FakePlatform
-from test._oldschema import old_job_data_table, old_experiment_run_table
 
 """Tests for the ``JobList`` class."""
 
@@ -99,7 +99,7 @@ def setup_job_list(as_conf):
     return jobs, edges, job_list
 
 def test_save_jobs(as_conf, setup_job_list, tmp_path):
-    jobs, edges, job_list = setup_job_list
+    jobs, _edges, job_list = setup_job_list
     job_list.save_jobs()
     job_list.save_edges()
     job_list.save_sections()
@@ -139,7 +139,7 @@ def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool,
     :return: None
     :rtype: None
     """
-    jobs, edges, job_list = setup_job_list
+    _jobs, _edges, job_list = setup_job_list
     job_list.save_jobs()
     job_list.save_edges()
     job_list.save_sections()
@@ -181,14 +181,14 @@ def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool,
 
 
 def test_get_completed_returns_only_the_completed(setup_job_list):
-    jobs, edges, job_list = setup_job_list
+    _jobs, _edges, job_list = setup_job_list
     completed = job_list.get_completed()
     for job in completed:
         assert job.status == Status.COMPLETED
 
 
 def test_get_in_queue(setup_job_list):
-    jobs, edges, job_list = setup_job_list
+    _jobs, _edges, job_list = setup_job_list
 
     in_queue = job_list.get_in_queue()
 
@@ -197,7 +197,7 @@ def test_get_in_queue(setup_job_list):
 
 
 def test_get_active(setup_job_list):
-    jobs, edges, job_list = setup_job_list
+    _jobs, _edges, job_list = setup_job_list
     active = job_list.get_active()
     for job in active:
         assert job.status in [Status.QUEUING, Status.SUBMITTED, Status.RUNNING, Status.UNKNOWN, Status.HELD,
@@ -205,7 +205,7 @@ def test_get_active(setup_job_list):
 
 
 def test_get_job_by_name_returns_the_expected_job(setup_job_list):
-    jobs, edges, job_list = setup_job_list
+    jobs, _edges, job_list = setup_job_list
 
     for job in jobs:
         retrieved_job = job_list.get_job_by_name(job.name)
@@ -216,7 +216,7 @@ def test_get_job_by_name_returns_the_expected_job(setup_job_list):
 
 
 def test_sort_by_name_returns_the_list_of_jobs_well_sorted(setup_job_list):
-    jobs, edges, job_list = setup_job_list
+    _jobs, _edges, job_list = setup_job_list
     sorted_by_name = job_list.sort_by_name()
 
     for i in range(len(sorted_by_name) - 1):
@@ -224,7 +224,7 @@ def test_sort_by_name_returns_the_list_of_jobs_well_sorted(setup_job_list):
 
 
 def test_sort_by_id_returns_the_list_of_jobs_well_sorted(setup_job_list):
-    jobs, edges, job_list = setup_job_list
+    _jobs, _edges, job_list = setup_job_list
     sorted_by_id = job_list.sort_by_id()
 
     for i in range(len(sorted_by_id) - 1):
@@ -232,7 +232,7 @@ def test_sort_by_id_returns_the_list_of_jobs_well_sorted(setup_job_list):
 
 
 def test_sort_by_type_returns_the_list_of_jobs_well_sorted(setup_job_list):
-    jobs, edges, job_list = setup_job_list
+    _jobs, _edges, job_list = setup_job_list
     sorted_by_type = job_list.sort_by_type()
 
     for i in range(len(sorted_by_type) - 1):
@@ -240,7 +240,7 @@ def test_sort_by_type_returns_the_list_of_jobs_well_sorted(setup_job_list):
 
 
 def test_sort_by_status_returns_the_list_of_jobs_well_sorted(setup_job_list):
-    jobs, edges, job_list = setup_job_list
+    _jobs, _edges, job_list = setup_job_list
     sorted_by_status = job_list.sort_by_status()
 
     for i in range(len(sorted_by_status) - 1):
@@ -251,8 +251,7 @@ def test_that_create_job_method_calls_dic_jobs_method_with_increasing_priority(m
     # arrange
     dic_mock = mocker.Mock()
     dic_mock.read_section = mocker.Mock()
-    dic_mock.experiment_data = dict()
-    dic_mock.experiment_data["JOBS"] = {'fake-section-1': {}, 'fake-section-2': {}}
+    dic_mock.experiment_data = {"JOBS": {'fake-section-1': {}, 'fake-section-2': {}}}
     # act
     JobList._create_jobs(dic_mock, 0, Language.BASH)
 

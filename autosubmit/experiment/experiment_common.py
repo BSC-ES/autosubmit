@@ -28,11 +28,11 @@ from autosubmit.database import db_common
 from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.helpers.processes import process_id
 from autosubmit.helpers.utils import user_yes_no_query
-from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 __all__ = [
-    'base36encode',
     'base36decode',
+    'base36encode',
     'check_ownership',
     'copy_experiment',
     'create_required_folders',

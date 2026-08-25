@@ -18,13 +18,12 @@
 """Integration tests for Autosubmit script templates written in Bash Shell."""
 
 import ctypes
-
 from multiprocessing import Process, Value
 from os import kill, killpg
 from pathlib import Path
 from signal import SIGKILL, SIGTERM
-from subprocess import run, Popen, PIPE
-from time import time, sleep
+from subprocess import PIPE, Popen, run
+from time import sleep, time
 from typing import TYPE_CHECKING
 
 from autosubmit.job.template import bash

@@ -17,7 +17,7 @@
 
 """Platform headers."""
 
-from typing import Any, Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job

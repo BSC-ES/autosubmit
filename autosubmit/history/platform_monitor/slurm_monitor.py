@@ -26,7 +26,7 @@ class SlurmMonitor(PlatformMonitor):
     """ Manages Slurm commands interpretation. """
 
     def __init__(self, platform_output):
-        super(SlurmMonitor, self).__init__(platform_output)
+        super().__init__(platform_output)
         self._identify_input_rows()
 
     @property

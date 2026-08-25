@@ -488,7 +488,7 @@ def test_submit_ready_jobs_raises_on_missing_template(mocker):
 
 def test_sigint_handler_sets_exit_flag():
     """Verify signal_handler sets Autosubmit.exit = True."""
-    from autosubmit.autosubmit import signal_handler, Autosubmit
+    from autosubmit.autosubmit import Autosubmit, signal_handler
     Autosubmit.exit = False
     signal_handler(2, None)  # SIGINT = 2
     assert Autosubmit.exit is True

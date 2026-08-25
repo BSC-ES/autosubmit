@@ -21,21 +21,22 @@ from contextlib import nullcontext as does_not_raise
 import pytest
 
 from autosubmit.database.db_manager import DbManager
+from autosubmit.database.session import get_engine
 from autosubmit.database.tables import ExperimentTable
 
 
 def test_insert_rejects_empty_data():
-    db_manager = DbManager('sqlite:///:memory:', schema='abc')
+    db_manager = DbManager(db_path=':memory:', schema='abc')
     with does_not_raise():
         db_manager.insert(ExperimentTable.name, {})
 
 
 def test_insert_many_rejects_empty_data():
-    db_manager = DbManager('sqlite:///:memory:', schema='abc')
+    db_manager = DbManager(db_path=':memory:', schema='abc')
     assert 0 == db_manager.insert_many(ExperimentTable.name, [])
 
 
 def test_delete_where_raises_empty_data():
-    db_manager = DbManager('sqlite:///:memory:', schema='abc')
+    db_manager = DbManager(db_path=':memory:', schema='abc')
     with pytest.raises(ValueError):
         db_manager.delete_where(ExperimentTable.name, {})
