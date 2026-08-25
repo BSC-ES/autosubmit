@@ -23,14 +23,13 @@ from zipfile import ZipFile
 
 import pytest
 from rocrate.rocrate import File  # type: ignore
-from rocrate_validator import services, models
+from rocrate_validator import models, services
 from ruamel.yaml.representer import RepresenterError
 
 from autosubmit.log.log import AutosubmitCritical
+
 # noinspection PyProtectedMember
-from autosubmit.provenance.rocrate import (
-    create_rocrate_archive
-)
+from autosubmit.provenance.rocrate import create_rocrate_archive
 
 _PROJECT_URL = 'https://earth.bsc.es/gitlab/es/autosubmit.git'
 """Project URL used in all the tests. This is not actually cloned."""

@@ -17,7 +17,7 @@
 
 import shutil
 from random import randrange
-from typing import Dict, Any, Tuple
+from typing import Any
 
 import pytest
 from networkx import DiGraph
@@ -32,9 +32,9 @@ from autosubmit.job.job_list import JobList
 def setup_job_list(autosubmit_exp, tmpdir, mocker):
     as_exp = autosubmit_exp()
     as_conf = as_exp.as_conf
-    as_conf.experiment_data = dict()
-    as_conf.experiment_data["JOBS"] = dict()
-    as_conf.experiment_data["PLATFORMS"] = dict()
+    as_conf.experiment_data = {}
+    as_conf.experiment_data["JOBS"] = {}
+    as_conf.experiment_data["PLATFORMS"] = {}
 
     job_list = JobList(as_exp.expid, as_conf, YAMLParserFactory())
 
@@ -78,7 +78,7 @@ def _create_dummy_job_with_status(status, platform):
 
 
 @pytest.fixture
-def init_jobs(setup_job_list: Tuple[Any, Any, Dict[str, Any]]) -> Tuple[Job, Job, Job]:
+def init_jobs(setup_job_list: tuple[Any, Any, dict[str, Any]]) -> tuple[Job, Job, Job]:
     """
     Initialize jobs for testing.
 
@@ -88,7 +88,7 @@ def init_jobs(setup_job_list: Tuple[Any, Any, Dict[str, Any]]) -> Tuple[Job, Job
     :rtype: Tuple[Job, Job, Job]
     """
     job_list, _, jobs = setup_job_list
-    job_list.jobs_edges = dict()
+    job_list.jobs_edges = {}
     job_a = jobs["completed"][0]
     job_b = jobs["running"][0]
     job_c = jobs["waiting"][0]
@@ -179,9 +179,9 @@ def init_jobs(setup_job_list: Tuple[Any, Any, Dict[str, Any]]) -> Tuple[Job, Job
     ]
 )
 def test_handle_special_checkpoint_jobs_matching_parent_status_with_target_and_not_optional(
-        job_a_edge_info: Dict[str, Any],
-        job_b_edge_info: Dict[str, Any],
-        init_jobs: Tuple[JobList, Any, Any, Any]
+        job_a_edge_info: dict[str, Any],
+        job_b_edge_info: dict[str, Any],
+        init_jobs: tuple[JobList, Any, Any, Any]
 ) -> None:
     """
     Test special checkpoint job handling for various parent job status combinations.

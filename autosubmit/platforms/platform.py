@@ -34,7 +34,6 @@ import setproctitle
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.db_manager_job_list import JobsDbManager
-
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -166,7 +165,7 @@ class Platform(ABC):
     TYPE: PlatformType
     EXECUTION_MODE: ExecutionMode
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: Union[str, list[str]] | None = None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str | list[str] | None = None):
         """Initializes the Platform object with the given experiment ID, platform name, configuration,
         and optional authentication password for two-factor authentication.
 
@@ -238,7 +237,7 @@ class Platform(ABC):
         self.work_event: Event | None = None
         self.cleanup_event: Event | None = None
         self.log_retrieval_process_active: bool = False
-        self.log_recovery_process: 'BaseProcess | None' = None
+        self.log_recovery_process: BaseProcess | None = None
         self.keep_alive_timeout = 60 * 5  # Useful in case of kill -9
         self.compress_remote_logs = False
         self.remote_logs_compress_type = "gzip"
@@ -435,8 +434,8 @@ class Platform(ABC):
         """
         Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self))}")
         # Submitting by sections allows to detect Scheduler misconfiguration derived from a bad configuration without submitting any job.
-        scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
-        x11_scripts_to_submit_by_section: dict[str, dict[str, 'JobPackageBase']] = {}
+        scripts_to_submit_by_section: dict[str, dict[str, JobPackageBase]] = {}
+        x11_scripts_to_submit_by_section: dict[str, dict[str, JobPackageBase]] = {}
         for package in packages_to_submit:
             self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, as_conf)
             if not only_wrappers:
@@ -958,7 +957,7 @@ class Platform(ABC):
     def join_new_process(self):
         # Check if the process is finished; prevent zombies
         if self.log_recovery_process is not None:
-            ret_pid, ret_status = os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
+            ret_pid, _ret_status = os.waitpid(self.log_recovery_process.pid, os.WNOHANG)
             if ret_pid == 0:  # Process is still running
                 Log.info(f"Process {self.log_recovery_process.pid} is still running.")
             else:
@@ -1102,7 +1101,7 @@ class Platform(ABC):
     def create_a_new_copy(self):
         raise NotImplementedError  # pragma: no cover
 
-    def read_file(self, src: str, max_size: int | None = None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: int | None = None) -> bytes | None:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path
@@ -1110,7 +1109,7 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def compress_file(self, file_path: str) -> Union[str, None]:
+    def compress_file(self, file_path: str) -> str | None:
         """Compress a file.
 
         :param file_path: file path

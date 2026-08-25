@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pytest
 from networkx import DiGraph  # type: ignore
-from typing_extensions import Tuple
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
@@ -124,10 +123,10 @@ def test_job(mocker) -> Job:
 def joblist(tmp_path, mocker):
     experiment_id = 'random-id'
     as_conf = mocker.Mock()
-    as_conf.experiment_data = dict()
-    as_conf.experiment_data["JOBS"] = dict()
+    as_conf.experiment_data = {}
+    as_conf.experiment_data["JOBS"] = {}
     as_conf.jobs_data = as_conf.experiment_data["JOBS"]
-    as_conf.experiment_data["PLATFORMS"] = dict()
+    as_conf.experiment_data["PLATFORMS"] = {}
     joblist = JobList(experiment_id, as_conf, YAMLParserFactory())
     joblist._date_list = _DATE_LIST
     joblist._member_list = _MEMBER_LIST
@@ -567,7 +566,7 @@ def test_check_relationship(joblist):
 
 
 @pytest.fixture()
-def _init_special_conditions(joblist: JobList) -> Tuple[Job, Job, Job, dict, JobList]:
+def _init_special_conditions(joblist: JobList) -> tuple[Job, Job, Job, dict, JobList]:
     """
     Initialize a JobList with a job and its parents, and add special conditions to the job.
     This is used to test the add_special_conditions method.
@@ -614,7 +613,7 @@ def _init_special_conditions(joblist: JobList) -> Tuple[Job, Job, Job, dict, Job
 
 
 def test_add_special_conditions(_init_special_conditions):
-    job, parent, parent2, special_conditions, joblist = _init_special_conditions
+    job, parent, parent2, _special_conditions, joblist = _init_special_conditions
 
     edge = joblist.graph.edges[parent.name, job.name]
     assert job.max_checkpoint_step == 2
@@ -633,7 +632,7 @@ def test_add_special_conditions(_init_special_conditions):
 def test_job_dict_get_jobs_filtered(mocker, joblist):
     # Test the get_jobs_filtered function
     as_conf = mocker.Mock()
-    as_conf.experiment_data = dict()
+    as_conf.experiment_data = {}
     as_conf.experiment_data = {
         'CONFIG': {'AUTOSUBMIT_VERSION': '4.1.2', 'MAXWAITINGJOBS': 20, 'TOTALJOBS': 20, 'SAFETYSLEEPTIME': 10,
                    'RETRIALS': 0}, 'MAIL': {'NOTIFICATIONS': False, 'TO': None},
@@ -760,8 +759,8 @@ def test_get_jobs_filtered_grouped_splits(parent_splits, child_splits, slice_siz
         if is_n_to_1:
             start = (child_split - 1) * slice_size
             end = min(start + slice_size, parent_splits)
-            expected = set(j.name for j in parent_jobs[start:end])
-            assert set(j.name for j in result) == expected, (
+            expected = {j.name for j in parent_jobs[start:end]}
+            assert {j.name for j in result} == expected, (
                 f"child_split={child_split}: expected parents {expected}, got {[j.name for j in result]}"
             )
         else:

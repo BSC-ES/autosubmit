@@ -17,7 +17,7 @@
 
 """Networking utilities for integration tests."""
 
-from socket import socket, create_connection
+from socket import create_connection, socket
 from time import sleep, time
 
 __all__ = [

@@ -21,10 +21,11 @@ Note that tests will start and destroy an SSH server. For unit tests, see ``test
 in the ``test/unit`` directory."""
 
 import socket
+from collections.abc import Callable
 from dataclasses import dataclass
 from getpass import getuser
 from pathlib import Path
-from typing import cast, Any, Callable, Protocol, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, Union, cast
 
 import paramiko
 import pytest
@@ -32,19 +33,19 @@ from paramiko import ChannelFile  # type: ignore[import]
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import AutosubmitCritical
-from autosubmit.log.log import AutosubmitError
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
-    from autosubmit.platforms.psplatform import PsPlatform
-    from docker.models.containers import Container
     # noinspection PyProtectedMember
     from _pytest._py.path import LocalPath
+    from docker.models.containers import Container
     from pytest import FixtureRequest
     from testcontainers.core.container import DockerContainer  # type: ignore
+
+    from autosubmit.platforms.psplatform import PsPlatform
     from test.integration.conftest import AutosubmitExperiment
 
 _PLATFORM_NAME = 'TEST_PS_PLATFORM'
@@ -105,7 +106,7 @@ def _get_platform(exp: 'AutosubmitExperiment') -> 'PsPlatform':
     submitter = ParamikoSubmitter(as_conf=exp.as_conf)
 
     assert submitter.platforms
-    ps_platform: 'PsPlatform' = cast('PsPlatform', submitter.platforms[_PLATFORM_NAME])
+    ps_platform: PsPlatform = cast('PsPlatform', submitter.platforms[_PLATFORM_NAME])
 
     return ps_platform
 
@@ -139,7 +140,7 @@ def create_job_parameters_platform(
             **kwargs: Any
     ) -> JobParametersPlatform:
         exp = autosubmit_exp(get_next_expid(), experiment_data=experiment_data, include_jobs=True)
-        slurm_platform: 'SlurmPlatform' = cast('SlurmPlatform', exp.platform)
+        slurm_platform: SlurmPlatform = cast('SlurmPlatform', exp.platform)
 
         job = Job(f"{exp.expid}_SIM", 10000, Status.SUBMITTED, 0)
         job.section = 'SIM'
@@ -525,8 +526,8 @@ def test_exec_command_ssh_session_not_active(
     [
         paramiko.ssh_exception.NoValidConnectionsError({'192.168.0.1': ValueError('failed')}),  # type: ignore
         ConnectionError('Someone unplugged the networking cable.'),
-        socket.error('A random socket error occurred!'),
-        IOError('Someone plugged the cable off.')
+        OSError('A random socket error occurred!'),
+        OSError('Someone plugged the cable off.')
     ],
     ids=[
         'paramiko ssh exception',
@@ -670,7 +671,7 @@ def test_fs_operations(
 def test_exec_command_with_x11(
         ssh_fixture: 'DockerContainer',
         x11: bool,
-        user_or_false: Union[str, bool],
+        user_or_false: str | bool,
         request: 'FixtureRequest',
         get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment']
 ):
@@ -682,7 +683,7 @@ def test_exec_command_with_x11(
         ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
         assert ps_platform.local_x11_display
 
-        stdin, stdout, stderr = ps_platform.exec_command('whoami', x11=x11)
+        _stdin, stdout, stderr = ps_platform.exec_command('whoami', x11=x11)
 
         assert isinstance(stdout, ChannelFile), f"Invalid value for stdout: {stderr, stdout}"
         assert user_or_false == stdout.readline().decode('UTF-8').strip()
@@ -903,8 +904,8 @@ def test_get_header_job_het(create_job_parameters_platform: CreateJobParametersP
 
     job_parameters_platform.job.het = job_parameters_platform.parameters.copy()
     job_parameters_platform.job.het['HETSIZE'] = hetsize
-    job_parameters_platform.job.het['NUMTHREADS'] = [i for i in range(0, hetsize)]
-    job_parameters_platform.job.het['TASKS'] = [i for i in range(0, hetsize)]
+    job_parameters_platform.job.het['NUMTHREADS'] = [i for i in range(hetsize)]
+    job_parameters_platform.job.het['TASKS'] = [i for i in range(hetsize)]
 
     header = platform.get_header(job_parameters_platform.job, job_parameters_platform.parameters)
     assert header

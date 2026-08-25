@@ -1,7 +1,9 @@
 from argparse import ArgumentParser
-from pathlib import Path
-from benchmark_utils import load_data
 from importlib.metadata import version
+from pathlib import Path
+
+from benchmark_utils import load_data
+
 parser = ArgumentParser(description="Generate performance comparison plots for Autosubmit.")
 parser.add_argument("--version", type=str, required=False, help="Autosubmit version string for naming the summary file.")
 args = parser.parse_args()

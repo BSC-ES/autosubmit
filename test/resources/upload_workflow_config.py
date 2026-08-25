@@ -3,8 +3,9 @@ This script is used to upload a new reference configuration to the regression te
 TODO: Make it an autosubmit command
 """
 import sys
-from ruamel.yaml import YAML
 from pathlib import Path
+
+from ruamel.yaml import YAML
 
 
 def process_yaml(input_file_path, output_file_path):

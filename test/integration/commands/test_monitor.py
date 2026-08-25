@@ -14,12 +14,14 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+import sqlite3
 from pathlib import Path
 
-from autosubmit.config.basicconfig import BasicConfig
 import pytest
+
+from autosubmit.config.basicconfig import BasicConfig
+
 from .conftest import wrapped_jobs
-import sqlite3
 
 
 def new_as_exp(autosubmit_exp, general_data, experiment_data, wrapper_type: str, structure: dict, sizes: dict):

@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import pytest
 
@@ -104,7 +104,7 @@ def job_with_different_retrials(mocker):
 
 
 @pytest.fixture()
-def job_stats() -> List[JobStat]:
+def job_stats() -> list[JobStat]:
     """Create a list of ``JobStat`` with the same length as the ``NUM_JOBS`` constant."""
     job_stats_list = []
 
@@ -137,7 +137,7 @@ def job_stats() -> List[JobStat]:
 
 
 @pytest.fixture()
-def statistics(create_jobs: List[Job], job_stats) -> Statistics:
+def statistics(create_jobs: list[Job], job_stats) -> Statistics:
     return Statistics(
         jobs=create_jobs,
         start=datetime(2023, 1, 1, 10, 0, 0),
@@ -167,7 +167,7 @@ def summary(request):
 
 
 @pytest.fixture()
-def summary_as_list(summary: StatsSummary) -> List[str]:
+def summary_as_list(summary: StatsSummary) -> list[str]:
     """Return the summary as a list of strings."""
     return [
         "Summary: ",
@@ -187,7 +187,7 @@ def summary_as_list(summary: StatsSummary) -> List[str]:
 
 
 @pytest.fixture()
-def statistics_old_format() -> Dict[str, Any]:
+def statistics_old_format() -> dict[str, Any]:
     """Create an instance of ``Statistics`` but with the old format."""
     start_times = [datetime(2023, 1, 1, 10, 30, 0) for _ in range(NUM_JOBS)]
     end_times = [datetime(2023, 1, 1, 11, 0, 0) for _ in range(NUM_JOBS)]
@@ -225,7 +225,7 @@ def statistics_old_format() -> Dict[str, Any]:
 
 
 @pytest.fixture()
-def failed_jobs(job_stats) -> Dict[str, int]:
+def failed_jobs(job_stats) -> dict[str, int]:
     """Create a dictionary with the failed jobs."""
     return {
         job_stats.name: idx
@@ -238,7 +238,7 @@ def failed_jobs(job_stats) -> Dict[str, int]:
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
-def test_build_statistics_object(create_jobs: List[Job]) -> None:
+def test_build_statistics_object(create_jobs: list[Job]) -> None:
     """Test that building a statistics object by chaining build calls works as expected."""
     exp_stats = (
         Statistics(
@@ -255,7 +255,7 @@ def test_build_statistics_object(create_jobs: List[Job]) -> None:
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
-def test_calculate_statistics(statistics: Statistics, job_with_different_retrials: Tuple[List[Job], JobStat],
+def test_calculate_statistics(statistics: Statistics, job_with_different_retrials: tuple[list[Job], JobStat],
                               create_jobs) -> None:
     """Test that the statistics object is correctly built and obtained values are correct."""
     statistics._jobs = job_with_different_retrials[0]
@@ -304,7 +304,7 @@ def test_calculate_statistics(statistics: Statistics, job_with_different_retrial
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
-def test_calculate_summary(statistics: Statistics, summary: StatsSummary, job_stats: List[JobStat], create_jobs) -> None:
+def test_calculate_summary(statistics: Statistics, summary: StatsSummary, job_stats: list[JobStat], create_jobs) -> None:
     """Test that the summary is correctly calculated."""
     # TODO: Had to assign jobs_stats again here, as otherwise the test would fail -- investigate why"
     statistics.jobs_stat = job_stats
@@ -331,7 +331,7 @@ def test_calculate_summary(statistics: Statistics, summary: StatsSummary, job_st
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
-def test_get_summary_as_list(statistics: Statistics, summary_as_list: List[str], create_jobs) -> None:
+def test_get_summary_as_list(statistics: Statistics, summary_as_list: list[str], create_jobs) -> None:
     """Test that the summary is correctly converted to a list of strings."""
     statistics.calculate_summary()
     summary_as_list = statistics.summary_list
@@ -340,7 +340,7 @@ def test_get_summary_as_list(statistics: Statistics, summary_as_list: List[str],
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
-def test_make_old_format(statistics: Statistics, statistics_old_format, job_stats: List[JobStat], create_jobs) -> None:
+def test_make_old_format(statistics: Statistics, statistics_old_format, job_stats: list[JobStat], create_jobs) -> None:
     """Test that attributes of old and new statistics objects have the same value.
 
     Old is a dictionary. New is an object. Check the access method in the assertion.
@@ -357,7 +357,7 @@ def test_make_old_format(statistics: Statistics, statistics_old_format, job_stat
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)
-def test_build_failed_job_only(statistics: Statistics, failed_jobs, job_stats: List[JobStat], create_jobs) -> None:
+def test_build_failed_job_only(statistics: Statistics, failed_jobs, job_stats: list[JobStat], create_jobs) -> None:
     """Test that failed jobs are correctly built."""
     # TODO: Had to assign jobs_stats again here, as otherwise the test would fail -- investigate why"
     statistics.jobs_stat = job_stats

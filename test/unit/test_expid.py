@@ -26,6 +26,7 @@ from autosubmit.autosubmit import Autosubmit
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
 
+
 @contextmanager
 def does_not_raise():
     yield

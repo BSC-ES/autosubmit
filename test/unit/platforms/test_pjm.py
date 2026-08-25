@@ -24,7 +24,11 @@ import pytest
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical, JobPackageHorizontal
+from autosubmit.job.job_packages import (
+    JobPackageHorizontal,
+    JobPackageSimple,
+    JobPackageVertical,
+)
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.pjmplatform import PJMPlatform
 

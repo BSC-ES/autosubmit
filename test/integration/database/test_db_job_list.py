@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 from ruamel.yaml import YAML
@@ -111,12 +111,12 @@ def _assert_exit_code(final_status: str, exit_code: int) -> None:
 
 def _get_expected_job_names(
     expid: str,
-    unified_data: Dict[str, Any],
-    once_sections: List[str],
-    member_sections: List[str],
-    date_sections: List[str],
-    chunk_sections: List[str]
-) -> List[str]:
+    unified_data: dict[str, Any],
+    once_sections: list[str],
+    member_sections: list[str],
+    date_sections: list[str],
+    chunk_sections: list[str]
+) -> list[str]:
     """
     Generate expected job names based on experiment configuration and section types.
 
@@ -201,7 +201,7 @@ def generate_job_list(as_conf, db_manager) -> JobList:
     return job_list
 
 
-def _create_db_manager(schema: str = None) -> JobsDbManager:
+def _create_db_manager(schema: str | None = None) -> JobsDbManager:
     db_path = Path(BasicConfig.LOCAL_ROOT_DIR) / schema / "db"
     db_path.mkdir(parents=True, exist_ok=True)
     return JobsDbManager(schema=schema)
@@ -1126,7 +1126,7 @@ DEPENDENCIES_IDS = [
 )
 def test_with_createcw_command_differences(
         as_exp: Any,
-        changed_data: Dict[str, Any],
+        changed_data: dict[str, Any],
         tmp_path: Path,
         as_db: str,
         _expid: str,
@@ -1141,54 +1141,54 @@ def test_with_createcw_command_differences(
     :param as_db: Fixture to set up the database
 
     """
-    fixed_data = dict(
-        CONFIG={
+    fixed_data = {
+        'CONFIG': {
             'AUTOSUBMIT_VERSION': 4.2,
             'MAXWAITINGJOBS': 100,
             'TOTALJOBS': 100,
             'SAFETYSLEEPTIME': 0,
             'RETRIALS': 0,
         },
-        MAIL={
+        'MAIL': {
             'NOTIFICATIONS': False,
             'TO': '',
         },
-        STORAGE={
+        'STORAGE': {
             'TYPE': f"{as_db}",
             'COPY_REMOTE_LOGS': True,
         },
-        DEFAULT={
+        'DEFAULT': {
             'EXPID': _expid,
             'HPCARCH': 'TEST_SLURM',
         },
-        PROJECT={
+        'PROJECT': {
             'PROJECT_TYPE': 'none',
             'PROJECT_DESTINATION': '',
         },
-        GIT={
+        'GIT': {
             'PROJECT_ORIGIN': '',
             'PROJECT_BRANCH': '',
             'PROJECT_COMMIT': '',
             'PROJECT_SUBMODULES': '',
             'FETCH_SINGLE_BRANCH': True,
         },
-        SVN={
+        'SVN': {
             'PROJECT_URL': '',
             'PROJECT_REVISION': '',
         },
-        LOCAL={
+        'LOCAL': {
             'PROJECT_PATH': '',
         },
-        PROJECT_FILES={
+        'PROJECT_FILES': {
             'FILE_PROJECT_CONF': '',
             'FILE_JOBS_CONF': '',
             'JOB_SCRIPTS_TYPE': '',
         },
-        RERUN={
+        'RERUN': {
             'RERUN': False,
             'RERUN_JOBLIST': '',
         },
-        PLATFORMS={
+        'PLATFORMS': {
             'TEST_SLURM': {
                 'TYPE': 'slurm',
                 'ADD_PROJECT_TO_HOST': 'False',
@@ -1204,7 +1204,7 @@ def test_with_createcw_command_differences(
                 'PROCESSORS_PER_NODE': '128',
             }
         },
-        WRAPPERS={
+        'WRAPPERS': {
             'WRAPPERV': {
                 'TYPE': 'vertical',
                 'JOBS_IN_WRAPPER': "vjob"
@@ -1222,9 +1222,9 @@ def test_with_createcw_command_differences(
                 'JOBS_IN_WRAPPER': "hvjob"
             },
         }
-    )
-    mutable_experiment_wrappers = dict(
-        EXPERIMENT={
+    }
+    mutable_experiment_wrappers = {
+        'EXPERIMENT': {
             'DATELIST': '20000101 20010101',
             'MEMBERS': 'fc0 fc1',
             'CHUNKSIZEUNIT': 'month',
@@ -1233,9 +1233,9 @@ def test_with_createcw_command_differences(
             'CHUNKINI': '',
             'CALENDAR': 'standard',
         },
-    )
-    mutable_jobs = dict(
-        JOBS={
+    }
+    mutable_jobs = {
+        'JOBS': {
             'job': {
                 'SCRIPT': 'echo "Hello World"',
                 'DEPENDENCIES': 'job-1',
@@ -1273,10 +1273,10 @@ def test_with_createcw_command_differences(
             },
 
         }
-    )
+    }
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _expid
     conf_dir = exp_path / 'conf'
-    unified_data: Dict[str, Dict] = fixed_data | mutable_experiment_wrappers | mutable_jobs
+    unified_data: dict[str, dict] = fixed_data | mutable_experiment_wrappers | mutable_jobs
     _init_test(as_exp, conf_dir, unified_data)
     db_manager = _create_db_manager(schema=_expid)
     exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=True, check_wrappers=True)
@@ -1306,7 +1306,7 @@ def test_with_createcw_command_differences(
     assert len(missing_in_db) == 0, f"Missing jobs in DB: {missing_in_db}"
     assert len(unexpected_in_db) == 0, f"Unexpected jobs in DB: {unexpected_in_db}"
 
-    new_data: Dict[str, Dict] = unified_data | changed_data
+    new_data: dict[str, dict] = unified_data | changed_data
     _modify_data(as_exp.expid, conf_dir, new_data)
 
     exit_code = as_exp.autosubmit.create(_expid, noplot=True, hide=False, force=False, check_wrappers=True)
@@ -1337,7 +1337,7 @@ def test_with_createcw_command_differences(
     assert len(unexpected_in_db) == 0, f"Unexpected jobs in DB: {unexpected_in_db}"
 
 
-def _wrapper_info(name: str, id: int, status: int = 1, **overrides) -> Dict[str, Any]:
+def _wrapper_info(name: str, id: int, status: int = 1, **overrides) -> dict[str, Any]:
     """Helper to build a wrapper_info dict with defaults matching WrapperInfoTable."""
     info = {
         "name": name,
@@ -1362,7 +1362,7 @@ def _wrapper_info(name: str, id: int, status: int = 1, **overrides) -> Dict[str,
     return info
 
 
-def _inner_job(package_id: int, package_name: str, job_name: str, timestamp: str = "2023-01-01T00:00:00") -> Dict[str, Any]:
+def _inner_job(package_id: int, package_name: str, job_name: str, timestamp: str = "2023-01-01T00:00:00") -> dict[str, Any]:
     return {
         "package_id": package_id,
         "package_name": package_name,

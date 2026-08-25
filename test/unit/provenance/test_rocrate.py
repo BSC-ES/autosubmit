@@ -28,14 +28,15 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
+
 # noinspection PyProtectedMember
 from autosubmit.provenance.rocrate import (
     _add_files,
-    _get_action_status,
     _create_formal_parameter,
     _create_parameter,
+    _get_action_status,
+    _get_git_branch_and_commit,
     _get_project_entity,
-    _get_git_branch_and_commit
 )
 
 _EXPID = 'zzzz'

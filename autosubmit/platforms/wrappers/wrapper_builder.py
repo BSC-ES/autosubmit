@@ -45,7 +45,7 @@ class WrapperDirector:
         return wrapper_script
 
 
-class WrapperBuilder(object):
+class WrapperBuilder:
 
     def __init__(self, **kwargs):
         if "retrials" in list(kwargs.keys()):
@@ -56,7 +56,7 @@ class WrapperBuilder(object):
         self.num_procs = kwargs['num_processors']
         self.num_procs_value = kwargs['num_processors_value']
         self.expid = kwargs['expid']
-        self.jobs_resources = kwargs.get('jobs_resources', dict())
+        self.jobs_resources = kwargs.get('jobs_resources', {})
         self.allocated_nodes = kwargs.get('allocated_nodes', '')
         self.machinefiles_name = ''
         self.machinefiles_indent = 0
@@ -96,7 +96,7 @@ class WrapperBuilder(object):
 
     def get_machinefile_function(self):
         machinefile_function = ""
-        if 'MACHINEFILES' in self.jobs_resources and self.jobs_resources['MACHINEFILES']:
+        if self.jobs_resources.get('MACHINEFILES'):
             machinefile_function = self.jobs_resources['MACHINEFILES']
 
             self.machinefiles_name = "jobname"
@@ -133,8 +133,8 @@ class WrapperBuilder(object):
 
 class PythonWrapperBuilder(WrapperBuilder):
     def get_random_alphanumeric_string(self, letters_count, digits_count):
-        sample_str = ''.join((random.choice(string.ascii_letters) for _ in range(letters_count)))
-        sample_str += ''.join((random.choice(string.digits) for _ in range(digits_count)))
+        sample_str = ''.join(random.choice(string.ascii_letters) for _ in range(letters_count))
+        sample_str += ''.join(random.choice(string.digits) for _ in range(digits_count))
 
         # Convert string to list and shuffle it to mix letters and digits
         sample_list = list(sample_str)
@@ -825,13 +825,13 @@ class BashWrapperBuilder(WrapperBuilder):
 class BashVerticalWrapperBuilder(BashWrapperBuilder):
 
     def build_main(self):
-        return super(BashVerticalWrapperBuilder, self).build_main() + self.build_sequential_threads_launcher()
+        return super().build_main() + self.build_sequential_threads_launcher()
 
 
 class BashHorizontalWrapperBuilder(BashWrapperBuilder):
 
     def build_main(self):
-        return super(BashHorizontalWrapperBuilder, self).build_main() + self.build_parallel_threads_launcher()
+        return super().build_main() + self.build_parallel_threads_launcher()
 
 
 # SRUN CLASSES

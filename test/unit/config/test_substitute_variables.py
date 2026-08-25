@@ -145,7 +145,7 @@ def test_substitute_keys_upper_lower_strings(autosubmit_config, dynamic_var, var
         [dynamic_var],
         ("FOO", dynamic_var),
         {"FOO": dynamic_var, "VARIABLES": variable},
-        "%[a-zA-Z0-9_.-]*(\^\^|,,)?%",
+        r"%[a-zA-Z0-9_.-]*(\^\^|,,)?%",
         1,
         "short",
         {"FOO": dynamic_var},

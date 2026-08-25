@@ -16,16 +16,20 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+from unittest.mock import MagicMock
+
 import pytest
-from mock import MagicMock
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_packages import JobPackageSimple, JobPackageVertical
-from autosubmit.job.job_packages import jobs_in_wrapper_str
-from autosubmit.log.log import AutosubmitError, AutosubmitCritical
+from autosubmit.job.job_packages import (
+    JobPackageSimple,
+    JobPackageVertical,
+    jobs_in_wrapper_str,
+)
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
@@ -114,7 +118,7 @@ def create_job_package_wrapper(jobs, as_conf):
 @pytest.fixture
 def joblist(tmp_path, as_conf):
     job_list = JobList('a000', as_conf, YAMLParserFactory())
-    job_list._ordered_jobs_by_date_member["WRAPPERS"] = dict()
+    job_list._ordered_jobs_by_date_member["WRAPPERS"] = {}
     return job_list
 
 

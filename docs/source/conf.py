@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # autosubmit documentation build configuration file, created by
 # sphinx-quickstart on Wed Mar 18 16:55:44 2015.
@@ -12,8 +11,8 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -73,8 +72,8 @@ master_doc = 'index'
 # General information about the project.
 project = 'autosubmit'
 # noinspection PyShadowingBuiltins
-copyright = u'2013-2026, Barcelona Supercomputing Center, BSC'
-author = u'Earth Sciences Department, Barcelona Supercomputing Center, BSC'
+copyright = '2013-2026, Barcelona Supercomputing Center, BSC'
+author = 'Earth Sciences Department, Barcelona Supercomputing Center, BSC'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -298,8 +297,8 @@ htmlhelp_basename = 'autosubmitdoc'
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'autosubmit.tex', u'autosubmit Documentation',
-     u'Daniel Beltran', 'manual'),
+    (master_doc, 'autosubmit.tex', 'autosubmit Documentation',
+     'Daniel Beltran', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of

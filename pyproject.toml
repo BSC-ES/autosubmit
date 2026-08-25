@@ -32,13 +32,13 @@ maintainers = [
 ]
 
 keywords = ["climate", "weather", "workflow", "HPC"]
-license = {file = "LICENSE"}
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 
 classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: GNU General Public License (GPL)",
     "Operating System :: POSIX :: Linux"
 ]
 
@@ -47,7 +47,7 @@ dependencies = [
     "bscearth.utils<=0.5.2",
     "requests<=2.34.2",
     "networkx<=3.6.1",
-    "portalocker<=3.2.0",
+    "portalocker<=4.1.0",
     "paramiko>=3.5.0",
     "pyparsing==3.3.2",
     "matplotlib<=3.10.9",
@@ -55,7 +55,6 @@ dependencies = [
     "py3dotplus==1.1.0",
     "numpy<3",
     "rocrate==0.15.1",
-    "configparser",
     "setproctitle",
     "invoke>=2.0",
     "SQLAlchemy~=2.0.23",
@@ -69,19 +68,17 @@ Homepage = "https://www.bsc.es/projects/earthscience/autosubmit/"
 Documentation = "https://autosubmit.readthedocs.io/"
 "Download Link" = "https://earth.bsc.es/wiki/doku.php?id=tools:autosubmit"
 
-[tool.setuptools.dynamic]
-version =  {file = "VERSION"}
-readme = {file = "README_PIP.md"}
-
 [project.optional-dependencies]
 postgres = ["psycopg", "psycopg2"]
+lint = [
+    "ruff==0.16.4",
+]
 tests = [
     # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
     "mock",
     "pytest>=8.2,<9.2",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.15.22",
     "pytest-xdist",
     "testcontainers",
     "pytest-timeout",
@@ -116,29 +113,30 @@ docs = [
 all = [
     "autosubmit[tests]",
     "autosubmit[mypy]",
+    "autosubmit[lint]",
     "autosubmit[docs]",
     "autosubmit[postgres]",
     "autosubmit[benchmark]"
 ]
 
+[project.scripts]
+autosubmit = "autosubmit.scripts.autosubmit:main"
+
+[tool.setuptools]
+package-data = { "autosubmit" = [
+    "config/files/*.yml",
+    "database/data/*.sql",
+] }
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
+readme = {file = "README_PIP.md"}
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["autosubmit*"]
 namespaces = true
-
-[tool.setuptools]
-package-data = { "autosubmit" = [
-    "autosubmit/config/files/autosubmit.conf",
-    "autosubmit/config/files/expdef.conf",
-    "autosubmit/database/data/autosubmit.sql",
-    "autosubmit/config/conf/files/*",
-    "README",
-    "CHANGELOG",
-    "VERSION",
-    "LICENSE",
-    "docs/autosubmit.pdf"
-] }
-include-package-data = true
 
 [tool.mypy]
 mypy_path = ["."]
@@ -159,17 +157,17 @@ module = [
 ignore_missing_imports = true
 follow_untyped_imports = true
 
-[tool.vulture]
-exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
-min_confidence = 70
-
-[project.entry-points.console_scripts]
-autosubmit = "autosubmit.scripts.autosubmit:main"
-
 [tool.ruff.lint]
 ignore = [
     "DTZ005",
     "E501",
     "F401",
-    "FA102"
+    "FA102",
+    "RUF010"
 ]
+
+# NOTE: used to inspect dead code from time to time.
+# Done on demand, not part of the CI/CD pipeline.
+[tool.vulture]
+exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
+min_confidence = 70

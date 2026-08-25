@@ -109,10 +109,10 @@ def create_packages(as_conf, pbs_platform):
 def test_get_header(pbs_platform):
     job = Job("dummy", 10000, Status.SUBMITTED, 0)
 
-    job.het = dict()
+    job.het = {}
     job.het["HETSIZE"] = 0
 
-    parameters = dict()
+    parameters = {}
 
     parameters['TASKS'] = '0'
     parameters['NODES'] = '0'

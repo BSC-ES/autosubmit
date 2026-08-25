@@ -18,8 +18,13 @@
 import traceback
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.database_managers.database_manager import DEFAULT_LOCAL_ROOT_DIR, DEFAULT_HISTORICAL_LOGS_DIR
-from autosubmit.history.database_managers.experiment_status_db_manager import create_experiment_status_db_manager
+from autosubmit.history.database_managers.database_manager import (
+    DEFAULT_HISTORICAL_LOGS_DIR,
+    DEFAULT_LOCAL_ROOT_DIR,
+)
+from autosubmit.history.database_managers.experiment_status_db_manager import (
+    create_experiment_status_db_manager,
+)
 from autosubmit.history.internal_logging import Logging
 
 
@@ -40,7 +45,7 @@ class ExperimentStatus:
             }
             self.manager = create_experiment_status_db_manager(BasicConfig.DATABASE_BACKEND, **options)
         except Exception:
-            message = "Error while trying to update {0} in experiment_status.".format(str(self.expid))
+            message = f"Error while trying to update {str(self.expid)} in experiment_status."
             Logging(self.expid, BasicConfig.HISTORICAL_LOG_DIR).log(message, traceback.format_exc())
             self.manager = None
 

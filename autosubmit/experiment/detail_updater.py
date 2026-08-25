@@ -22,15 +22,15 @@ import pwd
 import sqlite3
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any
 
-from sqlalchemy import Table, select, insert, delete
+from sqlalchemy import Table, delete, insert, select
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_common import get_connection_url, get_experiment_id
-from autosubmit.database.session import create_engine
+from autosubmit.database.db_common import get_experiment_id
+from autosubmit.database.session import get_engine
 from autosubmit.database.tables import TableRegistry
 
 LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
@@ -43,7 +43,7 @@ class ExperimentDetailsRepository(ABC):
     """
 
     @abstractmethod
-    def get_details(self, exp_id: int) -> Union[Dict[str, Any], None]:
+    def get_details(self, exp_id: int) -> dict[str, Any] | None:
         """
         Get the details of an experiment by its ID.
 
@@ -175,8 +175,7 @@ class ExperimentDetailsSQLAlchemyRepository(ExperimentDetailsRepository):
     def __init__(self):
         table_registry = TableRegistry(None)
         self.table: Table = table_registry.get("details")
-        connection_url = get_connection_url(BasicConfig.DB_PATH)
-        self.engine = create_engine(connection_url=connection_url)
+        self.engine = get_engine(db_path=BasicConfig.DB_PATH)
 
     def get_details(self, exp_id: int):
         with self.engine.connect() as conn:
@@ -196,24 +195,22 @@ class ExperimentDetailsSQLAlchemyRepository(ExperimentDetailsRepository):
     def upsert_details(
         self, exp_id: int, user: str, created: str, model: str, branch: str, hpc: str
     ):
-        with self.engine.connect() as conn:
-            with conn.begin():
-                conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
-                conn.execute(
-                    insert(self.table).values(
-                        exp_id=exp_id,
-                        user=user,
-                        created=created,
-                        model=model,
-                        branch=branch,
-                        hpc=hpc,
-                    )
+        with self.engine.connect() as conn, conn.begin():
+            conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
+            conn.execute(
+                insert(self.table).values(
+                    exp_id=exp_id,
+                    user=user,
+                    created=created,
+                    model=model,
+                    branch=branch,
+                    hpc=hpc,
                 )
+            )
 
     def delete_details(self, exp_id: int):
-        with self.engine.connect() as conn:
-            with conn.begin():
-                conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
+        with self.engine.connect() as conn, conn.begin():
+            conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
 
 
 def create_experiment_details_repository(
@@ -268,7 +265,7 @@ class ExperimentDetails:
             self.exp_id, self.user, self.created, self.model, self.branch, self.hpc
         )
     
-    def get_details(self) -> Union[Dict[str, Any], None]:
+    def get_details(self) -> dict[str, Any] | None:
         """
         Retrieve the last stored snapshot of the experiment's details
         from the database.

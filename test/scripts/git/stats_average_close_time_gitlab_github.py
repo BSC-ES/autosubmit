@@ -70,10 +70,9 @@ def avg_close_time_gitlab_2024():
 def avg_close_time_gitlab_2025():
     import datetime
     import os
-    import pytz
 
-    from github import Github
-    from github import Auth
+    import pytz
+    from github import Auth, Github
 
     utc = pytz.UTC
 

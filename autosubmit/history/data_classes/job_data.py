@@ -16,13 +16,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import autosubmit.history.utils as HUtils
-import autosubmit.history.database_managers.database_models as Models
 from datetime import datetime, timedelta
 from json import loads
 
+import autosubmit.history.database_managers.database_models as Models
+import autosubmit.history.utils as HUtils
 
-class JobData(object):
+
+class JobData:
     """
     Robust representation of a row in the job_data table of the experiment history database.
     """

@@ -18,13 +18,13 @@
 """Tests for ``autosubmit expid``."""
 import sqlite3
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from itertools import permutations, product
 from pathlib import Path
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Iterator, Union, cast
+from typing import TYPE_CHECKING, Any, Union, cast
 
 import pytest
 from ruamel.yaml import YAML
@@ -337,7 +337,7 @@ def test_expid_git_repo_sets_project_type_and_destination(
         "as_conf",
     )
 
-    project_data: Union[dict[str, Any], None] = None
+    project_data: dict[str, Any] | None = None
     for conf_file in conf_path.iterdir():
         if conf_file.name.lower().endswith((".yml", ".yaml")):
             with open(conf_file, "r") as file:
@@ -480,7 +480,7 @@ def test_create_expid_default_hpc(autosubmit: Autosubmit):
     )
 
     # capture the platform using the "describe"
-    describe: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(experiment_id)  # type: ignore
+    describe: tuple[str, str | datetime, str, str, str] = autosubmit.describe(experiment_id)  # type: ignore
     hpc_result = describe[4].lower()
 
     assert hpc_result == "local"
@@ -511,7 +511,7 @@ def test_create_expid_flag_hpc(fake_hpc: str, expected_hpc: str, autosubmit: Aut
     )
 
     # capture the platform using the "describe"
-    describe_experiment: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(experiment_id)  # type: ignore
+    describe_experiment: tuple[str, str | datetime, str, str, str] = autosubmit.describe(experiment_id)  # type: ignore
     hpc_result_experiment = describe_experiment[4].lower()
 
     assert hpc_result_experiment == expected_hpc
@@ -536,10 +536,10 @@ def test_copy_expid_with_flag_hpc(experiment_hpc: str, expected_hpc: str, tmp_pa
     exp_id = autosubmit.expid('experiment', hpc=experiment_hpc, minimal_configuration=True)
     copy_exp = autosubmit.expid('copy', hpc=expected_hpc, copy_id=exp_id, minimal_configuration=True)
 
-    describe: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(exp_id)  # type: ignore
+    describe: tuple[str, str | datetime, str, str, str] = autosubmit.describe(exp_id)  # type: ignore
     hpc_experiment = describe[4].lower()
 
-    describe_copy: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(copy_exp)  # type: ignore
+    describe_copy: tuple[str, str | datetime, str, str, str] = autosubmit.describe(copy_exp)  # type: ignore
     hpc_experiment_copy = describe_copy[4].lower()
 
     assert hpc_experiment != hpc_experiment_copy
@@ -574,7 +574,7 @@ def test_copy_expid(fake_hpc: str, expected_hpc: str, autosubmit: Autosubmit):
     copy_id = autosubmit.expid('copy', "", original_id)
 
     # capture the platform using the "describe"
-    describe_copy: tuple[str, Union[str, 'datetime'], str, str, str] = autosubmit.describe(copy_id)  # type: ignore
+    describe_copy: tuple[str, str | datetime, str, str, str] = autosubmit.describe(copy_id)  # type: ignore
     hpc_result_copy = describe_copy[4].lower()
 
     assert hpc_result_copy == expected_hpc
@@ -596,7 +596,7 @@ def test_copy_expid_no(autosubmit: Autosubmit):
     experiment_id = autosubmit.expid('original', fake_hpc)
     copy_experiment_id = autosubmit.expid("copy experiment", new_hpc, experiment_id)
     # capture the platform using the "describe"
-    describe: tuple[str, Union[str, "datetime"], str, str, str] = autosubmit.describe(  # type: ignore
+    describe: tuple[str, str | datetime, str, str, str] = autosubmit.describe(  # type: ignore
         copy_experiment_id
     )
     hpc_result = describe[4].lower()

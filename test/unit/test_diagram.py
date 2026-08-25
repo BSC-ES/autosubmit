@@ -25,8 +25,16 @@ from matplotlib.patches import Rectangle
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.monitor.diagram import (
-    JobData, JobAggData, build_legends, create_bar_diagram, create_csv_stats, create_stats_report, populate_statistics,
-    _get_status, _filter_by_status, _seq
+    JobAggData,
+    JobData,
+    _filter_by_status,
+    _get_status,
+    _seq,
+    build_legends,
+    create_bar_diagram,
+    create_csv_stats,
+    create_stats_report,
+    populate_statistics,
 )
 
 _EXPID = 't001'

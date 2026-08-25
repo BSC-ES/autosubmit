@@ -18,18 +18,17 @@
 import sqlite3
 
 import pytest
-from sqlalchemy import and_, create_engine, inspect, insert, select
+from sqlalchemy import and_, create_engine, insert, inspect, select
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import JobDataTable, get_table_with_schema
-from autosubmit.history.utils import get_current_datetime
 from autosubmit.history.database_managers.experiment_history_db_manager import (
-    create_experiment_history_db_manager,
     ExperimentHistoryDbManager,
     SqlAlchemyExperimentHistoryDbManager,
+    create_experiment_history_db_manager,
 )
-
-from test._oldschema import old_job_data_table, old_experiment_run_table
+from autosubmit.history.utils import get_current_datetime
+from test._oldschema import old_experiment_run_table, old_job_data_table
 
 
 def _create_old_schema(engine):
@@ -135,7 +134,6 @@ def test_create_experiment_history_db_manager_invalid():
 
 def test_functions_not_implemented(mocker):
     """Confirm that we do not implement a few functions for Postgres."""
-    mocker.patch('autosubmit.history.database_managers.experiment_history_db_manager.get_connection_url')
     mocker.patch('autosubmit.history.database_managers.experiment_history_db_manager.session')
     db_manager = SqlAlchemyExperimentHistoryDbManager(None, BasicConfig.JOBDATA_DIR)
     # NOTE: These are all parameter-less.

@@ -18,8 +18,8 @@
 """Regression tests for Slurm parallel submission helpers."""
 
 from collections import OrderedDict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import pytest
 

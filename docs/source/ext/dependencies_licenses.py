@@ -17,9 +17,10 @@
 
 from __future__ import annotations
 
-from importlib.metadata import metadata, PackageNotFoundError
+from collections.abc import Callable
+from importlib.metadata import PackageNotFoundError, metadata
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Literal
 
 import tomli
 from docutils import nodes  # type: ignore

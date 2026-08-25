@@ -59,5 +59,6 @@ def try_parse_time_to_timestamp(input_):
 
 def read_example(example_name):
     import importlib.resources as pkg_resources
+
     from autosubmit.history.platform_monitor import output_examples
     return pkg_resources.read_text(output_examples, example_name)

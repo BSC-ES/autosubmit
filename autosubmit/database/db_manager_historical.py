@@ -18,8 +18,8 @@
 """Contains code to manage a database via SQLAlchemy."""
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.db_manager import DbManager
 
 if TYPE_CHECKING:
@@ -45,7 +45,7 @@ class HistoricalDbManager(DbManager):
         else:
             historical_persistence_full_path = None
 
-        super().__init__(get_connection_url(historical_persistence_full_path), schema, True)
+        super().__init__(historical_persistence_full_path, schema, True)
         self._job_manager = job_manager
 
     def load_current_edges(self):

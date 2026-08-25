@@ -259,7 +259,7 @@ def test_clone_repository_empty_submodule_depth_list(autosubmit_config, mocker) 
     )
 
     # Force the branch under test.
-    as_conf.get_project_submodules_depth = lambda: []
+    as_conf.get_project_submodules_depth = list
     platform = mocker.Mock()
     submitter_cls = mocker.patch("autosubmit.git.autosubmit_git.ParamikoSubmitter"
     )
@@ -920,7 +920,7 @@ def test_clone_repository_submodules_empty_list_with_depth(autosubmit_config, mo
         },
     )
 
-    as_conf.get_submodules_list = lambda: []
+    as_conf.get_submodules_list = list
     as_conf.get_project_submodules_depth = lambda: [3]
 
     platform = mocker.Mock()
@@ -955,8 +955,8 @@ def test_clone_repository_submodules_empty_list_recursive(autosubmit_config, moc
         },
     )
 
-    as_conf.get_submodules_list = lambda: []
-    as_conf.get_project_submodules_depth = lambda: []
+    as_conf.get_submodules_list = list
+    as_conf.get_project_submodules_depth = list
 
     platform = mocker.Mock()
     submitter_cls = mocker.patch("autosubmit.git.autosubmit_git.ParamikoSubmitter")

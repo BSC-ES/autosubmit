@@ -35,7 +35,7 @@ _FAIL_COUNT = '0'
 pytestmark = pytest.mark.skipif(_RSCRIPT is None, reason='Rscript not found on PATH')
 
 
-def _build_script(tmp_path: 'Path', body: str, executable: str = None) -> 'Path':
+def _build_script(tmp_path: 'Path', body: str, executable: str | None = None) -> 'Path':
     """Assemble and write a runnable R script, returning its path."""
     executable = executable or _RSCRIPT
     h = as_header(platform_header='', executable=executable)

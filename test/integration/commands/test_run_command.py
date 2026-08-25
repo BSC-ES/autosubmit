@@ -16,8 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import pytest
 from ruamel.yaml import YAML
@@ -26,7 +27,11 @@ from autosubmit.log.log import AutosubmitCritical
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
-    from test.integration.conftest import AutosubmitExperiment, AutosubmitExperimentFixture
+
+    from test.integration.conftest import (
+        AutosubmitExperiment,
+        AutosubmitExperimentFixture,
+    )
 
 
 def set_up_test(
@@ -272,9 +277,7 @@ def test_run_command_plot_behavior(
 
     if "create" in command:
         assert exp.autosubmit.run_command(args=args) == 0
-    elif "setstatus" in command:
-        assert exp.autosubmit.run_command(args=args)
-    elif "recovery" in command:
+    elif "setstatus" in command or "recovery" in command:
         assert exp.autosubmit.run_command(args=args)
 
 

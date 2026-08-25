@@ -22,7 +22,6 @@ import pytest
 from sqlalchemy.schema import CreateTable
 
 from autosubmit.database import session
-from autosubmit.database.db_common import get_connection_url
 from autosubmit.database.tables import DetailsTable
 from autosubmit.experiment.detail_updater import (
     ExperimentDetails,
@@ -61,10 +60,10 @@ def test_details_properties(autosubmit_exp, mocker):
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_details_repository(tmpdir, as_db: str):
-    connection_url = get_connection_url(Path(tmpdir / 'details.db'))
-    with session.create_engine(connection_url=connection_url).connect() as conn:
-        with conn.begin():
-            conn.execute(CreateTable(DetailsTable, if_not_exists=True))
+    db_path = Path(tmpdir, 'details.db')
+    with session.get_engine(db_path=db_path).connect() as conn:
+        conn.execute(CreateTable(DetailsTable, if_not_exists=True))
+        conn.commit()
 
     details_repo = create_experiment_details_repository(as_db)
 
