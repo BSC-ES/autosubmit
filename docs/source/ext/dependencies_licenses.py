@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -19,12 +19,15 @@ from __future__ import annotations
 
 from importlib.metadata import metadata, PackageNotFoundError
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Callable, Literal, Optional
 
 import tomli
 from docutils import nodes  # type: ignore
 from docutils.nodes import Node  # type: ignore
 from packaging.requirements import Requirement
+from packaging.specifiers import SpecifierSet
+from packaging.utils import canonicalize_name
+from packaging.version import Version
 from sphinx.util import logging
 from sphinx.util.docutils import SphinxDirective
 
@@ -37,6 +40,108 @@ _PROJECT_ROOTDIR: Path = Path(__file__).parents[3]
 # Fixed table headers and column widths for typing
 TableHeader = Literal["Package", "Version Spec", "License"]
 ColumnWidth = Literal[30, 20, 50]
+
+# A ``License`` metadata field longer than this, or spanning several lines, is
+# the full licence text rather than a name, and is not usable as a table cell.
+_MAX_LICENSE_NAME_LENGTH = 64
+
+# Carries no information beyond what the other classifiers already say.
+_UNSPECIFIC_CLASSIFIERS = frozenset({"License :: OSI Approved"})
+
+_PYTHON_SUBSTITUTIONS = """
+
+.. |python_min| replace:: {minimum}
+.. |python_max| replace:: {maximum}
+.. |python_requires| replace:: {requires}
+"""
+
+
+def _load_pyproject() -> dict:
+    """Read ``pyproject.toml`` from the project root, or return an empty dict."""
+    pyproject_path: Path = Path(_PROJECT_ROOTDIR, "pyproject.toml")
+    if not pyproject_path.exists():
+        logger.warning(f"pyproject.toml not found at {pyproject_path}")
+        return {}
+
+    with pyproject_path.open("rb") as f:
+        data: dict = tomli.load(f)
+    return data
+
+
+def _license_from_metadata(md) -> str:
+    """Resolve a package's licence name from its installed metadata.
+
+    Tries, in order of decreasing reliability: the PEP 639 ``License-Expression``
+    field, the most specific ``License ::`` trove classifier, and finally the
+    legacy free-form ``License`` field.
+    """
+    # 1) PEP 639 License-Expression (Metadata 2.4+).
+    license_expression: Optional[str] = md.get("License-Expression", None)
+    if license_expression and license_expression.strip():
+        return license_expression.strip()
+
+    # 2) Trove classifiers. Prefer the most specific one, i.e. the one with the
+    #    most "::" separators, rather than whichever happens to come first.
+    license_classifiers = [
+        c for c in md.get_all("Classifier", [])
+        if c.startswith("License ::") and c.strip() not in _UNSPECIFIC_CLASSIFIERS
+    ]
+    if license_classifiers:
+        most_specific = max(license_classifiers, key=lambda c: c.count("::"))
+        return most_specific.split("::")[-1].strip()
+
+    # 3) Legacy free-form License field. Some packages put the entire licence
+    #    text here, which would blow up the table, so only accept short values.
+    raw_license: str = (md.get("License") or "").strip()
+    if raw_license and "\n" not in raw_license and len(raw_license) <= _MAX_LICENSE_NAME_LENGTH:
+        return raw_license
+
+    return "UNKNOWN"
+
+
+def _python_bounds(requires_python: str) -> tuple[str, str]:
+    """Return the (minimum, maximum) supported ``MAJOR.MINOR`` Python versions.
+
+    An exclusive upper bound such as ``<3.13`` is reported as the last version
+    it admits, ``3.12``.
+    """
+    minimum: str = ""
+    maximum: str = ""
+
+    for specifier in SpecifierSet(requires_python):
+        version = Version(specifier.version)
+        if specifier.operator in (">=", "=="):
+            minimum = f"{version.major}.{version.minor}"
+        elif specifier.operator == "<=":
+            maximum = f"{version.major}.{version.minor}"
+        elif specifier.operator == "<" and version.minor > 0:
+            maximum = f"{version.major}.{version.minor - 1}"
+
+    return minimum, maximum
+
+
+def inject_python_substitutions(app, config) -> None:
+    """Define ``|python_min|``, ``|python_max|`` and ``|python_requires|``.
+
+    The values come from ``project.requires-python`` in ``pyproject.toml``, so
+    the docs cannot drift from the packaging metadata.
+    """
+    requires_python: str = _load_pyproject().get("project", {}).get("requires-python", "")
+    if not requires_python:
+        logger.warning("No requires-python found in pyproject.toml")
+        return
+
+    minimum, maximum = _python_bounds(requires_python)
+    if not minimum or not maximum:
+        logger.warning(
+            f"Could not derive both Python bounds from requires-python={requires_python!r}"
+        )
+
+    config.rst_epilog = (config.rst_epilog or "") + _PYTHON_SUBSTITUTIONS.format(
+        minimum=minimum or requires_python,
+        maximum=maximum or requires_python,
+        requires=requires_python,
+    )
 
 
 class AutosubmitDependenciesLicensesDirective(SphinxDirective):
@@ -52,50 +157,29 @@ class AutosubmitDependenciesLicensesDirective(SphinxDirective):
     arguments: list[str]
 
     def run(self) -> list[Node]:
-        pyproject_path: Path = Path(_PROJECT_ROOTDIR, "pyproject.toml")
-        if not pyproject_path.exists():
-            logger.warning(f"pyproject.toml not found at {pyproject_path}")
-            return []
-
-        with pyproject_path.open("rb") as f:
-            data: dict = tomli.load(f)
-
-        deps: list[str] = data.get("project", {}).get("dependencies", [])
+        deps: list[str] = _load_pyproject().get("project", {}).get("dependencies", [])
         if not deps:
             logger.warning("No runtime dependencies found in pyproject.toml")
             return []
 
         rows: list[tuple[str, str, str]] = []
+        seen: set[str] = set()
         for dep in deps:
             req: Requirement = Requirement(dep)
             name: str = req.name
+
+            # pyproject.toml may list the same package twice; render it once.
+            canonical_name: str = canonicalize_name(name)
+            if canonical_name in seen:
+                logger.info(f"Skipping duplicate dependency {name}")
+                continue
+            seen.add(canonical_name)
+
             try:
-                md = metadata(name)
-
-                # 1) Try License‑Expression
-                license_expr = md.get("License‑Expression", None)
-                if license_expr:
-                    license_ = license_expr.strip()
-                    logger.info(f'Dependency {dep} license={license_}')
-                else:
-                    # 2) Try classifiers
-                    classifiers = md.get_all("Classifier", [])
-                    license_classifiers = [
-                        c for c in classifiers
-                        if c.startswith("License ::")
-                    ]
-                    if license_classifiers:
-                        # Take the most specific classifier
-                        license_ = license_classifiers[0].split("::")[-1].strip()
-                        logger.info(f'Dependency {dep} license={license_}')
-
-                    else:
-                        # 3) Fallback to the plain License field
-                        raw_license = md.get("License", "").strip()
-                        license_ = raw_license if raw_license else "UNKNOWN"
-                        logger.info(f'Dependency {dep} license={license_}')
+                license_ = _license_from_metadata(metadata(name))
             except PackageNotFoundError:
                 license_ = "NOT INSTALLED"
+            logger.info(f'Dependency {dep} license={license_}')
 
             rows.append((name, str(req.specifier) or "-", license_))
 
@@ -132,6 +216,7 @@ def setup(app) -> dict[str, object]:
         "dependencies_licenses",
         AutosubmitDependenciesLicensesDirective
     )
+    app.connect("config-inited", inject_python_substitutions)
     return {
         "version": __version__,
         "parallel_read_safe": True,
