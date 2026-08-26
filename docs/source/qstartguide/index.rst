@@ -1,8 +1,8 @@
 ===============
-Getting Started
+Getting started
 ===============
 
-This tutorial is a starter’s guide to run a dummy experiment with Autosubmit.
+This tutorial is a starter's guide to run a dummy experiment with Autosubmit.
 
 Dummy experiments run workflows with inexpensive empty tasks and therefore are ideal for teaching and testing purposes.
 
@@ -10,15 +10,15 @@ Real experiments instead run workflows with complex tasks. To read information a
 
 .. _Local Platform:
 
-Pre-requisites
-==============
+Set up password-less SSH
+========================
 
 Autosubmit needs to establish **password-less SSH connections** in order to run and monitor workflows on remote platforms.
 
 Ensure that you have a **password-less** connection to all platforms you want to use in your experiment. If you are unsure how to do this, please follow these instructions:
 
-- Open a terminal and prompt ``ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM``
-- Copy the resulting key to your platform of choice. Via SCP or ssh-copy-key.
+- Open a terminal and run ``ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM``.
+- Copy the resulting key to your platform of choice, via ``scp`` or ``ssh-copy-id``.
 
 .. code-block:: bash
 
@@ -26,58 +26,30 @@ Ensure that you have a **password-less** connection to all platforms you want to
         ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM
         # Copy the public key to the remote machine
         ssh-copy-id -i ~/.ssh/id_rsa.pub user@remotehost
-        # Add your key to ssh agent ( if encrypted )
+        # Add your key to ssh agent (if encrypted)
         # If not initialized, initialize it
         eval `ssh-agent -s`
         # Add the key
         ssh-add ~/.ssh/id_rsa
         # Where ~/.ssh/id_rsa is the path to your private key
 
-
-Description of most used commands
-=================================
-
-.. list-table::
-    :header-rows: 1
-    :widths: 20 80
-
-    * - Command
-      - Short description
-    * - **expid**
-      - Creates a new experiment and generates a new entry in the database by giving it a serial id composed of 4 letters. In addition, it also creates the folder experiment and the basic folder structure.
-    * - **create <EXPID>**
-      - Generates the experiment workflow.
-    * - **run <EXPID>**
-      - Runs the experiment workflow.
-    * - **monitor <EXPID>**
-      - Shows the experiment workflow structure and status.
-    * - **inspect <EXPID>**
-      - Generates Autosubmit scripts and batch scripts for inspection, by processing the tasks’ templates with the experiment parameters.
-    * - **refresh <EXPID>**
-      - Updates the project directory.
-    * - **recovery <EXPID>**
-      - Recovers the experiment workflow obtaining the last run complete jobs.
-    * - **setstatus <EXPID>**
-      - Sets one or multiple jobs status to a given value.
-    * - **describe <EXPID>**
-      - Displays summary information about the experiment: owner, location, creation time, model, branch, HPC platform, and description.
-    * - **report <EXPID>**
-      - Extracts the experiment parameters into a flat list (``-all``) or renders them through a user-supplied template (``-t``).
+.. seealso::
+    For host keys, proxies and shared setups, see
+    :doc:`Configuration details, setup and sharing </userguide/set_and_share_the_configuration/index>`.
 
 
 Create a new experiment
 =======================
 
-Example:
-::
+Example::
 
     autosubmit expid -dm -H "local" -d "Tutorial"
 
-- *-dm: Generates a dummy experiment.*
-- *-H: Sets the principal experiment platform.*
-- *-d: Sets a short description for the experiment.*
+- ``-dm``: Generates a dummy experiment.
+- ``-H``: Sets the principal experiment platform.
+- ``-d``: Sets a short description for the experiment.
 
-The output of the command will show the <EXPID> of the experiment and generate the following directory structure:
+The output of the command will show the ``<EXPID>`` of the experiment and generate the following directory structure:
 
 .. list-table::
     :header-rows: 1
@@ -85,16 +57,16 @@ The output of the command will show the <EXPID> of the experiment and generate t
 
     * - Experiment folder
       - Contains
-    * - conf
+    * - ``conf``
       - Experiment configuration files.
-    * - pkl
+    * - ``pkl``
       - Workflow pkl files.
-    * - plot
-      - Visualization output files
-    * - tmp
+    * - ``plot``
+      - Visualization output files.
+    * - ``tmp``
       - Logs, templates and misc files.
-    * - proj
-      - User scripts and  project code. (empty)
+    * - ``proj``
+      - User scripts and project code. (empty)
 
 
 Then, execute ``autosubmit create <EXPID>`` and Autosubmit will generate the workflow graph.
@@ -103,14 +75,19 @@ Then, execute ``autosubmit create <EXPID>`` and Autosubmit will generate the wor
     :silent-output: 1
     :prompt:
 
-Run and monitoring
-==================
+.. seealso::
+    For every ``expid`` option, and for how experiment IDs are allocated, see
+    :doc:`Create an experiment </userguide/create/index>` and
+    :doc:`Experiment IDs </userguide/expids>`.
 
- To run an experiment, use ``autosubmit run <EXPID>``. Autosubmit runs experiments performing the following operations:
+Run and monitor the experiment
+==============================
 
- - First, it **checks the experiment configuration**. If it is wrong, it won't proceed further.
- - Second, it **runs the experiment while retrieving all logs** from completed or failed tasks as they run.
- - Third, it manages all the **workflow steps by following the dependencies defined by the user** until all jobs are in COMPLETED or FAILED status. There can be jobs left in **WAITING** status if their dependencies are in **FAILED** status.
+To run an experiment, use ``autosubmit run <EXPID>``. Autosubmit runs experiments performing the following operations:
+
+- First, it **checks the experiment configuration**. If it is wrong, it won't proceed further.
+- Second, it **runs the experiment while retrieving all logs** from completed or failed tasks as they run.
+- Third, it manages all the **workflow steps by following the dependencies defined by the user** until all jobs are in ``COMPLETED`` or ``FAILED`` status. There can be jobs left in ``WAITING`` status if their dependencies are in ``FAILED`` status.
 
 While the experiment is running, it can be visualized via ``autosubmit monitor <EXPID>``.
 
@@ -125,17 +102,25 @@ While the experiment is running, it can be visualized via ``autosubmit monitor <
     :align: center
     :alt: dummy
 
-It illustrates the output of the autosubmit monitor. It describes all workflow jobs' possible status and actual status.
+It illustrates the output of ``autosubmit monitor``. It describes all workflow jobs' possible status and actual status.
 
 
 Concurrently, the ``<EXPID>/tmp`` gets filled with the cmd scripts generated by Autosubmit to run the local and remote tasks (in this case, they are sent and submitted to the remote platform(s)).
 
 Autosubmit keeps logs at ``ASLOGS`` and ``LOG_<EXPID>`` folders, which are filled up with Autosubmit's command logs and job logs.
 
-Viewing the logs
-================
+.. seealso::
+    This tutorial only covers a plain run. For the full set of run options, and for
+    restarting a workflow that stopped part-way, see
+    :doc:`Running experiments </userguide/run/index>` and
+    :doc:`Restart an experiment </userguide/modifying_workflow/index>`.
+    The monitoring output and the job statuses are covered in
+    :doc:`/userguide/monitor_and_check/index`.
 
-The ``autosubmit`` commands such as ``EXPID``, ``run``, ``monitor``, all may produce
+View the logs
+=============
+
+The ``autosubmit`` commands such as ``expid``, ``run``, ``monitor``, all may produce
 log files on the user's file system. To save the user from having to navigate to the
 log file, or to memorize the location of these files, Autosubmit provides the
 ``autosubmit cat-log`` command.
@@ -152,8 +137,12 @@ log file, or to memorize the location of these files, Autosubmit provides the
     flag in the command to tell Autosubmit you want job files generated by
     ``autosubmit inspect``, instead of job files generated by ``autosubmit run``.
 
-Inspecting the experiment
-=========================
+.. seealso::
+    For log retrieval, retention and the complete ``cat-log`` syntax, see
+    :doc:`Log operations </userguide/log_operations>`.
+
+Inspect the experiment
+======================
 
 Once an experiment exists on disk, two commands help you understand what it
 contains.
@@ -182,10 +171,16 @@ Both files land in ``<EXPID>/tmp/`` by default.
 For the template syntax and a starter template, see
 :doc:`/userguide/monitor_and_check/index`.
 
-Configuration summary
-=====================
+.. seealso::
+    For the meaning of each parameter that ``report`` emits, see
+    :doc:`Variables reference </userguide/variables>`.
+    To inspect the generated scripts before submitting anything, see
+    :doc:`Inspect and debug tools </userguide/debug/index>`.
 
- In the folder ``<EXPID>/conf`` there are different files that define the actual experiment configuration.
+Configuration files
+===================
+
+In the folder ``<EXPID>/conf`` there are different files that define the actual experiment configuration.
 
 .. list-table::
     :header-rows: 1
@@ -195,47 +190,95 @@ Configuration summary
       - Content
     * - ``expdef_<EXPID>.yml``
       -
-        * It contains the default platform, the one set with -H.
+        * It contains the default platform, the one set with ``-H``.
         * Allows changing the start dates, members and chunks.
-        * Allows changing the experiment project source ( git, local, svn or dummy)
+        * Allows changing the experiment project source (git, local, svn or dummy).
     * - ``platforms_<EXPID>.yml``
       -
         * It contains the list of platforms to use in the experiment.
         * This file contains the definitions for managing clusters, fat-nodes and support computers.
-        * This file must be filled-up with the platform(s) configuration(s).
+        * This file must be filled up with the platform(s) configuration(s).
         * Several platforms can be defined and used in the same experiment.
     * - ``jobs_<EXPID>.yml``
       -
-        - It contains the tasks' definitions in sections. Depending on the parameters, one section can generate multiple similar tasks.
-        - This file must be filled-up with the tasks' definitions.
-        - Several sections can be defined and used in the same experiment.
+        * It contains the tasks' definitions in sections. Depending on the parameters, one section can generate multiple similar tasks.
+        * This file must be filled up with the tasks' definitions.
+        * Several sections can be defined and used in the same experiment.
     * - ``autosubmit_<EXPID>.yml``
       -
-        - This file contains the definitions that impact the workflow behavior.
-        - It changes workflow behavior with parameters such as job limitations, remote_dependencies and retries.
-        - It extends autosubmit functionalities with parameters such as wrappers and mail notification.
+        * This file contains the definitions that impact the workflow behavior.
+        * It changes workflow behavior with parameters such as job limitations, ``remote_dependencies`` and retries.
+        * It extends Autosubmit functionalities with parameters such as wrappers and mail notification.
     * - ``proj_<EXPID>.yml``
       -
-        - This file contains the configuration used by the user scripts.
-        - This file is fully customizable for the current experiment. Allows setting user- parameters that will be readable by the autosubmit jobs.
+        * This file contains the configuration used by the user scripts.
+        * This file is fully customizable for the current experiment. Allows setting user parameters that will be readable by the autosubmit jobs.
+
+.. seealso::
+    Every key in these files is documented in
+    :doc:`Configure experiments </userguide/configure/index>`.
+    For dependencies between job sections, see
+    :doc:`Defining the workflow </userguide/defining_workflows/index>`; for
+    grouping several jobs into a single submission, see
+    :doc:`Wrappers </userguide/wrappers/index>`.
 
 
+Run on a remote platform
+========================
 
-Final step: Modify and run
-==========================
+It is time to look into the configuration files of the dummy experiment and modify them with a remote platform to run a workflow with a few more chunks.
 
- It is time to look into the configuration files of the dummy experiment and modify them with a remote platform to run a workflow with a few more chunks.
-
- Open expdef_<EXPID>.yml
+Open ``expdef_<EXPID>.yml``.
 
 .. runcmd:: cat /home/docs/autosubmit/a000/conf/expdef_a000.yml
 
-Now open platforms_<EXPID>.yml. Note: This will be an example for marenostrum4
+Now open ``platforms_<EXPID>.yml``. Note: this is an example for ``marenostrum4``.
 
 .. runcmd:: cat /home/docs/autosubmit/a000/conf/platforms_a000.yml
 
-``autosubmit create <EXPID>`` will generate the new workflow and ``autosubmit run <EXPID>`` will run the experiment with the latest changes. 
+``autosubmit create <EXPID>`` will generate the new workflow and ``autosubmit run <EXPID>`` will run the experiment with the latest changes.
 If you want to visualize the workflow when creating it, use the command ``autosubmit create <EXPID> -plt`` instead.
 
 .. warning::
     If you are using an encrypted key, you will need to add it to the ssh-agent before running the experiment. To do so, run ``ssh-add <path_to_key>``.
+
+.. seealso::
+    For the full set of platform keys, see
+    :doc:`Configure experiments </userguide//configure/index>`.
+    If your site maps local users to different remote users, see
+    :doc:`User mapping </userguide/user_mapping>`.
+
+
+Common commands
+===============
+
+.. list-table::
+    :header-rows: 1
+    :widths: 20 80
+
+    * - Command
+      - Short description
+    * - ``expid``
+      - Creates a new experiment and generates a new entry in the database by giving it a serial id composed of 4 letters. In addition, it also creates the folder experiment and the basic folder structure.
+    * - ``create <EXPID>``
+      - Generates the experiment workflow.
+    * - ``run <EXPID>``
+      - Runs the experiment workflow.
+    * - ``monitor <EXPID>``
+      - Shows the experiment workflow structure and status.
+    * - ``inspect <EXPID>``
+      - Generates Autosubmit scripts and batch scripts for inspection, by processing the tasks' templates with the experiment parameters.
+    * - ``refresh <EXPID>``
+      - Updates the project directory.
+    * - ``recovery <EXPID>``
+      - Recovers the experiment workflow obtaining the last run complete jobs.
+    * - ``setstatus <EXPID>``
+      - Sets one or multiple jobs status to a given value.
+    * - ``describe <EXPID>``
+      - Displays summary information about the experiment: owner, location, creation time, model, branch, HPC platform, and description.
+    * - ``report <EXPID>``
+      - Extracts the experiment parameters into a flat list (``-all``) or renders them through a user-supplied template (``-t``).
+
+.. seealso::
+    For archiving, deleting, migrating and otherwise administering experiments, see
+    :doc:`Manage experiments </userguide/manage/index>`.
