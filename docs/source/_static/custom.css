@@ -167,10 +167,41 @@ html[data-theme="dark"] .hero-logo {
     filter: invert(100%) hue-rotate(-180deg);
 }
 
-#autosubmit-workflow-manager {
+:root {
+--as-rule: #EE5B25;
 --as-accent: #4E8490;
 --as-accent-soft: rgba(78, 132, 144, .11);
---as-rule: #EE5B25;
+}
+
+html[data-theme="dark"] {
+--as-rule: #7FB3BE;
+--as-accent: #7FB3BE;
+--as-accent-soft: rgba(127, 179, 190, .15);
+}
+
+.bd-article section > h1,
+.bd-article section > h2 {
+display: table;
+}
+
+.bd-article section > h1::after,
+.bd-article section > h2::after {
+content: "";
+display: block;
+margin-top: .7rem;
+border-radius: 3px;
+background: var(--as-rule);
+}
+
+.bd-article section > h1::after {
+height: 4px;
+}
+
+.bd-article section > h2::after {
+height: 3px;
+}
+
+#autosubmit-workflow-manager {
 --sd-color-card-border: var(--as-border-light);
 --sd-color-card-background: transparent;
 --sd-color-shadow: rgba(15, 33, 38, .10);
@@ -180,29 +211,16 @@ padding-inline: 1.25rem;
 }
 
 html[data-theme="dark"] #autosubmit-workflow-manager {
---as-accent: #7FB3BE;
---as-accent-soft: rgba(127, 179, 190, .15);
---as-rule: #7FB3BE;
 --sd-color-card-border: var(--as-border-dark);
 --sd-color-shadow: rgba(0, 0, 0, .45);
 }
 
 #autosubmit-workflow-manager > section > h2 {
-display: table;
 font-size: 1.85rem;
 font-weight: 700;
 letter-spacing: -.022em;
 line-height: 1.2;
 margin: 6rem 0 1.15rem;
-}
-
-#autosubmit-workflow-manager > section > h2::after {
-content: "";
-display: block;
-height: 3px;
-margin-top: .7rem;
-border-radius: 3px;
-background: var(--as-rule);
 }
 
 #autosubmit-workflow-manager > section > h2 + p {
@@ -379,13 +397,20 @@ text-decoration: underline;
 
 @media (max-width: 700px) {
 #autosubmit-workflow-manager .as-eco .sd-card {
-flex-direction: column;
-align-items: stretch;
+padding: 1.5rem;
+min-height: 0;
 }
 
 #autosubmit-workflow-manager .as-eco .sd-card > *:not(.sd-card-body) {
-flex: none;
-padding: 1.75rem 1.75rem 0;
+position: static;
+width: auto;
+padding: 0 0 1.25rem;
+justify-content: flex-start;
+}
+
+#autosubmit-workflow-manager .as-eco img.sd-card-img-top {
+width: auto;
+max-height: 4rem;
 }
 }
 
