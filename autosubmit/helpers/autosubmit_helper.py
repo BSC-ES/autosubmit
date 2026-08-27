@@ -35,8 +35,9 @@ def handle_start_time(start_time: str) -> None:
         try:
             # Trying first parse H:M:S
             parsed_time = datetime.datetime.strptime(start_time, "%H:%M:%S")
-            target_date = datetime.datetime(datetime_now.year, datetime_now.month,
-                                            datetime_now.day, parsed_time.hour, parsed_time.minute, parsed_time.second)
+            target_date = datetime_now.replace(hour=parsed_time.hour,
+                                               minute=parsed_time.minute,
+                                               second=parsed_time.second)
         except (ValueError, TypeError, OverflowError, NotImplementedError):
             try:
                 # Trying second parse y-m-d H:M:S
