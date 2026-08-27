@@ -124,11 +124,10 @@ def new_features_2025():
     repo = g.get_repo("BSC-ES/autosubmit")
 
     issues_since_2025 = repo.get_issues(
-        since=datetime.datetime(2025, 1, 1),
+        since=datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc),
         state='closed',
     )
-    last_day_2025 = datetime.datetime(2025, 12, 31, 23, 59, 59)
-    last_day_2025 = utc.localize(last_day_2025)
+    last_day_2025 = datetime.datetime(2025, 12, 31, 23, 59, 59, tzinfo=datetime.timezone.utc)
 
     filtered_issues = []
 
