@@ -39,7 +39,7 @@ from contextlib import suppress
 from importlib.resources import files as read_files
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Union, cast
+from typing import TYPE_CHECKING, cast
 
 from bscearth.utils.date import date2str
 from portalocker import Lock

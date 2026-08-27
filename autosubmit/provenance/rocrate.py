@@ -30,7 +30,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Union, cast
+from typing import Any, cast
 
 from rocrate.model.contextentity import ContextEntity
 from rocrate.rocrate import File, ROCrate

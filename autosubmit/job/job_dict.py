@@ -17,7 +17,6 @@
 
 import datetime
 import re
-from typing import Union
 
 from bscearth.utils.date import date2str
 

@@ -20,7 +20,7 @@ import os
 import subprocess
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import autosubmit.log.utils as log_utils
 from autosubmit.config.basicconfig import BasicConfig

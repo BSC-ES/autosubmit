@@ -28,7 +28,7 @@ from multiprocessing.synchronize import Event
 # noinspection PyProtectedMember
 from os import _exit  # type: ignore
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 import setproctitle
 

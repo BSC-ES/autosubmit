@@ -18,7 +18,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import textwrap
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from autosubmit.log.log import Log
 

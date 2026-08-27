@@ -20,7 +20,6 @@
 import locale
 import re
 import shutil
-from collections import defaultdict
 from io import StringIO
 from pathlib import Path
 from typing import Any

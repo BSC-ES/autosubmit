@@ -23,7 +23,6 @@ import os
 import random
 import re
 import select
-import socket
 import sys
 from contextlib import suppress
 from io import BufferedReader

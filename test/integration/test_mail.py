@@ -16,7 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>. 
 
 from collections.abc import Callable, Generator
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 import pytest
 

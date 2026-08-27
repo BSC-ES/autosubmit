@@ -21,7 +21,6 @@ from contextlib import nullcontext as does_not_raise
 import pytest
 
 from autosubmit.database.db_manager import DbManager
-from autosubmit.database.session import get_engine
 from autosubmit.database.tables import ExperimentTable
 
 
