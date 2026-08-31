@@ -5411,11 +5411,12 @@ class Autosubmit:
                 job_list.update_list(as_conf, False, True)
                 start = time.time()
                 if save and wrongExpid == 0:
-                    job_list.recover_last_data(final_list)
-                    try:
-                        recover_stale_job_data(expid, as_conf, platforms)
-                    except Exception as e:
-                        Log.debug(f"Error while recovering stale job data: {str(e)}")
+                    if final_status in job_list._FINAL_STATUSES:
+                        job_list.recover_last_data(final_list)
+                        try:
+                            recover_stale_job_data(expid, as_conf, platforms)
+                        except Exception as e:
+                            Log.debug(f"Error while recovering stale job data: {str(e)}")
                     job_list.save()
                     end = time.time()
                     Log.info(f"JobList saved in {end - start:.2f} seconds.")
