@@ -7,6 +7,7 @@
 - The `updated_list_<EXPID>.txt` status file is now friendlier: bad lines are skipped with a warning, job names and statuses are case-insensitive, and it can't break your run.
 - Autosubmit no longer gets stuck on logs of jobs whose info was lost after an interrupted run.
 - Relaunching a finished job from the `updated_list` file now correctly resets some variables used to download the logs
+- The default for IO_SAFE_WAIT is set back to 60 seconds
 
 **Enhancements:**
 
