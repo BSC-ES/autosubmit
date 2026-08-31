@@ -203,20 +203,35 @@ def _get_git_branch_and_commit(project_path: str) -> tuple[str, str]:
     :return: a tuple where the first element is the branch, and the second the commit hash
     """
     try:
-        output = subprocess.check_output(
-            f"cd {project_path}; git rev-parse --abbrev-ref HEAD", shell=True, text=True)
+        branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=Path(project_path),
+            text=True,
+            stderr=subprocess.STDOUT,
+        ).strip()
     except subprocess.CalledProcessError as e:
-        raise AutosubmitCritical("Failed to retrieve project branch...", 7014, str(e))
-
-    project_branch = output.strip()
-    Log.debug("Project branch is: " + project_branch)
+        raise AutosubmitCritical(
+            "Failed to retrieve project branch...",
+            7014,
+            e.output.strip() if e.output else str(e),
+        ) from e
     try:
-        output = subprocess.check_output(f"cd {project_path}; git rev-parse HEAD", shell=True, text=True)
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(project_path),
+            text=True,
+            stderr=subprocess.STDOUT,
+        ).strip()
     except subprocess.CalledProcessError as e:
-        raise AutosubmitCritical("Failed to retrieve project commit SHA...", 7014, str(e))
-    project_sha = output.strip()
-    Log.debug("Project commit SHA is: " + project_sha)
-    return project_branch, project_sha
+        raise AutosubmitCritical(
+            "Failed to retrieve project commit SHA...",
+            7014,
+            e.output.strip() if e.output else str(e),
+        ) from e
+
+    Log.debug("Project branch is: " + branch)
+    Log.debug("Project commit SHA is: " + sha)
+    return branch, sha
 
 
 # Add Autosubmit Project to the RO-Crate.

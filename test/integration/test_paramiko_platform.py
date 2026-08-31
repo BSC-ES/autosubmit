@@ -552,6 +552,7 @@ def test_exec_command_socket_error(
     try:
         ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
+        assert ps_platform.transport
         ps_platform.transport.close()
 
         mocker.patch.object(ps_platform.transport, 'open_session', side_effect=error)
@@ -560,6 +561,7 @@ def test_exec_command_socket_error(
         assert stdin is not False
         assert stderr is not False
         # The stdout contents should be [b"user_name\n"]; thus the ugly list comprehension + extra code.
+        assert isinstance(stdout, ChannelFile)
         assert user == str(''.join([x.decode('UTF-8').strip() for x in stdout.readlines()]))
     finally:
         ps_platform.close_connection()
@@ -629,6 +631,7 @@ def test_fs_operations(
         assert contents.decode('UTF-8').strip() == text
         assert exp_ps_platform.read_file(str(file_not_found)) is None
 
+        assert isinstance(exp_ps_platform._ftpChannel, paramiko.SFTPClient)
         file_size = exp_ps_platform._ftpChannel.stat(str(remote_file)).st_size
         assert file_size
         assert file_size > 0
@@ -879,7 +882,7 @@ def test_get_header_serial_parallel(
     platform = job_parameters_platform.platform
 
     a_paramiko_platform_header = SlurmHeader()
-    platform._header = a_paramiko_platform_header
+    platform._header = a_paramiko_platform_header  # type: ignore[assignment]
 
     job_parameters_platform.job.processors = processors
 
@@ -897,7 +900,7 @@ def test_get_header_job_het(create_job_parameters_platform: CreateJobParametersP
     platform = job_parameters_platform.platform
 
     a_paramiko_platform_header = SlurmHeader()
-    platform._header = a_paramiko_platform_header
+    platform._header = a_paramiko_platform_header  # type: ignore[assignment]
 
     hetsize = 2
 

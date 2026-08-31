@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Utilities for Docker."""
+
 import multiprocessing
 from getpass import getuser
 from os import environ
@@ -40,7 +41,7 @@ from test.integration.test_utils.ssh import (
 
 if TYPE_CHECKING:
     from docker.models.containers import Container, ExecResult
-    from pytest_mock import MockerFixture
+    from pytest import MonkeyPatch
     from requests import Response
 
 __all__ = [
@@ -60,18 +61,23 @@ __all__ = [
     'stop_test_containers'
 ]
 
-_SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
+# Mirrored from Docker Hub: lscr.io/linuxserver/openssh-server:latest
+_SSH_DOCKER_IMAGE = 'ghcr.io/bsc-es/openssh-server:latest'
 """This is the vanilla image from LinuxServer.io, with OpenSSH. About 39MB."""
-_SSH_DOCKER_IMAGE_X11_MFA = 'autosubmit/linuxserverio-ssh-2fa-x11:latest'
+# Mirrored from Docker Hub: autosubmit/linuxserverio-ssh-2fa-x11:latest
+_SSH_DOCKER_IMAGE_X11_MFA = 'ghcr.io/bsc-es/linuxserverio-ssh-2fa-x11:latest'
 """This is our test image, built on top of LinuxServer.io's, but with MFA and X11. About 395MB."""
 _SSH_DOCKER_PASSWORD = 'password'
 """Common password used in SSH containers; we mock the SSH Client of Paramiko to avoid hassle with keys."""
 
+# Mirrored from Docker Hub: giovtorres/slurm-docker:25.11.2-v0.1.7
 _SLURM_DOCKER_IMAGE = 'giovtorres/slurm-docker:25.11.2-v0.1.7'
 """The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
 
-_GIT_DOCKER_IMAGE = 'githttpd/githttpd:latest'
+# Mirrored from Docker Hub: githttpd/githttpd:latest
+_GIT_DOCKER_IMAGE = 'ghcr.io/bsc-es/githttpd:latest'
 """The Git image used for tests where Autosubmit needs to clone a repository."""
+# Mirrored from Docker Hub: elleflorio/svn-server:latest
 _SVN_DOCKER_IMAGE = 'elleflorio/svn-server:latest'
 """The SVN image used for tests where Autosubmit needs to clone a repository."""
 
@@ -108,7 +114,7 @@ def get_containers_by_filter(filters: dict) -> list['Container']:
     GitHub Actions, for instance, where the ``ancestor`` attribute
     contains the image used.
 
-    E.g.,
+    E.g.
 
         {"ancestor": "giovtorres/slurm-docker:25.11.2-v0.1.5"}
 
@@ -144,7 +150,7 @@ def _create_git_container(git_repos_path: Path, http_port: int) -> DockerContain
 
     # The docker image ``githttpd/githttpd`` creates an HTTP server for Git
     # repositories, using the volume bound onto ``/opt/git-server`` as base
-    # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}}``.
+    # for any subdirectory, the Git URL becoming ``git/{subdirectory-name}``.
     return container
 
 
@@ -188,7 +194,7 @@ def _create_svn_container(svn_repos_path: Path, http_port: int) -> DockerContain
 
     # The docker image ``elleflorio/svn-server`` creates an HTTP server for SVN
     # repositories, using the volume bound onto ``<TBC>`` as base
-    # for any subdirectory, the SVN URL becoming ``svn/{subdirectory-name}}``.
+    # for any subdirectory, the SVN URL becoming ``svn/{subdirectory-name}``.
     return container
 
 
@@ -218,7 +224,7 @@ def get_svn_container(svn_repos_path: Path) -> tuple[DockerContainer, int]:
 
 
 def prepare_and_test_slurm_container(
-        container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: 'MockerFixture') -> None:
+        container: DockerContainer, ssh_port: int, ssh_path: Path, monkey_patch: 'MonkeyPatch') -> None:
     # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
     wait_for_logs(container, lambda logs: 'All services started' in logs)
 
@@ -263,6 +269,9 @@ def prepare_and_test_slurm_container(
 
     for authorized_keys_path in [Path('/root/.ssh/authorized_keys'), Path(f'/home/{user}/.ssh/authorized_keys')]:
         # noinspection PyProtectedMember
+        if not container._container:
+            raise ValueError('Missing container instance')
+        # noinspection PyProtectedMember
         exec_result = _write_authorized_keys(container._container, pubkey, authorized_keys_path)
         exit_code = exec_result.exit_code
 
@@ -275,7 +284,7 @@ def prepare_and_test_slurm_container(
 
     wait_for_ssh_port('localhost', ssh_port, timeout=30)
 
-    mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, mocker)
+    mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, monkey_patch)
 
 
 def _create_slurm_container(ssh_port: int) -> DockerContainer:
@@ -286,16 +295,16 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
     container instance is created per test session (a singleton).
 
     Do not repeat Autosubmit experiment IDs. Do not reuse experiment folders.
-    Doing any of these, will result in pytest failures that i. do not contain
+    Doing any of these will result in pytest failures that i. do not contain
     any meaningful information in the logs, ii. nothing useful in the ASLOGS or
     experiment temporary logs, iii. you will have to figure out how to set a
     breakpoint and inspect what is inside the Slurm server.
 
-    Avoiding these risks will save you & other developers time debugging
+    Avoiding these risks will save you and other developers time debugging
     issues like this.
 
     :param ssh_port: The SSH port.
-    :return: an instance of a TestContainers container, with a docker container wrapped,
+    :return: An instance of a TestContainers container, with a docker container wrapped,
         and the SSH configuration file path.
     """
     docker_args = {
@@ -333,7 +342,7 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
 
 def get_slurm_container() -> tuple[DockerContainer, int]:
     """Get a running Slurm container and its SSH port."""
-    # ssh_port = int(container.ports['2222/tcp'][0]['HostPort'])  # type: ignore
+    # ssh_port = int(container.ports['2222/tcp'][0]['HostPort'])
     ssh_port = get_free_port()
     # noinspection PyProtectedMember
     container_instance = _create_slurm_container(ssh_port=ssh_port)
@@ -352,7 +361,7 @@ def _write_authorized_keys(container: 'Container', public_key: Path, authorized_
 
 
 def prepare_and_test_ssh_container(
-        container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: 'MockerFixture') -> None:
+        container: DockerContainer, ssh_port: int, ssh_path: Path, monkey_patch: 'MonkeyPatch') -> None:
     exec_result = container.exec('whoami')
     if exec_result.exit_code != 0:
         raise RuntimeError(f'Failed to run whoami on test container {container.get_wrapped_container().id}')
@@ -372,9 +381,11 @@ def prepare_and_test_ssh_container(
     if exit_code != 0:
         raise RuntimeError(f'Failed to write authorized_keys to test container {container.get_wrapped_container().id}')
 
-    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context',
-                 return_value = multiprocessing.get_context('fork'))
-    mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, mocker)
+    monkey_patch.setattr(
+        'autosubmit.platforms.platform.Platform.get_mp_context',
+        lambda *args, **kwargs: multiprocessing.get_context('fork')
+    )
+    mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, monkey_patch)
 
 
 def _create_ssh_container(ssh_port: int, mfa=False, x11=False) -> DockerContainer:
