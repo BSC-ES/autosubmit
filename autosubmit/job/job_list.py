@@ -44,6 +44,7 @@ from autosubmit.database.tables import WrapperJobsTable
 from autosubmit.job.job_packages import JobPackageThread
 from autosubmit.job.job_utils import Dependency
 from autosubmit.job.job_utils import transitive_reduction
+from autosubmit.job.job_utils import change_jobs_status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.monitor.diagram import JobData
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
@@ -64,7 +65,6 @@ class JobList(object):
         self._expid = expid
         self._config = config
         self._parser_factory = parser_factory
-        self._stat_val = Status()
         self._parameters = []
         self._date_list = []
         self._member_list = []
@@ -1880,18 +1880,6 @@ class JobList(object):
             return [job for job in completed_jobs if job.packed is False]
         return completed_jobs
 
-    def get_completed_failed_without_logs(self) -> list[Job]:
-        """Returns a list of completed or failed jobs without updated logs.
-
-        :return: List of completed and failed jobs without updated logs.
-        :rtype: List[Job]
-        """
-
-        completed_failed_jobs = [job for job in self._job_list if
-                                 job.status in [Status.COMPLETED, Status.FAILED] and job.updated_log <= job.fail_count]
-
-        return completed_failed_jobs
-
     def get_uncompleted(self, platform=None, wrapper=False):
         """Returns a list of completed jobs.
 
@@ -2490,26 +2478,65 @@ class JobList(object):
             Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
             ).VALUE_TO_KEY[job.status], job.platform.name, queue)
 
-    def update_from_file(self, store_change=True):
-        """Updates jobs list on the fly from and update file
+    def update_from_file(self, store_change: bool = True) -> bool:
+        """Updates jobs list on the fly from an update file.
+
+        Active jobs (QUEUING/RUNNING/SUBMITTED) are cancelled on their platform before any
+        status change (when the platform is reachable), and active statuses cannot be set
+        as a target.
 
         :param store_change: if True, renames the update file to avoid reloading it at the next iteration
+        :return: True if an update file was found (and attempted to process), False otherwise
         """
-        if os.path.exists(os.path.join(self._persistence_path, self._update_file)):
-            Log.info(f"Loading updated list: {os.path.join(self._persistence_path, self._update_file)}")
-            for line in open(os.path.join(self._persistence_path, self._update_file)):
-                if line.strip() == '':
+        legacy_update_path = Path(self._persistence_path, self._update_file)
+        status_update_path = Path(BasicConfig.LOCAL_ROOT_DIR, self.expid, "status", self._update_file)
+        update_path = status_update_path if status_update_path.exists() else legacy_update_path
+        if not update_path.exists():
+            return False
+        Log.info(f"Loading updated list: {update_path}")
+        lines = []
+        try:
+            lines = update_path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as e:
+            Log.warning(f"Could not read the update file {update_path}: {e}")
+        jobs_by_name: dict[str, Job] = {}
+        for job in self._job_list:
+            jobs_by_name.setdefault(job.name.upper(), job)
+        job_status_pairs = []
+        for line in lines:
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            # TODO: For 4.2 change this into db call as the job may not be loaded
+            # Case-insensitive change
+            job = jobs_by_name.get(parts[0].upper())
+            if not job:
+                continue
+            status = Status.KEY_TO_VALUE.get(parts[1].upper())
+            if status is None:
+                Log.warning(f"Invalid status '{parts[1]}' for job '{parts[0]}' in {self._update_file}, skipping it")
+                continue
+            if status in Status.ACTIVE:
+                Log.warning(f"Status '{parts[1]}' for job '{parts[0]}' is active and cannot be set "
+                            f"from {self._update_file}, skipping it")
+                continue
+            elif job.status in Status.ACTIVE:
+                platform = getattr(job, "platform", None)
+                if platform is None or not platform.connected:
+                    Log.warning(f"Cannot change status of active job [{job.name}] because the connection to its "
+                                f"platform [{getattr(platform, 'name', 'unknown')}] is not available, skipping it")
                     continue
-                job = self.get_job_by_name(line.split()[0])
-                if job:
-                    job.status = self._stat_val.retval(line.split()[1])
-                    job._fail_count = 0
-            now = localtime()
-            output_date = strftime("%Y%m%d_%H%M", now)
-            if store_change:
-                move(os.path.join(self._persistence_path, self._update_file),
-                     os.path.join(self._persistence_path, self._update_file +
-                                  "_" + output_date))
+            job_status_pairs.append((job, status))
+        if job_status_pairs:
+            change_jobs_status(job_status_pairs)
+        if store_change:
+            moved_path = Path(update_path.parent,
+                              update_path.name + "_" + strftime("%Y%m%d_%H%M", localtime()))
+            try:
+                move(update_path, moved_path)
+            except OSError as e:
+                Log.warning(f"Could not move the update file {update_path}: {e}")
+        return True
 
     def get_skippable_jobs(self, jobs_in_wrapper):
         job_list_skip = [job for job in self.get_job_list() if job.skippable == "true" and
@@ -2623,6 +2650,10 @@ class JobList(object):
         jobs_to_recover = [job for job in self._job_list if
                            job.status in self._FINAL_STATUSES and job.updated_log <= job.fail_count]
         for job in jobs_to_recover:
+            if not job.id or not job.has_valid_submit_time():
+                Log.debug(f"Skipping the log recovery of {job.name} because the id/submit_time is not valid, probably lost in the recovery")
+                job.updated_log = job.fail_count + 1
+                continue
             self._recover_log(job)
         return len(jobs_to_recover) > 0
 
@@ -2809,8 +2840,12 @@ class JobList(object):
                                             related_job.date, related_job.date_format)):
                                     try:
                                         if job.status == Status.QUEUING:
-                                            job.platform.send_command(job.platform.cancel_cmd +
-                                                                      " " + str(job.id), ignore_log=True)
+                                            if not job.id:
+                                                Log.warning(
+                                                    f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+                                            else:
+                                                job.platform.send_command(job.platform.cancel_cmd +
+                                                                          " " + str(job.id), ignore_log=True)
                                     except Exception:
                                         pass  # jobid finished already
                                     job.status = Status.SKIPPED
@@ -2823,8 +2858,12 @@ class JobList(object):
                                         date2str(related_job.date, related_job.date_format)):
                                     try:
                                         if job.status == Status.QUEUING:
-                                            job.platform.send_command(job.platform.cancel_cmd +
-                                                                      " " + str(job.id), ignore_log=True)
+                                            if not job.id:
+                                                Log.warning(
+                                                    f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+                                            else:
+                                                job.platform.send_command(job.platform.cancel_cmd +
+                                                                          " " + str(job.id), ignore_log=True)
                                     except Exception:
                                         pass  # job_id finished already
                                     job.status = Status.SKIPPED
@@ -3532,35 +3571,36 @@ class JobList(object):
             return None
 
     def recover_last_data(self, finished_jobs: Optional[list["Job"]] = None) -> None:
-        """Recover job IDs and log names for completed, failed, and skipped jobs from experiment history.
+        """Recover job IDs, log names and submit time for finished jobs from experiment history.
+
+        Jobs whose id/updated_log/submit_time are still meaningful are left untouched so the
+        main loop can recover their logs. Otherwise the last known data is restored from the
+        database (when available) and the job is marked as fully recovered so the main loop
+        skips it.
 
         :param finished_jobs: Optional list of finished Job objects to recover data for.
         :return: None
         :rtype: None
         """
-        jobs_ran_atleast_once = False
         if not finished_jobs:
-            jobs_ran_atleast_once = True
             finished_jobs = self._get_jobs_by_name(
                 status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
-        # Recover job_id and log name if missing
-        if finished_jobs:
-            exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
-            jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in finished_jobs])
-            # Only if we have information already stored, otherwise the job will be downloaded later
-            for job in [job for job in finished_jobs if job.name in jobs_data]:
-                job.id = int(jobs_data[job.name]["job_id"])
-                job.local_logs = jobs_data[job.name]["out"]
-                job.remote_logs = jobs_data[job.name]["err"]
-                job.updated_log += 1
-
+        if not finished_jobs:
+            return
+        exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
+        jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in finished_jobs])
         for job in finished_jobs:
-            # TODO: Another fix will come in 4.2. Currently, if the job has no id, the log will not be recovered properly.
-            if not job.id:
-                job.id = 1
-            # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
-            if not jobs_ran_atleast_once:
-                job.updated_log += 1
+            if job.id and job.updated_log <= job.fail_count and job.has_valid_submit_time():
+                continue
+            data = jobs_data.get(job.name)
+            if data:
+                job.id = int(data["job_id"])
+                job.local_logs = data["out"]
+                job.remote_logs = data["err"]
+                if data["submit"] > 0:
+                    job.submit_time_timestamp = datetime.datetime.fromtimestamp(
+                        int(data["submit"])).strftime("%Y%m%d%H%M%S")
+            job.updated_log = job.fail_count + 1
 
     def _get_jobs_by_name(self, status: Optional[list[int]] = None, platform: Platform = None,
                           return_only_names=False) -> Union[List[str], List["Job"]]:

@@ -193,3 +193,27 @@ def test_platform_job_is_over_wallclock_force_failure(setup_as_conf, new_platfor
     job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
     job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
     assert job_status == Status.FAILED
+
+
+@pytest.mark.parametrize(
+    "platform_class, platform_name",
+    [(SlurmPlatform, "Slurm"), (PsPlatform, "PS"), (PsPlatform, "PJM")],
+    ids=["SlurmPlatform", "PsPlatform", "PjmPlatform"]
+)
+@pytest.mark.parametrize(
+    "invalid_id",
+    [0, None, ""],
+    ids=["zero", "none", "empty"],
+)
+def test_platform_job_is_over_wallclock_skips_cancel_for_invalid_id(
+        invalid_id, setup_as_conf, new_platform_mock, platform_class, platform_name, mocker):
+    """Test that an over-wallclock job without a valid id is failed without a cancel command."""
+    platform_instance = platform_class("dummy", f"{platform_name}-dummy", setup_as_conf.experiment_data)
+    job = Job("dummy-1", invalid_id, Status.RUNNING, 0)
+    setup_jobs([job], platform_instance)
+    platform_instance.get_completed_job_names = mocker.MagicMock(return_value=[])
+    platform_instance.send_command = mocker.MagicMock()
+    job.start_time_timestamp = (datetime.now() - timedelta(minutes=2)).strftime('%Y%m%d%H%M%S')
+    job_status = platform_instance.job_is_over_wallclock(job, Status.RUNNING, True)
+    assert job_status == Status.FAILED
+    platform_instance.send_command.assert_not_called()

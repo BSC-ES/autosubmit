@@ -135,7 +135,7 @@ class Platform:
     worker_events: list[Event] = []
     # Shared lock between the main process and a retrieval log process
     lock = multiprocessing.Lock()
-    IO_SAFE_WAIT = 0
+    IO_SAFE_WAIT = 60
 
     def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
         """Initializes the Platform object with the given experiment ID, platform name, configuration,

@@ -496,7 +496,7 @@ def as_db(request: 'FixtureRequest', autosubmit: Autosubmit, tmp_path: 'LocalPat
         # Replace the backend with postgres (default is sqlite)
         user = postgres_server.env['POSTGRES_USER']
         password = postgres_server.env['POSTGRES_PASSWORD']
-        port = postgres_server.ports[5432]
+        port = postgres_server.get_exposed_port(5432)
         db = request.node.name
         if '[' in db:
             db = db.split('[')[0]

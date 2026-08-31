@@ -2230,6 +2230,23 @@ class Job(object):
         """Reset job log counters."""
         self.updated_log = 0
 
+    def apply_status(self, status: int) -> None:
+        """Apply a new status, resetting the per-attempt state when the job will run again.
+
+        Statuses in :attr:`Status.RE_RUNNABLE` (e.g. WAITING, READY) mean the job will be
+        scheduled again, so attempt counters, stale scheduler id and log recovery state are
+        reset to guarantee the new run starts clean (and its logs are recovered).
+
+        :param status: Numeric status value from :class:`Status`.
+        :type status: int
+        """
+        self.prev_status = self.status
+        self.status = status
+        if status in Status.RE_RUNNABLE:
+            self.fail_count = 0
+            self.reset_logs()
+            self.id = None
+
     def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
         """Find and substitute dynamic placeholders in `parameters` using the provided
         Autosubmit configuration helpers.
@@ -2833,6 +2850,16 @@ class Job(object):
         """Convert a date string in the format YYYYMMDDHHMMSS to epoch time."""
         return int(datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S").timestamp())
 
+    def has_valid_submit_time(self) -> bool:
+        """Whether the submit time can be used for log recovery."""
+        if not self.submit_time_timestamp:
+            return False
+        try:
+            self._datestr_to_epoch(str(self.submit_time_timestamp))
+        except ValueError:
+            return False
+        return True
+
     def write_end_time(self, completed, count=-1):
         """Writes end timestamp to TOTAL_STATS file and jobs_data.db
         :param completed: True if the job has been completed, False otherwise
@@ -3186,7 +3213,10 @@ class WrapperJob(Job):
         if not over_wallclock:
             return False
 
-        self.platform.cancel_jobs([self.id])
+        if not self.id:
+            Log.warning(f"Skipping cancellation of wrapper job [{self.name}] with invalid ID: {self.id}")
+        else:
+            self.platform.cancel_jobs([self.id])
         self.new_status = Status.FAILED
         for inner_job in self.job_list:
             if inner_job.new_status == Status.RUNNING:

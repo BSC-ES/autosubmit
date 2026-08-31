@@ -19,6 +19,7 @@
 
 import shutil
 from copy import copy
+from datetime import datetime
 from pathlib import Path
 from random import randrange
 from typing import Callable
@@ -1043,3 +1044,61 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     job_list._job_list.append(Job("test_job", "1", Status.COMPLETED, 0))
 
     job_list.recover_last_data()
+
+
+def _finished_job(name="job1", status=Status.COMPLETED, fail_count=0, updated_log=0,
+                  submit_time=None, job_id=0):
+    job = Job("a000", "1", status, 0)
+    job.name = name
+    job.fail_count = fail_count
+    job.updated_log = updated_log
+    job.submit_time_timestamp = submit_time
+    job.id = job_id
+    return job
+
+
+@pytest.fixture
+def job_list(as_conf):
+    return JobList(_EXPID, as_conf, YAMLParserFactory(), JobListPersistencePkl())
+
+
+@pytest.mark.parametrize(
+    "job, db_data, expected_id, expected_submit_time, expected_updated_log",
+    [
+        (_finished_job(fail_count=2, updated_log=1, submit_time="20250101120000", job_id=42),
+         {"job_id": 7, "out": "o", "err": "e", "submit": 1700000000},
+         42, "20250101120000", 1),
+        (_finished_job(fail_count=2, submit_time=0),
+         {"job_id": 7, "out": "job1.0.out", "err": "job1.0.err", "submit": 1700000000},
+         7, datetime.fromtimestamp(1700000000).strftime("%Y%m%d%H%M%S"), 3),
+        (_finished_job(fail_count=1, submit_time=0),
+         {}, 0, 0, 2),
+    ],
+    ids=["meaningful-left-untouched", "restores-last-known-from-db", "marks-without-db-data"],
+)
+def test_recover_last_data(job_list, mocker, job, db_data, expected_id, expected_submit_time,
+                           expected_updated_log):
+    job_list._job_list.append(job)
+    mock_exp = mocker.patch("autosubmit.job.job_list.ExperimentHistory")
+    mock_exp.return_value.manager.get_jobs_data_last_row.return_value = {job.name: db_data} if db_data else {}
+
+    job_list.recover_last_data()
+
+    assert job.id == expected_id
+    assert job.submit_time_timestamp == expected_submit_time
+    assert job.updated_log == expected_updated_log
+
+
+@pytest.mark.parametrize("job, expected_calls", [
+    (_finished_job(submit_time=0), 0),
+    (_finished_job(submit_time="20250101120000", job_id=42), 1),
+], ids=["skips-invalid", "recovers-valid"])
+def test_recover_logs(job_list, mocker, job, expected_calls):
+    job_list._job_list.append(job)
+    mock_recover = mocker.patch.object(JobList, "_recover_log")
+
+    assert job_list.recover_logs() is True
+    assert mock_recover.call_count == expected_calls
+    if expected_calls == 0:
+        assert job.updated_log == job.fail_count + 1
+        assert job_list.recover_logs() is False
