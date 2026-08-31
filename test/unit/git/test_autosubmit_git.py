@@ -324,8 +324,10 @@ def test_clone_repository_existing_project_skips_clone(autosubmit_config, mocker
     assert clone_repository(as_conf, False)
 
 
-def test_clone_repository_force_removes_existing_project(autosubmit_config, mocker, tmp_path: Path) -> None:
-    """Verify that ``force=True`` removes the existing project directory."""
+def test_clone_repository_force_backup_enabled_moves_aside(
+    autosubmit_config, mocker
+) -> None:
+    """With backup opt-in enabled, force moves the existing project aside (legacy behavior)."""
     as_conf = autosubmit_config(
         _EXPID,
         experiment_data={
@@ -342,20 +344,62 @@ def test_clone_repository_force_removes_existing_project(autosubmit_config, mock
         },
     )
 
-    platform = mocker.Mock()
+    # Opt into the legacy backup behavior.
+    as_conf.get_git_project_backup = lambda: True
 
+    platform = mocker.Mock()
     submitter_cls = mocker.patch("autosubmit.git.autosubmit_git.ParamikoSubmitter")
-    submitter_cls.return_value.platforms = {
-        as_conf.get_platform(): platform,
-    }
+    submitter_cls.return_value.platforms = {as_conf.get_platform(): platform}
+
+    project_path = (
+        Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid / BasicConfig.LOCAL_PROJ_DIR
+    )
+
+    mocker.patch(
+        "autosubmit.git.autosubmit_git.os.path.exists",
+        side_effect=lambda p: p == str(project_path),
+    )
+    move = mocker.patch("autosubmit.git.autosubmit_git.shutil.move")
+    mocker.patch("autosubmit.git.autosubmit_git.shutil.rmtree")
+
+    clone_repository(as_conf, True)
+
+    move.assert_called_once()
+
+
+def test_clone_repository_force_clean_tree_rmtrees_without_backup(
+    autosubmit_config, mocker, tmp_path: Path
+) -> None:
+    """With backup disabled (default) and a clean tree, force rmtrees the project directly."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "GIT": {
+                "PROJECT_ORIGIN": "https://github.com/user/repo.git",
+                "PROJECT_BRANCH": "main",
+                "PROJECT_COMMIT": "",
+                "REMOTE_CLONE_ROOT": "workflow",
+            },
+            "PROJECT": {
+                "PROJECT_TYPE": "GIT",
+                "PROJECT_DESTINATION": "git_project",
+            },
+        },
+    )
+
+    # Default: backup disabled.
+    as_conf.get_git_project_backup = lambda: False
+
+    platform = mocker.Mock()
+    submitter_cls = mocker.patch("autosubmit.git.autosubmit_git.ParamikoSubmitter")
+    submitter_cls.return_value.platforms = {as_conf.get_platform(): platform}
 
     project_path = tmp_path / as_conf.expid / "proj"
     destination = project_path / as_conf.get_project_destination()
 
     def fake_exists(path: str) -> bool:
-        """Return True only for the paths used by this test."""
-        path = Path(path)
-        return path == project_path or path == destination
+        p = Path(path)
+        return p == project_path or p == destination
 
     mocker.patch("autosubmit.git.autosubmit_git.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
     mocker.patch("autosubmit.git.autosubmit_git.os.path.exists", side_effect=fake_exists)
@@ -365,15 +409,14 @@ def test_clone_repository_force_removes_existing_project(autosubmit_config, mock
 
     clone_repository(as_conf, True)
 
-    move.assert_called_once()
+    move.assert_not_called()
     rmtree.assert_called_once()
 
 
-def test_clone_repository_force_creates_backup(
-    autosubmit_config,
-    mocker,
+def test_clone_repository_force_aborts_on_uncommitted_changes(
+    autosubmit_config, mocker, tmp_path: Path
 ) -> None:
-    """Verify that ``force=True`` creates a backup of an existing project."""
+    """With backup disabled and uncommitted changes, force aborts and touches nothing."""
     as_conf = autosubmit_config(
         _EXPID,
         experiment_data={
@@ -390,29 +433,89 @@ def test_clone_repository_force_creates_backup(
         },
     )
 
+    as_conf.get_git_project_backup = lambda: False
+
     platform = mocker.Mock()
-
     submitter_cls = mocker.patch("autosubmit.git.autosubmit_git.ParamikoSubmitter")
-    submitter_cls.return_value.platforms = {
-        as_conf.get_platform(): platform,
-    }
+    submitter_cls.return_value.platforms = {as_conf.get_platform(): platform}
 
-    project_path = (
-        Path(BasicConfig.LOCAL_ROOT_DIR)
-        / as_conf.expid
-        / BasicConfig.LOCAL_PROJ_DIR
+    project_path = tmp_path / as_conf.expid / "proj"
+    destination = project_path / as_conf.get_project_destination()
+    # Create a real .git so the pre-flight fires.
+    (destination / ".git").mkdir(parents=True)
+
+    mocker.patch("autosubmit.git.autosubmit_git.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
+    mocker.patch(
+        "autosubmit.git.autosubmit_git.os.path.exists",
+        side_effect=lambda p: Path(p) == project_path,
+    )
+    mocker.patch(
+        "autosubmit.git.autosubmit_git._get_uncommitted_code",
+        return_value=" M file.py\n",
     )
 
-    def fake_exists(path: str) -> bool:
-        return path == str(project_path)
-
-    mocker.patch("autosubmit.git.autosubmit_git.os.path.exists", side_effect=fake_exists)
     move = mocker.patch("autosubmit.git.autosubmit_git.shutil.move")
-    mocker.patch("autosubmit.git.autosubmit_git.shutil.rmtree")
+    rmtree = mocker.patch("autosubmit.git.autosubmit_git.shutil.rmtree")
 
-    clone_repository(as_conf, True)
+    with pytest.raises(AutosubmitCritical):
+        clone_repository(as_conf, True)
 
-    move.assert_called_once()
+    move.assert_not_called()
+    rmtree.assert_not_called()
+
+
+def test_clone_repository_force_aborts_on_unpushed_commits(
+    autosubmit_config, mocker, tmp_path: Path
+) -> None:
+    """With backup disabled and unpushed commits, force aborts and touches nothing."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "GIT": {
+                "PROJECT_ORIGIN": "https://github.com/user/repo.git",
+                "PROJECT_BRANCH": "main",
+                "PROJECT_COMMIT": "",
+                "REMOTE_CLONE_ROOT": "workflow",
+            },
+            "PROJECT": {
+                "PROJECT_TYPE": "GIT",
+                "PROJECT_DESTINATION": "git_project",
+            },
+        },
+    )
+
+    as_conf.get_git_project_backup = lambda: False
+
+    platform = mocker.Mock()
+    submitter_cls = mocker.patch("autosubmit.git.autosubmit_git.ParamikoSubmitter")
+    submitter_cls.return_value.platforms = {as_conf.get_platform(): platform}
+
+    project_path = tmp_path / as_conf.expid / "proj"
+    destination = project_path / as_conf.get_project_destination()
+    (destination / ".git").mkdir(parents=True)
+
+    mocker.patch("autosubmit.git.autosubmit_git.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
+    mocker.patch(
+        "autosubmit.git.autosubmit_git.os.path.exists",
+        side_effect=lambda p: Path(p) == project_path,
+    )
+    mocker.patch(
+        "autosubmit.git.autosubmit_git._get_uncommitted_code",
+        return_value=None,
+    )
+    mocker.patch(
+        "autosubmit.git.autosubmit_git._get_code_not_pushed",
+        return_value="abc123 Commit message\n",
+    )
+
+    move = mocker.patch("autosubmit.git.autosubmit_git.shutil.move")
+    rmtree = mocker.patch("autosubmit.git.autosubmit_git.shutil.rmtree")
+
+    with pytest.raises(AutosubmitCritical):
+        clone_repository(as_conf, True)
+
+    move.assert_not_called()
+    rmtree.assert_not_called()
 
 
 def test_clone_repository_without_single_branch(autosubmit_config, mocker) -> None:
@@ -645,7 +748,7 @@ def test_clone_repository_remote_clone_root_with_trailing_slash(autosubmit_confi
 
 
 def test_clone_repository_clone_failure_restores_backup(autosubmit_config, mocker) -> None:
-    """Verify failed clones restore the backup project."""
+    """With backup opt-in, a failed clone restores from the backup."""
     as_conf = autosubmit_config(
         _EXPID,
         experiment_data={
@@ -660,13 +763,13 @@ def test_clone_repository_clone_failure_restores_backup(autosubmit_config, mocke
             },
         },
     )
+    as_conf.get_git_project_backup = lambda: True
 
     mocker.patch("autosubmit.git.autosubmit_git.time", return_value=123)
 
     project_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _EXPID / BasicConfig.LOCAL_PROJ_DIR
     backup_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _EXPID / "proj_123"
 
-    # noinspection PyUnusedLocal
     def check_output(command, shell):
         if command == "git --version":
             return b"git version 2.39.0\n"
@@ -676,17 +779,19 @@ def test_clone_repository_clone_failure_restores_backup(autosubmit_config, mocke
 
     mocker.patch(
         "autosubmit.git.autosubmit_git.os.path.exists",
-        side_effect=lambda path: path == str(backup_path),
+        side_effect=lambda path: path in (str(project_path), str(backup_path)),
     )
 
     rmtree = mocker.patch("autosubmit.git.autosubmit_git.shutil.rmtree")
     move = mocker.patch("autosubmit.git.autosubmit_git.shutil.move")
 
     with pytest.raises(AutosubmitCritical):
-        clone_repository(as_conf, False)
+        clone_repository(as_conf, True)   # force=True so backup path can fire
 
+    assert move.call_count == 2
+    move.assert_any_call(str(project_path), str(backup_path))
+    move.assert_any_call(str(backup_path), str(project_path))
     rmtree.assert_called_once_with(str(project_path))
-    move.assert_called_once_with(str(backup_path), str(project_path))
 
 
 def test_clone_repository_clone_failure_without_backup(autosubmit_config, mocker) -> None:
@@ -753,7 +858,7 @@ def test_clone_repository_submodule_failure_returns_false(autosubmit_config, moc
 
 
 def test_clone_repository_removes_backup_after_success(autosubmit_config, mocker) -> None:
-    """Verify successful clones remove old backups."""
+    """With backup opt-in, a successful clone removes the backup it created."""
     as_conf = autosubmit_config(_EXPID, experiment_data={
         "GIT": {
             "PROJECT_ORIGIN": "https://github.com/user/repo.git",
@@ -767,26 +872,34 @@ def test_clone_repository_removes_backup_after_success(autosubmit_config, mocker
         },
     })
 
-    platform = mocker.Mock()
+    as_conf.get_git_project_backup = lambda: True
 
+    platform = mocker.Mock()
     submitter_cls = mocker.patch("autosubmit.git.autosubmit_git.ParamikoSubmitter")
-    submitter_cls.return_value.platforms = {
-        as_conf.get_platform(): platform,
-    }
+    submitter_cls.return_value.platforms = {as_conf.get_platform(): platform}
+
+    mocker.patch("autosubmit.git.autosubmit_git.time", return_value=123)
+
+    project_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _EXPID / BasicConfig.LOCAL_PROJ_DIR
+    backup_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _EXPID / "proj_123"
 
     def fake_exists(path):
-        return "proj_" in str(path)
+        return path in (str(project_path), str(backup_path))
 
     mocker.patch(
         "autosubmit.git.autosubmit_git.os.path.exists",
         side_effect=fake_exists,
     )
 
+    move = mocker.patch("autosubmit.git.autosubmit_git.shutil.move")
     rmtree = mocker.patch("autosubmit.git.autosubmit_git.shutil.rmtree")
 
-    clone_repository(as_conf, False)
+    clone_repository(as_conf, True)
 
-    rmtree.assert_called_once()
+    # Backup was created
+    move.assert_called_once_with(str(project_path), str(backup_path))
+    # Backup was removed at the end
+    rmtree.assert_called_once_with(str(backup_path))
 
 
 def test_clone_repository_submodules_empty_list_with_depth(autosubmit_config, mocker) -> None:
