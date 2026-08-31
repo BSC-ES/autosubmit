@@ -23,6 +23,7 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
 )
 from autosubmit.job.job_common import Status
+from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical
@@ -33,6 +34,19 @@ def reset(as_exp_, target="WAITING"):
     job_list_ = as_exp_.autosubmit.load_job_list(
         as_exp_.expid, as_exp_.as_conf, new=False
     )
+
+    if target.upper() == "RUNNING":
+        # Active statuses cannot be set via set_status, so emulate the online state directly.
+        # Platforms must be attached for the job list to be saved (status log reads job.queue).
+        submitter = ParamikoSubmitter(as_conf=as_exp_.as_conf)
+        hpcarch = as_exp_.as_conf.get_platform()
+        for job in job_list_.get_job_list():
+            job.platform_name = (as_exp_.as_conf.jobs_data.get(job.section, {}).get("PLATFORM", "").upper()
+                                 or hpcarch)
+            job.platform = submitter.platforms[job.platform_name]
+            job.status = Status.RUNNING
+        job_list_.save()
+        return job_list_
 
     job_names = " ".join([job.name for job in job_list_.get_job_list()])
     do_setstatus(as_exp_, fl=job_names, target=target)
@@ -705,16 +719,25 @@ def test_update_from_file_applies_status_and_handles_file(job_list, store_change
     job = job_list.get_job_list()[0]
     job.status = Status.READY if new_status == Status.WAITING else Status.WAITING
     job.fail_count = 2
+    job.updated_log = 1
+    job.id = "42"
     update_file = _write_update_file(job_list, f"{job.name} {_status_token(new_status)}", in_status=in_status)
 
     result = job_list.update_from_file(store_change=store_change)
 
     assert result is True
     assert job.status == new_status
-    assert job.fail_count == 0
     assert update_file.exists() is file_kept
     if not file_kept:
         assert len(list(update_file.parent.glob(job_list._update_file + "_*"))) == 1
+    if new_status in Status.RE_RUNNABLE:
+        assert job.fail_count == 0
+        assert job.updated_log == 0
+        assert job.id is None
+    else:
+        assert job.fail_count == 2
+        assert job.updated_log == 1
+        assert job.id == "42"
 
 
 @pytest.mark.parametrize("line, expected_status, expected_warning", [
@@ -790,3 +813,70 @@ def test_update_list_save_follows_store_change(job_list, as_exp, store_change, e
     _write_update_file(job_list, f"{job.name} COMPLETED")
 
     assert job_list.update_list(as_exp.as_conf, store_change=store_change) is expected
+
+
+ACTIVE_STATUSES = list(Status.ACTIVE)
+
+
+@pytest.mark.parametrize("active_status", ACTIVE_STATUSES, ids=lambda s: _status_token(s).lower())
+def test_update_from_file_cancels_active_job(job_list, mocker, active_status):
+    """Test that moving an active job to a re-runnable status cancels it on its platform first."""
+    job = job_list.get_job_list()[0]
+    job.status = active_status
+    job.id = "123"
+    job.platform = mocker.MagicMock()
+    job.platform.connected = True
+    job.platform.name = "slurm"
+    _write_update_file(job_list, f"{job.name} WAITING")
+
+    result = job_list.update_from_file()
+
+    assert result is True
+    job.platform.cancel_jobs.assert_called_once_with(["123"])
+    assert job.status == Status.WAITING
+    assert job.fail_count == 0
+    assert job.updated_log == 0
+    assert job.id is None
+
+
+@pytest.mark.parametrize("active_status", ACTIVE_STATUSES, ids=lambda s: _status_token(s).lower())
+def test_update_from_file_skips_active_target(job_list, mocker, active_status):
+    """Test that an active status cannot be set as a target from the update file."""
+    job = job_list.get_job_list()[0]
+    job.status = Status.WAITING
+    _write_update_file(job_list, f"{job.name} {_status_token(active_status)}")
+    mock_warning = mocker.patch("autosubmit.job.job_list.Log.warning")
+
+    result = job_list.update_from_file()
+
+    assert result is True
+    assert job.status == Status.WAITING
+    assert any("active" in call.args[0] for call in mock_warning.call_args_list)
+
+
+@pytest.mark.parametrize("active_status", ACTIVE_STATUSES, ids=lambda s: _status_token(s).lower())
+def test_set_status_rejects_active_targets(as_exp, active_status):
+    """Test that active statuses cannot be set as a target via set_status."""
+    fl = f"{as_exp.expid}_20200101_fc0_1_1_LOCALJOB"
+    with pytest.raises(AutosubmitCritical):
+        do_setstatus(as_exp, fl=fl, target=_status_token(active_status))
+
+
+@pytest.mark.parametrize("active_status", ACTIVE_STATUSES, ids=lambda s: _status_token(s).lower())
+def test_update_from_file_skips_active_job_without_connection(job_list, mocker, active_status):
+    """Test that an active job whose platform is unreachable keeps its status to avoid a double submit."""
+    job = job_list.get_job_list()[0]
+    job.status = active_status
+    job.id = "123"
+    job.platform = mocker.MagicMock()
+    job.platform.connected = False
+    job.platform.name = "slurm"
+    _write_update_file(job_list, f"{job.name} WAITING")
+    mock_warning = mocker.patch("autosubmit.job.job_list.Log.warning")
+
+    result = job_list.update_from_file()
+
+    assert result is True
+    job.platform.cancel_jobs.assert_not_called()
+    assert job.status == active_status
+    assert any("connection" in call.args[0] for call in mock_warning.call_args_list)

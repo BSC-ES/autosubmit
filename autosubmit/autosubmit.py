@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from collections import defaultdict
 import argparse
 import copy
 import datetime
@@ -76,7 +75,7 @@ from autosubmit.job.job_list import JobList
 from autosubmit.job.job_list_persistence import JobListPersistence, JobListPersistenceDb, JobListPersistencePkl
 from autosubmit.job.job_package_persistence import JobPackagePersistence
 from autosubmit.job.job_packager import JobPackager
-from autosubmit.job.job_utils import SubJob, SubJobManager
+from autosubmit.job.job_utils import SubJob, SubJobManager, change_jobs_status
 from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
@@ -4636,32 +4635,26 @@ class Autosubmit:
             final_list: list["Job"],
             save: bool,
             definitive_platforms: list[str],
-            platforms: dict[str, ParamikoPlatform],
     ) -> dict[str, str]:
         """Apply a status change to all jobs in final_list and cancel active jobs on their platforms.
 
-        Iterates over ``final_list``, skipping jobs already at ``final_status``.
-        For jobs moving out of an active status, the platform connection is verified
-        and a batch cancel command is queued. All queued cancels are dispatched
-        once after the loop.
+        Iterates over ``final_list``, skipping jobs already at ``final_status``. For jobs whose
+        current status is ACTIVE, the platform connection is verified against ``definitive_platforms``
+        and the job is skipped if it cannot be reached. The actual cancellation (batched per
+        platform) and status application are delegated to :func:`change_jobs_status`.
 
         :param final: Human-readable name of the target status.
         :param final_status: Numeric status value to assign.
         :param final_list: Jobs selected for the status change.
         :param save: Whether changes should be persisted.
         :param definitive_platforms: Names of platforms with a confirmed connection.
-        :param platforms: Mapping of platform name to Platform instance.
         :return: Mapping of job name to ``"old_status -> new_status"`` strings.
         """
-        performed_changes: dict[str, str] = {}
-        batch_cancel_commands: dict[str, list[str]] = defaultdict(list)
-        _active_statuses = {Status.QUEUING, Status.RUNNING, Status.SUBMITTED}
-
+        job_status_pairs: list[tuple[Job, int]] = []
         for job in final_list:
             if job.status == final_status:
                 continue
-
-            if save and job.status in _active_statuses and final_status not in _active_statuses:
+            if save and job.status in Status.ACTIVE:
                 if job.platform.name not in definitive_platforms:
                     Log.error(
                         f"Cannot change status of job [{job.name}] because the connection to its "
@@ -4671,23 +4664,11 @@ class Autosubmit:
                     )
                     Log.error(f"Job [{job.name}] status will remain as {Status.VALUE_TO_KEY[job.status]}.")
                     continue
-                if not job.id:
-                    Log.warning(f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
-                else:
-                    batch_cancel_commands[job.platform.name].append(f"{job.platform.cancel_cmd} {job.id}; ")
-
-            performed_changes[job.name] = f"{Status.VALUE_TO_KEY[job.status]} -> {final}"
-            job.status = final_status
-            Log.info(f"CHANGED: job: {job.name} status to: {final}")
-            Log.status(f"CHANGED: job: {job.name} status to: {final}")
-
-        if save and batch_cancel_commands:
-            for platform_name, cancel_cmds in batch_cancel_commands.items():
-                try:
-                    platforms[platform_name].send_command("".join(cancel_cmds), ignore_log=True)
-                except Exception as e:
-                    Log.error(f"Failed to send batch cancel command to platform {platform_name}: {e}")
-
+            job_status_pairs.append((job, final_status))
+        performed_changes = change_jobs_status(job_status_pairs, cancel_active=save)
+        for job_name in performed_changes:
+            Log.info(f"CHANGED: job: {job_name} status to: {final}")
+            Log.status(f"CHANGED: job: {job_name} status to: {final}")
         return performed_changes
 
     @staticmethod
@@ -5380,6 +5361,17 @@ class Autosubmit:
                 jobs_to_set_status = job_list.get_job_list()
                 selected_job_names = {job.name for job in jobs_to_set_status}
                 final_status = Autosubmit._get_status(final)
+                if final_status is None:
+                    raise AutosubmitCritical(
+                        f"Invalid status '{final}'. Expected one of {Status.VALUE_TO_KEY.keys()}",
+                        7011,
+                    )
+                if final_status in Status.ACTIVE:
+                    raise AutosubmitCritical(
+                        f"Cannot set jobs to the active status '{final}'. Active statuses "
+                        f"(SUBMITTED, QUEUING, RUNNING) cannot be set via set_status.",
+                        7011,
+                    )
 
                 Log.info("Filtering jobs...")
 
@@ -5400,7 +5392,7 @@ class Autosubmit:
                 # Time to change status
                 Log.info(f"The selected number of jobs to change is: {len(final_list)}")
                 performed_changes = Autosubmit.change_status(
-                    final, final_status, final_list, save, definitive_platforms, platforms
+                    final, final_status, final_list, save, definitive_platforms
                 )
 
                 if performed_changes:
@@ -5515,6 +5507,8 @@ class Autosubmit:
             return Status.RUNNING
         elif s == 'QUEUING':
             return Status.QUEUING
+        elif s == 'SUBMITTED':
+            return Status.SUBMITTED
         elif s == 'UNKNOWN':
             return Status.UNKNOWN
 
