@@ -135,6 +135,7 @@ def test_time_verdicts(baseline_time, current_time, expected, expected_delta):
     pytest.param("Total Dependencies", 7, 8, "WARN", id="total-deps-change-warns"),
     pytest.param("Total Jobs", 7, 7, "PASS", id="total-jobs-unchanged-passes"),
     pytest.param("Total Dependencies", 7, 7, "PASS", id="total-deps-unchanged-passes"),
+    pytest.param("Total Jobs", 7.9, 7.1, "WARN", id="total-jobs-fractional-change-warns"),
 ])
 def test_exact_metric_change_warns(metric, baseline_val, current_val, expected):
     baseline = _make_run(_make_entry("create", "create", "fc0_1_1", 0.7,
@@ -172,7 +173,7 @@ def test_current_directory_uses_newest_run_only(tmp_path: Path):
     os.utime(older, (now - 10, now - 10))
     os.utime(newer, (now, now))
 
-    files = compare._iter_run_files(str(tmp_path), latest_only=True)
+    files = compare._iter_run_files(str(tmp_path))
     assert files == [newer]
 
 

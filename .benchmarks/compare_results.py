@@ -142,18 +142,16 @@ def _load_thresholds(path: Path) -> dict:
     return {"metrics": metrics, "exact_metrics": exact, "plot": plot_cfg}
 
 
-def _iter_run_files(path: str | None, latest_only: bool = False) -> list[Path]:
-    """Return the pytest-benchmark JSON files under ``path`` (file or dir).
+def _iter_run_files(path: str | None) -> list[Path]:
+    """Return the pytest-benchmark JSON file under ``path`` (file or dir).
 
-    When ``latest_only`` is set and ``path`` is a directory, only the most
-    recently modified run file is returned. This is used for the ``--current``
-    argument so the merged file of the latest run is the one compared.
+    When ``path`` is a directory, only the most recently modified run file is
+    returned: the workflow merges each run into a single file per invocation,
+    so the latest run is the one compared.
 
     :param path: Path to a benchmark run file or directory, or None.
     :type path: str | None
-    :param latest_only: Whether to return only the most recent file.
-    :type latest_only: bool
-    :return: List of benchmark run file paths.
+    :return: List with the benchmark run file paths (zero or one).
     :rtype: list
     """
     if not path:
@@ -161,9 +159,9 @@ def _iter_run_files(path: str | None, latest_only: bool = False) -> list[Path]:
     p = Path(path)
     if p.is_dir():
         files = list(p.rglob("*.json"))
-        if latest_only and files:
+        if files:
             return [max(files, key=lambda f: f.stat().st_mtime)]
-        return files
+        return []
     if p.is_file():
         return [p]
     return []
@@ -327,7 +325,7 @@ def _metric_verdict(test_type: str, run_id: str, metric: str, cur_val: float | N
     """
     if metric in exact:
         if baseline_ok and prev_val is not None and not pd.isna(prev_val):
-            verdict = "WARN" if int(float(cur_val)) != int(float(prev_val)) else "PASS"
+            verdict = "WARN" if round(float(cur_val), 1) != round(float(prev_val), 1) else "PASS"
             return {"test type": test_type, "ID": run_id, "metric": metric,
                     "baseline": prev_val, "current": cur_val, "delta %": None, "verdict": verdict}
         if not baseline_ok:
@@ -940,7 +938,7 @@ def main() -> int:
         except PackageNotFoundError:
             args.version = (Path(__file__).parent.parent / "VERSION").read_text().strip()
 
-    current_files = _iter_run_files(args.current, latest_only=True)
+    current_files = _iter_run_files(args.current)
     if not current_files:
         print(f"[ERROR] No benchmark runs found under --current {args.current}", file=sys.stderr)
         return 1

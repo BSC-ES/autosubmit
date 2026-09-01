@@ -13,10 +13,10 @@
 # (in %), and `delta_tolerance` is the neutral "dead zone" (any delta inside
 # this band renders neutral instead of red/blue).
 #
-# Initial values were calibrated against the variance observed in
-# .benchmarks/artifacts/performance-metrics-4.2.0.csv. Tune them after a few
-# benchmark cycles on the GitHub-hosted runner (wall-clock time and memory are
-# the noisiest metrics; the deterministic counters should never move).
+# Initial values were calibrated against early benchmark cycles on the
+# GitHub-hosted runners. Tune them after a few benchmark cycles.
+# Baselines and observed runs live under .benchmarks/reference
+# and .benchmarks/data (see the metrics workflow).
 metrics:
   Time Taken(Seconds):
     threshold: 15.0

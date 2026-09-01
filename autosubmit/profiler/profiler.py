@@ -75,12 +75,10 @@ class Profiler:
 
         # Object profiling variables
         self._obj_iteration: list = []
-        self._obj_growth: list = []
 
         # File descriptor / handle profiling variables
         self._fd_iteration: list = []
         self._fd_names_iteration: list = []
-        self._fd_growth: list = []
 
         # Workflow stats
         self._jobs_iteration: list = []
@@ -92,8 +90,6 @@ class Profiler:
         self._trace_stats_by_iter: list = []
         self._obj_by_iter: list = []
 
-        self._mem_growth: list = []
-        self._mem_total_growth: float = 0.0
         self._obj_total_growth: int = 0
         self._fd_total_growth: int = 0
         self._obj_diffs_between_iter: set = set()
@@ -191,16 +187,7 @@ class Profiler:
     def _calculate_growth(self) -> None:
         """Calculate total growth metrics for objects and file descriptors."""
 
-        # growth by iteration
-        self._mem_growth = [self._mem_iteration[i] - self._mem_iteration[i - 1]
-                          for i in range(1, len(self._mem_iteration))]
-        self._obj_growth = [self._obj_iteration[i] - self._obj_iteration[i - 1]
-                          for i in range(1, len(self._obj_iteration))]
-        self._fd_growth = [self._fd_iteration[i] - self._fd_iteration[i - 1]
-                         for i in range(1, len(self._fd_iteration))]
-
         # total growth
-        self._mem_total_growth = self._mem_iteration[-1] - self._mem_iteration[0] if self._mem_iteration else 0
         if self.checkpoints > 3:
             self._obj_total_growth = self._obj_iteration[-1] - self._obj_iteration[3] if self._obj_iteration else 0
             self._fd_total_growth = self._fd_iteration[-1] - self._fd_iteration[3] if self._fd_iteration else 0
@@ -222,7 +209,7 @@ class Profiler:
             fd_names = self._fd_names_iteration[i]
 
             mem_unit = 0
-            while mem >= 1024 and mem_unit <= len(_UNITS):
+            while mem >= 1024 and mem_unit < len(_UNITS):
                 mem_unit += 1
                 mem /= 1024
             current_iter = f"Iteration {i + 1}:"
@@ -323,7 +310,7 @@ class Profiler:
             ""
         ])
         # Generate memory profiling results
-        if self._mem_growth and self._obj_growth and self._fd_growth:
+        if len(self._mem_iteration) > 1:
             report += "\n" + _generate_title("Memory, object and file descriptor by iteration") + "\n"
             report += self._report_growth()
         report += "\n" + _generate_title("Overall Memory, Object and File Descriptor Growth") + "\n"
@@ -343,7 +330,7 @@ class Profiler:
         report += f"\nMEMORY GROWTH: {growth_val:.2f} {growth_unit}."
         report += f"\nINITIAL MEMORY: {init_val:.2f} {init_unit}."
         report += f"\nFINAL MEMORY: {final_val:.2f} {final_unit}."
-        if self._obj_growth and self._fd_growth:
+        if len(self._obj_iteration) > 1:
             report += f"\nOBJECTS GROWTH: {self._obj_total_growth} objects."
             report += f"\nFILE DESCRIPTORS GROWTH: {self._fd_total_growth} file descriptors.\n"
 

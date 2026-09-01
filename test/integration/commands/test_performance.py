@@ -249,7 +249,6 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
         mem_growth = _to_mib(mem_grow_match.group(1), mem_grow_match.group(2))
     else:
         mem_growth = None
-    obj_growth = _find(r"OBJECTS GROWTH: (\d+)", text)
 
     return {
         "test type": test_type,
@@ -262,7 +261,6 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
         "Total Dependencies": total_dependencies,
         "FD GROWTH": fd_growth,
         "MEM GROWTH(MIB)": mem_growth,
-        "OBJ GROWTH": obj_growth,
     }
 
 

@@ -120,8 +120,7 @@ jobs:
       (
         github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
-        needs.authorize.outputs.allowed == 'true' &&
-        contains(github.event.comment.body, '/metrics')
+        needs.authorize.outputs.allowed == 'true'
       )
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -182,30 +181,41 @@ jobs:
       - name: Determine benchmark scope
         id: scope
         run: |
+          # Exact command parsing
+          cmd=""
+          if [ "${{ github.event_name }}" == "issue_comment" ]; then
+            body='${{ github.event.comment.body }}'
+            for tok in $body; do
+              case "$tok" in
+                "/metrics_full")    cmd="metrics_full" ;;
+                "/metrics_promote") cmd="metrics_promote" ;;
+                "/metrics")         cmd="metrics" ;;
+              esac
+              [ -n "$cmd" ] && break
+            done
+          fi
           # Suite: full on the PR label gate and /metrics_full, quick on /metrics.
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             echo "test_type=profilelong" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" == "issue_comment" ] && \
-               [[ "${{ github.event.comment.body }}" == *"/metrics_full"* ]]; then
+          elif [ "$cmd" == "metrics_full" ]; then
             echo "test_type=profilelong" >> "$GITHUB_OUTPUT"
           else
             echo "test_type=profile" >> "$GITHUB_OUTPUT"
           fi
           # Promote the last completed run without re-running: /metrics_promote.
-          if [ "${{ github.event_name }}" == "issue_comment" ] && \
-             [[ "${{ github.event.comment.body }}" == *"/metrics_promote"* ]]; then
+          if [ "$cmd" == "metrics_promote" ]; then
             echo "promote_last=true" >> "$GITHUB_OUTPUT"
           else
             echo "promote_last=false" >> "$GITHUB_OUTPUT"
           fi
           # Run the benchmark for labeled PRs and for manual commands, except
           # /metrics_promote which only re-baselines the last run.
-          if [ "${{ github.event_name }}" == "issue_comment" ] && \
-             [[ "${{ github.event.comment.body }}" == *"/metrics_promote"* ]]; then
+          if [ "$cmd" == "metrics_promote" ]; then
             echo "should_run=false" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" == "issue_comment" ]; then
+          elif [ "$cmd" == "metrics" ] || [ "$cmd" == "metrics_full" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ steps.label.outputs.label_present }}" == "true" ]; then
+          elif [ "${{ github.event_name }}" == "pull_request" ] && \
+               [ "${{ steps.label.outputs.label_present }}" == "true" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
