@@ -21,7 +21,7 @@
   those states on its own.
 - QOL: `updated_list` and `setstatus` now call the same functions to manage status.
 
-### 4.1.17: Submission and Job Tracking Overhaul, Bug Fixes, and Enhancements                                                                                                                                                               
+### 4.1.17: Submission and Job Tracking Overhaul, Bug Fixes, and Enhancements
 
 **Bug fixes:**
 
@@ -64,7 +64,8 @@
 - Fixed `CPU per task` for new version of autosubmit #2897
 - Fixed issue overwritting expid config variables with the ones from the github repo #2877
 - Fixed inspect infinite loop when PLATFORMS.TOTALJOBS or PLATFORMS.MAX_WAITING_JOBS is set to 0 #2749
-
+- Fixed vertical wrappers computing the wrong per-job timeout. Each inner job now gets the
+  longest wrapped job's wallclock to finish. #3210
 
 **Enhancements:**
 
@@ -110,7 +111,11 @@
 - Expanded ECPlatform, paramiko platform support, and platform code cleanup #3007
 - Changed JOBS_IN_WRAPPER unknown job from critical error to warning #3006
 - Added ``ECACCESS_RETRIES`` platform config key to configure SSL retries for ecaccess platforms. Defaults to 100 #3059
-
+- Moved wallclock parsing into shared helpers (`wallclock_to_seconds` and
+  `max_wallclock_seconds`) so the time parsing lives in one single place.
+- Renamed the misleading `level` variable (now a scan index) in the
+  vertical wrapper packager and removed dead code that was no longer
+  called.
 
 ### 4.1.16: Postgres (experimental) support, bug fixes, and enhancements
 
