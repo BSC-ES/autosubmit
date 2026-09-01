@@ -169,6 +169,7 @@ operational services.
       <div class="col-lg-3 col-md-4 col-xs-6"><div class="community-logo"><img class="img-fluid dark-light" src="_static/logos/ganana.png" alt="GANANA" title="GANANA, uniting European Union and Indian efforts in scientific High-Performance Computing" /></div></div>
       <div class="col-lg-3 col-md-4 col-xs-6"><div class="community-logo"><img class="img-fluid dark-light" src="_static/logos/hpcw.png" alt="HPCW" title="HPCW, The High Performance Climate and Weather Benchmark" /></div></div>
       <div class="col-lg-3 col-md-4 col-xs-6"><div class="community-logo"><img class="img-fluid dark-light" src="_static/logos/terradt.png" alt="TerraDT" title="TerraDT, Digital Twins of Earth System for Cryosphere, Land surface and related interaction" /></div></div>
+      <div class="col-lg-3 col-md-4 col-xs-6"><div class="community-logo"><img class="img-fluid dark-light" src="_static/logos/moirai-project.svg" alt="Moirai-project" title="Multiscale Ocean models and Information for climate Risk Assessment and Impact mitigation" /></div></div>
    </div>
 
 The Autosubmit Ecosystem
