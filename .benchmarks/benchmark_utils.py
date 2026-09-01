@@ -1,8 +1,9 @@
-import pandas as pd
 from pathlib import Path
 
+import pandas as pd
 
-def get_last_version_names(artifact_folder: str = None) -> list[str]:
+
+def get_last_version_names(artifact_folder: str | None = None) -> list[str]:
     """Get the names of the last two versions from the artifact folder.
     File names are expected to be in the format ref_metrics_{version}.csv
     :param artifact_folder: Path to the folder containing benchmark CSV files. If None, defaults to .benchmarks/artifacts/
@@ -25,7 +26,7 @@ def get_last_version_names(artifact_folder: str = None) -> list[str]:
     return version_names
 
 
-def load_data(version_names, artifact_folder: str = None) -> dict[str, pd.DataFrame]:
+def load_data(version_names, artifact_folder: str | None = None) -> dict[str, pd.DataFrame]:
     """Load benchmark data from CSV files in the specified folder.
 
     File is expected to be in .benchmarks/artifacts/

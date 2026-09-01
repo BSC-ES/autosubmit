@@ -18,7 +18,7 @@
 import datetime
 import sys
 from time import sleep
-from typing import Union, Any
+from typing import Any
 
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database.db_common import check_experiment_exists
@@ -99,7 +99,7 @@ def handle_start_after(start_after: str, expid: str) -> None:
             sleep(60)
 
 
-def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> Union[list[str], list[Any]]:
+def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> list[str] | list[Any]:
     """Check if the members sent are allowed
 
    :param run_members: str
@@ -116,6 +116,6 @@ def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> Union[li
                 f"the current list of members specified in the conf files."
                 f"\nCurrent list of members: {str(as_conf.get_member_list())}")
         if len(allowed_members) == 0:
-            raise AutosubmitCritical("Not a valid -rom --run_only_members input: {0}".format(str(run_members)))
+            raise AutosubmitCritical(f"Not a valid -rom --run_only_members input: {str(run_members)}")
         return allowed_members
     return []

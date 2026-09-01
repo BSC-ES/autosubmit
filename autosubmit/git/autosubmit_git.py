@@ -23,7 +23,6 @@ import subprocess
 from pathlib import Path
 from shutil import rmtree
 from time import time
-from typing import Union
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -230,7 +229,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
     git_remote_project_path = as_conf.get_git_remote_project_root()
 
     git_project_commit = as_conf.get_git_project_commit()
-    git_project_submodules: Union[list[str], bool] = as_conf.get_submodules_list()
+    git_project_submodules: list[str] | bool = as_conf.get_submodules_list()
     git_project_submodules_depth = as_conf.get_project_submodules_depth()
     max_depth = -1
     if len(git_project_submodules_depth) > 0:
@@ -243,14 +242,13 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
     project_path = os.path.join(
         BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
     project_backup_path = os.path.join(
-        BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, 'proj_{0}'.format(int(time())))
+        BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, f'proj_{int(time())}')
     git_path = as_conf.get_project_dir()
 
     # Making proj backup
     if force:
         if os.path.exists(project_path):
-            Log.info("Making a backup of your current proj folder at {0}".format(
-                project_backup_path))
+            Log.info(f"Making a backup of your current proj folder at {project_backup_path}")
             shutil.move(project_path, project_backup_path)
         # shutil.make_archive(project_backup_path, 'zip', project_path)
         # project_backup_path = project_backup_path + ".zip"
@@ -283,23 +281,20 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
     Log.info("Cloning {0} into {1}", clone_description, project_path)
     if git_project_branch:
         if not git_single_branch:
-            command_0 += " git clone -b {0} {1} {2};".format(git_project_branch, git_project_origin,
-                                                            project_destination)
+            command_0 += f" git clone -b {git_project_branch} {git_project_origin} {project_destination};"
         else:
-            command_0 += " git clone --single-branch -b {0} {1} {2};".format(git_project_branch,
-                                                                            git_project_origin,
-                                                                         project_destination)
+            command_0 += f" git clone --single-branch -b {git_project_branch} {git_project_origin} {project_destination};"
     else:
-        command_0 += " git clone {0} {1};".format(git_project_origin, project_destination)
+        command_0 += f" git clone {git_project_origin} {project_destination};"
     try:
         # command 0
         Log.debug('Clone command: {0}', command_0)
         git_version = _get_git_version()
         if git_remote_project_path == '':
-            command_0 = "cd {0} ; {1}".format(project_path, command_0)
+            command_0 = f"cd {project_path} ; {command_0}"
             subprocess.check_output(command_0, shell=True)
         else:
-            command_0 = "cd {0} ; {1}".format(project_path, command_0)
+            command_0 = f"cd {project_path} ; {command_0}"
             platform.send_command(command_0)
         # command 1
 
@@ -311,7 +306,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
                     os.chmod(os.path.join(root_dir, f_file), 0o750)
             command_githook += " git config core.hooksPath ./.githooks ; "
         if git_project_commit:
-            command_1 += "git checkout {0}; ".format(git_project_commit)
+            command_1 += f"git checkout {git_project_commit}; "
         else:
             command_1 += "git checkout; "
 
@@ -319,7 +314,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
             if len(git_project_submodules) == 0:
                 if max_depth > 0:
                     Log.info("Depth is incompatible with --recursive, ignoring recursive option")
-                    command_1 += " git submodule update --init --depth {0}; ".format(max_depth)
+                    command_1 += f" git submodule update --init --depth {max_depth}; "
                 else:
                     command_1 += " git submodule update --init --recursive; "
             else:
@@ -329,34 +324,32 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
                     if max_depth > 0:
                         Log.info("Depth is incompatible with --recursive, ignoring recursive option")
                         if index_submodule < len(git_project_submodules_depth):
-                            command_1 += " git submodule update --init --depth {0} {1}; ".format(
-                                git_project_submodules_depth[index_submodule], submodule)
+                            command_1 += f" git submodule update --init --depth {git_project_submodules_depth[index_submodule]} {submodule}; "
                         else:
-                            command_1 += " git submodule update --init --depth {0} {1}; ".format(
-                                max_depth, submodule)
+                            command_1 += f" git submodule update --init --depth {max_depth} {submodule}; "
                     else:
-                        command_1 += " git submodule update --init --recursive {0}; ".format(submodule)
+                        command_1 += f" git submodule update --init --recursive {submodule}; "
                     index_submodule += 1
         if git_remote_project_path == '':
             try:
                 if len(command_githook) > 0:
-                    command_githook = "cd {0} ; {1}".format(git_path, command_githook)
+                    command_githook = f"cd {git_path} ; {command_githook}"
                     as_conf.parse_githooks()
                     subprocess.check_output(command_githook, shell=True)
-                command_1 = "cd {0}; {1} ".format(git_path, command_1)
+                command_1 = f"cd {git_path}; {command_1} "
                 Log.debug(f'Githook + Checkout and Submodules: {command_githook} {command_1}')
                 subprocess.check_output(command_1, shell=True)
             except BaseException as e:
                 submodule_failure = True
-                Log.printlog("Trace: {0}".format(str(e)), 6014)
+                Log.printlog(f"Trace: {str(e)}", 6014)
                 Log.printlog(
-                    "Submodule has a wrong configuration.\n{0}".format(command_1), 6014)
+                    f"Submodule has a wrong configuration.\n{command_1}", 6014)
         else:
             if len(command_githook) > 0:
-                command_githook = "cd {0} ; {1}".format(project_path, command_githook)
+                command_githook = f"cd {project_path} ; {command_githook}"
                 as_conf.parse_githooks()
                 platform.send_command(command_githook)
-            command_1 = "cd {0}; {1} ".format(project_path, command_1)
+            command_1 = f"cd {project_path}; {command_1} "
             platform.send_command(command_1)
     except subprocess.CalledProcessError:
         shutil.rmtree(project_path)
@@ -367,8 +360,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
         raise AutosubmitCritical(
             f'Cannot clone {clone_description} into {project_path}', 7065)
     if submodule_failure:
-        Log.info("Some Submodule failures have been detected. Backup {0} will not be removed.".format(
-            project_backup_path))
+        Log.info(f"Some Submodule failures have been detected. Backup {project_backup_path} will not be removed.")
         return False
 
     if os.path.exists(project_backup_path):

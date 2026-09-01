@@ -3,7 +3,6 @@ import logging
 
 from docutils.parsers.rst import Directive
 from docutils.statemachine import StringList
-
 from sphinx import addnodes
 
 from autosubmit.helpers.parameters import PARAMETERS

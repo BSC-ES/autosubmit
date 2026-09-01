@@ -1,4 +1,3 @@
-import pytest
 
 
 def test_auto_splits_dependency_creates(autosubmit_exp):

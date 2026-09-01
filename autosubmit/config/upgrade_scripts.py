@@ -23,7 +23,7 @@ import shutil
 from io import StringIO
 from pathlib import Path
 from typing import Any
-from collections import defaultdict
+
 from configobj import ConfigObj
 from ruamel.yaml import YAML
 
@@ -287,11 +287,11 @@ def _fix_placeholders(template_or_script_path: Path, as_conf: AutosubmitConfig) 
             new_key = new_key.pop().upper()
             success.append(f"Translated {key} to {new_key}")
             template_or_script_content = re.sub('%(?<!%%)' + key + '%(?!%%)', new_key, template_or_script_content,
-                                                flags=re.I)
+                                                flags=re.IGNORECASE)
     # Deletes unused keys from confs
     if 'autosubmit' in template_or_script_path.name.lower():
         template_or_script_content = re.sub('(?m)^( )*(EXPID:)( )*[a-zA-Z0-9._-]*(\n)*', "", template_or_script_content,
-                                            flags=re.I)
+                                            flags=re.IGNORECASE)
     # Write the final result
     with open(template_or_script_path, "w") as f:
         f.write(template_or_script_content)

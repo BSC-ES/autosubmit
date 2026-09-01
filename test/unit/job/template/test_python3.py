@@ -24,7 +24,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from autosubmit.job.template.python3 import _DEFAULT_EXECUTABLE, as_body, as_header, as_tailer
+from autosubmit.job.template.python3 import (
+    _DEFAULT_EXECUTABLE,
+    as_body,
+    as_header,
+    as_tailer,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -33,7 +38,7 @@ _JOBNAME = 't000_test'
 _FAIL_COUNT = '0'
 
 
-def _build_script(tmp_path: 'Path', body: str, executable: str = None) -> 'Path':
+def _build_script(tmp_path: 'Path', body: str, executable: str | None = None) -> 'Path':
     """Assemble and write a runnable Python 3 script, returning its path."""
     executable = executable or sys.executable
     h = as_header(platform_header='', executable=executable)

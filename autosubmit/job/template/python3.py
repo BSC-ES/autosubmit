@@ -16,8 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Autosubmit template scripts written in Python 3."""
-from autosubmit.job.template.common import shebang_from_executable
 from textwrap import dedent, indent
+
+from autosubmit.job.template.common import shebang_from_executable
 
 _DEFAULT_EXECUTABLE = "/usr/bin/env python3"
 """The default executable used when none provided."""

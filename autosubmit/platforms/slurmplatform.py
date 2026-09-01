@@ -25,7 +25,7 @@ import re
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Any, Union
+from typing import Any
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
@@ -33,11 +33,6 @@ from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
-
-if TYPE_CHECKING:
-    # Avoid circular imports
-    pass
-
 
 # Compiled patterns that identify valid stdout from any Slurm command.
 _SLURM_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
@@ -70,7 +65,7 @@ class SlurmPlatform(ParamikoPlatform):
     TYPE = PlatformType.SLURM
 
     def __init__(self, expid: str, name: str, config: dict,
-                 auth_password: Union[str, list[str]] | None = None) -> None:
+                 auth_password: str | list[str] | None = None) -> None:
         """Initialization of the Class SlurmPlatform.
 
         :param expid: ID of the experiment which will instantiate the SlurmPlatform.
@@ -95,7 +90,7 @@ class SlurmPlatform(ParamikoPlatform):
         self.cancel_cmd = None
         self._header = SlurmHeader()
         self._wrapper = SlurmWrapperFactory(self)
-        self.job_status = dict()
+        self.job_status = {}
         self.job_status['COMPLETED'] = ['COMPLETED']
         self.job_status['RUNNING'] = ['RUNNING']
         self.job_status['QUEUING'] = ['PENDING', 'CONFIGURING', 'RESIZING']
@@ -128,7 +123,7 @@ class SlurmPlatform(ParamikoPlatform):
         try:
             # Test if remote_path exists
             self._ftpChannel.chdir(self.remote_log_dir)
-        except IOError as io_err:
+        except OSError as io_err:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
                     Log.debug(f'{self.remote_log_dir} has been created on {self.host}.')
@@ -182,7 +177,7 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return self.remote_log_dir
 
-    def parse_all_jobs_output(self, output: str, job_id: int) -> Union[list[str], str]:
+    def parse_all_jobs_output(self, output: str, job_id: int) -> list[str] | str:
         status = ""
         with suppress(Exception):
             status = [
@@ -342,7 +337,7 @@ class SlurmPlatform(ParamikoPlatform):
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), src))
                 file_exist = True
-            except IOError:  # File doesn't exist, retry in sleeptime
+            except OSError:  # File doesn't exist, retry in sleeptime
                 if not wrapper_failed:
                     sleep(sleeptime)
                     retries = retries + 1

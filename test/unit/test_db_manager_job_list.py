@@ -17,7 +17,6 @@
 
 from unittest.mock import patch
 
-
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.database.tables import ExperimentStructureTable, JobsTable
 

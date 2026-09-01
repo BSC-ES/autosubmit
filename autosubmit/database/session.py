@@ -17,10 +17,11 @@
 
 import threading
 from pathlib import Path
-from typing import Union
+
+from sqlalchemy import Engine, NullPool
+from sqlalchemy import create_engine as sqlalchemy_create_engine
 
 from autosubmit.config.basicconfig import BasicConfig
-from sqlalchemy import Engine, NullPool, create_engine as sqlalchemy_create_engine
 
 __all__ = ["_resolve_engine", "get_engine"]
 
@@ -54,7 +55,7 @@ class PostgreSQLEngineSingleton:
         return cls._instance
 
 
-def get_engine(db_path: Union[str, Path]) -> Engine:
+def get_engine(db_path: str | Path) -> Engine:
     """Get SQLAlchemy Core engine.
     This will resolve which backend to use based on the AS configuration.
 

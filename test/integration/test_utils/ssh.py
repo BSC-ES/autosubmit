@@ -22,11 +22,10 @@ from getpass import getuser
 from pathlib import Path
 from subprocess import check_output
 from textwrap import dedent
-from typing import cast, Any, Protocol, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, Union, cast
 
 import paramiko.ssh_exception
-from cryptography.hazmat.primitives import asymmetric
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import asymmetric, serialization
 
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
@@ -38,10 +37,10 @@ if TYPE_CHECKING:
 
 __all__ = [
     'MakeSSHClientFixture',
+    'copy_ssh_key_from_container',
+    'create_ssh_keypair_and_config',
     'make_ssh_client',
     'mock_ssh_config_and_client',
-    'create_ssh_keypair_and_config',
-    'copy_ssh_key_from_container',
     'wait_for_ssh_port'
 ]
 

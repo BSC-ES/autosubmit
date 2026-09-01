@@ -23,10 +23,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from autosubmit.job.template.bash import _DEFAULT_EXECUTABLE, as_body, as_header, as_tailer
+from autosubmit.job.template.bash import (
+    _DEFAULT_EXECUTABLE,
+    as_body,
+    as_header,
+    as_tailer,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
+
     # noinspection PyProtectedMember
     from _pytest._py.path import LocalPath
 

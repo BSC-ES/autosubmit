@@ -19,7 +19,6 @@ import inspect
 import os
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Union
 
 
 class BasicConfig:
@@ -60,8 +59,8 @@ class BasicConfig:
     DEFAULT_JOBS_CONF = ''
     SMTP_SERVER = ''
     MAIL_FROM = ''
-    ALLOWED_HOSTS: Union[str, dict] = ''
-    DENIED_HOSTS: Union[str, dict] = ''
+    ALLOWED_HOSTS: str | dict = ''
+    DENIED_HOSTS: str | dict = ''
     CONFIG_FILE_FOUND = False
     DATABASE_BACKEND = "sqlite"
     DATABASE_CONN_URL = ""
@@ -138,7 +137,7 @@ class BasicConfig:
             for _ in list_command_allowed:
                 list_command_allowed[i] = list_command_allowed[i].strip('[]')
                 i = i + 1
-            restrictions = dict()
+            restrictions = {}
             for command_unparsed in list_command_allowed:
                 command_allowed = command_unparsed.split(' ')
                 if ',' in command_allowed[0]:
@@ -159,7 +158,7 @@ class BasicConfig:
             for _ in list_command_allowed:
                 list_command_allowed[i] = list_command_allowed[i].strip('[]')
                 i = i + 1
-            restrictions = dict()
+            restrictions = {}
             for command_unparsed in list_command_allowed:
                 command_allowed = command_unparsed.split(' ')
                 if ',' in command_allowed[0]:
@@ -224,7 +223,6 @@ class BasicConfig:
                     BasicConfig.__read_file_config(etc_rc_path)
 
         BasicConfig._update_config()
-        return
 
 
 def generate_dirs() -> None:

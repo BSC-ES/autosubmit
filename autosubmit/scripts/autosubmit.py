@@ -20,16 +20,16 @@
 import argparse
 import traceback
 from contextlib import suppress
-from os import _exit  #noqa
+from os import _exit  # noqa: F401  # Patched by lockfile tests.
+
 # noinspection PyProtectedMember
 from pathlib import Path
-from typing import Union
 
 from portalocker.exceptions import BaseLockException
 
-from autosubmit.autosubmit import Autosubmit  # noqa: E402
-from autosubmit.config.configcommon import AutosubmitConfig  # noqa: E402
-from autosubmit.log.log import Log, AutosubmitCritical, AutosubmitError  # noqa: E402
+from autosubmit.autosubmit import Autosubmit
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 
 
 def delete_lock_file(base_path: str = Log.file_path, lock_file: str = 'autosubmit.lock') -> None:
@@ -78,7 +78,7 @@ def exit_from_error(e: BaseException) -> int:
         delete_lock_file()
 
     if is_autosubmit_error:
-        e: Union[AutosubmitError, AutosubmitCritical] = e
+        e: AutosubmitError | AutosubmitCritical = e
         if e.trace:
             Log.critical(f"Trace: {str(e.trace)}")
         Log.critical(f"{e.message} [eCode={e.code}]")

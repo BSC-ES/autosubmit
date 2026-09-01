@@ -22,9 +22,10 @@ from os import utime
 from pathlib import Path
 from shutil import rmtree
 from subprocess import CalledProcessError
-from typing import Any, Tuple
+from typing import Any
 
 import pytest
+
 # noinspection PyProtectedMember
 from _pytest._py.path import LocalPath
 
@@ -34,8 +35,15 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList
 from autosubmit.monitor.monitor import (
-    _check_final_status, _check_node_exists, _color_status, _create_node, _display_file,
-    _display_file_xdg, clean_plot, clean_stats, Monitor
+    Monitor,
+    _check_final_status,
+    _check_node_exists,
+    _color_status,
+    _create_node,
+    _display_file,
+    _display_file_xdg,
+    clean_plot,
+    clean_stats,
 )
 
 _EXPID = 't000'
@@ -559,7 +567,7 @@ _COLORS = [
         f'MIN_TRIGGER_STATUS: {_COLORS[12][0]} {_COLORS[12][1]}, label 1, MANDATORY',
     ]
 )
-def test_check_final_status(job_edges_info: dict[str, Any], expected: Tuple[Any, Any], mocker):
+def test_check_final_status(job_edges_info: dict[str, Any], expected: tuple[Any, Any], mocker):
     job = mocker.MagicMock()
     job.name = 'needle'
     child = mocker.MagicMock()

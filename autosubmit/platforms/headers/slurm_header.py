@@ -18,7 +18,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import textwrap
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from autosubmit.log.log import Log
 
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from autosubmit.job.job import Job
 
 
-def check_directive(directive: str, job_parameters: Union[dict, list, str], het: int = -1) -> bool:
+def check_directive(directive: str, job_parameters: dict | list | str, het: int = -1) -> bool:
     """Returns if directive the directive exists and has value
 
     :param directive: Which directive needs to be found
@@ -50,11 +50,11 @@ def check_directive(directive: str, job_parameters: Union[dict, list, str], het:
     return False
 
 
-class SlurmHeader(object):
+class SlurmHeader:
     """Class to handle the SLURM headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_queue_directive(self, job: 'Job', parameters: dict = None, het=-1):
+    def get_queue_directive(self, job: 'Job', parameters: dict | None = None, het=-1):
         """
         Returns queue directive for the specified job
 
@@ -76,7 +76,7 @@ class SlurmHeader(object):
         Log.warning(f"No QUEUE was found for the JOB: {job.name}")
         return ""
 
-    def get_processors_directive(self, job: 'Job', parameters: dict = None, het: int = -1) -> str:
+    def get_processors_directive(self, job: 'Job', parameters: dict | None = None, het: int = -1) -> str:
         """
         Returns processors directive for the specified job
 
@@ -103,7 +103,7 @@ class SlurmHeader(object):
             return f"SBATCH -n {job.processors}"
         return ""
 
-    def get_partition_directive(self, job: 'Job', parameters: dict = None, het: int = -1) -> str:
+    def get_partition_directive(self, job: 'Job', parameters: dict | None = None, het: int = -1) -> str:
         """
         Returns partition directive for the specified job
 
@@ -125,7 +125,7 @@ class SlurmHeader(object):
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_account_directive(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+    def get_account_directive(self, job: 'Job', parameters: dict | None = None, het=-1) -> str:
         """
         Returns account directive for the specified job
 
@@ -146,7 +146,7 @@ class SlurmHeader(object):
                 return f"SBATCH -A {parameters['CURRENT_PROJ']}"
         return ""
 
-    def get_exclusive_directive(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+    def get_exclusive_directive(self, job: 'Job', parameters: dict | None = None, het=-1) -> str:
         """
         Returns account directive for the specified job
 
@@ -159,13 +159,11 @@ class SlurmHeader(object):
         :return: `EXCLUSIVE` directive
         :rtype: str
         """
-        if het > -1 and 'EXCLUSIVE' in job.het and str(parameters['EXCLUSIVE']).lower() == 'true':
-            return "SBATCH --exclusive"
-        elif parameters is not None and 'EXCLUSIVE' in parameters and bool(parameters['EXCLUSIVE']):
+        if het > -1 and 'EXCLUSIVE' in job.het and str(parameters['EXCLUSIVE']).lower() == 'true' or parameters is not None and 'EXCLUSIVE' in parameters and bool(parameters['EXCLUSIVE']):
             return "SBATCH --exclusive"
         return ""
 
-    def get_nodes_directive(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+    def get_nodes_directive(self, job: 'Job', parameters: dict | None = None, het=-1) -> str:
         """
         Returns nodes directive for the specified job
 
@@ -185,7 +183,7 @@ class SlurmHeader(object):
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_directive(self, job: 'Job', parameters: dict = None, het=-1):
+    def get_memory_directive(self, job: 'Job', parameters: dict | None = None, het=-1):
         """
         Returns memory directive for the specified job
 
@@ -205,7 +203,7 @@ class SlurmHeader(object):
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_memory_per_task_directive(self, job: 'Job', parameters: dict = None, het=-1):
+    def get_memory_per_task_directive(self, job: 'Job', parameters: dict | None = None, het=-1):
         """
         Returns memory per task directive for the specified job
 
@@ -224,7 +222,7 @@ class SlurmHeader(object):
             return f"SBATCH --mem-per-cpu={parameters['MEMORY_PER_TASK']}"
         return ""
 
-    def get_threads_per_task(self, job: 'Job', parameters: dict = None, het=-1):
+    def get_threads_per_task(self, job: 'Job', parameters: dict | None = None, het=-1):
         """
         Returns threads per task directive for the specified job
 
@@ -246,7 +244,7 @@ class SlurmHeader(object):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
 
-    def get_reservation_directive(self, job: 'Job', parameters: dict = None, het=-1):
+    def get_reservation_directive(self, job: 'Job', parameters: dict | None = None, het=-1):
         """
         Returns reservation directive for the specified job
 
@@ -265,7 +263,7 @@ class SlurmHeader(object):
             return f"SBATCH --reservation={parameters['RESERVATION']}"
         return ""
 
-    def get_custom_directives(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+    def get_custom_directives(self, job: 'Job', parameters: dict | None = None, het=-1) -> str:
         """
         Returns custom directives for the specified job
 
@@ -285,7 +283,7 @@ class SlurmHeader(object):
             return '\n'.join(str(s) for s in parameters['CUSTOM_DIRECTIVES'])
         return ""
 
-    def get_tasks_per_node(self, job: 'Job', parameters: dict = None, het=-1) -> str:
+    def get_tasks_per_node(self, job: 'Job', parameters: dict | None = None, het=-1) -> str:
         """
         Returns memory per task directive for the specified job
 

@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
-from typing import Union
 
 import pytest
 
@@ -92,7 +91,7 @@ def test_get_rc_path(expected: Path, machine: bool, local: bool, env_vars: dict,
         ('', Exception)
     ]
 )
-def test_user_yes_no_query(answer: str, expected_or_error: Union[bool, Exception], mocker):
+def test_user_yes_no_query(answer: str, expected_or_error: bool | Exception, mocker):
     mocked_sys = mocker.patch('autosubmit.helpers.utils.sys')
     if expected_or_error is ValueError:
         mocker.patch('autosubmit.helpers.utils.input', return_value=[expected_or_error, 'y'])

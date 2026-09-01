@@ -3,7 +3,7 @@ import os
 import pstats
 import shutil
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Any
 
 import pytest
 
@@ -13,8 +13,8 @@ from test.regression.utils.common import create_database, init_expid
 PROFILE = False  # Enable/disable profiling ( speed up the tests )
 
 
-def prepare_custom_config_tests(default_yaml_file: Dict[str, Any], project_yaml_files: Dict[str, Dict[str, str]],
-                                current_tmpdir: Path) -> Dict[str, Any]:
+def prepare_custom_config_tests(default_yaml_file: dict[str, Any], project_yaml_files: dict[str, dict[str, str]],
+                                current_tmpdir: Path) -> dict[str, Any]:
     """
     Prepare custom configuration tests by creating necessary YAML files.
 
@@ -120,7 +120,7 @@ class SimpleJoblist:
         return self.name
 
 
-def parse_job_list(lines: List[str]) -> List[SimpleJoblist]:
+def parse_job_list(lines: list[str]) -> list[SimpleJoblist]:
     """
     Parse a list of lines representing a job list and return a list of root nodes.
 
@@ -130,7 +130,7 @@ def parse_job_list(lines: List[str]) -> List[SimpleJoblist]:
     :rtype: List[SimpleJoblist]
     """
     roots = []
-    stack: List[SimpleJoblist] = []
+    stack: list[SimpleJoblist] = []
 
     for line in lines:
         indent_level = line.count('|  ')
@@ -151,7 +151,7 @@ def parse_job_list(lines: List[str]) -> List[SimpleJoblist]:
     return sorted(roots, key=lambda x: x.name)
 
 
-def compare_and_print_differences(node1: SimpleJoblist | None, node2: SimpleJoblist | None) -> List[str]:
+def compare_and_print_differences(node1: SimpleJoblist | None, node2: SimpleJoblist | None) -> list[str]:
     """
     Compare two job list nodes and return a list of differences.
 
@@ -161,7 +161,7 @@ def compare_and_print_differences(node1: SimpleJoblist | None, node2: SimpleJobl
     """
     differences = []
     path = ""
-    stack: List[Tuple[SimpleJoblist | None, SimpleJoblist | None, str]] = [(node1, node2, path)]
+    stack: list[tuple[SimpleJoblist | None, SimpleJoblist | None, str]] = [(node1, node2, path)]
 
     while stack:
         n1, n2, current_path = stack.pop()
@@ -186,7 +186,7 @@ def compare_and_print_differences(node1: SimpleJoblist | None, node2: SimpleJobl
     return differences
 
 
-def remove_noise_from_list(lines: List[str]) -> List[str]:
+def remove_noise_from_list(lines: list[str]) -> list[str]:
     """
     Remove noise from a list of lines by stripping whitespace and specific substrings.
 
@@ -220,7 +220,7 @@ def get_project_root() -> Path:
     return project_root
 
 
-def get_workflow_folder() -> List[str]:
+def get_workflow_folder() -> list[str]:
     """
     Get a sorted list of workflow folder names in the 'test/regression/workflows' directory.
 

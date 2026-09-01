@@ -16,8 +16,9 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for ``autosubmit_svn``."""
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -65,7 +66,7 @@ def test_svn_submodules_dirty(
     expected to fail, raising an error when the experiment is operational.
     """
 
-    container, svn_repos_path, svn_url = svn_server  # type: Container, Path, str # type: ignore
+    _container, svn_repos_path, svn_url = svn_server  # type: Container, Path, str # type: ignore
 
     svn_repo = svn_repos_path / 'svn-project'
 

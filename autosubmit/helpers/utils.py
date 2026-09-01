@@ -17,12 +17,13 @@
 
 import os
 import pwd
-from pathlib import Path
 import re
 import sys
+from collections.abc import Iterable
 from contextlib import suppress
 from itertools import zip_longest
-from typing import Iterable, Union, TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -307,7 +308,7 @@ def get_rc_path(machine: bool, local: bool) -> Path:
     if "AUTOSUBMIT_CONFIGURATION" in os.environ:
         return Path(os.environ["AUTOSUBMIT_CONFIGURATION"])
 
-    rc_path: Union[str, Path]
+    rc_path: str | Path
     if machine:
         return Path("/etc/autosubmitrc")  # Higher priority than /etc/.autosubmitrc
     elif local:

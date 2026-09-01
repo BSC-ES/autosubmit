@@ -299,7 +299,7 @@ def test_run_with_additional_files(
             for chunk in range(1, 1 + experiment_data_yaml.get("EXPERIMENT", {}).get("NUMCHUNKS", 1)):
                 remote_name = additional_filename.replace(".sh", f'_20000101_fc0_{chunk}_JOB')
                 command = f"cat {project_remote_path}/{remote_name}"
-                exit_code, output = slurm_server.exec_run(["bash", "-c", command])
+                exit_code, _output = slurm_server.exec_run(["bash", "-c", command])
                 assert exit_code == 0, f"File {additional_filename} not found in remote project path."
 
 
@@ -775,7 +775,7 @@ def test_run_interrupted_multiple_vertical_wrappers(
     as_conf.set_last_as_command('run')
 
     # First run: interrupt after 3 seconds
-    as_thread, result, stop_event = run_in_thread(
+    as_thread, _result, stop_event = run_in_thread(
         as_exp.autosubmit.run_experiment,
         expid=as_exp.expid
     )
@@ -1200,7 +1200,7 @@ def test_run_interrupted_destine_like(
     as_conf.set_last_as_command('run')
 
     for attempt in range(5):
-        as_thread, result, stop_event = run_in_thread(
+        as_thread, _result, stop_event = run_in_thread(
             as_exp.autosubmit.run_experiment,
             expid=as_exp.expid
         )

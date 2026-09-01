@@ -45,7 +45,7 @@ class ExperimentStatusDbManager(DatabaseManager):
             main_db_name: str,
             local_root_dir_path: str = DEFAULT_LOCAL_ROOT_DIR
     ):
-        super(ExperimentStatusDbManager, self).__init__(expid, local_root_dir_path=local_root_dir_path)
+        super().__init__(expid, local_root_dir_path=local_root_dir_path)
         db_dir = Path(db_dir_path)
         local_root = Path(local_root_dir_path)
 
@@ -151,9 +151,8 @@ class SqlAlchemyExperimentStatusDbManager:
         self.engine = session.get_engine(
             db_path=Path(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)
         )
-        with self.engine.connect() as conn:
-            with conn.begin():
-                conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
+        with self.engine.connect() as conn, conn.begin():
+            conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
 
     def set_existing_experiment_status_as_running(self, expid):
         self.update_exp_status(expid, Models.RunningStatus.RUNNING)
@@ -173,7 +172,7 @@ class SqlAlchemyExperimentStatusDbManager:
         with self.engine.connect() as conn:
             row = conn.execute(query).first()
             if not row:
-                raise ValueError("Experiment {0} not found in Postgres {1}".format(expid, expid))
+                raise ValueError(f"Experiment {expid} not found in Postgres {expid}")
         return Models.ExperimentRow(*row)
 
     def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Models.ExperimentStatusRow | None:
@@ -229,9 +228,8 @@ class SqlAlchemyExperimentStatusDbManager:
                 modified=HUtils.get_current_datetime()
             )
         )
-        with self.engine.connect() as conn:
-            with conn.begin():
-                conn.execute(query)
+        with self.engine.connect() as conn, conn.begin():
+            conn.execute(query)
 
 
 def create_experiment_status_db_manager(db_engine: str, **options) -> ExperimentStatusDatabaseManager:

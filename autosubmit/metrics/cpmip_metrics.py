@@ -16,7 +16,7 @@
 # along with Autosubmit. If not, see <http://www.gnu.org/licenses/>.
 
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any
 
 from autosubmit.log.log import Log
 
@@ -83,7 +83,7 @@ class CPMIPMetrics:
 
     @staticmethod
     def _validate_positive(
-        value: Union[int, float],
+        value: float,
         var_name: str,
         error_message: str | None = None,
         allow_zero: bool = False,

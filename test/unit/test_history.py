@@ -15,25 +15,28 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from collections import namedtuple
-from pathlib import Path
-
 import os
 import re
-from autosubmit.history.utils import get_current_datetime
-import pytest
 import time
 import traceback
+from collections import namedtuple
+from pathlib import Path
 from shutil import copy2
+
+import pytest
 from sqlalchemy import create_engine
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
-from autosubmit.history.strategies import StraightWrapperAssociationStrategy, GeneralizedWrapperDistributionStrategy, \
-    PlatformInformationHandler
-from autosubmit.config.basicconfig import BasicConfig
-from test._oldschema import old_job_data_table, old_experiment_run_table
+from autosubmit.history.strategies import (
+    GeneralizedWrapperDistributionStrategy,
+    PlatformInformationHandler,
+    StraightWrapperAssociationStrategy,
+)
+from autosubmit.history.utils import get_current_datetime
+from test._oldschema import old_experiment_run_table, old_job_data_table
 
 EXPID_TT00_SOURCE = "test_database.db~"
 EXPID_TT01_SOURCE = "test_database_no_run.db~"

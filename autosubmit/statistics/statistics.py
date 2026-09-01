@@ -16,12 +16,11 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/
 
 from datetime import datetime, timedelta
-from typing import Union
 
 from autosubmit.job.job import Job
 from autosubmit.statistics.jobs_stat import JobStat
 from autosubmit.statistics.stats_summary import StatsSummary
-from autosubmit.statistics.utils import timedelta2hours, parse_number_processors
+from autosubmit.statistics.utils import parse_number_processors, timedelta2hours
 
 _COMPLETED_RETRIAL = 1
 _FAILED_RETRIAL = 0
@@ -41,13 +40,13 @@ class Statistics:
         self._start = start
         self._end = end
         self._queue_time_fixes = queue_time_fix
-        self._name_to_jobstat_dict: dict[str, JobStat] = dict()
+        self._name_to_jobstat_dict: dict[str, JobStat] = {}
         self.jobs_stat = jobs_stat
         # Old format
         self.max_time = 0.0
         self.max_fail = 0
-        self.start_times: list[Union[datetime, None]] = []
-        self.end_times: list[Union[datetime, None]] = []
+        self.start_times: list[datetime | None] = []
+        self.end_times: list[datetime | None] = []
         self.queued: list[float] = []
         self.run: list[float] = []
         self.failed_jobs: list[int] = []
@@ -87,7 +86,7 @@ class Statistics:
                                                     timedelta()) - timedelta(
                             seconds=self._queue_time_fixes.get(job.name, 0))
                         job_stat.failed_queue_time += max(adjusted_failed_queue, timedelta())
-        self.jobs_stat = sorted(list(self._name_to_jobstat_dict.values()), key=lambda x: (
+        self.jobs_stat = sorted(self._name_to_jobstat_dict.values(), key=lambda x: (
             x.date if x.date else datetime.now(), x.member if x.member else "", x.section if x.section else "", x.chunk))
         return self
 

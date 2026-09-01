@@ -28,7 +28,6 @@ from autosubmit.job.job_common import Status
 from autosubmit.log.log import Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 
-
 # -- fixtures
 
 

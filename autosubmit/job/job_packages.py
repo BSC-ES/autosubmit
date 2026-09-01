@@ -98,7 +98,7 @@ class JobPackageBase:
         is_batch_platform = self.platform.EXECUTION_MODE is ExecutionMode.BATCH
         self.timeout: int | None = None if is_batch_platform else max(job.wallclock_in_seconds for job in jobs)
         self.x11 = first_job.x11
-        self.het = dict()
+        self.het = {}
         self._num_processors = '0'
         self._threads = '0'
         self._tmp_path = first_job._tmp_path
@@ -233,7 +233,7 @@ class JobPackageSimple(JobPackageBase):
     """
 
     def __init__(self, jobs: list[Job]):
-        super(JobPackageSimple, self).__init__(jobs)
+        super().__init__(jobs)
         self._job_scripts = {}
         self.export = jobs[0].export
         self.name = jobs[0].name
@@ -257,16 +257,16 @@ class JobPackageSimpleWrapped(JobPackageSimple):
     """
 
     def __init__(self, jobs: list[Job]):
-        super(JobPackageSimpleWrapped, self).__init__(jobs)
+        super().__init__(jobs)
         self._job_wrapped_scripts = {}
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
-        super(JobPackageSimpleWrapped, self)._create_scripts(configuration)
+        super()._create_scripts(configuration)
         for job in self.jobs:
             self._job_wrapped_scripts[job.name] = job.create_wrapped_script(configuration)
 
     def send_files(self):
-        super(JobPackageSimpleWrapped, self).send_files()
+        super().send_files()
         for job in self.jobs:
             self.platform.send_file(self._job_wrapped_scripts[job.name])
 
@@ -299,7 +299,7 @@ class JobPackageThread(JobPackageBase):
         # the user in the wrapper section, current wrapper section, job or platform in that order.
         # Some variables are calculated in further functions, like num_processors and wallclock.
         # These variables can only be present in the wrapper itself
-        super(JobPackageThread, self).__init__(jobs)
+        super().__init__(jobs)
         if jobs_resources is None:
             jobs_resources = {}
         if wrapper_info is None:
@@ -316,7 +316,7 @@ class JobPackageThread(JobPackageBase):
             self.wrapper_method = None
             self.jobs_in_wrapper = None
             self.extensible_wallclock = 0
-        self._job_scripts: dict = dict()
+        self._job_scripts: dict = {}
         # Seems like this one is not used at all in the class
         self._job_dependency = dependency
         self._common_script = None
@@ -331,7 +331,7 @@ class JobPackageThread(JobPackageBase):
         self.inner_retrials = 0
         if not hasattr(self, "_num_processors"):
             self._num_processors = '0'
-        self.parameters = dict()
+        self.parameters = {}
         self.nodes = jobs[0].nodes if not self.nodes else self.nodes
         self.queue = jobs[0].queue
         self.parameters["CURRENT_QUEUE"] = self.queue
@@ -430,7 +430,7 @@ class JobPackageThread(JobPackageBase):
         jobs_scripts = []
         for job in self.jobs:
             if job.section not in self._jobs_resources:
-                self._jobs_resources[job.section] = dict()
+                self._jobs_resources[job.section] = {}
                 self._jobs_resources[job.section]['PROCESSORS'] = job.processors
                 self._jobs_resources[job.section]['TASKS'] = job.tasks
             with suppress(Exception):
@@ -458,7 +458,7 @@ class JobPackageThread(JobPackageBase):
         self._job_dependency = dependency
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
-        for i in range(0, len(self.jobs)):
+        for i in range(len(self.jobs)):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
         self._common_script = self._create_common_script()
 
@@ -479,8 +479,8 @@ class JobPackageThread(JobPackageBase):
         Log.debug("Check remote dir")
         self.platform.check_remote_log_dir()
         output_filepath = 'wrapper_scripts.tar'
-        if callable(getattr(self.platform, 'remove_multiple_files')):
-            filenames = str()
+        if callable(self.platform.remove_multiple_files):
+            filenames = ""
             for job in self.jobs:
                 filenames += " " + self.platform.remote_log_dir + "/" + job.name + ".cmd"
             self.platform.remove_multiple_files(filenames)
@@ -516,7 +516,7 @@ class JobPackageThreadWrapped(JobPackageThread):
 
     def __init__(self, jobs: list[Job], dependency=None, configuration: 'AutosubmitConfig | None' = None,
                  wrapper_section="WRAPPERS"):
-        super(JobPackageThreadWrapped, self).__init__(jobs, configuration)
+        super().__init__(jobs, configuration)
         self._job_scripts = {}
         self._job_dependency = dependency
         self._common_script = None
@@ -548,7 +548,7 @@ class JobPackageThreadWrapped(JobPackageThread):
         return self._platform.project
 
     def _create_scripts(self, configuration: 'AutosubmitConfig'):
-        for i in range(0, len(self.jobs)):
+        for i in range(len(self.jobs)):
             self._job_scripts[self.jobs[i].name] = self.jobs[i].create_script(configuration)
         self._common_script = self._create_common_script()
 
@@ -578,7 +578,7 @@ class JobPackageVertical(JobPackageThread):
                  wrapper_section: str = "WRAPPERS", wrapper_info: list | None = None):
         if wrapper_info is None:
             wrapper_info = []
-        super(JobPackageVertical, self).__init__(jobs, dependency, configuration=configuration,
+        super().__init__(jobs, dependency, configuration=configuration,
                                                  wrapper_section=wrapper_section, wrapper_info=wrapper_info)
         for job in jobs:
             if int(job.processors) >= int(self._num_processors):
@@ -669,13 +669,12 @@ class JobPackageHorizontal(JobPackageThread):
     def __init__(self, jobs: list[Job], dependency: str | None = None, jobs_resources: dict | None = None,
                  method: str = 'ASThread', configuration: 'AutosubmitConfig | None' = None,
                  wrapper_section="WRAPPERS"):
-        super(JobPackageHorizontal, self).__init__(jobs, dependency, jobs_resources, configuration=configuration,
+        super().__init__(jobs, dependency, jobs_resources, configuration=configuration,
                                                    wrapper_section=wrapper_section)
         self.method = method
         self._queue = self.queue
         for job in jobs:
-            if job.wallclock > self._wallclock:
-                self._wallclock = job.wallclock
+            self._wallclock = max(self._wallclock, job.wallclock)
             self._num_processors = str(int(self._num_processors) + int(job.processors))
             self._threads = job.threads
         self._threads = configuration.experiment_data["WRAPPERS"].get(self.current_wrapper_section, {}).get("THREADS",
@@ -706,7 +705,7 @@ class JobPackageHybrid(JobPackageThread):
         all_jobs = [item for sublist in jobs for item in sublist]  # flatten list
         if jobs_resources is None:
             jobs_resources = {}
-        super(JobPackageHybrid, self).__init__(all_jobs, dependency, jobs_resources, method,
+        super().__init__(all_jobs, dependency, jobs_resources, method,
                                                configuration=configuration, wrapper_section=wrapper_section)
         self.jobs_lists = jobs
         self.method = method
@@ -721,11 +720,11 @@ class JobPackageHybrid(JobPackageThread):
 
         jobs_scripts = []
         for job_list in self.jobs_lists:
-            inner_jobs = list()
+            inner_jobs = []
             for job in job_list:
                 inner_jobs.append(job.name + '.cmd')
                 if job.section not in self._jobs_resources:
-                    self._jobs_resources[job.section] = dict()
+                    self._jobs_resources[job.section] = {}
                     self._jobs_resources[job.section]['PROCESSORS'] = job.processors
                     self._jobs_resources[job.section]['TASKS'] = job.tasks
             jobs_scripts.append(inner_jobs)

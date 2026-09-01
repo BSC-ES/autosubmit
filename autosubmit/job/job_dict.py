@@ -17,7 +17,6 @@
 
 import datetime
 import re
-from typing import Union
 
 from bscearth.utils.date import date2str
 
@@ -50,7 +49,7 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
         self._chunk_list = chunk_list
         self._date_format = date_format
         self.default_retrials = default_retrials
-        self._dic = dict()
+        self._dic = {}
         self.as_conf = as_conf
         self.experiment_data = as_conf.experiment_data
         self.recreate_jobs = False
@@ -103,7 +102,7 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
                           for the last
         :type frequency: int
         """
-        self._dic[section] = dict()
+        self._dic[section] = {}
         count = 0
         for date in self._date_list:
             count += 1
@@ -127,9 +126,9 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
         :param excluded_members: if member index is listed there, the job won't run for this member.
 
         """
-        self._dic[section] = dict()
+        self._dic[section] = {}
         for date in self._date_list:
-            self._dic[section][date] = dict()
+            self._dic[section][date] = {}
             count = 0
             for member in self._member_list:
                 count += 1
@@ -165,9 +164,9 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
         :param delay: if this parameter is set, the job is only created for the chunks greater than the delay
         :type delay: int
         """
-        self._dic[section] = dict()
+        self._dic[section] = {}
         # Temporally creation for unified jobs in case of synchronize
-        tmp_dic: dict[str, Union[list, dict]] = dict()
+        tmp_dic: dict[str, list | dict] = {}
         if synchronize is not None and len(str(synchronize)) > 0:
             count = 0
             for chunk in self._chunk_list:
@@ -179,16 +178,16 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
                             self._create_jobs_split(splits, section, None, None, chunk, priority,
                                                     default_job_type, tmp_dic[chunk])
                         elif synchronize == 'member':
-                            tmp_dic[chunk] = dict()
+                            tmp_dic[chunk] = {}
                             for date in self._date_list:
                                 tmp_dic[chunk][date] = []
                                 self._create_jobs_split(splits, section, date, None, chunk, priority,
                                                         default_job_type, tmp_dic[chunk][date])
         # Real dic jobs assignment/creation
         for date in self._date_list:
-            self._dic[section][date] = dict()
+            self._dic[section][date] = {}
             for member in (member for member in self._member_list):
-                self._dic[section][date][member] = dict()
+                self._dic[section][date][member] = {}
                 count = 0
                 for chunk in (chunk for chunk in self._chunk_list):
                     count += 1
@@ -208,7 +207,7 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
 
     def _create_jobs_split(
         self,
-        splits: Union[int, dict[str, list[int]]],
+        splits: int | dict[str, list[int]],
         section: str,
         date: datetime.datetime | None,
         member: str | None,
@@ -533,7 +532,7 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
         :return: jobs matching parameters passed
         :rtype: list
         """
-        jobs = list()
+        jobs = []
 
         if section not in self._dic:
             return jobs
@@ -610,9 +609,9 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
         if member:
             name += "_" + member
         if chunk:
-            name += "_{0}".format(chunk)
+            name += f"_{chunk}"
         if split > 0:
-            name += "_{0}".format(split)
+            name += f"_{split}"
         name += "_" + section
         if not self._job_list.get(name, None):
             job = Job(name, 0, Status.WAITING, priority)

@@ -20,7 +20,7 @@ import os
 import sys
 from datetime import datetime
 from time import sleep
-from typing import cast, Any, Union
+from typing import Any, cast
 
 
 class AutosubmitError(Exception):
@@ -32,7 +32,7 @@ class AutosubmitError(Exception):
         trace (str): extra information about the error
     """
 
-    def __init__(self, message="Unhandled Error", code=6000, trace: Union[None, str] = None):
+    def __init__(self, message="Unhandled Error", code=6000, trace: None | str = None):
         self.code = code
         self.message = message
         self.trace = trace
@@ -164,7 +164,7 @@ class Log:
     (from lower to higher priority):
     """
 
-    date = '{0:%Y%m%d_%H%M%S}_'.format(datetime.now())
+    date = f'{datetime.now():%Y%m%d_%H%M%S}_'
     file_path = ""
     __module__ = __name__
     EVERYTHING = 0
@@ -332,7 +332,7 @@ class Log:
             pass
 
     @staticmethod
-    def set_console_level(level: Union[int, str]) -> None:
+    def set_console_level(level: int | str) -> None:
         """Sets log level for logging to console.
 
         Every output of level equal or higher to parameter level will be printed on console

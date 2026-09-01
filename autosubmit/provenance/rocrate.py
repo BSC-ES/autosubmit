@@ -26,10 +26,11 @@ import json
 import mimetypes
 import os
 import subprocess
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Union, cast
+from typing import Any, cast
 
 from rocrate.model.contextentity import ContextEntity
 from rocrate.rocrate import File, ROCrate
@@ -37,10 +38,13 @@ from rocrate.utils import iso_now
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.database.db_common import get_autosubmit_version, get_experiment_description
+from autosubmit.database.db_common import (
+    get_autosubmit_version,
+    get_experiment_description,
+)
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
 
 """List of profiles used in our RO-Crate implementation, plus the one used
 as graph context."""
@@ -332,8 +336,8 @@ def create_rocrate_archive(
         as_conf: AutosubmitConfig,
         rocrate_json: dict[str, Any],
         jobs: list[Job],
-        start_time: Union[str, None],
-        end_time: Union[str, None],
+        start_time: str | None,
+        end_time: str | None,
         path: Path) -> ROCrate:
     """Create an RO-Crate archive using the ro-crate-py library.
 
@@ -504,9 +508,9 @@ def create_rocrate_archive(
     outs = []
     # TODO: Modify when we manage to have dicts/objects in YAML,
     #       https://earth.bsc.es/gitlab/es/autosubmit/-/issues/1045
-    if 'INPUTS' in rocrate_json and rocrate_json['INPUTS']:
+    if rocrate_json.get('INPUTS'):
         ins.extend(rocrate_json['INPUTS'])
-    if 'OUTPUTS' in rocrate_json and rocrate_json['OUTPUTS']:
+    if rocrate_json.get('OUTPUTS'):
         outs.extend(rocrate_json['OUTPUTS'])
     # Add the extra keys defined by the user in the ``ROCRATE.INPUT``.
     if ins:

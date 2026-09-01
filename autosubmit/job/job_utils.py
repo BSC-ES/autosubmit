@@ -17,13 +17,13 @@
 
 import math
 from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date
+from bscearth.utils.date import chunk_end_date, chunk_start_date, date2str
 
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
 
 if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
@@ -419,7 +419,7 @@ def get_split_size(as_conf: dict[str, Any], section: str) -> int:
 
 
 
-class Dependency(object):
+class Dependency:
     """
     Class to manage the metadata related with a dependency
 
@@ -436,7 +436,7 @@ class Dependency(object):
         self.relationships = relationships
 
 
-class SubJob(object):
+class SubJob:
     """
     Class to manage package times
     """
@@ -449,11 +449,11 @@ class SubJob(object):
         self.total = total
         self.status = status
         self.transit = 0
-        self.parents = list()
-        self.children = list()
+        self.parents = []
+        self.children = []
 
 
-class SubJobManager(object):
+class SubJobManager:
     """
     Class to manage list of SubJobs
     """
@@ -464,8 +464,8 @@ class SubJobManager(object):
         self.packages_map = packages_map
         self.packages_dict = packages_dict
         self.current_structure = current_structure
-        self.subjobindex = dict()
-        self.subjobfixes = dict()
+        self.subjobindex = {}
+        self.subjobfixes = {}
         self.process_index()
         self.process_times()
 
@@ -480,13 +480,13 @@ class SubJobManager(object):
         if self.packages_map and self.packages_dict:
             if self.current_structure and len(self.current_structure) > 0:
                 # Structure exists
-                new_queues = dict()
-                fixes_applied = dict()
+                new_queues = {}
+                fixes_applied = {}
                 for package_name, wrapped_jobs in self.packages_dict.items():
                     # SubJobs in Package
-                    local_structure = dict()
+                    local_structure = {}
                     # SubJob Name -> SubJob Object
-                    local_index = dict()
+                    local_index = {}
                     # Build index
                     local_jobs_in_package = [sub for sub in self.subjobList if sub.package and sub.package.name == package_name]
                     for sub in local_jobs_in_package:
@@ -496,7 +496,7 @@ class SubJobManager(object):
                         # If job in current_structure, store children names in dictionary
                         # local_structure: Job Name -> Children (if present in the Job package)
                         for edge in self.current_structure:
-                            if edge["e_from"] == sub_job.name and edge["e_to"] in local_index.keys():
+                            if edge["e_from"] == sub_job.name and edge["e_to"] in local_index:
                                 local_structure.setdefault(
                                     sub_job.name, []).append(edge["e_to"])
                                 # Add child to parent

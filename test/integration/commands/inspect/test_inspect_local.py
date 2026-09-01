@@ -419,15 +419,15 @@ def test_inspect_calendar(tmp_path, autosubmit_exp, general_data: dict[str, Any]
 
         if split_start_date and split_end_date:
             if not (chunk_start_date <= chunk_end_date and split_start_date <= split_end_date and chunk_start_date <= split_start_date <= split_end_date <= chunk_end_date):
-                lookup_date_errors[key] = jobs_info[key]
+                lookup_date_errors[key] = info
             if (im_first_chunk and chunk != 1 or im_first_split and split != 1 or im_last_split and split != max_splits or im_last_chunk and chunk != max_chunks) or (
                     im_first_chunk and im_first_split and split_start_date != chunk_start_date) or (im_last_chunk and im_last_split and split_end_date != chunk_end_date):
-                lookup_first_last_errors[key] = jobs_info[key]
+                lookup_first_last_errors[key] = info
         else:
             if not chunk_start_date <= chunk_end_date or split_start_date or split_end_date:
-                lookup_date_errors[key] = jobs_info[key]
+                lookup_date_errors[key] = info
             if (im_first_chunk and chunk != 1 or im_last_chunk and chunk != max_chunks) or (im_first_chunk and im_last_chunk and chunk_start_date != chunk_end_date):
-                lookup_first_last_errors[key] = jobs_info[key]
+                lookup_first_last_errors[key] = info
 
     assert not lookup_first_last_errors, f"First/Last chunk/split errors found in splits: {lookup_first_last_errors}"
     assert not lookup_date_errors, f"Date errors found in splits: {lookup_date_errors}"

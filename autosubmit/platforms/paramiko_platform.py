@@ -23,14 +23,13 @@ import os
 import random
 import re
 import select
-import socket
 import sys
 from contextlib import suppress
 from io import BufferedReader
 from pathlib import Path
 from threading import Thread
 from time import sleep, time
-from typing import TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING
 
 import paramiko
 import Xlib.support.connect as xlib_connect
@@ -144,7 +143,7 @@ def _init_poller():
 class ParamikoPlatform(Platform):
     """Class to manage the connections to the different platforms with the Paramiko library."""
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: Union[str, list[str]] | None = None):
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str | list[str] | None = None):
         """An SSH-enabled platform that uses the Paramiko library.
 
         :param expid: Experiment ID.
@@ -242,7 +241,7 @@ class ParamikoPlatform(Platform):
         except EOFError as e:
             self.connected = False
             raise AutosubmitError(f"[{self.name}] not alive. Host: {self.host}", 6002, str(e))
-        except (AutosubmitError, AutosubmitCritical, IOError):
+        except (OSError, AutosubmitError, AutosubmitCritical):
             self.connected = False
             raise
         except Exception as e:
@@ -274,7 +273,7 @@ class ParamikoPlatform(Platform):
             self.reset()
         # TODO: Configure this https://github.com/BSC-ES/autosubmit/issues/986
         retries = 2
-        for retry in range(0, retries):
+        for retry in range(retries):
             try:
                 self.connect(as_conf, reconnect=(retry > 0), log_recovery_process=log_recovery_process)
                 if self.connected:
@@ -455,12 +454,9 @@ class ParamikoPlatform(Platform):
         except SSHException:
             self.connected = False
             raise
-        except IOError as e:
+        except OSError as e:
             self.connected = False
-            if "refused" in str(e.strerror).lower():
-                raise SSHException(f" {self.host} doesn't accept remote connections. "
-                                   f"Check if there is an typo in the hostname")
-            elif "name or service not known" in str(e.strerror).lower():
+            if "refused" in str(e.strerror).lower() or "name or service not known" in str(e.strerror).lower():
                 raise SSHException(f" {self.host} doesn't accept remote connections. "
                                    f"Check if there is an typo in the hostname")
             else:
@@ -509,7 +505,7 @@ class ParamikoPlatform(Platform):
             self._ftpChannel.put(local_path, remote_path)
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
             return True
-        except socket.error as e:
+        except OSError as e:
             raise AutosubmitError(f'Cannot send file {local_path} to {remote_path}. '
                                   f'Connection does not appear to be active: {str(e)}', 6004)
         except Exception as e:
@@ -519,7 +515,7 @@ class ParamikoPlatform(Platform):
     def get_logs_files(self, exp_id: str, remote_logs: tuple[str, str]) -> None:
         (job_out_filename, job_err_filename) = remote_logs
         self.get_files(
-            [job_out_filename, job_err_filename], False, "LOG_{0}".format(exp_id)
+            [job_out_filename, job_err_filename], False, f"LOG_{exp_id}"
         )
 
     def _chunked_md5(self, file_buffer: BufferedReader) -> str:
@@ -617,7 +613,7 @@ class ParamikoPlatform(Platform):
         try:
             self._ftpChannel.remove(str(remote_file))
             return True
-        except IOError:
+        except OSError:
             # No such file
             # There is no need of logging this as it is expected behaviour when the experiment runs for the first time
             return False
@@ -649,10 +645,10 @@ class ParamikoPlatform(Platform):
             dest = os.path.join(path_root, dest)
             try:
                 self._ftpChannel.stat(dest)
-            except IOError:
+            except OSError:
                 self._ftpChannel.rename(src, dest)
             return True
-        except IOError as e:
+        except OSError as e:
             if str(e) in "Garbage":
                 raise AutosubmitError(f'File {os.path.join(path_root, src)} does not exists, something went '
                                       f'wrong with the platform', 6004, str(e))
@@ -915,7 +911,7 @@ class ParamikoPlatform(Platform):
         finished_time: float | None,
         io_safe_wait: int,
         now: float,
-    ) -> Tuple[Status, float | None]:
+    ) -> tuple[Status, float | None]:
         """Resolve final job status from STAT file and scheduler information.
 
         :param job_name: Job name for logging.
@@ -1130,7 +1126,7 @@ class ParamikoPlatform(Platform):
         if not job_list:
             return
 
-        file_to_job: dict[str, "Job"] = {
+        file_to_job: dict[str, Job] = {
             str(Path(self.remote_log_dir) / f"{job.name}_STAT_{job.fail_count}"): job
             for job in job_list
         }
@@ -1260,14 +1256,14 @@ class ParamikoPlatform(Platform):
                             # forward data between local/remote x11 socket.
                             data = channel.recv(4096)
                             counterpart.sendall(data)
-                        except socket.error:
+                        except OSError:
                             channel.close()
                             counterpart.close()
                             del self.channels[fd]
 
     def exec_command(
             self, command, bufsize=-1, timeout=30, get_pty=False, retries=3, x11=False
-    ) -> Union[tuple[paramiko.ChannelFile, paramiko.ChannelFile, paramiko.ChannelFile], tuple[bool, bool, bool]]:
+    ) -> tuple[paramiko.ChannelFile, paramiko.ChannelFile, paramiko.ChannelFile] | tuple[bool, bool, bool]:
         """Execute a command on the SSH server.
 
         A new ``.Channel`` is open and the requested command is executed.
@@ -1310,7 +1306,7 @@ class ParamikoPlatform(Platform):
                 stdout = chan.makefile('rb', bufsize)
                 stderr = chan.makefile_stderr('rb', bufsize)
                 return stdin, stdout, stderr
-            except (paramiko.SSHException, ConnectionError, socket.error, IOError) as e:
+            except (OSError, paramiko.SSHException, ConnectionError) as e:
                 Log.warning(f'A networking error occurred while executing command [{command}]: {str(e)}')
                 if not self.connected or not self.transport or not self.transport.active:
                     self.restore_connection(None)
@@ -1436,7 +1432,7 @@ class ParamikoPlatform(Platform):
             return True
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
-        except IOError as e:
+        except OSError as e:
             raise AutosubmitError(f"I/O issues: {str(e)}", 6016)
 
     def get_multi_submit_cmd(self, job_scripts: dict) -> str:
@@ -1660,7 +1656,7 @@ class ParamikoPlatform(Platform):
             try:
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
-            except IOError as e:
+            except OSError as e:
                 Log.warning(f'Failed checking remote permissions (1): {str(e)}')
                 # TODO: Writing the test, it become confusing as to why we are removing,
                 #       then trying again -- if it failed on the first try, we cannot really
@@ -1693,7 +1689,7 @@ class ParamikoPlatform(Platform):
             return self._ftpChannel.stat(src)
         return False
 
-    def read_file(self, src: str, max_size: int | None=None) -> Union[bytes, None]:
+    def read_file(self, src: str, max_size: int | None=None) -> bytes | None:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path
@@ -1742,14 +1738,14 @@ class ParamikoPlatform(Platform):
 
     def update_cmds(self):
         """Updates commands for this platform. """
-        pass  # pragma: no cover
+        # pragma: no cover
 
     def _check_and_cancel_duplicated_job_names(self, scripts_to_submit: dict) -> None:
         """Check for duplicated job names in the submitted packages.
         :param scripts_to_submit: Package script names and their info.
         :type: dict
         """
-        all_jobs_submitted = [name.split(".cmd")[0] for name in scripts_to_submit.keys()]
+        all_jobs_submitted = [name.split(".cmd")[0] for name in scripts_to_submit]
         cmd = self._get_job_names_cmd(all_jobs_submitted)
         self.send_command(cmd)
         # Gather all jobs that were recently submitted

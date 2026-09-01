@@ -19,12 +19,12 @@
 
 import os
 from collections import defaultdict
+from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
-from .platform import Platform
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
@@ -34,13 +34,15 @@ from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
+from .platform import Platform
+
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
 __all__ = [
-    "get_platform_by_type",
-    "ParamikoSubmitter"
+    "ParamikoSubmitter",
+    "get_platform_by_type"
 ]
 
 
@@ -177,7 +179,7 @@ class ParamikoSubmitter:
 
     def __init__(self, as_conf: 'AutosubmitConfig', auth_password: str | None = None,
                  local_auth_password=None):
-        self.platforms: dict[str, 'ParamikoPlatform'] = {}
+        self.platforms: dict[str, ParamikoPlatform] = {}
         self.load_platforms(as_conf=as_conf, auth_password=auth_password, local_auth_password=local_auth_password)
 
     @property

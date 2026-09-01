@@ -16,17 +16,21 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for ``autosubmit_git``."""
+from collections.abc import Callable
 from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from pathlib import Path
-from typing import Callable, ContextManager, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, ContextManager
 
 import pytest
 
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.log.log import AutosubmitCritical
 from test.integration.test_utils.git import (
-    create_git_repository, git_commit_all_in_dir, git_clone_repository, git_add_submodule
+    create_git_repository,
+    git_add_submodule,
+    git_clone_repository,
+    git_commit_all_in_dir,
 )
 
 if TYPE_CHECKING:
@@ -258,7 +262,7 @@ def test_git_submodules_dirty(
 @pytest.mark.docker
 def test_git_operational_experiment_toggle_flag(
         git_operational_check_enabled: bool,
-        expected: Union[int, Exception],
+        expected: int | Exception,
         autosubmit_exp: Callable,
         git_server: tuple['Container', Path, str],
         tmp_path,

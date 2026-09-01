@@ -15,15 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from test.unit.conftest import AutosubmitConfigFactory
-from typing import TYPE_CHECKING
 
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
-
-if TYPE_CHECKING:
-    pass
+from test.unit.conftest import AutosubmitConfigFactory
 
 """A small configuration example."""
 AS_CONF_SMALL = {

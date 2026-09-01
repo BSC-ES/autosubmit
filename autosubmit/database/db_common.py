@@ -22,7 +22,7 @@ import os
 import sqlite3
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import Connection, delete, func, insert, select, text, update
 from sqlalchemy.schema import CreateTable
@@ -724,12 +724,11 @@ def _create_db_pg() -> bool:
     ]
 
     try:
-        with _get_sqlalchemy_conn() as conn:
-            with conn.begin():
-                for table in tables_to_create:
-                    conn.execute(CreateTable(table, if_not_exists=True))
-                conn.execute(delete(tables.DBVersionTable))
-                conn.execute(insert(tables.DBVersionTable).values({"version": 1}))
+        with _get_sqlalchemy_conn() as conn, conn.begin():
+            for table in tables_to_create:
+                conn.execute(CreateTable(table, if_not_exists=True))
+            conn.execute(delete(tables.DBVersionTable))
+            conn.execute(insert(tables.DBVersionTable).values({"version": 1}))
     except Exception as exc:
         raise AutosubmitCritical(f"Database can not be created: {str(exc)}", 7004, str(exc))
 
@@ -761,7 +760,7 @@ def _check_experiment_exists_sqlalchemy(name: str, error_on_inexistence=True) ->
     if row is None:
         if error_on_inexistence:
             raise AutosubmitCritical(
-                'The experiment name "{0}" does not exist yet!!!'.format(name), 7005
+                f'The experiment name "{name}" does not exist yet!!!', 7005
             )
         # FIXME: what if this is issued from another server/VM?
         if Path(BasicConfig.LOCAL_ROOT_DIR, name).exists():
@@ -800,9 +799,8 @@ def _update_experiment_description_version_sqlalchemy(
         vals["autosubmit_version"] = version
     query = query.values(vals)
 
-    with _get_sqlalchemy_conn() as conn:
-        with conn.begin():
-            result = conn.execute(query)
+    with _get_sqlalchemy_conn() as conn, conn.begin():
+        result = conn.execute(query)
 
     if result.rowcount == 0:
         raise AutosubmitCritical(f"Update on experiment {name} failed.", 7005)
@@ -822,7 +820,7 @@ def _get_autosubmit_version_sqlalchemy(expid) -> str:
 
 
 def _last_name_used_sqlalchemy(test=False, operational=False, evaluation=False) -> str:
-    condition: 'ColumnElement[bool]'
+    condition: ColumnElement[bool]
     if test:
         condition = tables.ExperimentTable.c.name.like("t%")
     elif operational:

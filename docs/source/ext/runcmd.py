@@ -14,7 +14,6 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 from docutils import nodes
 from docutils.nodes import Node
@@ -39,7 +38,7 @@ class _Singleton(type):
 
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:
-            cls._instances[cls] = super(_Singleton, cls).__call__(*args, **kwargs)
+            cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]
 
 
@@ -99,8 +98,8 @@ def run_command(command, working_directory):
         # err = err.decode(encoding, "replace").rstrip()
 
     if err and err != "":
-        print("Error in runcmd: {}".format(err))
-        out = "{}\n{}".format(out, err)
+        print(f"Error in runcmd: {err}")
+        out = f"{out}\n{err}"
 
     return out
 
@@ -203,7 +202,7 @@ class RunCmdDirective(code.CodeBlock):
         self.arguments[0] = syntax
         # noinspection PyAttributeOutsideInit
         self.content = output
-        node = super(RunCmdDirective, self).run()
+        node = super().run()
 
         return node
 

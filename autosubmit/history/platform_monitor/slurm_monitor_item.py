@@ -79,7 +79,7 @@ class SlurmMonitorItem:
     def from_line(cls, line):
         line = line.strip().split()
         if len(line) < 2:
-            raise Exception("Slurm parser found a line too short {0}".format(line))
+            raise Exception(f"Slurm parser found a line too short {line}")
         new_item = cls(line[0],
                        line[1],
                        str(line[2]) if len(line) > 2 else 0,

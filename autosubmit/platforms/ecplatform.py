@@ -120,9 +120,9 @@ class EcPlatform(ParamikoPlatform):
         elif scheduler_lower == PlatformType.SLURM.lower():
             self._header = SlurmHeader()
         else:
-            raise ParamikoPlatformException('ecaccess scheduler {0} not supported'.format(scheduler))
+            raise ParamikoPlatformException(f'ecaccess scheduler {scheduler} not supported')
         self._wrapper = EcWrapperFactory(self)
-        self.job_status = dict()
+        self.job_status = {}
         self.job_status['COMPLETED'] = ['DONE']
         self.job_status['RUNNING'] = ['EXEC']
         self.job_status['QUEUING'] = ['INIT', 'RETR', 'STDBY', 'WAIT']
@@ -507,7 +507,7 @@ class EcPlatform(ParamikoPlatform):
         except Exception:
             process_ok = False
         if not process_ok:
-            Log.printlog("Log file don't recovered {0}".format(src), 6004)
+            Log.printlog(f"Log file don't recovered {src}", 6004)
         return process_ok
 
     def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
@@ -519,8 +519,7 @@ class EcPlatform(ParamikoPlatform):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        command = '{0} {3}:{2} {1}'.format(self.get_cmd, file_path, os.path.join(self.get_files_path(), filename),
-                                           self.host)
+        command = f'{self.get_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)} {file_path}'
         try:
             retries = 0
             sleeptime = 5
@@ -540,9 +539,9 @@ class EcPlatform(ParamikoPlatform):
         except Exception:
             process_ok = False
         if not process_ok and must_exist:
-            Log.printlog("Completed/Stat File don't recovered {0}".format(filename), 6004)
+            Log.printlog(f"Completed/Stat File don't recovered {filename}", 6004)
         if not process_ok:
-            Log.printlog("Log file don't recovered {0}".format(filename), 6004)
+            Log.printlog(f"Log file don't recovered {filename}", 6004)
         return process_ok
 
     def read_jobid_from_remote_log(self, remote_path: str) -> int | None:
@@ -573,7 +572,7 @@ class EcPlatform(ParamikoPlatform):
         return None
 
     def delete_file(self, filename: str) -> bool:
-        command = '{0} {1}:{2}'.format(self.del_cmd, self.host, os.path.join(self.get_files_path(), filename))
+        command = f'{self.del_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)}'
         try:
             FNULL = open(os.devnull, 'w')
             subprocess.check_call(command, stdout=FNULL, stderr=FNULL, shell=True)
@@ -716,7 +715,7 @@ class EcPlatform(ParamikoPlatform):
         :type scripts_to_submit: dict
         """
         # There isen't a reliable way to check for duplicated job names in ecaccess, as the job list command doesn't return all the information needed to identify them,
-        pass  # pragma: no cover
+        # pragma: no cover
 
     def _check_for_unrecoverable_errors(self) -> None:
         """Check ecaccess command output for recoverable and unrecoverable errors.

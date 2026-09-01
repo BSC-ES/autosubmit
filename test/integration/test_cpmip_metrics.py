@@ -23,7 +23,7 @@ from typing import Any
 import pytest
 from ruamel.yaml import YAML
 
-from test.integration.test_mail import (
+from test.integration.test_mail import (  # noqa: F401
     configured_mail,
     fake_smtp_server,
 )

@@ -15,10 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from collections.abc import Callable
 from getpass import getuser
 from pathlib import Path
 from shutil import rmtree
-from typing import Callable
 
 import pytest
 from pytest_mock import MockerFixture

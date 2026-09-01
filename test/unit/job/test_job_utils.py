@@ -15,8 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 
@@ -24,10 +25,10 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import (
+    _count_units_between_dates,
+    _validate_calendar_inputs,
     calendar_chunk_section,
     calendar_get_month_days,
-    _validate_calendar_inputs,
-    _count_units_between_dates,
     calendar_unitsize_getlowersize,
     calendar_unitsize_isgreater,
     cancel_jobs,

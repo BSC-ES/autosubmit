@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
 
 import pytest
 
@@ -30,7 +29,7 @@ from autosubmit.database.session import _resolve_engine, get_engine
         (None, ValueError),
     ],
 )
-def test_resolve_engine(url: str, expected: Union[str, Exception]):
+def test_resolve_engine(url: str, expected: str | Exception):
     if type(expected) is not str:
         with pytest.raises(expected):  # type: ignore
             _resolve_engine(connection_url=url)

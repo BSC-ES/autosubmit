@@ -57,7 +57,7 @@ def test_invalid_commands(command, args, mocker):
 )
 def test_exceptions_raised(exception: BaseException, raised: BaseException, status: int | None, mocker):
     """Test exceptions being raised (for whatever reason) when running commands."""
-    mocker.patch('autosubmit.autosubmit.MyParser', **{'side_effect': exception})
+    mocker.patch('autosubmit.autosubmit.MyParser', side_effect=exception)
 
     if raised:
         with pytest.raises(raised):

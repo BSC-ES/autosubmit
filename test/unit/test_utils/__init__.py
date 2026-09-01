@@ -19,26 +19,25 @@
 
 import re
 from pathlib import Path
-from typing import Union
 
 XZ_MAGIC = "FD 37 7A 58 5A 00"
 GZIP_MAGIC = "1F 8B"
 
 
-def is_xz_file(filepath: Union[Path, str]):
+def is_xz_file(filepath: Path | str):
     with open(filepath, "rb") as f:
         magic = f.read(6)
     return magic == bytes.fromhex(XZ_MAGIC)
 
 
-def is_gzip_file(filepath: Union[Path, str]):
+def is_gzip_file(filepath: Path | str):
     with open(filepath, "rb") as f:
         magic = f.read(2)
     return magic == bytes.fromhex(GZIP_MAGIC)
 
 
 def find_uncompressed_files(
-    file_path: Union[Path, str], pattern: str | None = None
+    file_path: Path | str, pattern: str | None = None
 ) -> list[str]:
     """
     Return all files that are not compressed with xz in a directory and

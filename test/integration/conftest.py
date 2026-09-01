@@ -21,20 +21,20 @@ import configparser
 import io
 import multiprocessing
 import os
-from collections.abc import Generator, Iterator
+from collections.abc import Callable, Generator, Iterator
 from contextlib import suppress
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import time_ns
-from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import pytest
 from ruamel.yaml import YAML
 from sqlalchemy import create_engine
-from testcontainers.core.container import DockerContainer  # type: ignore
 from testcontainers.community.postgres import PostgresContainer  # type: ignore
+from testcontainers.core.container import DockerContainer  # type: ignore
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
