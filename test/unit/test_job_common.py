@@ -78,8 +78,9 @@ def test_wallclock_to_seconds(wallclock, expected):
         (['00:00', '', None], '24:00', 0, 86400),
         (['00:00', ''], None, 42, 42),
         ([], None, 42, 42),
+        ([123], None, 42, 42),
     ],
-    ids=['longest-section', 'platform-fallback', 'fallback-arg', 'empty']
+    ids=['longest-section', 'platform-fallback', 'fallback-arg', 'empty', 'not string']
 )
 def test_max_wallclock_seconds(wallclocks, platform_max_wallclock, fallback, expected):
     assert job_common.max_wallclock_seconds(
