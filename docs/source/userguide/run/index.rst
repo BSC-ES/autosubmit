@@ -187,7 +187,7 @@ How to profile Autosubmit while running an experiment
 -----------------------------------------------------
 
 Autosubmit offers the possibility to profile an experiment execution. To enable the profiler, just
-add the ``--profile`` (or ``-p``) flag to your ``autosubmit run`` command, as in the following example:
+add the ``--profile`` flag to your ``autosubmit run`` command, as in the following example:
 
 .. code-block:: bash
 
