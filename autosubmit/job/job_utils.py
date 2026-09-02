@@ -548,7 +548,49 @@ class SubJobManager:
         return self.subjobfixes
 
 
-def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status= str | None) -> None:
+def change_jobs_status(job_status_pairs: list[tuple["Job", int]], cancel_active: bool = True) -> dict[str, str]:
+    """Apply new statuses to a set of jobs, cancelling active ones (batched per platform) first.
+
+    Used by both the ``updated_list_<EXPID>.txt`` mechanism (``JobList.update_from_file``) and the
+    ``set_status`` command (``Autosubmit.change_status``).
+
+    Jobs whose current status is ACTIVE (QUEUING/RUNNING/SUBMITTED) are cancelled on their
+    platform first, avoiding a double submission. Active statuses can never be set as a target:
+    those pairs are rejected with a warning. Re-running jobs start from a clean per-attempt state.
+
+    :param job_status_pairs: Iterable of ``(job, new_status)`` pairs to change.
+    :param cancel_active: Whether to cancel jobs whose current status is ACTIVE.
+    :return: Mapping of ``job.name -> "OLD -> NEW"`` for every applied change.
+    """
+    performed_changes: dict[str, str] = {}
+    jobs_to_cancel: dict[str, list[str]] = defaultdict(list)
+    platforms_by_name: dict[str, Any] = {}
+    for job, new_status in job_status_pairs:
+        if new_status in Status.ACTIVE:
+            Log.warning(f"Job [{job.name}] cannot be set to active status "
+                        f"{Status.VALUE_TO_KEY.get(new_status, 'UNKNOWN')}, skipping it")
+            continue
+        old_status = Status.VALUE_TO_KEY.get(job.status, "UNKNOWN")
+        if cancel_active and job.status in Status.ACTIVE:
+            if job.id:
+                # The id is captured before apply_status resets it.
+                platform = job.platform
+                jobs_to_cancel[platform.name].append(str(job.id))
+                platforms_by_name[platform.name] = platform
+            else:
+                Log.warning(f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+        job.apply_status(new_status)
+        performed_changes[job.name] = f"{old_status} -> {Status.VALUE_TO_KEY.get(new_status, 'UNKNOWN')}"
+    for platform_name, job_ids in jobs_to_cancel.items():
+        try:
+            platforms_by_name[platform_name].cancel_jobs(job_ids)
+        except Exception as e:
+            Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform_name}: {e}")
+    return performed_changes
+
+
+def cancel_jobs(job_list: "JobList", active_jobs_filter: list[str] | None = None,
+                target_status: str | None = None) -> None:
     """Cancel jobs on platforms.
 
     It receives a list ``active_jobs_filter`` of statuses to filter jobs for their statuses,
@@ -594,13 +636,19 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status= str
         jobs_by_platform.setdefault(job.platform, []).append(job)
 
     for platform, jobs in jobs_by_platform.items():
-        job_ids = [str(job.id) for job in jobs]
+        job_ids = []
+        for job in jobs:
+            if not job.id:
+                Log.warning(f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+            else:
+                job_ids.append(str(job.id))
         Log.info(f'Cancelling jobs {", ".join(job_ids)} on platform {platform.name}')
 
-        try:
-            platform.cancel_jobs(job_ids)
-        except Exception as e:
-            Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform.name}: {str(e)}")
+        if job_ids:
+            try:
+                platform.cancel_jobs(job_ids)
+            except Exception as e:
+                Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform.name}: {str(e)}")
 
         for job in jobs:
             Log.info(f"Changing status of job {job.name} to {target_status}")

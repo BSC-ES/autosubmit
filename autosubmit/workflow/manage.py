@@ -29,6 +29,7 @@ from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING
 
+import paramiko
 from portalocker import Lock
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
@@ -938,8 +939,23 @@ def _online_recovery(
                     7050,
                 )
         else:
-            # Fetch completed jobs from platform
-            completed_jobnames.update(p.get_completed_job_names())
+            # Fetch completed jobs from platform.
+            try:
+                completed_jobnames.update(p.get_completed_job_names())
+            except (AutosubmitError, OSError, paramiko.SSHException) as e:
+                if offline:
+                    Log.warning(
+                        f"Platform {p.name} failed to report completed jobs, "
+                        f"proceeding with offline recovery for this platform: {e}"
+                    )
+                    completed_jobnames.update(
+                        job_list.recover_all_completed_jobs_from_exp_history(p)
+                    )
+                else:
+                    raise AutosubmitCritical(
+                        f"Couldn't fetch completed jobs from platform {p.name} during recovery: {e}",
+                        7050,
+                    )
 
     return list(completed_jobnames)
 

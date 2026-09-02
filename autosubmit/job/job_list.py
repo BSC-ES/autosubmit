@@ -40,7 +40,7 @@ from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
 from autosubmit.job.job_dict import DicJobs
-from autosubmit.job.job_utils import Dependency
+from autosubmit.job.job_utils import Dependency, change_jobs_status
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.platform import Platform
 
@@ -57,7 +57,6 @@ class JobList:
         self._expid = expid
         self._as_conf = config
         self._parser_factory = parser_factory
-        self._stat_val = Status()
         self._parameters = []
         self._date_list = []
         self._member_list = []
@@ -3021,61 +3020,77 @@ class JobList:
         #     Log.status_failed("{0:<35}{1:<15}{2:<15}{3:<20}{4:<15}", job.name, job_id, Status(
         #     ).VALUE_TO_KEY[job.status], job.platform.name, queue)
 
-    def update_from_file(self, store_change: bool = True) -> None:
-        """Update jobs status  from an external status file.
+    def update_from_file(self, store_change: bool = True) -> bool:
+        """Update job statuses from an external ``updated_list_<EXPID>.txt`` file.
 
-        Reads job status updates from a file and applies them to the job list.
-        If `store_change` is True, the update file is archived after processing.
+        Active jobs (QUEUING/RUNNING/SUBMITTED) are cancelled on their platform before any
+        status change (when the platform is reachable), and active statuses cannot be set
+        as a target. Job names and statuses are matched case-insensitively; malformed lines
+        are skipped with a warning.
 
         :param store_change: If True, rename the update file after processing to prevent reloading.
-        :raises FileNotFoundError: If the status directory cannot be created.
-        :raises ValueError: If a line in the update file has invalid format.
+        :return: True if an update file was found (and attempted to process), False otherwise.
         """
-        # TODO: Warn users that this file has changed it's location ( from pkl/ -> status/)
-
         if not self._update_file_path.exists():
-            return
+            return False
 
         Log.info(f"Loading updated list: {self._update_file_path.name}")
         try:
-            with open(self._update_file_path, 'r', encoding='utf-8') as f:
-                for line_num, line in enumerate(f, start=1):
-                    line = line.strip()
-                    if not line or line.startswith('#'):
-                        continue
+            lines = self._update_file_path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as e:
+            Log.warning(f"Could not read the update file {self._update_file_path}: {e}")
+            return False
 
-                    parts = line.split()
-                    if len(parts) < 2:
-                        Log.warning(f"Skipping invalid line {line_num} in {self._update_file_path.name}: '{line}'")
-                        continue
+        jobs_by_name: dict[str, Job] = {}
+        for job in self.job_list:
+            jobs_by_name.setdefault(job.name.upper(), job)
 
-                    job_name, status_str = parts[0], parts[1]
-                    status_str = status_str.upper()
+        job_status_pairs: list[tuple[Job, int]] = []
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                Log.warning(f"Skipping invalid line in {self._update_file_path.name}: '{line}'")
+                continue
 
-                    if status_str not in Status.VALUE_TO_KEY:
-                        Log.warning(f"Invalid status '{status_str}' on line {line_num}")
-                        continue
+            job_name, status_str = parts[0], parts[1].upper()
+            # TODO: For 4.2 change this into a database call as the job may not be loaded.
+            job = jobs_by_name.get(job_name.upper())
+            if not job:
+                Log.warning(f"Job '{job_name}' not found in {self._update_file_path.name}, skipping it")
+                continue
 
-                    job = self.get_job_by_name(job_name)
+            status = Status.KEY_TO_VALUE.get(status_str)
+            if status is None:
+                Log.warning(f"Invalid status '{status_str}' for job '{job_name}' in "
+                            f"{self._update_file_path.name}, skipping it")
+                continue
+            if status in Status.ACTIVE:
+                Log.warning(f"Status '{status_str}' for job '{job_name}' is active and cannot be set "
+                            f"from {self._update_file_path.name}, skipping it")
+                continue
+            elif job.status in Status.ACTIVE:
+                platform = getattr(job, "platform", None)
+                if platform is None or not platform.connected:
+                    Log.warning(f"Cannot change status of active job [{job.name}] because the connection to its "
+                                f"platform [{getattr(platform, 'name', 'unknown')}] is not available, skipping it")
+                    continue
+            job_status_pairs.append((job, status))
 
-                    if not job:
-                        Log.warning(f"Job '{job_name}' not found (line {line_num})")
-                        continue
-
-                    try:
-                        new_status = self._stat_val.retval(status_str)
-                        job.status = new_status
-                        Log.result(f"Updated job '{job_name}' to status '{status_str}'")
-                    except (ValueError, AttributeError) as e:
-                        Log.warning(f"Invalid status '{status_str}' for job '{job_name}' (line {line_num}): {e}")
-        except OSError as e:
-            Log.warning(f"Failed to read update file {self._update_file_path}: {e}")
+        if job_status_pairs:
+            change_jobs_status(job_status_pairs)
 
         if store_change:
             output_date = strftime("%Y%m%d_%H%M", localtime())
-            archived_file_path = self._set_status_path / f"{self._update_file}_{output_date}"
-            self._update_file_path.rename(archived_file_path)
-            Log.result(f"Renamed update file to prevent reloading in each iteration: {archived_file_path.name}")
+            archived_file_path = self._update_file_path.parent / f"{self._update_file_path.name}_{output_date}"
+            try:
+                self._update_file_path.rename(archived_file_path)
+                Log.result(f"Renamed update file to prevent reloading in each iteration: {archived_file_path.name}")
+            except OSError as e:
+                Log.warning(f"Could not move the update file {self._update_file_path}: {e}")
+        return True
 
     def get_skippable_jobs(self, jobs_in_wrapper):
         job_list_skip = [job for job in self.get_job_list() if job.skippable == "true" and
@@ -3227,6 +3242,13 @@ class JobList:
 
         if jobs_to_recover:
             for job in jobs_to_recover:
+                if not job.id or not job.has_valid_submit_time():
+                    Log.debug(
+                        f"Skipping the log recovery of {job.name} because the id/submit_time is not valid, "
+                        f"probably lost in the recovery"
+                    )
+                    job.updated_log = job.fail_count + 1
+                    continue
                 job.recover_log(self._as_conf)
             self.save_jobs(jobs_to_recover)
 
@@ -3509,8 +3531,12 @@ class JobList:
                                     jobdate == date2str(related_job.date, related_job.date_format)):
                                 try:
                                     if job.status == Status.QUEUING:
-                                        job.platform.send_command(job.platform.cancel_cmd +
-                                                                  " " + str(job.id), ignore_log=True)
+                                        if not job.id:
+                                            Log.warning(
+                                                f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+                                        else:
+                                            job.platform.send_command(job.platform.cancel_cmd +
+                                                                      " " + str(job.id), ignore_log=True)
                                 except Exception:
                                     pass  # jobid finished already
                                 job.status = Status.SKIPPED
@@ -3523,8 +3549,12 @@ class JobList:
                                     date2str(related_job.date, related_job.date_format)):
                                 try:
                                     if job.status == Status.QUEUING:
-                                        job.platform.send_command(job.platform.cancel_cmd +
-                                                                  " " + str(job.id), ignore_log=True)
+                                        if not job.id:
+                                            Log.warning(
+                                                f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+                                        else:
+                                            job.platform.send_command(job.platform.cancel_cmd +
+                                                                      " " + str(job.id), ignore_log=True)
                                 except Exception:
                                     pass  # job_id finished already
                                 job.status = Status.SKIPPED
@@ -4210,37 +4240,34 @@ class JobList:
         self.graph.add_node(job.name, job=job)
 
     def recover_last_data(self, finished_jobs: list["Job"] | None = None) -> None:
-        """Recover job IDs and log names for completed, failed, and skipped jobs from experiment history.
+        """Recover job IDs, log names and submit time for finished jobs from experiment history.
+
+        Jobs whose id/updated_log/submit_time are still meaningful are left untouched so the
+        main loop can recover their logs. Otherwise the last known data is restored from the
+        database (when available) and the job is marked as fully recovered so the main loop
+        skips it.
 
         :param finished_jobs: Optional list of finished Job objects to recover data for.
-        :return: None
-        :rtype: None
         """
-        jobs_ran_atleast_once = False
         if not finished_jobs:
-            jobs_ran_atleast_once = True
             finished_jobs = self._get_jobs_by_name(
                 status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
-        # Recover job_id and log name if missing
-        if finished_jobs:
-            exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
-            jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in finished_jobs])
-            # Only if we have information already stored, otherwise the job will be downloaded later
-            for job in [job for job in finished_jobs if job.name in jobs_data]:
-                job.id = int(jobs_data[job.name]["job_id"])
-                job.local_logs = jobs_data[job.name]["out"]
-                job.remote_logs = jobs_data[job.name]["err"]
-                # TODO: rebase is fixed
-                job.updated_log = jobs_data[job.name]["fail_count"]
-
+        if not finished_jobs:
+            return
+        exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
+        jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in finished_jobs])
         for job in finished_jobs:
-            # TODO: Another fix will come in 4.2. Currently, if the job has no id, the log will not be recovered properly.
-            if not job.id:
-                job.id = 1
-            # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
-            if not jobs_ran_atleast_once:
-                # TODO: rebase is fixed
-                job.updated_log = job.fail_count
+            if job.id and job.updated_log <= job.fail_count and job.has_valid_submit_time():
+                continue
+            data = jobs_data.get(job.name)
+            if data:
+                job.id = int(data["job_id"])
+                job.local_logs = data["out"]
+                job.remote_logs = data["err"]
+                if data.get("submit", 0) > 0:
+                    job.submit_time_timestamp = datetime.datetime.fromtimestamp(
+                        int(data["submit"])).strftime("%Y%m%d%H%M%S")
+            job.updated_log = job.fail_count + 1
 
     def _get_jobs_by_name(self, status: list[int] | None = None, platform: Platform = None,
                           return_only_names=False) -> list[str] | list["Job"]:

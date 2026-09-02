@@ -685,3 +685,130 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     job_list.add_job(Job("test_job", "1", Status.COMPLETED, 0))
 
     job_list.recover_last_data()
+
+
+def test_recover_logs_skips_jobs_without_valid_id_or_submit_time(as_conf, mocker):
+    """Jobs without a valid scheduler id or submit time are not handed to log recovery."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    invalid = Job("bad_job", None, Status.COMPLETED, 0)
+    valid = Job("good_job", "42", Status.FAILED, 0)
+    valid.submit_time_timestamp = "20200101000000"
+    for job in (invalid, valid):
+        job_list.add_job(job)
+
+    mocked_recover_log = mocker.patch.object(Job, "recover_log", return_value=None)
+    mocked_save = mocker.patch.object(job_list, "save_jobs")
+
+    assert job_list.recover_logs() is True
+
+    assert invalid.updated_log == invalid.fail_count + 1
+    assert valid.updated_log == 0
+    assert mocked_recover_log.call_count == 1
+    mocked_save.assert_called_once()
+
+
+def test_recover_last_data_restores_and_marks_finished_jobs(as_conf, mocker):
+    """recover_last_data leaves meaningful jobs untouched and restores/marks the rest."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    meaningful = Job("meaningful", "5", Status.COMPLETED, 0)
+    meaningful.submit_time_timestamp = "20200101000000"
+    meaningful.updated_log = 0
+    lost = Job("lost", None, Status.FAILED, 0)
+    job_list.add_job(meaningful)
+    job_list.add_job(lost)
+
+    mocked_history = mocker.patch("autosubmit.job.job_list.ExperimentHistory")
+    mocked_history.return_value.manager.get_jobs_data_last_row.return_value = {
+        lost.name: {"job_id": 7, "out": "out.log", "err": "err.log", "submit": 1600000000},
+    }
+
+    job_list.recover_last_data([meaningful, lost])
+
+    assert meaningful.id == "5"
+    assert meaningful.updated_log == 0
+    assert lost.id == 7
+    assert lost.local_logs == "out.log"
+    assert lost.remote_logs == "err.log"
+    assert lost.has_valid_submit_time()
+    assert lost.updated_log == lost.fail_count + 1
+
+
+def _mock_platform(mocker, connected: bool = True, name: str = "pl"):
+    platform = mocker.MagicMock()
+    platform.name = name
+    platform.connected = connected
+    platform.serial_platform = platform
+    return platform
+
+
+def test_update_from_file_applies_case_insensitive_changes(as_conf, mocker, tmp_path):
+    """update_from_file parses job names and statuses case-insensitively and archives the file."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    job = Job("MyJob", "1", Status.WAITING, 0)
+    job_list.add_job(job)
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text("myjob COMPLETED\n", encoding="utf-8")
+    mocked_change = mocker.patch("autosubmit.job.job_list.change_jobs_status")
+
+    assert job_list.update_from_file() is True
+    assert mocked_change.call_args.args[0] == [(job, Status.COMPLETED)]
+    assert not update_path.exists()
+    assert list(tmp_path.glob("updated_list_a000.txt_*"))
+
+
+@pytest.mark.parametrize(
+    "line, expected_status",
+    [
+        ("job1 RUNNING", Status.WAITING),  # active targets are rejected
+        ("job1 BOGUS", Status.WAITING),  # unknown status is skipped
+        ("ghost COMPLETED", None),  # unknown job is skipped
+    ],
+    ids=["active-target-rejected", "unknown-status", "unknown-job"],
+)
+def test_update_from_file_skips_invalid_entries(as_conf, tmp_path, line, expected_status):
+    """update_from_file warns and skips entries it cannot apply."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    job = Job("job1", "1", Status.WAITING, 0)
+    job_list.add_job(job)
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text(f"{line}\n", encoding="utf-8")
+
+    assert job_list.update_from_file(store_change=False) is True
+    if expected_status is not None:
+        assert job.status == expected_status
+    else:
+        assert job.status == Status.WAITING
+
+
+def test_update_from_file_cancels_active_job_when_platform_connected(as_conf, mocker, tmp_path):
+    """Active jobs are cancelled (via the shared helper) only when their platform is reachable."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    platform = _mock_platform(mocker, connected=True)
+    active = Job("job_active", "77", Status.RUNNING, 0)
+    active.platform = platform
+    job_list.add_job(active)
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text("job_active COMPLETED\n", encoding="utf-8")
+
+    assert job_list.update_from_file(store_change=False) is True
+    assert active.status == Status.COMPLETED
+    platform.cancel_jobs.assert_called_once_with(["77"])
+
+
+def test_update_from_file_skips_active_job_when_platform_not_connected(as_conf, mocker, tmp_path):
+    """Active jobs on unreachable platforms keep their status."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    platform = _mock_platform(mocker, connected=False)
+    active = Job("job_active", "77", Status.RUNNING, 0)
+    active.platform = platform
+    job_list.add_job(active)
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text("job_active COMPLETED\n", encoding="utf-8")
+
+    assert job_list.update_from_file(store_change=False) is True
+    assert active.status == Status.RUNNING
+    platform.cancel_jobs.assert_not_called()

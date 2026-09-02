@@ -19,18 +19,20 @@ import json
 import locale
 import os
 import random
-import re
 import tarfile
 import time
 from contextlib import suppress
-from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from bscearth.utils.date import date2str, sum_str_hours
 
 from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status
+from autosubmit.job.job_common import (
+    Status,
+    max_wallclock_seconds,
+    wallclock_to_seconds,
+)
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
 
@@ -590,63 +592,27 @@ class JobPackageVertical(JobPackageThread):
             self._wallclock = sum_str_hours(self._wallclock, job.wallclock)
         self.name = f"{self._expid}_{self.FILE_PREFIX}_{jobs_in_wrapper_str(configuration, self.current_wrapper_section)}_{str(int(time.time())) + str(random.randint(1, 10000))}_{self._num_processors}_{len(self._jobs)}"
 
-    def parse_time(self):
-        # TODO: Remove this function and use the one in the Job class or move the one in the job class into utils
-        # noinspection Annotator
-        regex = re.compile(r'(((?P<hours>\d+):)(?P<minutes>\d+))(:(?P<seconds>\d+))?')
-        parts = regex.match(self._wallclock)
-        if not parts:
-            return None
-        parts = parts.groupdict()
-        if int(parts['hours']) > 0:
-            format_ = "hour"
-        else:
-            format_ = "minute"
-        time_params = {}
-        for name, param in parts.items():
-            if param:
-                time_params[name] = int(param)
-        return timedelta(**time_params), format_
-
     def _common_script_content(self) -> str:
-        # TODO: normalize this logic to be the same as the one in the Job class
+        """Build the vertical wrapper script.
+
+        Computes the per-job timeout (the longest wrapped section wallclock, falling back to the
+        platform maximum wallclock for jobs without one), optionally extends the wrapper wallclock,
+        and delegates the script generation to the wrapper factory.
+
+        :return: The wrapper script content.
+        """
         if self.jobs[0].wrapper_type == "vertical":
-            wallclock, format_ = self.parse_time()
-            original_wallclock_to_seconds = wallclock.days * 86400.0 + wallclock.seconds
-
-            if format_ == "hour":
-                total = wallclock.days * 24 + wallclock.seconds / 60 / 60
-            else:
-                total = wallclock.days * 24 + wallclock.seconds / 60
-
-            if format_ == "hour":
-                hour = int(total)
-                minute = int((total - int(total)) * 60.0)
-                second = int(((total - int(total)) * 60 -
-                              int((total - int(total)) * 60.0)) * 60.0)
-            else:
-                hour = 0
-                minute = int(total)
-                second = int((total - int(total)) * 60.0)
-            wallclock_delta = datetime.timedelta(hours=hour, minutes=minute, seconds=second)
-            wallclock_seconds = wallclock_delta.days * 24 * 60 * 60 + wallclock_delta.seconds
-            wallclock_by_level = wallclock_seconds / (self.jobs[-1].level + 1)
+            wallclock_seconds = wallclock_to_seconds(self._wallclock) or 0
+            wallclock_by_level = max_wallclock_seconds(
+                (job.wallclock for job in self.jobs),
+                platform_max_wallclock=self.platform.max_wallclock if self.platform else None,
+                fallback=wallclock_seconds,
+            )
             if self.extensible_wallclock > 0:
-                wallclock_seconds = int(original_wallclock_to_seconds + wallclock_by_level * self.extensible_wallclock)
-                wallclock_delta = datetime.timedelta(hours=0, minutes=0, seconds=wallclock_seconds)
-                total = wallclock_delta.days * 24 + wallclock_delta.seconds / 60 / 60
-                hh = int(total)
-                mm = int((total - int(total)) * 60.0)
-                if hh < 10:
-                    hh_str = '0' + str(hh)
-                else:
-                    hh_str = str(hh)
-                if mm < 10:
-                    mm_str = '0' + str(mm)
-                else:
-                    mm_str = str(mm)
-                self._wallclock = f"{hh_str}:{mm_str}"
-                Log.info(f"Submitting {self.name} with wallclock {hh_str}:{mm_str}")
+                wallclock_seconds = int(wallclock_seconds + wallclock_by_level * self.extensible_wallclock)
+                hh, mm = divmod(wallclock_seconds // 60, 60)
+                self._wallclock = f"{hh:02d}:{mm:02d}"
+                Log.info(f"Submitting {self.name} with wallclock {self._wallclock}")
         else:
             wallclock_by_level = 0
 

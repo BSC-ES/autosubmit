@@ -39,6 +39,13 @@ def reset(as_exp_, target="WAITING"):
         as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
         check_failed_jobs=True)
 
+    if target.upper() == "RUNNING":
+        # Active statuses cannot be set via set_status, so emulate the online state directly.
+        for job in job_list_.get_job_list():
+            job.status = Status.RUNNING
+        job_list_.save_jobs(reset_log_counters=True)
+        return job_list_
+
     job_names = " ".join([job.name for job in job_list_.get_job_list()])
     do_setstatus(as_exp_, fl=job_names, target=target)
     return job_list_

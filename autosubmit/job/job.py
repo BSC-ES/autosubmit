@@ -46,7 +46,11 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
 )
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
+from autosubmit.job.job_common import (
+    Status,
+    increase_wallclock_by_chunk,
+    wallclock_to_seconds,
+)
 from autosubmit.job.job_utils import get_split_size, get_split_size_unit
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import Language, get_template_snippet
@@ -265,7 +269,6 @@ class Job:
         'file',
         'finish_time_timestamp',
         'finished_time',
-        'first_wrapped_level',
         'het',
         'hold',
         'id',
@@ -516,7 +519,6 @@ class Job:
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
-        self.first_wrapped_level = False
         self._wrapper_queue = None
         self._queue = None
         self._partition = None
@@ -1687,11 +1689,11 @@ class Job:
             error=error,
         )
 
-    def _max_possible_wallclock(self):
+    def _max_possible_wallclock(self) -> int | None:
         if self.platform and self.platform.max_wallclock:
-            wallclock = self.parse_time(self.platform.max_wallclock)
-            if wallclock:
-                return int(wallclock.total_seconds())
+            seconds = wallclock_to_seconds(self.platform.max_wallclock)
+            if seconds:
+                return seconds
         return None
 
     def _time_in_seconds_and_margin(self, wallclock: datetime.timedelta) -> int:
@@ -1720,20 +1722,20 @@ class Job:
         return int(wallclock_delta.total_seconds())
 
     @staticmethod
-    def parse_time(wallclock):
-        # TODO This is a workaround for the time being, just defined for tests passing without more issues
+    def parse_time(wallclock) -> datetime.timedelta | None:
+        """Convert a ``HH:MM[:SS]`` wallclock to a :class:`datetime.timedelta`.
+
+        :param wallclock: Wallclock to convert, e.g. ``'07:30'`` or ``'07:30:00'``.
+        :return: The wallclock as a timedelta, or ``None`` if it cannot be parsed. ``'00:00'``
+            yields a zero-duration timedelta (not ``None``). Non-string values return a one-day
+            timedelta as a test workaround.
+        """
         if type(wallclock) is not str:
             return datetime.timedelta(24 * 60 * 60)
-        regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
-        parts = regex.match(wallclock)
-        if not parts:
+        seconds = wallclock_to_seconds(wallclock)
+        if seconds is None:
             return None
-        parts = parts.groupdict()
-        time_params = {}
-        for name, param in parts.items():
-            if param:
-                time_params[name] = int(param)
-        return datetime.timedelta(**time_params)
+        return datetime.timedelta(seconds=seconds)
 
     def is_over_wallclock(self, effective_wallclock=None) -> bool:
         """Check if the job is over the wallclock time, it is an alternative method to avoid platform issues."""
@@ -1782,13 +1784,6 @@ class Job:
                 Log.debug(f"Metrics collection skipped for {self.name}: no experiment run found in database.")
 
         return self.status
-
-    def update_children_status(self):
-        children = list(self.children)
-        for child in children:
-            if child.level == 0 and child.status in [Status.SUBMITTED, Status.RUNNING, Status.QUEUING, Status.UNKNOWN]:
-                child.status = Status.FAILED
-                children += list(child.children)
 
     def check_completion(self, default_status=Status.FAILED):
         """Check whether a COMPLETED file exists on the platform.
@@ -2512,6 +2507,23 @@ class Job:
         self.updated_log = 0
         self.updated_stats = 0
 
+    def apply_status(self, status: int) -> None:
+        """Apply a new status, resetting the per-attempt state when the job will run again.
+
+        Statuses in :attr:`Status.RE_RUNNABLE` (e.g. WAITING, READY) mean the job will be
+        scheduled again, so attempt counters, stale scheduler id and log recovery state are
+        reset to guarantee the new run starts clean (and its logs are recovered).
+
+        :param status: Numeric status value from :class:`Status`.
+        """
+        self.prev_status = self.status
+        self.status = status
+        if status in Status.RE_RUNNABLE:
+            self.fail_count = 0
+            self.reset_logs()
+            self.log_recovery_call_count = 0
+            self.wrapper_type = None
+            self.id = None
 
     def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
         """Find and substitute dynamic placeholders in `parameters` using the provided
@@ -3104,6 +3116,19 @@ class Job:
         """Convert a date string in the format YYYYMMDDHHMMSS to epoch time."""
         return int(datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S").timestamp())
 
+    def has_valid_submit_time(self) -> bool:
+        """Whether the submit time can be used for log recovery.
+
+        :return: True if ``submit_time_timestamp`` is set and parses as ``YYYYMMDDHHMMSS``.
+        """
+        if not self.submit_time_timestamp:
+            return False
+        try:
+            self._datestr_to_epoch(str(self.submit_time_timestamp))
+        except ValueError:
+            return False
+        return True
+
     def write_end_time(self, completed, attempt):
         """Writes end timestamp to TOTAL_STATS file and jobs_data.db
         :param completed: True if the job has been completed, False otherwise
@@ -3470,7 +3495,10 @@ class WrapperJob(Job):
         if not over_wallclock:
             return False
 
-        self.platform.cancel_jobs([self.id])
+        if not self.id:
+            Log.warning(f"Skipping cancellation of wrapper job [{self.name}] with invalid ID: {self.id}")
+        else:
+            self.platform.cancel_jobs([self.id])
         self.new_status = Status.FAILED
         for inner_job in self.job_list:
             if inner_job.new_status == Status.RUNNING:

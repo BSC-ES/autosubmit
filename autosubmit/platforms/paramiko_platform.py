@@ -371,6 +371,13 @@ class ParamikoPlatform(Platform):
         try:
             self._init_local_x11_display()
 
+            # How long to wait for a key (re)negotiation to finish before giving
+            # up. Busy OpenSSH login nodes can take longer than paramiko's
+            # hard-coded default (30s) to complete a rekey, which raises
+            # ``SSHException: Key-exchange timed out waiting for key negotiation``.
+            clear_to_send_timeout = float(
+                self.config.get('PLATFORMS', {}).get(self.name.upper(), {}).get('CLEAR_TO_SEND_TIMEOUT', 180))
+
             is_current_real_user_owner = True if not as_conf else as_conf.is_current_real_user_owner
 
             ssh_config_path: Path = _get_user_config_file(
@@ -423,6 +430,7 @@ class ParamikoPlatform(Platform):
                                               disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                 self.transport = self._ssh.get_transport()
                 self.transport.banner_timeout = 60
+                self.transport.clear_to_send_timeout = clear_to_send_timeout
             else:
                 Log.warning("2FA is enabled, this is an experimental feature and it may not work as expected")
                 Log.warning("nohup can't be used as the password will be asked")
@@ -442,6 +450,7 @@ class ParamikoPlatform(Platform):
                 if self.transport.is_authenticated():
                     self._ssh._transport = self.transport
                     self.transport.banner_timeout = 60
+                    self.transport.clear_to_send_timeout = clear_to_send_timeout
                 else:
                     self.transport.close()
                     raise SSHException
@@ -816,9 +825,11 @@ class ParamikoPlatform(Platform):
 
             if cancel and job_status is Status.FAILED:
                 try:
-                    if self.cancel_cmd is not None:
+                    if self.cancel_cmd is not None and job.id:
                         Log.warning(f"Job {job.id} is over wallclock, cancelling job")
                         job.platform.send_command(self.cancel_cmd + " " + str(job.id))
+                    elif not job.id:
+                        Log.warning(f"Skipping cancellation of job with invalid ID: {job.id}")
                 except Exception as e:
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
@@ -1308,8 +1319,15 @@ class ParamikoPlatform(Platform):
                 return stdin, stdout, stderr
             except (OSError, paramiko.SSHException, ConnectionError) as e:
                 Log.warning(f'A networking error occurred while executing command [{command}]: {str(e)}')
-                if not self.connected or not self.transport or not self.transport.active:
-                    self.restore_connection(None)
+                # A transport stuck in key negotiation (e.g. "Key-exchange timed out
+                # waiting for key negotiation") still reports ``active=True`` but can
+                # never complete the command; the only reliable recovery is to rebuild
+                # the connection.
+                if isinstance(e, paramiko.SSHException) or not self.connected or not self.transport or not self.transport.active:
+                    try:
+                        self.restore_connection(None)
+                    except (AutosubmitError, AutosubmitCritical, OSError, paramiko.SSHException) as reconnect_error:
+                        Log.warning(f'Failed to restore SSH connection after error: {reconnect_error}')
                     if self.transport and self.transport.active:
                         continue
                 else:
@@ -1432,6 +1450,8 @@ class ParamikoPlatform(Platform):
             return True
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
+        except (paramiko.SSHException, ConnectionError, TimeoutError) as e:
+            raise AutosubmitError(f"SSH transport error: {str(e)}", 6005)
         except OSError as e:
             raise AutosubmitError(f"I/O issues: {str(e)}", 6016)
 

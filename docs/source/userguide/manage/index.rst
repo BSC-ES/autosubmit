@@ -392,11 +392,13 @@ If Autosubmit finds the above file, it will process it. You can check that the p
 if you see that the file name has changed to:
 ::
 
-    update_list_<EXPID>_<DATE>_<TIME>.txt
+    updated_list_<EXPID>.txt_<YYYYMMDD_HHMM>
 
 .. note:: A running instance of Autosubmit will check the existence of the above file after checking already submitted jobs.
     It may take some time, depending on the setting ``SAFETYSLEEPTIME``.
 
 
 
-.. warning:: Keep in mind that autosubmit reads the file automatically, so it is suggested to create the file in another location like ``/tmp`` or ``/var/tmp`` and then copy/move it to the ``pkl`` folder. Alternatively, you can create the file with a different name and rename it when you have finished.
+.. note:: Job names and statuses are matched case-insensitively. Malformed lines, unknown jobs/statuses and active
+    statuses (``SUBMITTED``, ``QUEUING``, ``RUNNING``) are skipped with a warning. When a job is active and its platform
+    is reachable, Autosubmit cancels it on the platform before applying the requested change.
