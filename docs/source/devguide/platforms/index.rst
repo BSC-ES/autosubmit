@@ -328,7 +328,7 @@ a directory, not a file; the name it uses depends on the platform type:
 When the write-permission check runs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The check is triggered by a small number of user-facing commands, and the
+The check is triggered by a small number of commands, and the
 frequency depends on the command:
 
 .. list-table::
@@ -491,6 +491,46 @@ A few patterns worth knowing when reasoning about Autosubmit filesystem load:
     counts) for a given workflow. Producing those numbers requires either
     instrumenting Autosubmit with an I/O tracer or running a representative
     workflow under ``strace`` / ``iostat`` against a controlled HPC.
+
+Measured I/O footprint (dummy workflow)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The counts below come from running the built-in dummy workflow against
+``localhost`` on a Linux laptop and tracing every relevant syscall. The
+dummy workflow is deliberately small (7-8 jobs), so
+these numbers are an illustrative baseline, not a benchmark of what
+Autosubmit does in an operational context.
+
+.. list-table:: 
+   :header-rows: 1
+   :widths: 55 45
+
+   * - Metric
+     - Count
+   * - SSH connections opened
+     - 0 (local platform)
+   * - Subprocess launches (total)
+     - ~365 across all binaries
+   * - Job-execution invocations (``bash`` + ``timeout`` + ``printenv``)
+     - 48 each (~7 per job)
+   * - Job-status check subprocesses (``ps`` + ``grep``)
+     - 40 each
+   * - Completion-marker sweeps (``find``)
+     - 24
+   * - Opens of local SQLite DBs
+     - 1,121 (682 job_list.db + 439 job_data_<expid>.db)
+   * - Bytes written to disk
+     - ~1 MB
+   * - Bytes read from disk (includes subprocess-startup overhead)
+     - ~70 MB
+   * - Total syscalls
+     - ~180,000
+
+To reproduce these numbers, or to run the same measurement against a
+different workflow or platform, see the runbook at
+:doc:`measure_autosubmit`. The script it references
+(``scripts/measure_platform_io.sh``) is included in the repository and
+uses ``bpftrace`` when available, falling back to ``strace`` otherwise.
 
 How to generate a new experiment
 --------------------------------

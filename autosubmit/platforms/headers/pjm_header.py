@@ -20,7 +20,7 @@
 import textwrap
 
 
-class PJMHeader(object):
+class PJMHeader:
     """Class to handle the PJM (also known as TCM Technical Computing Suite) headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
