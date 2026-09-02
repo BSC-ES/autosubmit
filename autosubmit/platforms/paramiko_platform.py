@@ -595,7 +595,7 @@ class ParamikoPlatform(Platform):
                     Log.printlog(f"File {filename} seems to no exists (skipping)", 5004)
             if must_exist:
                 if not ignore_log:
-                    Log.printlog(f"File {filename} does not exists", 6004)
+                    Log.printlog(f"File {filename} does not exist", 6004)
             else:
                 if not ignore_log:
                     Log.printlog(f"Log file couldn't be retrieved: {filename}", 5000)
@@ -650,18 +650,18 @@ class ParamikoPlatform(Platform):
             return True
         except OSError as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(path_root, src)} does not exists, something went '
+                raise AutosubmitError(f'File {os.path.join(path_root, src)} does not exist, something went '
                                       f'wrong with the platform', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exist", 6004, str(e))
             else:
-                Log.debug(f"File {path_root} doesn't exists ")
+                Log.debug(f"File {path_root} doesn't exist ")
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
+                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exist', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exist", 6004, str(e))
             else:
                 Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
                 return False
