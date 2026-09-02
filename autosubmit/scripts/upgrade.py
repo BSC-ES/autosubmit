@@ -44,7 +44,7 @@ class UpgradeOptions(AutosubmitOptions):
     # These are not passed via the command line.
     accepts_multiple_expids = False
     """Whether or not the sub-command accepts multiple expids. Default is no."""
-    files: str
+    files: list[str] | None
 
 
 def args_parser() -> ArgumentParser:
