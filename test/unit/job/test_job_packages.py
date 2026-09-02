@@ -449,3 +449,33 @@ def test_job_package_execution_mode_for_slurm_with_serial_platform(autosubmit_co
 
     assert job_packages.platform.EXECUTION_MODE is ExecutionMode.BATCH
     assert job_packages.timeout is None
+
+
+@pytest.mark.parametrize(
+    "wallclock0, wallclock1, level, expected",
+    [
+        ("00:10", "00:30", 2714, 1800),
+        ("00:00", "00:00", 0, 86400),
+    ],
+    ids=["max-section-ignores-level", "platform-max-fallback"],
+)
+def test_vertical_wrapper_wallclock_by_level(create_job_package_wrapper, jobs, mocker, create_platform,
+                                             wallclock0, wallclock1, level, expected) -> None:
+    """Vertical per-job timeout must be the longest wrapped section, ignoring job.level."""
+    platform = create_platform()
+    for job in jobs:
+        job._platform = platform
+    jobs[0].wrapper_type = "vertical"
+    jobs[0].wallclock = wallclock0
+    jobs[1].wallclock = wallclock1
+    jobs[-1].level = level  # should be ignored now
+    package = create_job_package_wrapper({
+        'TYPE': "vertical",
+        'JOBS_IN_WRAPPER': "None",
+        'METHOD': "ASThread",
+        'POLICY': "flexible",
+        'EXTEND_WALLCLOCK': 0,
+    })
+    get_wrapper = mocker.patch.object(package._wrapper_factory, 'get_wrapper', return_value="")
+    package._common_script_content()
+    assert get_wrapper.call_args.kwargs['wallclock_by_level'] == expected
