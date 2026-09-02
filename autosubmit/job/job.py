@@ -1466,7 +1466,7 @@ class Job(object):
         return int(wallclock_delta.total_seconds())
 
     @staticmethod
-    def parse_time(wallclock):
+    def parse_time(wallclock) -> datetime.timedelta | None:
         """Convert a ``HH:MM[:SS]`` wallclock to a :class:`datetime.timedelta`.
 
         :param wallclock: Wallclock to convert, e.g. ``'07:30'`` or ``'07:30:00'``.
@@ -1474,7 +1474,6 @@ class Job(object):
         :return: The wallclock as a timedelta, or ``None`` if it cannot be parsed. ``'00:00'``
             yields a zero-duration timedelta (not ``None``). Non-string values return a one-day
             timedelta as a test workaround.
-        :rtype: Optional[datetime.timedelta]
         """
         # TODO This is a workaround for the time being, just defined for tests passing without more issues
         if type(wallclock) is not str:

@@ -18,18 +18,16 @@
 import datetime
 import re
 from collections.abc import Iterable
-from typing import Optional
 
 _WALLCLOCK_RE = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
 
 
-def wallclock_to_seconds(wallclock: Optional[str]) -> Optional[int]:
+def wallclock_to_seconds(wallclock: str | None) -> int | None:
     """Convert a ``HH:MM[:SS]`` wallclock to seconds.
 
     :param wallclock: Wallclock to convert, e.g. ``'07:30'`` or ``'07:30:00'``.
     :type wallclock: str
     :return: The wallclock in seconds, or ``None`` if it is empty, not a string or cannot be parsed.
-    :rtype: Optional[int]
     """
     if not wallclock or not isinstance(wallclock, str):
         return None
@@ -43,7 +41,7 @@ def wallclock_to_seconds(wallclock: Optional[str]) -> Optional[int]:
     return hours * 3600 + minutes * 60 + seconds
 
 
-def max_wallclock_seconds(wallclocks: Iterable[str], platform_max_wallclock: Optional[str] = None,
+def max_wallclock_seconds(wallclocks: Iterable[str], platform_max_wallclock: str | None = None,
                           fallback: int = 0) -> int:
     """Return the longest wallclock (seconds) among the given ones.
 

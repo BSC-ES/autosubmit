@@ -20,7 +20,7 @@ import operator
 from contextlib import suppress
 from math import ceil
 from operator import attrgetter
-from typing import List, Optional, TYPE_CHECKING, Union
+from typing import List, TYPE_CHECKING, Union
 
 from bscearth.utils.date import sum_str_hours
 
@@ -1032,14 +1032,13 @@ class JobPackagerVertical(object):
                     stack.append((child, scan_index))
         return self.jobs_list
 
-    def get_wrappable_child(self, job: Job, scan_index: int) -> tuple[Optional[Job], int]:
+    def get_wrappable_child(self, job: Job, scan_index: int) -> tuple[Job | None, int]:
         """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
         :param job: Job to be evaluated.
         :type job: Job
         :param scan_index: Position in sorted_jobs from which to start looking for the next wrappable job.
         :return: The wrappable job (or ``None``) and the next scan position.
-        :rtype: tuple[Optional[Job], int]
         """
         sorted_jobs = self.sorted_jobs
         child = None
@@ -1113,14 +1112,13 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         # sort by chunk number
         self.index = 0
 
-    def get_wrappable_child(self, job: Job, scan_index: int) -> tuple[Optional[Job], int]:
+    def get_wrappable_child(self, job: Job, scan_index: int) -> tuple[Job | None, int]:
         """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
         :param job: Job to be evaluated.
         :type job: Job
         :param scan_index: Position in sorted_jobs from which to start looking for the next wrappable job.
         :return: The wrappable job (or ``None``) and the next scan position.
-        :rtype: tuple[Optional[Job], int]
         """
         sorted_jobs = self.sorted_jobs
         child = None
