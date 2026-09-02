@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+from autosubmit.log.log import Log
+
 from .platform_monitor import PlatformMonitor
 from .slurm_monitor_item import SlurmMonitorItem
 
@@ -24,7 +26,7 @@ class SlurmMonitor(PlatformMonitor):
     """ Manages Slurm commands interpretation. """
 
     def __init__(self, platform_output):
-        super(SlurmMonitor, self).__init__(platform_output)
+        super().__init__(platform_output)
         self._identify_input_rows()
 
     @property
@@ -74,5 +76,17 @@ class SlurmMonitor(PlatformMonitor):
         else:
             return None
 
-    def steps_plus_extern_approximate_header_energy(self):
+    def steps_plus_extern_approximate_header_energy(self) -> bool:
+        """Check if the sum of steps energy and extern energy approximately equals the header energy.
+
+        :return: True if the sum of steps and extern energy is within 1% of the header energy, False otherwise.
+        :rtype: bool
+        """
+        if not self.header:
+            Log.warning("Header information is missing. Cannot perform energy comparison.")
+            return 0
+        elif not self.extern:
+            Log.warning("Extern information is missing. Cannot perform energy comparison.")
+            return 0
+
         return abs(self.steps_energy + self.extern.energy - self.header.energy) <= 0.01 * self.header.energy

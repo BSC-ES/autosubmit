@@ -23,14 +23,13 @@ from zipfile import ZipFile
 
 import pytest
 from rocrate.rocrate import File  # type: ignore
-from rocrate_validator import services, models
+from rocrate_validator import models, services
 from ruamel.yaml.representer import RepresenterError
 
 from autosubmit.log.log import AutosubmitCritical
+
 # noinspection PyProtectedMember
-from autosubmit.provenance.rocrate import (
-    create_rocrate_archive
-)
+from autosubmit.provenance.rocrate import create_rocrate_archive
 
 _PROJECT_URL = 'https://earth.bsc.es/gitlab/es/autosubmit.git'
 """Project URL used in all the tests. This is not actually cloned."""
@@ -166,6 +165,8 @@ def test_rocrate(tmp_path, autosubmit_exp):
     start_time = ''
     end_time = ''
 
+    assert exp.autosubmit.create(exp.expid, noplot=True, hide=True, force=True) == 0
+
     crate = create_rocrate_archive(
         as_conf=as_conf,
         rocrate_json=rocrate_json,
@@ -215,6 +216,8 @@ def test_rocrate_invalid_project(autosubmit_exp, tmp_path, mocker):
 
     mocker.patch('autosubmit.provenance.rocrate._get_project_entity',
                  side_effect=AutosubmitCritical('Failed to read the Autosubmit Project for RO-Crate...'))
+
+    assert exp.autosubmit.create(exp.expid, noplot=True, hide=True, force=True) == 0
 
     with pytest.raises(AutosubmitCritical) as cm:
         create_rocrate_archive(

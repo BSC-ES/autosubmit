@@ -18,7 +18,8 @@
 
 import os
 from datetime import datetime, timezone
-from typing import Any, Union
+from pathlib import Path
+from typing import Any
 
 LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S%z'
@@ -48,7 +49,7 @@ def get_current_datetime() -> str:
     return datetime.now(LOCAL_TZ).strftime(DATETIME_FORMAT)
 
 
-def get_current_datetime_if_none(argument: Any) -> Union[str, None]:
+def get_current_datetime_if_none(argument: Any) -> str | None:
     # type : (Any) -> Union[Any, str]
     """ Returns the current time in format '%Y-%m-%dT%H:%M:%S%z' if the supplied argument is None, else return argument. """
     if argument is None:
@@ -61,6 +62,20 @@ def create_file_with_full_permissions(path: str) -> None:
     """ creates a database files with full permissions """
     os.umask(0)
     os.open(path, os.O_WRONLY | os.O_CREAT, 0o777)
+
+
+def create_path_if_not_exists(path: str) -> bool:
+    """Create the directory if it does not exist.
+
+    :param path: Directory path to ensure.
+    :return: ``True`` when the directory is created, ``False`` if it already exists.
+    :raises OSError: If the directory cannot be created.
+    """
+    directory = Path(path)
+    if directory.exists():
+        return False
+    directory.mkdir(parents=True, exist_ok=True)
+    return True
 
 
 class SupportedStatus:

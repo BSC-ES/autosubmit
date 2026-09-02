@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -17,17 +17,39 @@
 
 """Basic tests for ``AutosubmitConfig``."""
 
+import copy
 from pathlib import Path
 from textwrap import dedent
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.upgrade_scripts import ini_to_yaml
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     from test.unit.conftest import AutosubmitConfigFactory
+
+
+_EXPID = "t000"
+"""Experiment ID used for testing."""
+
+
+@pytest.fixture
+def submitter(mocker):
+    """Create a fake submitter."""
+    local = mocker.Mock(name="local_platform")
+    remote = mocker.Mock(name="remote_platform")
+
+    return SimpleNamespace(
+        platforms={
+            "HPC": remote,
+            PlatformType.LOCAL.upper(): local,
+        }
+    )
 
 
 def test_get_submodules_list_default_empty_list(autosubmit_config: 'AutosubmitConfigFactory'):
@@ -123,7 +145,7 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
     verifies that the YAML files exist and are not empty, and a backup file was
     created. All without warnings being raised (i.e., they were suppressed).
     """
-    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={})
+    autosubmit_config(expid='a000', experiment_data={})
     ini_file = tmp_path / 'a000_jobs.ini'
     with open(ini_file, 'w+') as f:
         f.write(dedent('''\
@@ -132,9 +154,9 @@ def test_yaml_deprecation_warning(tmp_path, autosubmit_config: 'AutosubmitConfig
             PLATFORM = LOCAL
             '''))
         f.flush()
-    as_conf.ini_to_yaml(root_dir=tmp_path, ini_file=ini_file)
+    ini_to_yaml(ini_file=ini_file)
 
-    backup_file = Path(f'{ini_file}_AS_v3_backup')
+    backup_file = Path(f'{ini_file}_as_v3_backup')
     assert backup_file.exists()
     assert backup_file.stat().st_size > 0
 
@@ -237,6 +259,143 @@ def test_set_version(autosubmit_config: 'AutosubmitConfigFactory', experiment_jo
 
 
 @pytest.mark.parametrize(
+    "parameter, value, error_msg",
+    [
+        (
+            "TOTALJOBS",
+            0,
+            "TOTALJOBS parameter not found or not strictly positive integer",
+        ),
+        (
+            "TOTALJOBS",
+            -1,
+            "TOTALJOBS parameter not found or not strictly positive integer",
+        ),
+        (
+            "MAXWAITINGJOBS",
+            0,
+            "MAXWAITINGJOBS parameter not found or not strictly positive integer",
+        ),
+        (
+            "MAXWAITINGJOBS",
+            -1,
+            "MAXWAITINGJOBS parameter not found or not strictly positive integer",
+        ),
+    ],
+    ids=[
+        "TOTALJOBS set to zero",
+        "TOTALJOBS set to negative",
+        "MAXWAITINGJOBS set to zero",
+        "MAXWAITINGJOBS set to negative",
+    ],
+)
+def test_check_autosubmit_conf_invalid_param(
+    as_conf_small: AutosubmitConfig, parameter, value, error_msg
+):
+    """Test that check_autosubmit_conf writes the error in the wrong_config
+    dictionary when a parameter is invalid."""
+    as_conf_small.experiment_data["CONFIG"][parameter] = value
+    assert not as_conf_small.check_autosubmit_conf()
+    assert error_msg in str(as_conf_small.wrong_config["Autosubmit"][0])
+
+
+@pytest.mark.parametrize(
+    "experiment_data, should_pass",
+    [
+        (
+            {
+                "PROJECT": {"PROJECT_TYPE": "git"},
+                "GIT": {"PROJECT_ORIGIN": "https://github.com/user/repo.git"},
+            },
+            True,
+        ),
+        (
+            {
+                "PROJECT": {"PROJECT_TYPE": "git"},
+                "GIT": {
+                    "PROJECT_ORIGIN": "https://github.com/user/repo.git",
+                    "PROJECT_BRANCH": "master",
+                },
+            },
+            True,
+        ),
+        ({"PROJECT": {"PROJECT_TYPE": "git"}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "git"}, "GIT": {"PROJECT_ORIGIN": ""}}, False),
+        (
+            {
+                "PROJECT": {"PROJECT_TYPE": "svn"},
+                "SVN": {
+                    "PROJECT_URL": "https://svn.example.com/repo",
+                    "PROJECT_REVISION": "123",
+                },
+            },
+            True,
+        ),
+        ({"PROJECT": {"PROJECT_TYPE": "svn"}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "svn"}, "SVN": {"PROJECT_URL": ""}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "svn"}, "SVN": {"PROJECT_REVISION": ""}}, False),
+        (
+            {
+                "PROJECT": {"PROJECT_TYPE": "local"},
+                "LOCAL": {"PROJECT_PATH": "/path/to/project"},
+            },
+            True,
+        ),
+        ({"PROJECT": {"PROJECT_TYPE": "local"}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "local"}, "LOCAL": {"PROJECT_PATH": ""}}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "invalid"}}, False),
+        ({}, False),
+        ({"PROJECT": {"PROJECT_TYPE": "none"}}, True),
+    ],
+    ids=[
+        "Valid git project configuration without PROJECT_BRANCH",
+        "Valid git project configuration with PROJECT_BRANCH",
+        "Missing GIT section for git project",
+        "Empty PROJECT_ORIGIN for git project",
+        "Valid SVN project configuration",
+        "Missing SVN section for SVN project",
+        "Empty PROJECT_URL for SVN project",
+        "Empty PROJECT_REVISION for SVN project",
+        "Valid local project configuration",
+        "Missing LOCAL section for local project",
+        "Empty PROJECT_PATH for local project",
+        "Invalid project type",
+        "Missing PROJECT section",
+        "Valid none project type",
+    ],
+)
+def test_check_expdef_conf_invalid_params(
+    autosubmit_config: "AutosubmitConfigFactory",
+    experiment_data: dict,
+    should_pass: bool,
+) -> None:
+    """Test experiment configuration validation for different project types."""
+    base = {
+        "DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"},
+        "EXPERIMENT": {
+            "DATELIST": "20200101",
+            "MEMBERS": "fc0",
+            "CHUNKSIZEUNIT": "month",
+            "CHUNKSIZE": 1,
+            "NUMCHUNKS": 1,
+            "CALENDAR": "standard",
+        },
+    }
+    base.update(experiment_data)
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=base)
+
+    result = as_conf.check_expdef_conf()
+
+    if should_pass:
+        assert (
+            result is True
+        ), f"Expected check_expdef_conf to pass, but it failed. wrong_config={as_conf.wrong_config}"
+    else:
+        assert result is False, "Expected check_expdef_conf to fail, but it passed"
+        assert "Expdef" in as_conf.wrong_config
+
+
+@pytest.mark.parametrize(
     'experiment_data, raise_error',
     [
         [{}, False],
@@ -283,6 +442,425 @@ def test_set_default_parameters(autosubmit_config: 'AutosubmitConfigFactory', ex
 )
 def test_is_valid_mail_address(email, expected):
     assert AutosubmitConfig.is_valid_mail_address(email) is expected
+
+
+@pytest.mark.parametrize(
+    'exp_data, invalid_settings',
+    [
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                },
+                [],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "sqlite",
+                    }
+                },
+                [],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "invalid",
+                    }
+                },
+                ['STORAGE.TYPE'],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "sqlite",
+                    }
+                },
+                ['CONFIG.TOTALJOBS', 'CONFIG.MAXWAITINGJOBS', 'CONFIG.AUTOSUBMIT_VERSION'],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "sqlite",
+                    },
+                    "MAIL": {
+                        "NOTIFICATIONS": True,
+                        "TO": ["valid_email_not_actually_exists@bsc.es", "another_valid_email_not_actually_exists@bsc.es"],
+                    }
+                },
+                [],
+        ),
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "sqlite",
+                    },
+                    "MAIL": {
+                        "NOTIFICATIONS": True,
+                        "TO": "invalidbsc.es invalid2bsc.es",
+                    }
+                },
+                ["MAIL.TO"],
+        ),
+
+        (
+                {
+                    "CONFIG": {
+                        "AUTOSUBMIT_VERSION": "4.1.12",
+                        "TOTALJOBS": 20,
+                        "MAXWAITINGJOBS": 20
+                    },
+                    "DEFAULT": {
+                        "EXPID": "",
+                        "HPCARCH": "",
+                        "CUSTOM_CONFIG": ""
+                    },
+                    "PROJECT": {
+                        "PROJECT_TYPE": "git",
+                        "PROJECT_DESTINATION": "git_project"
+                    },
+                    "GIT": {
+                        "PROJECT_ORIGIN": "",
+                        "PROJECT_BRANCH": "",
+                        "PROJECT_COMMIT": "",
+                        "PROJECT_SUBMODULES": "",
+                        "FETCH_SINGLE_BRANCH": True
+                    },
+                    "JOBS": {
+                        "JOB1": {
+                            "WALLCLOCK": "01:00",
+                            "PLATFORM": "test"
+                        }
+                    },
+                    "PLATFORMS": {
+                        "test": {
+                            "MAX_WALLCLOCK": "01:30"
+                        }
+                    },
+                    "STORAGE": {
+                        "TYPE": "sqlite",
+                    },
+                    "MAIL": {
+                        "NOTIFICATIONS": True,
+                        "TO": "valid@bsc.es,invalid2bsc.es",
+                    }
+                },
+                ["MAIL.TO"],
+        ),
+
+    ],
+    ids=[
+        'valid_config_without_storage',
+        'valid_config_with_storage',
+        'invalid_storage_type',
+        'invalid_total_jobs_maxwaitingjobs,autosubmit_version',
+        'valid_mail_configuration',
+        'invalid_mail_to_no_at',
+        'invalid_mail_to_no_at_comma'
+    ], )
+def test_check_autosubmit_conf(autosubmit_config, exp_data, invalid_settings):
+    """Test that ``check_autosubmit_conf()`` works as expected."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data=exp_data)
+    as_conf.check_autosubmit_conf()
+
+    if not invalid_settings:
+        assert len(as_conf.wrong_config) == 0
+    else:
+        assert len(as_conf.wrong_config) > 0
+        # normalize for comparison
+        section_list = []
+        keys = []
+        # TODO for some reason this is a list of lists ( and the last list should be tuple?)
+        for weird_list in as_conf.wrong_config["Autosubmit"]:
+            section, key = weird_list
+            key = key[1].split(" ")[0].upper()
+            section_list.append(section.strip().upper())
+            keys.append(key.strip().upper())
+
+        for expected in invalid_settings:
+            if "." in expected:
+                items = expected.split(".")
+                section = items[0].upper()
+                keys = [item.upper() for item in items[1:]]
+                assert section in section_list
+                for key in keys:
+                    assert key in keys
+            else:
+                assert expected.upper() in section_list
+
+
+
+def test_set_safetysleeptime_updates_file(autosubmit_config, tmp_path: Path) -> None:
+    """Ensure set_safetysleeptime replaces the existing SAFETYSLEEPTIME line."""
+    as_conf = autosubmit_config(expid='a000', experiment_data={})
+    as_conf._conf_parser_file = tmp_path / "config.txt"
+    initial = (
+        "SOME_SETTING: whatever\n"
+        "SAFETYSLEEPTIME: 10\n"
+        "OTHER: value\n"
+    )
+    as_conf._conf_parser_file.write_text(initial)
+    as_conf.set_safetysleeptime(25)
+    content = as_conf._conf_parser_file.read_text()
+    expected = (
+        "SOME_SETTING: whatever\n"
+        "SAFETYSLEEPTIME: 25\n"
+        "OTHER: value\n"
+    )
+    assert content == expected
+
+
+@pytest.mark.parametrize(
+    "storage_type,expected",
+    [
+        ("sqlite", True),
+        ("postgres", True),
+        ("sqlite3", False),
+        ("pkl", False),
+        ("", True),  # default sqlite
+    ],
+)
+def test_is_valid_storage_type(storage_type: str, expected: bool,
+                               autosubmit_config: 'AutosubmitConfigFactory') -> None:
+    """Return whether the configured storage type is accepted.
+
+    Uses realistic `STORAGE.TYPE` values and asserts the boolean result
+    from ``is_valid_storage_type()``.
+    """
+    as_conf = autosubmit_config(expid='a000', experiment_data={
+        "STORAGE": {"TYPE": storage_type}
+    })
+    assert as_conf.is_valid_storage_type() is expected
+
+
+@pytest.mark.parametrize(
+    "exp_data, expected",
+    [
+        ({}, []),
+        ({"WRAPPERS": {}}, []),
+        ({"WRAPPERS": {"JOBS_IN_WRAPPER": ""}}, []),
+        ({"WRAPPERS": {"JOBS_IN_WRAPPER": "job1 job2  job3"}}, ["job1", "job2", "job3"]),
+        ({"WRAPPERS": {"JOBS_IN_WRAPPER": "jobA&jobB & jobC"}}, ["jobA", "jobB", "jobC"]),
+        ({"WRAPPERS": {"JOBS_IN_WRAPPER": [" jobX ", "", "jobY"]}}, ["jobX", "jobY"]),
+        ({"WRAPPERS": {"JOBS_IN_WRAPPER": [""]}}, []),
+    ],
+)
+def test_get_wrapped_jobs_various_formats(
+        autosubmit_config: "AutosubmitConfigFactory", exp_data: dict, expected: list[str]
+) -> None:
+    as_conf = autosubmit_config(expid="a000", experiment_data=exp_data)
+    result = as_conf.get_wrapped_jobs()
+    assert result == expected
+
+
+def test_check_files_loaded_reads_existing_files(
+    autosubmit_config: "AutosubmitConfigFactory", tmp_path: Path, monkeypatch
+) -> None:
+    as_conf = autosubmit_config(expid="a000", experiment_data={})
+
+    file1 = tmp_path / "a.yml"
+    file2 = tmp_path / "b.yml"
+
+    # mock reload, as we don't want to actually reload anything (unit test)
+    monkeypatch.setattr(as_conf, "reload", lambda x: None)
+
+    file1.write_text("content1\n")
+    file2.write_text("content2\n")
+
+    as_conf.current_loaded_files = [str(file1), str(file2)]
+
+    result = as_conf.check_files_loaded()
+
+    expected = f"header:{file1}\ncontent1\nheader:{file2}\ncontent2\n"
+    assert result == expected
 
 
 def test_platforms_missing_hpcarch_local(autosubmit_config: "AutosubmitConfigFactory"):
@@ -350,6 +928,7 @@ def test_platforms_not_dict(
     else:
         assert platform_description == as_conf.platforms_data
 
+
 @pytest.mark.parametrize('experiment_data, expected', 
     [
         (
@@ -396,6 +975,7 @@ def test_get_cpmip_thresholds_different_cases(autosubmit_config, experiment_data
     thresholds = as_conf.get_cpmip_thresholds('SIM')
     assert thresholds == expected
 
+
 def test_validate_wallclock(autosubmit_config: 'AutosubmitConfigFactory'):
     """Test should succeed"""
     as_conf: AutosubmitConfig = autosubmit_config(
@@ -421,6 +1001,7 @@ def test_validate_wallclock(autosubmit_config: 'AutosubmitConfigFactory'):
 
     res = as_conf.validate_wallclock()
     assert res == ""
+
 
 def test_validate_wallclock_errors(autosubmit_config: 'AutosubmitConfigFactory'):
     """Test should produce an error that the job WALLCLOCK is greater than the platform MAX_WALLCLOCK"""
@@ -622,3 +1203,393 @@ def test_is_section_in_any_wrapper(
     as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data=experiment_data)
     as_conf.experiment_data = experiment_data
     assert as_conf.is_section_in_any_wrapper(section) is expected
+
+
+def test_immutable_variables_overwrites_default_values(
+    autosubmit_config: "AutosubmitConfigFactory",
+) -> None:
+    """Test that the _pin_immutable_variables method correctly pins immutable variables."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.starter_conf = {"DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"}}
+    parameters = {
+        "DEFAULT": {"EXPID": "a001", "HPCARCH": "MARENOSTRUM5", "OTHER": "value"}
+    }
+    pinned = as_conf._pin_immutable_variables(parameters)
+
+    # Check immutable variables keep original values, other variables not affected
+    assert pinned["DEFAULT"]["EXPID"] == "a000"
+    assert pinned["DEFAULT"]["HPCARCH"] == "MARENOSTRUM5"
+    assert pinned["DEFAULT"]["OTHER"] == "value"
+
+
+def test_immutable_variables_adds_missing_sections(
+    autosubmit_config: "AutosubmitConfigFactory",
+) -> None:
+    """Test that the _pin_immutable_variables method adds missing sections and keys."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.starter_conf = {"DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"}}
+
+    parameters = {}
+    pinned = as_conf._pin_immutable_variables(parameters)
+
+    # Only EXPID is pinned
+    assert pinned["DEFAULT"]["EXPID"] == "a000"
+    assert not pinned["DEFAULT"].get("HPCARCH")
+
+
+def test_load_custom_config(autosubmit_config, tmp_path) -> None:
+    """Test that the load_custom_config method correctly loads and merges custom configuration files."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+
+    git_project_dir = tmp_path / "proj" / "git_project"
+    conf_dir = git_project_dir / "conf"
+    common_dir = git_project_dir / "as_conf" / "common"
+    real_dir = git_project_dir / "as_conf" / "real_from_ideal"
+    post_dir = git_project_dir / "as_conf" / "post"
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    # PRE
+    common_dir.mkdir(parents=True, exist_ok=True)
+    real_dir.mkdir(parents=True, exist_ok=True)
+    # POST
+    post_dir.mkdir(parents=True, exist_ok=True)
+
+    as_conf.starter_conf = {
+        "DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"},
+        "JOBS": {"DO_NOTHING": {"SCRIPT": "sleep 20", "PLATFORM": "LOCAL", "RUNNING": "once"}},
+        "CONFIG": {},
+        "PROJDIR": str(git_project_dir),
+    }
+
+    current_data = {
+        "DEFAULT": {"EXPID": "a000", "HPCARCH": "LOCAL"},
+        "JOBS": {"DO_NOTHING": {"SCRIPT": "sleep 20", "PLATFORM": "LOCAL", "RUNNING": "once"}},
+        "CONFIG": {},
+        "PROJDIR": str(git_project_dir),
+    }
+
+    current_data_before = copy.deepcopy(current_data)
+
+    root_file = conf_dir / "root_config.yml"
+    root_file.write_text(
+        dedent(
+            """\
+            DEFAULT:
+              CUSTOM_CONFIG:
+                PRE: "%PROJDIR%/as_conf/common,%PROJDIR%/as_conf/real_from_ideal"
+                POST: "%PROJDIR%/as_conf/post"
+            """
+        )
+    )
+
+    (common_dir / "common_config.yml").write_text(
+        dedent("""\
+        DEFAULT:
+          EXPID: "a001"
+          HPCARCH: "MARENOSTRUM5"
+          COMMON_CONFIG_VALUE: "common_value"
+        JOBS:
+          DO_NOTHING:
+            SCRIPT: "pre a.yml!"
+
+    """)
+    )
+
+    (real_dir / "real_from_ideal_config.yml").write_text(
+        dedent("""\
+        DEFAULT:
+          EXPID: "a002"
+          HPCARCH: "MARENOSTRUM5"
+          REAL_CONFIG_VALUE: "real_from_ideal_value_1"
+        REAL_FROM_IDEAL_VALUE: "real_from_ideal_value_2"
+    """)
+    )
+
+    (post_dir / "post_config.yml").write_text(
+        dedent("""\
+        DEFAULT:
+          EXPID: "a003"
+          HPCARCH: "MARENOSTRUM6"
+          POST_CONFIG_VALUE: "post_value"
+        JOBS:
+          DO_NOTHING:
+            SCRIPT: "post b.yml!"
+    """)
+    )
+
+    data_pre, data_post = as_conf.load_custom_config(current_data, [str(root_file)])
+
+    # check nested configurations are merged in PRE
+    assert data_pre["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
+    assert data_pre["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
+    assert data_pre["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
+
+    # check that custom_config does not appear in data_pre
+    assert "CUSTOM_CONFIG" not in data_pre.get("DEFAULT", {})
+    assert "CUSTOM_CONFIG" not in data_post.get("DEFAULT", {})
+    assert "CUSTOM_CONFIG" not in data_post.get("DEFAULT", {})
+
+    # check that pinned variables are not overwritten in data_pre
+    assert data_pre["DEFAULT"]["EXPID"] == "a000"
+    assert data_pre["DEFAULT"]["HPCARCH"] == "LOCAL"
+
+    # check that POST config is merged in data_post
+    assert "POST_CONFIG_VALUE" not in data_pre.get("DEFAULT", {})
+    assert data_post["DEFAULT"]["POST_CONFIG_VALUE"] == "post_value"
+    assert data_post["DEFAULT"]["COMMON_CONFIG_VALUE"] == "common_value"
+    assert data_post["DEFAULT"]["REAL_CONFIG_VALUE"] == "real_from_ideal_value_1"
+    assert data_post["REAL_FROM_IDEAL_VALUE"] == "real_from_ideal_value_2"
+
+    # check there is no aliasing between data_pre and data_post
+    assert data_pre is not data_post
+    data_post["DEFAULT"]["POST_ONLY_TMP"] = "tmp"
+    assert "POST_ONLY_TMP" not in data_pre["DEFAULT"]
+
+    # check input current_data is not mutated by load_custom_config
+    expected = {**current_data_before, "STORAGE": {"TYPE": "sqlite"}}
+    assert current_data == expected
+
+    # check that JOBS section has DO_NOTHING script with post b.yml!
+    assert data_post["JOBS"]["DO_NOTHING"]["SCRIPT"] == "post b.yml!"
+    assert data_pre["JOBS"]["DO_NOTHING"]["SCRIPT"] == "sleep 20"
+
+    assert data_pre is not data_post
+
+
+@pytest.mark.parametrize(
+    "section, d_value, must_exists, expected",
+    [
+        (["CONFIG", "TOTALJOBS"], None, False, None),
+        (["CONFIG", "TOTALJOBS"], 10, False, 10),
+        (["CONFIG", "TOTALJOBS"], None, True, AutosubmitCritical),
+        (["CONFIG", "TOTALJOBS"], 10, True, AutosubmitCritical),
+        (["LOCAL", "PROJECT_PATH"], "", False, ""),
+    ],
+    ids=[
+        "Non-mandatory section missing with None d_value returns None",
+        "Non-mandatory section missing with d_value returns d_value",
+        "Mandatory section missing with None d_value raises AutosubmitCritical",
+        "Mandatory section missing with d_value raises AutosubmitCritical",
+        "Non-mandatory section missing with default d_value returns default d_value",
+    ],
+)
+def test_get_section_missing_returns_d_value(
+    autosubmit_config,
+    section,
+    d_value,
+    must_exists,
+    expected,
+):
+    """Test that get_section returns the correct value when the section is missing."""
+    as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data={})
+    as_conf.experiment_data.pop(section[0], None)
+
+    if expected is AutosubmitCritical:
+        with pytest.raises(AutosubmitCritical):
+            as_conf.get_section(section, d_value=d_value, must_exists=must_exists)
+    else:
+        result = as_conf.get_section(section, d_value=d_value, must_exists=must_exists)
+        assert result == expected
+
+
+def test_no_conf_folder(mocker, tmp_path):
+    mocked_basic_config = mocker.patch('autosubmit.config.configcommon.BasicConfig')
+    mocked_basic_config.LOCAL_ROOT_DIR.return_value = str(tmp_path / 'does_not_exist')
+    with pytest.raises(IOError):
+        AutosubmitConfig(_EXPID)
+
+
+def test_jobs_data_no_jobs(autosubmit_config):
+    as_conf = autosubmit_config(_EXPID, experiment_data={})
+    del as_conf.experiment_data['JOBS']
+    with pytest.raises(AutosubmitCritical) as cm:
+        len(as_conf.jobs_data)
+    assert 'JOBS section not found' in str(cm.value)
+
+
+def test_jobs_data_unexpected_error(autosubmit_config):
+    as_conf = autosubmit_config(_EXPID, experiment_data={})
+    as_conf.experiment_data = None
+    with pytest.raises(AutosubmitCritical) as cm:
+        len(as_conf.jobs_data)
+    assert 'Error while reading JOBS' in str(cm.value)
+
+
+def test_get_wrapper_export_when_none(autosubmit_config):
+    """Test that when the ``wrapper`` given is ``None``, it uses an empty dictionary."""
+    as_conf = autosubmit_config(_EXPID, experiment_data={})
+    wrapper_export = as_conf.get_wrapper_export(None)
+    assert wrapper_export == ''
+
+
+def test_check_platforms_conf_valid_main_platform(autosubmit_config):
+    """Test that the main platform is found in the configuration."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "PLATFORMS": {
+                "MARENOSTRUM": {
+                    "TYPE": "slurm",
+                    "HOST": "host",
+                    "PROJECT": "proj",
+                    "USER": "user",
+                    "SCRATCH_DIR": "/scratch",
+                }
+            }
+        },
+    )
+    as_conf.hpcarch = "MARENOSTRUM"
+
+    assert as_conf.check_platforms_conf() is True
+    assert "Platform" not in as_conf.wrong_config
+
+
+def test_check_platforms_conf_main_platform_not_defined(autosubmit_config):
+    """Test the experiment default HPCARCH missing from the platforms."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "PLATFORMS": {
+                "OTHER": {
+                    "TYPE": "slurm",
+                    "HOST": "host",
+                    "PROJECT": "proj",
+                    "USER": "user",
+                    "SCRATCH_DIR": "/scratch",
+                }
+            }
+        },
+    )
+    as_conf.hpcarch = "MARENOSTRUM"
+
+    assert as_conf.check_platforms_conf() is True
+
+    assert any(
+        "Main platform is not defined" in err
+        for _, err in as_conf.wrong_config["Expdef"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("missing_key", "expected"),
+    [
+        ("TYPE", "Mandatory TYPE parameter"),
+        ("HOST", "Mandatory HOST parameter"),
+        ("PROJECT", "Mandatory PROJECT parameter"),
+        ("USER", "Mandatory USER parameter"),
+        ("SCRATCH_DIR", "Mandatory SCRATCH_DIR parameter"),
+    ],
+)
+def test_check_platforms_conf_missing_required_parameter(
+    autosubmit_config,
+    missing_key,
+    expected,
+):
+    """Test when the platform has missing required parameters."""
+    platform = {
+        "TYPE": "slurm",
+        "HOST": "host",
+        "PROJECT": "proj",
+        "USER": "user",
+        "SCRATCH_DIR": "/scratch",
+    }
+    del platform[missing_key]
+
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={"PLATFORMS": {"MARENOSTRUM": platform}},
+    )
+    as_conf.hpcarch = "MARENOSTRUM"
+
+    assert as_conf.check_platforms_conf() is False
+
+    assert any(
+        expected in message
+        for _, message in as_conf.wrong_config["Platform"]
+    )
+
+
+def test_check_platforms_conf_ps_platform_does_not_require_project_or_user(autosubmit_config):
+    """Test when a ``PS`` platform is missing parameters (project or user)."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "PLATFORMS": {
+                "PS": {
+                    "TYPE": PlatformType.PS,
+                    "HOST": "host",
+                    "SCRATCH_DIR": "/scratch",
+                }
+            }
+        },
+    )
+    as_conf.hpcarch = "PS"
+
+    assert as_conf.check_platforms_conf() is True
+    assert "Platform" not in as_conf.wrong_config
+
+
+def test_check_platforms_conf_invalid_secondary_platform_is_ignored(autosubmit_config):
+    """Test when an invalid configuration is found in an unused platform, the other remains OK."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "PLATFORMS": {
+                "MAIN": {
+                    "TYPE": "slurm",
+                    "HOST": "host",
+                    "PROJECT": "proj",
+                    "USER": "user",
+                    "SCRATCH_DIR": "/scratch",
+                },
+                "BROKEN": {
+                    "USER": "someone",
+                },
+            }
+        },
+    )
+    as_conf.hpcarch = "MAIN"
+
+    assert as_conf.check_platforms_conf() is True
+    assert "Platform" not in as_conf.wrong_config
+
+
+def test_check_platforms_conf_local_platform_is_implicit(autosubmit_config):
+    """Test when the no platforms are defined, the ``LOCAL`` platform is still auto-initialised."""
+    as_conf = autosubmit_config(_EXPID, experiment_data={"PLATFORMS": {}})
+    as_conf.hpcarch = PlatformType.LOCAL
+
+    assert as_conf.check_platforms_conf() is True
+
+
+def test_check_platforms_conf_ignore_undefined_platforms(autosubmit_config):
+    """Test when no platforms are defined and ``.ignore_undefined_platforms`` is set to ``True``."""
+    as_conf = autosubmit_config(_EXPID, experiment_data={"PLATFORMS": {}})
+    as_conf.hpcarch = "UNKNOWN"
+    as_conf.ignore_undefined_platforms = True
+
+    assert as_conf.check_platforms_conf() is True
+
+
+def test_check_wrapper_conf_local_platform_not_supported(autosubmit_config):
+    """Test that using wrappers with the ``LOCAL`` platform raises an error."""
+    as_conf = autosubmit_config(
+        _EXPID,
+        experiment_data={
+            "JOBS": {
+                "JOB1": {
+                    "PLATFORM": "LOCAL",
+                },
+            },
+        },
+    )
+
+    wrappers = {
+        "wrapper": {
+            "JOBS_IN_WRAPPER": ["JOB1"],
+        },
+    }
+
+    with pytest.raises(AutosubmitCritical) as exc:
+        as_conf.check_wrapper_conf(wrappers)
+
+    assert "LOCAL platform does not support wrappers" in str(exc.value)

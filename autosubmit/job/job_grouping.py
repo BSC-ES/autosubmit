@@ -15,8 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import copy
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from bscearth.utils.date import date2str
 
@@ -27,10 +26,10 @@ if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
 
 
-class JobGrouping(object):
+class JobGrouping:
 
-    def __init__(self, group_by: str, jobs: list["Job"], job_list: "JobList", expand_list: Optional[list] = None,
-                 expanded_status: Optional[list] = None):
+    def __init__(self, group_by: str, jobs: list["Job"], job_list: "JobList", expand_list: list | None = None,
+                 expanded_status: list | None = None):
         if not expand_list:
             expand_list = []
         if not expanded_status:
@@ -43,17 +42,17 @@ class JobGrouping(object):
         self.expand_list = expand_list
         self.expand_status = expanded_status
         self.automatic = False
-        self.group_status_dict = dict()
-        self.ungrouped_jobs = list()
+        self.group_status_dict = {}
+        self.ungrouped_jobs = []
 
     def group_jobs(self) -> dict[str, Any]:
         if self.expand_list:
             self._set_expanded_jobs()
 
-        jobs_group_dict = dict()
-        blacklist = list()
+        jobs_group_dict = {}
+        blacklist = []
 
-        groups_map = dict()
+        groups_map = {}
         if self.group_by == 'automatic':
             self.automatic = True
             jobs_group_dict = self._automatic_grouping(groups_map)
@@ -64,7 +63,7 @@ class JobGrouping(object):
                 status = self._set_group_status(statuses)
                 self.group_status_dict[group] = status
 
-        final_jobs_group = dict()
+        final_jobs_group = {}
         for job, groups in jobs_group_dict.items():
             for group in groups:
                 if group not in blacklist:
@@ -73,12 +72,12 @@ class JobGrouping(object):
                     # to remove the jobs belonging to group that should be expanded
                     if group in self.group_status_dict:
                         if job not in final_jobs_group:
-                            final_jobs_group[job] = list()
+                            final_jobs_group[job] = []
                         final_jobs_group[job].append(group)
 
         jobs_group_dict = final_jobs_group
 
-        groups_dict = dict()
+        groups_dict = {}
         groups_dict['jobs'] = jobs_group_dict
         groups_dict['status'] = self.group_status_dict
 
@@ -106,7 +105,7 @@ class JobGrouping(object):
 
         if self.group_by == 'date':
             if depth(out) == 2:
-                dates = list()
+                dates = []
                 for date in out[0]:
                     dates.append(date)
                 self.ungrouped_jobs = dates
@@ -136,7 +135,7 @@ class JobGrouping(object):
                         for element_member in member_chunks:
                             if member_count % 2 == 0:
                                 member = member_chunks[member_count]
-                                chunks = list()
+                                chunks = []
                                 for chunk in member_chunks[member_count + 1]:
                                     if chunk.find("-") != -1:
                                         numbers = chunk.split("-")
@@ -175,7 +174,7 @@ class JobGrouping(object):
             elif Status.UNKNOWN in statuses:
                 return Status.UNKNOWN
 
-    def _create_groups(self, jobs_group_dict, blacklist=list()):
+    def _create_groups(self, jobs_group_dict, blacklist=[]):
         for i in reversed(range(len(self.jobs))):
             job = self.jobs[i]
 
@@ -212,7 +211,7 @@ class JobGrouping(object):
                         break
 
                     if job.name not in jobs_group_dict:
-                        jobs_group_dict[job.name] = list()
+                        jobs_group_dict[job.name] = []
                     jobs_group_dict[job.name].append(group)
 
     def _check_synchronized_job(self, job, groups):
@@ -231,7 +230,7 @@ class JobGrouping(object):
                             group_name = date2str(date, self.date_format)
                     else:
                         groups.append(group_name)
-            elif job.member is None :
+            elif not job.member:
                 synchronized = True
                 if self.group_by == 'date':
                     groups.append(date2str(job.date, self.date_format))
@@ -243,16 +242,19 @@ class JobGrouping(object):
                         groups.append(group_name)
         return synchronized
 
+    def _automatic_grouping(self, groups_map: dict[str, str]) -> dict[str, list[str]]:
+        """Build automatic chunk-based groups and normalize group mappings.
 
-    def _automatic_grouping(self, groups_map):
-        all_jobs = copy.deepcopy(self.jobs)
+        :param groups_map: Mapping of temporary group names to their merged counterparts.
+        :return: Mapping of job names to the list of resolved groups.
+        """
         split_groups, split_groups_status = self._create_splits_groups()
-
-        blacklist = list()
-        jobs_group_dict = dict()
-        self.group_status_dict = dict()
+        # TODO: (See why) Apparently, the splits_groups depletes the self.jobs, so we need to restore it
+        self.jobs = self.job_list.job_list
+        blacklist = []
+        jobs_group_dict = {}
+        self.group_status_dict = {}
         self.group_by = 'chunk'
-        self.jobs = all_jobs
 
         self._create_groups(jobs_group_dict, blacklist)
 
@@ -270,19 +272,19 @@ class JobGrouping(object):
                 if group in job.name and status == job.status:
                     jobs_group_dict[job.name] = [group]
                     self.jobs.pop(i)
-    
+
         return jobs_group_dict
 
     def _create_splits_groups(self):
-        jobs_group_dict = dict()
+        jobs_group_dict = {}
 
         self.group_by = 'split'
-        self._create_groups(jobs_group_dict, list())
+        self._create_groups(jobs_group_dict, [])
         return jobs_group_dict, self.group_status_dict
 
     def _fix_splits_automatic_grouping(self, split_groups, split_groups_status, jobs_group_dict):
         if split_groups and split_groups_status:
-            group_maps = dict()
+            group_maps = {}
             for group in list(self.group_status_dict.keys()):
                 matching_groups = [split_group for split_group in list(split_groups_status.keys()) if group in split_group]
                 for matching_group in matching_groups:
@@ -294,7 +296,7 @@ class JobGrouping(object):
                 self.group_status_dict[split_group] = status
 
             for job, groups in split_groups.items():
-                final_groups = list()
+                final_groups = []
                 for group in groups:
                     if group in group_maps:
                         group = group_maps[group]
@@ -316,7 +318,7 @@ class JobGrouping(object):
         return True
 
     def _create_higher_level_group(self, groups_to_check, groups_map):
-        checked_groups = list()
+        checked_groups = []
         for group in groups_to_check:
             if group in self.group_status_dict:
                 split_count = len(group.split('_'))

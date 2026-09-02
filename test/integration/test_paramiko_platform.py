@@ -20,11 +20,11 @@
 Note that tests will start and destroy an SSH server. For unit tests, see ``test_paramiko_platform.py``
 in the ``test/unit`` directory."""
 
-import socket
+from collections.abc import Callable
 from dataclasses import dataclass
 from getpass import getuser
 from pathlib import Path
-from typing import cast, Any, Callable, Optional, Protocol, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import paramiko
 import pytest
@@ -32,19 +32,19 @@ from paramiko import ChannelFile  # type: ignore[import]
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import AutosubmitCritical
-from autosubmit.log.log import AutosubmitError
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
-    from autosubmit.platforms.psplatform import PsPlatform
-    from docker.models.containers import Container
     # noinspection PyProtectedMember
     from _pytest._py.path import LocalPath
+    from docker.models.containers import Container
     from pytest import FixtureRequest
     from testcontainers.core.container import DockerContainer  # type: ignore
+
+    from autosubmit.platforms.psplatform import PsPlatform
     from test.integration.conftest import AutosubmitExperiment
 
 _PLATFORM_NAME = 'TEST_PS_PLATFORM'
@@ -105,7 +105,7 @@ def _get_platform(exp: 'AutosubmitExperiment') -> 'PsPlatform':
     submitter = ParamikoSubmitter(as_conf=exp.as_conf)
 
     assert submitter.platforms
-    ps_platform: 'PsPlatform' = cast('PsPlatform', submitter.platforms[_PLATFORM_NAME])
+    ps_platform: PsPlatform = cast('PsPlatform', submitter.platforms[_PLATFORM_NAME])
 
     return ps_platform
 
@@ -121,7 +121,7 @@ class CreateJobParametersPlatformFixture(Protocol):
 
     def __call__(
             self,
-            experiment_data: Optional[dict] = None,
+            experiment_data: dict | None = None,
             /,
             *args: Any,
             **kwargs: Any
@@ -133,13 +133,13 @@ class CreateJobParametersPlatformFixture(Protocol):
 def create_job_parameters_platform(
         autosubmit_exp, get_next_expid: Callable[[], str]) -> CreateJobParametersPlatformFixture:
     def job_parameters_platform(
-            experiment_data: Optional[dict] = None,
+            experiment_data: dict | None = None,
             /,
             *args: Any,
             **kwargs: Any
     ) -> JobParametersPlatform:
         exp = autosubmit_exp(get_next_expid(), experiment_data=experiment_data, include_jobs=True)
-        slurm_platform: 'SlurmPlatform' = cast('SlurmPlatform', exp.platform)
+        slurm_platform: SlurmPlatform = cast('SlurmPlatform', exp.platform)
 
         job = Job(f"{exp.expid}_SIM", 10000, Status.SUBMITTED, 0)
         job.section = 'SIM'
@@ -276,7 +276,7 @@ def test_send_file_errors(
 @pytest.mark.ssh
 @pytest.mark.docker
 def test_send_command(
-        cmd: str, error: Optional[Exception],
+        cmd: str, error: Exception | None,
         ssh_fixture: 'DockerContainer',
         mfa_enabled: bool,
         x11_enabled: bool,
@@ -301,11 +301,11 @@ def test_send_command(
         exp_ps_platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
 
         if error:
-            assert exp_ps_platform.get_ssh_output_err() == ''
+            assert exp_ps_platform._ssh_output_err == ''
             with pytest.raises(error):  # type: ignore
                 exp_ps_platform.send_command(cmd, ignore_log=False, x11=x11_enabled)
 
-            stderr = exp_ps_platform.get_ssh_output_err()
+            stderr = exp_ps_platform._ssh_output_err
             assert 'command not found' in stderr
         else:
             assert exp_ps_platform.get_ssh_output() == ''
@@ -330,7 +330,7 @@ def test_send_command(
 @pytest.mark.docker
 def test_send_command_timeout_error_exec_command(
         cmd: str,
-        timeout: Optional[int],
+        timeout: int | None,
         mocker,
         request: 'FixtureRequest',
         get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
@@ -525,8 +525,8 @@ def test_exec_command_ssh_session_not_active(
     [
         paramiko.ssh_exception.NoValidConnectionsError({'192.168.0.1': ValueError('failed')}),  # type: ignore
         ConnectionError('Someone unplugged the networking cable.'),
-        socket.error('A random socket error occurred!'),
-        IOError('Someone plugged the cable off.')
+        OSError('A random socket error occurred!'),
+        OSError('Someone plugged the cable off.')
     ],
     ids=[
         'paramiko ssh exception',
@@ -629,10 +629,10 @@ def test_fs_operations(
         assert contents.decode('UTF-8').strip() == text
         assert exp_ps_platform.read_file(str(file_not_found)) is None
 
-        file_size: Optional[int] = exp_ps_platform.get_file_size(str(remote_file))
+        file_size = exp_ps_platform._ftpChannel.stat(str(remote_file)).st_size
         assert file_size
         assert file_size > 0
-        assert exp_ps_platform.get_file_size(str(file_not_found)) is None
+        assert not file_not_found.exists()
 
         assert exp_ps_platform.check_absolute_file_exists(str(remote_file))
         assert not exp_ps_platform.check_absolute_file_exists(str(file_not_found))
@@ -670,7 +670,7 @@ def test_fs_operations(
 def test_exec_command_with_x11(
         ssh_fixture: 'DockerContainer',
         x11: bool,
-        user_or_false: Union[str, bool],
+        user_or_false: str | bool,
         request: 'FixtureRequest',
         get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment']
 ):
@@ -682,7 +682,7 @@ def test_exec_command_with_x11(
         ps_platform.connect(as_conf=exp.as_conf, reconnect=False, log_recovery_process=False)
         assert ps_platform.local_x11_display
 
-        stdin, stdout, stderr = ps_platform.exec_command('whoami', x11=x11)
+        _stdin, stdout, stderr = ps_platform.exec_command('whoami', x11=x11)
 
         assert isinstance(stdout, ChannelFile), f"Invalid value for stdout: {stderr, stdout}"
         assert user_or_false == stdout.readline().decode('UTF-8').strip()
@@ -903,8 +903,8 @@ def test_get_header_job_het(create_job_parameters_platform: CreateJobParametersP
 
     job_parameters_platform.job.het = job_parameters_platform.parameters.copy()
     job_parameters_platform.job.het['HETSIZE'] = hetsize
-    job_parameters_platform.job.het['NUMTHREADS'] = [i for i in range(0, hetsize)]
-    job_parameters_platform.job.het['TASKS'] = [i for i in range(0, hetsize)]
+    job_parameters_platform.job.het['NUMTHREADS'] = [i for i in range(hetsize)]
+    job_parameters_platform.job.het['TASKS'] = [i for i in range(hetsize)]
 
     header = platform.get_header(job_parameters_platform.job, job_parameters_platform.parameters)
     assert header
@@ -981,6 +981,26 @@ def test_test_connection(
         assert None is exp_ps_platform.test_connection(None)
     finally:
         exp_ps_platform.close_connection()
+
+
+@pytest.mark.ssh
+@pytest.mark.docker
+def test_read_jobid_from_remote_log(
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        request: 'FixtureRequest',
+        ssh_server
+):
+    import time
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+    try:
+        platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
+        remote_path = f'/tmp/test_jobid_{int(time.time())}.out'
+        platform.send_command(f"echo '[INFO] JOBID=42' > {remote_path}")
+        result = platform.read_jobid_from_remote_log(remote_path)
+        assert result == 42
+    finally:
+        platform.close_connection()
 
 
 @pytest.mark.ssh

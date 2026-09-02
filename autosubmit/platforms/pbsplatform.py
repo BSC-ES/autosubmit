@@ -23,9 +23,11 @@ from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING
 
-from autosubmit.log.log import AutosubmitCritical, Log, AutosubmitError
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.pbs_header import PBSHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     # Avoid circular imports
@@ -35,7 +37,10 @@ if TYPE_CHECKING:
 class PBSPlatform(ParamikoPlatform):
     """Class to manage jobs to host using PBS scheduler."""
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: str = None) -> None:
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.PBS
+
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str | None = None) -> None:
         """Initialization of the Class PBSPlatform.
 
         :param expid: ID of the experiment which will instantiate the PBSPlatform.
@@ -58,12 +63,11 @@ class PBSPlatform(ParamikoPlatform):
         self.x11_options = None
         self._submit_cmd_x11 = f'{self.remote_log_dir}'
         self.cancel_cmd = None
-        self.type = 'PBS'
         self._header = PBSHeader()
         self.job_status: dict = {'COMPLETED': ['FINISH'], 'RUNNING': ['RUNNING'],
                                  'QUEUING': ['QUEUED', 'BEGUN', 'HELD'],
                                  'FAILED': ['EXITING']}
-        self._pathdir = "\$HOME/LOG_" + self.expid
+        self._pathdir = r"\$HOME/LOG_" + self.expid
         self._allow_arrays: bool = False
         self.update_cmds()
         self.config: dict = config
@@ -127,7 +131,7 @@ class PBSPlatform(ParamikoPlatform):
         try:
             # Test if remote_path exists
             self._ftpChannel.chdir(self.remote_log_dir)
-        except IOError as io_err:
+        except OSError as io_err:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
                     Log.debug(f'{self.remote_log_dir} has been created on {self.host}.')
@@ -171,7 +175,7 @@ class PBSPlatform(ParamikoPlatform):
     def _check_for_unrecoverable_errors(self) -> None:
         """Check PBS command output for transient and permanent errors."""
 
-        err = self._ssh_output_err or ""
+        err = self._ssh_output_err
         err_lower = err.lower()
         if not err_lower.strip():
             return
@@ -293,17 +297,7 @@ class PBSPlatform(ParamikoPlatform):
         """
         return self.remote_log_dir
 
-    def parse_job_output(self, output: str) -> str:
-        """Parse check job command output so it can be interpreted by autosubmit.
-
-        :param output: output to parse.
-        :type output: str
-        :return: job status.
-        :rtype: str
-        """
-        return output.strip().split(' ')[0].strip()
-
-    def parse_all_jobs_output(self, output: str, job_id: str) -> str:  # noqa
+    def parse_all_jobs_output(self, output: str, job_id: str) -> str:
         """Filter one or more status of a specific Job ID.
 
         :param output: Output of the status of the jobs.
@@ -346,19 +340,7 @@ class PBSPlatform(ParamikoPlatform):
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
 
-    def get_check_job_cmd(self, job_id: str) -> str:  # noqa
-        """Generate qstat command for the selected job.
-
-        :param job_id: ID of a job.
-        :param job_id: str
-
-        :return: Generates the qstat command to be executed.
-        :rtype: str
-        """
-        job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
-        return f"qstat {job_id} | awk " + "'{print $3}' && " + f"qstat -H {job_id} | awk " + "'{print $3}'"
-
-    def get_check_all_jobs_cmd(self, jobs_id: str) -> str:  # noqa
+    def get_check_all_jobs_cmd(self, jobs_id: str) -> str:
         """Generate qstat command for all the jobs passed down.
 
         :param jobs_id: ID of one or more jobs.
@@ -398,7 +380,7 @@ class PBSPlatform(ParamikoPlatform):
         if isinstance(reason, list):
             # convert reason to str
             return ''.join(reason)
-        return reason  # noqa F501
+        return reason
 
 
 
@@ -436,7 +418,7 @@ class PBSPlatform(ParamikoPlatform):
         :return: True if the file exists, False otherwise
         :rtype: bool
         """
-        # noqa TODO check the sleeptime retrials of these function, previously it was waiting a lot of time
+
         file_exist = False
         retries = 0
         while not file_exist and retries < max_retries:
@@ -445,16 +427,15 @@ class PBSPlatform(ParamikoPlatform):
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), src))
                 file_exist = True
-            except IOError:  # File doesn't exist, retry in sleeptime
+            except OSError:  # File doesn't exist, retry in sleeptime
                 sleep(sleeptime)
                 retries = retries + 1
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
+            except Exception as e:
+                if "garbage" in str(e).lower():
                     sleep(2)
                     retries = retries + 1
                 else:
-                    file_exist = False  # won't exist
-                    retries = 999  # no more retries
+                    raise
         if not file_exist:
             Log.warning(f"File {src} couldn't be found")
         return file_exist

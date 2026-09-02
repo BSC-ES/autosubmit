@@ -19,9 +19,8 @@ import re
 from contextlib import suppress
 from getpass import getuser
 from pathlib import Path
-from typing import List, Optional
 
-from psutil import process_iter, ZombieProcess
+from psutil import ZombieProcess, process_iter
 
 from autosubmit.log.log import Log
 
@@ -50,7 +49,7 @@ def _match_expid(token: str, expid=None) -> bool:
     return re.search(_EXPID_REGEX, token) is not None
 
 
-def _match_autosubmit_cmdline(cmdline: List[str], command='run', expid: Optional[str] = None) -> Optional[str]:
+def _match_autosubmit_cmdline(cmdline: list[str], command='run', expid: str | None = None) -> str | None:
     """Guess if the command line is for ``autosubmit <COMMAND> <EXPID>``.
 
     The function tries to guess it by iterating the list of tokens produced by
@@ -140,14 +139,14 @@ def _match_autosubmit_cmdline(cmdline: List[str], command='run', expid: Optional
     return filtered_list[2]
 
 
-def retrieve_expids() -> List[str]:
+def retrieve_expids() -> list[str]:
     """Retrieve all expids in use by autosubmit attached to the current user.
 
     :return: A list of Autosubmit experiment IDs of running experiments for the current user.
     :rtype: List[str]
     """
     user: str = getuser()
-    expids: List[str] = []
+    expids: list[str] = []
     # NOTE: psutil may raise ``ZombieProcess`` in some cases, even when other exceptions happen in the
     #       case when a process is a zombie (e.g. got a IO error, but the process is zombie)
     for process in process_iter(['pid', 'cmdline', 'username']):
@@ -163,15 +162,12 @@ def retrieve_expids() -> List[str]:
 # TODO: check with Dani if the platform is needed (no processes using it on hub or destine vm?).
 #       The previous code used ``grep`` to search by expid, and also had some code ready to
 #       search by platform name, although that was not actually used anywhere, yet.
-def process_id(expid: str, command="run") -> Optional[int]:
+def process_id(expid: str, command="run") -> int | None:
     """Retrieve the process id of the autosubmit process.
 
     :param expid: An Autosubmit experiment ID.
-    :type expid: str
     :param command: An Autosubmit (sub)command.
-    :type command: str
     :return: The process ID or an empty string if no process running.
-    :rtype: Optional[int]
     """
     user: str = getuser()
     processes = []

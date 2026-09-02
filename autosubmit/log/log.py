@@ -20,7 +20,7 @@ import os
 import sys
 from datetime import datetime
 from time import sleep
-from typing import cast, Any, Union
+from typing import Any, cast
 
 
 class AutosubmitError(Exception):
@@ -32,7 +32,7 @@ class AutosubmitError(Exception):
         trace (str): extra information about the error
     """
 
-    def __init__(self, message="Unhandled Error", code=6000, trace: Union[None, str] = None):
+    def __init__(self, message="Unhandled Error", code=6000, trace: None | str = None):
         self.code = code
         self.message = message
         self.trace = trace
@@ -97,7 +97,8 @@ class LogFormatter(logging.Formatter):
     ERROR = '\033[38;5;214m'
     WARNING = "\x1b[33;20m"
 
-    def __init__(self, to_file=False):
+    def __init__(self, to_file: bool = False):
+        super().__init__()
         """
         Initializer for LogFormatter
 
@@ -163,7 +164,7 @@ class Log:
     (from lower to higher priority):
     """
 
-    date = '{0:%Y%m%d_%H%M%S}_'.format(datetime.now())
+    date = f'{datetime.now():%Y%m%d_%H%M%S}_'
     file_path = ""
     __module__ = __name__
     EVERYTHING = 0
@@ -242,7 +243,7 @@ class Log:
         }
         levels["NO_LOG"] = levels["CRITICAL"] + 1000
 
-        level = levels.get(str(level).upper(), "DEBUG")
+        level = levels.get(str(level).upper(), logging.NOTSET)
 
         retries = 0
 
@@ -274,7 +275,7 @@ class Log:
                     err_file_handler.setFormatter(LogFormatter(True))
                     Log.log.addHandler(err_file_handler)
                 elif type == 'status':
-                    custom_filter = StatusFilter()
+                    custom_filter: logging.Filter = StatusFilter()
                     file_path = os.path.join(directory, filename)
                     status_file_handler = logging.FileHandler(file_path, 'w')
                     status_file_handler.setLevel(Log.STATUS)
@@ -282,12 +283,12 @@ class Log:
                     status_file_handler.addFilter(custom_filter)
                     Log.log.addHandler(status_file_handler)
                 elif type == 'status_failed':
-                    custom_filter = StatusFailedFilter()
+                    custom_filter_failed: logging.Filter = StatusFailedFilter()
                     file_path = os.path.join(directory, filename)
                     status_file_handler = logging.FileHandler(file_path, 'w')
                     status_file_handler.setLevel(Log.STATUS_FAILED)
                     status_file_handler.setFormatter(LogFormatter(False))
-                    status_file_handler.addFilter(custom_filter)
+                    status_file_handler.addFilter(custom_filter_failed)
                     Log.log.addHandler(status_file_handler)
                 os.chmod(file_path, 509)
             except Exception as exc:  # retry again
@@ -314,24 +315,24 @@ class Log:
             if type == 'status':
                 while len(Log.log.handlers) > 3:
                     Log.log.handlers.pop()
-                custom_filter = StatusFilter()
+                custom_filter: logging.Filter = StatusFilter()
                 status_file_handler = logging.FileHandler(file_path, 'w')
                 status_file_handler.setLevel(Log.STATUS)
                 status_file_handler.setFormatter(LogFormatter(False))
                 status_file_handler.addFilter(custom_filter)
                 Log.log.addHandler(status_file_handler)
             elif type == 'status_failed':
-                custom_filter = StatusFailedFilter()
+                custom_filter_failed: logging.Filter = StatusFailedFilter()
                 status_file_handler = logging.FileHandler(file_path, 'w')
                 status_file_handler.setLevel(Log.STATUS_FAILED)
                 status_file_handler.setFormatter(LogFormatter(False))
-                status_file_handler.addFilter(custom_filter)
+                status_file_handler.addFilter(custom_filter_failed)
                 Log.log.addHandler(status_file_handler)
         except Exception:  # retry again
             pass
 
     @staticmethod
-    def set_console_level(level: Union[int, str]) -> None:
+    def set_console_level(level: int | str) -> None:
         """Sets log level for logging to console.
 
         Every output of level equal or higher to parameter level will be printed on console

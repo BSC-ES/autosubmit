@@ -22,11 +22,10 @@ from getpass import getuser
 from pathlib import Path
 from subprocess import check_output
 from textwrap import dedent
-from typing import Any, Optional, Protocol, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, Union, cast
 
 import paramiko.ssh_exception
-from cryptography.hazmat.primitives import asymmetric
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import asymmetric, serialization
 
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import _create_ssh_client
@@ -38,10 +37,10 @@ if TYPE_CHECKING:
 
 __all__ = [
     'MakeSSHClientFixture',
+    'copy_ssh_key_from_container',
+    'create_ssh_keypair_and_config',
     'make_ssh_client',
     'mock_ssh_config_and_client',
-    'create_ssh_keypair_and_config',
-    'copy_ssh_key_from_container',
     'wait_for_ssh_port'
 ]
 
@@ -50,13 +49,13 @@ class MakeSSHClientFixture(Protocol):
     def __call__(
             self,
             ssh_port: int,
-            password: Optional[str],
-            key: Optional[Union['Path', str]]) -> 'SSHClient':
+            password: str | None,
+            key: Union['Path', str] | None) -> 'SSHClient':
         ...
 
 
 # noinspection PyUnusedLocal
-def make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union['Path', str]]) -> 'SSHClient':
+def make_ssh_client(ssh_port: int, password: str | None, key: Union['Path', str] | None) -> 'SSHClient':
     """Creates the SSH client
 
     It modifies the list of arguments so that the port is always
@@ -69,9 +68,9 @@ def make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union[
     """
     ssh_client = _create_ssh_client()
 
-    orig_ssh_client_connect = ssh_client.connect
+    orig_ssh_client_connect = cast(Any, ssh_client.connect)
 
-    def _ssh_connect(*args, **kwargs):
+    def _ssh_connect(*args, **kwargs) -> Any:
         """Mock call.
 
         The SSH port is always set to the Docker container port, discarding
@@ -101,11 +100,11 @@ def make_ssh_client(ssh_port: int, password: Optional[str], key: Optional[Union[
 
         return orig_ssh_client_connect(*args_list, **kwargs)
 
-    ssh_client.connect = _ssh_connect
+    ssh_client.connect = _ssh_connect  # type: ignore[method-assign]
     return ssh_client
 
 
-def mock_ssh_config_and_client(ssh_config_path: Path, ssh_port: int, password: Optional[str], mocker: 'MockerFixture') -> Any:
+def mock_ssh_config_and_client(ssh_config_path: Path, ssh_port: int, password: str | None, mocker: 'MockerFixture') -> Any:
     ssh_config = paramiko.SSHConfig()
     with open(ssh_config_path, 'r') as f:
         ssh_config.parse(f)

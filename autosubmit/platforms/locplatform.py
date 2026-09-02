@@ -20,13 +20,15 @@ import os
 import subprocess
 from pathlib import Path
 from time import sleep
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
+import autosubmit.log.utils as log_utils
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import Log, AutosubmitError
+from autosubmit.log.log import AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.local_header import LocalHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
-import autosubmit.log.utils as log_utils
+from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -35,7 +37,10 @@ if TYPE_CHECKING:
 class LocalPlatform(ParamikoPlatform):
     """Class to manage jobs to localhost."""
 
-    def __init__(self, expid: str, name: str, config: dict, auth_password: Optional[Union[str, list[str]]] = None):
+    EXECUTION_MODE = ExecutionMode.DIRECT
+    TYPE = PlatformType.LOCAL
+
+    def __init__(self, expid: str, name: str, config: dict, auth_password: str | list[str] | None = None):
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.cancel_cmd = None
         self.mkdir_cmd = None
@@ -43,9 +48,8 @@ class LocalPlatform(ParamikoPlatform):
         self.get_cmd = None
         self.put_cmd = None
         self._checkhost_cmd = None
-        self.type = 'local'
         self._header = LocalHeader()
-        self.job_status = dict()
+        self.job_status = {}
         self.job_status['COMPLETED'] = ['1']
         self.job_status['RUNNING'] = ['0']
         self.job_status['QUEUING'] = []
@@ -88,7 +92,7 @@ class LocalPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Updates commands for platforms."""
-        self.root_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, self.expid)
+        self.root_dir = os.path.join(self.config.get("LOCAL_ROOT_DIR", BasicConfig.LOCAL_ROOT_DIR), self.expid)
         self.remote_log_dir = os.path.join(self.root_dir, "tmp", 'LOG_' + self.expid)
         self.cancel_cmd = "kill -2"
         self._checkhost_cmd = "echo 1"
@@ -104,9 +108,6 @@ class LocalPlatform(ParamikoPlatform):
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
 
-    def parse_job_output(self, output):
-        return output[0]
-
     def get_submitted_job_id(self, raw_output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
 
@@ -115,9 +116,6 @@ class LocalPlatform(ParamikoPlatform):
         :return: job ID of the submitted job.
         """
         return [output.strip() for output in raw_output.splitlines() if output.strip()]
-
-    def get_check_job_cmd(self, job_id):
-        return self.get_pscall(job_id)
 
     def write_jobid(self, jobid: str, complete_path: str) -> None:
         try:
@@ -142,6 +140,17 @@ class LocalPlatform(ParamikoPlatform):
         except Exception as exc:
             Log.error("Writing Job Id Failed : " + str(exc))
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> int | None:
+        try:
+            if os.path.exists(remote_path):
+                with open(remote_path) as f:
+                    first_line = f.readline()
+                if first_line.startswith('[INFO] JOBID='):
+                    return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, IndexError):
+            pass
+        return None
+
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
 
@@ -151,7 +160,7 @@ class LocalPlatform(ParamikoPlatform):
         :return: None
         """
         self.connected = True
-        if log_recovery_process:
+        if not log_recovery_process:
             self.spawn_log_retrieval_process(as_conf)
 
     def test_connection(self, as_conf: 'AutosubmitConfig') -> None:
@@ -266,7 +275,7 @@ class LocalPlatform(ParamikoPlatform):
 
     # Moves .err .out
     def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 1,
-                          max_retries: int = 1) -> bool:
+                          max_retries: int = 1, show_logs: bool = True) -> bool:
         """Checks if a file exists in the platform.
 
         :param src: source name.
@@ -283,10 +292,11 @@ class LocalPlatform(ParamikoPlatform):
         # This function has a short sleep as the files are locally
         sleeptime = 1
         for i in range(max_retries):
-            if os.path.isfile(os.path.join(self.get_files_path(), src)):
+            if Path(self.get_files_path(), src).is_file():
                 return True
             sleep(sleeptime)
-        Log.warning(f"File {src} does not exist")
+        if show_logs:
+            Log.warning(f"File {src} does not exist")
         return False
 
     def delete_file(self, filename, del_cmd=False):
@@ -317,7 +327,7 @@ class LocalPlatform(ParamikoPlatform):
             path_root = self.get_files_path()
             os.rename(os.path.join(path_root, src), os.path.join(path_root, dest))
             return True
-        except IOError as e:
+        except OSError as e:
             if must_exist:
                 raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
             else:
@@ -342,41 +352,7 @@ class LocalPlatform(ParamikoPlatform):
         """Do nothing because the log files are already in the local platform (redundancy)."""
         return
 
-    def check_completed_files(self, sections: str = None) -> Optional[str]:
-        """Checks for completed files in the remote log directory.
-        This function is used to check inner_jobs of a wrapper.
-
-        :param sections: Space-separated string of sections to check for completed files. Defaults to None.
-        :type sections: str
-        :return: The output if the command is successful, None otherwise.
-        :rtype: str
-        """
-        # Clone of the slurm one.
-        command = "find %s " % self.remote_log_dir
-        if sections:
-            for i, section in enumerate(sections.split()):
-                command += " -name *%s_COMPLETED" % section
-                if i < len(sections.split()) - 1:
-                    command += " -o "
-        else:
-            command += " -name *_COMPLETED"
-
-        if self.send_command(command, True):
-            return self._ssh_output
-        return None
-
-    def get_file_size(self, src: Union[str, Path]) -> Union[int, None]:
-        """Get file size in bytes
-
-        :param src: file path
-        """
-        try:
-            return Path(src).stat().st_size
-        except Exception as e:
-            Log.debug(f"Error getting file size for {src}: {str(e)}")
-        return None
-
-    def read_file(self, src: Union[str, Path], max_size: int = None) -> Union[bytes, None]:
+    def read_file(self, src: str | Path, max_size: int | None = None) -> bytes | None:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path

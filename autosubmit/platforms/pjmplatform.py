@@ -23,8 +23,10 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.pjm_header import PJMHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import PJMWrapperFactory
 
 if TYPE_CHECKING:
@@ -53,6 +55,9 @@ class PJMPlatform(ParamikoPlatform):
     :type expid: str
     """
 
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.PJM
+
     def __init__(self, expid, name, config):
         ParamikoPlatform.__init__(self, expid, name, config)
         self.mkdir_cmd = None
@@ -66,7 +71,7 @@ class PJMPlatform(ParamikoPlatform):
         self._header = PJMHeader()
         self._wrapper = PJMWrapperFactory(self)
         # https://software.fujitsu.com/jp/manual/manualfiles/m220008/j2ul2452/02enz007/j2ul-2452-02enz0.pdf page 16
-        self.job_status = dict()
+        self.job_status = {}
         self.job_status['COMPLETED'] = ['EXT']
         self.job_status['RUNNING'] = ['RNO', 'RNE', 'RUN']
         self.job_status['QUEUING'] = ['ACC', 'QUE', 'RNA', 'RNP', 'HLD']  # TODO NOT SURE ABOUT HOLD HLD
@@ -82,7 +87,6 @@ class PJMPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
         self._submit_script_base_name = os.path.join(
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
-        self.type = "pjm"
 
     def create_a_new_copy(self):
         return PJMPlatform(self.expid, self.name, self.config)
@@ -101,7 +105,7 @@ class PJMPlatform(ParamikoPlatform):
         try:
             # Test if remote_path exists
             self._ftpChannel.chdir(self.remote_log_dir)
-        except IOError:
+        except OSError:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
                     Log.debug(f'{self.remote_log_dir} has been created on {self.host} .')
@@ -131,9 +135,6 @@ class PJMPlatform(ParamikoPlatform):
 
     def get_remote_log_dir(self):
         return self.remote_log_dir
-
-    def parse_job_output(self, output):
-        return output.strip().split()[1].strip().strip("\n")
 
     def queuing_reason_cancel(self, reason):
         try:
@@ -213,11 +214,6 @@ class PJMPlatform(ParamikoPlatform):
             jobs_id = jobs_id[:-1]  # deletes comma
         return f"pjstat -H -v --choose jid,st,ermsg --filter \"jid={jobs_id}\" > as_checkalljobs.txt ; pjstat -v --choose jid,st,ermsg --filter \"jid={jobs_id}\" >> as_checkalljobs.txt ; cat as_checkalljobs.txt ; rm as_checkalljobs.txt"
 
-    def get_check_job_cmd(self, job_id):
-        return f"pjstat -H -v --choose st --filter \"jid={job_id}\" > as_checkjob.txt ; pjstat -v --choose st --filter \"jid={job_id}\" >> as_checkjob.txt ; cat as_checkjob.txt ; rm as_checkjob.txt"
-        # return 'pjstat -v --choose jid,st,ermsg --filter \"jid={0}\"'.format(job_id)
-
-
     def get_job_id_by_job_name_cmd(self, job_name):
         if job_name[-1] == ",":
             job_name = job_name[:-1]
@@ -281,7 +277,7 @@ class PJMPlatform(ParamikoPlatform):
     def allocated_nodes():
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
-    def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3):
+    def check_file_exists(self, filename: str, wrapper_failed: bool = False, sleeptime: int = 5, max_retries: int = 3, show_logs: bool = True):
         file_exist = False
         retries = 0
 
@@ -291,22 +287,21 @@ class PJMPlatform(ParamikoPlatform):
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), filename))
                 file_exist = True
-            except IOError:  # File doesn't exist, retry in sleeptime
+            except OSError:  # File doesn't exist, retry in sleeptime
                 if not wrapper_failed:
                     sleep(sleeptime)
                     sleeptime = sleeptime + 5
                     retries = retries + 1
                 else:
                     retries = 9999
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
+            except Exception as e:
+                if "garbage" in str(e).lower():
                     if not wrapper_failed:
                         sleep(sleeptime)
                         sleeptime = sleeptime + 5
                         retries = retries + 1
                 else:
-                    file_exist = False  # won't exist
-                    retries = 999  # no more retries
+                    raise
         return file_exist
 
     def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
@@ -384,8 +379,8 @@ class PJMPlatform(ParamikoPlatform):
 
     def _check_for_unrecoverable_errors(self) -> None:
         """Check PJM command output for recoverable and unrecoverable errors."""
-        out = self._ssh_output or ""
-        err = self._ssh_output_err or ""
+        out = self._ssh_output
+        err = self._ssh_output_err
 
         # Fast-exit: any match in stdout confirms valid PJM command output.
         if any(pat.search(out) for pat in _PJM_EXPECTED_OUTPUT):

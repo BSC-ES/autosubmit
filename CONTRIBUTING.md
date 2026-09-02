@@ -88,38 +88,9 @@ $ sudo setfacl --modify user:$USER:rw /var/run/docker.sock
 # $ sudo setfacl --remove user:$USER /var/run/docker.sock
 ```
 
-You can follow the steps below if you would like to have a Slurm container
+You can follow the steps specified at the [Giovtorres Slurm Git Repository](https://github.com/giovtorres/slurm-docker-cluster) if you would like to have a Slurm container
 locally for the tests marked with `slurm`. This step is optional as each test
-launches the container in an isolated manner.
-
-```bash
-$ docker pull autosubmit/slurm-openssh-container:25-05-0-1
-```
-
-```bash
-$ docker run --rm -it --cgroupns=host --privileged --volume /sys/fs/cgroup:/sys/fs/cgroup:rw --hostname slurmctld --name slurm-container -p 2222:2222 autosubmit/slurm-openssh-container:25-05-0-1
-```
-
-```bash
-$ docker cp slurm-container:/root/.ssh/container_root_pubkey $HOME/.ssh/container_root_pubkey || echo "Failed to docker cp SSH key"
-```
-
-```bash
-$ chmod 600 $HOME/.ssh/container_root_pubkey
-```
-
-```bash
-$ cat <<- EOF >> $HOME/.ssh/config
-Host localDocker
-    HostName localhost
-    User root
-    StrictHostKeyChecking no
-    UserKnownHostsFile /dev/null
-    IdentityFile $HOME/.ssh/container_root_pubkey
-    Port 2222
-    ForwardX11 yes
-EOF
-```
+launches the container in an isolated manner by using [testcontainers-python](https://testcontainers-python.readthedocs.io/en/latest/) library with pytest.
 
 Then you can run all the tests, with
 
@@ -139,6 +110,25 @@ or just the tests that require Slurm:
 $ pytest -m 'slurm'
 ```
 
+### Running the tests on VS Code
+
+If you want to discover, run, and debug your test suites directly inside the native Visual Studio Code Test Explorer panel, you must configure `pytest` arguments to find the decoupled test directories.
+
+Create or append the following configuration to your local workspace settings file (`.vscode/settings.json`):
+
+```json
+{
+    "python.testing.pytestArgs": [
+        "test/unit",
+        "test/integration",
+        "test/regression",
+        "--override-ini=addopts=--strict-markers --doctest-modules --durations=5"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}
+```
+
 ## Random ports
 
 Some tests require random ports. To acquire a free random port, we rely
@@ -148,3 +138,56 @@ We close the socket and use that port for our next test. Chances or the
 port being used by multiple tests is smaller than using random or ranges.
 
 See `test/integration/test_utils/networking.py` for more.
+
+## Postgres Database. 
+
+In case you want to do some manual testing with the Postgres backend,
+you can use the following command to start a Postgres container:
+
+```bash
+$ sudo setfacl --modify user:$USER:rw /var/run/docker.sock
+```
+
+```bash
+$ docker run -d --name some-postgres \
+    -e POSTGRES_PASSWORD=mypwd \
+    -e POSTGRES_USER=postgres \
+    -p 5432:5432 \
+    postgres 
+```
+
+## Test GitHub Actions locally
+
+Prerequisites: `docker`, `act` and a GitHub token.
+
+Go to the root directory of the repository and configure one `event.json` file
+with the content below ( for a PR ) :
+
+Example to trigger the `metrics` job on a PR comment `/metrics`:
+
+```json
+{
+  "comment": { "body": "/metrics" }, 
+  "issue": { "number": %pr_number%, "pull_request": { "url": "https://api.github.com/repos/BSC-ES/autosubmit/pulls/%pr_number%" } },
+  "repository": { "full_name": "BSC-ES/autosubmit", "name": "autosubmit", "owner": { "login": "BSC-ES" } },
+  "sender": { "login": "%yourusername%" }
+}
+```
+Note: replace `%pr_number%` and `%yourusername%` with your PR number and GitHub username.
+Note: you can also create an `event.json` for other events, e.g., `push`.
+
+Then you can run `act` with:
+
+```bash
+$ act -j metrics -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest -e event.json -s GITHUB_TOKEN="$GITHUB_TOKEN" --artifact-server-path /tmp/artifacts
+```
+replace `metrics_markdown` with the name of the job you want to run
+
+For debugging purposes, you can also enter the container where the job is
+being executed with:
+
+```bash
+$ act --reuse -j metrics -P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest -e event.json -s GITHUB_TOKEN="$GITHUB_TOKEN" --artifact-server-path /tmp/artifacts
+$ docker exec -it <container_id> /bin/bash
+cd /home/runner/work/<repo>/<repo>
+```

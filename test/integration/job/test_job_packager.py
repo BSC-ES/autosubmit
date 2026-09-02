@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, Protocol
+from typing import Protocol
 
 import pytest
 
@@ -29,23 +29,22 @@ class CreatePackagerFixture(Protocol):
 
     def __call__(
             self,
-            experiment_data: Optional[dict] = None,
-            total_jobs: Optional[int] = 20
+            experiment_data: dict | None = None,
+            total_jobs: int | None = 20
     ) -> JobPackager:
         ...
 
 
 @pytest.fixture
 def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
-    def _job_packager(experiment_data: Optional[dict], total_jobs: Optional[int] = 20) -> JobPackager:
+    def _job_packager(experiment_data: dict | None, total_jobs: int | None = 20) -> JobPackager:
         local.total_jobs = total_jobs
 
         exp = autosubmit_exp(experiment_data=experiment_data)
         as_conf = exp.as_conf
         parameters = as_conf.load_parameters()
 
-        job_list_persistence = autosubmit._get_job_list_persistence(exp.expid, as_conf)
-        job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory(), job_list_persistence)
+        job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory())
 
         job_list.generate(
             as_conf,
@@ -58,9 +57,9 @@ def create_packager(autosubmit_exp, autosubmit, local) -> CreatePackagerFixture:
             as_conf.get_retrials(),
             as_conf.get_default_job_type(),
             {},
-            run_only_members=[],
-            force=False,
-            create=True)
+            full_load=True)
+        for job in job_list.get_job_list():
+            job.update_parameters(as_conf, set_attributes=True)
 
         return JobPackager(exp.as_conf, local, job_list)
 
@@ -190,3 +189,58 @@ def test_check_if_packages_are_ready_to_build_jobs_to_run_first(create_packager:
 
     assert jobs
     assert flag
+
+
+@pytest.mark.parametrize(
+    "total_jobs, max_jobs_to_submit",
+    [
+        (None, float('inf')),
+        (-10, float('inf')),
+        (-1, float('inf')),
+        (20, 20),
+    ]
+)
+def test_calculate_job_limits_total_jobs_inf(create_packager: CreatePackagerFixture, total_jobs: int, max_jobs_to_submit: float):
+    """Test that the job limits are calculated correctly based on total jobs."""
+    job_packager = create_packager(
+        experiment_data={
+            'JOBS': {
+                'A': {
+                    'running': 'once',
+                    'platform': 'local',
+                    'script': '"sleep 0"',
+                }
+            }
+        },
+        total_jobs=total_jobs
+    )
+    job_packager.calculate_job_limits(job_packager._platform)
+    assert job_packager._max_jobs_to_submit == max_jobs_to_submit
+
+
+@pytest.mark.parametrize(
+    "max_waiting_jobs, expected_max_waiting_jobs",
+    [
+        (None, float('inf')),
+        (-10, float('inf')),
+        (-1, float('inf')),
+        (20, 20),
+    ]
+)
+def test_calculate_job_limits_max_waiting_jobs(create_packager: CreatePackagerFixture, max_waiting_jobs: int, expected_max_waiting_jobs: float):
+    """Test that the job limits are calculated correctly based on max waiting jobs."""
+    job_packager = create_packager(
+        experiment_data={
+            'JOBS': {
+                'A': {
+                    'running': 'once',
+                    'platform': 'local',
+                    'script': '"sleep 0"',
+                }
+            }
+        }
+    )
+    job_packager._platform.max_waiting_jobs = max_waiting_jobs
+    job_packager.calculate_job_limits(job_packager._platform)
+    assert job_packager._max_wait_jobs_to_submit == expected_max_waiting_jobs
+

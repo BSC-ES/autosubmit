@@ -6,15 +6,15 @@
 # the Common Workflow Language project, and, where practical,
 # linking to https://www.commonwl.org/ ),...
 # Ref: https://github.com/common-workflow-language/user_guide/blob/8abf537144d7b63c3561c1ff2b660543effd0eb0/LICENSE.md
-from pathlib import Path
 from html import escape
+from pathlib import Path
 from shutil import copy, move
-from typing import cast, Optional
-from sphinx.util import logging
+from typing import cast
 
 from docutils import nodes
 from docutils.nodes import Element, Node
 from docutils.parsers.rst import directives
+from sphinx.util import logging
 from sphinx.util.docutils import SphinxDirective
 
 from docs.source.ext.runcmd import RunCmdDirective
@@ -57,7 +57,7 @@ class AutosubmitFigureDirective(SphinxDirective):
     def run(self) -> list[Node]:
         caption = self.options.get('caption')
 
-        configuration_name: Optional[str] = self.options.get('name', None)
+        configuration_name: str | None = self.options.get('name', None)
         if configuration_name is None:
             logger.warning('No configuration name specified in the figure directive, skipping copying YAML files.')
             raise ValueError('No configuration name specified in the figure directive.')
@@ -203,8 +203,7 @@ def _move_latest_image(experiment_plot_path: Path, target_path: Path, figure_nam
         logger.warning(f'Could not find latest image in {experiment_plot_path}')
         return
     latest_image = max(images, key=lambda f: f.stat().st_ctime)
-    if figure_name.startswith('/'):
-        figure_name = figure_name[1:]
+    figure_name = figure_name.removeprefix('/')
     path_to = target_path / figure_name
     path_to.parent.mkdir(parents=True, exist_ok=True)
 

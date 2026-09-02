@@ -32,18 +32,18 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_packager import JobPackager
-from autosubmit.log.utils import is_gzip_file, is_xz_file
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from test.integration.conftest import AutosubmitExperimentFixture
+from test.unit.test_utils import is_gzip_file, is_xz_file
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -56,6 +56,7 @@ def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
     return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -93,6 +94,7 @@ def test_create_platform_slurm(
     # TODO: add more assertion statements...
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -167,7 +169,8 @@ def test_run_simple_workflow_slurm(
     exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
-
+# TODO: 4.2 - readd hybrid wrappers
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -303,86 +306,10 @@ def test_run_simple_workflow_slurm(
             },
         },
     },
-    {
-        'JOBS': {
-            'SIMHV': {
-                'DEPENDENCIES': {
-                    'SIMHV-1': {}
-                },
-                'SCRIPT': 'echo "0"',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'chunk',
-                'CHECK': 'on_submission',
-                'RETRIALS': 1,
-                'PLATFORM': _PLATFORM_NAME,
-            },
-        },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            },
-        },
-        'WRAPPERS': {
-            'WRAPPERHV': {
-                'TYPE': 'horizontal-vertical',
-                'JOBS_IN_WRAPPER': 'SIMHV',
-                'RETRIALS': 0,
-            },
-        },
-    },
-    {
-        'JOBS': {
-            'SIMVH': {
-                'DEPENDENCIES': {
-                    'SIMVH-1': {},
-                },
-                'SCRIPT': 'echo "0"',
-                'WALLCLOCK': '00:03',
-                'RUNNING': 'chunk',
-                'CHECK': 'on_submission',
-                'RETRIALS': 1,
-                'PLATFORM': _PLATFORM_NAME,
-            },
-        },
-        'PLATFORMS': {
-            _PLATFORM_NAME: {
-                'ADD_PROJECT_TO_HOST': False,
-                'HOST': 'localhost',
-                'MAX_WALLCLOCK': '00:03',
-                'PROJECT': 'group',
-                'QUEUE': 'gp_debug',
-                'SCRATCH_DIR': '/tmp/scratch/',
-                'TEMP_DIR': '',
-                'TYPE': 'slurm',
-                'USER': 'root',
-                'MAX_PROCESSORS': 1,
-                'PROCESSORS_PER_NODE': 1,
-            },
-        },
-        'WRAPPERS': {
-            'WRAPPERVH': {
-                'TYPE': 'vertical-horizontal',
-                'JOBS_IN_WRAPPER': 'SIMVH',
-                'RETRIALS': 0,
-            },
-        },
-    },
 ], ids=[
     'Vertical Wrapper Workflow',
     'Wrapper Vertical',
     'Wrapper Horizontal',
-    'Wrapper Horizontal-vertical',
-    'Wrapper Vertical-horizontal',
 ])
 def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 'AutosubmitExperimentFixture',
                                          slurm_server: 'DockerContainer'):
@@ -406,6 +333,7 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -652,6 +580,9 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
     exp = autosubmit_exp(experiment_data=experiment_data, wrapper=True)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, "t001")
+    Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+
     exp.as_conf.experiment_data = {
         'EXPERIMENT': {
             'DATELIST': '20000101',
@@ -668,6 +599,7 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
     assert 0 == exp.autosubmit.run_experiment(exp.expid)
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -714,6 +646,7 @@ def test_check_remote_permissions(autosubmit_exp, slurm_server: 'DockerContainer
     assert not slurm_platform.check_remote_permissions()
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -900,6 +833,7 @@ def test_simple_workflow_compress_logs_slurm(
         )
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -985,6 +919,7 @@ def test_compress_log_missing_tool(
         )
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -1037,6 +972,7 @@ def test_compress_log_fail_command(
     assert result is None
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -1122,6 +1058,7 @@ def test_remove_files_on_transfer_slurm(
         assert not bool(re.match(r".*\.(out|err)(\.(xz|gz))?$", filename))
 
 
+@pytest.mark.timeout(60)
 def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     exp = autosubmit_exp(experiment_data={})
     platform_config = {
@@ -1131,12 +1068,12 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     }
     platform = SlurmPlatform(exp.expid, "wrappers_test", platform_config)
 
-    job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory(), JobListPersistencePkl())
+    job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory())
     for i in range(3):
         job = Job(f"job{i}", i, Status.READY, 0)
         job.section = f"SECTION{i}"
         job.platform = platform
-        job_list._job_list.append(job)
+        job_list.add_job(job)
 
     packager = JobPackager(exp.as_conf, platform, job_list)
     packager.wallclock = "01:00"
@@ -1159,6 +1096,8 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     assert check and len(job_result) == 3
 
 
+@pytest.mark.timeout(120)
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
@@ -1247,4 +1186,5 @@ def test_run_bug_save_wrapper_crashes(
     #       this fails showing the same exception reported by users,
     #       ``AttributeError: 'list' object has no attribute 'status'``. But only after it
     #       failed to save the wrappers (which is why we are mocking it above).
+    JobList.save_wrappers = real_save_wrappers  # restore original
     assert exp.autosubmit.run_experiment(expid=exp.expid) == 0

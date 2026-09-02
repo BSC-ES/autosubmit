@@ -17,13 +17,13 @@
 
 import math
 from datetime import datetime
-from typing import Optional, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from bscearth.utils.date import date2str, chunk_end_date, chunk_start_date
-from networkx.classes import DiGraph
+from bscearth.utils.date import chunk_end_date, chunk_start_date, date2str
 
+from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
 
 if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
@@ -94,7 +94,7 @@ def calendar_unitsize_getlowersize(unitsize: str) -> str:
     except KeyError:
         raise AutosubmitCritical("Invalid calendar unit size")
     if unit_value == 0:
-        return "hour"
+        return ChunkUnit.HOUR
     else:
         return list(CALENDAR_UNITSIZE_ENUM.keys())[unit_value - 1]
 
@@ -139,11 +139,11 @@ def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int, ca
         num_days_in_a_year = 366
     else:
         num_days_in_a_year = 365
-    if chunk_unit == "year":
+    if chunk_unit == ChunkUnit.YEAR:
         chunk_size_in_hours = num_days_in_a_year * 24 * chunk_length
-    elif chunk_unit == "month":
+    elif chunk_unit == ChunkUnit.MONTH:
         chunk_size_in_hours = calendar_get_month_days(date_str, cal) * 24 * chunk_length
-    elif chunk_unit == "day":
+    elif chunk_unit == ChunkUnit.DAY:
         chunk_size_in_hours = 24 * chunk_length
     else:
         chunk_size_in_hours = chunk_length
@@ -172,11 +172,11 @@ def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
     else:
         num_days_in_a_year = 365
 
-    if split_unit == "year":
+    if split_unit == ChunkUnit.YEAR:
         split_size_in_hours = num_days_in_a_year * 24 * split_size
-    elif split_unit == "month":
+    elif split_unit == ChunkUnit.MONTH:
         split_size_in_hours = calendar_get_month_days(date_str, cal) * 24 * split_size
-    elif split_unit == "day":
+    elif split_unit == ChunkUnit.DAY:
         split_size_in_hours = 24 * split_size
     else:
         split_size_in_hours = split_size
@@ -205,7 +205,7 @@ def _validate_calendar_inputs(
     :return: None
     :raises: AutosubmitCritical if any of the inputs are invalid
     """
-    if chunk_unit == "hour":
+    if chunk_unit == ChunkUnit.HOUR:
         raise AutosubmitCritical(
             "Chunk unit is hour, Autosubmit doesn't support lower than hour splits. Please change the chunk unit to day or higher. Or don't use calendar splits."
         )
@@ -246,11 +246,11 @@ def _count_units_between_dates(start_date: datetime, end_date: datetime, unit: s
     :rtype: float
     :raises: AutosubmitCritical if the unit is invalid
     """
-    if unit == "hour":
+    if unit == ChunkUnit.HOUR:
         return float((end_date - start_date).days * 24)
-    elif unit == "day":
+    elif unit == ChunkUnit.DAY:
         return float((end_date - start_date).days)
-    elif unit == "month":
+    elif unit == ChunkUnit.MONTH:
         total = 0.0
         current = start_date.replace(day=1)
         while current < end_date:
@@ -266,7 +266,7 @@ def _count_units_between_dates(start_date: datetime, end_date: datetime, unit: s
                 total += days_covered / days_in_month
             current = next_month
         return total
-    elif unit == "year":
+    elif unit == ChunkUnit.YEAR:
         total = 0.0
         current = start_date
         while current < end_date:
@@ -277,7 +277,7 @@ def _count_units_between_dates(start_date: datetime, end_date: datetime, unit: s
                 days_in_year = 366
             else:
                 days_in_year = 365
-            
+
             start_doy = 1 if current == current.replace(month=1, day=1) else (current - current.replace(month=1, day=1)).days + 1
             end_doy = (days_in_year + 1) if year_end >= next_year else (year_end - current.replace(month=1, day=1)).days + 1
             days_covered = end_doy - start_doy
@@ -387,14 +387,14 @@ def get_split_size_unit(data: dict[str, Any], section: str) -> str:
     split_unit = str(data.get('JOBS', {}).get(section, {}).get('SPLITSIZEUNIT', "none")).lower()
     if split_unit == "none":
         split_unit = str(data.get('EXPERIMENT', {}).get('CHUNKSIZEUNIT', "day")).lower()
-        if split_unit == "year":
-            return "month"
-        elif split_unit == "month":
-            return "day"
-        elif split_unit == "day":
-            return "hour"
+        if split_unit == ChunkUnit.YEAR:
+            return ChunkUnit.MONTH
+        elif split_unit == ChunkUnit.MONTH:
+            return ChunkUnit.DAY
+        elif split_unit == ChunkUnit.DAY:
+            return ChunkUnit.HOUR
         else:
-            return "day"
+            return ChunkUnit.DAY
     return split_unit
 
 
@@ -416,26 +416,10 @@ def get_split_size(as_conf: dict[str, Any], section: str) -> int:
     return int(job_split_size or experiment_split_size or 1)
 
 
-def transitive_reduction(graph) -> DiGraph:
-    """Returns transitive reduction of a directed graph
-
-    The transitive reduction of G = (V,E) is a graph G- = (V,E-) such that
-    for all v,w in V there is an edge (v,w) in E- if and only if (v,w) is
-    in E and there is no path from v to w in G with length greater than 1.
-
-    :param graph: A directed acyclic graph (DAG)
-    :type graph: NetworkX DiGraph
-    :return: The transitive reduction of G
-    """
-    for u in graph:
-        graph.nodes[u]["job"].parents = set()
-        graph.nodes[u]["job"].children = set()
-    for u in graph:
-        graph.nodes[u]["job"].add_children([graph.nodes[v]["job"] for v in graph[u]])
-    return graph
 
 
-class Dependency(object):
+
+class Dependency:
     """
     Class to manage the metadata related with a dependency
 
@@ -452,7 +436,7 @@ class Dependency(object):
         self.relationships = relationships
 
 
-class SubJob(object):
+class SubJob:
     """
     Class to manage package times
     """
@@ -465,23 +449,23 @@ class SubJob(object):
         self.total = total
         self.status = status
         self.transit = 0
-        self.parents = list()
-        self.children = list()
+        self.parents = []
+        self.children = []
 
 
-class SubJobManager(object):
+class SubJobManager:
     """
     Class to manage list of SubJobs
     """
 
-    def __init__(self, subjoblist, job_to_package=None, package_to_jobs=None, current_structure=None) -> None:
+    def __init__(self, subjoblist, packages_map=None, packages_dict=None, current_structure=None) -> None:
         self.subjobList = subjoblist
         # print("Number of jobs in SubManager : {}".format(len(self.subjobList)))
-        self.job_to_package = job_to_package
-        self.package_to_jobs = package_to_jobs
+        self.packages_map = packages_map
+        self.packages_dict = packages_dict
         self.current_structure = current_structure
-        self.subjobindex = dict()
-        self.subjobfixes = dict()
+        self.subjobindex = {}
+        self.subjobfixes = {}
         self.process_index()
         self.process_times()
 
@@ -491,34 +475,34 @@ class SubJobManager(object):
             self.subjobindex[subjob.name] = subjob
 
     def process_times(self) -> None:
-        if self.job_to_package and self.package_to_jobs:
-            if self.current_structure and len(list(self.current_structure.keys())) > 0:
+        """
+        """
+        if self.packages_map and self.packages_dict:
+            if self.current_structure and len(self.current_structure) > 0:
                 # Structure exists
-                new_queues = dict()
-                fixes_applied = dict()
-                for package in self.package_to_jobs:
+                new_queues = {}
+                fixes_applied = {}
+                for package_name, wrapped_jobs in self.packages_dict.items():
                     # SubJobs in Package
-                    local_structure = dict()
+                    local_structure = {}
                     # SubJob Name -> SubJob Object
-                    local_index = dict()
-                    subjobs_in_package = [x for x in self.subjobList if x.package ==
-                                          package]
-                    local_jobs_in_package = [job for job in subjobs_in_package]
+                    local_index = {}
                     # Build index
+                    local_jobs_in_package = [sub for sub in self.subjobList if sub.package and sub.package.name == package_name]
                     for sub in local_jobs_in_package:
                         local_index[sub.name] = sub
                     # Build structure
                     for sub_job in local_jobs_in_package:
                         # If job in current_structure, store children names in dictionary
                         # local_structure: Job Name -> Children (if present in the Job package)
-                        local_structure[sub_job.name] = [v for v in self.current_structure[sub_job.name]
-                                                         if v in self.package_to_jobs[
-                                                             package]] if sub_job.name in self.current_structure else list()
-                        # Assign children to SubJob in local_jobs_in_package
-                        sub_job.children = local_structure[sub_job.name]
-                        # Assign sub_job Name as a parent of each of its children
-                        for child in local_structure[sub_job.name]:
-                            local_index[child].parents.append(sub_job.name)
+                        for edge in self.current_structure:
+                            if edge["e_from"] == sub_job.name and edge["e_to"] in local_index:
+                                local_structure.setdefault(
+                                    sub_job.name, []).append(edge["e_to"])
+                                # Add child to parent
+                                sub_job.children.append(edge["e_to"])
+                                # Add parent to child
+                                local_index[edge["e_to"]].parents.append(sub_job.name)
 
                     # Identify root as the job with no parents in the package
                     roots = [sub for sub in local_jobs_in_package if len(
@@ -550,47 +534,6 @@ class SubJobManager(object):
                 for name in fixes_applied:
                     self.subjobfixes[name] = fixes_applied[name]
 
-            else:
-                # There is no structure
-                for package in self.package_to_jobs:
-                    # Filter only jobs in the current package
-                    filtered = [x for x in self.subjobList if x.package ==
-                                package]
-                    # Order jobs by total time (queue + run)
-                    filtered = sorted(
-                        filtered, key=lambda x: x.total, reverse=False)
-                    # Sizes of fixes
-                    fixes_applied = dict()
-                    if len(filtered) > 1:
-                        filtered[0].transit = 0
-                        # Reverse for
-                        for i in range(len(filtered) - 1, 0, -1):
-                            # Assume that the total time of the next job is always smaller than
-                            # the queue time of the current job
-                            # because the queue time of the current also considers the
-                            # total time of the previous (next because of reversed for) job by default
-                            # Confusing? It is.
-                            # Assign to transit the adjusted queue time
-                            filtered[i].transit = max(filtered[i].queue -
-                                                      filtered[i - 1].total, 0)
-
-                        # Positive or zero transit time
-                        positive = len(
-                            [job for job in filtered if job.transit >= 0])
-
-                        if positive > 1:
-                            for i in range(0, len(filtered)):
-                                if i > 0:
-                                    # Only consider after the first job
-                                    filtered[i].queue = max(filtered[i].queue -
-                                                            filtered[i - 1].total, 0)
-                                    fixes_applied[filtered[i].name] = filtered[i - 1].total
-                    for sub in filtered:
-                        self.subjobindex[sub.name].queue = sub.queue
-                        # print("{} : {}".format(sub.name, sub.queue))
-                    for name in fixes_applied:
-                        self.subjobfixes[name] = fixes_applied[name]
-
     def get_subjoblist(self) -> set[SubJob]:
         """Returns the list of SubJob objects with their corrected queue times
         in the case of jobs that belong to a wrapper. """
@@ -600,7 +543,7 @@ class SubJobManager(object):
         return self.subjobfixes
 
 
-def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status=Optional[str]) -> None:
+def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status= str | None) -> None:
     """Cancel jobs on platforms.
 
     It receives a list ``active_jobs_filter`` of statuses to filter jobs for their statuses,
@@ -658,4 +601,4 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status=Opti
             Log.info(f"Changing status of job {job.name} to {target_status}")
             job.status = Status.KEY_TO_VALUE[target_status]
 
-    job_list.save()
+    job_list.save_jobs()

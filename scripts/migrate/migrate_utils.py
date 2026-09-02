@@ -15,8 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import List, Optional, Type, Union
-
 from sqlalchemy import (
     Column,
     Connection,
@@ -36,7 +34,7 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.schema import CreateSchema, CreateTable
 
 
-def check_table_schema(engine: Engine, valid_tables: List[Table]) -> Union[Table, None]:
+def check_table_schema(engine: Engine, valid_tables: list[Table]) -> Table | None:
     """
     Check if one of the valid table schemas matches the current table schema.
     Returns the first matching table schema or None if no match is found.
@@ -61,7 +59,7 @@ def check_table_schema(engine: Engine, valid_tables: List[Table]) -> Union[Table
     return None
 
 
-def table_copy(table: Table, metadata: Optional[MetaData] = None) -> Table:
+def table_copy(table: Table, metadata: MetaData | None = None) -> Table:
     """
     Copy a table schema
     """
@@ -75,7 +73,7 @@ def table_copy(table: Table, metadata: Optional[MetaData] = None) -> Table:
 
 
 def table_change_schema(
-    schema: str, source: Union[Type[DeclarativeBase], Table]
+    schema: str, source: type[DeclarativeBase] | Table
 ) -> Table:
     """
     Copy the source table and change the schema of that SQLAlchemy table into a new table instance
@@ -134,7 +132,7 @@ def _copy_table_data(
     target_conn: Connection,
     expid: str,
     source_table: Table,
-    dest_table: Optional[Table] = None,
+    dest_table: Table | None = None,
     schema_required=True,
 ):
     """

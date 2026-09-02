@@ -16,21 +16,21 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import pytest
+from bscearth.utils.date import date2str
+
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
 )
 from autosubmit.job.job_common import Status
-import pytest
-
 from autosubmit.log.log import AutosubmitCritical
-from bscearth.utils.date import date2str
 
 
 def reset(as_exp_, target="WAITING"):
     job_list_ = as_exp_.autosubmit.load_job_list(
-        as_exp_.expid, as_exp_.as_conf, new=False
-    )
+        as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
+        check_failed_jobs=True)
 
     job_names = " ".join([job.name for job in job_list_.get_job_list()])
     do_setstatus(as_exp_, fl=job_names, target=target)
@@ -59,7 +59,9 @@ def do_setstatus(
         check_wrapper=False,
         detail=False,
     )
-    return as_exp_.autosubmit.load_job_list(as_exp_.expid, as_exp_.as_conf, new=False)
+    return as_exp_.autosubmit.load_job_list(
+        as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
+        check_failed_jobs=True)
 
 
 @pytest.mark.docker

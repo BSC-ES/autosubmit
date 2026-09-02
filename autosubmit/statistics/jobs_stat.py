@@ -17,10 +17,9 @@
 
 from datetime import datetime, timedelta
 from math import ceil
-from typing import Optional
 
-from autosubmit.statistics.utils import timedelta2hours
 from autosubmit.log.log import Log
+from autosubmit.statistics.utils import timedelta2hours
 
 
 def _estimate_requested_nodes(nodes, processors, tasks, processors_per_node) -> int:
@@ -69,16 +68,16 @@ def _calculate_processing_elements(nodes, processors, tasks, processors_per_node
     return int(processors)
 
 
-class JobStat(object):
+class JobStat:
     def __init__(self, name: str, processors: int, wallclock: float, section: str, date: str,
                  member: str, chunk: str, processors_per_node: str, tasks: str, nodes: str,
                  exclusive: str):
         self._name = name
         self._processors = _calculate_processing_elements(nodes, processors, tasks, processors_per_node, exclusive)
         self._wallclock = wallclock
-        self.submit_time: Optional[datetime] = None
-        self.start_time: Optional[datetime] = None
-        self.finish_time: Optional[datetime] = None
+        self.submit_time: datetime | None = None
+        self.start_time: datetime | None = None
+        self.finish_time: datetime | None = None
         self.completed_queue_time = timedelta()
         self.completed_run_time = timedelta()
         self.failed_queue_time = timedelta()

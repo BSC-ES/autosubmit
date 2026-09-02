@@ -17,24 +17,46 @@
 
 """Code for handling submitting jobs to platforms."""
 
-
 import os
 from collections import defaultdict
-from typing import Optional, Union, TYPE_CHECKING
+from collections.abc import Callable
+from functools import partial
+from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.ecplatform import EcPlatform
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
 from autosubmit.platforms.pbsplatform import PBSPlatform
 from autosubmit.platforms.pjmplatform import PJMPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
+
+from .platform import Platform
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+
+__all__ = [
+    "ParamikoSubmitter",
+    "get_platform_by_type"
+]
+
+
+_PlatformFactory = Callable[..., 'ParamikoPlatform']
+"""The type for a platform builder/factory."""
+
+_PLATFORM_MAPPING: dict[PlatformType, _PlatformFactory] = {
+    PlatformType.PS: PsPlatform,
+    PlatformType.PJM: PJMPlatform,
+    PlatformType.PBS: PBSPlatform,
+    PlatformType.ECACCESS: partial(EcPlatform),
+    PlatformType.SLURM: partial(SlurmPlatform),
+}
+"""A dictionary that maps the platform types to its builders/factories."""
 
 
 def _get_platforms_used(hpcarch: str, jobs_data: dict) -> set[str]:
@@ -52,7 +74,7 @@ def _get_serial_platforms(platforms_used: set[str], platforms_data: dict) -> dic
     """Traverse used platforms and then look for serial platforms."""
     serial_platforms = defaultdict(list)
     for platform in list(platforms_used):
-        hpc: Optional[str] = platforms_data.get(platform, {}).get("SERIAL_PLATFORM", None)
+        hpc: str | None = platforms_data.get(platform, {}).get("SERIAL_PLATFORM", None)
         if hpc:
             serial_platforms[hpc].append(platform)
             if hpc not in platforms_used:
@@ -91,33 +113,86 @@ def _get_host(section_host: str, add_project_to_host: bool, project: str) -> str
     return host.strip(" ")
 
 
-def _get_platform_by_type(platform_type: str, expid: str, platform_name: str, experiment_data: dict,
-                          platform_version: str, auth_password: Optional[str]) -> Optional['ParamikoPlatform']:
-    if platform_type == 'ps':
-        return PsPlatform(expid, platform_name, experiment_data)
-    elif platform_type == 'ecaccess':
-        return EcPlatform(expid, platform_name, experiment_data, platform_version)
-    elif platform_type == 'slurm':
-        return SlurmPlatform(expid, platform_name, experiment_data, auth_password=auth_password)
-    elif platform_type == 'pjm':
-        return PJMPlatform(expid, platform_name, experiment_data)
-    elif platform_type == 'pbs':
-        return PBSPlatform(expid, platform_name, experiment_data)
+def _validate_platform_config(platform_name: str, platform: 'ParamikoPlatform') -> None:
+    """Validate platform configuration values.
 
-    return None
+    :param platform_name: The name of the platform (as used in PLATFORMS config).
+    :type platform_name: str
+    :param platform: The platform object with configuration already loaded.
+    :type platform: ParamikoPlatform
+    :return: None
+    :raises AutosubmitCritical: If any configuration value is invalid.
+    """
+    if platform.total_jobs is not None and int(platform.total_jobs) == 0:
+        raise AutosubmitCritical(
+            f"PLATFORMS.{platform_name.upper()}.TOTALJOBS must be greater than 0. "
+            f"Current value: {platform.total_jobs}.", 7012)
+    if platform.max_waiting_jobs is not None and int(platform.max_waiting_jobs) == 0:
+        raise AutosubmitCritical(
+            f"PLATFORMS.{platform_name.upper()}.MAX_WAITING_JOBS must be greater than 0. "
+            f"Current value: {platform.max_waiting_jobs}.", 7012)
+
+
+def get_platform_by_type(platform_type: str, expid: str, platform_name: str, experiment_data: dict,
+                          platform_version: str, auth_password: str | None) -> 'ParamikoPlatform':
+    """Get the platform by its type.
+
+    Raise an error if the platform type is not supported.
+
+    :param platform_type: Platform type (e.g. ``slurm``, ``ecaccess``, ``pbs``).
+    :param expid: Experiment identifier.
+    :param platform_name: Platform name from the experiment configuration.
+    :param experiment_data: Experiment configuration dictionary.
+    :param platform_version: Platform version used by ECaccess platforms.
+    :param auth_password: Authentication password for platforms that support it.
+    :return: The instantiated platform.
+    :raise AutosubmitCritical: If the platform type is not supported.
+    """
+    try:
+        platform_type = PlatformType(platform_type.strip().lower())
+    except ValueError:
+        raise AutosubmitCritical(
+            f"Platform {platform_name.upper()} type {platform_type} is not supported",
+            6003,
+        )
+
+    factory = _PLATFORM_MAPPING[platform_type]
+
+    # TODO: It would be a lot simpler if the signatures were reviewed and standardised?
+    if platform_type == PlatformType.ECACCESS:
+        return factory(expid, platform_name, experiment_data, platform_version)
+
+    if platform_type == PlatformType.SLURM:
+        return factory(
+            expid,
+            platform_name,
+            experiment_data,
+            auth_password=auth_password,
+        )
+
+    return factory(expid, platform_name, experiment_data)
 
 
 # TODO: This doesn't need a class if we just return ``platforms``.
 class ParamikoSubmitter:
     """Class to manage the experiments Paramiko platforms."""
 
-    def __init__(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
-                       local_auth_password=None):
-        self.platforms: Optional[dict[str, 'ParamikoPlatform']] = None
+    def __init__(self, as_conf: 'AutosubmitConfig', auth_password: str | None = None,
+                 local_auth_password=None):
+        self.platforms: dict[str, ParamikoPlatform] = {}
         self.load_platforms(as_conf=as_conf, auth_password=auth_password, local_auth_password=local_auth_password)
 
-    def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: Optional[dict] = None,
-                            auth_password: Optional[str] = None) -> None:
+    @property
+    def platforms_object(self) -> list[Platform]:
+        """Returns a list of all the platforms objects used by the experiment.
+
+        :return: List of platform objects
+        :rtype: list[Platform]
+        """
+        return list(self.platforms.values())
+
+    def load_local_platform(self, as_conf: 'AutosubmitConfig', experiment_data: dict | None = None,
+                            auth_password: str | None = None) -> None:
         """Create the local platform.
 
         :param as_conf: Autosubmit configuration.
@@ -139,22 +214,23 @@ class ParamikoSubmitter:
         local_platform.host = 'localhost'
         # Add an object to entry in dictionary
         self.platforms = {
-            'local': local_platform,
-            'LOCAL': local_platform
+            LocalPlatform.TYPE: local_platform,
+            LocalPlatform.TYPE.upper(): local_platform
         }
 
-    def load_platforms(self, as_conf: 'AutosubmitConfig', auth_password: Optional[str] = None,
+    def load_platforms(self, as_conf: 'AutosubmitConfig', auth_password: str | None = None,
                        local_auth_password=None) -> None:
         """Create all the platform's object that will be used by the experiment."""
-        exp_data: dict = as_conf.experiment_data
-        platforms_used: set[str] = _get_platforms_used(
+        exp_data = as_conf.experiment_data
+        platforms_used = _get_platforms_used(
             hpcarch=as_conf.get_platform(),
             jobs_data=exp_data.get('JOBS', {})
         )
-        platforms_data: dict = exp_data.get('PLATFORMS', {})
-        platforms_serial_in_parallel: dict[str, list] = _get_serial_platforms(
+        platforms_data = exp_data.get('PLATFORMS', {})
+        platforms_data_upper = {k.upper(): v for k, v in platforms_data.items()}
+        platforms_serial_in_parallel = _get_serial_platforms(
             platforms_used=platforms_used,
-            platforms_data=platforms_data
+            platforms_data=platforms_data_upper
         )
 
         # Build Local Platform Object
@@ -171,7 +247,7 @@ class ParamikoSubmitter:
 
             try:
                 section_name = platform_used.upper()
-                remote_platform = _get_platform_by_type(
+                remote_platform = get_platform_by_type(
                     platform_type, as_conf.expid, platform_used, exp_data, platform_version, auth_password)
                 if remote_platform is None:
                     raise AutosubmitCritical(
@@ -182,12 +258,10 @@ class ParamikoSubmitter:
                 return
 
             # Set the type and version of the platform found
-            remote_platform.type = platform_type
             remote_platform._version = platform_version
 
             # Concatenating the host with a project and adding to the object
-            add_project_to_host: Union[str, bool] = section_platform.get('ADD_PROJECT_TO_HOST', False)
-            add_project_to_host: bool = str(add_project_to_host).lower() != "false"
+            add_project_to_host = str(section_platform.get('ADD_PROJECT_TO_HOST', False)).lower() != "false"
             section_project = section_platform.get('PROJECT', "")
             section_host = section_platform.get('HOST', "")
             remote_platform.host = _get_host(section_host, add_project_to_host, section_project)
@@ -218,9 +292,8 @@ class ParamikoSubmitter:
 
             remote_platform.processors_per_node = section_platform.get('PROCESSORS_PER_NODE', "1")
             remote_platform.custom_directives = section_platform.get('CUSTOM_DIRECTIVES', "")
-            if len(remote_platform.custom_directives) > 0:
-                Log.debug(f'Custom directives for {platform_used}: {remote_platform.custom_directives}')
             remote_platform.scratch_free_space = str(section_platform.get('SCRATCH_FREE_SPACE', False)).lower()
+            _validate_platform_config(platform_used, remote_platform)
             try:
                 remote_platform.root_dir = os.path.join(remote_platform.scratch, remote_platform.project,
                                                         remote_platform.user, remote_platform.expid)

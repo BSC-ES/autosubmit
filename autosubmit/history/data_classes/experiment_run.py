@@ -18,6 +18,7 @@
 
 from autosubmit.history.utils import get_current_datetime_if_none
 
+
 class ExperimentRun:
   """
   Class that represents an experiment run

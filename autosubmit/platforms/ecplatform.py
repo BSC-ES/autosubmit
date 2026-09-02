@@ -23,16 +23,21 @@ import subprocess
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from bscearth.utils.date import date2str
 
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import Log, AutosubmitError, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
 from autosubmit.platforms.headers.ec_header import EcHeader
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException
+from autosubmit.platforms.paramiko_platform import (
+    ParamikoPlatform,
+    ParamikoPlatformException,
+)
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import EcWrapperFactory
 
 if TYPE_CHECKING:
@@ -59,6 +64,9 @@ class EcPlatform(ParamikoPlatform):
     :param scheduler: scheduler to use
     :type scheduler: str (pbs, loadleveler)
     """
+
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.ECACCESS
 
     def parse_all_jobs_output(self, output, job_id):
         """Parse ecaccess-job-list tabular output for a single job ID.
@@ -104,16 +112,17 @@ class EcPlatform(ParamikoPlatform):
     def __init__(self, expid, name, config, scheduler):
         ParamikoPlatform.__init__(self, expid, name, config)
         # version=scheduler
-        if scheduler == 'pbs':
+        scheduler_lower = scheduler.lower()
+        if scheduler_lower == PlatformType.PBS.lower():
             self._header = EcCcaHeader()
-        elif scheduler == 'loadleveler':
+        elif scheduler_lower == PlatformType.LOAD_LEVELER.lower():
             self._header = EcHeader()
-        elif scheduler == 'slurm':
+        elif scheduler_lower == PlatformType.SLURM.lower():
             self._header = SlurmHeader()
         else:
-            raise ParamikoPlatformException('ecaccess scheduler {0} not supported'.format(scheduler))
+            raise ParamikoPlatformException(f'ecaccess scheduler {scheduler} not supported')
         self._wrapper = EcWrapperFactory(self)
-        self.job_status = dict()
+        self.job_status = {}
         self.job_status['COMPLETED'] = ['DONE']
         self.job_status['RUNNING'] = ['EXEC']
         self.job_status['QUEUING'] = ['INIT', 'RETR', 'STDBY', 'WAIT']
@@ -220,6 +229,9 @@ class EcPlatform(ParamikoPlatform):
         Overrides the base ``awk``-based implementation because EcPlatform runs
         commands locally via subprocess and cannot read remote files directly.
 
+        STAT format: submit_time (L0), start_time (L1), end_time (L2), status (L3).
+        A single numeric line means the job is submitted but not yet started → QUEUING.
+
         :param job_list: Jobs to confirm.
         :return: Mapping of job names to resolved statuses.
         """
@@ -252,25 +264,31 @@ class EcPlatform(ParamikoPlatform):
             remote_path = f"{self.host}:{self.remote_log_dir}/{stat_name}"
             local_path = Path(self.tmp_path) / stat_name
 
-            subprocess.check_output(
-                f"{self.get_cmd} {remote_path} {local_path}",
-                shell=True,
-                stderr=subprocess.DEVNULL,
-            )
+            # The job may still be queuing and not yet running, in that case the
+            # STAT file won't exist on the remote side and the download will fail.
+            try:
+                subprocess.check_output(
+                    f"{self.get_cmd} {remote_path} {local_path}",
+                    shell=True,
+                    stderr=subprocess.DEVNULL,
+                )
+            except subprocess.CalledProcessError:
+                continue
             content = local_path.read_text().strip()
             if content:
-                last_line = content.splitlines()[-1]
-                result[job.name] = self._resolve_status(last_line)
+                lines = content.splitlines()
+                if len(lines) == 1 and lines[-1].isdigit():
+                    result[job.name] = Status.QUEUING
+                else:
+                    result[job.name] = self._resolve_status(lines[-1])
+            local_path.unlink(missing_ok=True)
 
         return result
 
     def set_start_time_from_remote_stat_file(self, job_list: list) -> None:
-        """Set the start_time_timestamp for each job from the first line of its STAT file.
+        """Set ``start_time_timestamp`` from line 1 (second line) of each remote STAT file.
 
-        Overrides the base SSH ``head``-based implementation because EcPlatform
-        runs commands locally via subprocess and cannot read remote files directly.
-        The first line of each STAT file contains the job start time as a Unix
-        epoch float.
+        Reads line 1 (not line 0) because L0 is now submit_time.
 
         :param job_list: Jobs whose start times should be filled from remote STAT files.
         """
@@ -304,8 +322,8 @@ class EcPlatform(ParamikoPlatform):
                 )
                 content = local_path.read_text().strip()
                 if content:
-                    first_line = content.splitlines()[0]
-                    start_epoch = float(first_line)
+                    lines = content.splitlines()
+                    start_epoch = float(lines[1]) if len(lines) >= 2 else float(lines[0])
                     job.start_time_timestamp = datetime.datetime.fromtimestamp(start_epoch).strftime("%Y%m%d%H%M%S")
             except Exception:
                 Log.warning(
@@ -350,14 +368,6 @@ class EcPlatform(ParamikoPlatform):
 
         return f"{pre} {self._submit_cmd}{script_name} {post}"
 
-    def parse_job_output(self, output):
-        job_state = output.split('\n')
-        if len(job_state) > 7:
-            job_state = job_state[7].split()
-            if len(job_state) > 1:
-                return job_state[1]
-        return 'DONE'
-
     def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
         """Parses the output of the submit command to get the job ID.
 
@@ -367,9 +377,6 @@ class EcPlatform(ParamikoPlatform):
         """
 
         return [out.strip() for out in output.splitlines()]
-
-    def get_check_job_cmd(self, job_id):
-        return self._checkjob_cmd + str(job_id)
 
     def connect(self, as_conf: 'AutosubmitConfig', reconnect: bool = False, log_recovery_process: bool = False) -> None:
         """Establishes an SSH connection to the host.
@@ -500,7 +507,7 @@ class EcPlatform(ParamikoPlatform):
         except Exception:
             process_ok = False
         if not process_ok:
-            Log.printlog("Log file don't recovered {0}".format(src), 6004)
+            Log.printlog(f"Log file don't recovered {src}", 6004)
         return process_ok
 
     def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
@@ -512,8 +519,7 @@ class EcPlatform(ParamikoPlatform):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        command = '{0} {3}:{2} {1}'.format(self.get_cmd, file_path, os.path.join(self.get_files_path(), filename),
-                                           self.host)
+        command = f'{self.get_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)} {file_path}'
         try:
             retries = 0
             sleeptime = 5
@@ -533,13 +539,40 @@ class EcPlatform(ParamikoPlatform):
         except Exception:
             process_ok = False
         if not process_ok and must_exist:
-            Log.printlog("Completed/Stat File don't recovered {0}".format(filename), 6004)
+            Log.printlog(f"Completed/Stat File don't recovered {filename}", 6004)
         if not process_ok:
-            Log.printlog("Log file don't recovered {0}".format(filename), 6004)
+            Log.printlog(f"Log file don't recovered {filename}", 6004)
         return process_ok
 
+    def read_jobid_from_remote_log(self, remote_path: str) -> int | None:
+        """Read the JOBID from the first line of the remote output file.
+
+        Overrides ``ParamikoPlatform.read_jobid_from_remote_log`` because
+        ``EcPlatform.send_command`` runs commands *locally*, so a plain
+        ``head -1`` would not find the remote file.
+
+        Downloads the file via ``ecaccess-file-get`` and parses the JOBID
+        from the ``[INFO] JOBID=`` marker on the first line.
+        """
+        filename = Path(remote_path).name
+        local_path = Path(self.tmp_path) / f".tmp_{filename}"
+        try:
+            subprocess.check_output(
+                f"{self.get_cmd} {self.host}:{remote_path} {local_path}",
+                shell=True,
+                stderr=subprocess.DEVNULL,
+            )
+            first_line = local_path.read_text().strip()
+            if first_line.startswith('[INFO] JOBID='):
+                return int(first_line.split('=', 1)[1].strip())
+        except (ValueError, OSError, subprocess.CalledProcessError):
+            pass
+        finally:
+            local_path.unlink(missing_ok=True)
+        return None
+
     def delete_file(self, filename: str) -> bool:
-        command = '{0} {1}:{2}'.format(self.del_cmd, self.host, os.path.join(self.get_files_path(), filename))
+        command = f'{self.del_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)}'
         try:
             FNULL = open(os.devnull, 'w')
             subprocess.check_call(command, stdout=FNULL, stderr=FNULL, shell=True)
@@ -577,7 +610,7 @@ class EcPlatform(ParamikoPlatform):
         """.format(filename, queue, project, wallclock, num_procs, expid, dependency, rootdir,
                    '\n'.ljust(13).join(str(s) for s in directives))
 
-    def get_completed_job_names(self, job_names: Optional[list[str]] = None) -> list[str]:
+    def get_completed_job_names(self, job_names: list[str] | None = None) -> list[str]:
         """Retrieve the names of all files ending with '_COMPLETED' from the remote log directory using SSH.
 
         Uses ``ecaccess-file-dir`` to inspect the remote directory and filters
@@ -682,7 +715,7 @@ class EcPlatform(ParamikoPlatform):
         :type scripts_to_submit: dict
         """
         # There isen't a reliable way to check for duplicated job names in ecaccess, as the job list command doesn't return all the information needed to identify them,
-        pass  # pragma: no cover
+        # pragma: no cover
 
     def _check_for_unrecoverable_errors(self) -> None:
         """Check ecaccess command output for recoverable and unrecoverable errors.
@@ -690,8 +723,8 @@ class EcPlatform(ParamikoPlatform):
         :raises AutosubmitError: For transient errors.
         :raises AutosubmitCritical: For permanent errors.
         """
-        out = self._ssh_output or ""
-        err = self._ssh_output_err or ""
+        out = self._ssh_output
+        err = self._ssh_output_err
 
         # Fast-exit: stdout matches a known ecaccess success pattern.
         if any(pat.search(out) for pat in _EC_EXPECTED_OUTPUT):

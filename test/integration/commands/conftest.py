@@ -17,9 +17,36 @@
 
 from getpass import getuser
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 import pytest
+
+
+@pytest.fixture
+def redirect_log_info(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Redirect `Log` calls to a temporary file called `autosubmit.log` and return the file path.
+    """
+    from datetime import datetime
+
+    log_file = tmp_path / "autosubmit.log"
+
+    def _new_log_path(message: Any, *args: Any, **kwargs: Any) -> None:
+        timestamp = datetime.now().astimezone().isoformat()
+        with log_file.open("a", encoding="utf-8") as fh:
+            fh.write(f"{timestamp} {message}\n")
+
+    try:
+        from autosubmit.log.log import Log
+        monkeypatch.setattr(Log, "info", _new_log_path)
+        monkeypatch.setattr(Log, "debug", _new_log_path)
+        monkeypatch.setattr(Log, "warning", _new_log_path)
+        monkeypatch.setattr(Log, "error", _new_log_path)
+        monkeypatch.setattr(Log, "critical", _new_log_path)
+        monkeypatch.setattr(Log, "status", _new_log_path)
+    except Exception:
+        raise
+
+    return log_file
 
 
 @pytest.fixture(scope="function")
@@ -106,7 +133,7 @@ def general_data(tmp_path: Path) -> dict[str, Any]:
 
 
 @pytest.fixture(scope="function")
-def experiment_data(tmp_path: Path) -> Dict[str, object]:
+def experiment_data(tmp_path: Path) -> dict[str, object]:
     """
     Provide part of the `experiment_data` dictionary used by the
     integration tests in `commands`.
@@ -130,7 +157,7 @@ def experiment_data(tmp_path: Path) -> Dict[str, object]:
 
 
 @pytest.fixture(scope="function")
-def jobs_data(tmp_path: Path) -> Dict[str, object]:
+def jobs_data(tmp_path: Path) -> dict[str, object]:
     """
     Provide a representative `jobs` dictionary used by the
     integration tests in `commands`.
@@ -194,7 +221,7 @@ def jobs_data(tmp_path: Path) -> Dict[str, object]:
     }
 
 
-def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> Dict[str, Any]:
+def wrapped_jobs(wrapper_type: str, structure: dict, size: dict) -> dict[str, Any]:
     """Provides a `jobs_data` dictionary with wrapped jobs used by the
     integration tests in `commands`.
 

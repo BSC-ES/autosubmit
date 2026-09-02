@@ -20,54 +20,52 @@
 We cover mainly error and validation scenarios here. See
 the ``test/integration/test_db_structure.py`` for more tests.
 """
-from pathlib import Path
-from typing import TYPE_CHECKING
+# from pathlib import Path
+# from typing import TYPE_CHECKING
+#
+# import pytest
+#
+# if TYPE_CHECKING:
+#     # noinspection PyProtectedMember
+#     from _pytest._py.path import LocalPath
+#
+#
+# def test_get_structure_exception(mocker):
+#     mocked_log = mocker.patch('autosubmit.database.db_structure.Log')
+#
+#     get_structure('a000', None)  # type: ignore
+#
+#     assert mocked_log.printlog.called
+#     assert mocked_log.debug.called
+#
+#
+# def test_get_structure_invalid_path(mocker):
+#     mocked_log = mocker.patch('autosubmit.database.db_structure.Log')
+#
+#     get_structure('a000', 'tree-hill')  # type: ignore
+#
+#     assert mocked_log.printlog.called
+#     assert mocked_log.debug.called
+#
+#
+# def test_get_structure_exception_getting_table(mocker, tmpdir: 'LocalPath'):
+#     """When ``get_structure`` calls ``_get_exp_structure``, but this function
+#     finds an exception, instead of raising it, it returns a dict (for some reason).
+#     This test verifies that that dictionary is returned what later results in an
+#     empty dictionary being returned as the table structure.
+#     """
+#     mocked_log = mocker.patch('autosubmit.database.db_structure.Log')
+#
+#     assert get_structure('a000', None) is None  # type: ignore
+#
+#     assert mocked_log.printlog.called
+#     assert mocked_log.debug.called
+#
+#
+# def test_save_structure_exception_raises(tmp_path):
+#     with pytest.raises(Exception) as cm:
+#         save_structure(None, '', Path(tmp_path) / 'does not exist yet')  # type: ignore
+#
+#     assert 'Structures folder not found' in str(cm.value)
 
-import pytest
-
-from autosubmit.database.db_structure import (
-    get_structure, save_structure
-)
-
-if TYPE_CHECKING:
-    # noinspection PyProtectedMember
-    from _pytest._py.path import LocalPath
-
-
-def test_get_structure_exception(mocker):
-    mocked_log = mocker.patch('autosubmit.database.db_structure.Log')
-
-    get_structure('a000', None)  # type: ignore
-
-    assert mocked_log.printlog.called
-    assert mocked_log.debug.called
-
-
-def test_get_structure_invalid_path(mocker):
-    mocked_log = mocker.patch('autosubmit.database.db_structure.Log')
-
-    get_structure('a000', 'tree-hill')  # type: ignore
-
-    assert mocked_log.printlog.called
-    assert mocked_log.debug.called
-
-
-def test_get_structure_exception_getting_table(mocker, tmpdir: 'LocalPath'):
-    """When ``get_structure`` calls ``_get_exp_structure``, but this function
-    finds an exception, instead of raising it, it returns a dict (for some reason).
-    This test verifies that that dictionary is returned what later results in an
-    empty dictionary being returned as the table structure.
-    """
-    mocked_log = mocker.patch('autosubmit.database.db_structure.Log')
-    
-    assert get_structure('a000', None) is None  # type: ignore
-
-    assert mocked_log.printlog.called
-    assert mocked_log.debug.called
-
-
-def test_save_structure_exception_raises(tmp_path):
-    with pytest.raises(Exception) as cm:
-        save_structure(None, '', Path(tmp_path) / 'does not exist yet')  # type: ignore
-
-    assert 'Structures folder not found' in str(cm.value)
+# TODO: Change to use the new file

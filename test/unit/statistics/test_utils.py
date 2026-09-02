@@ -15,16 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import timedelta, datetime
-from typing import Optional
+from datetime import datetime, timedelta
 
 import pytest
 
 from autosubmit.job.job import Job
-from autosubmit.statistics.utils import (
-    filter_by_section, filter_by_time_period, timedelta2hours, parse_number_processors
-)
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.statistics.utils import (
+    filter_by_section,
+    filter_by_time_period,
+    parse_number_processors,
+    timedelta2hours,
+)
 
 DEFAULT_NUMBER_PROCESSORS = 1
 
@@ -154,5 +156,5 @@ def test_timedelta2hours():
         ('1:2:3', 108)
     ]
 )
-def test_parse_number_processors(n: Optional[str], expected: int):
+def test_parse_number_processors(n: str | None, expected: int):
     assert parse_number_processors(n) == expected

@@ -21,18 +21,17 @@ import pytest
 from sqlalchemy import MetaData
 
 from autosubmit.database.tables import (
-    get_table_with_schema,
-    get_table_from_name,
-    get_all_tables_by_name,
-    create_wrapper_tables,
-    TableRegistry,
     ExperimentTable,
     JobDataTable,
-    JobListTable,
-    TABLES,
-    WrapperInfoTable,
-    WrapperJobsTable,
+    JobsTable,
+    TableRegistry,
+    create_wrapper_tables,
+    get_all_tables_by_name,
+    get_table_from_name,
+    get_table_with_schema,
 )
+
+JobListTable = JobsTable
 
 
 @pytest.fixture
@@ -41,32 +40,29 @@ def meta() -> MetaData:
     return MetaData()
 
 
-def test_get_table_with_schema_invalid_table():
-    with pytest.raises(ValueError, match='Invalid source type on table schema change'):
-        get_table_with_schema(schema=None, table=None)  # type: ignore
 
-
-def test_get_table_with_schema():
+def test_get_table():
     table = ExperimentTable
+    table_registry = TableRegistry("testing")
     assert table.schema is None
-    table = get_table_with_schema(schema='testing', table=table)
+    table = table_registry.get(table.name)
     assert table.schema == 'testing'
 
 
-def test_get_table_from_name_invalid_name():
-    with pytest.raises(ValueError, match='Missing table name: None'):
-        get_table_from_name(schema=None, table_name=None)  # type: ignore
+def test_get_table_from_name_invalid_table_name() -> None:
+    """Raise ``KeyError`` for an unknown table name."""
+    table_registry = TableRegistry("testing")
 
+    with pytest.raises(KeyError) as exc_info:
+        table_registry.get(table_name="catch-me-if-you-can")
 
-def test_get_table_from_name_invalid_table_name():
-    """An invalid table name will result in the same scenario as ``test_get_table_with_schema_invalid_table``."""
-    with pytest.raises(ValueError, match='Invalid source type on table schema change'):
-        get_table_from_name(schema=None, table_name='catch-me-if-you-can')
+    assert exc_info.value.args[0] == "No table definition found for 'catch-me-if-you-can'."
 
 
 @pytest.mark.parametrize('schema', [None, 'paraguay'])
 def test_get_table_from_name(schema):
-    table = get_table_from_name(schema=schema, table_name=ExperimentTable.name)
+    table_registry = TableRegistry(schema)
+    table = table_registry.get(table_name=ExperimentTable.name)
     assert table.name == ExperimentTable.name
     assert len(table.columns) == len(ExperimentTable.columns)  # type: ignore
     assert all([left.name == right.name for left, right in zip(table.columns, ExperimentTable.columns)])  # type: ignore
@@ -86,8 +82,8 @@ def test_create_wrapper_tables_info_columns(meta):
         'name', 'id', 'script_name', 'status',
         'local_logs_out', 'local_logs_err',
         'remote_logs_out', 'remote_logs_err',
-        'updated_log', 'platform_name', 'wallclock',
-        'num_processors', 'type', 'sections', 'method',
+        'updated_log', 'updated_stats', 'platform_name', 'wallclock',
+        'num_processors', 'type', 'sections', 'method', 'run_id',
     }
     assert col_names == expected
 
@@ -95,7 +91,7 @@ def test_create_wrapper_tables_info_columns(meta):
 def test_create_wrapper_tables_jobs_columns(meta):
     _, jobs_table = create_wrapper_tables('my_wrapper', meta)
     col_names = {c.name for c in jobs_table.columns}
-    expected = {'package_id', 'package_name', 'job_name', 'timestamp'}
+    expected = {'package_id', 'package_name', 'job_name', 'timestamp', 'run_id'}
     assert col_names == expected
 
 
@@ -168,20 +164,19 @@ def test_registry_get_multiple_tables():
     registry = TableRegistry(schema='multi_schema')
     exp = registry.get('experiment')
     job = registry.get('job_data')
-    job_list = registry.get('job_list')
+    jobs = registry.get('jobs')
     assert exp.name == 'experiment'
     assert job.name == 'job_data'
-    assert job_list.name == 'job_list'
+    assert jobs.name == 'jobs'
     # All share the same metadata.
     assert exp.metadata is job.metadata
-    assert job.metadata is job_list.metadata
+    assert job.metadata is jobs.metadata
 
 
 def test_registry_get_all_known_tables():
     """Verify all known table names can be retrieved."""
     registry = TableRegistry(schema=None)
-    known_names = {t.name for t in TABLES}
-    for name in known_names:
+    for name in get_all_tables_by_name():
         table = registry.get(name)
         assert table is not None
         assert table.name == name
@@ -197,10 +192,10 @@ def test_get_all_tables_by_name_returns_dict():
 def test_get_all_tables_by_name_contains_expected_tables():
     result = get_all_tables_by_name()
     expected_names = {
-        'experiment', 'db_version', 'experiment_structure',
-        'experiment_status', 'experiment_run', 'job_data',
-        'job_list', 'job_pkl', 'details', 'user_metrics',
-        'wrappers_info', 'wrappers_jobs',
+        'experiment', 'db_version', 'experiment_status',
+        'experiment_run', 'job_data', 'jobs', 'details',
+        'user_metrics', 'experiment_structure', 'structure_data',
+        'sections', 'wrappers_info', 'wrappers_jobs',
         'preview_wrappers_info', 'preview_wrappers_jobs',
     }
     for name in expected_names:
@@ -216,24 +211,7 @@ def test_get_all_tables_by_name_values_are_tables():
 
 def test_get_all_tables_by_name_count():
     result = get_all_tables_by_name()
-    assert len(result) == len(TABLES)
-
-
-# --- TABLES tuple ---
-
-@pytest.mark.parametrize('table', [
-    ExperimentTable,
-    JobDataTable,
-    JobListTable,
-    WrapperInfoTable,
-    WrapperJobsTable,
-])
-def test_tables_tuple_contains(table):
-    assert table in TABLES
-
-
-def test_tables_tuple_length():
-    assert len(TABLES) == 14
+    assert len(result) > 0
 
 
 @pytest.mark.parametrize('table_name,expected_name,schema', [

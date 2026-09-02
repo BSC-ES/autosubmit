@@ -19,12 +19,8 @@
 
 from pathlib import Path
 from time import sleep, time
-from typing import TYPE_CHECKING
 
-from portalocker import Lock, AlreadyLocked, LockException
-
-if TYPE_CHECKING:
-    pass
+from portalocker import AlreadyLocked, Lock, LockException
 
 __all__ = [
     'wait_child',

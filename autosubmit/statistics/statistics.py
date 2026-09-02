@@ -16,12 +16,11 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/
 
 from datetime import datetime, timedelta
-from typing import Optional, Union
 
 from autosubmit.job.job import Job
 from autosubmit.statistics.jobs_stat import JobStat
 from autosubmit.statistics.stats_summary import StatsSummary
-from autosubmit.statistics.utils import timedelta2hours, parse_number_processors
+from autosubmit.statistics.utils import parse_number_processors, timedelta2hours
 
 _COMPLETED_RETRIAL = 1
 _FAILED_RETRIAL = 0
@@ -32,8 +31,8 @@ class Statistics:
     def __init__(
             self,
             jobs: list[Job],
-            start: Optional[datetime],
-            end: Optional[datetime],
+            start: datetime | None,
+            end: datetime | None,
             queue_time_fix: dict[str, int],
             jobs_stat=None
     ) -> None:
@@ -41,18 +40,18 @@ class Statistics:
         self._start = start
         self._end = end
         self._queue_time_fixes = queue_time_fix
-        self._name_to_jobstat_dict: dict[str, JobStat] = dict()
+        self._name_to_jobstat_dict: dict[str, JobStat] = {}
         self.jobs_stat = jobs_stat
         # Old format
         self.max_time = 0.0
         self.max_fail = 0
-        self.start_times: list[Union[datetime, None]] = []
-        self.end_times: list[Union[datetime, None]] = []
-        self.queued: list[timedelta] = []
-        self.run: list[timedelta] = []
+        self.start_times: list[datetime | None] = []
+        self.end_times: list[datetime | None] = []
+        self.queued: list[float] = []
+        self.run: list[float] = []
         self.failed_jobs: list[int] = []
-        self.fail_queued: list[timedelta] = []
-        self.fail_run: list[timedelta] = []
+        self.fail_queued: list[float] = []
+        self.fail_run: list[float] = []
         self.wallclocks: list[float] = []
         self.threshold = 0.0
         self.failed_jobs_dict: dict[str, int] = {}
@@ -87,7 +86,7 @@ class Statistics:
                                                     timedelta()) - timedelta(
                             seconds=self._queue_time_fixes.get(job.name, 0))
                         job_stat.failed_queue_time += max(adjusted_failed_queue, timedelta())
-        self.jobs_stat = sorted(list(self._name_to_jobstat_dict.values()), key=lambda x: (
+        self.jobs_stat = sorted(self._name_to_jobstat_dict.values(), key=lambda x: (
             x.date if x.date else datetime.now(), x.member if x.member else "", x.section if x.section else "", x.chunk))
         return self
 

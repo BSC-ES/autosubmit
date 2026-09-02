@@ -17,7 +17,10 @@
 
 import pytest
 
-from autosubmit.statistics.jobs_stat import _calculate_processing_elements, _estimate_requested_nodes
+from autosubmit.statistics.jobs_stat import (
+    _calculate_processing_elements,
+    _estimate_requested_nodes,
+)
 
 """Tests for ``autosubmit.statistics.jobs_stat``."""
 

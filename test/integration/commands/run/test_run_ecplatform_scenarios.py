@@ -1,14 +1,19 @@
-from pathlib import Path
-from textwrap import dedent
 from getpass import getuser
+from pathlib import Path
+from shutil import copy
+from textwrap import dedent
 
 import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
-from test.integration.commands.run.conftest import _check_db_fields, _assert_exit_code, _check_files_recovered, \
-    _assert_db_fields, _assert_files_recovered
-from shutil import copy
+from test.integration.commands.run.conftest import (
+    _assert_db_fields,
+    _assert_exit_code,
+    _assert_files_recovered,
+    _check_db_fields,
+    _check_files_recovered,
+)
 
 """WARNING!! this test file can be only run with a valid .eccert in ~/.eccert, otherwise it will fail."""
 
@@ -21,15 +26,18 @@ from shutil import copy
     (dedent("""\
 
     EXPERIMENT:
-        NUMCHUNKS: '3'
+        NUMCHUNKS: '2'
     JOBS:
         job:
             SCRIPT: |
+                sleep 10
                 echo "Hello World with id=Success"
+            DEPENDENCIES:
+                job-1:
             PLATFORM: TEST_EC
             RUNNING: chunk
-            wallclock: 00:01
-    """), 3, "COMPLETED", "simple"),  # No wrappers, simple type
+            wallclock: 00:03
+    """), 2, "COMPLETED", "simple"),  # No wrappers, simple type
 
 ], ids=["Success"])
 def test_run_uninterrupted(

@@ -19,7 +19,9 @@ import traceback
 from abc import ABCMeta, abstractmethod
 
 import autosubmit.history.database_managers.database_models as Models
-from autosubmit.history.database_managers.database_manager import DEFAULT_HISTORICAL_LOGS_DIR
+from autosubmit.history.database_managers.database_manager import (
+    DEFAULT_HISTORICAL_LOGS_DIR,
+)
 from autosubmit.history.internal_logging import Logging
 
 
@@ -70,7 +72,7 @@ class Strategy(metaclass=ABCMeta):
 class SingleAssociationStrategy(Strategy):
 
     def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
-        super(SingleAssociationStrategy, self).__init__(historiclog_dir_path=historiclog_dir_path)
+        super().__init__(historiclog_dir_path=historiclog_dir_path)
 
     def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
         try:
@@ -92,8 +94,7 @@ class SingleAssociationStrategy(Strategy):
             return [job_data_dc]
         except Exception as exp:
             Logging("strategies", self.historiclog_dir_path).log(
-                "SingleAssociationStrategy failed for {0}. Using ssh_output: {1}. Exception message: {2}".format(
-                    job_data_dc.job_name, slurm_monitor.original_input, str(exp)),
+                f"SingleAssociationStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {str(exp)}",
                 traceback.format_exc())
             job_data_dc = self.set_job_data_dc_as_process_failed(job_data_dc, slurm_monitor.original_input)
             return [job_data_dc]
@@ -102,7 +103,7 @@ class SingleAssociationStrategy(Strategy):
 class StraightWrapperAssociationStrategy(Strategy):
 
     def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
-        super(StraightWrapperAssociationStrategy, self).__init__(historiclog_dir_path=historiclog_dir_path)
+        super().__init__(historiclog_dir_path=historiclog_dir_path)
 
     def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
         """ """
@@ -127,10 +128,7 @@ class StraightWrapperAssociationStrategy(Strategy):
             return result
         except Exception as exp:
             Logging("strategies", self.historiclog_dir_path).log(
-                "StraightWrapperAssociationStrategy failed for {0}. Using ssh_output: {1}. Exception message: {2}".format(
-                    job_data_dc.job_name,
-                    slurm_monitor.original_input,
-                    str(exp)),
+                f"StraightWrapperAssociationStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {str(exp)}",
                 traceback.format_exc())
             job_data_dc = self.set_job_data_dc_as_process_failed(job_data_dc, slurm_monitor.original_input)
             return [job_data_dc]
@@ -139,7 +137,7 @@ class StraightWrapperAssociationStrategy(Strategy):
 class GeneralizedWrapperDistributionStrategy(Strategy):
 
     def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
-        super(GeneralizedWrapperDistributionStrategy, self).__init__(historiclog_dir_path=historiclog_dir_path)
+        super().__init__(historiclog_dir_path=historiclog_dir_path)
 
     def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
         try:
@@ -156,8 +154,7 @@ class GeneralizedWrapperDistributionStrategy(Strategy):
             return result
         except Exception as exp:
             Logging("strategies", self.historiclog_dir_path).log(
-                "GeneralizedWrapperDistributionStrategy failed for {0}. Using ssh_output: {1}. Exception message: {2}".format(
-                    job_data_dc.job_name, slurm_monitor.original_input, str(exp)),
+                f"GeneralizedWrapperDistributionStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {str(exp)}",
                 traceback.format_exc())
             job_data_dc = self.set_job_data_dc_as_process_failed(job_data_dc, slurm_monitor.original_input)
             return [job_data_dc]
@@ -166,7 +163,7 @@ class GeneralizedWrapperDistributionStrategy(Strategy):
 class TwoDimWrapperDistributionStrategy(Strategy):
 
     def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
-        super(TwoDimWrapperDistributionStrategy, self).__init__(historiclog_dir_path=historiclog_dir_path)
+        super().__init__(historiclog_dir_path=historiclog_dir_path)
         self.jobs_per_level = None
 
     def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
@@ -191,8 +188,7 @@ class TwoDimWrapperDistributionStrategy(Strategy):
             return result
         except Exception as exp:
             Logging("strategies", self.historiclog_dir_path).log(
-                "TwoDimWrapperDistributionStrategy failed for {0}. Using ssh_output: {1}. Exception message: {2}".format(
-                    job_data_dc.job_name, slurm_monitor.original_input, str(exp)),
+                f"TwoDimWrapperDistributionStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {str(exp)}",
                 traceback.format_exc())
             job_data_dc = self.set_job_data_dc_as_process_failed(job_data_dc, slurm_monitor.original_input)
             return [job_data_dc]

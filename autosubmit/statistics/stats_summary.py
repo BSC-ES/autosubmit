@@ -1,6 +1,6 @@
 #!/bin/env/python
 
-class StatsSummary(object):
+class StatsSummary:
 
   def __init__(self):    
     # Counters

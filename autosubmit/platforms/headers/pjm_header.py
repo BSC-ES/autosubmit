@@ -63,7 +63,7 @@ class PJMHeader(object):
         # There is no account, so directive is empty
         nodes = parameters.get('NODES', "")
         if nodes != '':
-            return "PJM -L node={0}".format(nodes)
+            return f"PJM -L node={nodes}"
         return ""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal

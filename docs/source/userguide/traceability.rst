@@ -138,7 +138,8 @@ The table below contains the complete list of Git parameters and their descripti
    * - **GIT.PROJECT_ORIGIN**
      - URL pointing towards the project
    * - **GIT.PROJECT_BRANCH**
-     - Branch that should be checkout out to, once repository is downloaded
+     - Branch that should be checked out to, once the repository is cloned.
+       If ommited (empty), ``git clone`` will auto-detect the remote's default branch (usually ``main`` or ``master``).
    * - **GIT.PROJECT_COMMIT**
      - Git commit message
    * - **GIT.PROJECT_TAG**

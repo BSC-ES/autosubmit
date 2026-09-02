@@ -13,20 +13,47 @@ permissions:
 jobs:
   ruff-changes-in-file:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     name: ruff run
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/checkout@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
 
-      - name: Install Ruff
-        run: pip install ruff
-      - name: Run Ruff
-        run: ruff check $(git diff --name-only --cached -- '*.py')
+      - name: Install dependencies
+        run: pip install -e .[lint]
+
+      - name: Determine diff range
+        id: range
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "range=origin/${GITHUB_BASE_REF}...HEAD" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ "${{github.event.before}}" != "0000000000000000000000000000000000000000" ]; then
+            echo "range=${{github.event.before}}...${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          else
+            echo "range=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint changed files
+        run: |
+          RANGE="${{ steps.range.outputs.range }}"
+          if [ -n "$RANGE" ]; then
+            git diff -z --name-only --diff-filter=ACMRT "$RANGE" -- '*.py' > changed.txt
+          else
+            git ls-files -z -- '*.py' > changed.txt
+          fi
+
+          if [ -s changed.txt ]; then
+            xargs -0 -a changed.txt ruff check
+          else
+            echo "No Python files to lint."
+          fi
 
 
   mypy-changes-in-file:
@@ -34,16 +61,12 @@ jobs:
     continue-on-error: true
     name: mypy run
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
-      - run: pip install mypy
+          python-version: "3.10"
       - run: |
-          python3 -m pip install \
-            types-mock \
-            types-requests \
-            types-paramiko  
+          pip install -e .[mypy]
           mypy --install-types
       - name: Get Python changed files
         id: changed-py-files

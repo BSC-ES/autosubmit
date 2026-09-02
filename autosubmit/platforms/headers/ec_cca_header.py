@@ -20,7 +20,7 @@
 import textwrap
 
 
-class EcCcaHeader(object):
+class EcCcaHeader:
     """Class to handle the ECMWF headers of a job"""
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -47,14 +47,14 @@ class EcCcaHeader(object):
         if not isinstance(job.tasks, str):
             return ""
         else:
-            return '#PBS -l EC_tasks_per_node={0}'.format(job.tasks)
+            return f'#PBS -l EC_tasks_per_node={job.tasks}'
 
     # noinspection PyMethodMayBeStatic
     def get_threads_per_task(self, job, parameters):
         if not isinstance(job.threads, str):
             return ""
         else:
-            return '#PBS -l EC_threads_per_task={0}'.format(job.threads)
+            return f'#PBS -l EC_threads_per_task={job.threads}'
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_memory_per_task_directive(self, job, parameters):

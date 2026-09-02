@@ -15,25 +15,28 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from collections import namedtuple
-from pathlib import Path
-
 import os
 import re
-from autosubmit.history.utils import get_current_datetime
-import pytest
 import time
 import traceback
+from collections import namedtuple
+from pathlib import Path
 from shutil import copy2
+
+import pytest
 from sqlalchemy import create_engine
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
-from autosubmit.history.strategies import StraightWrapperAssociationStrategy, GeneralizedWrapperDistributionStrategy, \
-    PlatformInformationHandler
-from autosubmit.config.basicconfig import BasicConfig
-from test._oldschema import old_job_data_table, old_experiment_run_table
+from autosubmit.history.strategies import (
+    GeneralizedWrapperDistributionStrategy,
+    PlatformInformationHandler,
+    StraightWrapperAssociationStrategy,
+)
+from autosubmit.history.utils import get_current_datetime
+from test._oldschema import old_experiment_run_table, old_job_data_table
 
 EXPID_TT00_SOURCE = "test_database.db~"
 EXPID_TT01_SOURCE = "test_database_no_run.db~"
@@ -465,3 +468,29 @@ def test_update_submit_time(tmp_path, monkeypatch):
     finish_data_dc = exp_history.get_finish_data_dc(JOB_NAME, fail_count=FAIL_COUNT)
     assert finish_data_dc is not None, "get_finish_data_dc returned None; record not found."
     assert finish_data_dc.submit == new_submit_time, f"Expected submit time {new_submit_time}, got {finish_data_dc.submit}"
+
+
+def test_update_submit_time_returns_none_when_not_found(tmp_path, monkeypatch):
+    """update_submit_time returns None when no record exists for that fail_count."""
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+    exp_history = ExperimentHistory("tt00")
+    exp_history.initialize_database()
+    exp_history.create_new_experiment_run()
+
+    JOB_NAME = "a29z_20000101_fc2_1_SIM"
+    NCPUS = 128
+    PLATFORM_NAME = "marenostrum5"
+    JOB_ID = 101
+
+    exp_history.write_submit_time(
+        JOB_NAME, int(time.time()), "COMPLETED", NCPUS, "00:30",
+        "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME,
+        JOB_ID, children="", fail_count=0
+    )
+
+    result = exp_history.update_submit_time(JOB_NAME, int(time.time()) + 3600, fail_count=1)
+
+    assert result is None, "update_submit_time should return None when fail_count=1 does not exist"
+
+    loaded = exp_history.get_finish_data_dc(JOB_NAME, fail_count=1)
+    assert loaded is None, "No record should exist for fail_count=1"

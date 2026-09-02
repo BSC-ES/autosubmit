@@ -16,20 +16,28 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from collections.abc import Generator
 from getpass import getuser
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Generator, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.log.log import AutosubmitError, AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.locplatform import LocalPlatform
+
 # noinspection PyProtectedMember
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException, _get_user_config_file
+from autosubmit.platforms.paramiko_platform import (
+    ParamikoPlatform,
+    ParamikoPlatformException,
+    _get_user_config_file,
+    _init_poller,
+)
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
@@ -291,7 +299,7 @@ def test_remove_multiple_files_no_error_path_does_not_exist(paramiko_platform):
         [None, True]
     ]
 )
-def test_init_local_x11_display(exception: Optional[Exception], expected: Optional[bool], paramiko_platform, mocker):
+def test_init_local_x11_display(exception: Exception | None, expected: bool | None, paramiko_platform, mocker):
     """Test the X11 display initialization.
 
     We rely heavily on mocking here.
@@ -311,18 +319,35 @@ def test_init_local_x11_display(exception: Optional[Exception], expected: Option
 
 
 @pytest.mark.parametrize(
-    'platform',
-    ['linux', 'darwin']
+    'platform,expected_poller',
+    [
+        ('linux', 'poll'),
+        ('darwin', 'kqueue')
+    ]
 )
-def test_poller(platform: str, mocker, paramiko_platform):
+def test_poller(platform: str, expected_poller: str, mocker, paramiko_platform):
     """Test the file descriptor poller, initialized to kqueue on Linux, and poll on other systems. """
-    mocked_sys = mocker.patch('autosubmit.platforms.paramiko_platform.sys')
+    mocked_sys = mocker.patch("autosubmit.platforms.paramiko_platform.sys")
     mocked_sys.platform = platform
-    mocker.patch('autosubmit.platforms.paramiko_platform.select')
 
-    paramiko_platform._init_poller()
+    mocked_select = mocker.patch("autosubmit.platforms.paramiko_platform.select")
 
-    assert paramiko_platform.poller
+    poller = object()
+    kqueue = object()
+
+    mocked_select.poll.return_value = poller
+    mocked_select.kqueue.return_value = kqueue
+
+    result = _init_poller()
+
+    if expected_poller == "poll":
+        assert result is poller
+        mocked_select.poll.assert_called_once_with()
+        mocked_select.kqueue.assert_not_called()
+    else:
+        assert result is kqueue
+        mocked_select.kqueue.assert_called_once_with()
+        mocked_select.poll.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -359,25 +384,6 @@ def test_parse_joblist(job_list: list, expected: str, paramiko_platform: Paramik
     assert cmd == expected
 
 
-def test_send_command_non_blocking(mocker, paramiko_platform: ParamikoPlatform):
-    """Test that a ``Thread`` is created and started for ``.send_command`` (mocked).
-
-    We mock that function as it is already tested in an integration test.
-
-    In this function we only verify that the function is wrapped in a thread and
-    receives its args.
-    """
-    mocked_send_command = mocker.MagicMock()
-    mocker.patch.object(paramiko_platform, 'send_command', mocked_send_command)
-    command = 'ls'
-    ignore_log = True
-    t = paramiko_platform.send_command_non_blocking(command=command, ignore_log=ignore_log)
-    t.join()
-    assert mocked_send_command.call_count == 1
-    assert mocked_send_command.call_args_list[0][0][0] == command
-    assert mocked_send_command.call_args_list[0][0][1] == ignore_log
-
-
 @pytest.mark.parametrize(
     'error,expected_error_or_return_value',
     [
@@ -409,9 +415,9 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
 @pytest.mark.parametrize(
     'error,must_exist,expected_error_or_return_value',
     [
-        (IOError("Garbage"), True, AutosubmitError),
-        (IOError("garbage"), True, AutosubmitError),
-        (IOError("garbage"), False, False),
+        (OSError("Garbage"), True, AutosubmitError),
+        (OSError("garbage"), True, AutosubmitError),
+        (OSError("garbage"), False, False),
         (Exception("Garbage"), True, AutosubmitError),
         (Exception("garbage"), True, AutosubmitError),
         (Exception("garbage"), False, False)
@@ -517,11 +523,10 @@ def test_get_call(executable: str, timeout, paramiko_platform: ParamikoPlatform)
 
     call = call.strip()
 
+    assert 'echo $(date +%s) > job_a_STAT_0' in call
+    assert 'nohup' in call
     if timeout > 0:
         assert 'timeout' in call
-    else:
-        assert call.startswith('nohup')
-    assert call.startswith('nohup')
     assert 'job_a' in call
 
 
@@ -560,6 +565,7 @@ def test_get_file_errors(exception_message: bool, must_exist: bool, ignore_log: 
     #       now the test should fail.
 
     paramiko_platform.tmp_path = tmp_path
+    paramiko_platform.TYPE = PlatformType.SLURM
 
     mocked_log = mocker.patch('autosubmit.platforms.paramiko_platform.Log')
     mocked_ftp_channel = mocker.MagicMock()

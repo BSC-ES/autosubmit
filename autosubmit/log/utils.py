@@ -17,17 +17,12 @@
 
 import gzip
 import lzma
-import re
 from pathlib import Path
-from typing import Optional, Union
-
-XZ_MAGIC = "FD 37 7A 58 5A 00"
-GZIP_MAGIC = "1F 8B"
 
 
 def compress_xz(
-    input_path: Union[Path, str],
-    output_path: Optional[Union[Path, str]] = None,
+    input_path: Path | str,
+    output_path: Path | str | None = None,
     preset: int = 6,
     extreme: bool = False,
     keep_input: bool = True,
@@ -60,7 +55,7 @@ def compress_xz(
 
 def compress_gzip(
     input_path: str,
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
     compression_level: int = 9,
     keep_input: bool = True,
 ):
@@ -76,54 +71,12 @@ def compress_gzip(
     if output_path is None:
         output_path = f"{input_path}.gz"
 
-    with open(input_path, "rb") as input_file:
-        with gzip.open(
-            output_path, "wb", compresslevel=compression_level
-        ) as output_file:
-            output_file.writelines(input_file)
+    with open(input_path, "rb") as input_file, gzip.open(
+        output_path, "wb", compresslevel=compression_level
+    ) as output_file:
+        output_file.writelines(input_file)
 
     if not keep_input and input_path != output_path:
         Path(input_path).unlink(missing_ok=True)
 
     return output_path
-
-
-def is_xz_file(filepath: Union[Path, str]):
-    with open(filepath, "rb") as f:
-        magic = f.read(6)
-    return magic == bytes.fromhex(XZ_MAGIC)
-
-
-def is_gzip_file(filepath: Union[Path, str]):
-    with open(filepath, "rb") as f:
-        magic = f.read(2)
-    return magic == bytes.fromhex(GZIP_MAGIC)
-
-
-def find_uncompressed_files(file_path: Union[Path, str], pattern: Optional[str] = None) -> list[str]:
-    """
-    Return all files that are not compressed with xz in a directory and
-    match the filename with the given regex pattern.
-    """
-
-    if not Path(file_path).exists():
-        raise FileNotFoundError(f"The file '{file_path}' does not exist.")
-
-    # Get all files in the directory sorted by modification time
-    all_files = sorted(
-        [f for f in Path(file_path).glob("*") if f.is_file()],
-        key=lambda f: f.stat().st_mtime,
-        reverse=True,
-    )
-
-    result = []
-    for filename in all_files:
-        # Match the regex pattern if provided
-        if pattern and not re.match(pattern, str(filename.name)):
-            continue
-
-        # Check if the file is not compressed
-        if not is_xz_file(str(filename)) and not is_gzip_file(str(filename)):
-            result.append(str(filename))
-
-    return result

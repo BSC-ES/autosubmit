@@ -23,7 +23,7 @@ build-backend = "setuptools.build_meta"
 name = "autosubmit"
 dynamic = ["version", "readme"]
 description = "Autosubmit is a Python-based workflow manager to create, manage and monitor complex tasks involving different substeps, such as scientific computational experiments. These workflows may involve multiple computing systems for their completion, from HPCs to post-processing clusters or workstations. Autosubmit can orchestrate all the tasks integrating the workflow by managing their dependencies, interfacing with all the platforms involved, and handling eventual errors."
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.10,<3.13"
 authors = [
   { name="The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email="support-autosubmit@bsc.es" },
 ]
@@ -32,31 +32,29 @@ maintainers = [
 ]
 
 keywords = ["climate", "weather", "workflow", "HPC"]
-license = {file = "LICENSE"}
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 
 classifiers = [
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: GNU General Public License (GPL)",
     "Operating System :: POSIX :: Linux"
 ]
 
 dependencies = [
     "xlib==0.21",
     "bscearth.utils<=0.5.2",
-    "requests<=2.32.5",
+    "requests<=2.34.2",
     "networkx<=3.6.1",
-    "portalocker<=3.2.0",
+    "portalocker<=4.3.0",
     "paramiko>=3.5.0",
     "pyparsing==3.3.2",
-    "matplotlib<=3.10.8",
+    "matplotlib<=3.10.9",
     "psutil<=7.2.2",
     "py3dotplus==1.1.0",
     "numpy<3",
-    "rocrate==0.15.0",
-    "configparser",
+    "rocrate==0.15.1",
     "setproctitle",
     "invoke>=2.0",
     "SQLAlchemy~=2.0.23",
@@ -70,30 +68,41 @@ Homepage = "https://www.bsc.es/projects/earthscience/autosubmit/"
 Documentation = "https://autosubmit.readthedocs.io/"
 "Download Link" = "https://earth.bsc.es/wiki/doku.php?id=tools:autosubmit"
 
-[tool.setuptools.dynamic]
-version =  {file = "VERSION"}
-readme = {file = "README_PIP.md"}
-
 [project.optional-dependencies]
-postgres = ["psycopg2"]
+postgres = ["psycopg", "psycopg2"]
+lint = [
+    "ruff==0.16.5",
+]
 tests = [
-    # TODO: remove mock by pytest-mock
+    # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
     "mock",
-    "pytest>=8.2,<9.1",
+    "pytest>=8.2,<9.2",
     "pytest-cov",
     "pytest-mock",
-    "ruff==0.15.13",
     "pytest-xdist",
     "testcontainers",
     "pytest-timeout",
     "roc-validator",
-    "types-requests",
     "typing_extensions==4.*",
     "pytest-timestamper"
 ]
+mypy = [
+    "mypy",
+    "types-docker",
+    "types-psutil",
+    "types-mock",
+    "types-networkx",
+    "types-paramiko",
+    "types-requests"
+]
+benchmark = [
+    "pandas",
+    "matplotlib",
+    "tabulate"
+]
 docs = [
     "livereload",
-    "pydata-sphinx-theme>=0.16.1,<0.17",
+    "pydata-sphinx-theme>=0.16.1,<0.20",
     "sphinx>=5,<10",
     "sphinx-autobuild>=2021.3,<2025.9",
     "sphinx_rtd_theme",
@@ -103,39 +112,117 @@ docs = [
 ]
 all = [
     "autosubmit[tests]",
+    "autosubmit[mypy]",
+    "autosubmit[lint]",
     "autosubmit[docs]",
-    "autosubmit[postgres]"
+    "autosubmit[postgres]",
+    "autosubmit[benchmark]"
 ]
+
+[project.scripts]
+autosubmit = "autosubmit.scripts.autosubmit:main"
+
+[tool.setuptools]
+package-data = { "autosubmit" = [
+    "config/files/*.yml",
+    "database/data/*.sql",
+] }
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
+readme = {file = "README_PIP.md"}
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["autosubmit*"]
 namespaces = true
 
-[tool.setuptools]
-package-data = { "autosubmit" = [
-    "autosubmit/config/files/autosubmit.conf",
-    "autosubmit/config/files/expdef.conf",
-    "autosubmit/database/data/autosubmit.sql",
-    "autosubmit/config/conf/files/*",
-    "README",
-    "CHANGELOG",
-    "VERSION",
-    "LICENSE",
-    "docs/autosubmit.pdf"
-] }
-include-package-data = true
+[tool.mypy]
+mypy_path = ["."]
+namespace_packages = true
+explicit_package_bases = false
 
 [[tool.mypy.overrides]]
 module = [
+    "bscearth.*",
+    "configobj.*",
+    "integration.*",
     "rocrate.*",
-    "rocrate_validator.*"
+    "rocrate_validator.*",
+    "unit.*",
+    "test.integration.*",
+    "test.unit.*"
 ]
 ignore_missing_imports = true
+follow_untyped_imports = true
 
+[tool.ruff.lint]
+ignore = [
+    "B003",
+    "B005",
+    "B006",
+    "B008",
+    "B015",
+    "B017",
+    "B019",
+    "B025",
+    "BLE001",
+    "C401",
+    "C403",
+    "C404",
+    "C417",
+    "C419",
+    "D419",
+    "DTZ001",
+    "DTZ002",
+    "DTZ004",
+    "DTZ005",
+    "DTZ006",
+    "DTZ007",
+    "EXE001",
+    "EXE002",
+    "FLY002",
+    "ISC004",
+    "LOG001",
+    "PERF102",
+    "PERF402",
+    "PLC0206",
+    "PLR0124",
+    "PLR1704",
+    "PLR1722",
+    "PLW0127",
+    "PLW1510",
+    "PT014",
+    "RUF010",
+    "RUF012",
+    "RUF015",
+    "RUF034",
+    "RUF046",
+    "S102",
+    "S110",
+    "SIM101",
+    "SIM102",
+    "SIM103",
+    "SIM113",
+    "SIM115",
+    "SIM117",
+    "SIM118",
+    "SIM201",
+    "SIM210",
+    "SIM211",
+    "SIM401",
+    "TRY002",
+    "TRY004",
+    "TRY201",
+    "TRY203",
+    "UP030",
+    "UP031",
+    "UP035"
+]
+
+# NOTE: used to inspect dead code from time to time.
+# Done on demand, not part of the CI/CD pipeline.
 [tool.vulture]
 exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
 min_confidence = 70
-
-[project.entry-points.console_scripts]
-autosubmit = "autosubmit.scripts.autosubmit:main"

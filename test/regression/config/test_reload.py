@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import cProfile
-import os
 import pstats
 import re
 import shutil
@@ -148,7 +147,7 @@ def test_custom_config_for(temp_folder: Path, default_yaml_file: dict[str, Any],
     as_conf.conf_folder_yaml = Path(temp_folder)
     as_conf.load_workflow_commit = MagicMock()
     as_conf.reload(True)
-    for file_name in project_yaml_files.keys():
+    for file_name in project_yaml_files:
         assert temp_folder / file_name in as_conf.current_loaded_files.keys()
     assert as_conf.experiment_data["VARX"] == expected_data["VARX"]
     assert as_conf.experiment_data["VARY"] == expected_data["VARY"]
@@ -202,14 +201,12 @@ def check_differences(data1: dict, data2: dict) -> list:
     return differences
 
 
-def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any) -> None:
-    """
-    Test the destine workflow (a1q2) hardcoded until CI/CD.
-    """
+def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any, monkeypatch) -> None:
+    """Test the Destination Earth workflow (a1q2) hardcoded until CI/CD."""
     profiler = cProfile.Profile()
-    os.environ["AS_ENV_PLATFORMS_PATH"] = "test"
-    os.environ["AS_ENV_SSH_CONFIG_PATH"] = "test2"
-    os.environ["SUDO_USER"] = "dummy"
+    monkeypatch.setenv("AS_ENV_PLATFORMS_PATH", "test")
+    monkeypatch.setenv("AS_ENV_SSH_CONFIG_PATH", "test2")
+    monkeypatch.setenv("SUDO_USER", "dummy")
     expid = "a000"  # TODO parametrize
     mocker.patch.object(BasicConfig, 'read', return_value=True)
     current_script_location = Path(__file__).resolve().parent
@@ -297,3 +294,54 @@ def test_destine_workflows(temp_folder: Path, mocker, prepare_basic_config: Any)
     if PROFILE:
         stats = pstats.Stats(profiler).sort_stats('cumtime')
         stats.print_stats()
+
+
+@pytest.mark.parametrize("custom_section", ["PRE", "POST"])
+def test_override_immutable_variables_in_custom_config(
+    temp_folder: Path, mocker, custom_section: str
+) -> None:
+    """Test that immutable variables (DEFAULT.EXPID) cannot be overridden
+    by custom configuration files.
+    """
+    custom_config = {"PRE": [], "POST": []}
+    custom_config[custom_section].append("%job_variableX.path%")
+
+    default_yaml_file = {
+        "DEFAULT": {
+            "EXPID": "a000",
+            "HPCARCH": "local",
+            "CUSTOM_CONFIG": custom_config,
+        },
+        "job": {"FOR": {"NAME": "%var%"}, "path": "TOFILL"},
+        "var": [
+            "%test%",
+        ],
+        "test": "variableX",
+    }
+    project_yaml_files = {
+        "/variableX/test.yml": {
+            "DEFAULT": {"EXPID": "a_test", "HPCARCH": "different_hpc"},
+            "custom_marker": "loaded",
+        }
+    }
+    mocker.patch("pathlib.Path.exists", return_value=True)
+    default_yaml_file = prepare_custom_config_tests(
+        default_yaml_file, project_yaml_files, temp_folder
+    )
+    prepare_yaml_files(default_yaml_file, temp_folder)
+
+    as_conf = AutosubmitConfig("test")
+    as_conf.conf_folder_yaml = Path(temp_folder)
+    as_conf.load_workflow_commit = MagicMock()
+    as_conf.reload(True)
+
+    # Custom file merged
+    assert as_conf.experiment_data["CUSTOM_MARKER"] == "loaded"
+
+    # Immutable variables not overridden
+    assert as_conf.experiment_data["DEFAULT"]["EXPID"] == "a000"
+    # HPCARCH is overriden by POST configuration
+    if custom_section == "POST":
+        assert as_conf.experiment_data["DEFAULT"]["HPCARCH"] == "DIFFERENT_HPC"
+    else:
+        assert as_conf.experiment_data["DEFAULT"]["HPCARCH"] == "LOCAL"

@@ -19,6 +19,7 @@
 
 import os
 import pwd
+from collections.abc import Generator
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING
@@ -26,12 +27,12 @@ from typing import TYPE_CHECKING
 import pytest
 
 from autosubmit.autosubmit import Autosubmit
-from autosubmit.config.basicconfig import generate_dirs, BasicConfig
+from autosubmit.config.basicconfig import BasicConfig, generate_dirs
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
-    from py._path.local import LocalPath  # type: ignore
     from _pytest.tmpdir import TempPathFactory
+    from py._path.local import LocalPath  # type: ignore
     from pytest import FixtureRequest
 
 
@@ -120,7 +121,8 @@ def local(prepare_test):
 
 
 @pytest.fixture(scope='function', autouse=True)
-def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest', autosubmit: Autosubmit) -> None:
+def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest',
+                            autosubmit: Autosubmit, monkeypatch) -> None:
     """Initialize the ``autosubmit.rc`` file for each test, automatically.
 
     This function should populate enough information so ``BasicConfig.read()``
@@ -162,7 +164,7 @@ def initialize_autosubmitrc(tmp_path: 'LocalPath', request: 'FixtureRequest', au
                 ''')
     )
 
-    os.environ['AUTOSUBMIT_CONFIGURATION'] = str(autosubmitrc)
+    monkeypatch.setenv('AUTOSUBMIT_CONFIGURATION', str(autosubmitrc))
 
     BasicConfig.read()
     generate_dirs()
@@ -181,7 +183,7 @@ def test_tmp_path(tmp_path: 'LocalPath', request: 'FixtureRequest') -> Path:
 
 
 @pytest.fixture(scope='session', autouse=True)
-def do_not_touch_user_home(tmp_path_factory: 'TempPathFactory') -> None:
+def do_not_touch_user_home(tmp_path_factory: 'TempPathFactory') -> Generator[None, None, None]:
     """Fixture to change the environment variable $HOME.
 
     Autosubmit by default uses the user home directory. However, for testing
@@ -195,8 +197,9 @@ def do_not_touch_user_home(tmp_path_factory: 'TempPathFactory') -> None:
     any test from modifying that file, or any other user file.
     """
     home_dir = tmp_path_factory.getbasetemp()
-    os.environ["HOME"] = str(home_dir)
-    os.environ["USERPROFILE"] = str(home_dir)
+    mp = pytest.MonkeyPatch()
+    mp.setenv('HOME', str(home_dir))
+    mp.setenv('USERPROFILE', str(home_dir))
 
     # Git global configuration for tests
     git_config = Path(home_dir, 'git_config')
@@ -205,7 +208,11 @@ def do_not_touch_user_home(tmp_path_factory: 'TempPathFactory') -> None:
     name = Autosubmit
     email = autosubmit@localhost
     '''))
-    os.environ["GIT_CONFIG_GLOBAL"] = str(git_config)
+    mp.setenv('GIT_CONFIG_GLOBAL', str(git_config))
+
+    yield
+
+    mp.undo()
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -226,3 +233,5 @@ def avoid_long_sleep_time(session_mocker):
         real_sleep(s)
 
     session_mocker.patch('time.sleep', side_effect=my_sleep)
+
+

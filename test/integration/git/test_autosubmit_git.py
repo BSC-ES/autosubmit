@@ -16,17 +16,21 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for ``autosubmit_git``."""
+from collections.abc import Callable
 from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from pathlib import Path
-from typing import Callable, ContextManager, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, ContextManager
 
 import pytest
 
 from autosubmit.git.autosubmit_git import check_unpushed_changes, clean_git
 from autosubmit.log.log import AutosubmitCritical
 from test.integration.test_utils.git import (
-    create_git_repository, git_commit_all_in_dir, git_clone_repository, git_add_submodule
+    create_git_repository,
+    git_add_submodule,
+    git_clone_repository,
+    git_commit_all_in_dir,
 )
 
 if TYPE_CHECKING:
@@ -78,12 +82,12 @@ def _get_experiment_data(tmp_path) -> dict:
         ('git', True, True, 'a812', does_not_raise()),
     ],
     ids=[
-        'NOK: Did not commit nor push an operational experiment',
-        'NOK: Committed but did not push an operational experiment',
-        'OK: Commited and pushed an operational experiment',
-        'OK: Did not commit nor push a common experiment',
-        'OK: Committed but did not commit nor push a common experiment',
-        'OK: Committed and pushed a common experiment'
+        'NOK Did not commit nor push an operational experiment',
+        'NOK Committed but did not push an operational experiment',
+        'OK Commited and pushed an operational experiment',
+        'OK Did not commit nor push a common experiment',
+        'OK Committed but did not commit nor push a common experiment',
+        'OK Committed and pushed a common experiment'
     ]
 )
 @pytest.mark.docker
@@ -164,22 +168,22 @@ def create_git_repository_and_server(
         (True, True, True, True, 'a804', does_not_raise()),
     ],
     ids=[
-        'NOK: Did not commit nor push repository and submodule of an operational experiment',
-        'NOK: Committed the submodule, but did not push it, nor committed or pushed the repository of an operational '
+        'NOK Did not commit nor push repository and submodule of an operational experiment',
+        'NOK Committed the submodule, but did not push it, nor committed or pushed the repository of an operational '
         'experiment',
-        'NOK: Committed and pushed the submodule, but without committing and pushing the repository of an operational '
+        'NOK Committed and pushed the submodule, but without committing and pushing the repository of an operational '
         'experiment',
-        'NOK: Committed and pushed the submodule, committed but did not push the repository of an operational '
+        'NOK Committed and pushed the submodule, committed but did not push the repository of an operational '
         'experiment',
-        'OK: Committed and pushed the submodule, and committed and pushed the repository of an operational '
+        'OK Committed and pushed the submodule, and committed and pushed the repository of an operational '
         'experiment',
-        'OK: Did not commit nor push repository and submodule of a common experiment',
-        'OK: Committed the submodule, but did not push it, nor committed or pushed the repository of a common '
+        'OK Did not commit nor push repository and submodule of a common experiment',
+        'OK Committed the submodule, but did not push it, nor committed or pushed the repository of a common '
         'experiment',
-        'OK: Committed and pushed the submodule, but without committing and pushing the repository of a common '
+        'OK Committed and pushed the submodule, but without committing and pushing the repository of a common '
         'experiment',
-        'OK: Committed and pushed the submodule, committed but did not push the repository of a common experiment',
-        'OK: Committed and pushed the submodule, and committed and pushed the repository of a common experiment',
+        'OK Committed and pushed the submodule, committed but did not push the repository of a common experiment',
+        'OK Committed and pushed the submodule, and committed and pushed the repository of a common experiment',
     ]
 )
 @pytest.mark.git
@@ -258,7 +262,7 @@ def test_git_submodules_dirty(
 @pytest.mark.docker
 def test_git_operational_experiment_toggle_flag(
         git_operational_check_enabled: bool,
-        expected: Union[int, Exception],
+        expected: int | Exception,
         autosubmit_exp: Callable,
         git_server: tuple['Container', Path, str],
         tmp_path,

@@ -27,6 +27,7 @@ from subprocess import CalledProcessError
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
 
 
@@ -61,7 +62,7 @@ def test_copy_code_local_project_destination_is_not_specified(autosubmit_exp):
             }
         })
 
-    assert 'LOCAL.PROJECT_PATH must exists' in str(cm.value.message)
+    assert 'Empty project path! Please change this parameter to a valid one' in str(cm.value.message)
 
 
 def test_copy_code_local_project_destination_is_an_empty_string(autosubmit_exp):
@@ -227,7 +228,7 @@ def test_copy_code_local_project_rsync_error(autosubmit_exp, tmp_path, mocker):
     assert 'Cannot rsync' in str(cm.value.message)
 
     # Failing to rsync the contents, the proj folder is left as-is.
-    proj_dir = Path(tmp_path, exp.expid, 'proj')
+    proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / exp.expid / "proj"
     assert proj_dir.exists
     assert Path(proj_dir, 'local_project').exists()
     assert Path(proj_dir, 'local_project', 'ROBOTS.txt').exists()

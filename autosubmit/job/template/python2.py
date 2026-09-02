@@ -27,7 +27,7 @@ _AS_PY2_HEADER = dedent("""\
         # Autosubmit header
         ###################
         import locale
-        import time
+        import os, sys, time
         try:
             try:
                 locale.setlocale(locale.LC_ALL,'C.utf8')
@@ -42,9 +42,15 @@ _AS_PY2_HEADER = dedent("""\
         except Exception as e:
             locale.setlocale(locale.LC_ALL, 'C')
         job_name_ptrn = '%CURRENT_LOGDIR%/%JOBNAME%'
-        stat_file = open(job_name_ptrn + '_STAT_%FAIL_COUNT%', 'w')
-        stat_file.write(f'{int(time.time())}\\n')
-        stat_file.close()
+        stat_path = job_name_ptrn + '_STAT_%FAIL_COUNT%'
+        if not os.path.exists(stat_path):
+            with open(stat_path, 'w') as stat:
+                stat.write(f'{int(time.time())}\\n')
+        with open(stat_path, 'a') as stat:
+            stat.write(f'{int(time.time())}\\n')
+        _as_job_id = next((os.environ[v] for v in ('SLURM_JOBID', 'PBS_JOBID', 'JOB_ID', 'LSB_JOBID', 'LOADL_STEP_ID', 'PJM_JOBID') if v in os.environ), str(os.getpid()))
+        sys.stdout.write('[INFO] JOBID=' + _as_job_id + '\n')
+        sys.stderr.write('[INFO] JOBID=' + _as_job_id + '\n')
         ###################
         # Autosubmit Checkpoint
         ###################

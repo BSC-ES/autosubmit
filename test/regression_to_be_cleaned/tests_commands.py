@@ -24,10 +24,6 @@ def recovery_experiment_cmd(experiment_id):
     return f'autosubmit -lf EVERYTHING -lc EVERYTHING recovery {experiment_id} --all --hide -s'
 
 
-def check_experiment_cmd(experiment_id):
-    return f'autosubmit -lf EVERYTHING -lc EVERYTHING check {experiment_id}'
-
-
 def stats_experiment_cmd(experiment_id):
     return f'autosubmit -lf EVERYTHING -lc EVERYTHING stats {experiment_id} --hide'
 

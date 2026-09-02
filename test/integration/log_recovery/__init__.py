@@ -15,22 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Log recovery tests
 
-class FixedSizeList(list):
-    """
-        Customized list to retrieve a fixed sublist / slice of its elements.
-        The list will be filled with as many items (default) as needed to
-        get a list with the expected size.
-    """
+This module contains unit tests for the log recovery functionality of the Autosubmit system.
 
-    def __init__(self, lst, default=None):
-        super(FixedSizeList, self).__init__(lst)
-        self._default = default
-
-    def __getitem__(self, key):
-        if isinstance(key, slice):
-            return [list(self)[i] if 0 <= i < len(self) else self._default for i in range(key.start, key.stop, key.step or 1)]
-        return list(self)[key]
-
-    def __getslice__(self, i, j):
-        return self.__getitem__(slice(i, j))
+"""

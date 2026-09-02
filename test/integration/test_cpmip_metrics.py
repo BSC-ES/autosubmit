@@ -23,14 +23,11 @@ from typing import Any
 import pytest
 from ruamel.yaml import YAML
 
-from test.integration.test_mail import (  # noqa: F401  (pytest fixture imports)
+from test.integration.test_mail import (  # noqa: F401
     configured_mail,
     fake_smtp_server,
 )
-from test.integration.test_utils.docker import get_mailhog_messages
-
-
-pytestmark = [pytest.mark.docker, pytest.mark.slurm, pytest.mark.ssh]
+from test.integration.test_utils.docker_utils import get_mailhog_messages
 
 # The experiment runs one SIM chunk of exactly one calendar year, so simulated
 # years equals 1.0. Processors is fixed to keep CPU-hour metrics deterministic.
@@ -96,8 +93,8 @@ def _find_sim_stat_file(exp) -> Path:
 def _read_stat_timestamps(stat_file: Path) -> tuple[int, int]:
     """Return ``(start_time, end_time)`` (Unix seconds) from the SIM stat file."""
     lines = stat_file.read_text().strip().splitlines()
-    assert len(lines) >= 2, f"Unexpected stat file format: {stat_file}"
-    start_time, end_time = int(lines[0]), int(lines[1])
+    assert len(lines) >= 3, f"Unexpected stat file format: {stat_file}"
+    start_time, end_time = int(lines[1]), int(lines[2])
     assert end_time > start_time, f"Non-positive runtime in stat file: {stat_file}"
     return start_time, end_time
 
@@ -163,6 +160,9 @@ def _assert_violation_email(email: dict[str, Any], expid: str, job_name: str,
     assert f"Observed value: {expected_core_hours}" in body
 
 
+@pytest.mark.ssh
+@pytest.mark.docker
+@pytest.mark.slurm
 @pytest.mark.parametrize(
     "thresholds, notifications, expected_inbox_count",
     [

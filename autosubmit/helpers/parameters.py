@@ -18,7 +18,7 @@
 import functools
 import inspect
 from collections import defaultdict
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 _C = TypeVar("_C")
 
@@ -72,7 +72,7 @@ def autosubmit_parameters(cls=None, *, parameters: dict):
     return wrap
 
 
-def autosubmit_parameter(func=None, *, name, group: Optional[str] = None):
+def autosubmit_parameter(func=None, *, name, group: str | None = None):
     """Decorator for Autosubmit configuration parameters.
 
     Used to annotate properties of classes

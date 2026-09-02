@@ -22,7 +22,6 @@
 import datetime
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 import pytest
 from _pytest._py.path import LocalPath
@@ -30,14 +29,21 @@ from _pytest._py.path import LocalPath
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.ecplatform import EcPlatform
+from autosubmit.platforms.headers.ec_cca_header import EcCcaHeader
+from autosubmit.platforms.headers.ec_header import EcHeader
+from autosubmit.platforms.headers.slurm_header import SlurmHeader
+from autosubmit.platforms.paramiko_platform import ParamikoPlatformException
+from autosubmit.platforms.platform_type import PlatformType
 
+_EXPID = "t000"
+"""Test expid."""
 
 @pytest.fixture
 def ec_platform(tmp_path: 'LocalPath'):
     """Create a minimal EcPlatform for unit tests."""
     config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"}
     from autosubmit.platforms.ecplatform import EcPlatform
-    yield EcPlatform(expid='t000', name='pytest-slurm', config=config, scheduler='slurm')
+    yield EcPlatform(expid=_EXPID, name='pytest-slurm', config=config, scheduler='slurm')
 
 
 @pytest.mark.parametrize("config_retry,expected", [
@@ -55,7 +61,7 @@ def test_ec_retry_count_from_config(
     if config_retry is not None:
         platforms["TEST_ECMWF"] = {"ECACCESS_RETRIES": config_retry}
     config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp", "PLATFORMS": platforms}
-    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    platform = EcPlatform(expid=_EXPID, name='TEST_ECMWF', config=config, scheduler='slurm')
     assert platform._ec_retry_count == expected
     assert platform._ec_retry_flag == f"-retry {expected}"
 
@@ -73,7 +79,7 @@ def test_ec_retry_count_fallback(
     """Verify _ec_retry_count falls back to 100 when ECACCESS_RETRIES is invalid."""
     platforms = {"TEST_ECMWF": {"ECACCESS_RETRIES": invalid_value}}
     config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp", "PLATFORMS": platforms}
-    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    platform = EcPlatform(expid=_EXPID, name='TEST_ECMWF', config=config, scheduler='slurm')
     assert platform._ec_retry_count == 100
     assert platform._ec_retry_flag == "-retry 100"
 
@@ -282,7 +288,6 @@ def test_snapshot_resets_and_captures_pre_existing_ids(
 @pytest.mark.parametrize("ssh_output,ssh_output_err", [
     # Empty or whitespace output – no error possible.
     ("", ""),
-    (None, None),
     ("   \n  ", ""),
     # Bare numeric job ID – ecaccess-job-submit success.
     ("12345", ""),
@@ -302,8 +307,8 @@ def test_snapshot_resets_and_captures_pre_existing_ids(
 ])
 def test_check_for_unrecoverable_errors_no_exception_for_valid_output(
     ec_platform: EcPlatform,
-    ssh_output: Optional[str],
-    ssh_output_err: Optional[str],
+    ssh_output: str | None,
+    ssh_output_err: str | None,
 ) -> None:
     """Verify that no exception is raised for known-valid ecaccess output.
 
@@ -314,6 +319,27 @@ def test_check_for_unrecoverable_errors_no_exception_for_valid_output(
     ec_platform._ssh_output = ssh_output
     ec_platform._ssh_output_err = ssh_output_err
     ec_platform._check_for_unrecoverable_errors()  # must not raise
+
+
+@pytest.mark.parametrize("ssh_output,ssh_output_err", [
+    (None, None),
+])
+def test_check_for_unrecoverable_errors_none_exception_expected(
+    ec_platform: EcPlatform,
+    ssh_output: str | None,
+    ssh_output_err: str | None,
+) -> None:
+    """Verify that no exception is raised for known-valid ecaccess output.
+
+    :param ec_platform: EcPlatform under test.
+    :param ssh_output: Value to assign to ``_ssh_output``.
+    :param ssh_output_err: Value to assign to ``_ssh_output_err``.
+    """
+    ec_platform._ssh_output = ssh_output
+    ec_platform._ssh_output_err = ssh_output_err
+    with pytest.raises(TypeError) as te:
+        ec_platform._check_for_unrecoverable_errors()
+    assert "expected string or bytes-like object" in te.value.args[0]
 
 
 @pytest.mark.parametrize("output", [
@@ -452,7 +478,7 @@ def test_check_remote_log_dir_creates_all_path_levels(
     ec_platform.scratch = "/scratch"
     ec_platform.project = "proj"
     ec_platform.user = "user1"
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
 
     import subprocess as sp
@@ -492,7 +518,7 @@ def test_check_remote_log_dir_does_not_raise_when_dir_already_exists(
     ec_platform.scratch = "/scratch"
     ec_platform.project = "proj"
     ec_platform.user = "user1"
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/proj/user1/t000/LOG_t000"
 
     import subprocess as sp
@@ -521,7 +547,7 @@ def test_check_remote_permissions_uses_ecaccess_file_mkdir(
     ec_platform.scratch = "/scratch"
     ec_platform.project = "proj"
     ec_platform.user = "user1"
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.check_remote_permissions_cmd = "ecaccess-file-mkdir hpc:/scratch/proj/user1/_permission_checker_azxbyc"
     ec_platform.check_remote_permissions_remove_cmd = "ecaccess-file-rmdir hpc:/scratch/proj/user1/_permission_checker_azxbyc"
 
@@ -553,7 +579,7 @@ def test_delete_previous_run_files_by_job_names_calls_del_cmd(
     :param ec_platform: EcPlatform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
     ec_platform.host = "hpc"
     ec_platform.del_cmd = "ecaccess-file-delete"
@@ -585,7 +611,7 @@ def test_delete_previous_run_files_by_job_names_skips_when_expid_not_in_log_dir(
     :param ec_platform: EcPlatform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/other/LOG_other"
 
     called: list[str] = []
@@ -606,7 +632,7 @@ def test_delete_previous_stat_files_by_job_names_removes_matching_stat_files(
     :param ec_platform: EcPlatform under test.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    ec_platform.expid = "t000"
+    ec_platform.expid = _EXPID
     ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
     ec_platform.host = "hpc"
     ec_platform.del_cmd = "ecaccess-file-delete"
@@ -729,7 +755,7 @@ def test_set_submit_cmd_uses_configured_retry(
         "LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp",
         "PLATFORMS": {"TEST_ECMWF": {"ECACCESS_RETRIES": retry_count}},
     }
-    platform = EcPlatform(expid='t000', name='TEST_ECMWF', config=config, scheduler='slurm')
+    platform = EcPlatform(expid=_EXPID, name='TEST_ECMWF', config=config, scheduler='slurm')
     platform._set_submit_cmd("hpc")
     assert expected_flag in platform._submit_cmd
     assert "-queueName hpc" in platform._submit_cmd
@@ -806,14 +832,12 @@ def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
 
     def _check_output(cmd: str, **_) -> bytes:
         downloaded.append(cmd)
-        # Create the local file with STAT content
         local_file = cmd.split()[-1]
-        Path(local_file).write_text("COMPLETED\n")
+        Path(local_file).write_text("1715769600\n1715769601\nCOMPLETED\n")
         return b""
 
     monkeypatch.setattr(subprocess, "check_output", _check_output)
 
-    # Create mock jobs
     class MockJob:
         def __init__(self, name: str, fail_count: int):
             self.name = name
@@ -822,15 +846,60 @@ def test_confirm_done_jobs_via_stat_downloads_and_reads_stat_files(
     job_list = [MockJob("t000_INI", 0), MockJob("t000_SIM", 0), MockJob("t000_MISSING", 0)]
     result = ec_platform.confirm_done_jobs_via_stat(job_list)
 
-    # Only the first two jobs have STAT files
     assert result["t000_INI"] == Status.COMPLETED
     assert result["t000_SIM"] == Status.COMPLETED
     assert "t000_MISSING" not in result
 
-    # Verify ecaccess-file-get was called for the existing STAT files
     assert any("t000_INI_STAT_0" in c for c in downloaded)
     assert any("t000_SIM_STAT_0" in c for c in downloaded)
     assert not any("t000_MISSING_STAT_0" in c for c in downloaded)
+
+
+@pytest.mark.parametrize("check_output_behaviour,expected_value", [
+    ("failure", None),
+    ("success", Status.COMPLETED),
+])
+def test_confirm_done_jobs_via_stat_handles_download_outcomes(
+    ec_platform: EcPlatform,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    check_output_behaviour: str,
+    expected_value: Status | None,
+) -> None:
+    """Verify confirm_done_jobs_via_stat handles both download failure and success correctly."""
+    ec_platform.host = "hpc"
+    ec_platform.remote_log_dir = "/scratch/t000/LOG_t000"
+    ec_platform.tmp_path = str(tmp_path)
+    ec_platform.get_cmd = "ecaccess-file-get"
+
+    def _send_command(cmd: str, **_) -> bool:
+        ec_platform._ssh_output = "t000_INI_STAT_0|size  5550\n"
+        return True
+
+    monkeypatch.setattr(ec_platform, "send_command", _send_command)
+
+    def _check_output(cmd: str, **_) -> bytes:
+        if check_output_behaviour == "failure":
+            raise subprocess.CalledProcessError(255, cmd)
+        local_file = cmd.split()[-1]
+        Path(local_file).write_text("COMPLETED\n")
+        return b""
+
+    monkeypatch.setattr(subprocess, "check_output", _check_output)
+
+    class MockJob:
+        def __init__(self, name: str, fail_count: int):
+            self.name = name
+            self.fail_count = fail_count
+
+    job_list = [MockJob("t000_INI", 0)]
+    result = ec_platform.confirm_done_jobs_via_stat(job_list)
+
+    if expected_value is None:
+        assert "t000_INI" not in result
+    else:
+        assert result["t000_INI"] == expected_value
+    assert not (tmp_path / "t000_INI_STAT_0").exists()
 
 
 def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
@@ -861,13 +930,11 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     def _check_output(cmd: str, **_) -> bytes:
         downloaded.append(cmd)
         local_file = cmd.split()[-1]
-        # Write an epoch timestamp as the first line
-        Path(local_file).write_text("1715769600\n")
+        Path(local_file).write_text("1715769500\n1715769600\n")
         return b""
 
     monkeypatch.setattr(subprocess, "check_output", _check_output)
 
-    # Create mock jobs
     class MockJob:
         def __init__(self, name: str, fail_count: int):
             self.name = name
@@ -879,13 +946,61 @@ def test_set_start_time_from_remote_stat_file_downloads_and_parses_epoch(
     job_missing = MockJob("t000_MISSING", 0)
     ec_platform.set_start_time_from_remote_stat_file([job_ini, job_sim, job_missing])
 
-    # start_time_timestamp should be set for jobs that have STAT files
+    # start_time_timestamp comes from line 1 (L1) = 1715769600
     expected_timestamp = datetime.datetime.fromtimestamp(1715769600).strftime("%Y%m%d%H%M%S")
     assert job_ini.start_time_timestamp == expected_timestamp
     assert job_sim.start_time_timestamp == expected_timestamp
     assert job_missing.start_time_timestamp is None
 
-    # Verify ecaccess-file-get was called for the existing STAT files
     assert any("t000_INI_STAT_0" in c for c in downloaded)
     assert any("t000_SIM_STAT_0" in c for c in downloaded)
     assert not any("t000_MISSING_STAT_0" in c for c in downloaded)
+
+
+@pytest.mark.parametrize(
+    'scheduler,expected',
+    [
+        (PlatformType.PBS, EcCcaHeader),
+        (PlatformType.LOAD_LEVELER, EcHeader),
+        (PlatformType.SLURM, SlurmHeader),
+        (PlatformType.LOCAL, ParamikoPlatformException)
+    ]
+)
+def test_ecplatform_header_selected(
+        scheduler: str,
+        expected: type[EcCcaHeader | EcHeader | SlurmHeader | Exception],
+        ec_platform: EcPlatform,
+        tmp_path: Path
+):
+    """Test that ``EcPlatform`` correctly selects its wrapped platform header."""
+    config = {
+        "LOCAL_ROOT_DIR": str(tmp_path),
+        "LOCAL_TMP_DIR": "tmp",
+        "PLATFORMS": {},
+    }
+    if issubclass(expected, Exception):
+        with pytest.raises(expected):
+            EcPlatform(expid=_EXPID, name="test_select", config=config, scheduler=scheduler)
+    else:
+        platform = EcPlatform(
+            expid=_EXPID, name="test_select", config=config, scheduler=scheduler
+        )
+        assert platform._header
+
+
+def test_get_remote_log_dir(ec_platform):
+    """The remote log dir will have the value specified in the constructor."""
+    assert ec_platform.get_remote_log_dir() == f'{_EXPID}/LOG_{_EXPID}'
+
+
+def test_check_remote_log_dir_failed_mkdir(ec_platform, mocker):
+    """Test that ``ecaccess-file-mkdir`` raised error is captured."""
+    mocker.patch("autosubmit.platforms.ecplatform.subprocess.check_output", side_effect=FileNotFoundError)
+
+    with pytest.raises(AutosubmitError):
+        ec_platform.check_remote_log_dir()
+
+def test_get_mkdir_cmd(ec_platform):
+    """Test the ``mkdir`` command for the ECaccess platform."""
+    assert 'ecaccess-file-mkdir' in ec_platform.get_mkdir_cmd()
+

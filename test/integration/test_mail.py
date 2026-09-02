@@ -15,13 +15,14 @@
 # You should have received a copy of the GNU General Public License 
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>. 
 
-from typing import Any, Callable, Generator, Optional, Union, TYPE_CHECKING
+from collections.abc import Callable, Generator
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
-from test.integration.test_utils.docker import (
+from test.integration.test_utils.docker_utils import (
     get_mail_container,
     get_mailhog_messages,
     prepare_and_test_mail_container,
@@ -29,9 +30,9 @@ from test.integration.test_utils.docker import (
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember
-    from integration.conftest import AutosubmitExperiment
-    from integration.conftest import AutosubmitExperimentFixture
     from pathlib import Path
+
+    from integration.conftest import AutosubmitExperiment, AutosubmitExperimentFixture
 
 
 def _find_email_by_subject(search_text: str, emails) -> Any:
@@ -90,7 +91,7 @@ def create_mail_notifier() -> Callable[['AutosubmitExperiment', int], MailNotifi
     """Factory fixture to create a MailNotifier instance."""
 
     def _create_mail_notifier(autosubmit_experiment: 'AutosubmitExperiment', smtp_port: int):
-        exp_path: 'Path' = autosubmit_experiment.exp_path
+        exp_path: Path = autosubmit_experiment.exp_path
         with (exp_path / 'dummy_run.log') as f:
             f.write_text("Log entry: simulation started.")
 
@@ -242,8 +243,8 @@ def test_recipients_list(
         autosubmit_exp: 'AutosubmitExperimentFixture',
         create_mail_notifier: Callable[['AutosubmitExperiment', int], MailNotifier],
         fake_smtp_server: tuple[int, str],
-        list_recipients: Union[str, list[str]],
-        expected_error_message: Optional[str]):
+        list_recipients: str | list[str],
+        expected_error_message: str | None):
     smtp_port, api_base = fake_smtp_server
     job_name = 'SIM'
 

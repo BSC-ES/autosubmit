@@ -24,7 +24,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from autosubmit.job.template.python3 import _DEFAULT_EXECUTABLE, as_body, as_header, as_tailer
+from autosubmit.job.template.python3 import (
+    _DEFAULT_EXECUTABLE,
+    as_body,
+    as_header,
+    as_tailer,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -33,7 +38,7 @@ _JOBNAME = 't000_test'
 _FAIL_COUNT = '0'
 
 
-def _build_script(tmp_path: 'Path', body: str, executable: str = None) -> 'Path':
+def _build_script(tmp_path: 'Path', body: str, executable: str | None = None) -> 'Path':
     """Assemble and write a runnable Python 3 script, returning its path."""
     executable = executable or sys.executable
     h = as_header(platform_header='', executable=executable)
@@ -139,29 +144,35 @@ def test_tailer_creates_completed_file():
     assert '_COMPLETED' in tailer
 
 
-def test_completed_file_created_on_success(tmp_path: 'Path'):
-    """A successful script produces a ``_COMPLETED`` marker file."""
+def test_stat_file_has_completed_status_on_success(tmp_path: 'Path'):
+    """A successful script writes ``COMPLETED`` as the last line of the ``_STAT_`` file."""
     script_path = _build_script(tmp_path, "print('ok')")
     result = run([sys.executable, str(script_path)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+    stat_file = tmp_path / f'{_JOBNAME}_STAT_{_FAIL_COUNT}'
+    assert stat_file.exists()
+    assert stat_file.read_text().strip().splitlines()[-1] == 'COMPLETED'
     assert (tmp_path / f'{_JOBNAME}_COMPLETED').exists()
 
 
 def test_stat_file_written_on_success(tmp_path: 'Path'):
-    """A successful script writes a ``_STAT_`` file with two timestamps."""
+    """A successful script writes a ``_STAT_`` file with two timestamps and a status."""
     script_path = _build_script(tmp_path, "print('ok')")
     run([sys.executable, str(script_path)], capture_output=True, text=True)
     stat_file = tmp_path / f'{_JOBNAME}_STAT_{_FAIL_COUNT}'
     assert stat_file.exists()
     lines = [line for line in stat_file.read_text().strip().splitlines() if line.strip()]
-    assert len(lines) == 3  # start + end timestamps + status
+    assert len(lines) == 4  # submit + start + end timestamps + status
 
 
-def test_completed_file_not_created_on_failure(tmp_path: 'Path'):
-    """A failing script does NOT produce a ``_COMPLETED`` marker file."""
+def test_stat_file_has_failed_status_on_failure(tmp_path: 'Path'):
+    """A failing script writes ``FAILED`` as the last line of the ``_STAT_`` file."""
     script_path = _build_script(tmp_path, "raise RuntimeError('fail')")
     result = run([sys.executable, str(script_path)], capture_output=True, text=True)
     assert result.returncode != 0
+    stat_file = tmp_path / f'{_JOBNAME}_STAT_{_FAIL_COUNT}'
+    assert stat_file.exists()
+    assert stat_file.read_text().strip().splitlines()[-1] == 'FAILED'
     assert not (tmp_path / f'{_JOBNAME}_COMPLETED').exists()
 
 

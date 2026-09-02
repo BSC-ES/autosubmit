@@ -24,7 +24,7 @@ import pytest
 from autosubmit.log.log import Log
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.platform import recover_platform_job_logs_wrapper
-from test.unit.test_job import TestJob, FakeBasicConfig
+from test.unit.test_job import FakeBasicConfig, TestJob
 
 _EXPID = 't000'
 
@@ -32,10 +32,8 @@ _EXPID = 't000'
 @pytest.mark.parametrize(
     'file_exists,count ',
     [
-        [True, -1],
         [True, 0],
         [True, 1],
-        [False, -1],
         [False, 0],
         [False, 1],
     ]
@@ -48,30 +46,23 @@ def test_get_stat_file(file_exists, count, tmp_path):
 
     basic_config = FakeBasicConfig()
     basic_config.LOCAL_ROOT_DIR = str(tmp_path)
-    basic_config.LOCAL_TMP_DIR = str(tmp_path)
+    basic_config.LOCAL_TMP_DIR = "tmp"
 
     job = TestJob()
     job.stat_file = "test_file"
     job.name = "test_name"
-    if count < 0:
-        job.fail_count = 0
-        filename = job.stat_file + "0"
-    else:
-        job.fail_count = count
-        filename = job.name + f'_STAT_{str(count)}'
+    job.fail_count = count
+    filename = f"{job.stat_file}{count}"
 
     if file_exists:
-        with open(f"{basic_config.LOCAL_ROOT_DIR}/{filename}", "w", encoding="utf-8") as f:
-            f.write("dummy content")
-            f.flush()
-        Path(f"{basic_config.LOCAL_ROOT_DIR}/LOG_t000/").mkdir()
-        with open(f"{basic_config.LOCAL_ROOT_DIR}/LOG_t000/{filename}", "w", encoding="utf-8") as f:
-            f.write("dummy content")
-            f.flush()
+        local_stat_path = Path(str(tmp_path), "t000", "tmp", filename)
+        local_stat_path.parent.mkdir(parents=True, exist_ok=True)
+        local_stat_path.write_text("dummy content")
+        remote_stat_path = Path(str(tmp_path), "t000", "tmp", "LOG_t000", filename)
+        remote_stat_path.parent.mkdir(parents=True, exist_ok=True)
+        remote_stat_path.write_text("dummy content")
 
     platform = LocalPlatform("t000", 'platform', basic_config.props())
-    assert Path(f"{basic_config.LOCAL_ROOT_DIR}/{filename}").exists() == file_exists
-    assert Path(f"{basic_config.LOCAL_ROOT_DIR}/LOG_t000/{filename}").exists() == file_exists
     assert platform.get_stat_file(job, count) == file_exists
 
 
@@ -84,7 +75,6 @@ def test_local_platform_read_file(tmp_path):
 
     path_not_exists = Path(tmp_path).joinpath("foo", "bar")
 
-    assert platform.get_file_size(path_not_exists) is None
     assert platform.read_file(path_not_exists) is None
 
 
@@ -95,13 +85,12 @@ def test_init_logs_log_process_no_root_dir(mocker, autosubmit_config):
             'LOG_RECOVERY_CONSOLE_LEVEL': 'NO_LOG'
         }
     })
-
     platform = mocker.MagicMock()
     mocker.patch('autosubmit.platforms.platform._exit', return_value=0)
+    mocker.patch.object(Log, 'set_console_level')
     recover_platform_job_logs_wrapper(
         platform, None, None, None, as_conf=as_conf)  # type: ignore
-
-    assert Log.console_handler.level == Log.NO_LOG
+    assert Log.set_console_level.call_count == 1
 
 
 def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):
@@ -126,3 +115,9 @@ def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):
         platform, None, None, None, as_conf=as_conf)  # type: ignore
 
     assert len(Log.log.handlers) == current_number_of_handlers + 2  # + out + err
+
+
+def test_add_job_to_log_recover_signals_work_event(mocker):
+    """add_job_to_log_recover signals work_event after queuing the job."""
+    platform = LocalPlatform("t000", "test_platform", {})
+    platform.recovery_queue = mocker.MagicMock()

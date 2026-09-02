@@ -22,13 +22,15 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.schema import CreateTable, CreateSchema
+from sqlalchemy import delete, insert
+from sqlalchemy.schema import CreateSchema, CreateTable
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.database import session, tables
+from autosubmit.database import session
+from autosubmit.database.tables import TableRegistry
 from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
@@ -47,10 +49,10 @@ class MetricSpecSelectorType(Enum):
 @dataclass
 class MetricSpecSelector:
     type: MetricSpecSelectorType
-    key: Optional[list[str]]
+    key: list[str] | None
 
     @staticmethod
-    def load(data: Optional[dict[str, Any]]) -> "MetricSpecSelector":
+    def load(data: dict[str, Any] | None) -> "MetricSpecSelector":
         if data is None:
             _type = MetricSpecSelectorType.TEXT
             return MetricSpecSelector(type=_type, key=None)
@@ -118,28 +120,25 @@ class UserMetricRepository:
     def __init__(self, expid: str):
         self.expid = expid
 
+        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
+        tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
+        db_path = tmp_path.joinpath(f"metrics_{expid}.db")
+
         if BasicConfig.DATABASE_BACKEND == "postgres":
             # Postgres backend
-            self.connection_url = BasicConfig.DATABASE_CONN_URL
             self.schema = self.expid
         else:
             # SQLite backend
-            exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
-            tmp_path = Path(exp_path).joinpath(BasicConfig.LOCAL_TMP_DIR)
-            db_path = tmp_path.joinpath(f"metrics_{expid}.db")
-            self.connection_url = f"sqlite:///{db_path}"
             self.schema = None
 
-        self.table = tables.get_table_from_name(
-            schema=self.schema, table_name="user_metrics"
-        )
-        self.engine = session.create_engine(self.connection_url)
+        self.table_registry = TableRegistry(schema=self.schema)
+        self.table = self.table_registry.get("user_metrics")
+        self.engine = session.get_engine(db_path=db_path)
 
-        with self.engine.connect() as conn:
+        with self.engine.connect() as conn, conn.begin():
             if self.schema:
                 conn.execute(CreateSchema(self.schema, if_not_exists=True))
             conn.execute(CreateTable(self.table, if_not_exists=True))
-            conn.commit()
 
     def store_metric(
         self, run_id: int, job_name: str, metric_name: str, metric_value: Any
@@ -147,10 +146,10 @@ class UserMetricRepository:
         """
         Store the metric value in the database. Will overwrite the value if it already exists.
         """
-        with self.engine.connect() as conn:
+        with self.engine.connect() as conn, conn.begin():
             # Delete the existing metric
             conn.execute(
-                self.table.delete().where(
+                delete(self.table).where(
                     self.table.c.run_id == run_id,
                     self.table.c.job_name == job_name,
                     self.table.c.metric_name == metric_name,
@@ -159,7 +158,7 @@ class UserMetricRepository:
 
             # Insert the new metric
             conn.execute(
-                self.table.insert().values(
+                insert(self.table).values(
                     run_id=run_id,
                     job_name=job_name,
                     metric_name=metric_name,
@@ -169,12 +168,11 @@ class UserMetricRepository:
                     ),
                 )
             )
-            conn.commit()
 
 
 class UserMetricProcessor:
     def __init__(
-        self, as_conf: AutosubmitConfig, job: "Job", run_id: Optional[int] = None
+        self, as_conf: AutosubmitConfig, job: "Job", run_id: int | None = None
     ):
         self.as_conf = as_conf
         self.job = job

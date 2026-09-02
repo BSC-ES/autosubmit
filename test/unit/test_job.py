@@ -24,20 +24,20 @@ from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
-from typing import Optional
+from unittest.mock import MagicMock, Mock  # type: ignore
 
 import pytest
 from bscearth.utils.date import date2str
-from mock import Mock, MagicMock  # type: ignore
 from mock.mock import patch  # type: ignore
 
-from autosubmit.autosubmit import Autosubmit
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.configcommon import BasicConfig, YAMLParserFactory
+from autosubmit.config.configcommon import (
+    AutosubmitConfig,
+    BasicConfig,
+    YAMLParserFactory,
+)
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
-from autosubmit.job.job_list_persistence import JobListPersistencePkl
 from autosubmit.job.job_utils import SubJob, SubJobManager
 from autosubmit.job.template import Language
 from autosubmit.log.log import AutosubmitCritical
@@ -58,13 +58,13 @@ class TestJob:
         self.job_id = 999
         self.job_priority = 0
         self.as_conf = MagicMock()
-        self.as_conf.experiment_data = dict()
-        self.as_conf.experiment_data["JOBS"] = dict()
+        self.as_conf.experiment_data = {}
+        self.as_conf.experiment_data["JOBS"] = {}
         self.as_conf.jobs_data = self.as_conf.experiment_data["JOBS"]
-        self.as_conf.experiment_data["PLATFORMS"] = dict()
+        self.as_conf.experiment_data["PLATFORMS"] = {}
         self.job = Job(self.job_name, self.job_id, Status.WAITING, self.job_priority)
         self.job.processors = 2
-        self.as_conf.load_project_parameters = Mock(return_value=dict())
+        self.as_conf.load_project_parameters = Mock(return_value={})
 
     def test_when_the_job_has_more_than_one_processor_returns_the_parallel_platform(self):
         platform = Platform(self.experiment_id, 'parallel-platform', FakeBasicConfig().props())
@@ -183,7 +183,7 @@ class TestJob:
             # FIXME: (Copied from Bruno) Not sure why but the submitted and
             #        Slurm were using the $expid/tmp/ASLOGS folder?
             for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf', f'{expid}/proj/project_files']:
+                         f'{expid}/conf', f'{expid}/proj/project_files', f'{expid}/db']:
                 Path(temp_dir, path).mkdir()
             # loop over the host script's type
             for script_type in ["Bash", "Python", "Rscript"]:
@@ -349,9 +349,8 @@ CONFIG:
 
                         # act
                         parameters = config.load_parameters()
-                        joblist_persistence = JobListPersistencePkl()
 
-                        job_list_obj = JobList(expid, config, YAMLParserFactory(), joblist_persistence)
+                        job_list_obj = JobList(expid, config, YAMLParserFactory())
 
                         job_list_obj.generate(
                             as_conf=config,
@@ -363,11 +362,9 @@ CONFIG:
                             date_format='M',
                             default_retrials=config.get_retrials(),
                             default_job_type=config.get_default_job_type(),
-                            wrapper_jobs={},
                             new=True,
-                            run_only_members=config.get_member_list(run_only=True),
                             show_log=True,
-                            create=True,
+                            full_load=True,
                         )
                         job_list = job_list_obj.get_job_list()
 
@@ -444,216 +441,6 @@ CONFIG:
                                 final_script = file.read()  # type: ignore
                                 assert "%EXTENDED_HEADER%" not in final_script
                                 assert "%EXTENDED_TAILER%" not in final_script
-
-    def test_hetjob(self):
-        """
-        Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
-        :return:
-        """
-        expid = "t000"
-        with tempfile.TemporaryDirectory() as temp_dir:
-            BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
-            Path(temp_dir, expid).mkdir()
-            for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                         f'{expid}/conf']:
-                Path(temp_dir, path).mkdir()
-            with open(Path(temp_dir, f'{expid}/conf/experiment_data.yml'), 'w+') as experiment_data:
-                experiment_data.write(dedent(f'''\
-                            CONFIG:
-                              RETRIALS: 0
-                            DEFAULT:
-                              EXPID: {expid}
-                              HPCARCH: test
-                            PLATFORMS:
-                              test:
-                                TYPE: slurm
-                                HOST: localhost
-                                PROJECT: abc
-                                QUEUE: debug
-                                USER: me
-                                SCRATCH_DIR: /anything/
-                                ADD_PROJECT_TO_HOST: False
-                                MAX_WALLCLOCK: '00:55'
-                                TEMP_DIR: ''
-                            '''))
-                experiment_data.flush()
-            # For could be added here to cover more configurations options
-            with open(Path(temp_dir, f'{expid}/conf/hetjob.yml'), 'w+') as hetjob:
-                hetjob.write(dedent('''\
-                            JOBS:
-                                HETJOB_A:
-                                    FILE: a
-                                    PLATFORM: test
-                                    RUNNING: once
-                                    WALLCLOCK: '00:30'
-                                    MEMORY:
-                                        - 0
-                                        - 0
-                                    NODES:
-                                        - 3
-                                        - 1
-                                    TASKS:
-                                        - 32
-                                        - 32
-                                    THREADS:
-                                        - 4
-                                        - 4
-                                    CUSTOM_DIRECTIVES:
-                                        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic', '#SBATCH --exclusive']
-                                        - ['#SBATCH --export=ALL', '#SBATCH --distribution=block:cyclic:fcyclic', '#SBATCH --exclusive']
-                '''))
-
-            basic_config = FakeBasicConfig()
-            basic_config.read()
-            basic_config.LOCAL_ROOT_DIR = str(temp_dir)
-
-            config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
-            config.reload(True)
-            parameters = config.load_parameters()
-            job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                   Autosubmit._get_job_list_persistence(expid, config))
-
-            job_list_obj.generate(
-                as_conf=config,
-                date_list=[],
-                member_list=[],
-                num_chunks=1,
-                chunk_ini=1,
-                parameters=parameters,
-                date_format='M',
-                default_retrials=config.get_retrials(),
-                default_job_type=config.get_default_job_type(),
-                wrapper_jobs={},
-                new=True,
-                run_only_members=[],
-                # config.get_member_list(run_only=True),
-                show_log=True,
-                create=True,
-            )
-
-            job_list = job_list_obj.get_job_list()
-            assert 1 == len(job_list)
-
-            submitter = ParamikoSubmitter(as_conf=config)
-
-            hpcarch = config.get_platform()
-            for job in job_list:
-                if job.platform_name == "" or job.platform_name is None:
-                    job.platform_name = hpcarch
-                job.platform = submitter.platforms[job.platform_name]
-
-            job = job_list[0]
-
-            # This is the final header
-            parameters = job.update_parameters(config, set_attributes=True)
-            job.update_content(config, parameters)
-
-            # Asserts the script is valid. There shouldn't be variables in the script that aren't in the parameters.
-            checked = job.check_script(config, parameters)
-            assert checked
-
-    def test_job_parameters(self):
-        """Test job platforms with a platform. Builds job and platform using YAML data, without mocks.
-
-        Actually one mock, but that's for something in the AutosubmitConfigParser that can
-        be modified to remove the need of that mock.
-        """
-
-        expid = 't000'
-
-        for reservation in [None, '', '  ', 'some-string', 'a', '123', 'True']:
-            reservation_string = '' if not reservation else f'RESERVATION: "{reservation}"'
-            with tempfile.TemporaryDirectory() as temp_dir:
-                BasicConfig.LOCAL_ROOT_DIR = str(temp_dir)
-                Path(temp_dir, expid).mkdir()
-                # FIXME: Not sure why but the submitted and Slurm were using the $expid/tmp/ASLOGS folder?
-                for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                             f'{expid}/conf']:
-                    Path(temp_dir, path).mkdir()
-                with open(Path(temp_dir, f'{expid}/conf/minimal.yml'), 'w+') as minimal:
-                    minimal.write(dedent(f'''\
-                    CONFIG:
-                      RETRIALS: 0
-                    DEFAULT:
-                      EXPID: {expid}
-                      HPCARCH: test
-                    JOBS:
-                      A:
-                        FILE: a
-                        PLATFORM: test
-                        RUNNING: once
-                        {reservation_string}
-                    PLATFORMS:
-                      test:
-                        TYPE: slurm
-                        HOST: localhost
-                        PROJECT: abc
-                        QUEUE: debug
-                        USER: me
-                        SCRATCH_DIR: /anything/
-                        ADD_PROJECT_TO_HOST: False
-                        MAX_WALLCLOCK: '00:55'
-                        TEMP_DIR: ''
-                    '''))
-                    minimal.flush()
-
-                basic_config = FakeBasicConfig()
-                basic_config.read()
-                basic_config.LOCAL_ROOT_DIR = str(temp_dir)
-
-                config = AutosubmitConfig(expid, basic_config=basic_config, parser_factory=YAMLParserFactory())
-                config.reload(True)
-                parameters = config.load_parameters()
-
-                job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                                       Autosubmit._get_job_list_persistence(expid, config))
-                job_list_obj.generate(
-                    as_conf=config,
-                    date_list=[],
-                    member_list=[],
-                    num_chunks=1,
-                    chunk_ini=1,
-                    parameters=parameters,
-                    date_format='M',
-                    default_retrials=config.get_retrials(),
-                    default_job_type=config.get_default_job_type(),
-                    wrapper_jobs={},
-                    new=True,
-                    run_only_members=config.get_member_list(run_only=True),
-                    show_log=True,
-                    create=True,
-                )
-                job_list = job_list_obj.get_job_list()
-                assert 1 == len(job_list)
-
-                submitter = ParamikoSubmitter(as_conf=config)
-
-                hpcarch = config.get_platform()
-                for job in job_list:
-                    if job.platform_name == "" or job.platform_name is None:
-                        job.platform_name = hpcarch
-                    job.platform = submitter.platforms[job.platform_name]
-
-                job = job_list[0]
-                parameters = job.update_parameters(config, set_attributes=True)
-                # Asserts the script is valid.
-                checked = job.check_script(config, parameters)
-                assert checked
-
-                # Asserts the configuration value is propagated as-is to the job parameters.
-                # Finally, asserts the header created is correct.
-                if not reservation:
-                    assert 'JOBS.A.RESERVATION' not in parameters
-                    template_content, additional_templates = job.update_content(config, parameters)
-                    assert not additional_templates
-
-                    assert '#SBATCH --reservation' not in template_content
-                else:
-                    assert reservation == parameters['JOBS.A.RESERVATION']
-
-                    template_content, additional_templates = job.update_content(config, parameters)
-                    assert not additional_templates
-                    assert f'#SBATCH --reservation={reservation}' in template_content
 
     def test_total_processors(self):
         for test in [
@@ -801,10 +588,10 @@ def test_update_stat_file():
     assert job.stat_file == "dummyname_STAT_"
 
 
-def test_pytest_check_script(mocker):
+def test_pytest_check_script(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
-    parameters = dict()
+    parameters = {}
     parameters['NUMPROC'] = 999
     parameters['NUMTHREADS'] = 777
     parameters['NUMTASK'] = 666
@@ -812,7 +599,8 @@ def test_pytest_check_script(mocker):
     mocker.patch("autosubmit.job.job.Job.update_content", return_value=(
         'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%', 'some-content: %NUMPROC%, %NUMTHREADS%, %NUMTASK%'))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("t000", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
 
     config = Mock(spec=AutosubmitConfig)
     config.default_parameters = {}
@@ -856,7 +644,7 @@ def test_create_script(test_tmp_path: Path, mocker) -> None:
     # arrange
     job = Job("job1", "1", Status.READY, 0)
     # arrange
-    parameters = dict()
+    parameters = {}
     parameters['NUMPROC'] = 999
     parameters['NUMTHREADS'] = 777
     parameters['NUMTASK'] = 666
@@ -889,21 +677,24 @@ def test_create_script(test_tmp_path: Path, mocker) -> None:
 
 
 def test_reset_logs(autosubmit_config):
+    as_conf = autosubmit_config("t000", {})
     job = Job("job1", "1", Status.READY, 0)
-    job.updated_log = 5
-    job.reset_logs()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
+    assert job.workflow_commit == ""
     assert job.updated_log == 0
+    assert job.packed_during_building is False
 
 
-def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker):
+def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
-    job._init_runtime_parameters()
+    as_conf = autosubmit_config("t000", {})
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     parameters = {}
     mocker.patch("autosubmit.job.job.Job.update_content",
                  return_value=('some-content: %UNBOUND%', 'some-content: %UNBOUND%'))
     mocker.patch("autosubmit.job.job.Job.update_parameters", return_value=parameters)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
 
     config = Mock(spec=AutosubmitConfig)
     config.default_parameters = {}
@@ -1208,7 +999,7 @@ def test_custom_directives(tmpdir, custom_directives, test_type, result_by_lines
         }
 )], ids=["Simple job"])
 def test_no_start_time(autosubmit_config, experiment_data):
-    job, as_conf, parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
+    job, as_conf, _parameters = create_job_and_update_parameters(autosubmit_config, experiment_data)
     del job.start_time
     as_conf.force_load = False
     as_conf.data_changed = False
@@ -1227,45 +1018,95 @@ def test_sub_job_instantiation(tmp_path, autosubmit_config):
     assert job.status == "UNKNOWN"
 
 
-@pytest.mark.parametrize("current_structure",
-                         [
-                             ({
-                                 'dummy2':
-                                     {'dummy', 'dummy1', 'dummy4'},
-                                 'dummy3':
-                                     'dummy'
-                             }),
-                             ({}),
-                         ],
-                         ids=["Current structure of the Job Manager with multiple values",
-                              "Current structure of the Job Manager without values"]
-                         )
-def test_sub_job_manager(current_structure):
+@pytest.fixture
+def load_wrapper(
+        tmp_path: Path,
+        autosubmit_config,
+        mocker
+):
+    from autosubmit.job.job_packages import JobPackageVertical
+    as_conf = autosubmit_config(
+        expid='a000',
+        experiment_data={
+            'AUTOSUBMIT': {'WORKFLOW_COMMIT': 'dummy'},
+            'PLATFORMS': {'DUMMY_P': {'TYPE': 'ps', 'HOST': 'localhost'}},
+            'JOBS': {'WRAPPED': {'FILE': 'dummy.sh', 'PLATFORM': 'DUMMY_P'}},
+            'DEFAULT': {'HPCARCH': 'DUMMY_P'},
+            'WRAPPERS': {
+                'WRAPPED': {
+                    'TYPE': 'vertical',
+                    'JOBS_IN_WRAPPER': 'WRAPPED',
+                    'CUSTOM_DIRECTIVES': [],
+                }
+            },
+        }
+    )
+    # create vertically wrapped jobs
+    jobs = [
+        Job(name="a000_20000101_fc0_1_WRAPPED", status=Status.COMPLETED),
+        Job(name="a000_20000101_fc0_2_WRAPPED", status=Status.COMPLETED),
+        Job(name="a000_20000101_fc0_3_WRAPPED", status=Status.COMPLETED),
+    ]
+
+    for job in jobs:
+        job.id = 1
+        job.section = "WRAPPED"
+        job.platform_name = "DUMMY_P"
+        job.wallclock = "00:01"
+        job.processors = 1
+        job.het = {}
+        job.custom_directives = []
+        job.update_parameters(as_conf, set_attributes=True)
+
+    package = JobPackageVertical(
+        jobs=jobs,
+        configuration=as_conf,
+        wrapper_section="WRAPPED"
+    )
+    package.custom_directives = []
+    package.id = 1
+    package_dict = {package.name: package.jobs}
+    package_map = {package.id: package}
+
+    return jobs, package_dict, package_map
+
+
+def test_sub_job_manager(load_wrapper, tmp_path):
     """
     tester of the function _sub_job_manager
     """
-    jobs = {
-        SubJob("dummy", package="test2", queue=0, run=1, total=30, status="UNKNOWN"),
-        SubJob("dummy", package=["test4", "test1", "test2", "test3"], queue=1,
-               run=2, total=10, status="UNKNOWN"),
-        SubJob("dummy2", package="test2", queue=2, run=3, total=100, status="UNKNOWN"),
-        SubJob("dummy", package="test3", queue=3, run=4, total=1000, status="UNKNOWN"),
-    }
+    jobs, packages_dict, packages_map = load_wrapper
+    sub_jobs = set()
+    for job in jobs:
+        sub_jobs.add(SubJob(
+            name=job.name,
+            package=packages_map[job.id] if job.id in packages_map else None,
+            queue=0,
+            run=0,
+            total=len(packages_dict[packages_map[job.id].name]) if job.id in packages_map else 0,
+            status="COMPLETED"
+        ))
 
-    job_to_package = {
-        'dummy test'
-    }
+    structure = [
+        {
+            "e_to": "a000_20000101_fc0_1_WRAPPED",
+            "e_from": "a000_20000101_fc0_2_WRAPPED",
+            "from_step": "0",
+            "min_trigger_status": "COMPLETED",
+            "completion_status": "WAITING",
+            "fail_ok": False
+        },
+        {
+            "e_to": "a000_20000101_fc0_1_WRAPPED",
+            "e_from": "a000_20000101_fc0_3_WRAPPED",
+            "from_step": "0",
+            "min_trigger_status": "COMPLETED",
+            "completion_status": "WAITING",
+            "fail_ok": False
+        },
+    ]
 
-    package_to_job = {
-        'test':
-            {'dummy', 'dummy2'},
-        'test2':
-            {'dummy', 'dummy2'},
-        'test3':
-            {'dummy', 'dummy2'}
-    }
-
-    job_manager = SubJobManager(jobs, job_to_package, package_to_job, current_structure)
+    job_manager = SubJobManager(sub_jobs, packages_map, packages_dict, structure)
     job_manager.process_index()
     job_manager.process_times()
 
@@ -1310,7 +1151,7 @@ def _create_relationship(parent, child):
 @pytest.fixture
 def integration_jobs():
     """The name of this function has "integration" because it was in the folder of integration tests."""
-    jobs = list()
+    jobs = []
     jobs.append(Job('whatever', 0, Status.UNKNOWN, 0))
     jobs.append(Job('whatever', 1, Status.UNKNOWN, 0))
     jobs.append(Job('whatever', 2, Status.UNKNOWN, 0))
@@ -1406,7 +1247,7 @@ def test_get_from_stat(tmpdir, file_exists, index_timestamp, fail_count, expecte
             stat_file.write("29704923\n29704924\n")
 
     if fail_count is None:
-        result = job._get_from_stat(index_timestamp)
+        result = job._get_from_stat(index_timestamp, 0)
     else:
         result = job._get_from_stat(index_timestamp, fail_count)
 
@@ -1439,7 +1280,7 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
         total_stats.touch()
         total_stats.write_text('First line')
 
-    job.write_submit_time()
+    job.write_submit_time(0)
 
     # It will exist regardless of the argument ``total_stats_exists``, as ``write_submit_time()``
     # must have created it.
@@ -1472,6 +1313,7 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
 
     It ignores what happens to the experiment history object."""
     mocker.patch('autosubmit.job.job.ExperimentHistory')
+    len(existing_lines.split('\n')) if existing_lines else 1
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
@@ -1485,7 +1327,7 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
         total_stats.touch()
         total_stats.write_text(existing_lines)
 
-    job.write_end_time(completed=completed, count=count)
+    job.write_end_time(completed=completed, attempt=count)
 
     # The file must exist after write_end_time regardless of whether it existed before.
     assert total_stats.exists()
@@ -1642,7 +1484,7 @@ def test_update_status_completed(has_completed_files: bool, job_id: str, autosub
             }
         }
     })
-    job = Job(as_conf.expid, job_id, status=Status.WAITING, priority=0, loaded_data=None)
+    job = Job("test", job_id, status=Status.WAITING, priority=0, loaded_data=None)
     job.platform_name = platform_name
     job.new_status = Status.COMPLETED
 
@@ -1700,16 +1542,16 @@ def test_checkpoint(job_language: Language):
         ['03:15', 'primeval', '03:15'],
     ]
 )
-def test_process_scheduler_parameters_wallclock(wallclock: Optional[str], platform_name: str, expected_wallclock: str,
+def test_process_scheduler_parameters_wallclock(wallclock: str | None, platform_name: str, expected_wallclock: str,
                                                 autosubmit_config):
     """Test that if the ``process_scheduler_parameters`` call sets wallclocks by default."""
     as_conf = autosubmit_config(_EXPID, {})
 
     job = Job(_EXPID, '1', 'WAITING', 0, None)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.het['HETSIZE'] = 1
     job.wallclock = wallclock
-    # FIXME: Job constructor and ``_init_runtime_parameters`` do not fully initialize the object!
+    # FIXME: Job constructor and ``init_runtime_parameters`` do not fully initialize the object!
     #        ``custom_directives`` appears to be initialized in one of the ``update_`` functions.
     #        This makes testing and maintaining the code harder (and more risky -- more bugs).
     job.custom_directives = []
@@ -1737,7 +1579,7 @@ def test_process_scheduler_parameters_wallclock(wallclock: Optional[str], platfo
         'local'
     ]
 )
-def test_update_dict_parameters_invalid_script_language(platform_name: Optional[str], autosubmit_config):
+def test_update_dict_parameters_invalid_script_language(platform_name: str | None, autosubmit_config):
     """Test that the ``update_dict_parameters`` function falls back to Bash."""
     as_conf = autosubmit_config(_EXPID, {
         'JOBS': {
@@ -1750,14 +1592,14 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
         }
     })
     job = Job(_EXPID, '1', 'WAITING', 0, None)
-    job._init_runtime_parameters()
+    job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     # Here, the job type is still `BASH`! The value provided in the
     # configuration is not evaluated, so we need to fake it here.
     # But it only works with the ``Job`` has a ``.section``...
     job.type = 'NUCLEAR'
     # FIXME: Yet another issue with the code design here. The ``Job`` class
     #        constructor creates a partial object. Then you need to call
-    #        ``_init_runtime_parameters`` to initialize other values.
+    #        ``init_runtime_parameters`` to initialize other values.
     #        Then, other ``Job._update.*`` functions create more member
     #        attribute values. However, there are still other attributes of
     #        a ``Job`` that are only filled by ``DictJob``, like the
@@ -1773,114 +1615,6 @@ def test_update_dict_parameters_invalid_script_language(platform_name: Optional[
         assert job.platform_name is None
     else:
         assert job.platform_name == platform_name.upper()
-
-
-@pytest.mark.parametrize(
-    "reservation",
-    [None, "", "  ", "some-string", "a", "123", "True"],
-    ids=["None", "empty", "spaces", "some-string", "a", "123", "True"]
-)
-def test_job_parameters(reservation: Optional[str], tmp_path: Path, autosubmit_config) -> None:
-    """
-    Parametrized test for job reservation propagation.
-
-    :param reservation: reservation value from configuration (may be None or string)
-    :type reservation: Optional[str]
-    :param tmp_path: pytest tmp path fixture
-    :type tmp_path: Path
-    """
-    expid = "t000"
-    reservation_string = "" if not reservation else f'RESERVATION: "{reservation}"'
-
-    # prepare experiment tree
-    BasicConfig.LOCAL_ROOT_DIR = str(tmp_path)
-    Path(tmp_path, expid).mkdir()
-    for path in [f'{expid}/tmp', f'{expid}/tmp/ASLOGS', f'{expid}/tmp/ASLOGS_{expid}', f'{expid}/proj',
-                 f'{expid}/conf']:
-        Path(tmp_path, path).mkdir()
-
-    # create minimal configuration
-    conf_path = Path(tmp_path, f'{expid}/conf/minimal.yml')
-    conf_path.write_text(dedent(f'''\
-        CONFIG:
-          RETRIALS: 0
-        DEFAULT:
-          EXPID: {expid}
-          HPCARCH: test
-        JOBS:
-          A:
-            FILE: a
-            PLATFORM: test
-            RUNNING: once
-            {reservation_string}
-        PLATFORMS:
-          test:
-            TYPE: slurm
-            HOST: localhost
-            PROJECT: abc
-            QUEUE: debug
-            USER: me
-            SCRATCH_DIR: /anything/
-            ADD_PROJECT_TO_HOST: False
-            MAX_WALLCLOCK: '00:55'
-            TEMP_DIR: ''
-    '''))
-
-    # bootstrap config and generate jobs
-    basic_config = FakeBasicConfig()
-    basic_config.read()
-    basic_config.LOCAL_ROOT_DIR = str(tmp_path)
-    config = autosubmit_config(expid, basic_config=basic_config)
-    config.reload(True)
-    parameters = config.load_parameters()
-
-    job_list_obj = JobList(expid, config, YAMLParserFactory(),
-                           Autosubmit._get_job_list_persistence(expid, config))
-    job_list_obj.generate(
-        as_conf=config,
-        date_list=[],
-        member_list=[],
-        num_chunks=1,
-        chunk_ini=1,
-        parameters=parameters,
-        date_format='M',
-        default_retrials=config.get_retrials(),
-        default_job_type=config.get_default_job_type(),
-        wrapper_jobs={},
-        new=True,
-        run_only_members=config.get_member_list(run_only=True),
-        show_log=True,
-        create=True,
-    )
-    job_list = job_list_obj.get_job_list()
-    assert len(job_list) == 1
-
-    submitter = Autosubmit._get_submitter(config)
-    submitter.load_platforms(config)
-
-    hpcarch = config.get_platform()
-    for job in job_list:
-        if job.platform_name == "" or job.platform_name is None:
-            job.platform_name = hpcarch
-        job.platform = submitter.platforms[job.platform_name]
-
-    job = job_list[0]
-    parameters = job.update_parameters(config, set_attributes=True)
-
-    # script validity
-    assert job.check_script(config, parameters)
-
-    # reservation propagation assertions
-    if not reservation:
-        assert 'JOBS.A.RESERVATION' not in parameters
-        template_content, additional_templates = job.update_content(config, parameters)
-        assert not additional_templates
-        assert '#SBATCH --reservation' not in template_content
-    else:
-        assert reservation == parameters['JOBS.A.RESERVATION']
-        template_content, additional_templates = job.update_content(config, parameters)
-        assert not additional_templates
-        assert f'#SBATCH --reservation={reservation}' in template_content
 
 
 def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch):
@@ -2078,6 +1812,274 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     assert parameters["TIMEFORMAT"] == "%keep_format_as_INTRODUCED%"
 
 
+def test_update_job_parameters(autosubmit_config, experiment_data):
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    job = Job('test_job', 1, Status.READY, 0)
+    job.section = 'TEST_JOB'
+    job.chunk = 1
+    job.member = "fc00"
+    job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+    parameters = {}
+    expected = {'AS_CHECKPOINT': 'as_checkpoint', 'CHUNK': 1, 'CHUNK_END_DATE': '20230816', 'CHUNK_END_DATE_LAST': '20230816', 'CHUNK_END_DAY': '16',
+                'CHUNK_END_HOUR': '00', 'CHUNK_END_IN_DAYS': '1', 'CHUNK_END_MONTH': '08', 'CHUNK_END_YEAR': '2023',
+                'CHUNK_FIRST': 'TRUE', 'CHUNK_LAST': 'TRUE', 'CHUNK_SECOND_TO_LAST_DATE': '20230815',
+                'CHUNK_SECOND_TO_LAST_DAY': '15', 'CHUNK_SECOND_TO_LAST_HOUR': '00', 'CHUNK_SECOND_TO_LAST_MONTH': '08',
+                'CHUNK_SECOND_TO_LAST_YEAR': '2023', 'CHUNK_START_DATE': '20230815', 'CHUNK_START_DAY': '15',
+                'CHUNK_START_HOUR': '00', 'CHUNK_START_MONTH': '08', 'CHUNK_START_YEAR': '2023',
+                'DAY_BEFORE': '20230814',
+                'DELAY': None, 'DELAY_RETRIALS': None, 'DELETE_WHEN_EDGELESS': True, 'EXPORT': 'none',
+                'FAIL_COUNT': '0',
+                'FREQUENCY': None, 'JOBNAME': 'test_job', 'JOB_DEPENDENCIES': [], 'LDATE': '20230815',
+                'MEMBER': 'fc00', 'NUMMEMBERS': 0,
+                'PACKED': False, 'PREV': '0', 'PROJECT_TYPE': 'none', 'RETRIALS': 0, 'RUN_DAYS': '1',
+                'SDATE': '20230815',
+                'SHAPE': '', 'SPLIT': None, 'SPLITS': None, 'SYNCHRONIZE': None, 'WORKFLOW_COMMIT': 'dummy',
+                'X11': False}
+    parameters = job.update_job_parameters(as_conf, parameters, True)
+    assert parameters == expected
+
+
+def test_set_state():
+    state = {
+        '_name': 'test_job',
+        'undefined_variables': [],
+        'file': 'test_job.sh',
+        '_local_logs': ("from_log_process.out.local", "from_log_process.err.local"),
+        '_remote_logs': ("from_log_process.out.remote", "from_log_process.err.remote"),
+        '_local_logs_out': "from_database",
+        '_local_logs_err': "from_database",
+        '_remote_logs_out': "from_database",
+        '_remote_logs_err': "from_database",
+        '_status': "COMPLETED",
+        'status': "COMPLETED",
+        'date': "2023-08-15"
+    }
+
+    job = Job('blank', 1, Status.WAITING, 0)
+    job.__setstate__(state)
+    assert job.name == 'test_job'
+    assert job.file == 'test_job.sh'
+    assert job.status == Status.COMPLETED
+    assert job.date == datetime.strptime("20230815", "%Y%m%d")
+    assert job.local_logs == ("from_database", "from_database")
+    assert job.remote_logs == ("from_database", "from_database")
+
+
+def test_get_state():
+    job = Job('test_job', 1, Status.COMPLETED, 0)
+    job.file = 'test_job.sh'
+    job.date = datetime.strptime("20230815", "%Y%m%d")
+    job.local_logs = ("from_local.out", "from_local.err")
+    job.remote_logs = ("from_remote.out", "from_remote.err")
+
+    state = job.__getstate__()
+    assert state['name'] == 'test_job'
+    assert state.get('file') is None  # Load from yml file, later
+    assert state['status'] == "COMPLETED"
+    assert state['date'] == "2023-08-15T00:00:00"  # ISO format, which will be parsed when loading
+    assert state['local_logs_out'] == "from_local.out"
+    assert state['local_logs_err'] == "from_local.err"
+    assert state['remote_logs_out'] == "from_remote.out"
+    assert state['remote_logs_err'] == "from_remote.err"
+
+
+@pytest.mark.parametrize('loaded_data',
+                         [
+                             None,
+                             True,
+                         ],
+                         ids=["without loaded_data",
+                              "with loaded_data"])
+def test_init(loaded_data):
+    if loaded_data:
+        state = {
+            '_name': 'test_job',
+            'undefined_variables': [],
+            'local_logs': ("from_log_process.out.local", "from_log_process.err.local"),
+            'remote_logs': ("from_log_process.out.remote", "from_log_process.err.remote"),
+            'local_logs_out': "from_database",
+            'local_logs_err': "from_database",
+            'remote_logs_out': "from_database",
+            'remote_logs_err': "from_database",
+            'status': "COMPLETED",
+            'date': "2023-08-15T00:00:00"
+        }
+        job = Job(None, None, None, None, loaded_data=None)
+        job.__init__(None, None, None, None, loaded_data=state)
+        assert job.name == 'test_job'
+        assert job.status == Status.COMPLETED
+        assert job.date == datetime.strptime("20230815", "%Y%m%d")
+        assert job.local_logs == ("from_database", "from_database")
+        assert job.remote_logs == ("from_database", "from_database")
+    else:
+        job = Job(None, None, None, None, loaded_data=None)
+        job.__init__('test_job', 1, Status.COMPLETED, 0, loaded_data=None)
+        assert job.name == 'test_job'
+        assert job.file is None
+        assert job.status == Status.COMPLETED
+        assert job.date is None
+        assert job.local_logs == ('', '')
+        assert job.remote_logs == ('', '')
+
+
+@pytest.fixture()
+def experiment_data() -> dict:
+    return {
+        'AUTOSUBMIT': {'WORKFLOW_COMMIT': 'dummy'},
+        'JOBS': {
+            'test_job': {
+                'RETRIALS': 3,
+                'PLATFORM': 'DUMMY_PLATFORM',
+                'FILE': ['test.sh', 'add.sh', 'add2.sh'],
+                'DELETE_WHEN_EDGELESS': True,
+                'DEPENDENCIES': {"test_split": {}},
+                'RUNNING': "chunk",
+                'EXTENDED_HEADER_PATH': "bla",
+                'EXTENDED_TAILER_PATH': "bla2",
+                'CHECK': False,
+                'CHECK_WARNINGS': True
+            },
+            'test_split': {
+                'RETRIALS': 3,
+                'PLATFORM': 'DUMMY_PLATFORM',
+                'FILE': ['test.sh', 'add.sh', 'add2.sh'],
+                'DELETE_WHEN_EDGELESS': True,
+                'RUNNING': "chunk",
+                'EXTENDED_HEADER_PATH': "bla",
+                'EXTENDED_TAILER_PATH': "bla2",
+                'SPLITS': 2,
+                'CHECK': False,
+                'CHECK_WARNINGS': True
+            },
+        },
+        'WRAPPERS': {
+            'WRAPPER': {
+                'TYPE': 'vertical',
+                'JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT',
+            }
+        },
+        'PLATFORMS': {
+            'dummy_platform': {
+                'TYPE': 'ps',
+
+            }
+        }
+    }
+
+
+def test_update_dict_parameters(autosubmit_config, experiment_data):
+    job_without_split = Job('test_job', 1, Status.READY, 0)
+    job_with_split = Job('test_split', 1, Status.READY, 0)
+    jobs = [job_without_split, job_with_split]
+    for job in jobs:
+        if job.name == "test_split":
+            job.splits = 2
+        job.section = job.name.upper()
+        job.chunk = 1
+        job.member = "fc00"
+        job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    for job in jobs:
+        job.update_dict_parameters(as_conf)
+        assert job.retrials == 3
+        assert job.platform_name == "DUMMY_PLATFORM"
+        assert job.delete_when_edgeless is True
+        if job.name == "test_job":
+            assert job.dependencies == "{'TEST_SPLIT': {}}"
+        else:
+            assert job.dependencies == "{}"
+        assert job.running == "chunk"
+        assert job.ext_header_path == "bla"
+        assert job.ext_tailer_path == "bla2"
+        assert job.file == 'test.sh'
+        assert job.additional_files == ['add.sh', 'add2.sh']
+        if job.name == "test_split":
+            assert job.splits == 2
+        else:
+            assert job.splits is None
+
+
+def test_update_check_variables(autosubmit_config, experiment_data):
+    job_without_split = Job('test_job', 1, Status.READY, 0)
+    job_with_split = Job('test_split', 1, Status.READY, 0)
+    jobs = [job_without_split, job_with_split]
+    for job in jobs:
+        if job.name == "test_split":
+            job.splits = 2
+        job.section = job.name.upper()
+        job.chunk = 1
+        job.member = "fc00"
+        job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+    for job in jobs:
+        job.update_check_variables(as_conf)
+        assert job.check is False
+        assert job.check_warnings is True
+
+
+def test_update_parameters(autosubmit_config, experiment_data):
+    job = Job('test_job', 1, Status.READY, 0)
+    job.section = 'TEST_JOB'
+    job.chunk = 1
+    job.member = "fc00"
+    job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+    as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+
+    parameters = job.update_parameters(as_conf, set_attributes=True)
+    expected_current_only = {'CURRENT_ADDITIONAL_FILES': ['add.sh', 'add2.sh'], 'CURRENT_ARCH': 'DUMMY_PLATFORM',
+                             'CURRENT_BUDG': '',
+                             'CURRENT_CHECK': False, 'CURRENT_CHECK_WARNINGS': True,
+                             'CURRENT_DELETE_WHEN_EDGELESS': True,
+                             'CURRENT_DEPENDENCIES': {'TEST_SPLIT': {}}, 'CURRENT_EC_QUEUE': '',
+                             'CURRENT_EXCLUSIVITY': '',
+                             'CURRENT_EXTENDED_HEADER_PATH': 'bla', 'CURRENT_EXTENDED_TAILER_PATH': 'bla2',
+                             'CURRENT_FILE': 'test.sh', 'CURRENT_HOST': '', 'CURRENT_HYPERTHREADING': 'false',
+                             'CURRENT_LOGDIR': 't001/LOG_t001', 'CURRENT_METRIC_FOLDER': 't001/LOG_t001/test_job',
+                             'CURRENT_PLATFORM': 'DUMMY_PLATFORM', 'CURRENT_PROJ': '', 'CURRENT_PROJ_DIR': '',
+                             'CURRENT_QUEUE': '',
+                             'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3, 'CURRENT_ROOTDIR': 't001',
+                             'CURRENT_RUNNING': 'chunk',
+                             'CURRENT_SCRATCH_DIR': '', 'CURRENT_TYPE': 'ps', 'CURRENT_USER': '', 'CURRENT_WRAPPER_TYPE': 'vertical',
+                             'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT'}
+    for key, value in parameters.items():
+        if key.startswith("CURRENT_"):
+            assert value == expected_current_only[key]
+    assert job.retrials == 3
+    assert job.platform_name == "DUMMY_PLATFORM"
+    assert job.delete_when_edgeless is True
+    assert job.dependencies == "{'TEST_SPLIT': {}}"
+    assert job.running == "chunk"
+    assert job.ext_header_path == "bla"
+    assert job.ext_tailer_path == "bla2"
+    assert job.file == 'test.sh'
+    assert job.additional_files == ['add.sh', 'add2.sh']
+    assert job.splits is None
+    assert job.check is False
+    assert job.check_warnings is True
+
+
 def test_process_scheduler_parameters(local):
     job = Job(_EXPID, '1', 'WAITING', 0, None)
     job.het = {}
@@ -2086,6 +2088,50 @@ def test_process_scheduler_parameters(local):
 
     with pytest.raises(AutosubmitCritical):
         assert isinstance(job.process_scheduler_parameters(local, 0), AutosubmitCritical)
+
+
+def test_write_time(tmp_path, local):
+    job = Job(_EXPID, '1', 5, 0, None)
+    job.platform = local
+    job._tmp_path = tmp_path
+    total_stats = job._tmp_path / f'{job.name}_TOTAL_STATS'
+    job.submit_time_timestamp = "20240101000000"
+    job.start_time_timestamp = "20240101010001"
+    job.finish_time_timestamp = "20240101020002"
+    job._write_time("submit")
+    job.status = Status.COMPLETED
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert "start" in total_stats.read_text()
+    assert "end" in total_stats.read_text()
+    assert "status" in total_stats.read_text()
+    job._write_time("start")
+
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert job.start_time_timestamp in total_stats.read_text()
+    assert "end" in total_stats.read_text()
+    assert "status" in total_stats.read_text()
+    job._write_time("end")
+
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert job.start_time_timestamp in total_stats.read_text()
+    assert job.finish_time_timestamp in total_stats.read_text()
+    assert "status" in total_stats.read_text()
+
+    job._write_time("status")
+    assert job.submit_time_timestamp in total_stats.read_text()
+    assert job.start_time_timestamp in total_stats.read_text()
+    assert job.finish_time_timestamp in total_stats.read_text()
+    assert "COMPLETED" in total_stats.read_text()
+
+    assert "submit" not in total_stats.read_text()
+    assert "start" not in total_stats.read_text()
+    assert "end" not in total_stats.read_text()
+    assert "status" not in total_stats.read_text()
+
+    # expected lines
+    assert len(total_stats.read_text().split('\n')) == 1
+    job._write_time("submit")
+    assert len(total_stats.read_text().split('\n')) == 2
 
 
 @pytest.mark.parametrize("create_jobs", [[1, 2]], indirect=True)
@@ -2101,7 +2147,7 @@ def test_process_scheduler_parameters(local):
     ]
 )
 def test_update_status(create_jobs: list[Job], status: Status,
-                       autosubmit_config: 'AutosubmitConfigFactory', local: 'LocalPlatform'):
+                       autosubmit_config: 'AutosubmitConfigFactory', local: 'LocalPlatform', mocker):
     as_conf = autosubmit_config('t000', experiment_data={
         'PLATFORMS': {
             local.name: {
@@ -2114,63 +2160,132 @@ def test_update_status(create_jobs: list[Job], status: Status,
     job.platform = local
     job.platform_name = local.name
     job.new_status = status
+    mocker.patch.object(local, 'get_completed_job_names', return_value=[])
 
     assert job.status != status
     job.update_status(as_conf=as_conf)
     assert job.status == status
 
 
+@pytest.mark.parametrize("show_logs,exists",
+                         [
+                             (True, True),
+                             (True, False),
+                             (False, True),
+                             (False, False)
+                         ], ids=[
+        "show_logs=True, exists=True",
+        "show_logs=True, exists=False",
+        "show_logs=False, exists=True",
+        "show_logs=False, exists=False"
+    ])
+def test_check_remote_log_exists(tmp_path, show_logs: bool, exists, autosubmit_config: 'AutosubmitConfigFactory', mocker):
+    platform = SlurmPlatform(expid='a000', name='slurm', config={'LOCAL_ROOT_DIR': str(tmp_path), 'LOCAL_ASLOG_DIR': 'logs'})
+
+    job = Job('some', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    if exists:
+        platform._ftpChannel = mocker.MagicMock()
+        platform._ftpChannel.stat = mocker.MagicMock(return_value=True)
+        platform.remote_log_dir = tmp_path / 'remote_logs'
+        platform.remote_log_dir.mkdir(parents=True, exist_ok=True)
+        (platform.remote_log_dir / 'some.out').touch()
+        (platform.remote_log_dir / 'some.err').touch()
+    else:
+        platform.remote_log_dir = tmp_path / 'non_existing_remote_logs'
+        platform._ftpChannel = mocker.MagicMock()
+        platform._ftpChannel.stat = mocker.MagicMock(side_effect=IOError)
+
+    job.platform = platform
+    job.remote_logs = (str(platform.remote_log_dir / 'some.out'), str(platform.remote_log_dir / 'some.err'))
+
+    log = job.check_remote_log_exists(show_logs=show_logs)
+    if exists:
+        assert log
+    else:
+        assert not log
+
+
 @pytest.mark.parametrize(
-    'output',
+    'count, with_stat_file',
     [
-        '''15994954        COMPLETED 448 2 2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      3486K
-                        15994954.batch  COMPLETED 224 1 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 497.36K 18111K    18111K
-                        15994954.extern COMPLETED 448 2 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      421K
-                        15994954.0      COMPLETED 224 1 2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52 0       3486K     3486K
-                        15994954.1      COMPLETED 448 2 2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22 820.90K 29740154K 27008625.50K
-        ''',
-        '''15994954        COMPLETED 448 2 2025-02-24T16:11:33 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      3486K
-                    15994954.batch  COMPLETED 224 1 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 497.36K 18111K    18111K
-                    15994954.extern COMPLETED 448 2 2025-02-24T16:11:42 2025-02-24T16:11:42 2025-02-24T16:21:30 883.55K 427K      421K
-                    15994954.0      COMPLETED 224 1 2025-02-24T16:11:47 2025-02-24T16:11:47 2025-02-24T16:11:52 0       3486K     3486K
-                    15994954.1      COMPLETED 448 2 2025-02-24T16:12:17 2025-02-24T16:12:17 2025-02-24T16:21:22 82.09 29740154K 27008625.50K
-        '''
-    ],
-    ids=["Energy + External is Lower", "Energy + External is Higher"]
+        (0, True),
+        (1, True),
+        (0, False),
+        (1, False),
+    ]
 )
-def test_retrieve_logfiles(local, mocker, output):
-    """This test replicates the behavior of retrieving data from the SSH output and processing it to ensure that the
-    returned data is properly handled and stored.
-    The first input returns a lower absolute energy value, causing the validation to fail.
-    The second input returns a higher absolute energy value, causing the validation to succeed.
-    These tests replicate the behavior of getting the data from the SSH output and handle it to make sure that
-    """
-    mocker.patch("autosubmit.history.database_managers.experiment_history_db_manager.ExperimentHistoryDbManager",
-                 return_value=mocker.MagicMock())
-    mocker.patch("autosubmit.history.experiment_history.ExperimentHistory", return_value=mocker.MagicMock())
-    mocker.patch("autosubmit.platforms.paramiko_platform.ParamikoPlatform.check_job_energy", return_value=output)
-    job = Job(_EXPID, '1', 'WAITING', 0, None)
+def test_update_and_write_time(count, with_stat_file, tmp_path):
+    """This test only tests that the functions run without errors. For a more detailled test look at the ones in the integration/run/*"""
+    platform = SlurmPlatform(expid='a000', name='slurm', config={'LOCAL_ROOT_DIR': str(tmp_path), 'LOCAL_ASLOG_DIR': 'logs'})
 
-    job.platform = local
+    job = Job('some', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
+    platform.remote_log_dir = tmp_path / 'remote_logs'
+    platform.remote_log_dir.mkdir(parents=True, exist_ok=True)
+    (platform.remote_log_dir / 'some.cmd').touch()
+    job._tmp_path = tmp_path / 'tmp'
+    job._tmp_path.mkdir(parents=True, exist_ok=True)
+    Path(job._tmp_path / f'{job.name}_STAT_{count}').touch()
+    job.platform = platform
+    with open(job._tmp_path.joinpath(f"{job.stat_file}{str(count)}"), "w") as stat_file:
+        stat_file.write("19704924\n19704925")
+    job.update_start_time(count)
+    assert job.start_time_timestamp
+    job.write_start_time(count)
+    assert (job._tmp_path / f'{job.name}_TOTAL_STATS').exists()
+    if with_stat_file:
+        job.write_end_time(True, count)
+    else:
+        job.write_end_time(False, count)
 
-    Path(job._tmp_path + "/" + job.name).mkdir(parents=True)
-    for i in range(2):
-        Path(job.platform.get_files_path() + f'/test.out.{i}').touch()
-        Path(job.platform.get_files_path() + f'/test.err.{i}').touch()
-        Path(job.platform.get_files_path() + f'/t001_STAT_{i}').touch()
-    job.platform.type = 'slurm'
-    job.platform.remote_log_dir = Path(job.platform.root_dir) / job.platform.config.get(
-        "LOCAL_TMP_DIR") / f'LOG_{job.platform.expid}'
-    job.wrapper_type = 'vertical'
-    job.retrials = 1
-    job.script_name = 'test'
-    job.local_logs = 'test_local'
-    job.submit_time_timestamp = '0'
 
-    job.platform.check_file_exists = mocker.MagicMock(return_value=True)
+@pytest.mark.parametrize("updated_log,updated_stats,fail_count,mock_log_exists,mock_compressed,mock_stats_throws,expected_log,expected_stats,expected_all_succeeded", [
+    (0, 0, 1, True, False, False, 2, 2, True),   # logs + stats same call
+    (0, 0, 1, True, False, True,  2, 0, False),  # logs ok, stats fail
+    (0, 0, 1, False, False, False, 0, 0, False),  # logs fail; no stats
+    (1, 0, 1, False, True,  False, 2, 2, True),   # log via compressed; stats for attempt 1 only
+    (2, 1, 2, False, False, False, 2, 1, False),  # log fails for 2; no stats for attempt 2
+    (2, 3, 2, False, False, False, 2, 3, False),  # stats > updated_log → no stats loop
+])
+def test_retrieve_logfiles_two_phase(
+    updated_log, updated_stats, fail_count,
+    mock_log_exists, mock_compressed, mock_stats_throws,
+    expected_log, expected_stats, expected_all_succeeded,
+    mocker,
+):
+    job = Job("dummy", 1, Status.WAITING, 0)
+    job.updated_log = updated_log
+    job.updated_stats = updated_stats
+    job.fail_count = fail_count
+    job.retrials = fail_count
+    job.local_logs = ("out", "err")
+    job.remote_logs = ("rout", "rerr")
+    job.submit_time_timestamp = "0"
+    job.id = "1"
+
+    job.platform = mocker.MagicMock()
+    job.platform.get_stat_file.return_value = True
+    job.platform.read_jobid_from_remote_log.return_value = None
+
+    mocker.patch('autosubmit.job.job.Job.stat_file_is_completed', return_value=True)
+    mocker.patch('autosubmit.job.job.Job.stat_registered', return_value=False)
+    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
+    mocker.patch('autosubmit.job.job.Job.update_local_logs')
+    mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
+    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=mock_log_exists)
+    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=mock_compressed)
+    mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
+    if mock_stats_throws:
+        mocker.patch('autosubmit.job.job.Job.write_stats', side_effect=RuntimeError("stats fail"))
+    else:
+        mocker.patch('autosubmit.job.job.Job.write_stats')
+
+
     report = job.retrieve_logfiles()
-    assert report.all_succeeded
-    assert len(report.attempts) == 1
+    assert job.updated_log == expected_log, f"expected updated_log={expected_log}, got {job.updated_log}"
+    assert job.updated_stats == expected_stats, f"expected updated_stats={expected_stats}, got {job.updated_stats}"
+    assert report.final_updated_log == expected_log
+    assert report.final_updated_stats == expected_stats
+    assert report.all_succeeded == expected_all_succeeded
 
 
 def test_case_insensitive_running_parameter(autosubmit_config):
@@ -2191,7 +2306,7 @@ def test_case_insensitive_running_parameter(autosubmit_config):
     ("status", r"^submit start end WAITING$"),
 ])
 @pytest.mark.parametrize("file_exists", [True, False])
-def test_write_time(tmp_path, column, expected_pattern, file_exists):
+def test_write_time_parametrized(tmp_path, column, expected_pattern, file_exists):
     job = Job("dummy", 1, Status.WAITING, 0)
     job._tmp_path = tmp_path
     job.submit_time_timestamp = 0
@@ -2222,7 +2337,7 @@ def test_write_start_time(mocker, tmp_path):
     job.splits = "2"
     mocker.patch('autosubmit.job.job.Job._write_time')
     mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    job.write_start_time()
+    job.write_start_time(attempt=2)
     job._write_time.assert_called_once_with("start")
     mock_exp_hist.return_value.write_start_time.assert_called_once()
     call_kwargs = mock_exp_hist.return_value.write_start_time.call_args.kwargs
@@ -2232,29 +2347,28 @@ def test_write_start_time(mocker, tmp_path):
 
 def test_write_stats(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
-    job.platform = mocker.MagicMock()
-    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs')
+    mocker.patch('autosubmit.job.job.Job._update_submit_time_from_stat')
+    mocker.patch('autosubmit.job.job.Job.write_submit_time')
     mocker.patch('autosubmit.job.job.Job.update_start_time')
     mocker.patch('autosubmit.job.job.Job.write_start_time')
     mocker.patch('autosubmit.job.job.Job.write_end_time')
     job.write_stats(attempt=1)
-    job.check_compressed_local_logs.assert_called_once()
-    job.platform.get_stat_file.assert_called_once_with(job, 1)
+    job._update_submit_time_from_stat.assert_called_once_with(1)
+    job.write_submit_time.assert_called_once_with(1)
     job.update_start_time.assert_called_once_with(1)
-    job.write_start_time.assert_called_once_with(fail_count=1)
+    job.write_start_time.assert_called_once_with(1)
     job.write_end_time.assert_called_once_with(job.status == Status.COMPLETED, 1)
 
 
-@pytest.mark.parametrize("fail_count,expected_out,expected_err", [
+@pytest.mark.parametrize("attempt,expected_out,expected_err", [
     (0, "dummy.0.out", "dummy.0.err"),
     (1, "dummy.0.out_attempt_1", "dummy.0.err_attempt_1"),
     (2, "dummy.0.out_attempt_2", "dummy.0.err_attempt_2"),
 ])
-def test_update_local_logs(fail_count, expected_out, expected_err):
+def test_update_local_logs(attempt, expected_out, expected_err):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.submit_time_timestamp = 0
-    job.fail_count = fail_count
-    job.update_local_logs()
+    job.update_local_logs(attempt=attempt)
     assert job.local_logs == (expected_out, expected_err)
 
 
@@ -2265,69 +2379,7 @@ def test_datestr_to_epoch():
 
 
 
-def test_update_submit_time_on_db(mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.submit_time_timestamp = "20250101120000"
-    job.status = Status.SUBMITTED
-    job.queue = "debug"
-    job.date = datetime(2025, 1, 1)
-    job.member = "fc0"
-    job.section = "A"
-    job.chunk = 1
-    job.platform_name = "local"
-    job.id = "123"
-    job._wrapper_queue = "wq"
-    job.packed = False
-    job.workflow_commit = "abc"
-    job.split = "1"
-    job.splits = "2"
-    job.fail_count = 3
-    mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    job.update_submit_time_on_db()
-    mock_exp_hist.return_value.update_submit_time.assert_called_once()
-    call_kwargs = mock_exp_hist.return_value.update_submit_time.call_args.kwargs
-    assert call_kwargs['submit'] == job._datestr_to_epoch(str(job.submit_time_timestamp))
-    assert call_kwargs['fail_count'] == 3
-    assert call_kwargs['split'] == "1"
-    assert call_kwargs['splits'] == "2"
 
-
-@pytest.mark.parametrize("scenario,fail_count,wrapper_type,prev_finish", [
-    ("no_data", 0, None, None),
-    ("vertical_with_prev", 1, "vertical", datetime(2025, 1, 1, 11, 0, 0)),
-    ("vertical_no_prev", 1, "vertical", None),
-    ("non_vertical", 0, None, None),
-])
-def test_update_submit_time_and_job_id(scenario, fail_count, wrapper_type, prev_finish, mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.fail_count = fail_count
-    job.wrapper_type = wrapper_type
-    mock_job_data = mocker.MagicMock()
-    mock_job_data.submit_datetime = datetime(2025, 1, 1, 10, 0, 0)
-    mock_job_data.job_id = "999"
-    mock_prev = mocker.MagicMock()
-    mock_prev.finish_datetime = prev_finish
-
-    def _get_submit(attempt):
-        return None if scenario == "no_data" else mock_job_data
-
-    def _get_finish(attempt):
-        return mock_prev if scenario in ("vertical_with_prev", "vertical_no_prev") else None
-
-    mocker.patch('autosubmit.job.job.Job._get_submit_data_dc_from_db', side_effect=_get_submit)
-    mocker.patch('autosubmit.job.job.Job._get_finish_time_from_db', side_effect=_get_finish)
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_on_db')
-    job.update_submit_time_and_job_id(0)
-    if scenario == "no_data":
-        assert job.submit_time_timestamp is None
-    elif scenario == "vertical_with_prev":
-        assert job.submit_time_timestamp == "20250101110000"
-        job.update_submit_time_on_db.assert_called_once()
-    elif scenario == "vertical_no_prev":
-        assert job.submit_time_timestamp == "20250101100000"
-    elif scenario == "non_vertical":
-        assert job.submit_time_timestamp == "20250101100000"
-        assert job.id == "999"
 
 
 def test_get_submit_data_dc_from_db(mocker):
@@ -2352,60 +2404,70 @@ def test_get_finish_time_from_db(mocker):
     mock_exp_hist.return_value.get_finish_data_dc.assert_called_once_with("dummy", 2)
 
 
-def test_recover_attempt_success(mocker):
+@pytest.mark.parametrize(
+    "remote_exists, compressed_exists, remote_raises, expected_success, expected_updated_log, expected_error_contains, expect_restored, expected_job_id",
+    [
+        (True,  False, False, True,  1, None,              False, 1),
+        (False, False, False, False, 0, "Remote logs not found", True, 1),
+        (False, False, True,  False, 0, "boom",            True, 1),
+        (False, True,  False, True,  1, None,              False, 1),
+        (True,  False, False, True,  1, None,              False, 12345),
+    ],
+    ids=[
+        "remote_logs_found",
+        "no_remote_no_local",
+        "check_remote_raises",
+        "no_remote_with_compressed_local",
+        "remote_logs_found_with_jobid_parse",
+    ]
+)
+def test_recover_log_attempt(mocker, remote_exists, compressed_exists, remote_raises,
+                              expected_success, expected_updated_log, expected_error_contains, expect_restored,
+                              expected_job_id):
     job = Job("dummy", 1, Status.WAITING, 0)
     job.updated_log = 0
+    job.updated_stats = 0
     job.fail_count = 0
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
     job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id')
+    job.id = 1
+
+    job.platform = mocker.MagicMock()
+    if expected_job_id != 1:
+        job.platform.read_jobid_from_remote_log.return_value = expected_job_id
+    else:
+        job.platform.read_jobid_from_remote_log.return_value = None
+
     mocker.patch('autosubmit.job.job.Job.update_local_logs')
     mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
-    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=True)
-    mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
-    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs')
-    mocker.patch('autosubmit.job.job.Job.write_stats')
-    result = job._recover_attempt(0)
-    assert result.success is True
+
+    if remote_raises:
+        mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', side_effect=RuntimeError("boom"))
+    else:
+        mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=remote_exists)
+
+    if remote_exists:
+        mocker.patch('autosubmit.job.job.Job._sync_retrieve_logfiles')
+
+    if compressed_exists is not None:
+        mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=compressed_exists)
+
+    result = job._recover_log_attempt(0)
     assert result.attempt == 0
-    assert result.error is None
+    assert result.success is expected_success
+    assert job.updated_stats == 0
+    assert job.id == expected_job_id
+    if expected_error_contains:
+        assert expected_error_contains in result.error
+    else:
+        assert result.error is None
 
+    if expect_restored:
+        assert job.local_logs == ("out", "err")
+        assert job.remote_logs == ("rout", "rerr")
 
-def test_recover_attempt_no_remote_no_local(mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.updated_log = 0
-    job.fail_count = 0
-    job.local_logs = ("out", "err")
-    job.remote_logs = ("rout", "rerr")
-    job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id')
-    mocker.patch('autosubmit.job.job.Job.update_local_logs')
-    mocker.patch('autosubmit.job.job.Job.get_new_remotelog_name', return_value=("new_out", "new_err"))
-    mocker.patch('autosubmit.job.job.Job.check_remote_log_exists', return_value=False)
-    mocker.patch('autosubmit.job.job.Job.check_compressed_local_logs', return_value=False)
-    result = job._recover_attempt(0)
-    assert result.success is False
-    assert "Remote logs not found" in result.error
-    assert job.local_logs == ("out", "err")
-    assert job.remote_logs == ("rout", "rerr")
-
-
-def test_recover_attempt_exception(mocker):
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.updated_log = 0
-    job.fail_count = 0
-    job.local_logs = ("out", "err")
-    job.remote_logs = ("rout", "rerr")
-    job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch('autosubmit.job.job.Job.update_submit_time_and_job_id', side_effect=RuntimeError("boom"))
-    result = job._recover_attempt(0)
-    assert result.success is False
-    assert result.error == "boom"
-    assert job.local_logs == ("out", "err")
+    assert job.updated_log == expected_updated_log
 
 
 def test_restore_previous_state(mocker):
@@ -2570,22 +2632,11 @@ def _make_wrapper_job(mocker, inner_jobs=None, new_status=Status.RUNNING):
     wrapper = WrapperJob(
         name="wrapper_1", job_id=1, status=Status.RUNNING, priority=0,
         job_list=inner_jobs or [], total_wallclock="01:00",
-        platform=platform, as_config=as_conf, hold=False
+        num_processors=1, platform=platform, as_config=as_conf, hold=False
     )
     wrapper.new_status = new_status
     return wrapper
 
-
-@pytest.mark.parametrize("eligible", [True, False])
-def test_handle_vertical_retries(eligible, mocker):
-    inner = Job("inner", 2, Status.FAILED, 0)
-    inner.wrapper_type = "vertical" if eligible else "horizontal"
-    inner.updated_log = 2
-    inner.fail_count = 0
-    inner.retrials = 3
-    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
-    wrapper._handle_vertical_retries()
-    assert inner.fail_count == (1 if eligible else 0)
 
 
 @pytest.mark.parametrize("has_finished_time,elapsed,expected,keep_alive", [
@@ -2645,16 +2696,30 @@ def test_apply_io_safe_wait_resets_finished_time(mocker):
     assert inner.finished_time is None
 
 
-@pytest.mark.parametrize("can_run,stat_status,wrapper_done,inner_status,expected", [
-    (False, Status.RUNNING, True, Status.RUNNING, Status.SUBMITTED),
-    (True, Status.RUNNING, True, Status.RUNNING, Status.RUNNING),
-    (True, Status.RUNNING, False, Status.RUNNING, Status.RUNNING),
-    (True, Status.FAILED, True, Status.RUNNING, Status.FAILED),
-    (True, Status.QUEUING, True, Status.RUNNING, Status.RUNNING),
-    (True, Status.QUEUING, False, Status.RUNNING, Status.QUEUING),
-    (True, Status.COMPLETED, True, Status.RUNNING, Status.COMPLETED),
+@pytest.mark.parametrize("can_run,wrapper_done,stat_status,inner_status,expected", [
+    (False, True,  Status.FAILED,    Status.RUNNING, Status.FAILED),
+    (False, False, Status.COMPLETED, Status.RUNNING, Status.COMPLETED),
+    (False, False, Status.QUEUING,   Status.RUNNING, Status.SUBMITTED),
+    (False, True,  Status.QUEUING,   Status.RUNNING, Status.WAITING),
+    (True,  True,  Status.RUNNING,   Status.RUNNING, Status.RUNNING),
+    (True,  False, Status.RUNNING,   Status.RUNNING, Status.RUNNING),
+    (True,  True,  Status.FAILED,    Status.RUNNING, Status.FAILED),
+    (True,  False, Status.COMPLETED, Status.RUNNING, Status.COMPLETED),
+    (True,  True,  Status.QUEUING,   Status.QUEUING, Status.QUEUING),
+    (True,  False, Status.QUEUING,   Status.WAITING, Status.WAITING),
+], ids=[
+    "cannot_run_stat_failed",
+    "cannot_run_stat_completed",
+    "cannot_run_stat_queuing",
+    "cannot_run_stat_queuing_wrapper_done",
+    "can_run_stat_running",
+    "can_run_stat_running_wrapper_not_done",
+    "can_run_stat_failed",
+    "can_run_stat_completed",
+    "can_run_stat_queuing_returns_inner",
+    "can_run_stat_queuing_returns_inner_wrapper_not_done",
 ])
-def test_compute_inner_job_status(can_run, stat_status, wrapper_done, inner_status, expected, mocker):
+def test_compute_inner_job_status(can_run, wrapper_done, stat_status, inner_status, expected, mocker):
     inner = Job("inner", 2, inner_status, 0)
     wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
 
@@ -2683,11 +2748,11 @@ def test_sync_inner_job_statuses(mocker):
 
 
 @pytest.mark.parametrize("inner_statuses,wrapper_status,expected_save", [
-    ([Status.RUNNING], Status.COMPLETED, False),     # guard: still RUNNING
-    ([Status.QUEUING], Status.COMPLETED, True),      # reset to WAITING + log
-    ([Status.SUBMITTED], Status.FAILED, True),       # reset to WAITING + log
-    ([Status.COMPLETED], Status.COMPLETED, True),    # no pending, just log
-    ([Status.FAILED], Status.FAILED, True),          # no pending, just log
+    ([Status.RUNNING], Status.COMPLETED, False),
+    ([Status.QUEUING], Status.COMPLETED, True),
+    ([Status.SUBMITTED], Status.FAILED, True),
+    ([Status.COMPLETED], Status.COMPLETED, True),
+    ([Status.FAILED], Status.FAILED, True)
 ])
 def test_finalize_wrapper_completion(inner_statuses, wrapper_status, expected_save, mocker):
     inners = [Job(f"inner_{i}", i + 2, st, 0) for i, st in enumerate(inner_statuses)]
@@ -2696,7 +2761,7 @@ def test_finalize_wrapper_completion(inner_statuses, wrapper_status, expected_sa
     mocker.patch("autosubmit.job.job.Job.update_status")
     mock_log = mocker.patch("autosubmit.job.job.Log.warning")
 
-    result = wrapper._finalize_wrapper_completion(wrapper.as_config)
+    result = wrapper._finalize_wrapper_completion()
     assert result == expected_save
     if wrapper_status == Status.FAILED:
         mock_log.assert_called_once()
@@ -2726,41 +2791,51 @@ def test_setstate_initializes_missing_timestamps():
     job = Job("t000_test", 1, Status.WAITING, 0)
     # Build a minimal state dict that omits the timestamp fields
     state = {slot: getattr(job, slot, None) for slot in job.__slots__ if hasattr(job, slot)}
+    state['status'] = Status.VALUE_TO_KEY[job.status]
     for attr in ("submit_time_timestamp", "start_time_timestamp", "finish_time_timestamp"):
         state.pop(attr, None)
     job.__setstate__(state)
-    assert job.submit_time_timestamp == 0
-    assert job.start_time_timestamp == 0
-    assert job.finish_time_timestamp == 0
+    assert job.submit_time_timestamp is None
+    assert job.start_time_timestamp is None
+    assert job.finish_time_timestamp is None
 
 
-def test_clean_attributes_sets_updated_log_to_zero():
+def test_clean_attributes_resets_both_counters():
     job = Job("t000_test", 1, Status.WAITING, 0)
     job.updated_log = 99
+    job.updated_stats = 42
     job.fail_count = 0
     job.retrials = 5
     job.clean_attributes()
     assert job.updated_log == 0
+    assert job.updated_stats == 0
 
 
-def test_recover_attempt_no_remote_with_compressed_local(mocker):
-    """_recover_attempt: remote missing but compressed local logs -> success."""
+def test_write_stat_attempt_success(mocker):
     job = Job("dummy", 1, Status.WAITING, 0)
-    job.updated_log = 0
-    job.fail_count = 0
+    job.updated_log = 2
+    job.updated_stats = 0
     job.local_logs = ("out", "err")
     job.remote_logs = ("rout", "rerr")
-    job.submit_time_timestamp = "0"
-    job.id = "1"
-    mocker.patch("autosubmit.job.job.Job.update_submit_time_and_job_id")
-    mocker.patch("autosubmit.job.job.Job.update_local_logs")
-    mocker.patch("autosubmit.job.job.Job.get_new_remotelog_name", return_value=("new_out", "new_err"))
-    mocker.patch("autosubmit.job.job.Job.check_remote_log_exists", return_value=False)
-    mocker.patch("autosubmit.job.job.Job.check_compressed_local_logs", return_value=True)
-    result = job._recover_attempt(0)
+    mocker.patch('autosubmit.job.job.Job.write_stats')
+    result = job._write_stat_attempt(1)
     assert result.success is True
-    assert result.local_logs == job.local_logs
-    assert result.remote_logs == job.remote_logs
+    assert result.attempt == 1
+    assert job.updated_stats == 2
+    job.write_stats.assert_called_once_with(1)
+
+
+def test_write_stat_attempt_failure(mocker):
+    job = Job("dummy", 1, Status.WAITING, 0)
+    job.updated_log = 2
+    job.updated_stats = 0
+    job.local_logs = ("out", "err")
+    job.remote_logs = ("rout", "rerr")
+    mocker.patch('autosubmit.job.job.Job.write_stats', side_effect=RuntimeError("stat fail"))
+    result = job._write_stat_attempt(1)
+    assert result.success is False
+    assert result.error == "stat fail"
+    assert job.updated_stats == 0
 
 
 @pytest.mark.parametrize("start_time_timestamp,effective_wallclock,expected", [
@@ -2866,7 +2941,7 @@ def test_write_end_time_with_positive_end_time(mocker, tmp_path):
     mocker.patch("autosubmit.job.job.Job.check_end_time", return_value=epoch)
     mocker.patch("autosubmit.job.job.Job._write_time")
     mocker.patch("autosubmit.job.job.ExperimentHistory")
-    job.write_end_time(completed=True)
+    job.write_end_time(True, attempt=0)
     expected = datetime.fromtimestamp(epoch).strftime("%Y%m%d%H%M%S")
     assert job.finish_time_timestamp == expected
 
@@ -2935,3 +3010,133 @@ def test_check_wrapper_wallclock_and_handle(mocker, inner_over, wrapper_over, in
     else:
         assert result is False
         wrapper.platform.cancel_jobs.assert_not_called()
+
+
+@pytest.mark.parametrize("chunk", [1, 2, 3])
+def test_update_parameters_synchronize_date_binds_chunk(autosubmit_config, chunk):
+    """Regression test for issue #3087.
+
+    Jobs with ``RUNNING: chunk`` and ``SYNCHRONIZE: date`` have ``job.date=None``
+    but a real chunk index (the name carries it). ``%CHUNK%`` must resolve to the
+    job's chunk value, not to the hardcoded ``1`` default.
+    """
+    experiment_data = {
+        'JOBS': {
+            'RANDOM-SECTION': {
+                'FILE': 'test.sh',
+                'PLATFORM': 'DUMMY_PLATFORM',
+                'RUNNING': 'chunk',
+                'SYNCHRONIZE': 'date',
+            },
+        },
+        'PLATFORMS': {'dummy_platform': {'type': 'ps'}},
+        'ROOTDIR': 'dummy_rootdir',
+        'LOCAL_TMP_DIR': 'dummy_tmpdir',
+        'LOCAL_ROOT_DIR': 'dummy_rootdir',
+    }
+    as_conf = autosubmit_config("t000", experiment_data)
+    as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.normalize_variables(
+        as_conf.experiment_data, must_exists=True)
+    as_conf.experiment_data = as_conf.deep_read_loops(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.substitute_dynamic_variables(as_conf.experiment_data)
+    as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
+
+    job = Job('A', '1', 0, 1)
+    job.section = 'RANDOM-SECTION'
+    job.platform = PsPlatform(
+        expid='t000', name='DUMMY_PLATFORM', config=as_conf.experiment_data)
+    # Reproduces the post-`_create_jobs_chunk` state for a SYNCHRONIZE=date job:
+    # the name carries the chunk index, but date and member are None.
+    job.date = None
+    job.member = None
+    job.chunk = chunk
+
+    parameters = job.update_parameters(as_conf, set_attributes=True)
+    assert parameters['CHUNK'] == chunk
+
+    
+@pytest.mark.parametrize("chunk_unit,chunk_size,date_format,expected_end,expected_ldate", [
+    ("month", 4,  "",  "20000901",     "20000831"),
+    ("day",   30, "",  "20000301",     "20000229"),
+    ("year",  1,  "",  "20020101",     "20011231"),
+    ("hour",  12, "H", "2000010200",   "2000010123"),
+])
+def test_calendar_chunk_exposes_experiment_terminal_dates(
+    chunk_unit, chunk_size, date_format, expected_end, expected_ldate
+):
+    """Issue #2430: date-aware jobs see CHUNK_END_DATE_LAST and LDATE
+    pointing at the experiment's end, independent of their own chunk."""
+    job = Job('A', '1', Status.WAITING, 0)
+    job.date = datetime(2000, 1, 1)
+    job.chunk = None
+    job.date_format = date_format
+    parameters = {
+        'EXPERIMENT.NUMCHUNKS': 2,
+        'EXPERIMENT.CHUNKSIZE': chunk_size,
+        'EXPERIMENT.CHUNKSIZEUNIT': chunk_unit,
+        'EXPERIMENT.CALENDAR': 'standard',
+    }
+
+    result = job.calendar_chunk(parameters)
+
+    assert result['CHUNK_END_DATE_LAST'] == expected_end
+    assert result['LDATE'] == expected_ldate
+
+
+@pytest.mark.parametrize("chunk_unit,chunk_size", [
+    ("month", 4),
+    ("day",   30),
+    ("year",  1),
+    ("hour",  12),
+])
+def test_calendar_chunk_last_chunk_consistency(chunk_unit, chunk_size):
+    """On the last chunk the new variables equal the per-chunk ones."""
+    job = Job('A', '1', Status.WAITING, 0)
+    job.date = datetime(2000, 1, 1)
+    job.chunk = 2
+    job.date_format = ''
+    parameters = {
+        'EXPERIMENT.NUMCHUNKS': 2,
+        'EXPERIMENT.CHUNKSIZE': chunk_size,
+        'EXPERIMENT.CHUNKSIZEUNIT': chunk_unit,
+        'EXPERIMENT.CALENDAR': 'standard',
+    }
+
+    result = job.calendar_chunk(parameters)
+
+    assert result['CHUNK_END_DATE'] == result['CHUNK_END_DATE_LAST']
+    assert result['CHUNK_SECOND_TO_LAST_DATE'] == result['LDATE']
+
+def test_recover_log_queues_recovery(mocker):
+    job = Job("test", 1, Status.COMPLETED, 0)
+    as_conf = mocker.MagicMock()
+    as_conf.platforms_data.get.return_value = {}
+    job.platform = mocker.MagicMock()
+    job.recover_log(as_conf)
+    job.platform.add_job_to_log_recover.assert_called_once_with(job)
+    assert job.log_recovery_call_count == 1
+
+
+def test_compute_inner_job_status_returns_stat_when_done(mocker):
+    inner = Job("inner", 2, Status.FAILED, 0)
+    inner._retrials = 3
+    inner.wrapper_type = "vertical"
+    wrapper = _make_wrapper_job(mocker, inner_jobs=[inner])
+
+    result = wrapper._compute_inner_job_status(inner, {"inner": Status.FAILED}, True)
+
+    assert result == Status.FAILED
+
+
+def test_recover_log_disabled_threads(mocker):
+    job = Job("test", 1, Status.COMPLETED, 0)
+    as_conf = mocker.MagicMock()
+    as_conf.platforms_data.get.return_value = {"DISABLE_RECOVERY_THREADS": "true"}
+    mock_retrieve = mocker.patch("autosubmit.job.job.Job.retrieve_logfiles")
+    mock_notify = mocker.patch("autosubmit.job.job.Job.send_cpmip_notification")
+    job.recover_log(as_conf)
+    mock_retrieve.assert_called_once()
+    mock_notify.assert_called_once_with(as_conf)
+    assert job.log_recovery_call_count == 1
+

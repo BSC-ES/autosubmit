@@ -48,26 +48,26 @@ as_setup: .EXPORT_ALL_VARIABLES
 	touch $(AUTOSUBMIT_CONFIGURATION)
 	@echo "Autosubmit configuration: [$(AUTOSUBMIT_CONFIGURATION)]"
 
-	$(eval AUTOSUBMIT_CONFIGURATION_CONTENTS="\
-	[database]\n\
-	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit\n\
-	filename = autosubmit.db\n\
-	\n\
-	[local]\n\
-	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit\n\
-	\n\
-	[globallogs]\n\
-	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/logs\n\
-	\n\
-	[structures]\n\
-	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/structures\n\
-	\n\
-	[historicdb]\n\
-	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/data\n\
-	\n\
-	[historiclog]\n\
-	path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/logs")
-	echo $(AUTOSUBMIT_CONFIGURATION_CONTENTS) > $(AUTOSUBMIT_CONFIGURATION)
+	printf '%s\n' \
+		"[database]" \
+		"path = $(AUTOSUBMIT_DIRECTORY)/autosubmit" \
+		"filename = autosubmit.db" \
+		"" \
+		"[local]" \
+		"path = $(AUTOSUBMIT_DIRECTORY)/autosubmit" \
+		"" \
+		"[globallogs]" \
+		"path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/logs" \
+		"" \
+		"[structures]" \
+		"path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/structures" \
+		"" \
+		"[historicdb]" \
+		"path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/data" \
+		"" \
+		"[historiclog]" \
+		"path = $(AUTOSUBMIT_DIRECTORY)/autosubmit/metadata/logs" \
+		> $(AUTOSUBMIT_CONFIGURATION)
 
 	@echo "Installing Autosubmit..."
 	AUTOSUBMIT_CONFIGURATION=$(AUTOSUBMIT_CONFIGURATION) autosubmit install
@@ -86,7 +86,7 @@ as_setup: .EXPORT_ALL_VARIABLES
 
 .DEFAULT_GOAL := html
 
-html dirhtml singlehtml watch latex latexpdf: as_setup
+html dirhtml singlehtml watch latex latexpdf xml_coverage: as_setup
 
 help:
 	env | grep AUTOSUBMIT

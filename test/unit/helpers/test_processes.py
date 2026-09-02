@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -16,15 +16,14 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 from getpass import getuser
-from psutil import ZombieProcess
-from typing import List, Optional
 
 import pytest
+from psutil import ZombieProcess
 
 from autosubmit.helpers.processes import process_id, retrieve_expids
 
 
-def _create_process(mocker, expid, username: Optional[str] = None, command='run', pid=1984):
+def _create_process(mocker, expid, username: str | None = None, command='run', pid=1984):
     process = mocker.Mock()
     process.username.return_value = username or getuser()
     process.pid = pid
@@ -60,7 +59,7 @@ def _create_process(mocker, expid, username: Optional[str] = None, command='run'
         'Two expids, none are valid, so none is retrieved',
     ]
 )
-def test_retrieve_expids(mocker, expids: List[str], expected_retrieved: int, username: Optional[str]):
+def test_retrieve_expids(mocker, expids: list[str], expected_retrieved: int, username: str | None):
     """Test the retrieval of experiment IDs.
 
     Test that given we are given N expids, and mock our way to have N processes

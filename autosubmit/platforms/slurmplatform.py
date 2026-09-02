@@ -25,17 +25,14 @@ import re
 from contextlib import suppress
 from pathlib import Path
 from time import sleep
-from typing import Any, Optional, Union, TYPE_CHECKING
+from typing import Any
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
+from autosubmit.platforms.execution_mode import ExecutionMode
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
 from autosubmit.platforms.paramiko_platform import ParamikoPlatform
+from autosubmit.platforms.platform_type import PlatformType
 from autosubmit.platforms.wrappers.wrapper_factory import SlurmWrapperFactory
-
-if TYPE_CHECKING:
-    # Avoid circular imports
-    pass
-
 
 # Compiled patterns that identify valid stdout from any Slurm command.
 _SLURM_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
@@ -64,8 +61,11 @@ _SLURM_EXPECTED_OUTPUT: tuple[re.Pattern, ...] = (
 class SlurmPlatform(ParamikoPlatform):
     """Class to manage jobs to host using SLURM scheduler."""
 
+    EXECUTION_MODE = ExecutionMode.BATCH
+    TYPE = PlatformType.SLURM
+
     def __init__(self, expid: str, name: str, config: dict,
-                 auth_password: Optional[Union[str, list[str]]] = None) -> None:
+                 auth_password: str | list[str] | None = None) -> None:
         """Initialization of the Class SlurmPlatform.
 
         :param expid: ID of the experiment which will instantiate the SlurmPlatform.
@@ -88,10 +88,9 @@ class SlurmPlatform(ParamikoPlatform):
         self.x11_options = None
         self._submit_cmd_x11 = None
         self.cancel_cmd = None
-        self.type = 'slurm'
         self._header = SlurmHeader()
         self._wrapper = SlurmWrapperFactory(self)
-        self.job_status = dict()
+        self.job_status = {}
         self.job_status['COMPLETED'] = ['COMPLETED']
         self.job_status['RUNNING'] = ['RUNNING']
         self.job_status['QUEUING'] = ['PENDING', 'CONFIGURING', 'RESIZING']
@@ -124,7 +123,7 @@ class SlurmPlatform(ParamikoPlatform):
         try:
             # Test if remote_path exists
             self._ftpChannel.chdir(self.remote_log_dir)
-        except IOError as io_err:
+        except OSError as io_err:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
                     Log.debug(f'{self.remote_log_dir} has been created on {self.host}.')
@@ -178,17 +177,7 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return self.remote_log_dir
 
-    def parse_job_output(self, output: str) -> str:
-        """Parses check job command output, so it can be interpreted by autosubmit.
-
-        :param output: output to parse.
-        :type output: str
-        :return: job status.
-        :rtype: str
-        """
-        return output.strip().split(' ')[0].strip()
-
-    def parse_all_jobs_output(self, output: str, job_id: int) -> Union[list[str], str]:
+    def parse_all_jobs_output(self, output: str, job_id: int) -> list[str] | str:
         status = ""
         with suppress(Exception):
             status = [
@@ -243,14 +232,6 @@ class SlurmPlatform(ParamikoPlatform):
             submitted_job_ids.append(max(matched_ids))
 
         return submitted_job_ids
-
-    def get_check_job_cmd(self, job_id: str) -> str:
-        """Generates sacct command to the job selected.
-
-        :param job_id: ID of a job.
-        :return: Generates the sacct command to be executes.
-        """
-        return f'sacct -n -X --jobs {job_id} -o "State"'
 
     def get_check_all_jobs_cmd(self, jobs_id: str):
         """Generates sacct command to all the jobs passed down.
@@ -356,20 +337,19 @@ class SlurmPlatform(ParamikoPlatform):
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), src))
                 file_exist = True
-            except IOError:  # File doesn't exist, retry in sleeptime
+            except OSError:  # File doesn't exist, retry in sleeptime
                 if not wrapper_failed:
                     sleep(sleeptime)
                     retries = retries + 1
                 else:
                     sleep(2)
                     retries = retries + 1
-            except BaseException as e:  # Unrecoverable error
-                if str(e).lower().find("garbage") != -1:
+            except Exception as e:
+                if "garbage" in str(e).lower():
                     sleep(2)
                     retries = retries + 1
                 else:
-                    file_exist = False  # won't exist
-                    retries = 999  # no more retries
+                    raise
         if not file_exist and show_logs:
             Log.warning(f"File {src} couldn't be found")
         return file_exist
@@ -403,8 +383,8 @@ class SlurmPlatform(ParamikoPlatform):
 
     def _check_for_unrecoverable_errors(self) -> None:
         """Check Slurm command output for recoverable and unrecoverable errors."""
-        out = self._ssh_output or ""
-        err = self._ssh_output_err or ""
+        out = self._ssh_output
+        err = self._ssh_output_err
 
         # Fast-exit: any match in stdout (single or multi-line) confirms the
         if any(pat.search(out) for pat in _SLURM_EXPECTED_OUTPUT):
