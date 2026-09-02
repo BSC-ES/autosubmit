@@ -737,7 +737,7 @@ This will be understood by Autosubmit and the result would be similar to:
 
 Although it depends on the experiment.
 
-If the parameter doesn't exist, it will be returned as ``-``, while if the
+If the parameter does not exist, it will be returned as ``-``, while if the
 parameter is declared but empty, it will remain empty.
 
 Starter template

@@ -423,11 +423,11 @@ class PBSPlatform(ParamikoPlatform):
         retries = 0
         while not file_exist and retries < max_retries:
             try:
-                # This return IOError if a path doesn't exist
+                # This return IOError if a path does not exist
                 self._ftpChannel.stat(os.path.join(
                     self.get_files_path(), src))
                 file_exist = True
-            except OSError:  # File doesn't exist, retry in sleeptime
+            except OSError:  # File does not exist, retry in sleeptime
                 sleep(sleeptime)
                 retries = retries + 1
             except Exception as e:

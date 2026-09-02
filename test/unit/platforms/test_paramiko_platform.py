@@ -547,9 +547,9 @@ def test_get_call_no_job(paramiko_platform: ParamikoPlatform):
 @pytest.mark.parametrize(
     'exception_message,must_exist,ignore_log,messages',
     [
-        ('Garbage', True, False, ['skipping', 'does not exists']),
+        ('Garbage', True, False, ['skipping', 'does not exist']),
         ('Garbage', False, False, ['skipping', 'be retrieved']),
-        ('error', True, False, ['does not exists']),
+        ('error', True, False, ['does not exist']),
         ('error', False, False, ['be retrieved']),
         ('Garbage', True, True, []),
         ('Garbage', False, True, []),

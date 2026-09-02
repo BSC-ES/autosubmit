@@ -420,7 +420,7 @@ def _check_files_recovered(as_conf, log_dir, expected_files) -> dict:
     for file in files_check_list:
         if not files_check_list[file]:
             all_ok = False
-            print(f"{file} does not exists: {files_check_list[file]}")
+            print(f"{file} does not exist: {files_check_list[file]}")
     if all_ok:
         print("All log files downloaded are renamed correctly.")
     else:

@@ -1263,7 +1263,7 @@ class AutosubmitConfig:
         """
         parser_data = self.experiment_data
         if parser_data.get("CONFIG", "") == "":
-            self.wrong_config["Autosubmit"] += [['CONFIG', "Mandatory AUTOSUBMIT section doesn't exists"]]
+            self.wrong_config["Autosubmit"] += [['CONFIG', "Mandatory AUTOSUBMIT section does not exist"]]
         else:
             if parser_data["CONFIG"].get('AUTOSUBMIT_VERSION', -1.1) == -1.1:
                 self.wrong_config["Autosubmit"] += [['config',
@@ -1405,9 +1405,9 @@ class AutosubmitConfig:
                                     if check_value not in "on_submission":
                                         self.wrong_config["Jobs"] += [
                                             [section,
-                                             f"FILE {section_file_path} doesn't exist and check parameter is not set on_submission value"]]
+                                             f"FILE {section_file_path} does not exist and check parameter is not set on_submission value"]]
                                 else:
-                                    self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} doesn't exist"]]
+                                    self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} does not exist"]]
 
             dependencies = section_data.get('DEPENDENCIES', '')
             if dependencies != "":
@@ -1458,7 +1458,7 @@ class AutosubmitConfig:
         parser = self.experiment_data
         self.hpcarch = ""
         if parser.get('DEFAULT', "") == "":
-            self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT section doesn't exists"]]
+            self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT section does not exist"]]
         else:
             if not parser.get('DEFAULT').get('EXPID', ""):
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT.EXPID parameter is invalid"]]
@@ -1467,7 +1467,7 @@ class AutosubmitConfig:
             if not self.hpcarch:
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT.HPCARCH parameter is invalid"]]
         if parser.get('EXPERIMENT', "") == "":
-            self.wrong_config["Expdef"] += [['EXPERIMENT', "Mandatory EXPERIMENT section doesn't exists"]]
+            self.wrong_config["Expdef"] += [['EXPERIMENT', "Mandatory EXPERIMENT section does not exist"]]
         else:
             if not parser['EXPERIMENT'].get('DATELIST', ""):
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory EXPERIMENT.DATELIST parameter is invalid"]]
@@ -1486,7 +1486,7 @@ class AutosubmitConfig:
             if parser['EXPERIMENT'].get('CALENDAR', "standard").lower() not in ['standard', 'noleap']:
                 self.wrong_config["Expdef"] += [['experiment', "Mandatory EXPERIMENT.CALENDAR choice is invalid"]]
         if parser.get('PROJECT', "") == "":
-            self.wrong_config["Expdef"] += [['PROJECT', "Mandatory PROJECT section doesn't exists"]]
+            self.wrong_config["Expdef"] += [['PROJECT', "Mandatory PROJECT section does not exist"]]
             project_type = ""
         else:
             project_type = parser['PROJECT'].get('PROJECT_TYPE', "")
@@ -1495,14 +1495,14 @@ class AutosubmitConfig:
         else:
             if project_type == 'git':
                 if parser.get('GIT', "") == "":
-                    self.wrong_config["Expdef"] += [['GIT', "Mandatory GIT section doesn't exists"]]
+                    self.wrong_config["Expdef"] += [['GIT', "Mandatory GIT section does not exist"]]
                 else:
                     if not parser['GIT'].get('PROJECT_ORIGIN', ""):
                         self.wrong_config["Expdef"] += [['git',
                                                          "PROJECT_ORIGIN parameter is invalid"]]
             elif project_type == 'svn':
                 if parser.get('SVN', "") == "":
-                    self.wrong_config["Expdef"] += [['SVN', "Mandatory SVN section doesn't exists"]]
+                    self.wrong_config["Expdef"] += [['SVN', "Mandatory SVN section does not exist"]]
                 else:
                     if not parser['SVN'].get('PROJECT_URL', ""):
                         self.wrong_config["Expdef"] += [['svn',
@@ -1512,7 +1512,7 @@ class AutosubmitConfig:
                                                          "PROJECT_REVISION parameter is invalid"]]
             elif project_type == 'local':
                 if parser.get('LOCAL', "") == "":
-                    self.wrong_config["Expdef"] += [['LOCAL', "Mandatory LOCAL section doesn't exists"]]
+                    self.wrong_config["Expdef"] += [['LOCAL', "Mandatory LOCAL section does not exist"]]
                 else:
 
                     if not parser['LOCAL'].get('PROJECT_PATH', ""):

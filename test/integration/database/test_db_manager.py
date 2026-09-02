@@ -354,7 +354,7 @@ def test_update_experiment_nonexistent(setup_experiment_table):
     :param setup_experiment_table: Fixture that sets up the experiment table
     :type setup_experiment_table: Path
     """
-    # Should raise an exception when the experiment doesn't exist
+    # Should raise an exception when the experiment does not exist
     with pytest.raises(AutosubmitCritical) as e:
         _update_experiment_description_version("nonexistent_exp", description="New description")
 

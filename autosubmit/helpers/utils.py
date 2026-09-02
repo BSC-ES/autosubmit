@@ -63,7 +63,7 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: st
         else:
             jobs_data = as_conf.jobs_data.values()
 
-        # List of files that doesn't exist.
+        # List of files that does not exist.
         missing_files: list[str] = []
 
         for data in jobs_data:
