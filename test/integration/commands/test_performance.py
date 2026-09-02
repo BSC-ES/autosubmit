@@ -291,12 +291,12 @@ def test_autosubmit_create_profile_metrics(benchmark, tmp_path: Path, autosubmit
     benchmark.extra_info.update(_collect_profiler_metrics(as_exp, test_type, current_id, tmp_path))
 
 
-@pytest.mark.parametrize("members,chunks,splits,max_iterations,test_type",
+@pytest.mark.parametrize("members,chunks,splits,max_iterations",
                          [
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "2", 0, "run",
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "2", 0,
                                           marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "6", 0, "run", marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8 fc9", "2", "75", 10, "run",
+                             pytest.param("fc0 fc1 fc2 fc3", "2", "6", 0, marks=[pytest.mark.profilelong]),
+                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8 fc9", "2", "75", 10,
                                            marks=[pytest.mark.profilelong]),
                          ],
                          ids=[
@@ -307,8 +307,9 @@ def test_autosubmit_create_profile_metrics(benchmark, tmp_path: Path, autosubmit
                          )
 @pytest.mark.timeout(1800)
 def test_autosubmit_run_profile_metrics(benchmark, tmp_path: Path, autosubmit_exp, members, chunks,
-                                        splits, max_iterations, slurm_server, test_type):
+                                        splits, max_iterations, slurm_server):
     """Integration/performance test for `autosubmit run` with profiling enabled."""
+    test_type = "run"
     current_id = _scenario_id(members, chunks, splits)
     yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
     as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=True)

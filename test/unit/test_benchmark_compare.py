@@ -26,6 +26,7 @@ import os
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -36,6 +37,8 @@ compare = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(compare)
 
 _THRESHOLDS_PATH = _BENCH_DIR / "thresholds.yml"
+
+_NAN = float("nan")
 
 
 def _make_entry(name: str, test_type: str, run_id: str, median: float, **extra) -> dict:
@@ -80,13 +83,12 @@ def _baseline_entry(**overrides):
     return extra
 
 
-def _evaluate_pair(baseline_time: float | None, current_time: float,
-                   test_type: str = "run", run_id: str = "fc0_1_1") -> pd.DataFrame:
-    """Build a current/baseline frame pair and evaluate them."""
-    current = _make_run(_make_entry(test_type, test_type, run_id, current_time, **_baseline_entry()))
+def _evaluate_pair(baseline_time: float | None, current_time: float) -> pd.DataFrame:
+    """Build a single-scenario current/baseline frame pair and evaluate them."""
+    current = _make_run(_make_entry("run", "run", "fc0_1_1", current_time, **_baseline_entry()))
     if baseline_time is None:
         return compare.evaluate(compare.build_frame(current), None, _thresholds())
-    baseline = _make_run(_make_entry(test_type, test_type, run_id, baseline_time, **_baseline_entry()))
+    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", baseline_time, **_baseline_entry()))
     return compare.evaluate(
         compare.build_frame(current), compare.build_frame(baseline), _thresholds()
     )
@@ -112,42 +114,69 @@ def test_render_markdown_variants(baseline_time, current_time, previous_label, e
         assert fragment in markdown
 
 
-@pytest.mark.parametrize("baseline_time, current_time, expected, expected_delta", [
-    pytest.param(10.0, 10.0 * (1 + (_time_threshold() + 10) / 100), "WARN",
-                 pytest.approx(_time_threshold() + 10), id="over-threshold-warns"),
-    pytest.param(0.01, _time_floor() * 0.5, "PASS", None, id="under-floor-suppressed"),
+def _single_scenario_runs(metric: str, test_type: str, baseline_val: float,
+                          current_val: float) -> tuple[dict, dict]:
+    """Build (baseline, current) run dicts that differ only in ``metric``."""
+    def _entry(value: float) -> dict:
+        extra = _baseline_entry()
+        if metric == "Time Taken(Seconds)":
+            return _make_entry(test_type, test_type, "fc0_1_1", float(value), **extra)
+        extra[metric] = value
+        return _make_entry(test_type, test_type, "fc0_1_1", 1.0, **extra)
+
+    return _make_run(_entry(baseline_val)), _make_run(_entry(current_val))
+
+
+def _check_delta(actual: float, expected_delta) -> None:
+    """Assert a report delta value against ``expected_delta``.
+
+    ``None`` skips the check, ``_NAN`` requires NaN, anything else (e.g.
+    ``pytest.approx``) is compared with equality.
+    """
+    if expected_delta is None:
+        return
+    if expected_delta is _NAN:
+        assert actual != actual  # NaN
+    else:
+        assert actual == expected_delta
+
+
+@pytest.mark.parametrize("metric,test_type,baseline,current,expected,expected_delta", [
+    # Wall-clock time verdicts.
+    pytest.param("Time Taken(Seconds)", "run", 10.0, 10.0 * (1 + (_time_threshold() + 10) / 100),
+                 "WARN", pytest.approx(_time_threshold() + 10), id="over-threshold-warns"),
+    pytest.param("Time Taken(Seconds)", "run", 0.01, _time_floor() * 0.5,
+                 "PASS", None, id="under-floor-suppressed"),
+    # Exact (deterministic) metrics must not move at all.
+    pytest.param("Total Jobs", "create", 7, 8, "WARN", None, id="total-jobs-change-warns"),
+    pytest.param("Total Dependencies", "create", 7, 8, "WARN", None, id="total-deps-change-warns"),
+    pytest.param("Total Jobs", "create", 7, 7, "PASS", None, id="total-jobs-unchanged-passes"),
+    pytest.param("Total Dependencies", "create", 7, 7, "PASS", None, id="total-deps-unchanged-passes"),
+    pytest.param("Total Jobs", "create", 7.9, 7.1, "WARN", None, id="total-jobs-fractional-change-warns"),
+    # Signed growth verdicts: a release is an improvement, never a regression.
+    pytest.param("MEM GROWTH(MIB)", "run", -15.0, 215.0, "WARN",
+                 pytest.approx((215.0 + 15.0) / 15.0 * 100.0), id="flip-to-leak-warns"),
+    pytest.param("MEM GROWTH(MIB)", "run", 215.0, -15.0, "PASS", None, id="flip-to-release-passes"),
+    pytest.param("MEM GROWTH(MIB)", "run", -215.62, -256.48, "PASS",
+                 pytest.approx(-(256.48 - 215.62) / 215.62 * 100.0), id="negative-more-negative-passes"),
+    pytest.param("MEM GROWTH(MIB)", "run", -215.0, -200.0, "PASS", None, id="negative-less-negative-passes"),
+    pytest.param("MEM GROWTH(MIB)", "run", 0.18, -0.8, "PASS", None, id="sub-floor-excluded"),
+    pytest.param("MEM GROWTH(MIB)", "run", -22.9, -26.98, "PASS",
+                 pytest.approx(-(26.98 - 22.9) / 22.9 * 100.0), id="release-grows-passes"),
+    pytest.param("FD GROWTH", "run", 0, 1, "WARN", _NAN, id="zero-baseline-change-warns"),
+    pytest.param("FD GROWTH", "run", 1, 0, "PASS", None, id="released-to-zero-passes"),
+    pytest.param("MEM GROWTH(MIB)", "run", 0, 0.5, "PASS", _NAN, id="zero-baseline-sub-floor-passes"),
+    pytest.param("MEM GROWTH(MIB)", "run", 0, -3.0, "PASS", _NAN, id="zero-baseline-release-passes"),
 ])
-def test_time_verdicts(baseline_time, current_time, expected, expected_delta):
-    baseline = _make_run(_make_entry("run", "run", "fc0_1_1", baseline_time, **_baseline_entry()))
-    current = _make_run(_make_entry("run", "run", "fc0_1_1", current_time, **_baseline_entry()))
+def test_metric_verdicts(metric, test_type, baseline, current, expected, expected_delta):
+    baseline_run, current_run = _single_scenario_runs(metric, test_type, baseline, current)
 
     report = compare.evaluate(
-        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
-    )
-    row = report[report["metric"] == "Time Taken(Seconds)"].iloc[0]
-    assert row["verdict"] == expected
-    if expected_delta is not None:
-        assert row["delta %"] == expected_delta
-
-
-@pytest.mark.parametrize("metric, baseline_val, current_val, expected", [
-    pytest.param("Total Jobs", 7, 8, "WARN", id="total-jobs-change-warns"),
-    pytest.param("Total Dependencies", 7, 8, "WARN", id="total-deps-change-warns"),
-    pytest.param("Total Jobs", 7, 7, "PASS", id="total-jobs-unchanged-passes"),
-    pytest.param("Total Dependencies", 7, 7, "PASS", id="total-deps-unchanged-passes"),
-    pytest.param("Total Jobs", 7.9, 7.1, "WARN", id="total-jobs-fractional-change-warns"),
-])
-def test_exact_metric_change_warns(metric, baseline_val, current_val, expected):
-    baseline = _make_run(_make_entry("create", "create", "fc0_1_1", 0.7,
-                                     **{**_baseline_entry(), metric: baseline_val}))
-    current = _make_run(_make_entry("create", "create", "fc0_1_1", 0.7,
-                                    **{**_baseline_entry(), metric: current_val}))
-
-    report = compare.evaluate(
-        compare.build_frame(current), compare.build_frame(baseline), _thresholds()
+        compare.build_frame(current_run), compare.build_frame(baseline_run), _thresholds()
     )
     row = report[report["metric"] == metric].iloc[0]
     assert row["verdict"] == expected
+    _check_delta(row["delta %"], expected_delta)
 
 
 @pytest.mark.parametrize("current_cpu, previous_cpu, expected", [
@@ -177,38 +206,6 @@ def test_current_directory_uses_newest_run_only(tmp_path: Path):
     assert files == [newer]
 
 
-_NAN = float("nan")
-
-
-@pytest.mark.parametrize("metric, baseline, current, expected, expected_delta", [
-    pytest.param("MEM GROWTH(MIB)", -15.0, 215.0, "WARN",
-                 pytest.approx((215.0 - 15.0) / 15.0 * 100.0), id="flip-to-leak-warns"),
-    pytest.param("MEM GROWTH(MIB)", 215.0, -15.0, "PASS", None, id="flip-to-release-passes"),
-    pytest.param("MEM GROWTH(MIB)", -215.62, -256.48, "WARN",
-                 pytest.approx((256.48 - 215.62) / 215.62 * 100.0), id="negative-more-negative-warns"),
-    pytest.param("MEM GROWTH(MIB)", -215.0, -200.0, "PASS", None, id="negative-less-negative-passes"),
-    pytest.param("MEM GROWTH(MIB)", 0.18, -0.8, "PASS", None, id="sub-floor-excluded"),
-    pytest.param("FD GROWTH", 0, 1, "WARN", _NAN, id="zero-baseline-change-warns"),
-    pytest.param("FD GROWTH", 1, 0, "PASS", None, id="zero-baseline-improvement-passes"),
-    pytest.param("MEM GROWTH(MIB)", 0, 0.5, "PASS", _NAN, id="zero-baseline-sub-floor-passes"),
-])
-def test_growth_verdicts(metric, baseline, current, expected, expected_delta):
-    baseline_run = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0,
-                                         **{**_baseline_entry(), metric: baseline}))
-    current_run = _make_run(_make_entry("run", "run", "fc0_1_1", 10.0,
-                                        **{**_baseline_entry(), metric: current}))
-
-    report = compare.evaluate(
-        compare.build_frame(current_run), compare.build_frame(baseline_run), _thresholds()
-    )
-    row = report[report["metric"] == metric].iloc[0]
-    assert row["verdict"] == expected
-    if expected_delta is _NAN:
-        assert row["delta %"] != row["delta %"]  # NaN
-    elif expected_delta is not None:
-        assert row["delta %"] == expected_delta
-
-
 @pytest.mark.parametrize("slug_dir, cpu, expected_file", [
     pytest.param("intel-xeon", "Intel Xeon", "4.2.0-aaaaaaa.json", id="slug-found"),
     pytest.param("amd-epyc", "Intel Xeon", None, id="slug-missing"),
@@ -222,7 +219,7 @@ def test_select_previous(slug_dir, cpu, expected_file, tmp_path):
     files = compare._select_previous(str(ref), cpu)
     if expected_file:
         # the selected file lives under the current CPU's slug directory
-        assert files[0].parent.name == "intel-xeon"
+        assert files[0].parent.name == slug_dir
         assert files[0].name == expected_file
     else:
         assert files == []
@@ -342,6 +339,46 @@ def test_render_heatmap_scenario_filter(tmp_path: Path):
     assert out is not None and out.exists() and out.stat().st_size > 0
 
 
+def _mem_growth_absval(current_val: float) -> np.ndarray:
+    """Absolute MEM GROWTH(MIB) values as a (1, 1) array, mirroring the heatmap input."""
+    run = _make_run(_make_entry("run", "run", "4m/2c/6s", 10.0,
+                                **{**_baseline_entry(), "MEM GROWTH(MIB)": current_val}))
+    frame = compare.build_frame(run)
+    return frame[["MEM GROWTH(MIB)"]].to_numpy(dtype=float)
+
+
+def test_below_floor_change_is_masked_neutral(tmp_path: Path):
+    baseline = _make_run(_make_entry("run", "run", "4m/2c/6s", 10.0,
+                                     **{**_baseline_entry(), "MEM GROWTH(MIB)": 0.22}))
+    current = _make_run(_make_entry("run", "run", "4m/2c/6s", 10.0,
+                                    **{**_baseline_entry(), "MEM GROWTH(MIB)": 1.51}))
+    cur_frame = compare.build_frame(current)
+    report = compare.evaluate(cur_frame, compare.build_frame(baseline), _thresholds())
+    row = report[report["metric"] == "MEM GROWTH(MIB)"].iloc[0]
+    assert row["verdict"] == "PASS"
+
+    metrics = ["MEM GROWTH(MIB)"]
+    absval = _mem_growth_absval(1.51)
+    mask = compare._below_floor_mask(absval, metrics, _thresholds())
+    assert mask.shape == (1, 1)
+    assert mask[0, 0]  # sub-floor -> neutral, never colored red
+
+    out = compare.render_heatmap(
+        cur_frame, compare.build_frame(baseline), report, "4.2.0", tmp_path,
+        thresholds=_thresholds(), test_types={"run"}, metrics=metrics,
+        out_name="test_below_floor.png",
+    )
+    assert out is not None and out.exists() and out.stat().st_size > 0
+
+
+def test_above_floor_change_is_significant():
+    # Same scenario but with a value at/above the floor: the cell is a real
+    # signal and must NOT be masked.
+    absval = _mem_growth_absval(30.0)
+    mask = compare._below_floor_mask(absval, ["MEM GROWTH(MIB)"], _thresholds())
+    assert not mask[0, 0]
+
+
 def test_heaviest_scenario_picks_max_total_jobs():
     entries = [
         _make_entry("run", "run", "4m/2c/2s", 10.0, **{**_baseline_entry(), "Total Jobs": 7}),
@@ -381,12 +418,12 @@ def test_heavy_scenario_in_report_but_excluded_from_heatmaps():
     current = compare.build_frame(_make_run(*entries))
 
     report = compare.evaluate(current, None, _thresholds())
-    assert any("10m/2c/75s" in rid for rid in report["ID"])
-    assert not report[report["ID"] == "10m/2c/75s"].empty
-    assert not report[report["ID"] == "10m/2c/75s·ftcs"].empty
+    for rid in ["10m/2c/75s", "10m/2c/75s·ftcs"]:
+        assert not report[report["ID"] == rid].empty
 
     cross = compare.evaluate_cross_scenarios(current)
-    assert any("10m/2c/75s" in row["ID"] or row["ID"] == "10m/2c/75s" for row in cross.to_dict("records"))
+    cross_pairs = {(row["ID"], row["counterpart"]) for row in cross.to_dict("records")}
+    assert ("10m/2c/75s", "10m/2c/75s·ftcs") in cross_pairs
     assert compare._heaviest_scenario(current) == "10m/2c/75s"
 
     run_order = compare._plot_order(current, compare._RUN_TEST_TYPES,

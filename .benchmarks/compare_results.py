@@ -278,7 +278,11 @@ def build_frame(run: dict) -> pd.DataFrame:
 
 
 def _safe_pct(current: float | None, previous: float | None) -> float | None:
-    """Return the percentage change current vs previous, or None when unknown.
+    """Return the signed percentage change current vs previous, or None when unknown.
+
+    Computed as ``(current - previous) / |previous|`` so the sign always
+    reflects the direction of change of the metric itself: a release (e.g.
+    MEM GROWTH going -23 -> -27) is a negative delta, not a regression.
 
     :param current: Current value.
     :type current: float | None
@@ -289,7 +293,7 @@ def _safe_pct(current: float | None, previous: float | None) -> float | None:
     """
     if previous is None or current is None or pd.isna(previous) or previous == 0 or pd.isna(current):
         return None
-    return (float(current) - float(previous)) / float(previous) * 100.0
+    return (float(current) - float(previous)) / abs(float(previous)) * 100.0
 
 
 def _metric_verdict(test_type: str, run_id: str, metric: str, cur_val: float | None,
@@ -297,11 +301,8 @@ def _metric_verdict(test_type: str, run_id: str, metric: str, cur_val: float | N
                     metrics_cfg: dict) -> dict:
     """Compute the report row for a single (scenario, metric) pair.
 
-    Deltas are always computed on the absolute value of the measurement
-    (``|current|`` vs ``|previous|``): a regression means the magnitude grew,
-    which is well-defined even when values can be negative or cross zero (a
-    growth metric going from -15 to +215 MiB is a regression even though the
-    signed delta would read as an "improvement").
+    A regression means the metric *increased* (larger positive, or less
+    negative, magnitude), which is the documented "worse direction".
 
     :param test_type: The test type of the scenario.
     :type test_type: str
@@ -336,19 +337,20 @@ def _metric_verdict(test_type: str, run_id: str, metric: str, cur_val: float | N
     cfg = metrics_cfg.get(metric, {})
     threshold = float(cfg.get("threshold", 15.0))
     floor = float(cfg.get("floor", 0.0))
-    abs_prev = abs(prev_val) if prev_val is not None else None
-    pct = _safe_pct(abs(cur_val), abs_prev)
+    pct = _safe_pct(cur_val, prev_val)
 
     if not baseline_ok or prev_val is None or pd.isna(prev_val):
         return {"test type": test_type, "ID": run_id, "metric": metric,
                 "baseline": prev_val, "current": cur_val, "delta %": pct, "verdict": "N/A"}
 
+    cur_float = float(cur_val)
     verdict = "PASS"
     if (pct is not None and pct > threshold
-            or prev_val == 0 and cur_val != 0) and abs(float(cur_val)) >= floor:
-        # Either the relative change exceeds the threshold or the value moved
-        # away from an exact zero baseline (no finite delta, e.g. FD GROWTH
-        # going 0 -> 1): any magnitude above the floor warns.
+            or prev_val == 0 and cur_float > 0) and abs(cur_float) >= floor:
+        # Either the signed change exceeds the threshold or the value moved
+        # away from an exact zero baseline into growth (no finite delta, e.g.
+        # FD GROWTH going 0 -> 1): any magnitude above the floor warns.
+        # Moving 0 -> negative (a release) never warns.
         verdict = "WARN"
     return {"test type": test_type, "ID": run_id, "metric": metric,
             "baseline": prev_val, "current": cur_val, "delta %": pct, "verdict": verdict}
@@ -552,6 +554,25 @@ def _metric_threshold(thresholds: dict, metric: str) -> float:
     return thr if thr > 0 else 15.0
 
 
+def _below_floor_mask(absval: np.ndarray, metrics: list[str], thresholds: dict) -> np.ndarray:
+    """Return a (rows x cols) mask of cells whose current value is below the metric floor.
+
+    :param absval: Current absolute values, shape (len(order), len(metrics)).
+    :type absval: np.ndarray
+    :param metrics: Metrics drawn in the plot, one per column.
+    :type metrics: list
+    :param thresholds: Thresholds configuration dictionary.
+    :type thresholds: dict
+    :return: Boolean mask of sub-floor cells.
+    :rtype: np.ndarray
+    """
+    floors = np.array([
+        float(thresholds.get("metrics", {}).get(m, {}).get("floor", 0.0))
+        for m in metrics
+    ], dtype=float)
+    return np.abs(absval) < floors
+
+
 def _text_color(rgba: np.ndarray, r: int, c: int) -> str:
     """Return 'white' or 'black' for text on a cell, based on its rendered luminance.
 
@@ -639,7 +660,9 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     Each scenario x metric intersection is a cell: its color encodes the
     direction (``coolwarm`` diverging, red = regression, blue = improvement)
     with a central dead zone (|delta| below ``plot.delta_tolerance`` renders
-    neutral) and opacity by threshold-relative severity. Cells are annotated
+    neutral), a per-metric ``floor`` (current values below it are noise and
+    render neutral, matching the verdict table) and opacity by
+    threshold-relative severity. Cells are annotated
     with the current absolute value (numbers only, units in the column headers);
     rows are grouped by test type via a left gutter. When there is no baseline,
     cells are uniformly neutral. Metrics excluded from a test type are left
@@ -781,10 +804,11 @@ def render_heatmap(current: pd.DataFrame, previous: pd.DataFrame | None, report:
     if not absolute_mode:
         no_baseline = np.isnan(delta) & ~excluded
         dead_zone = (np.abs(delta) <= tolerance) & ~excluded
-        neutral = (no_baseline | dead_zone) & ~excluded
+        below_floor = _below_floor_mask(absval, metrics, thresholds) & ~excluded
+        neutral = (no_baseline | dead_zone | below_floor) & ~excluded
         rgba[neutral, 0:3] = [0.88, 0.88, 0.88]
         rgba[neutral, 3] = 1.0
-        significant = ~excluded & ~np.isnan(delta) & ~dead_zone
+        significant = ~excluded & ~np.isnan(delta) & ~dead_zone & ~below_floor
         if significant.any():
             sig_rows, sig_cols = np.nonzero(significant)
             thresholds_by_col = np.array([_metric_threshold(thresholds, m) for m in metrics], dtype=float)
