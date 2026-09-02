@@ -18,7 +18,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 - [enhancement] Allow recovery to update current running/ready jobs #1251
 - Introduced a performance benchmark suite and a `metrics` workflow that profiles `create`, `run`, `recovery` and `setstatus`, compares each run against a per-CPU baseline stored on the `benchmark-reference` branch, and posts a regression report (tables, heatmap plots and artifact download links) on PRs labeled `perf-benchmark`. Maintainers can also trigger it manually with `/metrics`, `/metrics_full` and `/metrics_promote`. #2696 #3162
 
-**Migration from `job_list.pkl` to Database**
+**Migration from `job_list.pkl` to Database** 
 
 - All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted in significant changes to the code.
 
