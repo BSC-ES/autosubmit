@@ -27,7 +27,7 @@ from autosubmit.log.log import Log
 
 __all__ = ["setup_log_files"]
 
-_GLOBAL_LOG_COMMANDS = {"archive", "unarchive", "upgrade"}
+_GLOBAL_LOG_COMMANDS = {"archive", "delete", "unarchive", "upgrade"}
 """List of commands that are considered "global", and do not have a single experiment associated."""
 
 _INSTALLATION_COMMANDS = ["configure", "install"]

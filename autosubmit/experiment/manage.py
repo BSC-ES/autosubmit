@@ -401,7 +401,6 @@ def delete_experiment(expids: str, force: bool) -> bool:
     :param expids: List of experiment IDs to delete.
     :param force: Ask for confirmation if ``False``.
     :returns: ``True`` if successful, ``False`` otherwise.
-    :raises AutosubmitCritical: If the experiment does not exist or if there are insufficient permissions.
     """
     # expid will come from argparse, which provides nix-style comma-separated values,
     # so here we parse the comma-separated values. ``.fromkeys`` keeps order and removes
@@ -994,7 +993,9 @@ def create(
                 job_list.run_id = run_dc.run_id if run_dc else None
                 database_backup(expid)
             except Exception:
-                Log.warning("Historic database seems corrupted, AS will repair it and resume the run")
+                Log.warning(
+                    "Historic database seems corrupted, AS will repair it and resume the run"
+                )
                 try:
                     # FIXME: https://github.com/BSC-ES/autosubmit/issues/3179
                     raise NotImplementedError(
