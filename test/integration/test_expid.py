@@ -43,6 +43,7 @@ from autosubmit.experiment.manage import (
     delete_experiment,
     describe,
     expid_fn,
+    get_experiment_owner,
     new_experiment,
 )
 from autosubmit.helpers.version import get_version
@@ -860,7 +861,7 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")
-    assert cursor.fetchone() is None
+    assert cursor.fetchone() is not None
     cursor.close()
     # Test does not exist
 
@@ -868,6 +869,50 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp):
     assert mocked_log.error.call_count > 0
     assert "Experiment does not exist" in mocked_log.error.call_args_list[0][0][0]
 
+
+def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp):
+    install()
+    as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
+    run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
+    mocker.patch('autosubmit.experiment.manage.user_yes_no_query', return_value=True)
+    mocker.patch('pwd.getpwuid', side_effect=TypeError)
+    mocker.patch("autosubmit.experiment.manage.process_id", return_value=None)
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
+    current_owner, _, _, _ = get_experiment_owner(as_exp.expid)
+    assert current_owner is None
+    # test not owner not eadmin
+    _user = getuser()
+    mocker.patch(
+        "autosubmit.experiment.manage.get_experiment_owner",
+        return_value=(_user, 0, False, False),
+    )
+
+    delete_experiment(expids=f'{as_exp.expid}', force=True)
+    assert mocked_log.error.call_count > 0
+    assert 'Failed to delete experiment' in mocked_log.error.call_args_list[0][0][0]
+
+    # test eadmin
+    mocker.patch(
+        "autosubmit.experiment.manage.get_experiment_owner",
+        return_value=(_user, 0, False, True),
+    )
+    delete_experiment(expids=f'{as_exp.expid}', force=False)
+    assert mocked_log.error.call_count > 0
+    assert 'Failed to delete experiment' in mocked_log.error.call_args_list[0][0][0]
+
+    # test eadmin force
+    delete_experiment(expids=f'{as_exp.expid}', force=True)
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}").iterdir())
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/data").iterdir())
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
+    assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/structures").iterdir())
+    # Consult if the expid is still in the database (tombstone)
+    db_path = Path(BasicConfig.DB_PATH)
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")
+        assert cursor.fetchone() is not None
+        cursor.close()
 
 @pytest.mark.parametrize(
     "expid_value",
@@ -919,16 +964,10 @@ def test_perform_deletion(mocker, tmp_path, autosubmit_exp):
         ]
     ):
         raise AutosubmitCritical("tmp not in path")
-    mocker.patch(
-        "autosubmit.database.db_common.delete_experiment", side_effect=FileNotFoundError
-    )
     err_message = _perform_deletion(
         experiment_path, structure_db_path, job_data_db_path, as_exp.expid
     )
-    assert all(
-        x in err_message
-        for x in ["Cannot delete experiment entry", "Cannot delete directory"]
-    )
+    assert "Cannot delete directory" in err_message
 
 
 def test_new_experiment_fails_for_some_unknown_reason(

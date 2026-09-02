@@ -24,12 +24,13 @@ import signal
 import threading
 import time
 from collections.abc import Iterable
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING
 
 from portalocker import Lock
+from portalocker.exceptions import BaseLockException
 
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 from autosubmit.config.basicconfig import BasicConfig
@@ -43,12 +44,17 @@ from autosubmit.experiment.manage import (
 )
 from autosubmit.experiment.utils import print_job_details
 from autosubmit.git.autosubmit_git import check_unpushed_changes
+from autosubmit.history.database_managers import database_models as Models
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
 )
 from autosubmit.history.experiment_history import (
     ExperimentHistory,
     get_historical_database,
+)
+from autosubmit.history.experiment_status import (
+    ExperimentHeartBeatMonitor,
+    ExperimentStatus,
 )
 from autosubmit.job.filters import (
     apply_job_filters,
@@ -89,6 +95,46 @@ def _signal_handler(signal_received, frame) -> None:
     """
     Log.info("Autosubmit will interrupt at the next safe occasion")
     Scheduler.exit = True
+
+
+def _set_experiment_status(status_tracker: ExperimentStatus, status) -> None:
+    """Update the experiment status, warning if the update cannot be performed."""
+    try:
+        # TODO: Separate NOT_RUNNING into FAILED, COMPLETED and PAUSED statuses.
+        # Currently it's all treated as NOT_RUNNING for simplicity.
+        status_tracker.set_status(status)
+    except Exception as e:
+        Log.warning(
+            f"Autosubmit couldn't update the final experiment status for "
+            f"{status_tracker.expid}: {str(e)}"
+        )
+
+
+@contextmanager
+def _finalise_experiment_status(
+    status_tracker: ExperimentStatus,
+    heartbeat_monitor: ExperimentHeartBeatMonitor,
+):
+    """Finalise the experiment status and stop the heartbeat on block exit.
+
+    The experiment is marked as ``NOT_RUNNING`` on both success and error. If a
+    ``BaseLockException`` is raised (e.g. another instance holds the lock), the
+    status is left untouched so the running instance is not overwritten.
+    """
+    try:
+        yield
+    except BaseLockException:
+        # Multiple instances of Autosubmit running the same experiment, or a
+        # previous instance that did not release the lock file. In both cases we
+        # do not want to overwrite the experiment status (API/GUI consistency).
+        raise
+    except BaseException:
+        _set_experiment_status(status_tracker, Models.RunningStatus.NOT_RUNNING)
+        raise
+    else:
+        _set_experiment_status(status_tracker, Models.RunningStatus.NOT_RUNNING)
+    finally:
+        heartbeat_monitor.stop(timeout=10)
 
 
 def _prepare_run(
@@ -609,6 +655,8 @@ def run(
     :return: An integer representing the command exit status.
     """
     Scheduler.exit = False
+    status_tracker = ExperimentStatus(expid)
+    heartbeat_monitor = status_tracker.heartbeat_monitor(interval_seconds=120)
 
     # TODO: We can probably delete this? The CLI validators should be checking these paths already?
     # Initialize common folders'
@@ -622,7 +670,10 @@ def run(
             str(e),
         )
 
-    with Lock(os.path.join(tmp_path, "autosubmit.lock"), timeout=1):
+    with (
+        Lock(os.path.join(tmp_path, "autosubmit.lock"), timeout=1),
+        _finalise_experiment_status(status_tracker, heartbeat_monitor),
+    ):
         try:
             Log.debug("Preparing run")
             # This function is called only once, when the experiment is started.
@@ -646,6 +697,19 @@ def run(
         git_operational_check_enabled = as_conf_config.get(
             "GIT_OPERATIONAL_CHECK_ENABLED", True
         )
+
+        try:
+            status_tracker.set_as_running()
+        except Exception as e:
+            Log.warning(
+                f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
+                f"{Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB}. Exception: {str(e)}"
+            )
+
+        if not heartbeat_monitor.start():
+            Log.warning(
+                f"Heartbeat monitor could not start for experiment {expid}. Experiment status updates may not work."
+            )
 
         if git_operational_check_enabled:
             Log.debug("Checking for dirty local Git repository")
@@ -693,6 +757,7 @@ def run(
         job_list.load_wrappers()
         while job_list.continue_run():
             try:
+                heartbeat_monitor.ping()
                 if profiler is not None:
                     Scheduler.exit = profiler.iteration_checkpoint(
                         loaded_jobs, loaded_edges
