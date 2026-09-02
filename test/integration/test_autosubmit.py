@@ -213,9 +213,7 @@ def test_install_sqlite_already_exists(monkeypatch, tmp_path, autosubmit):
 
     with pytest.raises(AutosubmitCritical) as cm:
         autosubmit.install()
-
     assert 'Database already exists.' == str(cm.value.message)
-
 
 def test_install_sqlite_create_db_fails(monkeypatch, tmp_path, autosubmit, mocker):
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
@@ -444,7 +442,7 @@ def test_stop_sets_exit_flag(autosubmit_exp, mocker):
     """stop: sets Autosubmit.exit to True for the given experiment."""
     exp = autosubmit_exp()
     mocker.patch('builtins.input', return_value='y')
-    mocker.patch('autosubmit.helpers.processes.process_id', return_value=0)
+    mocker.patch('autosubmit.autosubmit.process_id', return_value=0)
     original = Autosubmit.exit
     try:
         Autosubmit.exit = False

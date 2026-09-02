@@ -51,7 +51,7 @@ def test_invalid_current_status(autosubmit, current_status):
 
 def test_pid_not_found(autosubmit, mocker):
     """Test when ``process_id`` returns ``None``."""
-    mocked_process_id = mocker.patch('autosubmit.helpers.processes.process_id')
+    mocked_process_id = mocker.patch('autosubmit.autosubmit.process_id')
     mocked_process_id.return_value = None
 
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
@@ -65,7 +65,7 @@ def test_pid_not_found(autosubmit, mocker):
 @pytest.mark.parametrize('pid', [-1, 0, 1])
 def test_ignored_pids(pid, autosubmit, mocker):
     """Test that we do not kill pids lower than init(1)."""
-    mocked_process_id = mocker.patch('autosubmit.helpers.processes.process_id')
+    mocked_process_id = mocker.patch('autosubmit.autosubmit.process_id')
     mocked_process_id.return_value = pid
 
     mocked_log = mocker.patch('autosubmit.autosubmit.Log')
@@ -78,7 +78,7 @@ def test_ignored_pids(pid, autosubmit, mocker):
 
 def test_os_kill_fails(autosubmit, mocker):
     """Test that if ``os.kill`` fails the code aborts."""
-    mocked_process_id = mocker.patch('autosubmit.helpers.processes.process_id')
+    mocked_process_id = mocker.patch('autosubmit.autosubmit.process_id')
     mocked_process_id.return_value = 1984
 
     mocked_kill = mocker.patch('os.kill', side_effect=OSError('chough'))
@@ -99,7 +99,7 @@ def test_stop_expids_no_cancel(autosubmit, mocker):
     expids = 'a000'
     cancel = False
 
-    mocked_process_id = mocker.patch('autosubmit.helpers.processes.process_id')
+    mocked_process_id = mocker.patch('autosubmit.autosubmit.process_id')
     mocked_process_id.side_effect = [42, None]
 
     mocker.patch(
@@ -142,7 +142,7 @@ def test_stop_expids_force_all(autosubmit, mocker, expids: str, user_input: list
     """Test that we ask the user for input before stopping experiments."""
     force_all = False
 
-    mocked_process_id = mocker.patch('autosubmit.helpers.processes.process_id')
+    mocked_process_id = mocker.patch('autosubmit.autosubmit.process_id')
     mocked_process_id.side_effect = [42 for _ in range(len(expids))] + [None for _ in range(len(expids))]
 
     mocked_kill = mocker.patch('os.kill')
@@ -193,7 +193,7 @@ def test_stop_expids(autosubmit, mocker, expids: str, num_expids: int, cancel: b
         # Start at PID=2, then increase in the mocked side effect.
         pid = 2
 
-        mocked_process_id = mocker.patch('autosubmit.helpers.processes.process_id')
+        mocked_process_id = mocker.patch('autosubmit.autosubmit.process_id')
         # Return the PIDs, then return as many empty values as PIDs. That's because for each
         # PID returned, it will check if it's still running after the ``os.kill`` call
         # (as we passed ``force=False``), so we avoid the ``sleep`` and loop by returning

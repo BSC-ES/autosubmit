@@ -61,6 +61,7 @@ ExperimentStatusTable = Table(
     Column("status", Text, nullable=False),
     Column("seconds_diff", Integer, nullable=False),
     Column("modified", Text, nullable=False),
+    Column("last_heartbeat", Text, nullable=True),
 )
 """Stores the status of the experiments."""
 
@@ -153,7 +154,7 @@ JobDataTable = Table(
 
 """All these tables will go inside the $expid/db/job_list.db."""
 # Jobs table
-"""Table that holds the minium neccesary info about the experiment jobs."""
+"""Table that holds the minium necessary info about the experiment jobs."""
 JobsTable = Table(
     "jobs",
     metadata_obj,
