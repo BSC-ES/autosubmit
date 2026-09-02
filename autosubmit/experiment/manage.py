@@ -18,9 +18,9 @@
 """Code to manage Autosubmit experiments."""
 
 import copy
+import getpass
 import json
 import os
-import pwd
 import signal
 import subprocess
 import tarfile
@@ -31,7 +31,7 @@ from pathlib import Path
 from re import sub
 from shutil import copyfile, rmtree
 from time import localtime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from portalocker import Lock
 from ruamel.yaml import YAML
@@ -43,10 +43,9 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database import db_common
 from autosubmit.database.db_common import (
     database_backup,
-    get_experiment_description,
-    get_experiment_expids,
     update_experiment_description_version,
 )
+from autosubmit.experiment.describe import ExperimentDescription
 from autosubmit.experiment.detail_updater import ExperimentDetails
 from autosubmit.experiment.utils import (
     create_required_folders,
@@ -1542,137 +1541,72 @@ def update_version(expid: str) -> bool:
 
 
 def describe(
-    input_experiment_list="*", get_from_user=""
-) -> (
-    tuple[str | Any, str | datetime | Any, str | Any, str | Any, str | Any]
-    | None
-    | bool
-):
-    """Show details for the specified experiment.
+    input_experiment_list: str = "",
+    get_from_user: str = "",
+) -> list[ExperimentDescription] | None:
+    """Show details for the specified experiments.
 
-    :param input_experiment_list: experiments identifier:
-    :param get_from_user: user to get the experiments from
-    :return: tuple with user, created time, model, branch, and HPC
+    By default, lists the current user's experiments. Explicitly requested
+    experiment IDs are used regardless of owner unless a user is specified.
+    Filtering can be done by user and by experiment ID, or both. ``*`` means
+    all users.
+
+    :param input_experiment_list: Experiment identifiers. An empty value
+        lists all experiments belonging to the selected user; ``*`` lists
+        experiments belonging to all users.
+    :param get_from_user: User whose experiments should be listed. An empty
+        value selects the current user when no experiment IDs are given.
+        ``*`` selects all users.
+    :return: A list of successfully described experiments, or ``None`` if
+        no experiments could be described.
     """
-    if get_from_user == "*" or get_from_user == "":
-        get_from_user = pwd.getpwuid(os.getuid())[0]
+    from autosubmit.experiment.describe import (
+        describe_experiment,
+        get_experiment_ids,
+        log_experiment_description,
+    )
 
-    user = created = model = branch = hpc = ""
-    not_described_experiments = []
-    experiments_ids_not_in_db = []
+    user = get_from_user
+    if not user and input_experiment_list.strip():
+        user = "*"
+    elif not user:
+        user = getpass.getuser()
 
-    if "," in input_experiment_list:
-        requested = [
-            e.strip().lower() for e in input_experiment_list.split(",") if e.strip()
-        ]
-    elif "*" in input_experiment_list:
-        requested = None  # all experiments
-    else:
-        requested = [
-            e.strip().lower() for e in input_experiment_list.split(" ") if e.strip()
-        ]
-
-    if requested is None:
-        experiments_ids = sorted(get_experiment_expids())
-    else:
-        found = get_experiment_expids(expids=requested)
-        experiments_ids = []
-        for e in requested:
-            (experiments_ids if e in found else experiments_ids_not_in_db).append(e)
+    experiments_ids, experiments_ids_not_in_db = get_experiment_ids(
+        input_experiment_list,
+        user,
+    )
 
     if experiments_ids_not_in_db:
         Log.warning(
-            f"Experiments not found in the database, skipping: {experiments_ids_not_in_db}"
+            "Experiments not found in the database, skipping: "
+            f"{experiments_ids_not_in_db}"
         )
 
-    for experiment_id in experiments_ids:
-        exp_path = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(experiment_id)
-        if exp_path.is_dir():
-            with suppress(OSError, KeyError, TypeError):
-                folder_owner = pwd.getpwuid(exp_path.stat().st_uid).pw_name
-                if folder_owner != get_from_user:
-                    continue
+    if not experiments_ids:
+        if not experiments_ids_not_in_db:
+            Log.warning(
+                f"No experiments found for expid={input_experiment_list or '*'} "
+                f"and user {user}"
+            )
+        return None
+
+    successfully_described: list[ExperimentDescription] = []
+
+    for expid in experiments_ids:
         try:
-            try:
-                # Preferred source of truth: the on-disk config files.
-                as_conf = AutosubmitConfig(experiment_id)
-                as_conf.check_conf_files(False, no_log=True)
-
-                uid = int(Path(as_conf.conf_folder_yaml).stat().st_uid)
-                try:
-                    user = pwd.getpwuid(uid).pw_name
-                except (KeyError, TypeError, OverflowError):
-                    Log.warning(
-                        "The user does not exist anymore in the system, using id instead"
-                    )
-                    user = str(uid)
-
-                created = datetime.fromtimestamp(
-                    Path(as_conf.conf_folder_yaml).stat().st_mtime
-                )
-
-                if as_conf.get_svn_project_url():
-                    model = branch = as_conf.get_svn_project_url()
-                else:
-                    model = as_conf.get_git_project_origin()
-                    branch = as_conf.get_git_project_branch()
-                if model == "":
-                    model = "Not Found"
-                if branch == "":
-                    branch = "Not Found"
-
-                submitter = ParamikoSubmitter(as_conf=as_conf)
-                if not submitter.platforms:
-                    return False
-                hpc = as_conf.get_platform()
-
-                description = get_experiment_description(experiment_id)
-                description = description[0][0] if description else ""
-            except Exception as e:
-                Log.warning(f"Experiment files are not available: {str(e)}")
-                # Files are not available (e.g. archived): fall back to the
-                # last snapshot stored in the database.
-                snapshot = ExperimentDetails(
-                    experiment_id, init_reload=False
-                ).get_details()
-                if not snapshot:
-                    raise
-                user = snapshot["user"]
-                created = snapshot["created"]
-                model = snapshot["model"]
-                branch = snapshot["branch"]
-                hpc = snapshot["hpc"]
-                description = get_experiment_description(experiment_id)
-                description = description[0][0] if description else ""
-                Log.info(
-                    f"Experiment '{experiment_id}' files not found; "
-                    f"it may have been archived. Showing the last "
-                    f"stored snapshot."
-                )
-            Log.result(f"Describing {experiment_id}")
-            Log.result(f"Owner: {user}")
-            Log.result(f"Location: {exp_path}")
-            Log.result(f"Created: {created}")
-            Log.result(f"Model: {model}")
-            Log.result(f"Branch: {branch}")
-            Log.result(f"HPC: {hpc}")
-            Log.result(f"Description: {description}")
+            details = describe_experiment(expid)
+            log_experiment_description(expid, details)
+            successfully_described.append(details)
         except Exception as e:
-            Log.warning(f"Failed to describe experiment {experiment_id}: {str(e)}")
-            not_described_experiments.append(experiment_id)
-    if len(not_described_experiments) > 0:
-        Log.printlog(
-            f"Could not describe the following experiments:\n{not_described_experiments}",
-            Log.WARNING,
-        )
-    if len(experiments_ids) == 1:
-        # for backward compatibility or GUI
-        return user, created, model, branch, hpc
-    elif len(experiments_ids) == 0:
-        Log.result(
-            f"No experiments found for expid={input_experiment_list} and user {get_from_user}"
-        )
-    return None
+            Log.warning(
+                f"Failed to describe experiment {expid}: {e}. Skipping and continuing."
+            )
+
+    if not successfully_described:
+        return None
+
+    return successfully_described
 
 
 def _create_project_associated_conf(

@@ -230,14 +230,14 @@ def avoid_long_sleep_time(session_mocker):
     session_mocker.patch('time.sleep', side_effect=my_sleep)
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture
 def experiment_config_fixture(session_mocker):
     # TODO: There are unit and regression tests that fail without this fixture.
     #  Those tests are good candidates to be rewritten or made into integration
     #  tests without mocks.
     session_mocker.patch(
-        'autosubmit.experiment.manage.get_experiment_description',
-        return_value=[['test experiment']]
+        "autosubmit.experiment.describe.get_experiment_description",
+        return_value=[["test experiment"]],
     )
     session_mocker.patch(
         "autosubmit.database.db_common.get_experiment_description",
