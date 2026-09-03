@@ -15,7 +15,24 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Autosubmit Source.
+"""Autosubmit module.
 
-These files are the core of the Autosubmit, where all the workflow will be handled, processed and generated
+These files are the core of the Autosubmit, where all the
+workflows will be handled, processed, and generated
 """
+
+from os import environ
+
+
+def environ_init():
+    """Initialise Autosubmit environment.
+
+    Python output buffering is disabled, so the output of stderr
+    and stdout is not buffered, being written immediately. This
+    avoids issues where the output is missing or written much
+    later.
+    """
+    environ["PYTHONUNBUFFERED"] = "true"
+
+
+environ_init()

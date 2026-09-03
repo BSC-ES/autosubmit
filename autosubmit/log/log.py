@@ -188,6 +188,22 @@ class Log:
     console_handler.setFormatter(LogFormatter(False))
     log.addHandler(console_handler)
 
+    file_log_level = "INFO"
+    """This is the current file log level for the running context.
+
+    In the future we may switch to ``contextvars``/PEP 567 (Py3.7+),
+    or keep it simple like this -- or nuke the log.py and use Python
+    logging module.
+
+    This setting is supposed to be set early in the Autosubmit execution
+    (e.g., like in the ``autosubmit`` console script). It is read
+    later when the file log level is set.
+    
+    This defaults to ``INFO``, as the console handler (above) also
+    defaults to the same level. Later, in other functions, the default
+    level is ``WARNING``...
+    """
+
     def __init__(self):
         pass  # pragma: no cover
 
@@ -457,3 +473,4 @@ class Log:
             Log.critical("{1}[eCode={0}]", code, message)
         else:
             Log.info("{0}", message)
+

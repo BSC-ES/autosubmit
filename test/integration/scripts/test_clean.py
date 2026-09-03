@@ -24,10 +24,12 @@ from subprocess import check_output
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical
-from autosubmit.scripts.autosubmit import main
+
+# noinspection PyProtectedMember
+from autosubmit.scripts.autosubmit import _autosubmit
 
 
-def test_clean_plots(autosubmit_exp, mocker):
+def test_clean_plots(autosubmit_exp):
     """Test cleaning plots in an Autosubmit experiment.
 
     The test case contains five files, four plots, and one statistics file.
@@ -40,27 +42,32 @@ def test_clean_plots(autosubmit_exp, mocker):
     """
     exp = autosubmit_exp(experiment_data={})
 
-    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f'{exp.expid}/plot/')
+    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
 
-    for i, plot in enumerate([
-        'plot_a.pdf', 'plot_b.pdf', 'plot_c.pdf', 'plot_d.pdf', f'{exp.expid}_statistics_1.pdf'
-    ]):
+    for i, plot in enumerate(
+        [
+            "plot_a.pdf",
+            "plot_b.pdf",
+            "plot_c.pdf",
+            "plot_d.pdf",
+            f"{exp.expid}_statistics_1.pdf",
+        ]
+    ):
         p = Path(plots_dir / plot)
         p.touch()
         utime(str(p), (i, i))
 
-    mocker.patch('sys.argv', ['autosubmit', 'clean', exp.expid, '--plot'])
-    main()
+    _autosubmit(["clean", exp.expid, "--plot"])
 
     plots = list(plots_dir.iterdir())
 
     # keeps the statistics file and two newest plot files
     assert len(plots) == 3
-    assert Path(plots_dir / 'plot_c.pdf').exists()
-    assert Path(plots_dir / 'plot_d.pdf').exists()
+    assert Path(plots_dir / "plot_c.pdf").exists()
+    assert Path(plots_dir / "plot_d.pdf").exists()
 
 
-def test_clean_stats(autosubmit_exp, mocker):
+def test_clean_stats(autosubmit_exp):
     """Test cleaning statistics files in an Autosubmit experiment.
 
     The test case contains five files, four plots, and one statistics file.
@@ -74,25 +81,31 @@ def test_clean_stats(autosubmit_exp, mocker):
     """
     exp = autosubmit_exp(experiment_data={})
 
-    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f'{exp.expid}/plot/')
+    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
 
-    for i, plot in enumerate([
-        'plot_a.pdf', 'plot_b.pdf', 'plot_c.pdf', 'plot_d.pdf', f'{exp.expid}_statistics_1.pdf',
-        f'{exp.expid}_statistics_2.pdf', f'{exp.expid}_statistics_3.pdf'
-    ]):
+    for i, plot in enumerate(
+        [
+            "plot_a.pdf",
+            "plot_b.pdf",
+            "plot_c.pdf",
+            "plot_d.pdf",
+            f"{exp.expid}_statistics_1.pdf",
+            f"{exp.expid}_statistics_2.pdf",
+            f"{exp.expid}_statistics_3.pdf",
+        ]
+    ):
         p = Path(plots_dir / plot)
         p.touch()
         utime(str(p), (i, i))
 
-    mocker.patch('sys.argv', ['autosubmit', 'clean', exp.expid, '--stats'])
-    main()
+    _autosubmit(["clean", exp.expid, "--stats"])
 
     plots = list(plots_dir.iterdir())
 
     # keeps plot files and two newest statistics files
     assert len(plots) == 6
-    assert Path(plots_dir / f'{exp.expid}_statistics_2.pdf').exists()
-    assert Path(plots_dir / f'{exp.expid}_statistics_3.pdf').exists()
+    assert Path(plots_dir / f"{exp.expid}_statistics_2.pdf").exists()
+    assert Path(plots_dir / f"{exp.expid}_statistics_3.pdf").exists()
 
 
 def test_clean_dummy_project(autosubmit_exp, mocker):
@@ -101,28 +114,33 @@ def test_clean_dummy_project(autosubmit_exp, mocker):
     Autosubmit only deletes Git projects, so it must simply log and exit,
     without touching plot or statistics files.
     """
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
 
-    exp = autosubmit_exp(experiment_data={
-        'PROJECT': {
-            'PROJECT_TYPE': 'none'
-        }
-    })
+    exp = autosubmit_exp(experiment_data={"PROJECT": {"PROJECT_TYPE": "none"}})
 
-    Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, ).mkdir(exist_ok=True)
+    Path(
+        exp.as_conf.basic_config.LOCAL_ROOT_DIR,
+        exp.expid,
+    ).mkdir(exist_ok=True)
 
-    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f'{exp.expid}/plot/')
+    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
 
-    for i, plot in enumerate([
-        'plot_a.pdf', 'plot_b.pdf', 'plot_c.pdf', 'plot_d.pdf', f'{exp.expid}_statistics_1.pdf',
-        f'{exp.expid}_statistics_2.pdf', f'{exp.expid}_statistics_3.pdf'
-    ]):
+    for i, plot in enumerate(
+        [
+            "plot_a.pdf",
+            "plot_b.pdf",
+            "plot_c.pdf",
+            "plot_d.pdf",
+            f"{exp.expid}_statistics_1.pdf",
+            f"{exp.expid}_statistics_2.pdf",
+            f"{exp.expid}_statistics_3.pdf",
+        ]
+    ):
         p = Path(plots_dir / plot)
         p.touch()
         utime(str(p), (i, i))
 
-    mocker.patch('sys.argv', ['autosubmit', 'clean', exp.expid, '--project'])
-    main()
+    _autosubmit(["clean", exp.expid, "--project"])
 
     plots = list(plots_dir.iterdir())
 
@@ -130,73 +148,78 @@ def test_clean_dummy_project(autosubmit_exp, mocker):
     assert len(plots) == 7
 
     assert mocked_log.info.called
-    assert 'No project to clean' in mocked_log.info.call_args_list[-1].args[0]
+    assert "No project to clean" in mocked_log.info.call_args_list[-1].args[0]
 
 
 @pytest.mark.parametrize(
-    'clean_git_return,main_exit_code,expected_result,expected_info',
+    "clean_git_return,main_exit_code,expected_result,expected_info",
     [
-        (True, 0, 'Git project cleaned', None),
-        (False, 1, None, 'Cleaning GIT directory'),
+        (True, 0, "Experiment cleaned successfully", None),
+        (False, 1, None, "Cleaning GIT directory"),
     ],
-    ids=[
-        'Best scenario',
-        'clean_git fails, so no result logged'
-    ]
+    ids=["Best scenario", "clean_git fails, so no result logged"],
 )
 def test_clean_git_project(
-        clean_git_return: bool,
-        main_exit_code: int,
-        expected_result: str,
-        expected_info: str,
-        autosubmit_exp,
-        mocker,
-        tmp_path):
+    clean_git_return: bool,
+    main_exit_code: int,
+    expected_result: str,
+    expected_info: str,
+    autosubmit_exp,
+    mocker,
+    tmp_path,
+):
     """Test cleaning an Autosubmit experiment Git project.
 
     Autosubmit only deletes Git projects, so it must simply log and exit,
     without touching plot or statistics files.
     """
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
+    mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
 
-    mocker.patch('autosubmit.autosubmit.clean_git', return_value=clean_git_return)
+    mocker.patch(
+        "autosubmit.git.autosubmit_git.clean_git", return_value=clean_git_return
+    )
 
-    git_project = Path(tmp_path / 'tmp_git_project')
+    git_project = Path(tmp_path / "tmp_git_project")
     git_project.mkdir()
-    Path(git_project, 'test.sh').touch()
+    Path(git_project, "test.sh").touch()
 
     chdir(git_project)
-    check_output(['git', 'init'])
-    check_output(['git', 'init'])
-    check_output(['git', 'checkout', '-b', 'test'])
-    check_output(['git', 'add', '.'])
-    check_output(['git', 'commit', '-m', 'Initial commit'])
+    check_output(["git", "init"])
+    check_output(["git", "init"])
+    check_output(["git", "checkout", "-b", "test"])
+    check_output(["git", "add", "."])
+    check_output(["git", "commit", "-m", "Initial commit"])
 
-    exp = autosubmit_exp(experiment_data={
-        'PROJECT': {
-            'PROJECT_TYPE': 'git',
-            'PROJECT_DESTINATION': 'git_project'
-        },
-        'GIT': {
-            'PROJECT_ORIGIN': str(git_project),
-            'PROJECT_BRANCH': 'test'
+    exp = autosubmit_exp(
+        experiment_data={
+            "PROJECT": {"PROJECT_TYPE": "git", "PROJECT_DESTINATION": "git_project"},
+            "GIT": {"PROJECT_ORIGIN": str(git_project), "PROJECT_BRANCH": "test"},
         }
-    })
+    )
 
-    Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, ).mkdir(exist_ok=True)
+    Path(
+        exp.as_conf.basic_config.LOCAL_ROOT_DIR,
+        exp.expid,
+    ).mkdir(exist_ok=True)
 
-    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f'{exp.expid}/plot/')
+    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
 
-    for i, plot in enumerate([
-        'plot_a.pdf', 'plot_b.pdf', 'plot_c.pdf', 'plot_d.pdf', f'{exp.expid}_statistics_1.pdf',
-        f'{exp.expid}_statistics_2.pdf', f'{exp.expid}_statistics_3.pdf'
-    ]):
+    for i, plot in enumerate(
+        [
+            "plot_a.pdf",
+            "plot_b.pdf",
+            "plot_c.pdf",
+            "plot_d.pdf",
+            f"{exp.expid}_statistics_1.pdf",
+            f"{exp.expid}_statistics_2.pdf",
+            f"{exp.expid}_statistics_3.pdf",
+        ]
+    ):
         p = Path(plots_dir / plot)
         p.touch()
         utime(str(p), (i, i))
 
-    mocker.patch('sys.argv', ['autosubmit', 'clean', exp.expid, '--project'])
-    assert main_exit_code == main()
+    assert main_exit_code == _autosubmit(["clean", exp.expid, "--project"])
 
     plots = list(plots_dir.iterdir())
 
@@ -217,8 +240,10 @@ def test_clean_git_project_error(autosubmit_exp, mocker):
     """Test cleaning an Autosubmit experiment Git project when an error occurs."""
     exp = autosubmit_exp(experiment_data={})
 
-    mocked_autosubmit_config = mocker.patch('autosubmit.autosubmit.AutosubmitConfig.get_project_type')
+    mocked_autosubmit_config = mocker.patch(
+        "autosubmit.config.configcommon.AutosubmitConfig.get_project_type"
+    )
     mocked_autosubmit_config.side_effect = AutosubmitCritical
 
-    mocker.patch('sys.argv', ['autosubmit', 'clean', exp.expid, '--project'])
-    assert 0 != main()
+    with pytest.raises(AutosubmitCritical):
+        _autosubmit(["clean", exp.expid, "--project"])
