@@ -110,7 +110,7 @@ def test_parse_docstring_with_examples():
         "Starts an experiment workflow.\n\n"
         "It submits the workflow jobs to the configured platform."
     )
-    assert result.examples == "$ autosubmit run a000"
+    assert result.examples == "\n    $ autosubmit run a000"
 
 
 def test_iter_entry_points(mocker):

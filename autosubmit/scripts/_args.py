@@ -204,11 +204,11 @@ def add_common_arguments(
 
     if has_expid and not _has_argument(parser, "expid"):
         if expid_mode is ExpidMode.REQUIRED:
-            parser.add_argument("expid", type=str, help="experiment identifier")
+            parser.add_argument("expid", type=str, help="Experiment identifier.")
         elif expid_mode is ExpidMode.OPTIONAL:
             # TODO: is optional required at all?
             parser.add_argument(
-                "expid", type=str, nargs="?", help="experiment identifier"
+                "expid", type=str, nargs="?", help="Experiment identifier."
             )
 
     if _has_argument(parser, "expid"):
@@ -222,7 +222,7 @@ def add_common_arguments(
             "--update_version",
             action="store_true",
             default=False,
-            help="update experiment version",
+            help="Update experiment version.",
         )
 
     # Allow to run every Autosubmit sub-command with a profiler.
@@ -231,8 +231,13 @@ def add_common_arguments(
         action="store_true",
         default=False,
         required=False,
-        help="prints performance parameters of the execution of this command",
+        help="Print performance parameters of the execution of this command.",
     )
+
+    # Change text of the help text.
+    for action in parser._actions:
+        if action.dest == "help":
+            action.help = "Show available options and exit."
 
     # TODO: add --debug here or --verbose later...
 
@@ -276,7 +281,7 @@ def parse_docstring(docstring: str | None) -> CommandDocstring:
         examples = None
     else:
         description_lines = lines[1:marker_index]
-        examples = "\n".join(lines[marker_index + 1 :]).strip() or None
+        examples = "\n".join(lines[marker_index + 1 :]) or None
 
     description = "\n".join(description_lines).strip()
 
@@ -312,7 +317,7 @@ def create_argparse_parser(docs: str | None, *, add_help=True) -> ArgumentParser
     return ArgumentParser(
         prog=doc.title,
         description=clean_docstring(doc.description),
-        epilog=clean_docstring(epilog) if epilog else None,
+        epilog=epilog if epilog else None,
         formatter_class=RawDescriptionHelpFormatter,
         add_help=add_help,
     )
