@@ -880,3 +880,33 @@ def test_update_from_file_skips_active_job_without_connection(job_list, mocker, 
     job.platform.cancel_jobs.assert_not_called()
     assert job.status == active_status
     assert any("connection" in call.args[0] for call in mock_warning.call_args_list)
+
+@pytest.mark.parametrize("target, recovery_expected", [
+    ("COMPLETED", True),
+    ("FAILED", True),
+    ("WAITING", False),
+    ("READY", False),
+], ids=["completed", "failed", "waiting", "ready"])
+def test_set_status_recovery_only_for_final_targets(as_exp, mocker, target, recovery_expected):
+    """Test that stale job data recovery only runs when the target status is a final status."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    mock_recover_stale = mocker.patch("autosubmit.autosubmit.recover_stale_job_data")
+    mock_recover_last_data = mocker.patch(
+        "autosubmit.job.job_list.JobList.recover_last_data"
+    )
+
+    job_names = " ".join(
+        job.name for job in as_exp.autosubmit.load_job_list(
+            as_exp.expid, as_exp.as_conf, new=False
+        ).get_job_list()
+    )
+    do_setstatus(as_exp, fl=job_names, target=target)
+
+    assert mock_recover_stale.called is recovery_expected
+    assert mock_recover_last_data.called is recovery_expected
