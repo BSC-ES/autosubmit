@@ -379,7 +379,9 @@ def test_autosubmit_create_profile_metrics(
 
     from autosubmit.profiler.profiler import Profiler
 
-    profiler = Profiler(as_exp.expid, trace_enabled=False, max_checkpoints=0)
+    profiler = Profiler(
+        subcommand=test_type, expid=as_exp.expid, trace_enabled=False, max_checkpoints=0
+    )
     profiler.start()
     profiler.iteration_checkpoint(0, 0)
 
@@ -451,7 +453,10 @@ def test_autosubmit_run_profile_metrics(
     as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=True)
     as_exp.as_conf.set_last_as_command("run")
     profiler = Profiler(
-        as_exp.expid, trace_enabled=False, max_checkpoints=max_iterations
+        subcommand="run",
+        expid=as_exp.expid,
+        trace_enabled=False,
+        max_checkpoints=max_iterations,
     )
     profiler.start()
     try:
@@ -499,7 +504,7 @@ def test_autosubmit_recovery_profile_metrics(
     job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False, full_load=True)
     job_names = [job.name for job in job_list.get_job_list()]
     prepare_setstatus_recovery(as_exp, tmp_path, job_names, slurm_server)
-    prof: Profiler = Profiler(as_exp.expid)
+    prof: Profiler = Profiler(subcommand="recovery", expid=as_exp.expid)
     prof.start()
     recover(
         as_exp.expid,
@@ -609,7 +614,7 @@ def test_autosubmit_setstatus_profile_metrics(
     fs = "WAITING"
     target = "COMPLETED"
 
-    prof: Profiler = Profiler(as_exp.expid)
+    prof: Profiler = Profiler(subcommand="recovery", expid=as_exp.expid)
     prof.start()
     do_setstatus(
         as_exp.expid,

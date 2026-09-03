@@ -62,7 +62,10 @@ def test_run_profile(trace_enabled, max_checkpoints, autosubmit_exp, tmp_path):
     #       that is needed.
     as_exp.as_conf.set_last_as_command("run")
     profiler = Profiler(
-        as_exp.expid, trace_enabled=trace_enabled, max_checkpoints=max_checkpoints
+        subcommand="run",
+        expid=as_exp.expid,
+        trace_enabled=trace_enabled,
+        max_checkpoints=max_checkpoints,
     )
     profiler.start()
     try:

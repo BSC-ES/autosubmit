@@ -77,7 +77,7 @@ def cli_factory(mocker, cli_environment):
 
         decorated = cli_function(
             args_parser=lambda: parser,
-            options_type=options_type,
+            options_type=options_type,  # type: ignore
             validators=validators,
             group=group,
         )(command)
@@ -94,7 +94,7 @@ def test_cli_function_requires_options_type():
     with pytest.raises(ValueError, match="options_type must be provided"):
         cli_function(
             args_parser=parser_factory,
-            options_type=None,
+            options_type=None,  # type: ignore
         )
 
 
@@ -102,8 +102,8 @@ def test_cli_function_requires_args_parser():
     """Test that args_parser is required."""
     with pytest.raises(ValueError, match="args_parser must be provided"):
         cli_function(
-            args_parser=None,
-            options_type=Options,
+            args_parser=None,  # type: ignore
+            options_type=Options,  # type: ignore
         )
 
 
@@ -119,12 +119,12 @@ def test_cli_function_sets_metadata(mocker):
         "autosubmit.scripts._cli_function.add_common_arguments",
     )
 
-    def command(opts):
+    def command(_):
         return 0
 
     decorated = cli_function(
         args_parser=lambda: parser,
-        options_type=Options,
+        options_type=Options,  # type: ignore
         group=CommandGroup.EXPERIMENT,
     )(command)
 
@@ -158,7 +158,7 @@ def test_cli_function_build_parser_updates_program_name(mocker):
 
     decorated = cli_function(
         args_parser=lambda: parser,
-        options_type=Options,
+        options_type=Options,  # type: ignore
     )(lambda opts: 0)
 
     result = decorated.build_parser()
@@ -309,7 +309,7 @@ def test_cli_function_profile(mocker, cli_factory):
 
     parser = ArgumentParser(prog="run")
 
-    def parse_args(args, namespace):
+    def parse_args(_, namespace):
         namespace.expid = "a000"
         namespace.profile = True
         namespace.profile_trace = True
@@ -328,12 +328,13 @@ def test_cli_function_profile(mocker, cli_factory):
     assert decorated() == 0
 
     profiler_class.assert_called_once_with(
-        "a000",
+        subcommand="run",
+        expid="a000",
         trace_enabled=True,
         max_checkpoints=10,
     )
+
     profiler.start.assert_called_once_with()
-    profiler.iteration_checkpoint.assert_called_once_with(0, 0)
     profiler.stop.assert_called_once_with()
 
     opts = command.call_args.args[0]
@@ -359,13 +360,14 @@ def test_cli_function_profile_uses_defaults(mocker, cli_factory):
 
     decorated, _, _ = cli_factory(
         command,
-        options_type=ProfileOptions,
+        options_type=ProfileOptions,  # type: ignore
     )
 
     decorated()
 
     profiler_class.assert_called_once_with(
-        "no-expid",
+        subcommand="run",
+        expid=None,
         trace_enabled=False,
         max_checkpoints=0,
     )
@@ -395,7 +397,7 @@ def test_cli_function_profile_stops_after_exception(mocker, cli_factory):
 
     decorated, _, _ = cli_factory(
         command,
-        options_type=ProfileOptions,
+        options_type=ProfileOptions,  # type: ignore
     )
 
     assert decorated() == 1
