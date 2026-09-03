@@ -40,7 +40,7 @@ examples:
     # create a new experiment by copying an existing experiment.
     $ autosubmit expid -d "My experiment copy" -y a000
 """
-
+import sys
 from argparse import ArgumentParser
 
 from autosubmit.scripts._args import (
@@ -166,6 +166,21 @@ def args_parser() -> ArgumentParser:
         type=str,
         required=True,
         help="Set a description for the experiment to store in the database.",
+    )
+    parser.add_argument(
+        "--import-experiment",
+        type=str,
+        required=["-dm", "--dummy"] in sys.argv,
+        default="local",
+        help="Select the experiment you want to copy.",
+    )
+    parser.add_argument(
+        "-cn",
+        "--connection",
+        type=str,
+        required="--import-experiment" in sys.argv,
+        default="local",
+        help="Set the host you want to copy the experiments from.",
     )
 
     return parser
