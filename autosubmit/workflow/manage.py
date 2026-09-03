@@ -140,7 +140,7 @@ def _prepare_run(
                 str(e),
             )
         os.system("clear")
-        if threading.current_thread().name is threading.main_thread():
+        if threading.current_thread().name == threading.main_thread():
             signal.signal(signal.SIGINT, _signal_handler)
         else:
             Log.debug("Not setting signal handler: Autosubmit running within a thread.")

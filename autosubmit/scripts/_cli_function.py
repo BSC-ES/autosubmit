@@ -155,17 +155,17 @@ def cli_function(
                 if opts.profile:
                     from autosubmit.profiler.profiler import Profiler
 
-                    profile_expid = getattr(opts, "expid", None) or "no-expid"
+                    profile_expid = getattr(opts, "expid", None)
                     trace = getattr(opts, "profile_trace", False)
                     max_iterations = getattr(opts, "profile_max_iterations", 0)
 
                     profiler = Profiler(
-                        profile_expid,
+                        subcommand=subcommand,
+                        expid=profile_expid,
                         trace_enabled=trace,
                         max_checkpoints=max_iterations,
                     )
                     profiler.start()
-                    profiler.iteration_checkpoint(0, 0)
 
                     opts._profiler = profiler
 
