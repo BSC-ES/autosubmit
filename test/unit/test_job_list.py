@@ -727,4 +727,3 @@ def _retry_delays(mocker, delay_retry_time, retries=4):
 def test_delay_retry_time_matches_documented_sequence(mocker, delay_retry_time, expected):
     """DELAY_RETRY_TIME must produce the sequences promised in the configuration reference."""
     assert _retry_delays(mocker, delay_retry_time) == expected
-    
