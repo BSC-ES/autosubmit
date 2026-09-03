@@ -62,7 +62,7 @@ if TYPE_CHECKING:
 
 Log.get_logger("Autosubmit")
 
-# A wrapper for encapsulate threads , TODO: Python 3+ to be replaced by the < from concurrent.futures >
+# A wrapper for encapsulate threads
 
 
 @dataclass
