@@ -15,7 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Generate Autosubmit manual pages.
+"""manpages
+
+Generate Autosubmit manual pages.
 
 The generated manual pages are written to the specified output directory.
 
