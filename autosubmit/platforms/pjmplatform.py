@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import re
 import textwrap
 from pathlib import Path
@@ -79,16 +78,16 @@ class PJMPlatform(ParamikoPlatform):
                            "FAILED": ["ERR", "CCL", "RJT"]}
         self._pathdir = "\\$HOME/LOG_" + self.expid
         self._allow_arrays = False
-        self._allow_wrappers = True  # NOT SURE IF WE NEED WRAPPERS
+        self._allow_wrappers = False  # WRAPPERS aARE CURRENTLY NOT ACTIVE FOR THIS PLATFORM
         self.update_cmds()
         self.config = config
-        exp_id_path = os.path.join(self.config.get("LOCAL_ROOT_DIR"), self.expid)
-        tmp_path = os.path.join(exp_id_path, "tmp")
-        self._submit_script_path = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh"
+        exp_id_path = Path(self.config.get("LOCAL_ROOT_DIR", ""), self.expid)
+        tmp_path = Path(exp_id_path, "tmp")
+        self._submit_script_path = Path(
+            tmp_path, self.config.get("LOCAL_ASLOG_DIR", ""), "submit_" + self.name + ".sh"
         )
-        self._submit_script_base_name = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_"
+        self._submit_script_base_name = Path(
+            tmp_path, self.config.get("LOCAL_ASLOG_DIR", ""), "submit_"
         )
 
     def create_a_new_copy(self):
@@ -113,7 +112,9 @@ class PJMPlatform(ParamikoPlatform):
         except OSError:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
-                    Log.debug(f'{self.remote_log_dir} has been created on {self.host} .')
+                    Log.debug(
+                        f"{self.remote_log_dir} has been created on {self.host} ."
+                    )
                 else:
                     raise AutosubmitError(
                         "SFTP session not active ",
@@ -125,9 +126,10 @@ class PJMPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Update commands for platforms."""
-        self.root_dir = os.path.join(
-            self.scratch, self.project_dir, self.user, self.expid)
-        self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
+        self.root_dir = Path(
+            self.scratch, self.project_dir, self.user, self.expid
+        )
+        self.remote_log_dir = str(self.root_dir / Path(f"LOG_{self.expid}"))
         self.cancel_cmd = "pjdel"
         self._checkhost_cmd = "echo 1"
         self._submit_cmd = f"cd {self.remote_log_dir} ; pjsub"
@@ -284,7 +286,7 @@ class PJMPlatform(ParamikoPlatform):
 
     def check_file_exists(
         self,
-        filename: str,
+        src: str,
         wrapper_failed: bool = False,
         sleeptime: int = 5,
         max_retries: int = 3,
@@ -296,7 +298,7 @@ class PJMPlatform(ParamikoPlatform):
         while not file_exist and retries < max_retries:
             try:
                 # This return IOError if path does not exist
-                self._ftpChannel.stat(os.path.join(self.get_files_path(), filename))
+                self._ftpChannel.stat(Path(self.get_files_path(), src))
                 file_exist = True
             except OSError:  # File does not exist, retry in sleeptime
                 if not wrapper_failed:
@@ -359,7 +361,7 @@ class PJMPlatform(ParamikoPlatform):
         if not job_names:
             return ""
 
-        commands = "+".join(
+        commands = "; ".join(
             f'pjstat -v --choose jid,jnam --filter "jnam={job_name}"'
             for job_name in job_names
         )
