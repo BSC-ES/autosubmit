@@ -284,3 +284,30 @@ def test_job_package_send_files_uses_current_public_api(mocker, local, tmp_path)
         mocker.call("job1.cmd"),
         mocker.call("job2.cmd"),
     ]
+
+
+@pytest.mark.parametrize(
+    'wallclock0, wallclock1, level, expected',
+    [
+        ("00:10", "00:30", 2714, 1800),
+        ("00:00", "00:00", 0, 86400),
+    ],
+    ids=['max-section-ignores-level', 'platform-max-fallback']
+)
+def test_vertical_wrapper_wallclock_by_level(create_job_package_wrapper, jobs, mocker, wallclock0, wallclock1,
+                                             level, expected) -> None:
+    """Vertical per-job timeout must be the longest wrapped section, ignoring job.level."""
+    jobs[0].wrapper_type = "vertical"
+    jobs[0].wallclock = wallclock0
+    jobs[1].wallclock = wallclock1
+    jobs[-1].level = level # should be ignored now
+    package = create_job_package_wrapper({
+        'TYPE': "vertical",
+        'JOBS_IN_WRAPPER': "None",
+        'METHOD': "ASThread",
+        'POLICY': "flexible",
+        'EXTEND_WALLCLOCK': 0,
+    })
+    get_wrapper = mocker.patch.object(package._wrapper_factory, 'get_wrapper', return_value="")
+    package._common_script_content()
+    assert get_wrapper.call_args.kwargs['wallclock_by_level'] == expected

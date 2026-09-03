@@ -16,6 +16,50 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
+import re
+from collections.abc import Iterable
+
+_WALLCLOCK_RE = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
+
+
+def wallclock_to_seconds(wallclock: str | None) -> int | None:
+    """Convert a ``HH:MM[:SS]`` wallclock to seconds.
+
+    :param wallclock: Wallclock to convert, e.g. ``'07:30'`` or ``'07:30:00'``.
+    :type wallclock: str
+    :return: The wallclock in seconds, or ``None`` if it is empty, not a string or cannot be parsed.
+    """
+    if not wallclock or not isinstance(wallclock, str):
+        return None
+    match = _WALLCLOCK_RE.match(wallclock)
+    if not match:
+        return None
+    parts = match.groupdict()
+    hours = int(parts['hours'])
+    minutes = int(parts['minutes']) if parts['minutes'] else 0
+    seconds = int(parts['seconds']) if parts['seconds'] else 0
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def max_wallclock_seconds(wallclocks: Iterable[str], platform_max_wallclock: str | None = None,
+                          fallback: int = 0) -> int:
+    """Return the longest wallclock (seconds) among the given ones.
+
+    Entries without a wallclock (empty, unparseable or ``'00:00'``) fall back to the platform
+    maximum wallclock. If no wallclock is available at all, ``fallback`` is returned.
+
+    :param wallclocks: Wallclocks to evaluate.
+    :type wallclocks: Iterable[str]
+    :param platform_max_wallclock: Platform maximum wallclock to use as fallback.
+    :type platform_max_wallclock: str
+    :param fallback: Value returned when no wallclock is available.
+    :type fallback: int
+    :return: The longest wallclock in seconds.
+    :rtype: int
+    """
+    platform_max = wallclock_to_seconds(platform_max_wallclock) or 0
+    longest = max((wallclock_to_seconds(wallclock) or platform_max for wallclock in wallclocks), default=0)
+    return longest or fallback
 
 
 class Status:

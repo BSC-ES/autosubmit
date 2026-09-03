@@ -36,7 +36,7 @@ from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.experiment_history import ExperimentHistory
-from autosubmit.job.job_common import Status, increase_wallclock_by_chunk
+from autosubmit.job.job_common import Status, increase_wallclock_by_chunk, wallclock_to_seconds
 from autosubmit.job.job_utils import get_split_size_unit, get_split_size
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import get_template_snippet, Language
@@ -173,7 +173,7 @@ class Job(object):
         'ec_queue', 'platform_name', '_serial_platform',
         'submitter', '_shape', '_x11', '_x11_options', '_hyperthreading',
         '_scratch_free_space', '_delay_retrials', '_custom_directives',
-        'packed_during_building', 'workflow_commit', '_validate_template', 'first_wrapped_level', 'finished_time'
+        'packed_during_building', 'workflow_commit', '_validate_template', 'finished_time'
     )
 
     def __setstate__(self, state):
@@ -216,7 +216,6 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
-        self.first_wrapped_level = False
         self._wrapper_queue = None
         self._platform: 'ParamikoPlatform' = None
         self._queue = None
@@ -339,7 +338,6 @@ class Job(object):
         self.rerun_only = False
         self.delay_end = None
         self.wrapper_type = None
-        self.first_wrapped_level = False
         self._wrapper_queue = None
         self._queue = None
         self._partition = None
@@ -1437,9 +1435,9 @@ class Job(object):
 
     def _max_possible_wallclock(self):
         if self.platform and self.platform.max_wallclock:
-            wallclock = self.parse_time(self.platform.max_wallclock)
-            if wallclock:
-                return int(wallclock.total_seconds())
+            seconds = wallclock_to_seconds(self.platform.max_wallclock)
+            if seconds:
+                return seconds
         return None
 
     def _time_in_seconds_and_margin(self, wallclock: datetime.timedelta) -> int:
@@ -1468,20 +1466,22 @@ class Job(object):
         return int(wallclock_delta.total_seconds())
 
     @staticmethod
-    def parse_time(wallclock):
+    def parse_time(wallclock) -> datetime.timedelta | None:
+        """Convert a ``HH:MM[:SS]`` wallclock to a :class:`datetime.timedelta`.
+
+        :param wallclock: Wallclock to convert, e.g. ``'07:30'`` or ``'07:30:00'``.
+        :type wallclock: str
+        :return: The wallclock as a timedelta, or ``None`` if it cannot be parsed. ``'00:00'``
+            yields a zero-duration timedelta (not ``None``). Non-string values return a one-day
+            timedelta as a test workaround.
+        """
         # TODO This is a workaround for the time being, just defined for tests passing without more issues
         if type(wallclock) is not str:
             return datetime.timedelta(24 * 60 * 60)
-        regex = re.compile(r'(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?')
-        parts = regex.match(wallclock)
-        if not parts:
+        seconds = wallclock_to_seconds(wallclock)
+        if seconds is None:
             return None
-        parts = parts.groupdict()
-        time_params = {}
-        for name, param in parts.items():
-            if param:
-                time_params[name] = int(param)
-        return datetime.timedelta(**time_params)
+        return datetime.timedelta(seconds=seconds)
 
     def is_over_wallclock(self, effective_wallclock=None) -> bool:
         """Check if the job is over the wallclock time, it is an alternative method to avoid platform issues."""
@@ -1533,13 +1533,6 @@ class Job(object):
                 )
 
         return self.status
-
-    def update_children_status(self):
-        children = list(self.children)
-        for child in children:
-            if child.level == 0 and child.status in [Status.SUBMITTED, Status.RUNNING, Status.QUEUING, Status.UNKNOWN]:
-                child.status = Status.FAILED
-                children += list(child.children)
 
     def check_completion(self, default_status=Status.FAILED):
         """Check whether a COMPLETED file exists on the platform.

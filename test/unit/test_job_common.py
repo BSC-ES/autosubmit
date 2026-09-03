@@ -48,3 +48,40 @@ def test_value_to_key_has_the_same_values_as_status_constants():
 )
 def test_parse_output_number(number, result):
     assert result == job_common.parse_output_number(number)
+
+
+@pytest.mark.parametrize(
+    'wallclock, expected',
+    [
+        ('00:10', 600),
+        ('07:30', 27000),
+        ('07:30:00', 27000),
+        ('24:00', 86400),
+        ('00:00', 0),
+        ('', None),
+        (None, None),
+        ('garbage', None),
+        ('0000', None),
+        (123, None),
+    ],
+    ids=['minutes', 'hour-minute', 'with-seconds', 'day', 'zero', 'empty', 'none',
+         'garbage', 'no-colon', 'non-string']
+)
+def test_wallclock_to_seconds(wallclock, expected):
+    assert job_common.wallclock_to_seconds(wallclock) == expected
+
+
+@pytest.mark.parametrize(
+    'wallclocks, platform_max_wallclock, fallback, expected',
+    [
+        (['00:10', '00:30', '00:15'], None, 0, 1800),
+        (['00:00', '', None], '24:00', 0, 86400),
+        (['00:00', ''], None, 42, 42),
+        ([], None, 42, 42),
+        ([123], None, 42, 42),
+    ],
+    ids=['longest-section', 'platform-fallback', 'fallback-arg', 'empty', 'not string']
+)
+def test_max_wallclock_seconds(wallclocks, platform_max_wallclock, fallback, expected):
+    assert job_common.max_wallclock_seconds(
+        wallclocks, platform_max_wallclock=platform_max_wallclock, fallback=fallback) == expected

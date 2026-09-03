@@ -424,6 +424,49 @@ class TestWrappers:
             for i in range(0, len(returned_packages)):
                 assert returned_packages[i]._jobs == packages[i]._jobs
 
+    def test_vertical_packager_does_not_leak_scan_index_into_job_level(self):
+        """Vertical packaging must not write the sorted_jobs scan index into job.level."""
+        date_list = ["d1"]
+        member_list = ["m1"]
+        chunk_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        for section, s_value in self.workflows['basic']['sections'].items():
+            self.as_conf.jobs_data[section] = s_value
+        self._createDummyJobs(self.workflows['basic'], date_list, member_list, chunk_list)
+
+        s2_jobs = [self.job_list.get_job_by_name(f'expid_d1_m1_{chunk}_s2') for chunk in chunk_list]
+        for job in s2_jobs[:8]:
+            job.status = Status.COMPLETED
+        for job in s2_jobs[8:]:
+            job.status = Status.READY
+
+        self.job_list._ordered_jobs_by_date_member["WRAPPERS"] = {}
+        self.job_list._ordered_jobs_by_date_member["WRAPPERS"]["d1"] = {}
+        self.job_list._ordered_jobs_by_date_member["WRAPPERS"]["d1"]["m1"] = s2_jobs
+
+        self.job_packager.current_wrapper_section = "WRAPPERS"
+        self.job_packager.retrials = 0
+        self.job_packager._platform.max_wallclock = '10:00'
+        self.job_packager.wrapper_type = 'vertical'
+
+        max_wrapped_job_by_section = dict.fromkeys(["s1", "s2", "s3", "s4"], 10)
+        wrapper_limits = {}
+        wrapper_limits["max"] = 10
+        wrapper_limits["max_v"] = 10
+        wrapper_limits["max_h"] = 10
+        wrapper_limits["min"] = 2
+        wrapper_limits["min_v"] = 2
+        wrapper_limits["min_h"] = 2
+        wrapper_limits["max_by_section"] = max_wrapped_job_by_section
+
+        with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
+            returned_packages = self.job_packager._build_vertical_packages(
+                [s2_jobs[8]], wrapper_limits, self.wrapper_info)
+
+        assert len(returned_packages) == 1
+        package = returned_packages[0]
+        assert [job.name for job in package.jobs] == ["expid_d1_m1_9_s2", "expid_d1_m1_10_s2"]
+        assert all(job.level == 0 for job in package.jobs)
+
     def test_returned_packages_max_wrapped_jobs(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
 

@@ -996,23 +996,22 @@ class JobPackagerVertical(object):
         self.max_wallclock = max_wallclock
         self.wrapper_info = wrapper_info
 
-    def build_vertical_package(self, job, wrapper_info):
-        """
-        Goes through the job and all the related jobs (children, or part of the same date member ordered group), finds those suitable
+    def build_vertical_package(self, job: Job, wrapper_info: list) -> list[Job]:
+        """Goes through the job and all the related jobs (children, or part of the same date member ordered group), finds those suitable
         and groups them together into a wrapper. (iterative-version)
 
         :param job: Job to be wrapped.
-        :type job: Job Object
+        :param wrapper_info: Wrapper parameters (type, policy, method, jobs in wrapper, extensible wallclock and configuration).
         :return: List of jobs that are wrapped together.
         :rtype: List() of Job Object
         """
         self.total_wallclock = job.wallclock  # reset total wallclock for package
         stack = [(job, 0)]
         while stack:
-            job, level = stack.pop()
+            job, scan_index = stack.pop()
             # Less verbose
-            if level % 50 == 0 and level > 0:
-                Log.info(f"Wrapper package creation is still ongoing. So far {level} jobs have been wrapped.")
+            if scan_index % 50 == 0 and scan_index > 0:
+                Log.info(f"Wrapper package creation is still ongoing. So far {scan_index} jobs have been scanned.")
                 for event in job.platform.worker_events:  # keep alive log retrieval workers.
                     if not event.is_set():
                         event.set()
@@ -1021,7 +1020,7 @@ class JobPackagerVertical(object):
                     self.wrapper_limits["max_by_section"][job.section] or len(self.jobs_list) >= self.wrapper_limits[
                 "max"]:
                 continue
-            child, level = self.get_wrappable_child(job, level)
+            child, scan_index = self.get_wrappable_child(job, scan_index)
             if child is not None and len(str(child)) > 0:
                 child.update_parameters(wrapper_info[-1], set_attributes=True)
 
@@ -1029,23 +1028,22 @@ class JobPackagerVertical(object):
                 # Local jobs could not have a wallclock defined
                 if self.total_wallclock <= self.max_wallclock or not self.max_wallclock:
                     child.packed_during_building = True
-                    child.level = level
                     self.jobs_list.append(child)
-                    stack.append((child, level))
+                    stack.append((child, scan_index))
         return self.jobs_list
 
-    def get_wrappable_child(self, job: Job, level: int) -> Job:
+    def get_wrappable_child(self, job: Job, scan_index: int) -> tuple[Job | None, int]:
         """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
         :param job: Job to be evaluated.
         :type job: Job
-        :return: Job that is wrappable, or None if no such job is found.
-        :rtype: Optional[Any]
+        :param scan_index: Position in sorted_jobs from which to start looking for the next wrappable job.
+        :return: The wrappable job (or ``None``) and the next scan position.
         """
         sorted_jobs = self.sorted_jobs
         child = None
-        index = level
-        for index in range(level, len(sorted_jobs)):
+        index = scan_index
+        for index in range(scan_index, len(sorted_jobs)):
             child_ = sorted_jobs[index]
             if child_.name != job.name and self._is_wrappable(child_):
                 child = child_
@@ -1114,18 +1112,18 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         # sort by chunk number
         self.index = 0
 
-    def get_wrappable_child(self, job: Job, level: int) -> Job:
+    def get_wrappable_child(self, job: Job, scan_index: int) -> tuple[Job | None, int]:
         """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
 
         :param job: Job to be evaluated.
         :type job: Job
-        :return: Job that is wrappable, or None if no such job is found.
-        :rtype: Optional[Any]
+        :param scan_index: Position in sorted_jobs from which to start looking for the next wrappable job.
+        :return: The wrappable job (or ``None``) and the next scan position.
         """
         sorted_jobs = self.sorted_jobs
         child = None
-        index = level
-        for index in range(level, len(sorted_jobs)):
+        index = scan_index
+        for index in range(scan_index, len(sorted_jobs)):
             child_ = sorted_jobs[index]
             if child_.name != job.name and self._is_wrappable(child_):
                 child = child_
