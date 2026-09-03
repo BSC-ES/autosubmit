@@ -766,8 +766,9 @@ def test_update_from_file_applies_case_insensitive_changes(as_conf, mocker, tmp_
     ],
     ids=["active-target-rejected", "unknown-status", "unknown-job"],
 )
-def test_update_from_file_skips_invalid_entries(as_conf, tmp_path, line, expected_status):
+def test_update_from_file_skips_invalid_entries(as_conf, mocker, tmp_path, line, expected_status):
     """update_from_file warns and skips entries it cannot apply."""
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
     job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
     job = Job("job1", "1", Status.WAITING, 0)
     job_list.add_job(job)
@@ -812,3 +813,165 @@ def test_update_from_file_skips_active_job_when_platform_not_connected(as_conf, 
     assert job_list.update_from_file(store_change=False) is True
     assert active.status == Status.RUNNING
     platform.cancel_jobs.assert_not_called()
+
+
+def test_update_from_file_applies_change_to_job_stored_only_in_database(as_conf, mocker, tmp_path):
+    """update_from_file resolves jobs absent from memory against the database, resets the
+    per-attempt state for re-runnable targets and does not load them into the graph."""
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    stored = Job("STOREDJOB", 9, Status.COMPLETED, 0)
+    job_list.dbmanager.save_jobs([stored])
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text("storedjob WAITING\n", encoding="utf-8")
+
+    assert job_list.update_from_file() is True
+
+    row = job_list.dbmanager.load_job_by_name("STOREDJOB")
+    assert row["status"] == "WAITING"
+    assert row["id"] is None
+    assert row["fail_count"] == 0
+    assert row["updated_log"] == 0
+    assert job_list.get_job_by_name("STOREDJOB") is None
+    assert not update_path.exists()
+
+
+@pytest.mark.parametrize(
+    "line, expected",
+    [
+        ("", None),  
+        ("   \n", None),
+        ("# a comment", None),
+        ("   # indented comment", None),
+        ("job1", None),
+        ("job1 COMPLETED trailing", ("JOB1", "COMPLETED")),
+        ("myjob waiting", ("MYJOB", "WAITING")),
+    ],
+    ids=["blank", "whitespace", "comment", "indented-comment", "missing-status",
+         "extra-tokens", "uppercased"],
+)
+def test_parse_update_line(line, expected):
+    """_parse_update_line strips, uppercases and ignores blank/comment/malformed lines."""
+    assert JobList._parse_update_line(line, "updated_list_a000.txt") == expected
+
+
+@pytest.mark.parametrize(
+    "memory_job, db_node, lookup_name, expected_name, expected_from_db",
+    [
+        pytest.param(Job("MEM", 1, Status.WAITING, 0), None, "MEM", "MEM", False,
+                     id="in-memory-first"),
+        pytest.param(None, Job("ONLYDB", 9, Status.COMPLETED, 0).__getstate__(),
+                     "ONLYDB", "ONLYDB", True, id="from-database"),
+        pytest.param(None, None, "GHOST", None, False, id="unknown-everywhere"),
+    ],
+)
+def test_resolve_update_job(as_conf, mocker, memory_job, db_node, lookup_name,
+                            expected_name, expected_from_db):
+    """_resolve_update_job checks memory first, then the database, and yields None when unknown."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    index = {memory_job.name.upper(): memory_job} if memory_job else {}
+    mocked_db = mocker.patch.object(job_list.dbmanager, "load_job_by_name", return_value=db_node)
+
+    job, from_db = job_list._resolve_update_job(lookup_name, index)
+
+    assert from_db is expected_from_db
+    if expected_name is None:
+        assert job is None
+    elif memory_job is not None:
+        assert job is memory_job
+        mocked_db.assert_not_called()
+    else:
+        assert job is not None
+        assert job.name == expected_name
+        assert job.status == Status.COMPLETED
+
+
+def test_persist_unloaded_job_changes_splits_reset_and_edge_updates(as_conf, mocker):
+    """Unloaded changes are saved with reset counters for re-runnable targets and reconcile
+    the DB edges of final targets, keeping everything else untouched."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    mocked_save = mocker.patch.object(job_list.dbmanager, "save_jobs")
+    mocked_edges = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_completion")
+    rerunnable = Job("RERUN", None, Status.READY, 0)
+    final = Job("DONE", 5, Status.COMPLETED, 0)
+    other = Job("UNKNOWN_STATE", None, Status.UNKNOWN, 0)
+    pairs = [(rerunnable, Status.READY), (final, Status.COMPLETED), (other, Status.UNKNOWN)]
+
+    job_list._persist_unloaded_job_changes(pairs)
+
+    mocked_save.assert_has_calls([
+        mocker.call([rerunnable], reset_log_counters=True),
+        mocker.call([final, other], reset_log_counters=False),
+    ])
+    mocked_edges.assert_called_once_with("DONE", "COMPLETED")
+
+
+def test_persist_unloaded_job_changes_skipped_when_saving_disabled(as_conf, mocker):
+    """Unloaded changes are not persisted when saving is disabled."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    mocked_save = mocker.patch.object(job_list.dbmanager, "save_jobs")
+    mocked_edges = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_completion")
+
+    job_list._persist_unloaded_job_changes([(Job("X", None, Status.COMPLETED, 0), Status.COMPLETED)])
+
+    mocked_save.assert_not_called()
+    mocked_edges.assert_not_called()
+
+
+def test_update_from_file_returns_false_without_update_file(as_conf, tmp_path):
+    """update_from_file returns False and changes nothing when no update file exists."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    job_list._update_file_path = tmp_path / "updated_list_a000.txt"
+
+    assert job_list.update_from_file() is False
+
+
+@pytest.mark.parametrize("store_change, file_kept", [(False, True), (True, False)])
+def test_update_from_file_store_change_controls_archiving(as_conf, tmp_path, store_change, file_kept):
+    """store_change controls whether the update file is archived after processing."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    job = Job("job1", "1", Status.WAITING, 0)
+    job_list.add_job(job)
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text("job1 COMPLETED\n", encoding="utf-8")
+
+    assert job_list.update_from_file(store_change=store_change) is True
+    assert job.status == Status.COMPLETED
+    assert update_path.exists() is file_kept
+    assert bool(list(tmp_path.glob("updated_list_a000.txt_*"))) is not file_kept
+
+
+def test_collect_update_changes_ignores_unchanged_targets(as_conf, mocker):
+    """Lines targeting the job's current status are ignored, producing no change."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    update_path = mocker.MagicMock()
+    update_path.name = "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    stored = Job("DUP", 5, Status.COMPLETED, 0)
+    mocker.patch.object(job_list.dbmanager, "load_job_by_name", return_value=stored.__getstate__())
+
+    pairs, unloaded_pairs = job_list._collect_update_changes(["DUP COMPLETED"])
+
+    assert pairs == []
+    assert unloaded_pairs == []
+
+
+def test_collect_update_changes_duplicate_lines_last_wins(as_conf, mocker):
+    """When a job appears more than once only the last line is applied."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    update_path = mocker.MagicMock()
+    update_path.name = "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    stored = Job("DUP", 5, Status.WAITING, 0)
+    mocker.patch.object(job_list.dbmanager, "load_job_by_name", return_value=stored.__getstate__())
+
+    pairs, unloaded_pairs = job_list._collect_update_changes(
+        ["DUP COMPLETED", "dup WAITING", "DUP FAILED"]
+    )
+
+    assert len(pairs) == 1
+    assert len(unloaded_pairs) == 1
+    assert pairs[0][0] is not None
+    assert pairs[0][1] == Status.FAILED
