@@ -260,3 +260,30 @@ def test_handle_missing_dependency(mocker):
         '"autosubmit scooby" requires "autosubmit-scooby[plot,stats]"\n\n'
         "ModuleNotFoundError: No module named 'scoobydoo'"
     )
+
+
+def test_entry_points_have_short_names():
+    """Ensure the entry-point sub-commands have short names.
+
+    The short name, or title, is derived from the very first line in the
+    docstring, after the three double quotes. This is a convention for the
+    Autosubmit sub-commands, enforced via this unit test, after a review
+    in a pull request detected an issue with the sub-command title. The
+    result was that the ``manpages`` command was writing global logs with
+    an invalid file name -- an issue we want to avoid, thus this test.
+    """
+    for cmd, entry_point in get_commands().items():
+        assert " " not in cmd
+        assert cmd.lower() == cmd
+
+        module = __import__(entry_point.module, fromlist=[""])
+
+        if hasattr(module, "__doc__") and module.__doc__:
+            doc = parse_docstring(module.__doc__)
+
+            # If a developer accidentally writes the docstring with something like
+            # "Generate Autosubmit manual pages.", instead of "manpages" in a script,
+            # then this test will fail alerting that the docstring "title" (the
+            # first string after the three double-quotes in a docstring) must be the
+            # sub-command short name.
+            assert doc.title == cmd
