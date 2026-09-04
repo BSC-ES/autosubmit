@@ -15,6 +15,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 - Added support for PostgreSQL as a database backend, in addition to the default SQLite. This provides users with more options for database management.
 - Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
 - [enhancement] Allow recovery to update current running/ready jobs #1251
+- Extended possible experiment statuses in `experiment_status` table, added `last_heartbeat` column as a keep-alive signal for running experiments #2947
 
 **Migration from `job_list.pkl` to Database**
 

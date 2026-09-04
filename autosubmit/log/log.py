@@ -362,7 +362,7 @@ class Log:
         """Sends debug information to the log.
 
         :param msg: message to show
-        :param args: arguments for message formating (it will be done using format() method on str)
+        :param args: arguments for message formatting (it will be done using format() method on str)
         """
         msg = Log._verify_args_message(msg, *args)
         Log.log.log(Log.DEBUG, msg)
@@ -382,7 +382,7 @@ class Log:
         """Sends results information to the log. It will be shown in green in the console.
 
         :param msg: message to show
-        :param args: arguments for message formating (it will be done using format() method on str)
+        :param args: arguments for message formatting (it will be done using format() method on str)
         """
         msg = Log._verify_args_message(msg, *args)
         Log.log.log(Log.RESULT, msg)
