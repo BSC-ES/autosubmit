@@ -15,12 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 
 import pytest
 
-from autosubmit.helpers import LOCAL_TZ
 from autosubmit.helpers.utils import get_rc_path, strtobool, user_yes_no_query
 
 
@@ -108,16 +106,3 @@ def test_user_yes_no_query(answer: str, expected_or_error: bool | Exception, moc
     else:
         mocker.patch('autosubmit.helpers.utils.input', return_value=answer)
         assert expected_or_error == user_yes_no_query('Sure?')
-
-
-def test_LOCAL_TZ():
-    """Test that LOCAL_TZ is valid"""
-    assert isinstance(LOCAL_TZ, tzinfo)
-
-    dt = datetime.now(LOCAL_TZ)
-    assert dt.tzinfo is not None
-    assert dt.utcoffset() is not None
-
-    expected_offset = datetime.now(timezone.utc).astimezone().utcoffset()
-    actual_offset = datetime.now(LOCAL_TZ).utcoffset()
-    assert actual_offset == expected_offset

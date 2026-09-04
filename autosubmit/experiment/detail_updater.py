@@ -32,7 +32,7 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_id
 from autosubmit.database.session import get_engine
 from autosubmit.database.tables import TableRegistry
-from autosubmit.helpers import LOCAL_TZ
+from autosubmit.helpers.datetime_utils import to_utc_iso
 
 
 class ExperimentDetailsRepository(ABC):
@@ -263,7 +263,7 @@ class ExperimentDetails:
         self._details_repo.upsert_details(
             self.exp_id, self.user, self.created, self.model, self.branch, self.hpc
         )
-    
+
     def get_details(self) -> dict[str, Any] | None:
         """
         Retrieve the last stored snapshot of the experiment's details
@@ -294,9 +294,11 @@ class ExperimentDetails:
         Get the creation date of the experiment. This is obtained from the
         experiment directory stat information.
         """
-        return datetime.datetime.fromtimestamp(
-            int(self.exp_dir_stat.st_ctime), tz=LOCAL_TZ
-        ).isoformat()
+        return to_utc_iso(
+            datetime.datetime.fromtimestamp(
+                int(self.exp_dir_stat.st_ctime), tz=datetime.timezone.utc
+            )
+        )
 
     @property
     def model(self) -> str:

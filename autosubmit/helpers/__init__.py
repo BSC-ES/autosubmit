@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -16,7 +16,3 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Autosubmit Helpers."""
-
-from datetime import datetime, timezone
-
-LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo

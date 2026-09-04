@@ -17,13 +17,10 @@
 
 
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from autosubmit.helpers import LOCAL_TZ
-
-DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S%z'
+from autosubmit.helpers.datetime_utils import utc_now_iso
 
 
 def get_fields_as_comma_str(model):
@@ -46,13 +43,12 @@ def calculate_run_time_in_seconds(start_time: float, finish_time: float) -> int:
 
 
 def get_current_datetime() -> str:
-    """Returns the current time in format '%Y-%m-%dT%H:%M:%S%z'."""
-    return datetime.now(LOCAL_TZ).strftime(DATETIME_FORMAT)
+    """Returns the current time in UTC format '%Y-%m-%dT%H:%M:%S+00:00'."""
+    return utc_now_iso()
 
 
 def get_current_datetime_if_none(argument: Any) -> str | None:
-    # type : (Any) -> Union[Any, str]
-    """ Returns the current time in format '%Y-%m-%dT%H:%M:%S%z' if the supplied argument is None, else return argument. """
+    """Return ``argument`` if provided, otherwise the current UTC datetime in ISO format."""
     if argument is None:
         return get_current_datetime()
     else:
