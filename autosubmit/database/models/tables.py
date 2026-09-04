@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import datetime
 from functools import cached_property
 
 from sqlalchemy import (
@@ -34,7 +33,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 
-from autosubmit.helpers import LOCAL_TZ
+from autosubmit.helpers.datetime_utils import utc_now_iso
 
 metadata_obj = MetaData()
 
@@ -55,7 +54,7 @@ ExperimentStatusTable = Table(
     Column("name", Text, nullable=False),
     Column("status", Text, nullable=False),
     Column("seconds_diff", Integer, nullable=False),
-    Column("modified", Text, nullable=False),
+    Column("modified", Text, nullable=False, default=utc_now_iso),
 )
 """Stores the status of the experiments."""
 
@@ -68,8 +67,8 @@ ExperimentRunTable = Table(
     "experiment_run",
     metadata_obj,
     Column("run_id", Integer, primary_key=True),
-    Column("created", Text, nullable=False),
-    Column("modified", Text, nullable=True),
+    Column("created", Text, nullable=False, default=utc_now_iso),
+    Column("modified", Text, nullable=True, default=utc_now_iso),
     Column("start", Integer, nullable=False),
     Column("finish", Integer),
     Column("chunk_unit", Text, nullable=False),
@@ -89,7 +88,7 @@ DetailsTable = Table(
     metadata_obj,
     Column("exp_id", Integer, primary_key=True),
     Column("user", Text, nullable=False),
-    Column("created", Text, nullable=False),
+    Column("created", Text, nullable=False, default=utc_now_iso),
     Column("model", Text, nullable=False),
     Column("branch", Text, nullable=False),
     Column("hpc", Text, nullable=False),
@@ -102,8 +101,8 @@ JobDataTable = Table(
     Column("id", Integer, nullable=False, primary_key=True),
     Column("counter", Integer, nullable=False),
     Column("job_name", Text, nullable=False, index=True),
-    Column("created", Text, nullable=False),
-    Column("modified", Text, nullable=False),
+    Column("created", Text, nullable=False, default=utc_now_iso),
+    Column("modified", Text, nullable=False, default=utc_now_iso),
     Column("submit", Integer, nullable=False),
     Column("start", Integer, nullable=False),
     Column("finish", Integer, nullable=False),
@@ -186,8 +185,8 @@ JobsTable = Table(
     Column("packed", Boolean),
     Column("current_checkpoint_step", Integer, nullable=False, default=0),
     Column("platform_name", String),
-    Column("created", Text, nullable=False, default=lambda: datetime.datetime.now(tz=LOCAL_TZ).isoformat(timespec='seconds')),
-    Column("modified", Text, nullable=False, default=lambda: datetime.datetime.now(tz=LOCAL_TZ).isoformat(timespec='seconds'))
+    Column("created", Text, nullable=False, default=utc_now_iso),
+    Column("modified", Text, nullable=False, default=utc_now_iso),
 )
 
 """Table that holds the structure of the experiment jobs."""
@@ -263,7 +262,7 @@ def create_wrapper_tables(name: str, metadata_obj_: MetaData) -> tuple[Table, Ta
         Column("package_id", Integer, nullable=False, primary_key=True),
         Column("package_name", String, nullable=False, primary_key=True),
         Column("job_name", String, nullable=False, primary_key=True),
-        Column("timestamp", String, nullable=True),
+        Column("timestamp", String, nullable=True, default=utc_now_iso),
         Column("run_id", Integer, nullable=True),
         UniqueConstraint("package_id", "package_name", "job_name", name=f"unique_{name}_jobs_package_id_package_name_job_name"),
 
@@ -282,7 +281,7 @@ UserMetricsTable = Table(
     Column("job_name", Text),
     Column("metric_name", Text),
     Column("metric_value", Text),
-    Column("modified", Text),
+    Column("modified", Text, default=utc_now_iso),
 )
 
 GENERALTABLES = {

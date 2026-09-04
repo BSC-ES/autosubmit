@@ -1974,6 +1974,8 @@ def test_get_state():
     assert dt_modified.tzinfo is not None and dt_modified.utcoffset() is not None, (
         f"modified must be timezone-aware, got: {modified!r}"
     )
+    assert dt_modified.utcoffset() == timedelta(0)
+    assert dt_modified.microsecond == 0
 
 
 @pytest.mark.parametrize('loaded_data',
