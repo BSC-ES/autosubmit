@@ -126,7 +126,7 @@ USER $MAMBA_USER
 # Install Python
 RUN micromamba install --yes --name base --channel conda-forge \
       git=2.41.0 \
-      python=3.10.20 && \
+      python=3.9.16 && \
     micromamba clean --all --yes && \
     /usr/local/bin/_activate_current_env.sh
 
