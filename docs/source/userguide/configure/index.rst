@@ -369,7 +369,7 @@ To add a new platform, open the ``platforms_<EXPID>.yml`` file and add:
             HOST: <host_name>
             PROJECT: <project>
             USER: <user>
-            SCRATCH: <scratch_dir>
+            SCRATCH_DIR: <scratch_dir>
             MAX_WALLCLOCK: <HH:MM>
             QUEUE: <hpc_queue>
             # OPTIONAL
