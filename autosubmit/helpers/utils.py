@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import ctypes
+import gc
 import os
 import pwd
 import re
@@ -384,3 +386,24 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
 
     plat.restore_connection(as_conf)
     return plat
+
+
+# Resolved once at import; None on platforms without glibc's malloc_trim
+# (macOS/musl), so the call becomes a safe no-op there.
+_malloc_trim = getattr(ctypes.CDLL(None, use_errno=True), "malloc_trim", None)
+
+
+def release_memory_to_os() -> None:
+    """Return free heap pages to the OS (Linux/glibc only).
+
+    ``gc.collect()`` frees Python objects; glibc's ``malloc_trim(0)`` pushes the
+    remaining free heap pages back so RSS reflects real usage instead of the
+    historical high-water mark. No-op on platforms without ``malloc_trim``.
+
+    :return: None
+    :rtype: None
+    """
+    gc.collect()
+    if _malloc_trim is not None:
+        with suppress(OSError):
+            _malloc_trim(0)
