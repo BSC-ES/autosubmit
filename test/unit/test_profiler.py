@@ -15,32 +15,21 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Unit tests for the Autosubmit profiler."""
-
-import socket
-from datetime import datetime, timezone
+import gc
+import os
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
 from autosubmit.log.log import AutosubmitCritical
+from autosubmit.profiler import profiler as profiler_module
 
 # noinspection PyProtectedMember
 from autosubmit.profiler.profiler import (
     Profiler,
     ProfilerState,
-    _calculate_fd_growth,
-    _calculate_fd_total_growth,
-    _calculate_growth,
-    _format_bytes,
-    _format_connection,
-    _format_fd_changes,
-    _format_fd_label,
-    _format_signed_bytes,
-    _format_signed_int,
-    _format_socket_address,
-    _format_top_allocations,
     _generate_title,
     _get_current_memory,
     _get_current_object_count,
@@ -48,145 +37,81 @@ from autosubmit.profiler.profiler import (
     _get_current_open_fds_names,
     _get_fd_connection_map,
     _get_pipe_direction,
-    _is_autosubmit_traceback,
     _now,
 )
 
 
 @pytest.fixture
-def profiler():
-    return Profiler(subcommand="run", expid="a001")
+def profiler(mocker):
+    profiler = Profiler(
+        subcommand="run",
+        expid="a000",
+    )
+
+    # Unit tests must never execute or depend on real cProfile data.
+    # noinspection PyProtectedMember
+    mocker.patch.object(profiler._profiler, "enable")
+    # noinspection PyProtectedMember
+    mocker.patch.object(profiler._profiler, "disable")
+    # noinspection PyProtectedMember
+    mocker.patch.object(profiler._profiler, "dump_stats")
+
+    class FakeStats:
+        def __init__(self, _, stream=None):
+            self.stream = stream
+
+        def strip_dirs(self):
+            return self
+
+        def sort_stats(self, *_, **__):
+            return self
+
+        def print_stats(self, *_, **__):
+            if self.stream is not None:
+                self.stream.write("Fake cProfile statistics\n")
+
+        # noinspection PyMethodMayBeStatic
+        def dump_stats(self, filename):
+            Path(filename).touch()
+
+    mocker.patch(
+        "autosubmit.profiler.profiler.pstats.Stats",
+        FakeStats,
+    )
+
+    yield profiler
+
+    # Do not let fixture clean-up invoke the real reporting machinery.
+    if profiler.started:
+        profiler._state = ProfilerState.STOPPED
+
+
+@pytest.fixture
+def profiled_profiler(profiler):
+    # noinspection PyProtectedMember
+    profiler._profiler.enable()
+    # noinspection PyProtectedMember
+    profiler._profiler.disable()
+    return profiler
 
 
 @pytest.fixture
 def started_profiler(profiler, mocker):
-    # noinspection PyProtectedMember
-    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch("gc.collect")
     mocker.patch(
         "autosubmit.profiler.profiler._get_current_memory",
         return_value=1000,
     )
-    mocker.patch("autosubmit.profiler.profiler.gc.collect")
-
     profiler.start()
     return profiler
 
 
-def test_profiler_initial_state(profiler):
-    assert profiler.stopped
-    assert not profiler.started
-    assert profiler._state == ProfilerState.STOPPED
-    assert profiler._subcommand == "run"
-    assert profiler._expid == "a001"
-    assert profiler.max_checkpoints == 0
-    assert profiler.checkpoint_count == 0
-
-
-def test_profiler_constructor_without_expid():
-    profiler = Profiler(subcommand="run", expid=None)
-
-    assert profiler._expid is None
-    assert profiler.report_path == Path(profiler.report_path)
-
-
-def test_profiler_constructor_with_options():
-    profiler = Profiler(
-        subcommand="monitor",
-        expid="a002",
-        trace_enabled=True,
-        max_checkpoints=4,
-    )
-
-    assert profiler._subcommand == "monitor"
-    assert profiler._expid == "a002"
-    assert profiler._trace_enabled is True
-    assert profiler.max_checkpoints == 4
-
-
-def test_profiler_start(started_profiler):
-    assert started_profiler.started
-    assert not started_profiler.stopped
-    assert started_profiler._mem_initial == 1000
-
-
-def test_profiler_start_twice_raises(started_profiler):
-    with pytest.raises(AutosubmitCritical) as exc_info:
-        started_profiler.start()
-
-    assert exc_info.value.code == 7074
-    assert "already started" in exc_info.value.message
-
-
-def test_profiler_stop_before_start_raises(profiler):
-    with pytest.raises(AutosubmitCritical) as exc_info:
-        profiler.stop()
-
-    assert exc_info.value.code == 7074
-    assert "was not running" in exc_info.value.message
-
-
-def test_profiler_stop(started_profiler, mocker):
-    disable = mocker.patch.object(started_profiler._profiler, "disable")
+@pytest.fixture
+def checkpoint_mocks(mocker):
+    mocker.patch("gc.collect")
     mocker.patch(
         "autosubmit.profiler.profiler._get_current_memory",
-        return_value=2000,
-    )
-    report = mocker.patch.object(started_profiler, "_report")
-
-    started_profiler.stop()
-
-    assert started_profiler.stopped
-    assert started_profiler._mem_final == 2000
-    disable.assert_called_once()
-    report.assert_called_once()
-
-
-def test_profiler_stop_stops_tracemalloc_on_report_error(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-
-    mocker.patch.object(profiler._profiler, "enable")
-    mocker.patch.object(profiler._profiler, "disable")
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_memory",
-        side_effect=[1000, 2000],
-    )
-    mocker.patch("autosubmit.profiler.profiler.gc.collect")
-    mocker.patch(
-        "autosubmit.profiler.profiler.tracemalloc.is_tracing",
-        return_value=True,
-    )
-    stop_trace = mocker.patch("autosubmit.profiler.profiler.tracemalloc.stop")
-    mocker.patch.object(
-        profiler,
-        "_report",
-        side_effect=RuntimeError("report failed"),
-    )
-
-    profiler.start()
-
-    with pytest.raises(RuntimeError, match="report failed"):
-        profiler.stop()
-
-    assert profiler.stopped
-    stop_trace.assert_called_once()
-
-
-def test_iteration_checkpoint_requires_started_profiler(profiler):
-    with pytest.raises(AutosubmitCritical) as exc_info:
-        profiler.iteration_checkpoint(10, 20)
-
-    assert exc_info.value.code == 7074
-    assert "not running" in exc_info.value.message
-
-
-def test_iteration_checkpoint_records_metrics(started_profiler, mocker):
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_memory",
-        return_value=1200,
+        return_value=1000,
     )
     mocker.patch(
         "autosubmit.profiler.profiler._get_current_object_count",
@@ -201,56 +126,364 @@ def test_iteration_checkpoint_records_metrics(started_profiler, mocker):
         return_value=["[fd=1] stdout"],
     )
 
-    assert started_profiler.iteration_checkpoint(25, 40) is False
-    assert started_profiler._mem_iteration == [1200]
-    assert started_profiler._obj_iteration == [200]
-    assert started_profiler._fd_iteration == [10]
-    assert started_profiler._fd_names_iteration == [["[fd=1] stdout"]]
-    assert started_profiler._jobs_iteration == [25]
-    assert started_profiler._edges_iteration == [40]
-    assert started_profiler.checkpoint_count == 1
 
+@pytest.fixture
+def report_setup(profiler, mocker, tmp_path):
+    report_path = tmp_path / "profile"
 
-def test_iteration_checkpoint_respects_max_checkpoints(started_profiler):
-    started_profiler.max_checkpoints = 2
-
-    assert started_profiler.iteration_checkpoint(10, 20) is False
-    assert started_profiler.iteration_checkpoint(11, 21) is True
-    assert started_profiler.checkpoint_count == 2
-    assert started_profiler.iteration_checkpoint(12, 22) is True
-
-
-def test_iteration_checkpoint_captures_trace(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
+    mocker.patch.object(
+        type(profiler),
+        "report_path",
+        new_callable=mocker.PropertyMock,
+        return_value=report_path,
     )
-
-    mocker.patch.object(profiler._profiler, "enable")
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_memory",
-        side_effect=[1000, 1100],
+    mocker.patch.object(
+        type(profiler),
+        "file_name",
+        new_callable=mocker.PropertyMock,
+        return_value="profile.prof",
     )
     mocker.patch(
-        "autosubmit.profiler.profiler._get_current_object_count",
-        return_value=10,
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_open_fds",
-        return_value=5,
+        "autosubmit.profiler.profiler.os.access",
+        return_value=True,
     )
     mocker.patch(
         "autosubmit.profiler.profiler._get_current_open_fds_names",
         return_value=[],
     )
-    mocker.patch("autosubmit.profiler.profiler.gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler.Log.info",
+    )
+
+    return report_path
+
+
+def test_initial_state(profiler):
+    assert profiler.stopped
+    assert not profiler.started
+    assert profiler._state == ProfilerState.STOPPED
+    assert profiler.checkpoints == 0
+
+
+def test_now_format():
+    value = _now()
+
+    assert len(value) == 15
+    assert value[8] == "-"
+    assert value[:8].isdigit()
+    assert value[9:].isdigit()
+
+
+def test_generate_title():
+    result = _generate_title("Test")
+    lines = result.splitlines()
+
+    assert len(lines) == 3
+    assert all(len(line) == 80 for line in lines)
+    assert lines[0] == "=" * 80
+    assert lines[1].strip() == "Test"
+    assert lines[2] == "=" * 80
+
+
+def test_generate_title_without_title():
+    result = _generate_title()
+
+    assert len(result.splitlines()) == 3
+    assert all(len(line) == 80 for line in result.splitlines())
+
+
+def test_file_name_with_expid(profiler, mocker):
+    mocker.patch(
+        "autosubmit.profiler.profiler._now",
+        return_value="20260101-120000",
+    )
+
+    assert profiler.file_name == "a000_run_profile_20260101-120000.prof"
+
+
+def test_file_name_without_expid(mocker):
+    mocker.patch(
+        "autosubmit.profiler.profiler._now",
+        return_value="20260101-120000",
+    )
+
+    profiler = Profiler(
+        subcommand="run",
+        expid=None,
+    )
+
+    assert profiler.file_name == "run_profile_20260101-120000.prof"
+
+
+def test_report_path_with_expid(profiler):
+    """Test that the profiler report path uses the experiment directory.
+
+    :param profiler: Profiler fixture configured with an experiment identifier.
+    :return: None.
+    :raises AssertionError: If the generated report path is incorrect.
+    """
+    # noinspection PyProtectedMember
+    expected = (
+        Path(profiler_module.BasicConfig.LOCAL_ROOT_DIR)
+        / profiler._expid  # type: ignore
+        / "tmp"
+        / "profile"
+    )
+
+    assert profiler.report_path == expected
+
+
+def test_report_path_without_expid():
+    """Test that the profiler report path uses the global profile directory.
+
+    :return: None.
+    :raises AssertionError: If the generated report path is incorrect.
+    """
+    profiler = Profiler(
+        subcommand="run",
+        expid=None,
+    )
+
+    expected = Path(profiler_module.BasicConfig.GLOBAL_LOG_DIR) / "profile"
+
+    assert profiler.report_path == expected
+
+
+def test_start(profiler, mocker):
+    enable = mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch("gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=123,
+    )
+
+    profiler.start()
+
+    enable.assert_called_once()
+    assert profiler.started
+    assert profiler._mem_init == 123
+
+
+def test_start_twice_fails(profiler, mocker):
+    mocker.patch("gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=123,
+    )
+
+    profiler.start()
+
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        profiler.start()
+
+    assert exc_info.value.code == 7074
+
+
+def test_stop_before_start_fails(profiler):
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        profiler.stop()
+
+    assert exc_info.value.code == 7074
+
+
+def test_stop_twice_fails(profiler, mocker):
+    mocker.patch("gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=123,
+    )
+    mocker.patch.object(profiler._profiler, "disable")
+    mocker.patch.object(profiler, "_report")
+
+    profiler.start()
+    profiler.stop()
+
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        profiler.stop()
+
+    assert exc_info.value.code == 7074
+
+
+def test_stop_disables_profiler(started_profiler, mocker):
+    disable = mocker.patch.object(started_profiler._profiler, "disable")
+    mocker.patch.object(started_profiler, "_report")
+
+    started_profiler.stop()
+
+    disable.assert_called_once()
+    assert started_profiler.stopped
+
+
+def test_start_enables_tracemalloc(profiler, mocker):
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch("gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=100,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.is_tracing",
+        return_value=False,
+    )
+    start = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.start",
+    )
+
+    profiler._trace_enabled = True
+    profiler.start()
+
+    start.assert_called_once()
+    assert profiler._trace_started is True
+
+
+def test_start_does_not_restart_tracemalloc(profiler, mocker):
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch("gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=100,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.is_tracing",
+        return_value=True,
+    )
+    start = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.start",
+    )
+
+    profiler._trace_enabled = True
+    profiler.start()
+
+    start.assert_not_called()
+    assert profiler._trace_started is False
+
+
+def test_stop_stops_tracemalloc(profiler, mocker):
+    profiler._trace_enabled = True
+
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch("gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        side_effect=[100, 200],
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.is_tracing",
+        side_effect=[False, True],
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.start",
+    )
+    stop = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.stop",
+    )
+    mocker.patch.object(profiler._profiler, "disable")
+    mocker.patch.object(profiler, "_report")
+
+    profiler.start()
+    profiler.stop()
+
+    stop.assert_called_once()
+
+
+def test_iteration_checkpoint(
+    started_profiler,
+    checkpoint_mocks,
+):
+    result = started_profiler.iteration_checkpoint(
+        loaded_jobs=5,
+        loaded_edges=7,
+    )
+
+    assert result is False
+    assert started_profiler._obj_iteration == [200]
+    assert started_profiler._fd_iteration == [10]
+    assert started_profiler._fd_names_iteration == [["[fd=1] stdout"]]
+    assert started_profiler._jobs_iteration == [5]
+    assert started_profiler._edges_iteration == [7]
+
+
+def test_iteration_checkpoint_calls_gc(
+    started_profiler,
+    checkpoint_mocks,
+):
+    collect = gc.collect
+
+    started_profiler.iteration_checkpoint(1, 2)
+
+    assert collect.called  # type: ignore
+
+
+def test_iteration_checkpoint_max_checkpoints(mocker):
+    profiler = Profiler(
+        subcommand="run",
+        expid="a000",
+        max_checkpoints=2,
+    )
+
+    mocker.patch.object(profiler._profiler, "enable")
+    mocker.patch.object(profiler._profiler, "disable")
+    mocker.patch.object(profiler, "_report")
+
+    profiler.start()
+
+    mocker.patch("gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=1000,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_object_count",
+        return_value=200,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds",
+        return_value=10,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds_names",
+        return_value=[],
+    )
+
+    assert profiler.iteration_checkpoint(1, 1) is False
+    assert profiler.iteration_checkpoint(1, 1) is False
+    assert profiler.iteration_checkpoint(1, 1) is True
+    assert profiler.checkpoints == 3
+
+
+def test_iteration_checkpoint_unlimited(started_profiler, checkpoint_mocks):
+    for _ in range(10):
+        assert started_profiler.iteration_checkpoint(1, 1) is False
+
+    assert started_profiler.checkpoints == 0
+
+
+def test_checkpoint_takes_snapshot(profiler, mocker):
+    profiler._trace_enabled = True
+
+    mocker.patch("gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=1000,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_object_count",
+        return_value=200,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds",
+        return_value=10,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds_names",
+        return_value=[],
+    )
     mocker.patch(
         "autosubmit.profiler.profiler.tracemalloc.is_tracing",
         return_value=True,
     )
 
-    snapshot = mocker.MagicMock()
+    snapshot = MagicMock()
     take_snapshot = mocker.patch(
         "autosubmit.profiler.profiler.tracemalloc.take_snapshot",
         return_value=snapshot,
@@ -258,1049 +491,994 @@ def test_iteration_checkpoint_captures_trace(mocker):
     capture = mocker.patch.object(
         profiler,
         "_capture_allocation_delta",
-        return_value=[],
+        return_value=["stat"],
     )
 
     profiler.start()
-    profiler.iteration_checkpoint(10, 20)
+    profiler.iteration_checkpoint(1, 2)
 
     take_snapshot.assert_called_once()
     capture.assert_called_once_with(snapshot)
-    assert profiler._trace_stats_by_iter == [[]]
+    assert profiler._trace_snapshots == [snapshot]
+    assert profiler._trace_stats_by_iter == [["stat"]]
 
 
-def test_calculate_growth():
-    assert _calculate_growth([100, 150, 180]) == [50, 30]
+def test_checkpoint_does_not_take_snapshot(
+    started_profiler,
+    checkpoint_mocks,
+    mocker,
+):
+    take_snapshot = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.take_snapshot",
+    )
+
+    started_profiler.iteration_checkpoint(1, 2)
+
+    take_snapshot.assert_not_called()
 
 
-def test_profiler_calculate_growth():
-    profiler = Profiler(subcommand="run", expid="a001")
-    profiler._mem_iteration = [100, 150, 180, 200]
-    profiler._obj_iteration = [10, 15, 21, 30]
-    profiler._fd_iteration = [4, 5, 7, 8]
-
-    profiler._calculate_growth()
-
-    assert profiler._mem_growth == [50, 30, 20]
-    assert profiler._obj_growth == [5, 6, 9]
-    assert profiler._fd_growth == [1, 2, 1]
-    assert profiler._obj_total_growth == 9
-    assert profiler._fd_total_growth == 1
+def test_capture_allocation_delta_without_previous_snapshot(profiler):
+    assert profiler._capture_allocation_delta(MagicMock()) == []
 
 
-def test_profiler_calculate_growth_with_short_run():
-    profiler = Profiler(subcommand="run", expid="a001")
-    profiler._mem_iteration = [100, 150]
-    profiler._obj_iteration = [10, 15]
-    profiler._fd_iteration = [4, 7]
+def test_capture_allocation_delta_returns_positive_stats(profiler):
+    previous = MagicMock()
+    current = MagicMock()
 
-    profiler._calculate_growth()
+    stats = [
+        SimpleNamespace(size_diff=100),
+        SimpleNamespace(size_diff=-20),
+        SimpleNamespace(size_diff=50),
+        SimpleNamespace(size_diff=10),
+        SimpleNamespace(size_diff=5),
+        SimpleNamespace(size_diff=4),
+        SimpleNamespace(size_diff=3),
+    ]
 
-    assert profiler._obj_total_growth == 5
-    assert profiler._fd_total_growth == 3
+    current.compare_to.return_value = stats
+    profiler._trace_snapshots.append(previous)
 
-
-def test_profiler_calculate_growth_with_unavailable_fds():
-    profiler = Profiler(subcommand="run", expid="a001")
-    profiler._mem_iteration = [100, 150]
-    profiler._obj_iteration = [10, 15]
-    profiler._fd_iteration = [None, 7]
-
-    profiler._calculate_growth()
-
-    assert profiler._fd_growth == []
-    assert profiler._fd_total_growth == 0
-
-
-@pytest.mark.parametrize(
-    ("values", "expected"),
-    [
-        ([4, 5, 7], [1, 2]),
-        ([4, None, 7], []),
-        ([None, 5, 7], [2]),
-        ([4, 5, None], [1]),
-        ([None, None], []),
-    ],
-)
-def test_calculate_fd_growth(values, expected):
-    assert _calculate_fd_growth(values) == expected
+    assert profiler._capture_allocation_delta(current) == [
+        stats[0],
+        stats[2],
+        stats[3],
+        stats[4],
+        stats[5],
+    ]
 
 
-@pytest.mark.parametrize(
-    ("values", "baseline", "expected"),
-    [
-        ([4, 5, 7], 0, 3),
-        ([4, 5, 7], 1, 2),
-        ([4, None, 7], 1, 0),
-        ([None, 5, 7], 0, 0),
-    ],
-)
-def test_calculate_fd_total_growth(values, baseline, expected):
-    assert _calculate_fd_total_growth(values, baseline) == expected
+def test_calculate_grow(profiler):
+    profiler._mem_iteration = [100, 150, 190, 250]
+    profiler._obj_iteration = [10, 15, 20, 30]
+    profiler._fd_iteration = [3, 4, 5, 7]
+    profiler.checkpoints = 3
+
+    profiler._calculate_grow()
+
+    assert profiler._mem_grow == [50, 40, 60]
+    assert profiler._obj_grow == [5, 5, 10]
+    assert profiler._fd_grow == [1, 1, 2]
+    assert profiler._mem_total_grow == 150
+    assert profiler._obj_total_grow == 20
+    assert profiler._fd_total_grow == 4
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        (0, "0.00 B"),
-        (1023, "1023.00 B"),
-        (1024, "1.00 KiB"),
-        (1024**2, "1.00 MiB"),
-        (-1024, "-1.00 KiB"),
-        (1024**3, "1.00 GiB"),
-    ],
-)
-def test_format_bytes(value, expected):
-    assert _format_bytes(value) == expected
+def test_calculate_grow_after_three_checkpoints(profiler):
+    """Test that object and FD growth starts after the first three checkpoints.
+
+    :param profiler: Profiler fixture used to calculate growth metrics.
+    :return: None.
+    :raises AssertionError: If growth is calculated from the wrong checkpoint.
+    """
+    profiler._mem_iteration = [100, 150, 190, 250, 310]
+    profiler._obj_iteration = [10, 15, 20, 30, 45]
+    profiler._fd_iteration = [3, 4, 5, 7, 9]
+    profiler.checkpoints = 4
+
+    profiler._calculate_grow()
+
+    assert profiler._mem_grow == [50, 40, 60, 60]
+    assert profiler._obj_grow == [5, 5, 10, 15]
+    assert profiler._fd_grow == [1, 1, 2, 2]
+    assert profiler._mem_total_grow == 210
+    assert profiler._obj_total_grow == 15
+    assert profiler._fd_total_grow == 2
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        (1024, "+1.00 KiB"),
-        (0, "+0.00 B"),
-        (-1024, "-1.00 KiB"),
-    ],
-)
-def test_format_signed_bytes(value, expected):
-    assert _format_signed_bytes(value) == expected
+def test_calculate_grow_with_three_checkpoints():
+    profiler = Profiler(
+        subcommand="run",
+        expid="a000",
+    )
+
+    profiler._mem_iteration = [100, 150, 190]
+    profiler._obj_iteration = [10, 15, 20]
+    profiler._fd_iteration = [3, 4, 5]
+    profiler.checkpoints = 3
+
+    profiler._calculate_grow()
+
+    assert profiler._mem_grow == [50, 40]
+    assert profiler._obj_grow == [5, 5]
+    assert profiler._fd_grow == [1, 1]
+    assert profiler._mem_total_grow == 90
+    assert profiler._obj_total_grow == 10
+    assert profiler._fd_total_grow == 2
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        (5, "+5"),
-        (0, "+0"),
-        (-5, "-5"),
-    ],
-)
-def test_format_signed_int(value, expected):
-    assert _format_signed_int(value) == expected
+def test_calculate_grow_empty(profiler):
+    profiler._calculate_grow()
+
+    assert profiler._mem_grow == []
+    assert profiler._obj_grow == []
+    assert profiler._fd_grow == []
+    assert profiler._mem_total_grow == 0
+    assert profiler._obj_total_grow == 0
+    assert profiler._fd_total_grow == 0
 
 
-def test_format_top_allocations_empty():
-    assert _format_top_allocations([]) == []
+def test_format_top_allocations_empty(profiler):
+    assert profiler._format_top_allocations([]) == ""
 
 
-def test_format_top_allocations():
-    frame = SimpleNamespace(filename="/tmp/example.py", lineno=42)
+def test_format_top_allocations(profiler):
+    frame = SimpleNamespace(
+        filename="/tmp/example.py",
+        lineno=42,
+    )
     stat = SimpleNamespace(
         traceback=[frame],
         size_diff=2048,
         count_diff=3,
     )
 
-    assert _format_top_allocations([stat]) == [  # type: ignore
-        "  Top allocation deltas:",
-        "    /tmp/example.py:42 +2.00 KiB (+3 blocks)",
+    result = profiler._format_top_allocations([stat])
+
+    assert "Top allocation deltas:" in result
+    assert "/tmp/example.py:42" in result
+    assert "+2.0 KiB" in result
+    assert "(+3 blocks)" in result
+
+
+def test_report_grow():
+    profiler = Profiler(
+        subcommand="run",
+        expid="a000",
+    )
+
+    profiler._mem_iteration = [1024, 2048, 4096]
+    profiler._obj_iteration = [10, 20, 30]
+    profiler._fd_iteration = [3, 4, 5]
+    profiler._fd_names_iteration = [
+        ["[fd=1] stdout"],
+        ["[fd=1] stdout", "[fd=5] foo"],
+        ["[fd=1] stdout"],
+    ]
+    profiler._jobs_iteration = [1, 2, 3]
+    profiler._edges_iteration = [5, 6, 7]
+    profiler._trace_stats_by_iter = [[], []]
+
+    result = profiler._report_grow()
+
+    assert "Iteration 1:" in result
+    assert "Memory:" in result
+    assert "Objects: 10" in result
+    assert "File Descriptors: 3" in result
+    assert "Loaded jobs: 1" in result
+    assert "Loaded edges: 5" in result
+
+
+def test_report_grow_reports_fd_changes(profiler):
+    profiler._mem_iteration = [1000, 2000, 3000, 4000]
+    profiler._obj_iteration = [10, 20, 30, 40]
+    profiler._fd_iteration = [2, 3, 2, 2]
+    profiler._fd_names_iteration = [
+        ["[fd=1] stdout", "[fd=2] old"],
+        ["[fd=1] stdout", "[fd=3] new"],
+        ["[fd=1] stdout"],
+        ["[fd=1] stdout"],
+    ]
+    profiler._jobs_iteration = [1, 2, 3, 4]
+    profiler._edges_iteration = [1, 2, 3, 4]
+    profiler._trace_stats_by_iter = [[], [], [], []]
+
+    result = profiler._report_grow()
+
+    assert "Iteration 2: Opened file descriptor: [fd=3] new" in result
+    assert "Iteration 2: Closed file descriptor: [fd=2] old" in result
+
+
+def test_report_grow_includes_allocation_statistics():
+    profiler = Profiler(
+        subcommand="run",
+        expid="a000",
+    )
+
+    profiler._mem_iteration = [1000, 2000, 3000]
+    profiler._obj_iteration = [10, 20, 30]
+    profiler._fd_iteration = [2, 3, 4]
+    profiler._fd_names_iteration = [[], [], []]
+    profiler._jobs_iteration = [1, 2, 3]
+    profiler._edges_iteration = [1, 2, 3]
+
+    frame = SimpleNamespace(
+        filename="/tmp/example.py",
+        lineno=10,
+    )
+    stat = SimpleNamespace(
+        traceback=[frame],
+        size_diff=4096,
+        count_diff=2,
+    )
+
+    profiler._trace_stats_by_iter = [[stat], []]
+
+    result = profiler._report_grow()
+
+    assert "Top allocation deltas:" in result
+    assert "/tmp/example.py:10" in result
+
+
+def test_report_creates_files(profiled_profiler, report_setup):
+    profiler = profiled_profiler
+    profiler._mem_init = 100
+    profiler._mem_final = 200
+    profiler._mem_iteration = [100, 200, 300]
+    profiler._obj_grow = [1, 1]
+    profiler._fd_grow = [1, 1]
+    profiler._obj_total_grow = 2
+    profiler._fd_total_grow = 2
+
+    profiler._report()
+
+    assert report_setup.exists()
+    assert (report_setup / "profile.prof").exists()
+    assert (report_setup / "profile.txt").exists()
+
+    report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
+
+    assert "Time & Calls Profiling" in report
+    assert "Overall Memory, Object and File Descriptor Growth" in report
+    assert "FINAL OPEN FILE DESCRIPTORS:" in report
+
+
+def test_report_includes_growth_and_converts_memory_units(
+    profiled_profiler,
+    report_setup,
+    mocker,
+):
+    """Test that the report includes growth details and converts byte values.
+
+    :param profiled_profiler: Profiler with cProfile data already collected.
+    :param report_setup: Fixture configuring the temporary report directory.
+    :param mocker: pytest-mock fixture used to provide final FD names.
+    :return: None.
+    :raises AssertionError: If growth, memory conversion, or FD reporting is missing.
+    """
+    profiler = profiled_profiler
+    profiler._mem_init = 2 * 1024**3
+    profiler._mem_final = 5 * 1024**3
+    profiler._mem_iteration = [1024, 2048, 4096]
+    profiler._obj_iteration = [10, 20, 30]
+    profiler._fd_iteration = [2, 3, 4]
+    profiler._fd_names_iteration = [[], [], []]
+    profiler._jobs_iteration = [1, 2, 3]
+    profiler._edges_iteration = [1, 2, 3]
+
+    profiler._mem_grow = [1024]
+    profiler._obj_grow = [10]
+    profiler._fd_grow = [1]
+    profiler._obj_total_grow = 20
+    profiler._fd_total_grow = 2
+
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds_names",
+        return_value=["[fd=9] /tmp/example.txt"],
+    )
+
+    profiler._report()
+
+    report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
+
+    assert "Memory, object and file descriptor by iteration" in report
+    assert "MEMORY GROW: 3.00 GiB." in report
+    assert "INITIAL MEMORY: 2.00 GiB." in report
+    assert "FINAL MEMORY: 5.00 GiB." in report
+    assert "OBJECTS GROW: 20 objects." in report
+    assert "FILE DESCRIPTORS GROW: 2 file descriptors." in report
+    assert "[fd=9] /tmp/example.txt" in report
+
+
+def test_report_includes_traceback_information(
+    profiled_profiler,
+    report_setup,
+    mocker,
+):
+    """Test that the report includes final file descriptors and object tracebacks.
+
+    :param profiled_profiler: Profiler with cProfile data already collected.
+    :param report_setup: Fixture configuring the temporary report directory.
+    :param mocker: pytest-mock fixture used to provide final FD names.
+    :return: None.
+    :raises AssertionError: If traced objects or final file descriptors are omitted.
+    """
+    profiler = profiled_profiler
+    profiler._mem_init = 100
+    profiler._mem_final = 200
+    profiler._trace_enabled = True
+
+    traceback = (MagicMock(),)
+    profiler._obj_diffs_between_iter.add(traceback)
+
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds_names",
+        return_value=["[fd=8] socket: example"],
+    )
+
+    profiler._report()
+
+    report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
+
+    assert "FINAL OPEN FILE DESCRIPTORS:" in report
+    assert "[fd=8] socket: example" in report
+    assert "Unique object tracebacks between iterations:" in report
+    assert str(traceback) in report
+
+
+def test_report_fails_when_directory_is_not_writable(
+    profiler,
+    mocker,
+    tmp_path,
+):
+    report_path = tmp_path / "profile"
+
+    mocker.patch.object(
+        type(profiler),
+        "report_path",
+        new_callable=mocker.PropertyMock,
+        return_value=report_path,
+    )
+    mocker.patch("os.access", return_value=False)
+
+    with pytest.raises(AutosubmitCritical) as exc_info:
+        profiler._report()
+
+    assert exc_info.value.code == 7012
+
+
+def test_report_without_iterations(
+    profiled_profiler,
+    report_setup,
+):
+    profiler = profiled_profiler
+    profiler._mem_init = 100
+    profiler._mem_final = 200
+
+    profiler._report()
+
+    report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
+
+    assert "MEMORY GROW:" in report
+    assert "INITIAL MEMORY:" in report
+    assert "FINAL MEMORY:" in report
+
+
+def test_stop_uses_iteration_memory(profiler, mocker):
+    profiler.start()
+
+    profiler._mem_iteration = [100, 150, 200]
+    profiler._obj_iteration = [10, 20, 30]
+    profiler._fd_iteration = [2, 3, 4]
+
+    calculate = mocker.patch.object(
+        profiler,
+        "_calculate_grow",
+    )
+    mocker.patch.object(
+        profiler._profiler,
+        "disable",
+    )
+    mocker.patch.object(
+        profiler,
+        "_report",
+    )
+
+    profiler.stop()
+
+    calculate.assert_called_once()
+
+    # noinspection PyProtectedMember
+    assert profiler._mem_init == 100
+
+    # noinspection PyUnreachableCode
+    assert profiler._mem_final == 200
+
+
+def test_stop_without_iterations_uses_current_memory(
+    profiler,
+    mocker,
+):
+    mocker.patch("gc.collect")
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        side_effect=[100, 500],
+    )
+    mocker.patch.object(
+        profiler._profiler,
+        "disable",
+    )
+    mocker.patch.object(
+        profiler,
+        "_report",
+    )
+
+    profiler.start()
+    profiler.stop()
+
+    assert profiler._mem_final == 500
+
+
+def test_get_current_memory(mocker):
+    process = mocker.patch(
+        "autosubmit.profiler.profiler.Process",
+    )
+    process.return_value.memory_info.return_value = SimpleNamespace(
+        rss=123456,
+    )
+
+    assert _get_current_memory() == 123456
+    process.assert_called_once_with(os.getpid())
+
+
+def test_get_current_object_count(mocker):
+    objects = mocker.patch(
+        "autosubmit.profiler.profiler.gc.get_objects",
+        return_value=[1, 2, 3],
+    )
+
+    assert _get_current_object_count() == 3
+    objects.assert_called_once()
+
+
+def test_get_current_open_fds(mocker):
+    process = mocker.patch(
+        "autosubmit.profiler.profiler.Process",
+    )
+    process.return_value.num_fds.return_value = 42
+
+    assert _get_current_open_fds() == 42
+
+
+def test_get_current_open_handles_when_num_fds_unavailable(
+    mocker,
+):
+    process = mocker.patch(
+        "autosubmit.profiler.profiler.Process",
+    )
+    proc = process.return_value
+
+    del proc.num_fds
+    proc.num_handles.return_value = 17
+
+    assert _get_current_open_fds() == 17
+
+
+def test_get_current_open_fds_returns_none_when_unsupported(
+    mocker,
+):
+    process = mocker.patch(
+        "autosubmit.profiler.profiler.Process",
+    )
+    proc = process.return_value
+
+    del proc.num_fds
+    del proc.num_handles
+
+    assert _get_current_open_fds() is None
+
+
+def test_get_fd_connection_map_unix_socket():
+    proc = MagicMock()
+    proc.net_connections.return_value = [
+        SimpleNamespace(
+            fd=5,
+            family=profiler_module._socket.AF_UNIX,
+            laddr=SimpleNamespace(path="/tmp/test.sock"),
+        )
     ]
 
-
-def test_generate_title():
-    assert _generate_title("Test Title").splitlines() == [
-        "=" * 80,
-        "Test Title".center(80),
-        "=" * 80,
-    ]
-
-
-def test_now_returns_utc_timestamp(mocker):
-    fixed_datetime = datetime(
-        2026,
-        9,
-        3,
-        12,
-        30,
-        45,
-        tzinfo=timezone.utc,
-    )
-    mocked_datetime = mocker.MagicMock()
-    mocked_datetime.now.return_value = fixed_datetime
-    mocker.patch("autosubmit.profiler.profiler.datetime", mocked_datetime)
-
-    assert _now() == "20260903-123045"
-
-
-def test_capture_allocation_delta_without_previous_snapshot(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-    snapshot = mocker.MagicMock()
-
-    assert profiler._capture_allocation_delta(snapshot) == []
-    assert profiler._previous_trace_snapshot is snapshot
-
-
-def test_capture_allocation_delta_filters_positive_and_limits_to_five(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-    previous = mocker.MagicMock()
-    current = mocker.MagicMock()
-
-    stats = []
-    for index in range(7):
-        stat = mocker.MagicMock()
-        stat.size_diff = index + 1
-        stats.append(stat)
-
-    negative = mocker.MagicMock()
-    negative.size_diff = -100
-    current.compare_to.return_value = stats + [negative]
-
-    profiler._previous_trace_snapshot = previous
-    mocker.patch.object(profiler, "_capture_object_growth")
-
-    assert profiler._capture_allocation_delta(current) == stats[:5]
-    current.compare_to.assert_called_once_with(previous, "lineno")
-    assert profiler._previous_trace_snapshot is current
-
-
-def test_capture_allocation_delta_records_object_growth(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-    profiler._previous_trace_snapshot = mocker.MagicMock()
-
-    current = mocker.MagicMock()
-    current.compare_to.return_value = []
-
-    capture = mocker.patch.object(profiler, "_capture_object_growth")
-
-    profiler._capture_allocation_delta(current)
-
-    capture.assert_called_once()
-
-
-def test_capture_object_growth_ignores_first_three_checkpoints(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler.gc.get_objects",
-        return_value=[object()],
-    )
-
-    for checkpoint in range(1, 4):
-        profiler._mem_iteration = [0] * checkpoint
-        profiler._capture_object_growth()
-
-    assert profiler._previous_object_ids is None
-    assert profiler._obj_diffs_between_iter == set()
-
-
-def test_capture_object_growth_initialises_object_ids_after_baseline(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-    profiler._mem_iteration = [0, 0, 0, 0]
-
-    objects = [object(), object()]
-    mocker.patch(
-        "autosubmit.profiler.profiler.gc.get_objects",
-        return_value=objects,
-    )
-
-    profiler._capture_object_growth()
-
-    assert profiler._previous_object_ids == {id(obj) for obj in objects}
-    assert profiler._obj_diffs_between_iter == set()
-
-
-def test_capture_object_growth_records_autosubmit_tracebacks(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-    profiler._mem_iteration = [0, 0, 0, 0]
-
-    old_object = object()
-    new_object = object()
-
-    mocker.patch(
-        "autosubmit.profiler.profiler.gc.get_objects",
-        return_value=[old_object],
-    )
-    profiler._capture_object_growth()
-
-    mocker.patch(
-        "autosubmit.profiler.profiler.gc.get_objects",
-        return_value=[old_object, new_object],
-    )
-    traceback = mocker.MagicMock()
-
-    mocker.patch(
-        "autosubmit.profiler.profiler.tracemalloc.get_object_traceback",
-        return_value=traceback,
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler._is_autosubmit_traceback",
-        return_value=True,
-    )
-
-    profiler._capture_object_growth()
-
-    assert traceback in profiler._obj_diffs_between_iter
-
-
-def test_record_object_tracebacks_ignores_non_autosubmit(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-    traceback = mocker.MagicMock()
-
-    mocker.patch(
-        "autosubmit.profiler.profiler.tracemalloc.get_object_traceback",
-        return_value=traceback,
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler._is_autosubmit_traceback",
-        return_value=False,
-    )
-
-    profiler._record_object_tracebacks([object()])
-
-    assert profiler._obj_diffs_between_iter == set()
-
-
-def test_is_autosubmit_traceback():
-    autosubmit = SimpleNamespace(
-        filename="/src/Autosubmit/autosubmit/foo.py",
-    )
-    profiler_file = SimpleNamespace(
-        filename="/src/Autosubmit/autosubmit/profiler/profiler.py",
-    )
-    external = SimpleNamespace(
-        filename="/usr/lib/python/example.py",
-    )
-
-    assert _is_autosubmit_traceback([autosubmit])  # type: ignore
-    assert not _is_autosubmit_traceback([profiler_file])  # type: ignore
-    assert not _is_autosubmit_traceback([external])  # type: ignore
-    assert _is_autosubmit_traceback([external, autosubmit])  # type: ignore
-
-
-def test_format_fd_changes():
-    assert _format_fd_changes(
-        ["fd1", "fd2"],
-        ["fd1", "fd3"],
-    ) == [
-        "Opened: fd3",
-        "Closed: fd2",
-    ]
-
-
-def test_format_fd_changes_sorts_output():
-    assert _format_fd_changes(
-        ["z", "b"],
-        ["a", "y"],
-    ) == [
-        "Opened: a",
-        "Opened: y",
-        "Closed: b",
-        "Closed: z",
-    ]
-
-
-@pytest.mark.parametrize(
-    ("address", "expected"),
-    [
-        (None, ""),
-        ("localhost", "localhost"),
-        (SimpleNamespace(ip="127.0.0.1", port=8080), "127.0.0.1:8080"),
-        (SimpleNamespace(path="/tmp/socket"), "/tmp/socket"),
-        (SimpleNamespace(foo="bar"), ""),
-    ],
-)
-def test_format_socket_address(address, expected):
-    assert _format_socket_address(address) == expected
-
-
-def test_format_connection_unix_socket():
-    connection = SimpleNamespace(
-        family=socket.AF_UNIX,
-        laddr="/tmp/autosubmit.sock",
-        raddr=None,
-        status="",
-    )
-
-    assert _format_connection(connection) == "unix-socket: /tmp/autosubmit.sock"
-
-
-def test_format_connection_network_socket():
-    connection = SimpleNamespace(
-        family=socket.AF_INET,
-        laddr=SimpleNamespace(ip="127.0.0.1", port=1234),
-        raddr=SimpleNamespace(ip="127.0.0.1", port=5678),
-        status="ESTABLISHED",
-    )
-
-    assert _format_connection(connection) == (
-        "socket: 127.0.0.1:1234 -> 127.0.0.1:5678 [ESTABLISHED]"
-    )
-
-
-def test_format_connection_without_addresses():
-    connection = SimpleNamespace(
-        family=socket.AF_INET,
-        laddr=None,
-        raddr=None,
-        status="",
-    )
-
-    assert _format_connection(connection) == ""
-
-
-def test_get_fd_connection_map(mocker):
-    process = mocker.MagicMock()
-    connection = SimpleNamespace(
-        fd=4,
-        family=socket.AF_INET,
-        laddr=SimpleNamespace(ip="127.0.0.1", port=1234),
-        raddr=None,
-        status="LISTEN",
-    )
-    process.net_connections.return_value = [connection]
-
-    assert _get_fd_connection_map(process) == {
-        4: "socket: 127.0.0.1:1234 [LISTEN]",
+    assert _get_fd_connection_map(proc) == {
+        5: "unix-socket: /tmp/test.sock",
     }
 
 
-def test_get_fd_connection_map_ignores_negative_fd(mocker):
-    process = mocker.MagicMock()
-    process.net_connections.return_value = [
+def test_get_fd_connection_map_unnamed_unix_socket():
+    proc = MagicMock()
+    proc.net_connections.return_value = [
+        SimpleNamespace(
+            fd=5,
+            family=profiler_module._socket.AF_UNIX,
+            laddr=SimpleNamespace(path=""),
+        )
+    ]
+
+    assert _get_fd_connection_map(proc) == {
+        5: "unix-socket: (unnamed)",
+    }
+
+
+def test_get_fd_connection_map_inet_socket():
+    proc = MagicMock()
+    proc.net_connections.return_value = [
+        SimpleNamespace(
+            fd=7,
+            family=profiler_module._socket.AF_INET,
+            laddr=SimpleNamespace(
+                ip="127.0.0.1",
+                port=1234,
+            ),
+            raddr=SimpleNamespace(
+                ip="127.0.0.1",
+                port=5678,
+            ),
+            status="ESTABLISHED",
+        )
+    ]
+
+    assert _get_fd_connection_map(proc) == {
+        7: "socket: 127.0.0.1:1234 -> 127.0.0.1:5678 [ESTABLISHED]",
+    }
+
+
+def test_get_fd_connection_map_without_remote_address():
+    proc = MagicMock()
+    proc.net_connections.return_value = [
+        SimpleNamespace(
+            fd=7,
+            family=profiler_module._socket.AF_INET,
+            laddr=SimpleNamespace(
+                ip="0.0.0.0",
+                port=8080,
+            ),
+            raddr=None,
+            status="LISTEN",
+        )
+    ]
+
+    assert _get_fd_connection_map(proc) == {
+        7: "socket: 0.0.0.0:8080 [LISTEN]",
+    }
+
+
+def test_get_fd_connection_map_skips_negative_fd():
+    proc = MagicMock()
+    proc.net_connections.return_value = [
         SimpleNamespace(
             fd=-1,
-            family=socket.AF_INET,
+            family=profiler_module._socket.AF_INET,
             laddr=None,
             raddr=None,
             status="",
         )
     ]
 
-    assert _get_fd_connection_map(process) == {}
+    assert _get_fd_connection_map(proc) == {}
 
 
-def test_get_fd_connection_map_handles_os_error(mocker):
-    process = mocker.MagicMock()
-    process.net_connections.side_effect = OSError
+def test_get_fd_connection_map_handles_error():
+    proc = MagicMock()
+    proc.net_connections.side_effect = RuntimeError("psutil failure")
 
-    assert _get_fd_connection_map(process) == {}
+    assert _get_fd_connection_map(proc) == {}
 
 
 @pytest.mark.parametrize(
-    ("target", "expected"),
+    ("flags", "expected"),
     [
-        ("read", "read"),
-        ("write", "write"),
-        ("unknown", "unknown"),
+        ("00000000", "read"),
+        ("00000001", "write"),
+        ("00000002", "write"),
     ],
+    ids=["read", "write_low", "write_high"],
 )
-def test_get_pipe_direction(mocker, target, expected):
-    flags = {
-        "read": "0100000",
-        "write": "01",
-        "unknown": "03",
-    }[target]
-
+def test_get_pipe_direction(
+    mocker,
+    flags,
+    expected,
+):
     mocker.patch(
         "builtins.open",
         mocker.mock_open(read_data=f"flags:\t{flags}\n"),
     )
 
-    assert _get_pipe_direction(123, 5) == expected
+    assert _get_pipe_direction(123, 4) == expected
 
 
-def test_get_pipe_direction_handles_missing_fdinfo(mocker):
-    mocker.patch("builtins.open", side_effect=OSError)
-
-    assert _get_pipe_direction(123, 5) == "unknown"
-
-
-def test_get_pipe_direction_handles_missing_flags(mocker):
+def test_get_pipe_direction_without_flags(mocker):
     mocker.patch(
         "builtins.open",
-        mocker.mock_open(read_data="pos:\t123\nmnt_id:\t456\n"),
+        mocker.mock_open(read_data="position:\t0\n"),
     )
 
-    assert _get_pipe_direction(123, 5) == "unknown"
+    assert _get_pipe_direction(123, 4) == "unknown"
 
 
-def test_format_fd_label_standard_stream():
-    assert (
-        _format_fd_label(
-            1,
-            1,
-            "/dev/pts/0",
-            {},
-            {0: "stdin", 1: "stdout", 2: "stderr"},
-        )
-        == "stdout (/dev/pts/0)"
-    )
-
-
-def test_format_fd_label_socket():
-    assert (
-        _format_fd_label(
-            1,
-            4,
-            "socket:[123]",
-            {4: "socket: 127.0.0.1:1 [LISTEN]"},
-            {},
-        )
-        == "socket: 127.0.0.1:1 [LISTEN]"
-    )
-
-
-def test_format_fd_label_pipe(mocker):
+def test_get_pipe_direction_handles_error(mocker):
     mocker.patch(
-        "autosubmit.profiler.profiler._get_pipe_direction",
-        return_value="write",
+        "builtins.open",
+        side_effect=OSError,
     )
 
-    assert (
-        _format_fd_label(
-            123,
-            9,
-            "pipe:[1770463]",
-            {},
-            {},
-        )
-        == "pipe (write) pipe:[1770463]"
-    )
-
-
-def test_format_fd_label_regular_target():
-    assert (
-        _format_fd_label(
-            123,
-            7,
-            "/tmp/example.log",
-            {},
-            {},
-        )
-        == "/tmp/example.log"
-    )
-
-
-def test_get_current_open_fds_names_non_linux(mocker):
-    process = mocker.MagicMock()
-    mocker.patch(
-        "autosubmit.profiler.profiler.Path.is_dir",
-        return_value=False,
-    )
-
-    assert _get_current_open_fds_names(process) == []
+    assert _get_pipe_direction(123, 4) == "unknown"
 
 
 def test_get_current_open_fds_names(mocker):
-    process = mocker.MagicMock()
-    process.pid = 123
-
-    mocker.patch(
-        "autosubmit.profiler.profiler.Path.is_dir",
-        return_value=True,
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_fd_connection_map",
-        return_value={4: "socket: 127.0.0.1:1234 [LISTEN]"},
-    )
     mocker.patch(
         "autosubmit.profiler.profiler.os.listdir",
-        return_value=["9", "1", "4", "0"],
+        return_value=["0", "1", "2", "3", "4"],
     )
     mocker.patch(
         "autosubmit.profiler.profiler.os.readlink",
         side_effect=[
-            "/dev/pts/0",
-            "/dev/pts/0",
-            "socket:[123]",
-            "pipe:[456]",
+            "/dev/stdin",
+            "/dev/stdout",
+            "/dev/stderr",
+            "pipe:[12345]",
+            "/tmp/test.txt",
         ],
-    )
-
-    assert _get_current_open_fds_names(process) == [
-        "[fd=0] stdin (/dev/pts/0)",
-        "[fd=1] stdout (/dev/pts/0)",
-        "[fd=4] socket: 127.0.0.1:1234 [LISTEN]",
-        "[fd=9] pipe (unknown) pipe:[456]",
-    ]
-
-
-def test_get_current_open_fds_names_handles_listdir_error(mocker):
-    process = mocker.MagicMock()
-    process.pid = 123
-
-    mocker.patch(
-        "autosubmit.profiler.profiler.Path.is_dir",
-        return_value=True,
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler.os.listdir",
-        side_effect=OSError,
-    )
-
-    assert _get_current_open_fds_names(process) == []
-
-
-def test_get_current_open_fds_names_skips_unreadable_fd(mocker):
-    process = mocker.MagicMock()
-    process.pid = 123
-
-    mocker.patch(
-        "autosubmit.profiler.profiler.Path.is_dir",
-        return_value=True,
     )
     mocker.patch(
         "autosubmit.profiler.profiler._get_fd_connection_map",
         return_value={},
     )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_pipe_direction",
+        return_value="read",
+    )
+
+    result = _get_current_open_fds_names()
+
+    assert "[fd=0] stdin (/dev/stdin)" in result
+    assert "[fd=1] stdout (/dev/stdout)" in result
+    assert "[fd=2] stderr (/dev/stderr)" in result
+    assert "[fd=3] pipe (read) pipe:[12345]" in result
+    assert "[fd=4] /tmp/test.txt" in result
+
+
+def test_get_current_open_fds_names_uses_socket_mapping(mocker):
+    mocker.patch(
+        "autosubmit.profiler.profiler.os.listdir",
+        return_value=["5"],
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler.os.readlink",
+        return_value="socket:[123]",
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_fd_connection_map",
+        return_value={
+            5: "socket: 127.0.0.1:1234 -> 127.0.0.1:5678 [ESTABLISHED]",
+        },
+    )
+
+    assert _get_current_open_fds_names() == [
+        "[fd=5] socket: 127.0.0.1:1234 -> 127.0.0.1:5678 [ESTABLISHED]"
+    ]
+
+
+def test_get_current_open_fds_names_ignores_invalid_entries(
+    mocker,
+):
+    mocker.patch(
+        "autosubmit.profiler.profiler.os.listdir",
+        return_value=["not-a-fd"],
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_fd_connection_map",
+        return_value={},
+    )
+
+    assert _get_current_open_fds_names() == []
+
+
+def test_get_current_open_fds_names_handles_disappearing_fd(
+    mocker,
+):
     mocker.patch(
         "autosubmit.profiler.profiler.os.listdir",
         return_value=["3"],
     )
     mocker.patch(
         "autosubmit.profiler.profiler.os.readlink",
-        side_effect=OSError,
-    )
-
-    assert _get_current_open_fds_names(process) == []
-
-
-def test_get_current_open_fds_names_skips_non_numeric_entries(mocker):
-    process = mocker.MagicMock()
-    process.pid = 123
-
-    mocker.patch(
-        "autosubmit.profiler.profiler.Path.is_dir",
-        return_value=True,
+        side_effect=OSError("fd disappeared"),
     )
     mocker.patch(
         "autosubmit.profiler.profiler._get_fd_connection_map",
         return_value={},
     )
-    mocker.patch(
-        "autosubmit.profiler.profiler.os.listdir",
-        return_value=["3", "not-a-fd"],
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler.os.readlink",
-        return_value="/tmp/example",
-    )
 
-    assert _get_current_open_fds_names(process) == [
-        "[fd=3] /tmp/example",
-    ]
+    assert _get_current_open_fds_names() == []
 
 
-def test_get_current_memory():
-    process = SimpleNamespace(
-        memory_info=lambda: SimpleNamespace(rss=123456),  # type: ignore
-    )
+def test_capture_allocation_delta_collects_autosubmit_objects(
+    profiler,
+    mocker,
+):
+    profiler._trace_snapshots.append(MagicMock())
+    profiler.checkpoints = 4
 
-    assert _get_current_memory(process) == 123456  # type: ignore
+    old_obj = object()
+    new_obj = object()
 
+    snapshot = MagicMock()
+    snapshot.compare_to.return_value = []
 
-def test_get_current_object_count(mocker):
     mocker.patch(
         "autosubmit.profiler.profiler.gc.get_objects",
-        return_value=[object(), object(), object()],
-    )
-
-    assert _get_current_object_count() == 3
-
-
-def test_get_current_open_fds_num_fds():
-    process = SimpleNamespace(num_fds=lambda: 7)
-
-    assert _get_current_open_fds(process) == 7  # type: ignore
-
-
-def test_get_current_open_fds_num_handles():
-    class ProcessWithoutFds:
-        # noinspection PyMethodMayBeStatic
-        def num_handles(self):
-            return 9
-
-    assert _get_current_open_fds(ProcessWithoutFds()) == 9  # type: ignore
-
-
-def test_get_current_open_fds_unavailable():
-    class ProcessWithoutFdMetrics:
-        pass
-
-    assert _get_current_open_fds(ProcessWithoutFdMetrics()) is None  # type: ignore
-
-
-def test_file_name_with_expid(profiler, mocker):
-    mocker.patch(
-        "autosubmit.profiler.profiler._now",
-        return_value="20260903-120000",
-    )
-
-    assert profiler.file_name == "a001_run_profile_20260903-120000.prof"
-
-
-def test_file_name_without_expid(mocker):
-    profiler = Profiler(subcommand="run", expid=None)
-    mocker.patch(
-        "autosubmit.profiler.profiler._now",
-        return_value="20260903-120000",
-    )
-
-    assert profiler.file_name == "run_profile_20260903-120000.prof"
-
-
-def test_report_path_with_expid(profiler, mocker, tmp_path):
-    mocker.patch(
-        "autosubmit.profiler.profiler.BasicConfig.LOCAL_ROOT_DIR",
-        str(tmp_path),
-    )
-
-    assert profiler.report_path == tmp_path / "a001" / "tmp" / "profile"
-
-
-def test_report_path_without_expid(mocker, tmp_path):
-    profiler = Profiler(subcommand="run", expid=None)
-    mocker.patch(
-        "autosubmit.profiler.profiler.BasicConfig.GLOBAL_LOG_DIR",
-        str(tmp_path),
-    )
-
-    assert profiler.report_path == tmp_path / "profile"
-
-
-def test_report_growth_without_checkpoints(profiler):
-    assert profiler._report_growth() == []
-
-
-def test_report_growth_contains_iteration_metrics(profiler):
-    profiler._mem_iteration = [1024, 2048]
-    profiler._obj_iteration = [10, 20]
-    profiler._fd_iteration = [4, 5]
-    profiler._fd_names_iteration = [["fd1"], ["fd1", "fd2"]]
-    profiler._jobs_iteration = [10, 20]
-    profiler._edges_iteration = [15, 25]
-    profiler._mem_growth = [1024]
-    profiler._obj_growth = [10]
-    profiler._fd_growth = [1]
-    profiler._trace_stats_by_iter = [[], []]
-
-    result = profiler._report_growth()
-
-    assert result[0] == "Iteration metrics:"
-    assert "Iteration | Memory" in result[2]
-    assert "         1 |" in result[4]
-    assert "         2 |" in result[5]
-    assert "Iteration 2 details:" in result
-    assert any("Opened: fd2" in line for line in result)
-
-
-def test_report_growth_includes_allocation_details(profiler):
-    profiler._mem_iteration = [100, 200]
-    profiler._obj_iteration = [10, 20]
-    profiler._fd_iteration = [4, 4]
-    profiler._fd_names_iteration = [[], []]
-    profiler._jobs_iteration = [1, 2]
-    profiler._edges_iteration = [3, 4]
-
-    stat = SimpleNamespace(
-        traceback=[SimpleNamespace(filename="foo.py", lineno=10)],
-        size_diff=1024,
-        count_diff=2,
-    )
-    profiler._trace_stats_by_iter = [[], [stat]]  # type: ignore
-    profiler._mem_growth = [100]
-    profiler._obj_growth = [10]
-    profiler._fd_growth = [0]
-
-    result = profiler._report_growth()
-
-    assert any("Top allocation deltas:" in line for line in result)
-    assert any("foo.py:10 +1.00 KiB (+2 blocks)" in line for line in result)
-
-
-def test_report_growth_handles_unavailable_file_descriptors(profiler):
-    profiler._mem_iteration = [1024, 2048]
-    profiler._obj_iteration = [10, 20]
-    profiler._fd_iteration = [4, None]
-    profiler._fd_names_iteration = [["fd1"], []]
-    profiler._jobs_iteration = [10, 20]
-    profiler._edges_iteration = [15, 25]
-    profiler._mem_growth = [1024]
-    profiler._obj_growth = [10]
-    profiler._fd_growth = []
-    profiler._trace_stats_by_iter = [[], []]
-
-    result = profiler._report_growth()
-
-    assert any("         2 |" in line for line in result)
-    assert any("|   - |" in line for line in result)
-
-
-def test_report_growth_handles_missing_previous_fd_measurement(profiler):
-    profiler._mem_iteration = [1024, 2048]
-    profiler._obj_iteration = [10, 20]
-    profiler._fd_iteration = [None, 5]
-    profiler._fd_names_iteration = [[], []]
-    profiler._jobs_iteration = [10, 20]
-    profiler._edges_iteration = [15, 25]
-    profiler._mem_growth = [1024]
-    profiler._obj_growth = [10]
-    profiler._fd_growth = []
-    profiler._trace_stats_by_iter = [[], []]
-
-    result = profiler._report_growth()
-
-    assert any("         2 |" in line for line in result)
-
-
-def test_report_growth_skips_iteration_without_details(profiler):
-    profiler._mem_iteration = [1024, 2048]
-    profiler._obj_iteration = [10, 20]
-    profiler._fd_iteration = [4, 4]
-    profiler._fd_names_iteration = [["fd1"], ["fd1"]]
-    profiler._jobs_iteration = [10, 20]
-    profiler._edges_iteration = [15, 25]
-    profiler._mem_growth = [1024]
-    profiler._obj_growth = [10]
-    profiler._fd_growth = [0]
-    profiler._trace_stats_by_iter = [[], []]
-
-    result = profiler._report_growth()
-
-    assert "Iteration 2 details:" not in result
-
-
-def _mock_report(mocker, tmp_path):
-    mocker.patch(
-        "autosubmit.profiler.profiler.BasicConfig.LOCAL_ROOT_DIR",
-        str(tmp_path),
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler.os.access",
-        return_value=True,
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_open_fds_names",
-        return_value=[],
-    )
-    mocker.patch("autosubmit.profiler.profiler.Log.info")
-
-    stats = mocker.patch("autosubmit.profiler.profiler.pstats.Stats")
-    stats_instance = stats.return_value
-    stats_instance.strip_dirs.return_value = stats_instance
-    stats_instance.sort_stats.return_value = stats_instance
-    return stats_instance
-
-
-def test_report_writes_prof_and_txt_files(mocker, tmp_path):
-    profiler = Profiler(subcommand="run", expid="a001")
-    stats_instance = _mock_report(mocker, tmp_path)
-    stats_instance.dump_stats.side_effect = lambda path: Path(path).touch()
-
-    profiler._mem_initial = 1000
-    profiler._mem_final = 2000
-
-    profiler._report()
-
-    report_dir = tmp_path / "a001" / "tmp" / "profile"
-
-    assert report_dir.is_dir()
-    assert len(list(report_dir.glob("*.prof"))) == 1
-    assert len(list(report_dir.glob("*.txt"))) == 1
-
-    txt_file = next(report_dir.glob("*.txt"))
-    assert "Overall Memory, Object and File Descriptor Growth" in (
-        txt_file.read_text(encoding="UTF-8")
-    )
-    stats_instance.dump_stats.assert_called_once_with(next(report_dir.glob("*.prof")))
-
-
-def test_report_includes_object_and_fd_growth(mocker, tmp_path):
-    profiler = Profiler(subcommand="run", expid="a001")
-    _mock_report(mocker, tmp_path)
-
-    profiler._mem_initial = 1000
-    profiler._mem_final = 2024
-    profiler._obj_growth = [1]
-    profiler._obj_total_growth = 12
-    profiler._fd_growth = [1]
-    profiler._fd_total_growth = -4
-
-    profiler._report()
-
-    txt_file = next((tmp_path / "a001" / "tmp" / "profile").glob("*.txt"))
-    report = txt_file.read_text(encoding="UTF-8")
-
-    assert "Growth  : +1.00 KiB" in report
-    assert "Objects:" in report
-    assert "Growth  : +12" in report
-    assert "File descriptors:" in report
-    assert "Growth  : -4" in report
-
-
-def test_report_includes_object_tracebacks(mocker, tmp_path):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-    _mock_report(mocker, tmp_path)
-
-    profiler._mem_initial = 1000
-    profiler._mem_final = 2000
-    profiler._obj_diffs_between_iter = {  # type: ignore
-        "Autosubmit/foo.py:10",
-        "Autosubmit/bar.py:20",
-    }
-
-    profiler._report()
-
-    txt_file = next((tmp_path / "a001" / "tmp" / "profile").glob("*.txt"))
-    report = txt_file.read_text(encoding="UTF-8")
-
-    assert "Unique Object Tracebacks Between Iterations" in report
-    assert "Autosubmit/bar.py:20" in report
-    assert "Autosubmit/foo.py:10" in report
-
-
-def test_report_raises_when_directory_not_writable(mocker, tmp_path):
-    profiler = Profiler(subcommand="run", expid="a001")
-
-    mocker.patch(
-        "autosubmit.profiler.profiler.BasicConfig.LOCAL_ROOT_DIR",
-        str(tmp_path),
-    )
-    mocker.patch(
-        "autosubmit.profiler.profiler.os.access",
-        return_value=False,
-    )
-
-    with pytest.raises(AutosubmitCritical) as exc_info:
-        profiler._report()
-
-    assert exc_info.value.code == 7012
-    assert "not writable" in exc_info.value.message
-
-
-def test_profiler_start_starts_tracemalloc_when_trace_enabled(mocker):
-    profiler = Profiler(
-        subcommand="run",
-        expid="a001",
-        trace_enabled=True,
-    )
-
-    mocker.patch.object(profiler._profiler, "enable")
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_memory",
-        return_value=1000,
-    )
-    mocker.patch("autosubmit.profiler.profiler.gc.collect")
-
-    is_tracing = mocker.patch(
-        "autosubmit.profiler.profiler.tracemalloc.is_tracing",
-        return_value=False,
-    )
-    start_trace = mocker.patch(
-        "autosubmit.profiler.profiler.tracemalloc.start",
-    )
-
-    profiler.start()
-
-    is_tracing.assert_called_once()
-    start_trace.assert_called_once()
-
-
-def test_profiler_stop_calculates_growth_when_checkpoints_exist(
-    started_profiler,
-    mocker,
-):
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_memory",
-        return_value=2000,
-    )
-    mocker.patch.object(started_profiler._profiler, "disable")
-    mocker.patch.object(started_profiler, "_report")
-
-    started_profiler._mem_iteration = [1000, 1500]
-    started_profiler._obj_iteration = [10, 15]
-    started_profiler._fd_iteration = [4, 5]
-
-    calculate_growth = mocker.patch.object(
-        started_profiler,
-        "_calculate_growth",
-    )
-
-    started_profiler.stop()
-
-    calculate_growth.assert_called_once()
-
-
-def test_report_includes_iteration_section_when_checkpoints_exist(
-    mocker,
-    tmp_path,
-):
-    profiler = Profiler(subcommand="run", expid="a001")
-    _mock_report(mocker, tmp_path)
-
-    profiler._mem_initial = 1000
-    profiler._mem_final = 2000
-    profiler._mem_iteration = [1000, 2000]
-    profiler._obj_iteration = [10, 20]
-    profiler._fd_iteration = [4, 5]
-    profiler._fd_names_iteration = [["fd1"], ["fd1", "fd2"]]
-    profiler._jobs_iteration = [10, 20]
-    profiler._edges_iteration = [15, 25]
-    profiler._mem_growth = [1000]
-    profiler._obj_growth = [10]
-    profiler._fd_growth = [1]
-    profiler._trace_stats_by_iter = [[], []]
-
-    profiler._report()
-
-    txt_file = next((tmp_path / "a001" / "tmp" / "profile").glob("*.txt"))
-    report = txt_file.read_text(encoding="UTF-8")
-
-    assert "Memory, Object and File Descriptor Usage by Iteration" in report
-    assert "Iteration metrics:" in report
-
-
-def test_report_includes_final_open_file_descriptors(mocker, tmp_path):
-    """Test that final open file descriptors are included in the report."""
-    profiler = Profiler(subcommand="run", expid="a001")
-    _mock_report(mocker, tmp_path)
-
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_open_fds_names",
-        return_value=[
-            "[fd=0] stdin (/dev/pts/0)",
-            "[fd=4] socket: 127.0.0.1:1234 [LISTEN]",
+        side_effect=[
+            [old_obj],
+            [old_obj, new_obj],
         ],
     )
 
-    profiler._mem_initial = 1000
-    profiler._mem_final = 2024
+    frame = MagicMock(
+        filename="/home/user/Autosubmit/autosubmit/workflow.py",
+        lineno=123,
+    )
+    traceback = (frame,)
+
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.get_object_traceback",
+        return_value=traceback,
+    )
+
+    profiler._capture_allocation_delta(snapshot)
+    profiler._capture_allocation_delta(snapshot)
+
+    assert traceback in profiler._obj_diffs_between_iter
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "/home/user/Autosubmit/autosubmit/profiler/profiler.py",
+        "/tmp/external.py",
+    ],
+    ids=["profiler_module", "external_module"],
+)
+def test_capture_allocation_delta_ignores_unwanted_objects(
+    profiler,
+    mocker,
+    filename,
+):
+    profiler._trace_snapshots.append(MagicMock())
+    profiler.checkpoints = 4
+
+    old_obj = object()
+    new_obj = object()
+
+    snapshot = MagicMock()
+    snapshot.compare_to.return_value = []
+
+    mocker.patch(
+        "autosubmit.profiler.profiler.gc.get_objects",
+        side_effect=[
+            [old_obj],
+            [old_obj, new_obj],
+        ],
+    )
+
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.get_object_traceback",
+        return_value=SimpleNamespace(
+            filename=filename,
+            lineno=123,
+        ),
+    )
+
+    profiler._capture_allocation_delta(snapshot)
+
+    assert not profiler._obj_diffs_between_iter
+
+
+def test_capture_allocation_delta_ignores_missing_traceback(
+    profiler,
+    mocker,
+):
+    profiler._trace_snapshots.append(MagicMock())
+    profiler.checkpoints = 4
+
+    old_obj = object()
+    new_obj = object()
+
+    snapshot = MagicMock()
+    snapshot.compare_to.return_value = []
+
+    mocker.patch(
+        "autosubmit.profiler.profiler.gc.get_objects",
+        side_effect=[
+            [old_obj],
+            [old_obj, new_obj],
+        ],
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.get_object_traceback",
+        return_value=None,
+    )
+
+    profiler._capture_allocation_delta(snapshot)
+
+    assert not profiler._obj_diffs_between_iter
+
+
+def test_start_does_not_stop_existing_tracemalloc(
+    profiler,
+    mocker,
+):
+    """An existing tracemalloc session must not be stopped by the profiler."""
+    mocker.patch.object(
+        profiler._profiler,
+        "enable",
+    )
+    mocker.patch.object(
+        profiler._profiler,
+        "disable",
+    )
+    mocker.patch.object(
+        profiler,
+        "_report",
+    )
+    mocker.patch(
+        "gc.collect",
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=100,
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.is_tracing",
+        return_value=True,
+    )
+
+    stop = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.stop",
+    )
+
+    profiler._trace_enabled = True
+
+    profiler.start()
+
+    assert profiler._trace_started is False
+
+    profiler.stop()
+
+    stop.assert_not_called()
+
+
+def test_stop_stops_only_tracemalloc_started_by_profiler(
+    profiler,
+    mocker,
+):
+    """The profiler stops tracemalloc only when it started the session."""
+    mocker.patch.object(
+        profiler._profiler,
+        "enable",
+    )
+    mocker.patch.object(
+        profiler._profiler,
+        "disable",
+    )
+    mocker.patch.object(
+        profiler,
+        "_report",
+    )
+    mocker.patch(
+        "gc.collect",
+    )
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_memory",
+        return_value=100,
+    )
+
+    is_tracing = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.is_tracing",
+        side_effect=[
+            False,
+            True,
+        ],
+    )
+    start = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.start",
+    )
+    stop = mocker.patch(
+        "autosubmit.profiler.profiler.tracemalloc.stop",
+    )
+
+    profiler._trace_enabled = True
+
+    profiler.start()
+
+    assert profiler._trace_started is True
+    start.assert_called_once()
+
+    profiler.stop()
+
+    is_tracing.assert_any_call()
+    stop.assert_called_once()
+    assert profiler._trace_started is False
+
+
+def test_report_includes_all_sections(
+    profiled_profiler,
+    report_setup,
+    mocker,
+):
+    profiler = profiled_profiler
+
+    profiler._mem_init = 1024
+    profiler._mem_final = 4096
+
+    profiler._mem_iteration = [1024, 2048, 4096]
+    profiler._obj_iteration = [10, 20, 30]
+    profiler._fd_iteration = [2, 3, 4]
+
+    profiler._mem_grow = [1024, 2048]
+    profiler._obj_grow = [10, 10]
+    profiler._fd_grow = [1, 1]
+
+    profiler._obj_total_grow = 20
+    profiler._fd_total_grow = 2
+
+    profiler._fd_names_iteration = [
+        ["[fd=1] stdout"],
+        ["[fd=1] stdout", "[fd=5] new.txt"],
+        ["[fd=1] stdout"],
+    ]
+
+    profiler._jobs_iteration = [1, 2, 3]
+    profiler._edges_iteration = [4, 5, 6]
+
+    profiler._trace_enabled = True
+
+    traceback = ("autosubmit/workflow.py:123",)
+    profiler._obj_diffs_between_iter.add(traceback)
+
+    mocker.patch(
+        "autosubmit.profiler.profiler._get_current_open_fds_names",
+        return_value=["[fd=7] socket: example"],
+    )
 
     profiler._report()
 
-    txt_file = next((tmp_path / "a001" / "tmp" / "profile").glob("*.txt"))
-    report = txt_file.read_text(encoding="UTF-8")
+    report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
 
-    assert "Final Open File Descriptors" in report
-    assert "[fd=0] stdin (/dev/pts/0)" in report
-    assert "[fd=4] socket: 127.0.0.1:1234 [LISTEN]" in report
+    # cProfile section
+    assert "Time & Calls Profiling" in report
+    assert "Fake cProfile statistics" in report
+
+    # Per-iteration section
+    assert "Memory, object and file descriptor by iteration" in report
+    assert "Iteration 1: Memory: 1.00 KiB" in report
+    assert "Iteration 1: Objects: 10" in report
+    assert "Iteration 1: File Descriptors: 2" in report
+    assert "Iteration 1: Loaded jobs: 1" in report
+    assert "Iteration 1: Loaded edges: 4" in report
+
+    # The final checkpoint is intentionally not rendered as an iteration.
+    assert "Iteration 2:" not in report
+
+    # Overall growth section
+    assert "Overall Memory, Object and File Descriptor Growth" in report
+    assert "MEMORY GROW: 3.00 KiB." in report
+    assert "INITIAL MEMORY: 1.00 KiB." in report
+    assert "FINAL MEMORY: 4.00 KiB." in report
+    assert "OBJECTS GROW: 20 objects." in report
+    assert "FILE DESCRIPTORS GROW: 2 file descriptors." in report
+
+    # Final FD section
+    assert "FINAL OPEN FILE DESCRIPTORS:" in report
+    assert "[fd=7] socket: example" in report
+
+    # tracemalloc/object traceback section
+    assert "Unique object tracebacks between iterations:" in report
+    assert str(traceback) in report
