@@ -1886,6 +1886,18 @@ def test_get_state():
     assert state['local_logs_err'] == "from_local.err"
     assert state['remote_logs_out'] == "from_remote.out"
     assert state['remote_logs_err'] == "from_remote.err"
+    # modified must be an ISO 8601 string with a timezone offset and second precision
+    modified = state["modified"]
+    assert isinstance(modified, str)
+    assert "T" in modified, (
+        f"Expected ISO 8601 'T' separator in modified, got: {modified!r}"
+    )
+    dt_modified = datetime.fromisoformat(modified)
+    assert dt_modified.tzinfo is not None and dt_modified.utcoffset() is not None, (
+        f"modified must be timezone-aware, got: {modified!r}"
+    )
+    assert dt_modified.utcoffset() == timedelta(0)
+    assert dt_modified.microsecond == 0
 
 
 @pytest.mark.parametrize('loaded_data',

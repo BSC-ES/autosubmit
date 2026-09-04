@@ -34,6 +34,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
+from autosubmit.helpers.datetime_utils import utc_now_iso
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
@@ -106,7 +107,7 @@ class JobList:
                 "from_step": attributes.get("from_step", 0),
                 "fail_ok": attributes.get("fail_ok", False),
                 "completion_status": attributes.get("completion_status", "WAITING"),
-                # check if the edge completion status is fullfilled or not
+                # check if the edge completion status is fulfilled or not
             })
         return edges_dict
 
@@ -3707,7 +3708,7 @@ class JobList:
                 'package_id': wrapper_job.id,
                 'package_name': wrapper_job.name,
                 'job_name': job.name,
-                'timestamp': datetime.datetime.now().isoformat(),
+                'timestamp': utc_now_iso(),
                 'run_id': self.run_id,
             }
             for job in wrapper_job.job_list

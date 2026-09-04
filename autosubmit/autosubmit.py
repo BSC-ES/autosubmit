@@ -78,6 +78,7 @@ from autosubmit.git.autosubmit_git import (
     clone_repository,
     is_git_repo,
 )
+from autosubmit.helpers.datetime_utils import to_utc_iso
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.utils import check_jobs_file_exists, get_rc_path
 from autosubmit.helpers.version import get_version
@@ -3273,8 +3274,12 @@ class Autosubmit:
                         Log.warning("The user does not exist anymore in the system, using id instead")
                         user = str(uid)
 
-                    created = datetime.datetime.fromtimestamp(
-                        Path(as_conf.conf_folder_yaml).stat().st_mtime)
+                    created = to_utc_iso(
+                        datetime.datetime.fromtimestamp(
+                            Path(as_conf.conf_folder_yaml).stat().st_mtime,
+                            tz=datetime.timezone.utc,
+                        )
+                    )
 
                     if as_conf.get_svn_project_url():
                         model = branch = as_conf.get_svn_project_url()
