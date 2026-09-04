@@ -889,7 +889,7 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosub
     cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")
     assert cursor.fetchone() is None
     cursor.close()
-    # Test doesn't exist
+    # Test does not exist
 
     delete_experiment(expids=f'{as_exp.expid}', force=True)
     assert mocked_log.error.call_count > 0

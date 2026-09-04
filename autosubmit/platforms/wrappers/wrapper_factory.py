@@ -253,7 +253,7 @@ class PJMWrapperFactory(WrapperFactory):
         return self.platform.allocated_nodes()
 
     def reservation_directive(self, reservation):
-        return "#"  # Reservation directive doesn't exist in PJM, they're handled directly by admins
+        return "#"  # Reservation directive does not exist in PJM, they're handled directly by admins
 
     def exclusive_directive(self, exclusive):
         return '#PJM --exclusive'

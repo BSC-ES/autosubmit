@@ -266,7 +266,7 @@ class LocalPlatform(ParamikoPlatform):
             subprocess.check_call(command, stdout=open(os.devnull, 'w'), stderr=open(os.devnull, 'w'), shell=True)
         except subprocess.CalledProcessError:
             if must_exist:
-                raise Exception(f'File {filename} does not exists')
+                raise Exception(f'File {filename} does not exist')
             return False
         return True
 
@@ -329,15 +329,15 @@ class LocalPlatform(ParamikoPlatform):
             return True
         except OSError as e:
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exist", 6004, str(e))
             else:
-                Log.debug(f"File {path_root} doesn't exists ")
+                Log.debug(f"File {path_root} does not exist ")
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
+                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exist', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exist", 6004, str(e))
             else:
                 Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
                 return False

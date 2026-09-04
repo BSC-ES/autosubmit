@@ -3173,7 +3173,7 @@ class Autosubmit:
             if template_file_path is not None:
                 if not os.path.exists(template_file_path):
                     raise AutosubmitCritical(
-                        f"Template {template_file_path} doesn't exist ", 7014)
+                        f"Template {template_file_path} does not exist ", 7014)
                 Log.info("Rendering report template (keys are case-insensitive)")
                 with open(template_file_path, 'r') as f:
                     template_content = f.read()
@@ -3948,10 +3948,10 @@ class Autosubmit:
                     output_type = as_conf.get_output_type()
 
                     if not os.path.exists(os.path.join(exp_path, "db")):
-                        raise AutosubmitCritical(f"The db folder doesn't exists. Make sure that the 'db'"
+                        raise AutosubmitCritical(f"The db folder does not exist. Make sure that the 'db'"
                                                  f" folder exists in the following path: {exp_path}", code=6013)
                     if not os.path.exists(os.path.join(exp_path, "plot")):
-                        raise AutosubmitCritical(f"The plot folder doesn't exists. Make sure that the 'plot'"
+                        raise AutosubmitCritical(f"The plot folder does not exist. Make sure that the 'plot'"
                                                  f" folder exists in the following path: {exp_path}", code=6013)
 
                     # Load parameters

@@ -431,7 +431,7 @@ CONFIG:
                                                f"Extended tailer script: script {tailer_file_name} seems " \
                                                f"{extended_type} but job t000_A.cmd isn't\n"
                         else:  # extended_position == "neither"
-                            # assert it doesn't exist
+                            # assert it does not exist
                             # load the parameters
                             job.check_script(config, parameters)
                             # create the script
@@ -1771,7 +1771,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     }
     as_conf.experiment_data = as_conf.experiment_data | additional_experiment_data
     as_conf.set_default_parameters()
-    # Needed to monkeypatch reload to avoid overwriting experiment_data ( the files doesn't exist in a unit-test)
+    # Needed to monkeypatch reload to avoid overwriting experiment_data ( the files does not exist in a unit-test)
     monkeypatch.setattr(as_conf, 'reload', lambda: None)
     job = Job(_EXPID, '1', Status.WAITING, 0)
     job.section = 'TEST_JOB_2'
