@@ -41,24 +41,3 @@ def to_utc_iso(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat(timespec="seconds")
-
-
-def parse_utc_iso(value: str) -> datetime:
-    """Parse a stored timestamp into a UTC-aware ``datetime``.
-
-    Accepts the canonical form (``+00:00``), the legacy local forms
-    (``+0200``/``+02:00``) and the old jobs-DB form
-    (``%Y-%m-%d %H:%M:%S``). Use it when normalizing rows
-    written before this standard was adopted (e.g. at the API).
-    """
-    value = value.strip()
-    try:
-        parsed = datetime.fromisoformat(value)  # +02:00 (and +0200 on 3.11+)
-    except ValueError:
-        try:
-            parsed = datetime.strptime(value, DATETIME_FORMAT)  # +0200 no colon
-        except ValueError:
-            parsed = datetime.strptime(value, LEGACY_NAIVE_FORMAT)
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
