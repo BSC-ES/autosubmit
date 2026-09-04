@@ -871,7 +871,7 @@ def test_expid_generated_correctly(tmp_path, autosubmit_exp, autosubmit):
 def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosubmit):
     autosubmit.install()
     as_exp = autosubmit_exp(experiment_data=_get_experiment_data(tmp_path))
-    run_dir = as_exp.as_conf.basic_config.LOCAL_ROOT_DIR
+    run_dir = Path(BasicConfig.LOCAL_ROOT_DIR)
     mocker.patch("autosubmit.experiment.experiment_common.process_id", return_value=None)
     mocked_log = mocker.patch("autosubmit.experiment.experiment_common.Log")
 
@@ -883,7 +883,7 @@ def test_delete_experiment(mocker, tmp_path, autosubmit_exp, autosubmit: Autosub
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/structures").iterdir())
     # Consult if the expid is still in the database (tombstone)
-    db_path = Path(f"{run_dir}/tests.db")
+    db_path = Path(BasicConfig.DB_PATH)
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")
@@ -929,7 +929,7 @@ def test_delete_experiment_not_owner(mocker, tmp_path, autosubmit_exp, autosubmi
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/logs").iterdir())
     assert all(as_exp.expid not in Path(f).name for f in Path(f"{run_dir}/metadata/structures").iterdir())
     # Consult if the expid is still in the database (tombstone)
-    db_path = Path(f"{run_dir}/tests.db")
+    db_path = Path(BasicConfig.DB_PATH)
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute(f"SELECT name FROM experiment WHERE name='{as_exp.expid}'")

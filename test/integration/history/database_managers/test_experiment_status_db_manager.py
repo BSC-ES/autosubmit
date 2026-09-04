@@ -221,7 +221,7 @@ def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
                 """)
             conn.commit()
 
-        # Initialize the manager
+        # Initialise the manager
         database_manager = ExperimentStatusDbManager(
             expid="a000",
             db_dir_path=str(db_dir),
