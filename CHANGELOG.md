@@ -6,6 +6,7 @@ This release also includes several bug fixes and enhancements to improve the ove
 
 **Bug fixes:**
 
+- Fixed `DELAY_RETRY_TIME` not matching the documented `+N` and `*N` delay sequences #3138
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 

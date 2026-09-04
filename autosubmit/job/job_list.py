@@ -3372,13 +3372,11 @@ class JobList:
                     if (as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or aux_job_delay <= 0):
                         delay_retry_time = str(as_conf.get_delay_retry_time())
                     else:
-                        delay_retry_time = job.retry_delay
-                    if "+" in delay_retry_time:
-                        retry_delay = (job.fail_count * int(delay_retry_time[:-1]) + int(delay_retry_time[:-1]))
-                    elif "*" in delay_retry_time:
-                        retry_delay = int(delay_retry_time[1:])
-                        for retrial_amount in range(job.fail_count):
-                            retry_delay += retry_delay * 10
+                        delay_retry_time = str(job.retry_delay)
+                    if delay_retry_time.startswith("+"):
+                        retry_delay = int(delay_retry_time[1:]) * job.fail_count
+                    elif delay_retry_time.startswith("*"):
+                        retry_delay = int(delay_retry_time[1:]) * 10 ** (job.fail_count - 1)
                     else:
                         retry_delay = int(delay_retry_time)
                     if retry_delay > 0:
