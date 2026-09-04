@@ -25,6 +25,7 @@ from autosubmit.database.db_common import check_experiment_exists
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.log.log import AutosubmitCritical, Log
 
+
 def handle_start_time(start_time: str) -> None:
     """Wait until the supplied time."""
     if start_time:
