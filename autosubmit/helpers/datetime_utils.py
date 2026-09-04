@@ -25,11 +25,6 @@ Converting to a local timezone for display is responsibility of the API/GUI.
 
 from datetime import datetime, timezone
 
-# Canonical format for every timestamp autosubmit stores or serves
-DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
-# Legacy format written by the jobs DB
-LEGACY_NAIVE_FORMAT = "%Y-%m-%d %H:%M:%S"
-
 
 def utc_now_iso() -> str:
     """Return the current UTC time as a canonical ISO string (seconds precision)."""
