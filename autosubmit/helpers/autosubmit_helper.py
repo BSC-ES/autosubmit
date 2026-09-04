@@ -72,8 +72,11 @@ def handle_start_after(start_after: str, expid: str) -> None:
             Log.info(
                 "Hey! What do you think is going to happen? In theory, "
                 "your experiment will run again after it has been completed. Good luck!")
-        # Check if experiment exists. If False or None, it does not exist
-        if not check_experiment_exists(start_after):
+        # Check if experiment exists. If False or None, it does not exist.
+        # error_on_inexistence is disabled because a missing experiment must not
+        # block the run: it is reported and ignored.
+        if not check_experiment_exists(start_after, error_on_inexistence=False):
+            Log.warning(f"Experiment {start_after} does not exist. Ignoring the start_after trigger.")
             return
         # Historical Database: We use the historical database to retrieve the current progress
         # data of the supplied expid (start_after)

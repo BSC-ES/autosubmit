@@ -1844,7 +1844,8 @@ class Autosubmit:
             exp_history.initialize_database()
             run_dc = exp_history.process_status_changes(job_list.get_job_list(), as_conf.get_chunk_size_unit(),
                                                         as_conf.get_chunk_size(),
-                                                        current_config=as_conf.get_full_config_as_json())
+                                                        current_config=as_conf.get_full_config_as_json(),
+                                                        status_counts=job_list.get_status_counts())
             job_list.run_id = run_dc.run_id if run_dc else None
             Autosubmit.database_backup(expid)
         except Exception:
@@ -1870,7 +1871,8 @@ class Autosubmit:
         """
         exp_history = ExperimentHistory(expid)
         if len(job_changes_tracker) > 0:
-            exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list())
+            exp_history.process_job_list_changes_to_experiment_totals(job_list.get_job_list(),
+                                                                      status_counts=job_list.get_status_counts())
             Autosubmit.database_backup(expid)
 
     @staticmethod
@@ -1943,10 +1945,12 @@ class Autosubmit:
 
         if recover:
             Log.info("Recovering job_list")
+        # Check if the user has launch autosubmit run with -rom option.
+        allowed_members = AutosubmitHelper.get_allowed_members(run_only_members, as_conf)
         try:
             job_list = Autosubmit.load_job_list(
                 expid, as_conf, new=False, full_load=False, submitter=submitter,
-                check_failed_jobs=True, run_mode=False)
+                check_failed_jobs=True, run_mode=False, run_members=allowed_members)
 
         except OSError as e:
             raise AutosubmitError(
@@ -1994,12 +1998,10 @@ class Autosubmit:
         if not recover:
             Log.info(f"Autosubmit is running with v{Autosubmit.autosubmit_version}")
             # Before starting main loop, setup historical database tables and main information
-        # Check if the user has launch autosubmit run with -rom option ( previously named -rm )
-        allowed_members = AutosubmitHelper.get_allowed_members(run_only_members, as_conf)
+        # Check if the user has launch autosubmit run with -rom option ( previously named -rm ).
+        # run_members was already applied in load_job_list before generating the
+        # graph, so only report the restriction here.
         if allowed_members:
-            # Set allowed members after checks have been performed.
-            # This triggers the setter and main logic of the -rm feature.
-            job_list.run_members = allowed_members
             Log.result(f"Only jobs with member value in {str(allowed_members)} or no member will be allowed in this "
                        f"run. Also, those jobs already SUBMITTED, QUEUING, or RUNNING will be allowed to complete and"
                        f" will be tracked.")
@@ -5184,7 +5186,7 @@ class Autosubmit:
     # TODO: To be moved to utils
     @staticmethod
     def load_job_list(expid, as_conf, monitor=False, new=True, full_load=True, submitter=None,
-                      check_failed_jobs=False, run_mode=False) -> JobList:
+                      check_failed_jobs=False, run_mode=False, run_members: list[str] | None = None) -> JobList:
         """Load the JobList for a given experiment.
 
         :param expid: experiment id
@@ -5195,10 +5197,15 @@ class Autosubmit:
         :param submitter: submitter to be used
         :param check_failed_jobs: whether to check failed jobs or not
         :param run_mode: whether to load the job list in run mode or not
+        :param run_members: optional list of members to restrict the run to. Set
+            before loading the job graph so that only the allowed members are
+            loaded into memory and therefore submitted.
         :return: JobList object
         """
         rerun = as_conf.get_rerun()
         job_list = JobList(expid, as_conf, YAMLParserFactory(), run_mode=run_mode, submitter=submitter)
+        if run_members:
+            job_list.run_members = run_members
         date_list = as_conf.get_date_list()
         date_format = ''
         if as_conf.get_chunk_size_unit() == ChunkUnit.HOUR:
