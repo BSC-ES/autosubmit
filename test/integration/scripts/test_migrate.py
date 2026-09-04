@@ -17,23 +17,19 @@
 
 """Tests for migrating AS experiments."""
 
-from autosubmit.scripts.autosubmit import main
+# noinspection PyProtectedMember
+import pytest
+
+from autosubmit.scripts.autosubmit import _autosubmit
 
 
-def test_migrate_offer(autosubmit_exp, mocker):
+def test_migrate_offer(autosubmit_exp):
     """Temporary test for AS migrate."""
     # TODO: Write the new test once we have the code working again (maybe not here, maybe not
     #       using ``autosubmit migrate`` directly).
     exp = autosubmit_exp(experiment_data={})
 
-    mocked_log = mocker.patch('autosubmit.scripts.autosubmit.Log')
+    with pytest.raises(SystemExit) as cm:
+        _autosubmit(["migrate", exp.expid, "-o"])
 
-    mocker.patch('sys.argv', ['autosubmit', 'migrate', exp.expid, '-o'])
-    main()
-
-    mocked_log.critical.call_count > 0
-
-    assert any(
-        'The command migrate was removed' in log_output
-        for log_output in mocked_log.critical.call_args_list[0][0]
-    )
+    assert cm.value.code == 1

@@ -1,3 +1,20 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import re
 from collections.abc import Container
@@ -6,9 +23,14 @@ from typing import Any
 
 import pytest
 
+from autosubmit.experiment.manage import create
+from autosubmit.job.job_list import load_job_list
+from autosubmit.job.manage import set_status
 from autosubmit.profiler.profiler import Profiler
+from autosubmit.workflow.manage import recover, run
 
 # https://github.com/BSC-ES/autosubmit/issues/1332
+
 
 def autosubmit_version():
     """Reads the version number from the VERSION file."""
@@ -17,7 +39,9 @@ def autosubmit_version():
     return content.strip(" \n")
 
 
-def prepare_setstatus_recovery(as_exp, tmp_path: Path, job_names_to_recover, slurm_server: 'Container') -> Any:
+def prepare_setstatus_recovery(
+    as_exp, tmp_path: Path, job_names_to_recover, slurm_server: "Container"
+) -> Any:
     """Generates some completed and stat files in the scratch directory to simulate completed jobs.
 
     :param as_exp: The Autosubmit experiment object.
@@ -30,10 +54,10 @@ def prepare_setstatus_recovery(as_exp, tmp_path: Path, job_names_to_recover, slu
     :type slurm_server: Any
     """
     slurm_root = f"/tmp/scratch/group/root/{as_exp.expid}/"
-    log_dir = Path(slurm_root) / f'LOG_{as_exp.expid}/'
-    local_completed_dir = tmp_path / as_exp.expid / "tmp" / f'LOG_{as_exp.expid}/'
+    log_dir = Path(slurm_root) / f"LOG_{as_exp.expid}/"
+    local_completed_dir = tmp_path / as_exp.expid / "tmp" / f"LOG_{as_exp.expid}/"
     # combining this with the touch, makes the touch generates a folder instead of a file. I have no idea why.
-    slurm_server.exec_run(f'mkdir -p {log_dir}')
+    slurm_server.exec_run(f"mkdir -p {log_dir}")
 
     cmds = []
     for name in job_names_to_recover:
@@ -41,7 +65,7 @@ def prepare_setstatus_recovery(as_exp, tmp_path: Path, job_names_to_recover, slu
             local_completed_dir.mkdir(parents=True, exist_ok=True)
             (local_completed_dir / f"{name}_COMPLETED").touch()
         else:
-            cmds.append(f'touch {log_dir}/{name}_COMPLETED')
+            cmds.append(f"touch {log_dir}/{name}_COMPLETED")
     full_cmd = " && ".join(cmds)
     slurm_server.exec_run(full_cmd)
 
@@ -50,9 +74,9 @@ def prepare_yml(members, chunks, splits) -> dict:
     """Fixture to prepare a jobs.yml file for testing."""
     return {
         "CONFIG": {
-            'MAXWAITINGJOBS': 1000,
-            'TOTALJOBS': 1000,
-            'SAFETYSLEEPTIME': 0,
+            "MAXWAITINGJOBS": 1000,
+            "TOTALJOBS": 1000,
+            "SAFETYSLEEPTIME": 0,
         },
         "DEFAULT": {
             "HPCARCH": "TEST_SLURM",
@@ -159,7 +183,7 @@ def prepare_yml(members, chunks, splits) -> dict:
                 "CHECK": "on_submission",
                 "SPLITS": splits,
             },
-        }
+        },
     }
 
 
@@ -201,11 +225,7 @@ def _write_csv(path: Path, header: str, lines: list[str]) -> None:
 
 
 def export_to_csv(
-        test_type: str,
-        run_id: str,
-        as_exp: Any,
-        profiler_text: str,
-        tmp_path: Path
+    test_type: str, run_id: str, as_exp: Any, profiler_text: str, tmp_path: Path
 ) -> None:
     """Export summary performance metrics to a versioned CSV file.
     :param test_type: The type of run (e.g., 'create', 'run', 'recovery').
@@ -216,7 +236,7 @@ def export_to_csv(
     """
     header = "test type,ID,Time Taken(Seconds),Memory consumption(MiB),Historical DB Disk Usage(MiB),Job list DB Usage,Total Jobs,Total Dependencies,FD GROW,MEM GROW(MIB),OBJ GROW"
 
-    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False, full_load=True)
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False, full_load=True)
     total_dependencies = len(job_list.graph.edges)
     total_jobs = len(job_list.graph.nodes)
     time_pattern = r"in (\d+\.\d+) seconds"
@@ -242,7 +262,7 @@ def export_to_csv(
     if db_path.exists():
         db_size = db_path.stat().st_size / (1024 * 1024)  # in MiB
     else:
-        db_size = '0'
+        db_size = "0"
 
     if metadata_db.exists():
         metadata_size = metadata_db.stat().st_size / (1024 * 1024)  # in MiB
@@ -260,8 +280,12 @@ def export_to_csv(
     obj_grow = obj_grow_match.group(1) if obj_grow_match else None
 
     as_version = autosubmit_version()
-    path = Path(
-        __file__).parent.parent.parent.parent / ".benchmarks" / "artifacts" / f"performance-metrics-{as_version}.csv"
+    path = (
+        Path(__file__).parent.parent.parent.parent
+        / ".benchmarks"
+        / "artifacts"
+        / f"performance-metrics-{as_version}.csv"
+    )
     line = f"{test_type},{run_id},{time_taken},{memory_consumption},{metadata_size},{db_size},{total_jobs},{total_dependencies},{fd_grow},{mem_grow},{obj_grow}"
     _write_csv(path, header, [line])
 
@@ -283,40 +307,68 @@ def export_to_csv_by_iteration(test_type: str, run_id: str, profiler_text: str) 
 
     iteration_csv_lines = []
     for i in range(1, last_iteration + 1):
-        mem_match = re.search(rf"Iteration {i}: Memory: (\d+\.\d+) MiB", profiler_text, re.IGNORECASE)
-        obj_match = re.search(rf"Iteration {i}: Objects: (\d+)", profiler_text, re.IGNORECASE)
-        fd_match = re.search(rf"Iteration {i}: File Descriptors: (\d+)", profiler_text, re.IGNORECASE)
-        jobs_match = re.search(rf"Iteration {i}: Loaded Jobs: (\d+)", profiler_text, re.IGNORECASE)
-        edges_match = re.search(rf"Iteration {i}: Loaded Edges: (\d+)", profiler_text, re.IGNORECASE)
+        mem_match = re.search(
+            rf"Iteration {i}: Memory: (\d+\.\d+) MiB", profiler_text, re.IGNORECASE
+        )
+        obj_match = re.search(
+            rf"Iteration {i}: Objects: (\d+)", profiler_text, re.IGNORECASE
+        )
+        fd_match = re.search(
+            rf"Iteration {i}: File Descriptors: (\d+)", profiler_text, re.IGNORECASE
+        )
+        jobs_match = re.search(
+            rf"Iteration {i}: Loaded Jobs: (\d+)", profiler_text, re.IGNORECASE
+        )
+        edges_match = re.search(
+            rf"Iteration {i}: Loaded Edges: (\d+)", profiler_text, re.IGNORECASE
+        )
         mem = mem_match.group(1) if mem_match else None
         obj = obj_match.group(1) if obj_match else None
         fd = fd_match.group(1) if fd_match else None
         jobs = jobs_match.group(1) if jobs_match else None
         edges = edges_match.group(1) if edges_match else None
-        iteration_csv_lines.append(f"{test_type},{run_id},{i},{mem},{obj},{fd},{jobs},{edges}")
+        iteration_csv_lines.append(
+            f"{test_type},{run_id},{i},{mem},{obj},{fd},{jobs},{edges}"
+        )
 
     as_version = autosubmit_version()
-    path = Path(
-        __file__).parent.parent.parent.parent / ".benchmarks" / "artifacts" / f"performance-metrics-by-iteration-{as_version}.csv"
+    path = (
+        Path(__file__).parent.parent.parent.parent
+        / ".benchmarks"
+        / "artifacts"
+        / f"performance-metrics-by-iteration-{as_version}.csv"
+    )
     _write_csv(path, header, iteration_csv_lines)
 
 
-@pytest.mark.parametrize("members,chunks,splits",
-                         [
-                             pytest.param("fc0", "1", "1", marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                         ],
-                         ids=[
-                             "1member_1chunk_1split",
-                             "4members_2chunks_5splits",
-                             "4members_2chunks_10splits",
-                         ],
-                         )
-def test_autosubmit_create_profile_metrics(tmp_path: Path, autosubmit_exp, general_data, members,
-                                           chunks, splits):
+@pytest.mark.parametrize(
+    "members,chunks,splits",
+    [
+        pytest.param(
+            "fc0", "1", "1", marks=[pytest.mark.profile, pytest.mark.profilelong]
+        ),
+        pytest.param(
+            "fc0 fc1 fc2 fc3",
+            "2",
+            "5",
+            marks=[pytest.mark.profile, pytest.mark.profilelong],
+        ),
+        pytest.param(
+            "fc0 fc1 fc2 fc3",
+            "2",
+            "10",
+            marks=[pytest.mark.profile, pytest.mark.profilelong],
+        ),
+    ],
+    ids=[
+        "1member_1chunk_1split",
+        "4members_2chunks_5splits",
+        "4members_2chunks_10splits",
+    ],
+)
+def test_autosubmit_create_profile_metrics(
+    tmp_path: Path, autosubmit_exp, general_data, members, chunks, splits
+):
     """Integration/performance test for `autosubmit create` with profiling enabled."""
     members_name = members.replace(" ", "_")
     test_type = "create"
@@ -325,71 +377,136 @@ def test_autosubmit_create_profile_metrics(tmp_path: Path, autosubmit_exp, gener
     yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
     as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=False)
 
-    as_exp.autosubmit.create(as_exp.expid, noplot=True, hide=False, force=True, profile=True)
+    from autosubmit.profiler.profiler import Profiler
+
+    profiler = Profiler(
+        subcommand=test_type, expid=as_exp.expid, trace_enabled=False, max_checkpoints=0
+    )
+    profiler.start()
+    profiler.iteration_checkpoint(0, 0)
+
+    try:
+        create(as_exp.expid, noplot=True, hide=False, force=True)
+    finally:
+        profiler.stop()
 
     parse_metrics(as_exp, test_type=test_type, run_id=current_id, tmp_path=tmp_path)
 
 
-@pytest.mark.parametrize("members,chunks,splits,max_iterations,test_type",
-                         [
-                             pytest.param("fc0", "1", "1", 0, "run",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1", "2", "2", 0, "run",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", 0, "run", marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", 0, "run", marks=[pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8", "5", "100", 10, "run_heavy",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                         ],
-                         ids=[
-                             "1member_1chunk_1split",
-                             "2members_2chunks_2splits",
-                             "4members_2chunks_5splits",
-                             "4members_2chunks_10splits",
-                             "MEM_TEST"
-                         ],
-                         )
-def test_autosubmit_run_profile_metrics(tmp_path: Path, autosubmit_exp, general_data, members, chunks,
-                                        splits, max_iterations, slurm_server, test_type):
+@pytest.mark.parametrize(
+    "members,chunks,splits,max_iterations,test_type",
+    [
+        pytest.param(
+            "fc0",
+            "1",
+            "1",
+            0,
+            "run",
+            marks=[pytest.mark.profile, pytest.mark.profilelong],
+        ),
+        pytest.param(
+            "fc0 fc1",
+            "2",
+            "2",
+            0,
+            "run",
+            marks=[pytest.mark.profile, pytest.mark.profilelong],
+        ),
+        pytest.param(
+            "fc0 fc1 fc2 fc3", "2", "5", 0, "run", marks=[pytest.mark.profilelong]
+        ),
+        pytest.param(
+            "fc0 fc1 fc2 fc3", "2", "10", 0, "run", marks=[pytest.mark.profilelong]
+        ),
+        pytest.param(
+            "fc0 fc1 fc2 fc3 fc4 fc5 fc6 fc7 fc8",
+            "5",
+            "100",
+            10,
+            "run_heavy",
+            marks=[pytest.mark.profile, pytest.mark.profilelong],
+        ),
+    ],
+    ids=[
+        "1member_1chunk_1split",
+        "2members_2chunks_2splits",
+        "4members_2chunks_5splits",
+        "4members_2chunks_10splits",
+        "MEM_TEST",
+    ],
+)
+def test_autosubmit_run_profile_metrics(
+    tmp_path: Path,
+    autosubmit_exp,
+    general_data,
+    members,
+    chunks,
+    splits,
+    max_iterations,
+    slurm_server,
+    test_type,
+):
     """Integration/performance test for `autosubmit create` with profiling enabled."""
     members_name = members.replace(" ", "_")
     current_id = f"{members_name}_{chunks}_{splits}"
     yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
     as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=True)
-    as_exp.as_conf.set_last_as_command('run')
-    as_exp.autosubmit.run_experiment(as_exp.expid, profile=True, trace=False, profile_max_iterations=max_iterations)
+    as_exp.as_conf.set_last_as_command("run")
+    profiler = Profiler(
+        subcommand="run",
+        expid=as_exp.expid,
+        trace_enabled=False,
+        max_checkpoints=max_iterations,
+    )
+    profiler.start()
+    try:
+        run(as_exp.expid, profiler=profiler)
+    finally:
+        profiler.stop()
     parse_metrics(as_exp, test_type=test_type, run_id=current_id, tmp_path=tmp_path)
 
 
-@pytest.mark.parametrize("members,chunks,splits",
-                         [
-                             pytest.param("fc0", "1", "1", marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10",
-                                          marks=[pytest.mark.profile, pytest.mark.profilelong]),
-                         ],
-                         ids=[
-                             "1member_1chunk_1split",
-                             "4members_2chunks_5splits",
-                             "4members_2chunks_10splits",
-                         ],
-                         )
-def test_autosubmit_recovery_profile_metrics(tmp_path: Path, autosubmit_exp, general_data, members, chunks, splits,
-                                             slurm_server):
+@pytest.mark.parametrize(
+    "members,chunks,splits",
+    [
+        pytest.param(
+            "fc0", "1", "1", marks=[pytest.mark.profile, pytest.mark.profilelong]
+        ),
+        pytest.param(
+            "fc0 fc1 fc2 fc3",
+            "2",
+            "5",
+            marks=[pytest.mark.profile, pytest.mark.profilelong],
+        ),
+        pytest.param(
+            "fc0 fc1 fc2 fc3",
+            "2",
+            "10",
+            marks=[pytest.mark.profile, pytest.mark.profilelong],
+        ),
+    ],
+    ids=[
+        "1member_1chunk_1split",
+        "4members_2chunks_5splits",
+        "4members_2chunks_10splits",
+    ],
+)
+def test_autosubmit_recovery_profile_metrics(
+    tmp_path: Path, autosubmit_exp, general_data, members, chunks, splits, slurm_server
+):
     """Integration/performance test for `autosubmit recovery` with profiling enabled."""
     members_name = members.replace(" ", "_")
     test_type = "recovery"
     current_id = f"{members_name}_{chunks}_{splits}"
     yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
     as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=True)
-    as_exp.as_conf.set_last_as_command('recovery')
-    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False, full_load=True)
+    as_exp.as_conf.set_last_as_command("recovery")
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False, full_load=True)
     job_names = [job.name for job in job_list.get_job_list()]
     prepare_setstatus_recovery(as_exp, tmp_path, job_names, slurm_server)
-    prof: Profiler = Profiler(as_exp.expid)
+    prof: Profiler = Profiler(subcommand="recovery", expid=as_exp.expid)
     prof.start()
-    as_exp.autosubmit.recovery(
+    recover(
         as_exp.expid,
         noplot=True,
         save=True,
@@ -406,10 +523,19 @@ def test_autosubmit_recovery_profile_metrics(tmp_path: Path, autosubmit_exp, gen
     parse_metrics(as_exp, test_type=test_type, run_id=current_id, tmp_path=tmp_path)
 
 
-def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=None, target="WAITING"):
+def do_setstatus(
+    expid: str,
+    fl=None,
+    fc=None,
+    fct=None,
+    ftcs=None,
+    fs=None,
+    ft=None,
+    target="WAITING",
+):
     target = target.upper()
-    as_exp_.autosubmit.set_status(
-        as_exp_.expid,
+    set_status(
+        expid,
         noplot=True,
         save=True,
         final=target,
@@ -424,44 +550,53 @@ def do_setstatus(as_exp_, fl=None, fc=None, fct=None, ftcs=None, fs=None, ft=Non
         expand=[],
         expand_status=[],
         check_wrapper=False,
-        detail=False
+        detail=False,
     )
 
 
 @pytest.mark.profile
 @pytest.mark.profilelong
-@pytest.mark.parametrize("members,chunks,splits,filter_type",
-                         [
-                             pytest.param("fc0", "1", "1", "ftcs"),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", "ftcs"),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", "ftcs"),
-                             pytest.param("fc0", "1", "1", "ft"),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", "ft"),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", "ft"),
-                             pytest.param("fc0", "1", "1", "fs"),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", "fs"),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", "fs"),
-                             pytest.param("fc0", "1", "1", "fl"),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "5", "fl"),
-                             pytest.param("fc0 fc1 fc2 fc3", "2", "10", "fl"),
-                         ],
-                         ids=[
-                             "1member_1chunk_1split_ftcs",
-                             "4members_2chunks_5splits_ftcs",
-                             "4members_2chunks_10splits_ftcs",
-                             "1member_1chunk_1split_ft",
-                             "4members_2chunks_5splits_ft",
-                             "4members_2chunks_10splits_ft",
-                             "1member_1chunk_1split_fs",
-                             "4members_2chunks_5splits_fs",
-                             "4members_2chunks_10splits_fs",
-                             "1member_1chunk_1split_fl",
-                             "4members_2chunks_5splits_fl",
-                             "4members_2chunks_10splits_fl",
-                         ],
-                         )
-def test_autosubmit_setstatus_profile_metrics(tmp_path: Path, autosubmit_exp, general_data, members, chunks, splits,
-                                              slurm_server, filter_type):
+@pytest.mark.parametrize(
+    "members,chunks,splits,filter_type",
+    [
+        pytest.param("fc0", "1", "1", "ftcs"),
+        pytest.param("fc0 fc1 fc2 fc3", "2", "5", "ftcs"),
+        pytest.param("fc0 fc1 fc2 fc3", "2", "10", "ftcs"),
+        pytest.param("fc0", "1", "1", "ft"),
+        pytest.param("fc0 fc1 fc2 fc3", "2", "5", "ft"),
+        pytest.param("fc0 fc1 fc2 fc3", "2", "10", "ft"),
+        pytest.param("fc0", "1", "1", "fs"),
+        pytest.param("fc0 fc1 fc2 fc3", "2", "5", "fs"),
+        pytest.param("fc0 fc1 fc2 fc3", "2", "10", "fs"),
+        pytest.param("fc0", "1", "1", "fl"),
+        pytest.param("fc0 fc1 fc2 fc3", "2", "5", "fl"),
+        pytest.param("fc0 fc1 fc2 fc3", "2", "10", "fl"),
+    ],
+    ids=[
+        "1member_1chunk_1split_ftcs",
+        "4members_2chunks_5splits_ftcs",
+        "4members_2chunks_10splits_ftcs",
+        "1member_1chunk_1split_ft",
+        "4members_2chunks_5splits_ft",
+        "4members_2chunks_10splits_ft",
+        "1member_1chunk_1split_fs",
+        "4members_2chunks_5splits_fs",
+        "4members_2chunks_10splits_fs",
+        "1member_1chunk_1split_fl",
+        "4members_2chunks_5splits_fl",
+        "4members_2chunks_10splits_fl",
+    ],
+)
+def test_autosubmit_setstatus_profile_metrics(
+    tmp_path: Path,
+    autosubmit_exp,
+    general_data,
+    members,
+    chunks,
+    splits,
+    slurm_server,
+    filter_type,
+):
     """Integration/performance test for `autosubmit setstatus` with profiling enabled."""
 
     members_name = members.replace(" ", "_")
@@ -469,8 +604,8 @@ def test_autosubmit_setstatus_profile_metrics(tmp_path: Path, autosubmit_exp, ge
     current_id = f"{members_name}_{chunks}_{splits}_{filter_type}"
     yaml_data = prepare_yml(members=members, chunks=chunks, splits=splits)
     as_exp = autosubmit_exp(experiment_data=yaml_data, include_jobs=False, create=True)
-    as_exp.as_conf.set_last_as_command('recovery')
-    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False, full_load=True)
+    as_exp.as_conf.set_last_as_command("recovery")
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False, full_load=True)
     job_names = [job.name for job in job_list.get_job_list()]
     prepare_setstatus_recovery(as_exp, tmp_path, job_names, slurm_server)
     fl_filter_names = " ".join(job_names)
@@ -479,17 +614,17 @@ def test_autosubmit_setstatus_profile_metrics(tmp_path: Path, autosubmit_exp, ge
     fs = "WAITING"
     target = "COMPLETED"
 
-    prof: Profiler = Profiler(as_exp.expid)
+    prof: Profiler = Profiler(subcommand="recovery", expid=as_exp.expid)
     prof.start()
     do_setstatus(
-        as_exp,
+        as_exp.expid,
         fl=fl_filter_names if filter_type.lower() == "fl" else None,
         fc=None,  # no need, it shares code with ftcs
         fct=None,  # no need, it shares code with ftcs
         ftcs=ftcs_filter if filter_type.lower() == "ftcs" else None,
         fs=fs if filter_type.lower() == "fs" else None,
         ft=ft_filter if filter_type.lower() == "ft" else None,
-        target=target
+        target=target,
     )
     prof.stop()
     parse_metrics(as_exp, test_type=test_type, run_id=current_id, tmp_path=tmp_path)

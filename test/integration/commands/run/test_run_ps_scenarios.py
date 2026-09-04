@@ -17,6 +17,7 @@
 
 """Tests that run diverse scenarios for Autosubmit run with a ``ps`` platform
 and checks the database for expected results."""
+
 import time
 from pathlib import Path
 from textwrap import dedent
@@ -26,6 +27,7 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.workflow.manage import run
 from test.integration.commands.run.conftest import (
     _assert_db_fields,
     _assert_exit_code,
@@ -99,7 +101,7 @@ def test_run_uninterrupted(
     as_conf.set_last_as_command('run')
 
     # Run the experiment
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    exit_code = run(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
     # Check and display results
@@ -182,10 +184,7 @@ def test_run_interrupted(
     as_conf.set_last_as_command('run')
 
     # Run the experiment
-    as_thread, _result, stop_event = run_in_thread(
-        as_exp.autosubmit.run_experiment,
-        expid=as_exp.expid
-    )
+    as_thread, _result, stop_event = run_in_thread(run, expid=as_exp.expid)
     #TODO: Instead of adding sleeps, make the workflow stop after X iterations
     time.sleep(2)
 
@@ -195,7 +194,7 @@ def test_run_interrupted(
 
     assert not as_thread.is_alive(), "Autosubmit thread did not stop as expected."
 
-    exit_code = as_exp.autosubmit.run_experiment(expid=as_exp.expid)
+    exit_code = run(expid=as_exp.expid)
 
     # Check and display results
     run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)

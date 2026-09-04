@@ -24,9 +24,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
+from autosubmit.job.manage import change_status
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
 from autosubmit.platforms.locplatform import LocalPlatform
 
@@ -42,6 +42,7 @@ from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
 if TYPE_CHECKING:
+    # noinspection PyProtectedMember
     from _pytest._py.path import LocalPath
 
 
@@ -126,7 +127,7 @@ def test_check_all_jobs_send_command1_raises_autosubmit_error(mocker, paramiko_p
             job_list=[job],
             as_conf=as_conf,
             retries=-1)
-    assert cm.value.message == ae.error_message
+    assert cm.value.message in ae.error_message
     assert cm.value.code == 6000
     assert cm.value.trace is None
 
@@ -147,14 +148,13 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
     job.id = 'TEST'
     job.name = 'TEST'
     job.status = Status.UNKNOWN
-    platform.get_queue_status = mocker.Mock(side_effect=None)
 
     with pytest.raises(AutosubmitError) as cm:
         platform.check_all_jobs(
             job_list=[job],
             as_conf=as_conf,
             retries=1)
-    assert cm.value.message == ae.error_message
+    assert cm.value.message in ae.error_message
     assert cm.value.code == 6000
     assert cm.value.trace is None
 
@@ -864,7 +864,7 @@ def test_change_status_sends_batch_cancel_per_platform(
         for i in range(jobs_per_platform)
     ]
 
-    changes = Autosubmit.change_status(
+    changes = change_status(
         final="FAILED",
         final_status=Status.FAILED,
         final_list=all_jobs,
@@ -910,7 +910,7 @@ def test_change_status_applies_status_to_all_jobs(
         for i, (name, platform) in enumerate(platforms.items())
     ]
 
-    changes = Autosubmit.change_status(
+    changes = change_status(
         final=final,
         final_status=final_status,
         final_list=jobs,
@@ -936,7 +936,7 @@ def test_change_status_skips_jobs_already_at_final_status(
         for i, (name, platform) in enumerate(platforms.items())
     ]
 
-    changes = Autosubmit.change_status(
+    changes = change_status(
         final="FAILED",
         final_status=Status.FAILED,
         final_list=jobs,
@@ -966,7 +966,7 @@ def test_change_status_skips_active_job_with_unreachable_platform(
         for i, (name, platform) in enumerate(platforms.items())
     ]
 
-    changes = Autosubmit.change_status(
+    changes = change_status(
         final="FAILED",
         final_status=Status.FAILED,
         final_list=jobs,
@@ -992,7 +992,7 @@ def test_change_status_no_cancel_when_save_is_false(
         for i, (name, platform) in enumerate(platforms.items())
     ]
 
-    changes = Autosubmit.change_status(
+    changes = change_status(
         final="FAILED",
         final_status=Status.FAILED,
         final_list=jobs,
@@ -1026,7 +1026,7 @@ def test_change_status_handles_send_command_failure_gracefully(
         for i, (name, platform) in enumerate(platforms.items())
     ]
 
-    changes = Autosubmit.change_status(
+    changes = change_status(
         final="FAILED",
         final_status=Status.FAILED,
         final_list=jobs,

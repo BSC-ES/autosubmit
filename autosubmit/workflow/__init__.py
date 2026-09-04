@@ -15,17 +15,4 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Fixtures for regression tests."""
-
-import pytest
-
-
-@pytest.fixture(scope='session', autouse=True)
-def experiment_config_fixture(session_mocker):
-    # TODO: There are unit tests that fail without this fixture. Those unit tests are good candidates
-    #       to be rewritten or made into integration tests without mocks.
-    session_mocker.patch(
-        'autosubmit.config.configcommon.get_experiment_description',
-        return_value=[['test experiment']]
-    )
-
+"""Autosubmit workflow management."""
