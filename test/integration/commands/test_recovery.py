@@ -182,6 +182,10 @@ def test_online_recovery(
                 job.status = Status.RUNNING
             else:
                 job.status = Status.WAITING
+            # Give these jobs a valid id and submit time so that
+            # ``recover_last_data`` leaves their logs pending for recovery
+            job.id = "123"
+            job.submit_time_timestamp = "20200101000000"
 
     job_list_.save()
 
@@ -226,6 +230,16 @@ def test_online_recovery(
                 assert name not in completed_jobs
             else:
                 assert name in completed_jobs
+
+        # Jobs marked COMPLETED by recovery must have their log attempt accounted
+        # so a later run does not retry their (non existing) logs.
+        recovered_completed = [
+            job for job in job_list_.get_job_list()
+            if job.name in job_names_to_recover and job.status == Status.COMPLETED
+        ]
+        assert recovered_completed
+        for job in recovered_completed:
+            assert job.updated_log == job.fail_count + 1
 
 
 @pytest.mark.parametrize("active_jobs,force", [

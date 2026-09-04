@@ -3130,6 +3130,9 @@ class Autosubmit:
                     recover_stale_job_data(expid, as_conf, platforms)
                 except Exception as e:
                     Log.debug(f"Error while recovering stale job data: {str(e)}")
+                for job in jobs_to_recover:
+                    if job.status == Status.COMPLETED:
+                        job.updated_log = job.fail_count + 1
                 job_list.save()
             else:
                 Log.warning('Changes NOT saved to the jobList. Use -s option to save')
