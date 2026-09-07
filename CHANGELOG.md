@@ -46,6 +46,28 @@ several bug fixes and enhancements to improve the overall user experience.
 - The documentation of CLI commands are synced automatically with the Sphinx docs #3171 #1344
 - Most `autosubmit` sub-commands now support the `--profiler`` to run with cProfile #1094 #3171
 - Every command now prints traceability information (AS/Python version, Linux, user name, ...) #2795 #3171
+- set_status now rejects active targets (SUBMITTED/QUEUING/RUNNING → AutosubmitCritical 7011). #3231
+- Centralized Job.apply_status / Status.ACTIVE/RE_RUNNABLE #3231
+- stale-data recovery on set-status runs only for final targets (_FINAL_STATUSES) in job/manage.py instead of the autosubmit.py monolith. #3231
+- Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly (with edge-completion reconciliation), never loaded into the graph. #3231
+
+### 4.1.17: (#3181)
+
+**Bug fixes:**
+
+- Fewer "key-exchange timed out" errors on busy cluster login servers. Autosubmit now waits longer and recovers by itself.
+- `recovery` no longer stops when a platform can't say which jobs finished; offline it falls back to its own records.
+- The `updated_list_<EXPID>.txt` status file is now friendlier: bad lines are skipped with a warning, job names and statuses are case-insensitive, and it can't break your run.
+- Autosubmit no longer gets stuck on logs of jobs whose info was lost after an interrupted run.
+- Relaunching a finished job from the `updated_list` file now correctly resets some variables used to download the logs
+- The default for IO_SAFE_WAIT is set back to 60 seconds
+
+**Enhancements:**
+
+- New `CLEAR_TO_SEND_TIMEOUT` platform setting: how long to wait for a busy login server. Default: 180 seconds.
+- When you change the status of a job that is still running, Autosubmit stops it on the cluster first and then applies the change. No more accidental duplicate runs.
+- `setstatus` and `updated_list` no longer let you put a job into an in-progress state like submitted, queuing, or running. Autosubmit manages those states on its own.
+- QOL: `updated_list` and `setstatus` now call the same functions to manage status.
 
 ### 4.1.17: Bug fixes and enhancements
 
