@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from multiprocessing import Process
 from pathlib import Path
 from textwrap import dedent
+from threading import Event
 
 import pytest
 from ruamel.yaml import YAML
@@ -1000,6 +1001,121 @@ def test_run_with_run_modes(
     run_tmpdir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
     db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
     _assert_db_fields(db_check_list)
+
+
+def _blocking_poll_sleep(release_event: Event, polling_started: Event, max_polls: int = 100, timeout: int = 60):
+    """Return a ``sleep`` replacement that blocks until ``release_event`` is set."""
+    state = {"polls": 0}
+
+    def _sleep(_):
+        state["polls"] += 1
+        if state["polls"] > max_polls:
+            raise TimeoutError("start_after monitor never triggered")
+        polling_started.set()
+        if not release_event.wait(timeout=timeout):
+            raise TimeoutError("start_after monitor never released")
+
+    return _sleep
+
+
+def test_start_after_concurrent_launch(
+        autosubmit_exp,
+        general_data,
+        prepare_scratch,
+        monkeypatch,
+):
+    """B launched at the same time as A must start once A completes."""
+    yaml = YAML(typ='rt')
+    jobs_data = dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World"
+                sleep 1
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+    """)
+
+    # Create both experiments. A completes first; B waits for A via start_after.
+    as_exp_a = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp_a.expid)
+    as_exp_a.as_conf.set_last_as_command('run')
+    as_exp_b = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp_b.expid)
+    as_exp_b.as_conf.set_last_as_command('run')
+
+    release_event = Event()
+    polling_started = Event()
+    monkeypatch.setattr("autosubmit.helpers.autosubmit_helper.sleep",
+                        _blocking_poll_sleep(release_event, polling_started))
+
+    # Start B first: it starts monitoring A before A is even launched.
+    thread_b, result_b, _ = run_in_thread(
+        run, expid=as_exp_b.expid, start_after=as_exp_a.expid)
+    assert polling_started.wait(timeout=60), "B never started polling A's run"
+
+    # Now launch A and let it finish while B keeps waiting on the release event.
+    process_a = Process(target=run, args=(as_exp_a.expid,))
+    process_a.start()
+    process_a.join(timeout=60)
+    assert not process_a.is_alive(), "Experiment A did not finish"
+    assert process_a.exitcode == 0
+
+    # Release B: it must now see A completed and start its own run.
+    release_event.set()
+    thread_b.join(timeout=60)
+    assert not thread_b.is_alive(), "Experiment B never started after experiment A finished"
+    assert result_b["exception"] is None, f"Experiment B failed: {result_b['exception']}"
+    _assert_exit_code("COMPLETED", result_b["exit_code"])
+
+    # A's run must be finalized with non-zero totals
+    last_run_a = _get_last_run_row(as_exp_a.expid)
+    assert last_run_a is not None
+    assert last_run_a["finish"] > 0
+    assert last_run_a["total"] > 0
+    assert last_run_a["total"] == last_run_a["completed"]
+
+
+def test_start_after_monitors_experiment_without_runs_yet(
+        autosubmit_exp,
+        general_data,
+        prepare_scratch,
+        monkeypatch,
+):
+    """B must keep polling (not crash) when A exists but has no run row yet."""
+    yaml = YAML(typ='rt')
+    jobs_data = dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '1'
+    JOBS:
+        job:
+            SCRIPT: |
+                echo "Hello World"
+                sleep 1
+            PLATFORM: LOCAL
+            RUNNING: chunk
+            wallclock: 00:01
+    """)
+
+    # A is created but never run: its experiment_run table stays empty.
+    as_exp_a = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=False)
+    prepare_scratch(expid=as_exp_a.expid)
+    as_exp_a.as_conf.set_last_as_command('run')
+    as_exp_b = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp_b.expid)
+    as_exp_b.as_conf.set_last_as_command('run')
+
+    monkeypatch.setattr("autosubmit.helpers.autosubmit_helper.sleep", _bounded_poll_sleep(max_polls=5))
+    thread_b, result_b, _ = run_in_thread(
+        run, expid=as_exp_b.expid, start_after=as_exp_a.expid)
+    thread_b.join(timeout=5)
+    assert not thread_b.is_alive()
+    assert result_b["exception"] is not None
+    assert "start_after monitor never triggered" in str(result_b["exception"]), (
+        f"B crashed instead of waiting for A's run row: {result_b['exception']!r}")
 
 
 @pytest.mark.parametrize("scenario", ["failed_job", "not_completed"])

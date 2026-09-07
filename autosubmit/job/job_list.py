@@ -2272,11 +2272,7 @@ class JobList:
         The counts are computed from the persisted ``jobs`` table, which keeps
         every job (including finished jobs unloaded from memory), so they are
         complete. Keys follow the same convention as
-        ``ExperimentHistory.get_status_counts_from_job_list``
-
-        :return: dict with keys COMPLETED, FAILED, QUEUING, SUBMITTED, RUNNING,
-            SUSPENDED and TOTAL.
-        :rtype: dict[str, int]
+        ``ExperimentHistory.get_status_counts_from_job_list``.
         """
         statuses = ["COMPLETED", "FAILED", "QUEUING", "SUBMITTED", "RUNNING", "SUSPENDED"]
         counts = {status: self.dbmanager.count_where("jobs", {"status": status}) for status in statuses}
