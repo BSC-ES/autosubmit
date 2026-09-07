@@ -133,8 +133,8 @@ def test_handle_start_after(mocker, autosubmit_config: Callable, time: str,
     experiment_history2.__bool__ = lambda _: True
 
     mocked_exp_history = mocker.Mock()
-    mocked_exp_history.manager.get_experiment_run_dc_with_max_id.side_effect = [experiment_history, experiment_history2,
-                                                                                None]
+    mocked_exp_history.manager.get_experiment_run_dc_with_max_id_or_none.side_effect = [experiment_history,
+                                                                                       experiment_history2, None]
     mocked_exp_history.is_header_ready.return_value = header_skip
     mock_experiment_history.return_value = mocked_exp_history
 
@@ -143,5 +143,5 @@ def test_handle_start_after(mocker, autosubmit_config: Callable, time: str,
 
     helper.handle_start_after(time, _EXPID)
     if header_skip is True and experiment_exists is True:
-        assert mocked_exp_history.manager.get_experiment_run_dc_with_max_id.called
+        assert mocked_exp_history.manager.get_experiment_run_dc_with_max_id_or_none.called
     assert mocked_sleep.has_been_called()
