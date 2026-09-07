@@ -2022,11 +2022,15 @@ class AutosubmitConfig:
             # During validation, all variable names are prefixed with `current_` hence the [8:].
             # However, special variables start with `^` that can break this logic since
             # it becomes part of the generated reference name.
-            if isinstance(experiment_data[key], str) and "%" in experiment_data[key]:
-                check_value = experiment_data[key].split("%")[1]
-                special_var = check_value[0] == "^"
-                if key.upper() == check_value[8:].upper() or (special_var and key.upper() == check_value[9:].upper()):
-                    raise AutosubmitCritical(f"Dynamic variables {key} causing infinite recursion during evaluation")
+            key_experiment_data = experiment_data[key]
+            if isinstance(key_experiment_data, str) and "%" in key_experiment_data:
+                try:
+                    check_value = key_experiment_data.split("%")[1]
+                    special_var = check_value[0] == "^"
+                    if key.casefold() == check_value[8:].casefold() or (special_var and key.casefold() == check_value[9:].casefold()):
+                        raise AutosubmitCritical(f"Dynamic variables {key} causing infinite recursion during evaluation of the element {key_experiment_data}")
+                except IndexError:
+                    raise AutosubmitCritical(f"The following key: {key} Has a problem with it's value {key_experiment_data}")
         return experiment_data
 
     @staticmethod
@@ -2479,11 +2483,9 @@ class AutosubmitConfig:
         :param sleep_time: value to set
         :type sleep_time: int
         """
-        with open(self._conf_parser_file) as content_in_file:
-            content = content_in_file.read()
-            content = content.replace(re.search('SAFETYSLEEPTIME:.*', content).group(0), f"SAFETYSLEEPTIME: {sleep_time:d}")
-            with open(self._conf_parser_file, 'w') as file:
-                file.write(content)
+        content = open(self._conf_parser_file).read()
+        content = content.replace(re.search('SAFETYSLEEPTIME:.*', content).group(0), "SAFETYSLEEPTIME: %d" % sleep_time)
+        open(self._conf_parser_file, 'w').write(content)
 
     def get_retrials(self):
         """Returns max number of retrials for job from autosubmit's config file.
@@ -2744,7 +2746,7 @@ class AutosubmitConfig:
         if not datelist or not chunks:
             return
 
-        if isinstance(datelist, (str, int)):
+        if isinstance(datelist, str) or isinstance(datelist, int):
             datelist = str(datelist).split()
 
         for section_name, section_data in self.jobs_data.items():
