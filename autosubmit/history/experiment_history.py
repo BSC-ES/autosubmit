@@ -324,24 +324,19 @@ class ExperimentHistory:
     def process_status_changes(self, job_list: "list[Job] | None" = None, chunk_unit: str = "NA", chunk_size: int = 0,
                                current_config: str = "", create: bool = False,
                                status_counts: "dict[str, int] | None" = None) -> ExperimentRun | None:
-        """ Detect status differences between job_list and current job_data rows, and update. Creates a new run if necessary.
+        """Detect status differences between the job list and the ``job_data`` rows and update them.
+
+        Creates a new run if necessary.
 
         :param job_list: the jobs of the experiment as a plain list.
-        :type job_list: list[Job] | None
         :param chunk_unit: the chunk unit (e.g. month) of the current run.
-        :type chunk_unit: str
         :param chunk_size: the chunk size of the current run.
-        :type chunk_size: int
         :param current_config: the experiment configuration as a JSON string.
-        :type current_config: str
         :param create: whether a new run must be created regardless of changes.
-        :type create: bool
         :param status_counts: optional pre-computed status counts (e.g. from the
             complete jobs database, which includes jobs unloaded from memory).
             When omitted they are computed from ``job_list``.
-        :type status_counts: dict[str, int] | None
         :return: the current ``ExperimentRun`` or None if the database failed.
-        :rtype: ExperimentRun | None
         """
         try:
             try:
@@ -373,14 +368,12 @@ class ExperimentHistory:
 
     def process_job_list_changes_to_experiment_totals(self, job_list: "list[Job] | None" = None,
                                                       status_counts: "dict[str, int] | None" = None) -> ExperimentRun | None:
-        """ Updates current experiment_run row with totals calculated from job_list.
+        """Updates the current ``experiment_run`` row with totals computed from the given ``status_counts``.
 
         :param job_list: the jobs of the experiment as a plain list.
-        :type job_list: list[Job] | None
         :param status_counts: optional pre-computed status counts (e.g. from the
             complete jobs database, which includes jobs unloaded from memory).
             When omitted they are computed from ``job_list``.
-        :type status_counts: dict[str, int] | None
         """
         try:
             current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
@@ -390,7 +383,7 @@ class ExperimentHistory:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
-    def should_we_create_a_new_run(self, job_list: "list[Job]", changes_count: int, current_experiment_run_dc,
+    def should_we_create_a_new_run(self, job_list: "list[Job]", changes_count: int, current_experiment_run_dc: ExperimentRun,
                                    new_chunk_unit: str, new_chunk_size: int, create: bool = False) -> bool:
         if create:
             return True
@@ -408,29 +401,27 @@ class ExperimentHistory:
             return True
         return False
 
-    def update_counts_on_experiment_run_dc(self, experiment_run_dc, job_list: "list[Job] | None" = None,
+    def update_counts_on_experiment_run_dc(self, current_experiment_run_dc: ExperimentRun, job_list: "list[Job] | None" = None,
                                            status_counts: "dict[str, int] | None" = None) -> ExperimentRun:
-        """ Return updated row as Models.ExperimentRun.
+        """Updates the counts of the run from the given ``status_counts`` and returns the updated row.
 
-        :param experiment_run_dc: the run to update.
-        :type experiment_run_dc: ExperimentRun
+        :param current_experiment_run_dc: the run to update.
         :param job_list: the jobs of the experiment as a plain list. Used to
             compute the counts when ``status_counts`` is not provided.
-        :type job_list: list[Job] | None
         :param status_counts: optional pre-computed status counts (e.g. from the
             complete jobs database, which includes jobs unloaded from memory).
-        :type status_counts: dict[str, int] | None
+            When omitted they are computed from ``job_list``.
         """
         if status_counts is None:
             status_counts = self.get_status_counts_from_job_list(job_list)
-        experiment_run_dc.completed = status_counts[HUtils.SupportedStatus.COMPLETED]
-        experiment_run_dc.failed = status_counts[HUtils.SupportedStatus.FAILED]
-        experiment_run_dc.queuing = status_counts[HUtils.SupportedStatus.QUEUING]
-        experiment_run_dc.submitted = status_counts[HUtils.SupportedStatus.SUBMITTED]
-        experiment_run_dc.running = status_counts[HUtils.SupportedStatus.RUNNING]
-        experiment_run_dc.suspended = status_counts[HUtils.SupportedStatus.SUSPENDED]
-        experiment_run_dc.total = status_counts["TOTAL"]
-        return self.manager.update_experiment_run_dc_by_id(experiment_run_dc)
+        current_experiment_run_dc.completed = status_counts[HUtils.SupportedStatus.COMPLETED]
+        current_experiment_run_dc.failed = status_counts[HUtils.SupportedStatus.FAILED]
+        current_experiment_run_dc.queuing = status_counts[HUtils.SupportedStatus.QUEUING]
+        current_experiment_run_dc.submitted = status_counts[HUtils.SupportedStatus.SUBMITTED]
+        current_experiment_run_dc.running = status_counts[HUtils.SupportedStatus.RUNNING]
+        current_experiment_run_dc.suspended = status_counts[HUtils.SupportedStatus.SUSPENDED]
+        current_experiment_run_dc.total = status_counts["TOTAL"]
+        return self.manager.update_experiment_run_dc_by_id(current_experiment_run_dc)
 
     def finish_current_experiment_run(self):
         if self.manager.is_there_a_last_experiment_run():
@@ -442,13 +433,11 @@ class ExperimentHistory:
     def create_new_experiment_run(self, chunk_unit: str = "NA", chunk_size: int = 0, current_config: str = "",
                                   job_list: "list[Job] | None" = None,
                                   status_counts: "dict[str, int] | None" = None) -> ExperimentRun:
-        """ Also writes the finish timestamp of the previous run.
+        """Create a new ``experiment_run`` row, also writing the finish timestamp of the previous run.
 
         :param job_list: the jobs of the experiment as a plain list.
-        :type job_list: list[Job] | None
         :param status_counts: optional pre-computed status counts (e.g. from the
             complete jobs database). When omitted they are computed from ``job_list``.
-        :type status_counts: dict[str, int] | None
         """
         self.finish_current_experiment_run()
         return self._create_new_experiment_run_dc_with_counts(chunk_unit=chunk_unit, chunk_size=chunk_size,
@@ -517,7 +506,7 @@ class ExperimentHistory:
         return sum(1 for job in job_list if
                    job.date is not None and job.member is not None and job.status_str == HUtils.SupportedStatus.COMPLETED)
 
-    def get_status_counts_from_job_list(self, job_list: "list[Job] | None" = None) -> "dict[str, int]":
+    def get_status_counts_from_job_list(self, job_list: "list[Job] | None" = None) -> dict[str, int]:
         """Return dict with keys COMPLETED, FAILED, QUEUING, SUBMITTED, RUNNING, SUSPENDED, TOTAL."""
         job_list = job_list or []
         result = {
