@@ -77,6 +77,8 @@ def handle_start_after(start_after: str, expid: str) -> None:
         # block the run: it is reported and ignored.
         if not check_experiment_exists(start_after, error_on_inexistence=False):
             Log.warning(f"Experiment {start_after} does not exist. Ignoring the start_after trigger.")
+            # Keep the warning readable before the console is cleared.
+            sleep(3)
             return
         # Historical Database: We use the historical database to retrieve the current progress
         # data of the supplied expid (start_after)

@@ -1256,7 +1256,7 @@ def test_run_only_members_invalid_member(autosubmit_exp, general_data, prepare_s
         run(expid=as_exp.expid, run_only_members="nonexistent")
 
 
-def test_start_after_inexistent_experiment(autosubmit_exp, general_data, prepare_scratch):
+def test_start_after_inexistent_experiment(autosubmit_exp, general_data, prepare_scratch, monkeypatch):
     """``start_after`` pointing to a non-existent experiment must not block the run."""
     yaml = YAML(typ="rt")
     jobs_data = dedent("""\
@@ -1278,6 +1278,8 @@ def test_start_after_inexistent_experiment(autosubmit_exp, general_data, prepare
     prepare_scratch(expid=as_exp.expid)
     as_exp.as_conf.set_last_as_command("run")
 
+    # Skip the warning pause that keeps the message readable on screen.
+    monkeypatch.setattr("autosubmit.helpers.autosubmit_helper.sleep", lambda _: None)
     exit_code = run(expid=as_exp.expid, start_after="a000")
 
     _assert_exit_code("COMPLETED", exit_code)
