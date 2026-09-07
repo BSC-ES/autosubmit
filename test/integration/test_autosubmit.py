@@ -39,7 +39,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList, load_job_list
 from autosubmit.job.job_utils import check_wrappers
 from autosubmit.job.manage import set_status
-from autosubmit.log.log import Log
+from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.platform import Platform
 from autosubmit.scheduler import Scheduler
 
@@ -692,4 +692,4 @@ def test_infinite_loop_dynamic_variable(autosubmit_exp):
                 }
             }
         })
-    assert "Dynamic variables FDB_COPY_BIN causing infinite recursion during evaluation" == str(ac.value.message)
+    assert "Dynamic variables FDB_COPY_BIN causing infinite recursion during evaluation of the element %CURRENT_FDB_COPY_BIN%/fdb-copy" == str(ac.value.message)
