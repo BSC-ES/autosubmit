@@ -26,10 +26,6 @@ test/coverage.xml
 coverage.xml
 test/htmlcov
 
-# Benchmark files
-.benchmarks/artifacts
-:memory:
-
 # Docker
 dockerfiles/id_rsa*
 dockerfiles/authorized_keys
