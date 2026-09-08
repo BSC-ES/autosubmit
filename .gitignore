@@ -15,6 +15,9 @@ dist/
 build/
 .cache
 
+# Benchmark files
+.benchmarks/artifacts
+
 # Coverage files
 coverage/
 .coverage
