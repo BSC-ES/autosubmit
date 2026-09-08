@@ -224,6 +224,7 @@ def _write_csv(path: Path, header: str, lines: list[str]) -> None:
     print(f"Metrics saved to {path}")
 
 
+@pytest.mark.benchmark
 def export_to_csv(
     test_type: str, run_id: str, as_exp: Any, profiler_text: str, tmp_path: Path
 ) -> None:
@@ -290,6 +291,7 @@ def export_to_csv(
     _write_csv(path, header, [line])
 
 
+@pytest.mark.benchmark
 def export_to_csv_by_iteration(test_type: str, run_id: str, profiler_text: str) -> None:
     """Export per-iteration profiler metrics to a versioned CSV file.
 
