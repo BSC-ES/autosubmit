@@ -26,6 +26,10 @@ test/coverage.xml
 coverage.xml
 test/htmlcov
 
+# Benchmark files
+.benchmarks/artifacts
+:memory:
+
 # Docker
 dockerfiles/id_rsa*
 dockerfiles/authorized_keys
@@ -36,5 +40,3 @@ man/
 venv/
 .ipynb_checkpoints
 .atl
-.benchmarks/artifacts/performance-metrics-4.2.0.csv
-:memory:
