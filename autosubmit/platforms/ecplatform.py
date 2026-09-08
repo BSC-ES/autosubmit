@@ -129,7 +129,7 @@ class EcPlatform(ParamikoPlatform):
         self.job_status['FAILED'] = ['STOP']
         self._pathdir = "\\$HOME/LOG_" + self.expid
         self._allow_arrays = False
-        self._allow_wrappers = False  # TODO
+        self._allow_wrappers = False
         try:
             self._ec_retry_count = int(
                 self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("ECACCESS_RETRIES", 100)

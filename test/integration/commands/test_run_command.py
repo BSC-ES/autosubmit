@@ -120,7 +120,7 @@ def _assert_run_result(r: bool | int):
         ["autosubmit", "archive", "{expid}"],  # TODO
         ["autosubmit", "readme"],  # TODO
         ["autosubmit", "changelog"],  # TODO
-        # ['autosubmit', 'dbfix', '{expid}'],  # TODO
+        # ['autosubmit', 'dbfix', '{expid}'],  # TODO: https://github.com/BSC-ES/autosubmit/issues/3179
         ["autosubmit", "updatedescrip", "{expid}", "description"],
         ["autosubmit", "cat-log", "{expid}"],
         ["autosubmit", "stop", "-a"],

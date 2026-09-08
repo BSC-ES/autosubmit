@@ -506,7 +506,7 @@ def create_rocrate_archive(
 
     ins = []
     outs = []
-    # TODO: Modify when we manage to have dicts/objects in YAML,
+    # TODO: Modify when we manage to have dicts/objects in YAML (https://github.com/BSC-ES/autosubmit/issues/2511),
     #       https://earth.bsc.es/gitlab/es/autosubmit/-/issues/1045
     if rocrate_json.get('INPUTS'):
         ins.extend(rocrate_json['INPUTS'])

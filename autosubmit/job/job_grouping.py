@@ -249,7 +249,7 @@ class JobGrouping:
         :return: Mapping of job names to the list of resolved groups.
         """
         split_groups, split_groups_status = self._create_splits_groups()
-        # TODO: (See why) Apparently, the splits_groups depletes the self.jobs, so we need to restore it
+        # TODO: (See why) Apparently, the splits_groups depletes the self.jobs, so we need to restore it: https://github.com/BSC-ES/autosubmit/issues/3238
         self.jobs = self.job_list.job_list
         blacklist = []
         jobs_group_dict = {}

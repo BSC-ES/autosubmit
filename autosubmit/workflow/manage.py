@@ -701,7 +701,7 @@ def run(
                 if stop_event and stop_event.is_set():
                     Scheduler.exit = True
 
-                # TODO fix in another PR, this is a workaround to avoid having mismatching job_list and platform experiment_data
+                # TODO fix in another PR, this is a workaround to avoid having mismatching job_list and platform experiment_data: https://github.com/BSC-ES/autosubmit/issues/3239
                 if as_conf.needs_reload():
                     as_conf.reload()
                     as_conf.set_platform_parameters(job_list, submitter.platforms)
@@ -1029,7 +1029,6 @@ def recover(
             raise AutosubmitCritical(
                 "You can use --offline and -f to avoid cancelling jobs", 7050
             )
-    # TODO: https://github.com/BSC-ES/autosubmit/issues/1251 don't need force flag
     if save:
         offline_jobs = []
         for job in current_active_jobs:

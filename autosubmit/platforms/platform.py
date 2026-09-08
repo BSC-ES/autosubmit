@@ -691,7 +691,7 @@ class Platform(ABC):
         :return: True if the file was removed, False otherwise.
         :rtype: bool
         """
-        # TODO: After rebasing everything I noticed that sometimes the stat file ends with '_'
+        # TODO: After rebasing everything I noticed that sometimes the stat file ends with '_': https://github.com/BSC-ES/autosubmit/issues/3237
         if job.stat_file.endswith('_'):
             stat_file_to_delete = f"{job.stat_file}{job.fail_count}"
         else:
@@ -1039,9 +1039,6 @@ class Platform(ABC):
             job = Job(loaded_data=jobs_db_manager.load_job_by_name(job_data["name"]))
             job.platform_name = self.name  # Change the original platform to this process platform.
             job.platform = self
-            # TODO: handle missing job IDs (id=0). During an Autosubmit run, a job's log
-            # may fail to be retrieved. When recovery or setstatus or while running, later, it  tries to recover
-            # it, the job id is 0 because it was never persisted.
             job.id = job_data["id"]
             report = job.retrieve_logfiles()
             job.send_cpmip_notification(self._as_conf)

@@ -144,7 +144,7 @@ JobDataTable = Table(
 
 """Table that holds the Historical structure of the experiment jobs."""
 
-# TODO this doesn't work in POSTGRESQL
+# TODO this doesn't work in POSTGRESQL: https://github.com/BSC-ES/autosubmit/issues/3174
 # JobStatusEnum = Enum(
 #     "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING",
 #     "SKIPPED", "FAILED", "UNKNOWN", "COMPLETED", "SUSPENDED",

@@ -788,7 +788,6 @@ def copy_code(
         )
         project_destination = local_proj_dir_path / project_destination
 
-        # TODO: Move to a new package/file once we simplify ``autosubmit.py``.
         def copy_contents(from_: Path, to: Path):
             try:
                 # TODO: Do it in pure-python?
@@ -1671,7 +1670,7 @@ def refresh(expid: str, model_conf: bool, jobs_conf: bool):
         )
     try:
         # FIXME: as_conf is not validated, so it never enters the if statement below.
-        #        Should be deleted.
+        #        Should be deleted: https://github.com/BSC-ES/autosubmit/issues/3235
         if "Expdef" in as_conf.wrong_config:
             as_conf.show_messages()
         project_type = as_conf.get_project_type()
