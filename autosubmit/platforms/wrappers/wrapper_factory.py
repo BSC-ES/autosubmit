@@ -24,6 +24,8 @@ from autosubmit.platforms.wrappers.wrapper_builder import (
     PythonHorizontalWrapperBuilder,
     PythonVerticalHorizontalWrapperBuilder,
     PythonVerticalWrapperBuilder,
+    QsubHorizontalWrapperBuilder,
+    QsubVerticalHorizontalWrapperBuilder,
     SrunHorizontalWrapperBuilder,
     SrunVerticalHorizontalWrapperBuilder,
     WrapperDirector,
