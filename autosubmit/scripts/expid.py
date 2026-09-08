@@ -60,7 +60,6 @@ class ExpidCommandOptions(DefaultOptions):
     testcase: bool
     dummy: bool
     minimal_configuration: bool
-    filter_status: str
     copy: bool
     git_repo: str
     git_branch: str
@@ -104,22 +103,6 @@ def args_parser() -> ArgumentParser:
         "--minimal_configuration",
         action="store_true",
         help="Create a new experiment with minimal configuration, usually combined with -repo.",
-    )
-    # TODO: This looks like a copy-pasta bug!
-    group.add_argument(
-        "-fs",
-        "--filter_status",
-        type=str,
-        choices=(
-            "Any",
-            "READY",
-            "COMPLETED",
-            "WAITING",
-            "SUSPENDED",
-            "FAILED",
-            "UNKNOWN",
-        ),
-        help="Select the original status to filter the list of jobs.",
     )
     parser.add_argument("-y", "--copy", help="Make a copy of the specified experiment.")
     parser.add_argument(
