@@ -76,16 +76,19 @@ Each entry under ``INPUTS`` refers to a top-level section of the resolved
 Autosubmit configuration. The direct keys contained in that section are exported
 as workflow inputs.
 
-For example, given:
+For example, given the following platforms configuration:
 
 .. code-block:: yaml
 
-    PROJECT:
-      PROJECT_TYPE: git
-      PROJECT_DESTINATION: git_project
+    PLATFORMS:
+      PLATFORM_A:
+        ...
+      PLATFORM_B:
+        ...
 
-exporting ``PROJECT`` results in ``PROJECT_TYPE`` and
-``PROJECT_DESTINATION`` being represented as workflow inputs.
+exporting ``PLATFORMS`` results in ``PLATFORM_A`` and ``PLATFORM_B`` being
+represented as separate workflow inputs, with identifiers such as
+``#PLATFORMS.PLATFORM_A-param`` and ``#PLATFORMS.PLATFORM_B-param``.
 
 Only the direct children of the selected section are expanded. Nested mappings
 are not recursively converted into separate workflow inputs. Instead, nested
