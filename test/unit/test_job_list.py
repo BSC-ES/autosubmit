@@ -688,43 +688,78 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     job_list.recover_last_data()
 
 
-def _retry_delays(mocker, delay_retry_time, retries=4):
-    """Drive ``_update_failed_jobs`` and return the delay, in seconds, applied to each retry."""
-    job = Job("t000_SIM", "1", Status.FAILED, 0)
-    job.section = "SIM"
-    job.parents = set()
-    job.fail_count = 0
-    job.delay_retrials = None
-    job.wrapper_type = None
+@pytest.fixture
+def failed_job(mocker):
+    """Build a FAILED job and the JobList/as_conf pair ``_update_failed_jobs`` needs."""
+    def _build(delay_retry_time="0", fail_count=0, retrials=4, parents=None, wrapper_type=None):
+        job = Job("t000_SIM", "1", Status.FAILED, 0)
+        job.section = "SIM"
+        job.parents = parents or set()
+        job.fail_count = fail_count
+        job.delay_retrials = None
+        job.wrapper_type = wrapper_type
 
-    as_conf = mocker.MagicMock()
-    as_conf.jobs_data = {"SIM": {}}
-    as_conf.get_retrials.return_value = retries + 1
-    as_conf.get_delay_retry_time.return_value = delay_retry_time
+        as_conf = mocker.MagicMock()
+        as_conf.jobs_data = {"SIM": {}}
+        as_conf.get_retrials.return_value = retrials
+        as_conf.get_delay_retry_time.return_value = delay_retry_time
 
-    job_list = mocker.MagicMock()
-    job_list.get_failed.return_value = [job]
-    job_list.is_wrapper_still_running.return_value = False
+        job_list = mocker.MagicMock()
+        job_list.get_failed.return_value = [job]
+        job_list.is_wrapper_still_running.return_value = False
+        return job_list, as_conf, job
 
-    delays = []
-    for _ in range(retries):
-        before = datetime.datetime.now()
-        JobList._update_failed_jobs(job_list, as_conf)
-        delays.append(round((job.delay_end - before).total_seconds()))
-    return delays
+    return _build
 
 
 @pytest.mark.parametrize(
     "delay_retry_time, expected",
     [
         ("11", [11, 11, 11, 11]),
-        ("+11", [11, 22, 33, 44]),      # was [2, 3, 4, 5]
-        ("*11", [11, 110, 1100, 11000]),  # was [121, 1331, 14641, 161051]
-        ("+5", [5, 10, 15, 20]),        # was ValueError from int("+")
-        ("*2", [2, 20, 200, 2000]),     # was [22, 242, 2662, 29282]
+        ("+11", [11, 22, 33, 44]),
+        ("*11", [11, 110, 1100, 11000]),
+        ("+5", [5, 10, 15, 20]),
+        ("*2", [2, 20, 200, 2000]),
     ],
-    ids=["constant", "linear", "factor_of_ten", "linear_single_digit", "factor_of_ten_single_digit"],
+    ids=["constant", "linear", "exponential", "linear_single_digit", "exponential_single_digit"],
 )
-def test_delay_retry_time_matches_documented_sequence(mocker, delay_retry_time, expected):
-    """DELAY_RETRY_TIME must produce the sequences promised in the configuration reference."""
-    assert _retry_delays(mocker, delay_retry_time) == expected
+def test_delay_retry_time_matches_documented_sequence(failed_job, delay_retry_time, expected):
+    """DELAY_RETRY_TIME must produce the sequences documented in the configuration reference."""
+    job_list, as_conf, job = failed_job(delay_retry_time, retrials=len(expected) + 1)
+    delays = []
+    for _ in expected:
+        before = datetime.datetime.now()
+        JobList._update_failed_jobs(job_list, as_conf)
+        delays.append(round((job.delay_end - before).total_seconds()))
+    assert delays == expected
+
+
+def test_zero_delay_sets_job_to_ready(failed_job):
+    """A job with no delay configured is retried immediately."""
+    job_list, as_conf, job = failed_job("0")
+    assert JobList._update_failed_jobs(job_list, as_conf) is True
+    assert job.status == Status.READY
+    assert job.id is None
+
+
+def test_job_waits_for_uncompleted_parents(failed_job):
+    """A failed job whose parents are not all COMPLETED goes back to WAITING."""
+    job_list, as_conf, job = failed_job(parents={Job("t000_INI", "2", Status.FAILED, 0)})
+    assert JobList._update_failed_jobs(job_list, as_conf) is True
+    assert job.status == Status.WAITING
+
+
+def test_job_stays_failed_when_retrials_are_exhausted(failed_job):
+    """Once fail_count reaches RETRIALS the job is not retried again."""
+    job_list, as_conf, job = failed_job(fail_count=4, retrials=4)
+    assert JobList._update_failed_jobs(job_list, as_conf) is True
+    assert job.status == Status.FAILED
+    assert job.fail_count == 4
+
+
+def test_vertical_wrapper_inner_job_is_not_retried(failed_job):
+    """Vertical wrapper inner jobs are retried by the wrapper, not externally."""
+    job_list, as_conf, job = failed_job(fail_count=1, wrapper_type="vertical")
+    assert JobList._update_failed_jobs(job_list, as_conf) is True
+    assert job.status == Status.FAILED
+
