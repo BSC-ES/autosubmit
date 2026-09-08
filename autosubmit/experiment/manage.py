@@ -788,7 +788,6 @@ def copy_code(
         )
         project_destination = local_proj_dir_path / project_destination
 
-        # TODO: Move to a new package/file once we simplify ``autosubmit.py``.
         def copy_contents(from_: Path, to: Path):
             try:
                 # TODO: Do it in pure-python?

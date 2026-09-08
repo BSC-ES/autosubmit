@@ -3008,7 +3008,7 @@ class JobList:
                 ).VALUE_TO_KEY[job.status], platform_name, queue)
             except Exception:
                 Log.debug(f"Couldn't print job status for job {job.name}")
-        # TODO: Adaptation missing: for 4.2 this should be a db call
+        # TODO: Adaptation missing: for 4.2 this should be a db call: https://github.com/BSC-ES/autosubmit/issues/2211
         # for job in failed_job_list:
         #     if len(job.queue) < 1:
         #         queue = "no-scheduler"
@@ -3663,7 +3663,15 @@ class JobList:
         from ..job.job import WrapperJob
         for wrapper_info in wrappers_info.values():
 
-            if not wrapper_info.get("job_list", None):  # to delete TODO (horizontal-vertical issue)
+            # TODO: drop this guard once horizontal/vertical wrapper loading is handled
+            #       properly (wrappers whose inner jobs cannot be resolved are skipped).
+            #       Related wrapper issues:
+            #       - https://github.com/BSC-ES/autosubmit/issues/2735  # horizontal resource request
+            #       - https://github.com/BSC-ES/autosubmit/issues/2535  # horizontal deadlocks
+            #       - https://github.com/BSC-ES/autosubmit/issues/2467  # multiple jobs in wrapper
+            #       - https://github.com/BSC-ES/autosubmit/issues/3106  # one vertical wrapper per split
+            #       - https://github.com/BSC-ES/autosubmit/issues/1027  # new Slurm/MPI behaviour
+            if not wrapper_info.get("job_list", None):
                 continue
             wrapper_job = WrapperJob(
                 name=wrapper_info["name"],
@@ -4230,16 +4238,13 @@ class JobList:
                 job.id = int(jobs_data[job.name]["job_id"])
                 job.local_logs = jobs_data[job.name]["out"]
                 job.remote_logs = jobs_data[job.name]["err"]
-                # TODO: rebase is fixed
                 job.updated_log = jobs_data[job.name]["fail_count"]
 
         for job in finished_jobs:
-            # TODO: Another fix will come in 4.2. Currently, if the job has no id, the log will not be recovered properly.
             if not job.id:
                 job.id = 1
             # Fixes: https://github.com/BSC-ES/autosubmit/pull/2700#issuecomment-3563572977
             if not jobs_ran_atleast_once:
-                # TODO: rebase is fixed
                 job.updated_log = job.fail_count
 
     def _get_jobs_by_name(self, status: list[int] | None = None, platform: Platform = None,

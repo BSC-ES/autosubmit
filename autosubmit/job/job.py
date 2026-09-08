@@ -370,15 +370,6 @@ class Job:
 
     CHECK_ON_SUBMISSION = 'on_submission'
 
-    # TODO
-    # This is crashing the code
-    # I added it for the assertions of unit testing... since job obj != job obj when it was saved & load
-    # since it points to another section of the memory.
-    # Unfortunately, this is crashing the code everywhere else
-
-    # def __eq__(self, other):
-    #     return self.name == other.name and self.id == other.id
-
     def __str__(self):
         return f"{self.name} STATUS: {self.status}"
 
@@ -857,7 +848,7 @@ class Job:
     @property  # type: ignore
     @autosubmit_parameter(name='frequency')
     def frequency(self):
-        """TODO."""
+        """Runs the job once every ``frequency`` iterations of its running level (``FREQUENCY``)."""
         return self._frequency
 
     @frequency.setter
@@ -867,7 +858,7 @@ class Job:
     @property  # type: ignore
     @autosubmit_parameter(name='synchronize')
     def synchronize(self):
-        """TODO."""
+        """Synchronization value (``SYNCHRONIZE``: ``'date'`` or ``'member'``) used to group chunks that must run together."""
         return self._synchronize
 
     @synchronize.setter
@@ -887,7 +878,7 @@ class Job:
     @property  # type: ignore
     @autosubmit_parameter(name='delay_retrials')
     def delay_retrials(self):
-        """TODO"""
+        """Per-job retrial delay; plain integer or prefixed with ``+``/``*`` (same format as ``DELAY_RETRY_TIME``)."""
         return self._delay_retrials
 
     @delay_retrials.setter
@@ -897,7 +888,7 @@ class Job:
     @property  # type: ignore
     @autosubmit_parameter(name='packed')
     def packed(self):
-        """TODO"""
+        """Whether the job is packed into a job package (inner job) and therefore excluded from scheduling lists."""
         return self._packed
 
     @packed.setter
@@ -907,7 +898,7 @@ class Job:
     @property  # type: ignore
     @autosubmit_parameter(name='export')
     def export(self):
-        """TODO."""
+        """Export statements to inject into the job script (``EXPORT``)."""
         return self._export
 
     @export.setter
@@ -2992,7 +2983,7 @@ class Job:
             self.local_logs = tuple(_aux_local_logs)
         return compressed
 
-    # TODO: To be removed when we rid of the TOTAL_STATS file used across multiple functions
+    # TODO: To be removed when we rid of the TOTAL_STATS file used across multiple functions: https://github.com/BSC-ES/autosubmit/issues/2559, https://github.com/BSC-ES/autosubmit/issues/2062
     def _write_time(self, column: str) -> None:
         """Write a timestamp to a specific position in the TOTAL_STATS file ensuring that each
         record has four whitespace-separated fields: submit start end status.

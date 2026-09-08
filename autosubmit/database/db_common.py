@@ -924,5 +924,5 @@ def database_backup(expid):
         except BaseException:
             Log.debug("Jobs_data database backup failed.")
     elif BasicConfig.DATABASE_BACKEND == "postgres":
-        # TODO: Implement Postgres backup
+        # TODO: Implement Postgres backup: https://github.com/BSC-ES/autosubmit/issues/3179
         Log.debug("Postgres database backup not implemented yet.")

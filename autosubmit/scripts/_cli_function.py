@@ -176,7 +176,8 @@ def cli_function(
                 return 1
             except Exception as e:
                 # TODO: We can centralise catching exceptions for command line
-                #       here, and handle --verbose/--debug like in Cylc later.
+                #       here, and handle --verbose/--debug like in Cylc later
+                #       (https://github.com/BSC-ES/autosubmit/issues/1199).
                 return exit_from_error(e)
             finally:
                 if profiler is not None:

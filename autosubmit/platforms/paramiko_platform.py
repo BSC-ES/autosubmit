@@ -1314,16 +1314,6 @@ class ParamikoPlatform(Platform):
                         continue
                 else:
                     Log.warning(f'The SSH transport is still active, will not try to reconnect: {str(e)}')
-                # TODO: We need to understand why we are increasing in increments of 60 seconds, then document it.
-                # new_timeout = timeout + 60
-                # Log.info(f"Increasing Paramiko channel timeout from {timeout} to {new_timeout}")
-                # timeout = new_timeout
-                # FIXME: We can call ``settimeout``, but the current behaviour is no timeout (``None``);
-                #        if we enable that setting now, it could break existing workflows like DestinE's,
-                #        so we will have to be careful (it would have been a lot easier if it had been done
-                #        earlier...).
-                #        https://github.com/BSC-ES/autosubmit/issues/2439
-                # chan.settimeout(timeout)
 
         return False, False, False
 

@@ -168,7 +168,7 @@ def test_check_if_packages_are_ready_to_build_max_waiting_time(create_packager: 
 
 
 def test_check_if_packages_are_ready_to_build_jobs_to_run_first(create_packager: CreatePackagerFixture):
-    """TODO: Looks like this might be removed when two_way_step is removed? Old auto-monarch was using that?"""
+    """TODO: Looks like this might be removed when two_way_step is removed? Old auto-monarch was using that? https://github.com/BSC-ES/autosubmit/issues/2540"""
     job_packager = create_packager(
         experiment_data={
             'JOBS': {
