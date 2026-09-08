@@ -151,6 +151,6 @@ def test_generate_output(
 
         # TODO: txt is creating an empty file, whereas the other formats create
         #       something that tells the user what are the jobs in the workflow.
-        #       So txt format gives less information to the user, thus the 0 size.
+        #       So txt format gives less information to the user, thus the 0 size: https://github.com/BSC-ES/autosubmit/issues/3236
         if output_format != 'txt':
             assert all(p.stat().st_size > 0 for p in plots)

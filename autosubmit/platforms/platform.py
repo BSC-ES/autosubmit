@@ -691,7 +691,7 @@ class Platform(ABC):
         :return: True if the file was removed, False otherwise.
         :rtype: bool
         """
-        # TODO: After rebasing everything I noticed that sometimes the stat file ends with '_'
+        # TODO: After rebasing everything I noticed that sometimes the stat file ends with '_': https://github.com/BSC-ES/autosubmit/issues/3237
         if job.stat_file.endswith('_'):
             stat_file_to_delete = f"{job.stat_file}{job.fail_count}"
         else:

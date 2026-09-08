@@ -1670,7 +1670,7 @@ def refresh(expid: str, model_conf: bool, jobs_conf: bool):
         )
     try:
         # FIXME: as_conf is not validated, so it never enters the if statement below.
-        #        Should be deleted.
+        #        Should be deleted: https://github.com/BSC-ES/autosubmit/issues/3235
         if "Expdef" in as_conf.wrong_config:
             as_conf.show_messages()
         project_type = as_conf.get_project_type()

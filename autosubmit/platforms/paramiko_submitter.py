@@ -298,7 +298,7 @@ class ParamikoSubmitter:
                 remote_platform.root_dir = os.path.join(remote_platform.scratch, remote_platform.project,
                                                         remote_platform.user, remote_platform.expid)
                 # FIXME: Why is ``update_cmds`` not in ``ParamikoPlatform``? Base classes have it defined...
-                #        Probably a bug (even if harmless).
+                #        Probably a bug (even if harmless). See https://github.com/BSC-ES/autosubmit/issues/3233
                 remote_platform.update_cmds()
 
                 self.platforms[platform_used] = remote_platform

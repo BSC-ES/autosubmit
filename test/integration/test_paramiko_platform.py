@@ -908,14 +908,6 @@ def test_get_header_job_het(create_job_parameters_platform: CreateJobParametersP
 
     header = platform.get_header(job_parameters_platform.job, job_parameters_platform.parameters)
     assert header
-
-    # FIXME: I thought this was supposed to be equal to the number of hetsize
-    #        components (2, set above), and at some point during debugging it is;
-    #        but then there is a call to other functions somewhere that reset it
-    #        to just one hetjob. Looks like it might be better to create the job
-    #        from the dictionary configuration, instead of trying to create the
-    #        object here (i.e. an integration test that loads everything from
-    #        YAML configuration).
     assert header.count('hetjob') > 0
 
 

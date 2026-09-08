@@ -2115,7 +2115,7 @@ class Job:
             self.shape = parameters.get("CURRENT_SHAPE", "")
             self.processors_per_node = parameters.get("CURRENT_PROCESSORS_PER_NODE", "1")
             self.nodes = parameters.get("CURRENT_NODES", "")
-            # FIXME: Should be ``CURRENT_EXCLUSIVITY`` instead of ``CURRENT_EXCLUSIVE`` to match the platform parameter?
+            # FIXME: Should be ``CURRENT_EXCLUSIVITY`` instead of ``CURRENT_EXCLUSIVE`` to match the platform parameter? (https://github.com/BSC-ES/autosubmit/issues/3234)
             self.exclusive = parameters.get("CURRENT_EXCLUSIVE", False)
             self.threads = parameters.get("CURRENT_THREADS", "1")
             self.tasks = parameters.get("CURRENT_TASKS", "0")
@@ -2591,7 +2591,7 @@ class Job:
             self.update_dict_parameters(as_conf)
         self.init_platform(as_conf)
         parameters = as_conf.load_parameters()
-        # TODO: This shouldn't be necessary aims to fix 2432 issue
+        # Re-inject HPC* parameters per job (part of the #2432 fix, PR #2724)
         as_conf.load_current_hpcarch_parameters(parameters)
         parameters = self.update_current_parameters(as_conf, parameters)
         parameters = self.update_job_parameters(as_conf, parameters, set_attributes)

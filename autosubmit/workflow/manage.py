@@ -1029,7 +1029,6 @@ def recover(
             raise AutosubmitCritical(
                 "You can use --offline and -f to avoid cancelling jobs", 7050
             )
-    # TODO: https://github.com/BSC-ES/autosubmit/issues/1251 don't need force flag
     if save:
         offline_jobs = []
         for job in current_active_jobs:
