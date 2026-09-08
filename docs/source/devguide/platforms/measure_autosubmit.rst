@@ -97,9 +97,8 @@ Step 3 - Read the summary
       Bytes written to disk                                        ~1 MB
       Bytes read from disk (includes subprocess-startup overhead)  ~67 MB
       Total syscalls                                               ~180,000
+      Jobs executed during trace                                   7
       --------------------------------------------------------------------------------
-
-      Jobs detected in trace: 7
 
 How to read each row:
 
@@ -129,6 +128,14 @@ How to read each row:
   process launched loads libc, the linker cache and locale data, so this
   figure scales with subprocess count and overstates Autosubmit's own
   work.
+* **Jobs executed during trace** - counted from the job artefacts touched
+  during the run (``STAT`` files, ``_COMPLETED`` markers and ``.cmd``
+  scripts). This reports ``0`` when the workflow had nothing left to do,
+  which is what happens if the same experiment is measured twice without
+  re-creating it in between. Re-run ``autosubmit create <expid>`` before
+  measuring again to get a full workflow. The per-job figure on the
+  job-execution row is derived from this count and is omitted when it is
+  zero.
 
 Caveats
 -------

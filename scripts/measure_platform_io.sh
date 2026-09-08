@@ -1,5 +1,22 @@
 #!/usr/bin/env bash
+# 
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+# 
 # Measure the process, file and network I/O Autosubmit performs during a run.
 #
 #   ./scripts/measure_platform_io.sh <expid>
@@ -67,7 +84,9 @@ summarise() {
                     opens++
                     b = base(p)
                     if (b ~ /\.db$/) { dbopens[b]++; db_total++ }
-                    if (b ~ /_STAT_[0-9]+$/) seen_stat[b] = 1
+                    if (b ~ /_STAT_[0-9]+$/) { sub(/_STAT_[0-9]+$/, "", b); seen_job[b] = 1 }
+                    else if (b ~ /_COMPLETED$/) { sub(/_COMPLETED$/, "", b); seen_job[b] = 1 }
+                    else if (b ~ /\.cmd$/) { sub(/\.cmd$/, "", b); seen_job[b] = 1 }
                 }
                 next
             }
@@ -83,7 +102,7 @@ summarise() {
         }
         END {
             jobs = 0
-            for (s in seen_stat) jobs++
+            for (s in seen_job) jobs++
 
             print "===================================================================="
             print "Autosubmit platform I/O measurement"
@@ -131,9 +150,9 @@ summarise() {
             row("Bytes read from disk (includes subprocess-startup overhead)", \
                 bytes(bytes_read))
             row("Total syscalls", comma(syscalls))
+            row("Jobs executed during trace", \
+                jobs > 0 ? comma(jobs) : "0 (no jobs ran during this trace)")
             rule()
-
-            if (jobs > 0) printf "\n  Jobs detected in trace: %d\n", jobs
         }
     ' "$trace"
 }
