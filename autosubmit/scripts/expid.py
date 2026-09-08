@@ -105,7 +105,7 @@ def args_parser() -> ArgumentParser:
         action="store_true",
         help="Create a new experiment with minimal configuration, usually combined with -repo.",
     )
-    # TODO: This looks like a copy-pasta bug!
+    # TODO: This looks like a copy-pasta bug: https://github.com/BSC-ES/autosubmit/issues/3241
     group.add_argument(
         "-fs",
         "--filter_status",

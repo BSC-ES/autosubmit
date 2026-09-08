@@ -1551,7 +1551,7 @@ def test_process_scheduler_parameters_wallclock(wallclock: str | None, platform_
     job.init_runtime_parameters(as_conf, reset_logs=True, called_from_log_recovery=False)
     job.het['HETSIZE'] = 1
     job.wallclock = wallclock
-    # FIXME: Job constructor and ``init_runtime_parameters`` do not fully initialize the object!
+    # FIXME: Job constructor and ``init_runtime_parameters`` do not fully initialize the object! (https://github.com/BSC-ES/autosubmit/issues/3242)
     #        ``custom_directives`` appears to be initialized in one of the ``update_`` functions.
     #        This makes testing and maintaining the code harder (and more risky -- more bugs).
     job.custom_directives = []
@@ -1597,7 +1597,7 @@ def test_update_dict_parameters_invalid_script_language(platform_name: str | Non
     # configuration is not evaluated, so we need to fake it here.
     # But it only works with the ``Job`` has a ``.section``...
     job.type = 'NUCLEAR'
-    # FIXME: Yet another issue with the code design here. The ``Job`` class
+    # FIXME: Yet another issue with the code design here (https://github.com/BSC-ES/autosubmit/issues/3242). The ``Job`` class
     #        constructor creates a partial object. Then you need to call
     #        ``init_runtime_parameters`` to initialize other values.
     #        Then, other ``Job._update.*`` functions create more member

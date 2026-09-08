@@ -268,7 +268,7 @@ class Log:
                 directory, filename = os.path.split(file_path)
                 # FIXME: This appears to be wrong. If the directory does not exist, we create it here;
                 #        however, below we create a ``FileHandler``, but that fails if the ``file_path``
-                #        does not exist -- which is the case when this directory is empty!
+                #        does not exist -- which is the case when this directory is empty: https://github.com/BSC-ES/autosubmit/issues/3240
                 if not os.path.exists(directory):
                     os.mkdir(directory)
                 files = [f for f in os.listdir(directory) if os.path.isfile(
