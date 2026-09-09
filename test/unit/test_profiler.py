@@ -23,6 +23,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from autosubmit.helpers.utils import release_memory_to_os
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.profiler import profiler as profiler_module
 
@@ -781,11 +782,11 @@ def test_report_includes_growth_and_converts_memory_units(
     report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
 
     assert "Memory, object and file descriptor by iteration" in report
-    assert "MEMORY GROW: 3.00 GiB." in report
+    assert "MEMORY GROWTH: 3.00 GiB." in report
     assert "INITIAL MEMORY: 2.00 GiB." in report
     assert "FINAL MEMORY: 5.00 GiB." in report
-    assert "OBJECTS GROW: 20 objects." in report
-    assert "FILE DESCRIPTORS GROW: 2 file descriptors." in report
+    assert "OBJECTS GROWTH: 20 objects." in report
+    assert "FILE DESCRIPTORS GROWTH: 2 file descriptors." in report
     assert "[fd=9] /tmp/example.txt" in report
 
 
@@ -858,7 +859,7 @@ def test_report_without_iterations(
 
     report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
 
-    assert "MEMORY GROW:" in report
+    assert "MEMORY GROWTH:" in report
     assert "INITIAL MEMORY:" in report
     assert "FINAL MEMORY:" in report
 
@@ -1469,11 +1470,11 @@ def test_report_includes_all_sections(
 
     # Overall growth section
     assert "Overall Memory, Object and File Descriptor Growth" in report
-    assert "MEMORY GROW: 3.00 KiB." in report
+    assert "MEMORY GROWTH: 3.00 KiB." in report
     assert "INITIAL MEMORY: 1.00 KiB." in report
     assert "FINAL MEMORY: 4.00 KiB." in report
-    assert "OBJECTS GROW: 20 objects." in report
-    assert "FILE DESCRIPTORS GROW: 2 file descriptors." in report
+    assert "OBJECTS GROWTH: 20 objects." in report
+    assert "FILE DESCRIPTORS GROWTH: 2 file descriptors." in report
 
     # Final FD section
     assert "FINAL OPEN FILE DESCRIPTORS:" in report
@@ -1482,3 +1483,9 @@ def test_report_includes_all_sections(
     # tracemalloc/object traceback section
     assert "Unique object tracebacks between iterations:" in report
     assert str(traceback) in report
+
+
+def test_release_memory_to_os_is_safe_and_idempotent():
+    # Must not raise on glibc or on platforms without malloc_trim (macOS/musl).
+    assert release_memory_to_os() is None
+    assert release_memory_to_os() is None
