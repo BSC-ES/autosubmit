@@ -474,6 +474,9 @@ There are some other parameters that you may need to specify:
     * - ``LOG_RECOVERY_QUEUE_SIZE``
       - A memory-consumption optimization for the recovery of logs.
          Default: ``max(100,TOTAL_JOBS) * 2``, in case of issues with the recovery of logs, you can increase this value.
+    * - ``CLEAR_TO_SEND_TIMEOUT``
+      - How long Autosubmit waits for the login server when it is busy. Raise it if you see "key-exchange timed out" errors.
+         Default: ``180``.
 
 .. _request-exclusivity-reservation:
 

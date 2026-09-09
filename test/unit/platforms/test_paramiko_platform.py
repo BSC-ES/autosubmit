@@ -22,6 +22,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
+import paramiko
 import pytest
 
 from autosubmit.job.job import Job
@@ -827,7 +828,7 @@ def _make_job(name: str, job_id: str, status: int, platform: ParamikoPlatform) -
 
 @pytest.fixture
 def multi_platform_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
-    """Return LOCAL, PS, and SLURM platforms, each with send_command patched to a tracker."""
+    """Return LOCAL, PS, and SLURM platforms with cancel_jobs patched to a tracker."""
     base_config = {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"}
     slurm_config = {**base_config, "LOCAL_ASLOG_DIR": "ASLOGS"}
 
@@ -835,13 +836,13 @@ def multi_platform_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dic
     ps = PsPlatform(expid="a000", name="ps", config=base_config)
     slurm = SlurmPlatform(expid="a000", name="slurm", config=slurm_config)
 
-    sent: dict[str, list[str]] = {"local": [], "ps": [], "slurm": []}
+    cancelled: dict[str, list[list[str]]] = {"local": [], "ps": [], "slurm": []}
     for platform, key in [(local, "local"), (ps, "ps"), (slurm, "slurm")]:
         monkeypatch.setattr(
-            platform, "send_command", lambda cmd, _k=key, **kw: sent[_k].append(cmd)
+            platform, "cancel_jobs", lambda ids, _k=key: cancelled[_k].append(list(ids))
         )
 
-    return {"platforms": {"local": local, "ps": ps, "slurm": slurm}, "sent": sent}
+    return {"platforms": {"local": local, "ps": ps, "slurm": slurm}, "cancelled": cancelled}
 
 
 @pytest.mark.parametrize(
@@ -855,7 +856,7 @@ def test_change_status_sends_batch_cancel_per_platform(
 ) -> None:
     """Test that N active jobs per platform produce exactly one batched cancel call containing all IDs."""
     platforms = multi_platform_setup["platforms"]
-    sent = multi_platform_setup["sent"]
+    cancelled = multi_platform_setup["cancelled"]
 
     jobs_per_platform = 3
     all_jobs = [
@@ -870,7 +871,6 @@ def test_change_status_sends_batch_cancel_per_platform(
         final_list=all_jobs,
         save=True,
         definitive_platforms=list(platforms.keys()),
-        platforms=platforms,
     )
 
     assert len(changes) == jobs_per_platform * len(platforms)
@@ -879,13 +879,12 @@ def test_change_status_sends_batch_cancel_per_platform(
         assert job.name in changes
 
     for platform_name, platform in platforms.items():
-        assert len(sent[platform_name]) == 1, (
-            f"Expected one batched call for '{platform_name}', "
-            f"got {len(sent[platform_name])}"
+        assert len(cancelled[platform_name]) == 1, (
+            f"Expected one batched cancel for '{platform_name}', "
+            f"got {len(cancelled[platform_name])}"
         )
-        assert platform.cancel_cmd in sent[platform_name][0]
-        for i in range(jobs_per_platform):
-            assert f"{platform_name[0]}{i}" in sent[platform_name][0]
+        expected_ids = {f"{platform_name[0]}{i}" for i in range(jobs_per_platform)}
+        assert set(cancelled[platform_name][0]) == expected_ids
 
 
 @pytest.mark.parametrize(
@@ -916,7 +915,6 @@ def test_change_status_applies_status_to_all_jobs(
         final_list=jobs,
         save=False,
         definitive_platforms=[],
-        platforms={},
     )
 
     for job in jobs:
@@ -942,7 +940,6 @@ def test_change_status_skips_jobs_already_at_final_status(
         final_list=jobs,
         save=False,
         definitive_platforms=[],
-        platforms={},
     )
 
     assert changes == {}
@@ -972,7 +969,6 @@ def test_change_status_skips_active_job_with_unreachable_platform(
         final_list=jobs,
         save=True,
         definitive_platforms=[],  # no platform reachable
-        platforms=platforms,
     )
 
     assert changes == {}
@@ -985,7 +981,7 @@ def test_change_status_no_cancel_when_save_is_false(
 ) -> None:
     """Test that no cancel is dispatched to any platform when save is False."""
     platforms = multi_platform_setup["platforms"]
-    sent = multi_platform_setup["sent"]
+    cancelled = multi_platform_setup["cancelled"]
 
     jobs = [
         _make_job(f"job_{name}", str(i), Status.RUNNING, platform)
@@ -998,28 +994,27 @@ def test_change_status_no_cancel_when_save_is_false(
         final_list=jobs,
         save=False,
         definitive_platforms=list(platforms.keys()),
-        platforms=platforms,
     )
 
     for job in jobs:
         assert job.status == Status.FAILED
         assert job.name in changes
     for platform_name in ("local", "ps", "slurm"):
-        assert sent[platform_name] == []
+        assert cancelled[platform_name] == []
 
 
-def test_change_status_handles_send_command_failure_gracefully(
+def test_change_status_handles_cancel_failure_gracefully(
         multi_platform_setup: dict,
         monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that send_command failures across all platforms do not prevent status changes."""
+    """Test that cancel failures across all platforms do not prevent status changes."""
     platforms = multi_platform_setup["platforms"]
 
     def _raise(*args, **kwargs):
         raise Exception("SSH connection lost")
 
     for platform in platforms.values():
-        monkeypatch.setattr(platform, "send_command", _raise)
+        monkeypatch.setattr(platform, "cancel_jobs", _raise)
 
     jobs = [
         _make_job(f"job_{name}", str(i), Status.RUNNING, platform)
@@ -1032,7 +1027,6 @@ def test_change_status_handles_send_command_failure_gracefully(
         final_list=jobs,
         save=True,
         definitive_platforms=list(platforms.keys()),
-        platforms=platforms,
     )
 
     assert len(changes) == len(platforms)
@@ -1110,3 +1104,89 @@ def test_resolve_stat_status(
         mock_log.warning.assert_called_once()
     else:
         mock_log.warning.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "configured_timeout",
+    [None, 300],
+    ids=["default-180", "configured-300"],
+)
+def test_connect_sets_clear_to_send_timeout(paramiko_platform, mocker, configured_timeout):
+    """connect() sets the transport clear_to_send_timeout from the platform config."""
+    platform = paramiko_platform
+    platform.host = "host"
+    platform.user = "user"
+    platform.two_factor_auth = False
+    platform.config = {
+        "LOCAL_ROOT_DIR": platform.config["LOCAL_ROOT_DIR"],
+        "LOCAL_TMP_DIR": "tmp",
+    }
+    if configured_timeout is not None:
+        platform.config["PLATFORMS"] = {"LOCAL": {"CLEAR_TO_SEND_TIMEOUT": configured_timeout}}
+
+    ssh_client = mocker.MagicMock()
+    transport = mocker.MagicMock()
+    ssh_client.get_transport.return_value = transport
+    ssh_config = mocker.MagicMock()
+    ssh_config.lookup.return_value = {"hostname": "host"}
+    mocker.patch("autosubmit.platforms.paramiko_platform._get_user_config_file", return_value=None)
+    mocker.patch("autosubmit.platforms.paramiko_platform._load_ssh_config", return_value=ssh_config)
+    mocker.patch("autosubmit.platforms.paramiko_platform._create_ssh_client", return_value=ssh_client)
+    mocker.patch.object(platform, "_init_local_x11_display")
+    mocker.patch.object(platform, "agent_auth", return_value=True)
+    mocker.patch.object(paramiko.SFTPClient, "from_transport", return_value=mocker.MagicMock())
+    mocker.patch.object(platform, "spawn_log_retrieval_process")
+
+    platform.connect(None)
+
+    expected = float(configured_timeout) if configured_timeout is not None else 180.0
+    assert transport.banner_timeout == 60
+    assert transport.clear_to_send_timeout == expected
+    assert platform.connected is True
+
+
+@pytest.mark.parametrize(
+    "error, transport_active, expect_reconnect",
+    [
+        (paramiko.SSHException("key negotiation timed out"), True, True),
+        (OSError("connection refused"), True, False),
+        (OSError("connection refused"), False, True),
+    ],
+    ids=["ssh-exception-active-reconnects", "os-error-active-keeps", "os-error-inactive-reconnects"],
+)
+def test_exec_command_reconnects_on_ssh_exception(paramiko_platform, mocker, error, transport_active,
+                                                  expect_reconnect):
+    """exec_command rebuilds the connection when the transport is stuck in key negotiation."""
+    platform = paramiko_platform
+    platform.connected = True
+    transport = mocker.MagicMock()
+    transport.active = transport_active
+    platform.transport = transport
+    transport.open_session.side_effect = error
+    mocked_restore = mocker.patch.object(platform, "restore_connection", return_value=None)
+
+    result = platform.exec_command("dummy_command", retries=1)
+
+    assert result == (False, False, False)
+    assert mocked_restore.call_count == (1 if expect_reconnect else 0)
+
+
+@pytest.mark.parametrize(
+    "error, expected_code",
+    [
+        (paramiko.SSHException("key negotiation"), 6005),
+        (ConnectionError("connection lost"), 6005),
+        (TimeoutError("timed out"), 6005),
+        (OSError("garbage"), 6016),
+    ],
+    ids=["ssh-exception-6005", "connection-error-6005", "timeout-error-6005", "os-error-6016"],
+)
+def test_send_command_maps_transport_errors(paramiko_platform, mocker, error, expected_code):
+    """send_command maps SSH transport errors to AutosubmitError(6005) and I/O errors to 6016."""
+    platform = paramiko_platform
+    mocker.patch.object(platform, "exec_command", side_effect=error)
+
+    with pytest.raises(AutosubmitError) as exc_info:
+        platform.send_command("dummy_command")
+
+    assert exc_info.value.code == expected_code
