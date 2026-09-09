@@ -717,9 +717,7 @@ class Job:
         return self.type.checkpoint
 
     def get_checkpoint_files(self):
-        """
-        Check if there is a file on the remote host that contains the checkpoint
-        """
+        """Check if there is a file on the remote host that contains the checkpoint"""
         return self.platform.get_checkpoint_files(self)
 
     @property  # type: ignore
@@ -985,8 +983,7 @@ class Job:
         self._validate_template = value
 
     def read_header_tailer_script(self, script_path: str, as_conf: AutosubmitConfig, is_header: bool):
-        """
-        Opens and reads a script. If it is not a BASH script it will fail :(
+        """Opens and reads a script. If it is not a BASH script it will fail :(
 
         Will strip away the line with the hash bang (#!)
 
@@ -1052,20 +1049,16 @@ class Job:
         return script
 
     @property  # type: ignore
-    def parents(self):
-        """
-        Returns parent jobs list
+    def parents(self) -> set:
+        """Returns parent jobs list
 
         :return: parent jobs
-        :rtype: set
         """
         return self._parents
 
     @parents.setter
     def parents(self, parents):
-        """
-        Sets the parents job list
-        """
+        """Sets the parents job list"""
         self._parents = parents
 
     @property  # type: ignore
@@ -1075,23 +1068,17 @@ class Job:
 
     @status.setter
     def status(self, status):
-        """
-        Sets the status of the job
-        """
+        """Sets the status of the job"""
         self._status = status
 
     @property  # type: ignore
     def status_str(self):
-        """
-        String representation of the current status
-        """
+        """String representation of the current status"""
         return Status.VALUE_TO_KEY.get(self.status, "UNKNOWN")
 
     @property  # type: ignore
     def children_names_str(self):
-        """
-        Comma separated list of children's names
-        """
+        """Comma separated list of children's names"""
         return ",".join([str(child.name) for child in self._children])
 
     @property  # type: ignore
@@ -1100,11 +1087,9 @@ class Job:
 
     @property  # type: ignore
     def platform(self) -> "Platform":
-        """
-        Returns the platform to be used by the job. Chooses between serial and parallel platforms
+        """Returns the platform to be used by the job. Chooses between serial and parallel platforms
 
         :return: HPCPlatform object for the job to use
-        :rtype: HPCPlatform
         """
         if self.is_serial and self._platform:
             return self._platform.serial_platform
@@ -1113,8 +1098,7 @@ class Job:
 
     @platform.setter
     def platform(self, value):
-        """
-        Sets the HPC platforms to be used by the job.
+        """Sets the HPC platforms to be used by the job.
 
         :param value: platforms to set
         :type value: HPCPlatform
@@ -1123,12 +1107,10 @@ class Job:
 
     @property  # type: ignore
     @autosubmit_parameter(name="current_queue")
-    def queue(self):
-        """
-        Returns the queue to be used by the job. Chooses between serial and parallel platforms.
+    def queue(self) -> "Platform":
+        """Returns the queue to be used by the job. Chooses between serial and parallel platforms.
 
         :return HPCPlatform object for the job to use
-        :rtype: HPCPlatform
         """
         if self._queue is not None and len(str(self._queue)) > 0:
             return self._queue
@@ -1139,8 +1121,7 @@ class Job:
 
     @queue.setter
     def queue(self, value):
-        """
-        Sets the queue to be used by the job.
+        """Sets the queue to be used by the job.
 
         :param value: queue to set
         :type value: HPCPlatform
@@ -1148,12 +1129,10 @@ class Job:
         self._queue = value
 
     @property  # type: ignore
-    def partition(self):
-        """
-        Returns the queue to be used by the job. Chooses between serial and parallel platforms
+    def partition(self) -> "Platform":
+        """Returns the queue to be used by the job. Chooses between serial and parallel platforms
 
         :return HPCPlatform object for the job to use
-        :rtype: HPCPlatform
         """
         if self._partition is not None and len(str(self._partition)) > 0:
             return self._partition
@@ -1164,8 +1143,7 @@ class Job:
 
     @partition.setter
     def partition(self, value):
-        """
-        Sets the partion to be used by the job.
+        """Sets the partion to be used by the job.
 
         :param value: partion to set
         :type value: HPCPlatform
@@ -1173,19 +1151,16 @@ class Job:
         self._partition = value
 
     @property  # type: ignore
-    def shape(self):
-        """
-        Returns the shape of the job. Chooses between serial and parallel platforms
+    def shape(self) -> "Platform":
+        """Returns the shape of the job. Chooses between serial and parallel platforms
 
         :return HPCPlatform object for the job to use
-        :rtype: HPCPlatform
         """
         return self._shape
 
     @shape.setter
     def shape(self, value):
-        """
-        Sets the shape to be used by the job.
+        """Sets the shape to be used by the job.
 
         :param value: shape to set
         :type value: HPCPlatform
@@ -1193,29 +1168,23 @@ class Job:
         self._shape = value
 
     @property  # type: ignore
-    def children(self):
-        """
-        Returns a list containing all children of the job
+    def children(self) -> set:
+        """Returns a list containing all children of the job
 
         :return: child jobs
-        :rtype: set
         """
         return self._children
 
     @children.setter
     def children(self, children):
-        """
-        Sets the children job list
-        """
+        """Sets the children job list"""
         self._children = children
 
     @property  # type: ignore
-    def long_name(self):
-        """
-        Job's long name. If not set, returns name
+    def long_name(self) -> str:
+        """Job's long name. If not set, returns name
 
         :return: long name
-        :rtype: str
         """
         if hasattr(self, '_long_name'):
             return self._long_name
@@ -1223,17 +1192,15 @@ class Job:
             return self.name
 
     @long_name.setter
-    def long_name(self, value):
-        """
-        Sets long name for the job
+    def long_name(self, value) -> None:
+        """Sets long name for the job
 
         :param value: long name to set
-        :type value: str
         """
         self._long_name = value
 
     @property  # type: ignore
-    def local_logs(self):
+    def local_logs(self) -> tuple[str, str]:
         return self._local_logs
 
     @local_logs.setter
@@ -1241,7 +1208,7 @@ class Job:
         self._local_logs = value
 
     @property  # type: ignore
-    def remote_logs(self):
+    def remote_logs(self) -> tuple[str, str]:
         return self._remote_logs
 
     @remote_logs.setter
@@ -1250,10 +1217,8 @@ class Job:
 
     @property  # type: ignore
     def total_processors(self):
-        """
-        Number of processors requested by job.
-        Reduces ':' separated format  if necessary.
-        """
+        """Number of processors requested by job.
+        Reduces ':' separated format  if necessary."""
         if ':' in str(self.processors):
             return reduce(lambda x, y: int(x) + int(y), self.processors.split(':'))
         elif self.processors == "" or self.processors == "1":
@@ -1296,9 +1261,7 @@ class Job:
         self.ready_date = int(time.strftime("%Y%m%d%H%M%S"))
 
     def inc_fail_count(self):
-        """
-        Increments fail count
-        """
+        """Increments fail count"""
         self.fail_count += 1
 
     @property
@@ -1313,8 +1276,7 @@ class Job:
 
     # Maybe should be renamed to the plural?
     def add_parent(self, *parents):
-        """
-        Add parents for the job. It also adds current job as a child for all the new parents
+        """Add parents for the job. It also adds current job as a child for all the new parents
 
         :param parents: job's parents to add
         :type parents: Job
@@ -1329,8 +1291,7 @@ class Job:
                 new_parent.__add_child(self)
 
     def add_children(self, children):
-        """
-        Add children for the job. It also adds current job as a parent for all the new children
+        """Add children for the job. It also adds current job as a parent for all the new children
 
         :param children: job's children to add
         :type children: list of Job objects
@@ -1340,8 +1301,7 @@ class Job:
             child._parents.add(self)
 
     def __add_child(self, new_child):
-        """
-        Adds a new child to the job
+        """Adds a new child to the job
 
         :param new_child: new child to add
         :type new_child: Job
@@ -1349,42 +1309,41 @@ class Job:
         self.children.add(new_child)
 
     def delete_parent(self, parent):
-        """
-        Remove a parent from the job
+        """Remove a parent from the job
 
         :param parent: parent to remove
         :type parent: Job
         """
         self.parents.remove(parent)
 
-    def has_children(self):
-        """
-        Returns true if job has any children, else return false
+    def has_children(self) -> bool:
+        """Returns true if job has any children, else return false
 
         :return: true if job has any children, otherwise return false
-        :rtype: bool
         """
         return self.children.__len__()
 
-    def has_parents(self):
-        """
-        Returns true if job has any parents, else return false
+    def has_parents(self) -> bool:
+        """Returns true if job has any parents, else return false
 
         :return: true if job has any parent, otherwise return false
-        :rtype: bool
         """
         return self.parents.__len__()
 
-    def _get_from_stat(self, index: int, attempt: int) -> int:
+    def edgeless(self) -> bool:
+        """Returns true if job has is edgless, else return false
+
+        :return: true if job has is edgless, otherwise return false
         """
-        Returns value from given row index position in STAT file associated to job.
+        return not self.has_parents() and not self.has_children()
+
+    def _get_from_stat(self, index: int, attempt: int) -> int:
+        """Returns value from given row index position in STAT file associated to job.
 
         :param index: Row position to retrieve.
         :type index: int
         :param fail_count: Fail count to determine the STAT file name. Default to self.stat_file for non-wrapped jobs.
         :type fail_count: int
-        :return:
-        :rtype: int
         """
         logname = os.path.join(self._tmp_path, f"{self.stat_file}{attempt}")
         if os.path.exists(logname):
@@ -1399,13 +1358,11 @@ class Job:
             return 0
 
     def _get_from_total_stats(self, index) -> list[datetime.datetime]:
-        """
-        Returns list of values from given column index position in TOTAL_STATS file associated to job
+        """Returns list of values from given column index position in TOTAL_STATS file associated to job
 
         :param index: column position to retrieve
         :type index: int
         :return: list of values in column index position
-        :rtype: list[datetime.datetime]
         """
         log_name = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
         lst = []
@@ -1431,12 +1388,10 @@ class Job:
         """Return end time (epoch seconds) from line 2 of the STAT file."""
         return self._get_from_stat(2, attempt)
 
-    def check_retrials_end_time(self):
-        """
-        Returns list of end datetime for retrials from total stats file
+    def check_retrials_end_time(self) -> list[int]:
+        """Returns list of end datetime for retrials from total stats file
 
         :return: date and time
-        :rtype: list[int]
         """
         return self._get_from_total_stats(2)
 
@@ -1450,12 +1405,10 @@ class Job:
                 stat_file.unlink()
         return result > 0
 
-    def check_retrials_start_time(self):
-        """
-        Returns list of start datetime for retrials from total stats file
+    def check_retrials_start_time(self) -> list[int]:
+        """Returns list of start datetime for retrials from total stats file
 
         :return: date and time
-        :rtype: list[int]
         """
         return self._get_from_total_stats(1)
 
@@ -1466,7 +1419,6 @@ class Job:
         is located or the list of registers is exhausted.
 
         :return: list of dates of retrial [submit, start, finish] in datetime format
-        :rtype: list of list
         """
         log_name = os.path.join(self._tmp_path, self.name + '_TOTAL_STATS')
         retrials_list: list = []
@@ -1507,7 +1459,6 @@ class Job:
         :param show_logs: Whether to show logs during the check
         :type show_logs: bool
         :return: True if remote log file exists, False otherwise
-        :rtype: bool
         """
         try:
             out_exist = self.platform.check_file_exists(self.remote_logs[0], False, sleeptime=0, max_retries=1,
@@ -1705,7 +1656,6 @@ class Job:
         :type wallclock: datetime.timedelta
 
         :return: The total wallclock time in seconds.
-        :rtype: int
         """
         total = int(wallclock.total_seconds() * 1.30)
         total_platform = self._max_possible_wallclock()
@@ -1807,11 +1757,9 @@ class Job:
             self.new_status = default_status
 
     def get_metric_folder(self, as_conf: AutosubmitConfig) -> str:
-        """
-        Returns the default metric folder for the job.
+        """Returns the default metric folder for the job.
 
         :return: The metric folder path.
-        :rtype: str
         """
         # Get the default path that should be the same as HPCROOTDIR
         # Check if the job platform is a subclass of ParamikoPlatform
@@ -1843,7 +1791,6 @@ class Job:
         :param parameters: Parameters dictionary to be updated. This dict is modified
         :type parameters: dict
         :return: The same `parameters` dictionary updated.
-        :rtype: dict
         """
 
         for key, value in as_conf.platforms_data.get(self.platform_name, {}).items():
@@ -2268,8 +2215,7 @@ class Job:
                                                                                                  -1))))
 
     def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
-        """
-        Calculate the calendar splits for the job.
+        """Calculate the calendar splits for the job.
 
         This method processes the calendar splits based on the provided parameters and the Autosubmit configuration.
 
@@ -2280,7 +2226,6 @@ class Job:
         :param set_attributes: Flag indicating whether to set attributes directly.
         :type set_attributes: bool
         :return: The updated parameters dictionary containing calendar split information.
-        :rtype: dict
         """
         # Calendar struct type numbered ( year, month, day, hour )
         if str(self.splits).isdigit() and int(self.splits) > 0 and self.running != "once":  # once jobs has no date
@@ -2340,8 +2285,7 @@ class Job:
         return parameters
 
     def calendar_chunk(self, parameters):
-        """
-        Calendar for chunks
+        """Calendar for chunks
 
         :param parameters:
         :return:
@@ -2432,7 +2376,6 @@ class Job:
         :param set_attributes: Whether to set job attributes from parameters.
         :type set_attributes: bool
         :return: Updated parameters dictionary.
-        :rtype: Dict[str, Any]
         """
         if set_attributes:
             if self.splits == "auto":
@@ -2524,7 +2467,6 @@ class Job:
         :param replace_by_empty: Flag indicating whether to replace dynamic variables with empty strings.
         :type replace_by_empty: bool
         :return: Parameters with placeholders substituted.
-        :rtype: dict
         """
 
         as_conf.deep_read_loops(parameters)
@@ -2720,8 +2662,7 @@ class Job:
 
     @staticmethod
     def is_a_completed_retrial(fields: list) -> bool:
-        """
-        Returns true only if there are 4 fields: submit start finish status, and status equals COMPLETED.
+        """Returns true only if there are 4 fields: submit start finish status, and status equals COMPLETED.
         """
         if len(fields) == 4:
             if fields[3] == 'COMPLETED':
@@ -2729,13 +2670,11 @@ class Job:
         return False
 
     def create_script(self, as_conf: AutosubmitConfig) -> str:
-        """
-        Create the script file to be run for the job.
+        """Create the script file to be run for the job.
 
         :param as_conf: Configuration object.
         :type as_conf: AutosubmitConfig
         :return: Script's filename.
-        :rtype: str
         """
         lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
         parameters = self.update_parameters(as_conf, set_attributes=False)
@@ -2768,7 +2707,6 @@ class Job:
         :param content: The script content to check.
         :type content: str
         :return: True if the content is valid Python code, False otherwise.
-        :rtype: bool
         """
         try:
             compile(content, '<string>', 'exec')
@@ -2782,7 +2720,6 @@ class Job:
         :param content: The script content to check.
         :type content: str
         :return: True if the content is valid R code, False otherwise.
-        :rtype: bool
         """
 
         import subprocess
@@ -2804,7 +2741,6 @@ class Job:
         :param content: The script content to check.
         :type content: str
         :return: True if the content is valid Bash code, False otherwise.
-        :rtype: bool
         """
         import subprocess
         result = subprocess.run(
@@ -2859,7 +2795,6 @@ class Job:
         :param undefined_variables: List of undefined variable names to remove.
         :type undefined_variables: list[str], optional
         :return: Content with placeholders substituted.
-        :rtype: str
         """
         if undefined_variables is None:
             undefined_variables = []
@@ -2905,7 +2840,6 @@ class Job:
         :param file_name: The name of the file to be sent.
         :type file_name: str
         :return: The full path of the file to be sent.
-        :rtype: str
         """
         real_name = str(f"{Path(file_name).stem}_{self.name}")
         real_name = real_name.replace(f"{self.expid}_", "")
@@ -2973,10 +2907,8 @@ class Job:
                                f"{self.name}.{self.submit_time_timestamp}.err")
 
     def check_compressed_local_logs(self) -> bool:
-        """
-        Checks if the current local log files are compressed versions (.gz or .xz)
-        and updates the local_logs attribute accordingly.
-        """
+        """Checks if the current local log files are compressed versions (.gz or .xz)
+        and updates the local_logs attribute accordingly."""
         compressed = False
         compress_ext = [".gz", ".xz"]
         _aux_local_logs = list(copy.deepcopy(self.local_logs))
@@ -2995,9 +2927,7 @@ class Job:
     # TODO: To be removed when we rid of the TOTAL_STATS file used across multiple functions
     def _write_time(self, column: str) -> None:
         """Write a timestamp to a specific position in the TOTAL_STATS file ensuring that each
-        record has four whitespace-separated fields: submit start end status.
-
-        """
+        record has four whitespace-separated fields: submit start end status."""
         if column == "submit":
             value_to_write = str(self.submit_time_timestamp)
         elif column == "start":
@@ -3055,8 +2985,7 @@ class Job:
                 datetime.datetime.now(), 'S')
 
     def fix_local_logs_timestamps(self, current_timestamp: str, new_timestamp: str) -> None:
-        """
-        Renames local log files to update the timestamp in their names without
+        """Renames local log files to update the timestamp in their names without
         changing the prefix and extension.
 
         It assumes that self.local_logs contains the new timestamp in their names.
@@ -3079,13 +3008,12 @@ class Job:
                 else:
                     Log.debug(f"Log file {old_log_path} does not exist, skipping rename.")
 
-    def write_start_time(self, attempt: int):
+    def write_start_time(self, attempt: int) -> bool:
         """Writes start date and time to TOTAL_STATS file and the history database.
 
         :param attempt: The fail count to identify the correct database row.
         :type attempt: int
         :return: True if successful, False otherwise
-        :rtype: bool
         """
         self._write_time("start")
         exp_history = ExperimentHistory(self.expid)
@@ -3150,8 +3078,7 @@ class Job:
         return exp_history.get_submit_data_dc(self.name, attempt)
 
     def _get_finish_time_from_db(self, attempt: int):
-        """
-        Retrieve finish data from the experiment history database for a given attempt.
+        """Retrieve finish data from the experiment history database for a given attempt.
 
         :param attempt: The attempt (fail_count) to look up.
         :type attempt: int
@@ -3170,26 +3097,22 @@ class Job:
         job_data = exp_history.get_job_data_by_job_id_and_fail_count(self.id, attempt)
         return job_data is not None
 
-    def check_started_after(self, date_limit):
-        """
-        Checks if the job started after the given date
+    def check_started_after(self, date_limit) -> bool:
+        """Checks if the job started after the given date
         :param date_limit: reference date
         :type date_limit: datetime.datetime
         :return: True if job started after the given date, false otherwise
-        :rtype: bool
         """
         if any(parse_date(str(date_retrial)) > date_limit for date_retrial in self.check_retrials_start_time()):
             return True
         else:
             return False
 
-    def check_running_after(self, date_limit):
-        """
-        Checks if the job was running after the given date
+    def check_running_after(self, date_limit) -> bool:
+        """Checks if the job was running after the given date
         :param date_limit: reference date
         :type date_limit: datetime.datetime
         :return: True if job was running after the given date, false otherwise
-        :rtype: bool
         """
         if any(parse_date(str(date_end)) > date_limit for date_end in self.check_retrials_end_time()):
             return True
@@ -3197,8 +3120,7 @@ class Job:
             return False
 
     def is_parent(self, job):
-        """
-        Check if the given job is a parent
+        """Check if the given job is a parent
         :param job: job to be checked if is a parent
         :return: True if job is a parent, false otherwise
         :rtype bool
@@ -3206,8 +3128,7 @@ class Job:
         return job in self.parents
 
     def is_ancestor(self, job):
-        """
-        Check if the given job is an ancestor
+        """Check if the given job is an ancestor
         :param job: job to be checked if is an ancestor
         :return: True if job is an ancestor, false otherwise
         :rtype bool
@@ -3422,7 +3343,6 @@ class WrapperJob(Job):
         :param keep_alive: Optional status to return if still within IO_SAFE_WAIT time.
         :type keep_alive: Status, optional
         :return: The new status for the inner job based on the IO_SAFE_WAIT logic.
-        :rtype: Status
         """
         if not inner_job.finished_time:
             inner_job.finished_time = time.time()
@@ -3442,7 +3362,6 @@ class WrapperJob(Job):
         :param wrapper_is_done: Whether the wrapper job is in a done state (COMPLETED or FAILED).
         :type wrapper_is_done: bool
         :return: The new status for the inner job.
-        :rtype: int
         """
         fallback = Status.WAITING if wrapper_is_done else Status.SUBMITTED
 
@@ -3504,7 +3423,6 @@ class WrapperJob(Job):
         :param as_conf: Autosubmit configuration object.
         :type as_conf: AutosubmitConfig
         :return: True if the status of the wrapper job has changed, otherwise False.
-        :rtype: bool
         """
         save = False
         # wrapper new_status is checked here
@@ -3550,7 +3468,6 @@ class WrapperJob(Job):
         :param job: The inner job of a job.
         :type job: Job
         :return: True if the job is running longer then wallclock, otherwise False.
-        :rtype: bool
         """
         effective_wallclock = job.wallclock_in_seconds
         if vertical_wrapper:
