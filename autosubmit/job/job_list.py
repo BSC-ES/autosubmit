@@ -2266,6 +2266,19 @@ class JobList:
         """
         return self.job_list
 
+    def get_status_counts(self) -> dict[str, int]:
+        """Return status counts of ALL jobs from the database.
+
+        The counts are computed from the persisted ``jobs`` table, which keeps
+        every job (including finished jobs unloaded from memory), so they are
+        complete. Keys follow the same convention as
+        ``ExperimentHistory.get_status_counts_from_job_list``.
+        """
+        statuses = ["COMPLETED", "FAILED", "QUEUING", "SUBMITTED", "RUNNING", "SUSPENDED"]
+        counts = {status: self.dbmanager.count_where("jobs", {"status": status}) for status in statuses}
+        counts["TOTAL"] = self.dbmanager.count("jobs")
+        return counts
+
     def get_date_format(self):
         date_format = ''
         for date in self.get_date_list():
@@ -4305,6 +4318,7 @@ def load_job_list(
     submitter=None,
     check_failed_jobs=False,
     run_mode=False,
+    run_members: list[str] | None = None,
 ) -> JobList:
     """Load the JobList for a given experiment.
 
@@ -4316,12 +4330,17 @@ def load_job_list(
     :param submitter: submitter to be used
     :param check_failed_jobs: whether to check failed jobs or not
     :param run_mode: whether to load the job list in run mode or not
+    :param run_members: optional list of members to restrict the run to. Set
+        before loading the job graph so that only the allowed members are
+        loaded into memory and therefore submitted.
     :return: JobList object
     """
     rerun = as_conf.get_rerun()
     job_list = JobList(
         expid, as_conf, YAMLParserFactory(), run_mode=run_mode, submitter=submitter
     )
+    if run_members:
+        job_list.run_members = run_members
     date_list = as_conf.get_date_list()
     date_format = ""
     if as_conf.get_chunk_size_unit() == ChunkUnit.HOUR:

@@ -72,8 +72,13 @@ def handle_start_after(start_after: str, expid: str) -> None:
             Log.info(
                 "Hey! What do you think is going to happen? In theory, "
                 "your experiment will run again after it has been completed. Good luck!")
-        # Check if experiment exists. If False or None, it does not exist
-        if not check_experiment_exists(start_after):
+        # Check if experiment exists. If False or None, it does not exist.
+        # error_on_inexistence is disabled because a missing experiment must not
+        # block the run: it is reported and ignored.
+        if not check_experiment_exists(start_after, error_on_inexistence=False):
+            Log.warning(f"Experiment {start_after} does not exist. Ignoring the start_after trigger.")
+            # Keep the warning readable before the console is cleared.
+            sleep(3)
             return
         # Historical Database: We use the historical database to retrieve the current progress
         # data of the supplied expid (start_after)
@@ -87,16 +92,34 @@ def handle_start_after(start_after: str, expid: str) -> None:
                  f"suspended jobs becomes equal to the total number of jobs of experiment {start_after}, experiment "
                  f"{expid} will start. Querying every 60 seconds. Status format "
                  f"Completed/Queuing/Running/Suspended/Failed.")
-        while current_run := exp_history.manager.get_experiment_run_dc_with_max_id():
-            if (current_run.finish > 0 and current_run.total > 0
-                    and current_run.total == current_run.completed + current_run.suspended):
-                break
-            sys.stdout.write(
-                f"\rExperiment {start_after} ({current_run.total} total jobs) status {current_run.completed}/"
-                f"{current_run.queuing}/{current_run.running}/{current_run.suspended}/{current_run.failed}")
+        waiting_for_first_run_reported = False
+        current_run = exp_history.manager.get_experiment_run_dc_with_max_id_or_none()
+        while not _run_is_completed(current_run):
+            if current_run is None:
+                if not waiting_for_first_run_reported:
+                    Log.warning(f"Experiment {start_after} exists but has not registered a run yet. "
+                                f"Autosubmit will keep waiting for it to start before launching experiment {expid}.")
+                    waiting_for_first_run_reported = True
+                sys.stdout.write(f"\rWaiting for experiment {start_after} to start...")
+            else:
+                sys.stdout.write(
+                    f"\rExperiment {start_after} ({current_run.total} total jobs) status {current_run.completed}/"
+                    f"{current_run.queuing}/{current_run.running}/{current_run.suspended}/{current_run.failed}")
             sys.stdout.flush()
             # Update every 60 seconds
             sleep(60)
+            current_run = exp_history.manager.get_experiment_run_dc_with_max_id_or_none()
+        Log.info(f"Experiment {start_after} finished. Starting experiment {expid}.")
+
+
+def _run_is_completed(current_run) -> bool:
+    """A run is completed when it was finished and all its jobs reached a terminal state."""
+    return bool(
+        current_run
+        and current_run.finish > 0
+        and current_run.total > 0
+        and current_run.total == current_run.completed + current_run.suspended
+    )
 
 
 def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> list[str] | list[Any]:
