@@ -614,40 +614,37 @@ def test_clean_plot(mocker, tmp_path: LocalPath):
 
 
 def test_clean_stats(mocker, tmp_path: LocalPath):
-    """Verify that ``clean_plot`` deletes the *statistics* plot files.
-
-     It must leave the latest 2 statistics files, and the plot files untouched."""
+    """Verify that ``clean_stats`` deletes the oldest statistics files."""
     expid = 't000'
-    search_dir = Path(tmp_path / expid / 'plot')
-    search_dir.mkdir(parents=True, exist_ok=True)
+    stats_dir = Path(tmp_path / expid / 'stats')
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    plot_dir = Path(tmp_path / expid / 'plot')
+    plot_dir.mkdir(parents=True, exist_ok=True)
 
     for i, stats_file in enumerate([
-        'plot_a.pdf',
         f'{expid}_statistics_19900101.csv',
-        'plot_b.pdf',
         f'{expid}_statistics_19900102.csv',
-        'plot_c.pdf',
         f'{expid}_statistics_19900103.csv',
     ]):
-        Path(search_dir / stats_file).touch()
+        Path(stats_dir / stats_file).touch()
         # Here we set the atime, mtime tuple to the enumeration index, so that
         # the generated files do not have the same milliseconds, making this test
         # deterministic.
-        utime(Path(search_dir / stats_file), (i, i))
+        utime(Path(stats_dir / stats_file), (i, i))
 
-    assert len(list(Path(search_dir).iterdir())) == 6
+    plot_file = plot_dir / 'plot_a.pdf'
+    plot_file.touch()
+    assert len(list(stats_dir.iterdir())) == 3
 
     mocker.patch('autosubmit.monitor.monitor.BasicConfig.LOCAL_ROOT_DIR', str(tmp_path))
 
     clean_stats(expid)
 
-    assert len(list(Path(search_dir).iterdir())) == 5
+    assert len(list(stats_dir.iterdir())) == 2
     # <EXPID>_statistics_19900101.csv had the earliest atime, mtime, so it was deleted and only the two newest kept.
-    assert Path(search_dir / f'{expid}_statistics_19900102.csv').exists()
-    assert Path(search_dir / f'{expid}_statistics_19900103.csv').exists()
-    assert Path(search_dir / 'plot_a.pdf').exists()
-    assert Path(search_dir / 'plot_b.pdf').exists()
-    assert Path(search_dir / 'plot_c.pdf').exists()
+    assert Path(stats_dir / f'{expid}_statistics_19900102.csv').exists()
+    assert Path(stats_dir / f'{expid}_statistics_19900103.csv').exists()
+    assert plot_file.exists()
 
 
 @pytest.mark.parametrize(

@@ -258,17 +258,21 @@ def _check_final_status(
     return edge_color, label, fail_ok
 
 
-def _delete_stats_files_but_two_newest(expid: str, _filter: Callable[[Path], bool]) -> None:
-    """Function to clean space on ``BasicConfig.LOCAL_ROOT_DIR/plot`` directory.
+def _delete_files_but_two_newest(
+        expid: str, directory: str, _filter: Callable[[Path], bool]
+) -> None:
+    """Clean files in an experiment directory while keeping the newest two.
 
-    Removes all plots that pass the filter, keeping the newest two files only.
+    Removes all files that pass the filter, keeping the newest two files only.
 
     :param expid: Experiment ID.
     :type expid: str
-    :param _filter: A filter to apply to each file located in the plot directory.
+    :param directory: Directory below the experiment root to clean.
+    :type directory: str
+    :param _filter: A filter to apply to each file in the directory.
     :type _filter: Callable[[Path], bool]
     """
-    search_dir = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "plot")
+    search_dir = Path(BasicConfig.LOCAL_ROOT_DIR, expid, directory)
     search_dir_files = [
         f for f in search_dir.iterdir()
         if f.is_file()
@@ -291,18 +295,18 @@ def clean_plot(expid: str) -> None:
     :param expid: experiment's identifier
     :type expid: str
     """
-    _delete_stats_files_but_two_newest(expid, lambda f: 'statistics' not in f.name)
+    _delete_files_but_two_newest(expid, "plot", lambda f: 'statistics' not in f.name)
 
 
 def clean_stats(expid: str) -> None:
     """
-    Function to clean space on BasicConfig.LOCAL_ROOT_DIR/plot directory.
-    Removes all stats' plots except the last two.
+    Function to clean space on BasicConfig.LOCAL_ROOT_DIR/stats directory.
+    Removes all stats except the last two.
 
     :param expid: experiment's identifier
     :type expid: str
     """
-    _delete_stats_files_but_two_newest(expid, lambda f: 'statistics' in f.name)
+    _delete_files_but_two_newest(expid, "stats", lambda f: 'statistics' in f.name)
 
 
 # TODO: This class can be replaced by module-level functions. There is no need to have

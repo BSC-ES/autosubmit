@@ -11,6 +11,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Remove the unrelated `--filter_status` option from `autosubmit expid` #3241
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
+- Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
 
 **New Features:**
 
@@ -47,6 +48,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - The documentation of CLI commands are synced automatically with the Sphinx docs #3171 #1344
 - Most `autosubmit` sub-commands now support the `--profiler`` to run with cProfile #1094 #3171
 - Every command now prints traceability information (AS/Python version, Linux, user name, ...) #2795 #3171
+- Improved provenance documentation, describing the inputs, outputs, how options are merged, etc. #3232
 
 ### 4.1.17: Bug fixes and enhancements
 
