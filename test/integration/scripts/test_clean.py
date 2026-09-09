@@ -70,42 +70,36 @@ def test_clean_plots(autosubmit_exp):
 def test_clean_stats(autosubmit_exp):
     """Test cleaning statistics files in an Autosubmit experiment.
 
-    The test case contains five files, four plots, and one statistics file.
-
-    Cleaning statistics files without specifying the ``-plots`` results
-    in only statistics files deleted (anything that contains "statistics"
-    in the name is kept).
-
-    So, the command will keep the plot file, as well as the two newest
-    statistics files. Everything else will be deleted.
+    Statistics are written to the experiment's ``stats`` directory. Cleaning
+    them keeps the two newest statistics files and leaves plots untouched.
     """
     exp = autosubmit_exp(experiment_data={})
 
+    stats_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/stats/")
     plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
+    stats_dir.mkdir(parents=True, exist_ok=True)
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    (plots_dir / "plot_a.pdf").touch()
 
-    for i, plot in enumerate(
+    for i, stats_file in enumerate(
         [
-            "plot_a.pdf",
-            "plot_b.pdf",
-            "plot_c.pdf",
-            "plot_d.pdf",
             f"{exp.expid}_statistics_1.pdf",
             f"{exp.expid}_statistics_2.pdf",
             f"{exp.expid}_statistics_3.pdf",
         ]
     ):
-        p = Path(plots_dir / plot)
+        p = Path(stats_dir / stats_file)
         p.touch()
         utime(str(p), (i, i))
 
     _autosubmit(["clean", exp.expid, "--stats"])
 
-    plots = list(plots_dir.iterdir())
+    stats = list(stats_dir.iterdir())
 
-    # keeps plot files and two newest statistics files
-    assert len(plots) == 6
-    assert Path(plots_dir / f"{exp.expid}_statistics_2.pdf").exists()
-    assert Path(plots_dir / f"{exp.expid}_statistics_3.pdf").exists()
+    assert len(stats) == 2
+    assert Path(stats_dir / f"{exp.expid}_statistics_2.pdf").exists()
+    assert Path(stats_dir / f"{exp.expid}_statistics_3.pdf").exists()
+    assert Path(plots_dir / "plot_a.pdf").exists()
 
 
 def test_clean_dummy_project(autosubmit_exp, mocker):
