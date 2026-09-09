@@ -141,7 +141,7 @@ jobs:
         run: |
           Xvfb :99 -screen 0 1024x768x24 -ac &
           export DISPLAY=:99
-          
+
           pytest \
             -n $(nproc) \
             test/integration \
@@ -180,7 +180,7 @@ jobs:
         if: failure()
         run: |
           logs_found=false
-          
+
           if [ -d ../container_logs_ssh_server ]; then
             echo "Found container logs for SSH server, moving them to container_logs_integration"
             mv ../container_logs_ssh_server/ container_logs_integration
@@ -188,7 +188,7 @@ jobs:
           else
             echo "No container logs found for SSH server"
           fi
-          
+
           if [ -d ../container_logs_git_server ]; then
             echo "Found container logs for Git server, moving them to container_logs_integration_git"
             mv ../container_logs_git_server/ container_logs_integration_git
@@ -196,7 +196,7 @@ jobs:
           else
             echo "No container logs found for Git server"
           fi
-          
+
           # Write the value to the GH Actions step output, so other steps can use it.
           echo "logs_found=$logs_found" >> $GITHUB_OUTPUT
 
@@ -341,7 +341,7 @@ jobs:
         if: failure()
         run: |
           logs_found=false
-          
+
           if [ -d ../container_logs_slurm_server ]; then
             echo "Found container logs for SLURM server, moving them to container_logs_slurm"
             mv ../container_logs_slurm_server/ container_logs_slurm
@@ -349,7 +349,7 @@ jobs:
           else
             echo "No container logs found for SLURM server"
           fi
-          
+
           # Write the value to the GH Actions step output, so other steps can use it.
           echo "logs_found=$logs_found" >> $GITHUB_OUTPUT
 
