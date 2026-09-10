@@ -685,7 +685,7 @@ def check_wrappers(
     :param job_list: a JobList object
     :param expid: a string with the experiment id
     """
-    jobs_to_check: dict[str, list[list["Job"]]] = defaultdict(list)
+    jobs_to_check: dict[str, list[list[Job]]] = defaultdict(list)
     job_changes_tracker: dict[str, tuple[Status, Status]] = {}
 
     for active_wrapper in list(job_list.job_package_map.values()):

@@ -998,7 +998,7 @@ def recover(
     submitter = ParamikoSubmitter(as_conf)
     # TODO: Rebase check if this still works
     # Changed to check the platforms in used by iterating the configuration instead of the whole job_list
-    platforms_to_test: set["ParamikoPlatform"] = set()
+    platforms_to_test: set[ParamikoPlatform] = set()
     for section_data in as_conf.jobs_data.values():
         if (
             "PLATFORM" in section_data
