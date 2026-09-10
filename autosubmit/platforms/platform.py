@@ -278,7 +278,7 @@ class Platform(ABC):
             except ValueError:
                 pass
             except AttributeError as e:
-                Log.warning(f"The event couldn't be stored, event has an invalid state: \n{str(e)}")
+                Log.warning(f"The event couldn't be stored, event has an invalid state: \n{e!s}")
 
     @classmethod
     def remove_workers(cls, event_worker: Event) -> None:
@@ -292,7 +292,7 @@ class Platform(ABC):
             except ValueError:
                 pass
             except AttributeError as e:
-                Log.warning(f"The event couldn't be removed, event has an invalid state: \n{str(e)}")
+                Log.warning(f"The event couldn't be removed, event has an invalid state: \n{e!s}")
 
     @property
     @autosubmit_parameter(name='current_arch')
@@ -676,12 +676,12 @@ class Platform(ABC):
             job.max_checkpoint_step = 0
         if job.current_checkpoint_step < job.max_checkpoint_step:
             remote_checkpoint_path = f'{self.get_files_path()}/CHECKPOINT_'
-            self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
+            self.get_file(f'{remote_checkpoint_path}{job.current_checkpoint_step!s}', False, ignore_log=True)
             while self.check_file_exists(
-                    f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}') and job.current_checkpoint_step < job.max_checkpoint_step:
-                self.remove_checkpoint_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}')
+                    f'{remote_checkpoint_path}{job.current_checkpoint_step!s}') and job.current_checkpoint_step < job.max_checkpoint_step:
+                self.remove_checkpoint_file(f'{remote_checkpoint_path}{job.current_checkpoint_step!s}')
                 job.current_checkpoint_step += 1
-                self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
+                self.get_file(f'{remote_checkpoint_path}{job.current_checkpoint_step!s}', False, ignore_log=True)
 
     def remove_stat_file(self, job: Any) -> bool:
         """Removes STAT files from remote.
@@ -736,9 +736,9 @@ class Platform(ABC):
             stat_local_path.unlink()
         if self.check_file_exists(filename):
             if self.get_file(filename, True):
-                Log.debug(f'{job.name}_STAT_{str(attempt)} file have been transferred')
+                Log.debug(f'{job.name}_STAT_{attempt!s} file have been transferred')
                 return True
-        Log.warning(f'{job.name}_STAT_{str(attempt)} file not found')
+        Log.warning(f'{job.name}_STAT_{attempt!s} file not found')
         return False
 
     @autosubmit_parameter(name='current_logdir')

@@ -75,7 +75,7 @@ def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
     print("-" * len(header))
     # Print the rows
     for row_dict in rows_as_dicts:  # always print, for debug proposes
-        print(" | ".join(f"{str(row_dict[col]):<{width}}" for col, width in zip(column_names, column_widths)))
+        print(" | ".join(f"{row_dict[col]!s:<{width}}" for col, width in zip(column_names, column_widths)))
     # Print the results
     print("\nDatabase check results:")
     print(f"JOB_DATA_EXIST: {db_check_list['JOB_DATA_EXIST']}")
@@ -123,8 +123,8 @@ def _check_db_fields(run_tmpdir: Path, expected_entries, expid, run_type='simple
     job_data_db = run_tmpdir / f'metadata/data/job_data_{expid}.db'
     autosubmit_db = Path(run_tmpdir, "tests.db")
     db_check_list: dict = {
-        "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {str(job_data_db)} missing"),
-        "AUTOSUBMIT_DB_EXIST": (autosubmit_db.exists(), f"DB {str(autosubmit_db)} missing"),
+        "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {job_data_db!s} missing"),
+        "AUTOSUBMIT_DB_EXIST": (autosubmit_db.exists(), f"DB {autosubmit_db!s} missing"),
         "JOB_DATA_FIELDS": {}
     }
 
@@ -330,7 +330,7 @@ def _check_wrapper_db_fields(run_tmpdir: Path, expid: str, preview: bool = False
     and that fields contain correct data."""
     job_packages_db = run_tmpdir / expid / 'db' / 'job_list.db'
     wrapper_db_check_list: dict = {
-        "DB_EXIST": (job_packages_db.exists(), f"DB {str(job_packages_db)} missing"),
+        "DB_EXIST": (job_packages_db.exists(), f"DB {job_packages_db!s} missing"),
         "WRAPPER_INFO_FIELDS": {},
         "WRAPPER_JOBS_FIELDS": {},
     }

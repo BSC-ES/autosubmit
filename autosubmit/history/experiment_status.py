@@ -45,7 +45,7 @@ class ExperimentStatus:
             }
             self.manager = create_experiment_status_db_manager(BasicConfig.DATABASE_BACKEND, **options)
         except Exception:
-            message = f"Error while trying to update {str(self.expid)} in experiment_status."
+            message = f"Error while trying to update {self.expid!s} in experiment_status."
             Logging(self.expid, BasicConfig.HISTORICAL_LOG_DIR).log(message, traceback.format_exc())
             self.manager = None
 

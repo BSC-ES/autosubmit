@@ -64,7 +64,7 @@ def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file
     job = Job('job', '1', Status.WAITING, None, None)
     job.fail_count = job_fail_count
 
-    filename = f'{job.name}_STAT_{str(job.fail_count)}'
+    filename = f'{job.name}_STAT_{job.fail_count!s}'
     local_stat_path = Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, filename)
 
     if remote_file_exists:

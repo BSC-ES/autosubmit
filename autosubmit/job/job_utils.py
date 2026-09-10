@@ -600,7 +600,7 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status= str
         try:
             platform.cancel_jobs(job_ids)
         except Exception as e:
-            Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform.name}: {str(e)}")
+            Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform.name}: {e!s}")
 
         for job in jobs:
             Log.info(f"Changing status of job {job.name} to {target_status}")
@@ -665,7 +665,7 @@ def _manage_wrapper_job(as_conf: "AutosubmitConfig", job_list: "JobList", wrappe
         check_wrapper = timedelta.total_seconds(datetime.now(
         ) - wrapper_job.checked_time) >= check_wrapper_jobs_sleeptime
     if check_wrapper:
-        Log.debug(f'Checking Wrapper {str(wrapper_job.id)}')
+        Log.debug(f'Checking Wrapper {wrapper_job.id!s}')
         wrapper_job.checked_time = datetime.now()
         save |= wrapper_job.check_and_update_status(as_conf)
         if save:
@@ -685,7 +685,7 @@ def check_wrappers(
     :param job_list: a JobList object
     :param expid: a string with the experiment id
     """
-    jobs_to_check: dict[str, list[list["Job"]]] = defaultdict(list)
+    jobs_to_check: dict[str, list[list[Job]]] = defaultdict(list)
     job_changes_tracker: dict[str, tuple[Status, Status]] = {}
 
     for active_wrapper in list(job_list.job_package_map.values()):

@@ -290,7 +290,7 @@ def expid_fn(
         with suppress(Exception):
             delete_experiment(exp_id, True)
         raise AutosubmitCritical(
-            f"Error creating the experiment structure: {str(e)}", 7011
+            f"Error creating the experiment structure: {e!s}", 7011
         )
     # Create the experiment configuration
     Log.info("Generating configuration files...")
@@ -305,7 +305,7 @@ def expid_fn(
         with suppress(Exception):
             delete_experiment(exp_id, True)
         raise AutosubmitCritical(
-            f"Error creating the experiment configuration: {str(e)}", 7011
+            f"Error creating the experiment configuration: {e!s}", 7011
         )
     # Change template values by default values specified from the commandline
     try:
@@ -324,7 +324,7 @@ def expid_fn(
     except Exception as e:
         with suppress(Exception):
             delete_experiment(exp_id, True)
-        raise AutosubmitCritical(f"Error setting the default values: {str(e)}", 7011)
+        raise AutosubmitCritical(f"Error setting the default values: {e!s}", 7011)
 
     # Try to update the experiment details
     try:
@@ -333,7 +333,7 @@ def expid_fn(
         Log.warning(
             f"Could not update experiment details for {exp_id}. Omitting this step."
         )
-        Log.debug(f"Error calling save_update_details: {str(e)}")
+        Log.debug(f"Error calling save_update_details: {e!s}")
 
     Log.result(f"Experiment {exp_id} created")
     return exp_id
@@ -413,7 +413,7 @@ def delete_experiment(expids: str, force: bool) -> bool:
         try:
             _delete_experiment(expid, force)
         except Exception as e:
-            Log.error(f"Failed to delete experiment {expid}: {str(e)}")
+            Log.error(f"Failed to delete experiment {expid}: {e!s}")
             failed.append(expid)
 
     if failed:
@@ -445,7 +445,7 @@ def _delete_experiment(expid: str, force: bool) -> None:
     try:
         ExperimentDetails(expid).delete_details()
     except Exception as e:
-        Log.warning(f"Failed to delete DB details for experiment {expid}: {str(e)}")
+        Log.warning(f"Failed to delete DB details for experiment {expid}: {e!s}")
         raise
 
     try:
@@ -780,7 +780,7 @@ def copy_code(
         # check if local_project_path is a valid path
         local_project_path: Path = Path(local_project)
         if not local_project_path.is_dir():
-            msg = f"Local project path is not a valid path and/or it does not exist: {str(local_project_path)}"
+            msg = f"Local project path is not a valid path and/or it does not exist: {local_project_path!s}"
             raise AutosubmitCritical(msg, 7014)
 
         local_proj_dir_path: Path = Path(
@@ -792,17 +792,17 @@ def copy_code(
         def copy_contents(from_: Path, to: Path):
             try:
                 # TODO: Do it in pure-python?
-                Log.info(f"Copying {str(from_)} into {str(to)}")
+                Log.info(f"Copying {from_!s} into {to!s}")
                 cmd_output = subprocess.check_output(
-                    f"cp -R {str(from_)}/* {str(to)}/", shell=True
+                    f"cp -R {from_!s}/* {to!s}/", shell=True
                 )
                 Log.debug(str(cmd_output))
             except subprocess.CalledProcessError:
                 with suppress(Exception):
-                    Log.debug(f"Deleting {str(to.parent)}")
+                    Log.debug(f"Deleting {to.parent!s}")
                     rmtree(to.parent)
                 raise AutosubmitCritical(
-                    f"Cannot copy {str(from_)} into {str(to.parent)}. Exiting...", 7063
+                    f"Cannot copy {from_!s} into {to.parent!s}. Exiting...", 7063
                 )
 
         if not local_proj_dir_path.exists():
@@ -811,7 +811,7 @@ def copy_code(
             Log.debug(f"The project folder {local_proj_dir_path} has been created.")
             copy_contents(Path(local_project_path), project_destination)
         else:
-            Log.info(f"Using project folder: {str(local_proj_dir_path)}")
+            Log.info(f"Using project folder: {local_proj_dir_path!s}")
 
             # We use ``rsync`` if the directory already exists, syncing existing files.
             # If the file does not exist, we create the directory and issue an ``cp``
@@ -821,12 +821,12 @@ def copy_code(
                 copy_contents(Path(local_project_path), project_destination)
             elif force:
                 try:
-                    cmd = f"rsync -ach --info=progress2 {str(local_project_path)}/* {str(project_destination)}"
+                    cmd = f"rsync -ach --info=progress2 {local_project_path!s}/* {project_destination!s}"
                     subprocess.call([cmd], shell=True)
                 except (OSError, subprocess.CalledProcessError):
                     raise AutosubmitCritical(
-                        f"Cannot rsync {str(local_project_path)} into "
-                        f"{str(project_destination.parent)}. Exiting...",
+                        f"Cannot rsync {local_project_path!s} into "
+                        f"{project_destination.parent!s}. Exiting...",
                         7063,
                     )
             else:
@@ -1112,11 +1112,11 @@ def archive(expid: str, noclean=True, uncompress=True, create_rocrate=False) -> 
             year_path.mkdir(mode=0o775, parents=True)
     except Exception as e:
         raise AutosubmitCritical(
-            f"Failed to create year-directory {str(year)} for experiment {expid}",
+            f"Failed to create year-directory {year!s} for experiment {expid}",
             7012,
             str(e),
         )
-    Log.info(f"Archiving in year {str(year)}")
+    Log.info(f"Archiving in year {year!s}")
 
     if create_rocrate:
         rocrate(expid, year_path)
@@ -1145,7 +1145,7 @@ def archive(expid: str, noclean=True, uncompress=True, create_rocrate=False) -> 
     try:
         rmtree(exp_folder)
     except Exception as e:
-        Log.warning(f"Can not fully remove experiments folder: {str(e)}")
+        Log.warning(f"Can not fully remove experiments folder: {e!s}")
         if os.stat(exp_folder):
             try:
                 tmp_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR, "tmp")
@@ -1214,7 +1214,7 @@ def unarchive(experiment_id: str, uncompressed=True, create_rocrate=False) -> bo
                 tar.close()
     except Exception as e:
         rmtree(exp_folder, ignore_errors=True)
-        Log.printlog(f"Can not extract file: {str(e)}", 6012)
+        Log.printlog(f"Can not extract file: {e!s}", 6012)
         return False
 
     Log.info("Unpacking finished")
@@ -1222,7 +1222,7 @@ def unarchive(experiment_id: str, uncompressed=True, create_rocrate=False) -> bo
     try:
         archive_path.unlink()
     except Exception as e:
-        Log.printlog(f"Can not remove archived file folder: {str(e)}", 7012)
+        Log.printlog(f"Can not remove archived file folder: {e!s}", 7012)
         Log.result(f"Experiment {experiment_id} unarchived successfully")
         return True
 
@@ -1348,7 +1348,7 @@ def provenance(expid: str, create_rocrate: bool = False) -> bool:
         Log.info("RO-Crate ZIP file created!")
         return r is not None
     except Exception as e:
-        raise AutosubmitCritical(f"Error creating RO-Crate ZIP file: {str(e)}", 7012)
+        raise AutosubmitCritical(f"Error creating RO-Crate ZIP file: {e!s}", 7012)
 
 
 def report(
@@ -1410,7 +1410,7 @@ def report(
             hpcarch = submitter.platforms[as_conf.get_platform()]
         except Exception as e:
             Log.warning(
-                f"Failed creating Paramiko submitter, will try loading only the local platform: {str(e)}"
+                f"Failed creating Paramiko submitter, will try loading only the local platform: {e!s}"
             )
             submitter = ParamikoSubmitter(as_conf=as_conf)
             hpcarch = submitter.platforms[as_conf.get_platform()]

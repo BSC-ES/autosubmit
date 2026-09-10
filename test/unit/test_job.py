@@ -2226,7 +2226,7 @@ def test_update_and_write_time(count, with_stat_file, tmp_path):
     job._tmp_path.mkdir(parents=True, exist_ok=True)
     Path(job._tmp_path / f'{job.name}_STAT_{count}').touch()
     job.platform = platform
-    with open(job._tmp_path.joinpath(f"{job.stat_file}{str(count)}"), "w") as stat_file:
+    with open(job._tmp_path.joinpath(f"{job.stat_file}{count!s}"), "w") as stat_file:
         stat_file.write("19704924\n19704925")
     job.update_start_time(count)
     assert job.start_time_timestamp

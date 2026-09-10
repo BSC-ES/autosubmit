@@ -171,7 +171,7 @@ def summary_as_list(summary: StatsSummary) -> list[str]:
     """Return the summary as a list of strings."""
     return [
         "Summary: ",
-        f"CPU Consumption Percentage  :  {str(summary.cpu_consumption_percentage)}%",
+        f"CPU Consumption Percentage  :  {summary.cpu_consumption_percentage!s}%",
         f"Total Queue Time  :  {round(summary.total_queue_time, 2)} hrs.",
         f"Submitted Count  :  {summary.submitted_count}",
         f"Run Count  :  {summary.run_count}",

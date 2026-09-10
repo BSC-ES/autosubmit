@@ -187,14 +187,14 @@ def create_ssh_keypair_and_config(
                     ForwardX11 yes
                     Port {ssh_port}
                     StrictHostKeyChecking no
-                    IdentityFile {str(private_key.resolve())}
+                    IdentityFile {private_key.resolve()!s}
                 Host 127.0.0.1
                     Hostname localhost
                     User {getuser()}
                     ForwardX11 yes
                     Port {ssh_port}
                     StrictHostKeyChecking no
-                    IdentityFile {str(private_key.resolve())}
+                    IdentityFile {private_key.resolve()!s}
                 """)
         )
         ssh_config.chmod(0o600)  # only user can read/write

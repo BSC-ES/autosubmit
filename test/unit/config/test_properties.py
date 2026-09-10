@@ -35,7 +35,7 @@ def test_is_current_logged_user_owner(autosubmit_config, mocker, is_owner, tmp_p
 
     as_conf = autosubmit_config(
         expid='a000',
-        experiment_data={"ROOTDIR": f"{str(tmp_path)}"}
+        experiment_data={"ROOTDIR": f"{tmp_path!s}"}
     )
     if is_owner:
         monkeypatch.setenv("USER", "dummy")

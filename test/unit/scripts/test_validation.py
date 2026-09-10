@@ -273,12 +273,11 @@ def test_validate_host_prohibited_commands_warning(mocker):
     with pytest.warns(
         FutureWarning,
         match="Host-based command restrictions",
-    ):
-        with pytest.raises(SystemExit):
-            validators.validate_host_prohibited_commands(
-                "clean",
-                mocker.Mock(),
-            )
+    ), pytest.raises(SystemExit):
+        validators.validate_host_prohibited_commands(
+            "clean",
+            mocker.Mock(),
+        )
 
 
 @pytest.mark.parametrize(

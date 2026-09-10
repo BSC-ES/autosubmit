@@ -223,17 +223,17 @@ def _get_expected_job_names(
                         if splits:
                             for split in range(1, splits + 1):
                                 job_names.append(
-                                    f"{expid}_{str(date)}_{str(member)}_{str(chunk)}_{str(split)}_{section}".upper()
+                                    f"{expid}_{date!s}_{member!s}_{chunk!s}_{split!s}_{section}".upper()
                                 )
                         else:
                             job_names.append(
-                                f"{expid}_{str(date)}_{str(member)}_{str(chunk)}_{section}".upper()
+                                f"{expid}_{date!s}_{member!s}_{chunk!s}_{section}".upper()
                             )
         elif section in once_sections:
             if splits is not None:
                 splits = int(splits)
                 for split in range(1, splits + 1) if splits else [None]:
-                    job_names.append(f"{expid}_{str(split)}_{section}".upper())
+                    job_names.append(f"{expid}_{split!s}_{section}".upper())
             else:
                 job_names.append(f"{expid}_{section}".upper())
         elif section in member_sections:
@@ -243,13 +243,13 @@ def _get_expected_job_names(
                     for date in dates.split():
                         for member in members.split():
                             job_names.append(
-                                f"{expid}_{str(date)}_{str(member)}_{str(split)}_{section}".upper()
+                                f"{expid}_{date!s}_{member!s}_{split!s}_{section}".upper()
                             )
             else:
                 for date in dates.split():
                     for member in members.split():
                         job_names.append(
-                            f"{expid}_{str(date)}_{str(member)}_{section}".upper()
+                            f"{expid}_{date!s}_{member!s}_{section}".upper()
                         )
         elif section in date_sections:
             if splits is not None:
@@ -257,11 +257,11 @@ def _get_expected_job_names(
                 for split in range(1, splits + 1) if splits else [None]:
                     for date in dates.split():
                         job_names.append(
-                            f"{expid}_{str(date)}_{str(split)}_{section}".upper()
+                            f"{expid}_{date!s}_{split!s}_{section}".upper()
                         )
             else:
                 for date in dates.split():
-                    job_names.append(f"{expid}_{str(date)}_{section}".upper())
+                    job_names.append(f"{expid}_{date!s}_{section}".upper())
 
     return job_names
 

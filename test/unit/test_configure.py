@@ -51,23 +51,23 @@ def test_configure(mocker, tmp_path, suffix: str) -> None:
     expected = dedent(f"""\
         [database]
         backend = sqlite
-        path = {str(tmp_path)}/database
+        path = {tmp_path!s}/database
         filename = autosubmit.db
         
         [local]
-        path = {str(tmp_path)}/experiments
+        path = {tmp_path!s}/experiments
         
         [globallogs]
-        path = {str(tmp_path)}/experiments/logs
+        path = {tmp_path!s}/experiments/logs
         
         [structures]
-        path = {str(tmp_path)}/experiments/metadata/structures
+        path = {tmp_path!s}/experiments/metadata/structures
         
         [historicdb]
-        path = {str(tmp_path)}/experiments/metadata/data
+        path = {tmp_path!s}/experiments/metadata/data
         
         [historiclog]
-        path = {str(tmp_path)}/experiments/metadata/logs
+        path = {tmp_path!s}/experiments/metadata/logs
         
         [autosubmitapi]
         url = http://192.168.11.91:8081 # Replace me?
@@ -115,31 +115,31 @@ def test_configure_advanced(mocker, tmp_path, suffix: str) -> None:
     expected = dedent(f"""\
         [database]
         backend = sqlite
-        path = {str(tmp_path)}/database
+        path = {tmp_path!s}/database
         filename = autosubmit.db
         
         [local]
-        path = {str(tmp_path)}/experiments
+        path = {tmp_path!s}/experiments
         
         [conf]
-        jobs = {str(jobs_conf)}
-        platforms = {str(platforms_conf)}
+        jobs = {jobs_conf!s}
+        platforms = {platforms_conf!s}
         
         [mail]
         smtp_server = smtp.example.com
         mail_from = autosubmit@example.com
         
         [globallogs]
-        path = {str(tmp_path)}/experiments/logs
+        path = {tmp_path!s}/experiments/logs
         
         [structures]
-        path = {str(tmp_path)}/experiments/metadata/structures
+        path = {tmp_path!s}/experiments/metadata/structures
         
         [historicdb]
-        path = {str(tmp_path)}/experiments/metadata/data
+        path = {tmp_path!s}/experiments/metadata/data
         
         [historiclog]
-        path = {str(tmp_path)}/experiments/metadata/logs
+        path = {tmp_path!s}/experiments/metadata/logs
         
         [autosubmitapi]
         url = http://192.168.11.91:8081 # Replace me?

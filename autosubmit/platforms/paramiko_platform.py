@@ -226,14 +226,14 @@ class ParamikoPlatform(Platform):
                     self.restore_connection(as_conf)
                     message = "OK"
                 except Exception as e:
-                    Log.log.log(logging.DEBUG, f'SSH test connection error: {str(e)}', exc_info=e)
+                    Log.log.log(logging.DEBUG, f'SSH test connection error: {e!s}', exc_info=e)
                     message = str(e)
                 if message.find("t accept remote connections") == -1:
                     try:
                         transport = self._ssh.get_transport()
                         transport.send_ignore()
                     except Exception as e:
-                        Log.debug(f'Test connection error: {str(e)}')
+                        Log.debug(f'Test connection error: {e!s}')
                         message = "Timeout connection"
                         Log.debug(str(e))
                 return message
@@ -279,7 +279,7 @@ class ParamikoPlatform(Platform):
                 if self.connected:
                     break
             except Exception as e:
-                Log.warning(f'Failed to open SSH connection (retry #{retry + 1} of {retries}): {str(e)}')
+                Log.warning(f'Failed to open SSH connection (retry #{retry + 1} of {retries}): {e!s}')
                 if ',' in self.host:
                     # TODO: This is confusing, here we say we will test another host, but we never test it here.
                     #       In the for loop below, in ``self.connect`` reads that (why don't we pass the host
@@ -288,7 +288,7 @@ class ParamikoPlatform(Platform):
                     #       host? It does a `[1:]`, so on the first retry it won't happen, but what
                     #       about the subsequent ones? https://github.com/BSC-ES/autosubmit/issues/2595
                     Log.printlog(f"Connection Failed to {self.host.split(',')[0]}, "
-                                 f"will test another host: {str(e)}", 6002)
+                                 f"will test another host: {e!s}", 6002)
 
         if not self.connected:
             trace = (f'Can not create ssh or sftp connection to {self.host}: Connection could not be established'
@@ -405,7 +405,7 @@ class ParamikoPlatform(Platform):
                                               banner_timeout=60)
                         except Exception as e:
                             Log.warning('SSH connect failed, will try again disabling RSA algorithms'
-                                        f'sha-256 and sha-512, error: {str(e)}')
+                                        f'sha-256 and sha-512, error: {e!s}')
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, sock=self._proxy, timeout=60,
                                               banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256',
@@ -417,7 +417,7 @@ class ParamikoPlatform(Platform):
                         except Exception as e:
                             Log.warning(f'SSH connection to {self.user}@{self._host_config["hostname"]} -p {port} '
                                         f'failed (certificate: {self._host_config_id}), will try again '
-                                        f'disabling RSA algorithms sha-256 and sha-512, error: {str(e)}')
+                                        f'disabling RSA algorithms sha-256 and sha-512, error: {e!s}')
                             self._ssh.connect(self._host_config['hostname'], port, username=self.user,
                                               key_filename=self._host_config_id, timeout=60, banner_timeout=60,
                                               disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
@@ -437,7 +437,7 @@ class ParamikoPlatform(Platform):
                     self.transport.auth_interactive_dumb(self.user)
                     self.transport.open_session()
                 except Exception as e:
-                    Log.printlog(f"2FA authentication failed: {str(e)}", 7000)
+                    Log.printlog(f"2FA authentication failed: {e!s}", 7000)
                     raise
                 if self.transport.is_authenticated():
                     self._ssh._transport = self.transport
@@ -507,10 +507,10 @@ class ParamikoPlatform(Platform):
             return True
         except OSError as e:
             raise AutosubmitError(f'Cannot send file {local_path} to {remote_path}. '
-                                  f'Connection does not appear to be active: {str(e)}', 6004)
+                                  f'Connection does not appear to be active: {e!s}', 6004)
         except Exception as e:
             raise AutosubmitError(f'Cannot send file {local_path} to {remote_path}. '
-                                  f'An unexpected error occurred: {str(e)}', 6004)
+                                  f'An unexpected error occurred: {e!s}', 6004)
 
     def get_logs_files(self, exp_id: str, remote_logs: tuple[str, str]) -> None:
         (job_out_filename, job_err_filename) = remote_logs
@@ -586,7 +586,7 @@ class ParamikoPlatform(Platform):
 
             return True
         except Exception as e:
-            Log.debug(f"Could not retrieve file {filename} from platform {self.name}: {str(e)}")
+            Log.debug(f"Could not retrieve file {filename} from platform {self.name}: {e!s}")
             with suppress(Exception):
                 os.remove(file_path)
             # FIXME: Huh, probably a bug here? See unit/test_paramiko_platform function test_get_file_errors
@@ -620,7 +620,7 @@ class ParamikoPlatform(Platform):
 
         except Exception as e:
             # Change to Path
-            Log.error(f'Could not remove file {str(remote_file)}, something went wrong with the platform',
+            Log.error(f'Could not remove file {remote_file!s}, something went wrong with the platform',
                       6004, str(e))
             if str(e).lower().find("garbage") != -1:
                 raise AutosubmitCritical(
@@ -812,7 +812,7 @@ class ParamikoPlatform(Platform):
                 job_status = job.new_status
             except Exception as e:
                 job_status = Status.FAILED
-                Log.debug(f"Unexpected error checking completed files for a job over wallclock: {str(e)}")
+                Log.debug(f"Unexpected error checking completed files for a job over wallclock: {e!s}")
 
             if cancel and job_status is Status.FAILED:
                 try:
@@ -820,7 +820,7 @@ class ParamikoPlatform(Platform):
                         Log.warning(f"Job {job.id} is over wallclock, cancelling job")
                         job.platform.send_command(self.cancel_cmd + " " + str(job.id))
                 except Exception as e:
-                    Log.debug(f"Error cancelling job {job.id}: {str(e)}")
+                    Log.debug(f"Error cancelling job {job.id}: {e!s}")
         return job_status
 
     def get_completed_job_names(self, job_names: list[str] | None = None) -> list[str]:
@@ -1307,13 +1307,13 @@ class ParamikoPlatform(Platform):
                 stderr = chan.makefile_stderr('rb', bufsize)
                 return stdin, stdout, stderr
             except (OSError, paramiko.SSHException, ConnectionError) as e:
-                Log.warning(f'A networking error occurred while executing command [{command}]: {str(e)}')
+                Log.warning(f'A networking error occurred while executing command [{command}]: {e!s}')
                 if not self.connected or not self.transport or not self.transport.active:
                     self.restore_connection(None)
                     if self.transport and self.transport.active:
                         continue
                 else:
-                    Log.warning(f'The SSH transport is still active, will not try to reconnect: {str(e)}')
+                    Log.warning(f'The SSH transport is still active, will not try to reconnect: {e!s}')
                 # TODO: We need to understand why we are increasing in increments of 60 seconds, then document it.
                 # new_timeout = timeout + 60
                 # Log.info(f"Increasing Paramiko channel timeout from {timeout} to {new_timeout}")
@@ -1431,9 +1431,9 @@ class ParamikoPlatform(Platform):
                 Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
             return True
         except AttributeError as e:
-            raise AutosubmitError(f'Session not active: {str(e)}', 6005)
+            raise AutosubmitError(f'Session not active: {e!s}', 6005)
         except OSError as e:
-            raise AutosubmitError(f"I/O issues: {str(e)}", 6016)
+            raise AutosubmitError(f"I/O issues: {e!s}", 6016)
 
     def get_multi_submit_cmd(self, job_scripts: dict) -> str:
         """Gets command to submit all the current active jobs on HPC
@@ -1512,7 +1512,7 @@ class ParamikoPlatform(Platform):
         """
         # Some platforms (right now only ECaccess) has a dual queue system, one to run the job and another to submit the job.
         self._set_submit_cmd(sub_queue)
-        pre = f"timeout {str(timeout)} " if float(timeout) > 0 else ""
+        pre = f"timeout {timeout!s} " if float(timeout) > 0 else ""
         pre += f"{export} " if export else ""
         pre += f"{executable} " if executable and not self.has_scheduler else ""
         post = f"> {script_name.replace('.cmd', f'.cmd.out.{fail_count}')} 2> {script_name.replace('.cmd', f'.cmd.err.{fail_count}')}" if redirect_out_err else ""
@@ -1657,7 +1657,7 @@ class ParamikoPlatform(Platform):
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
             except OSError as e:
-                Log.warning(f'Failed checking remote permissions (1): {str(e)}')
+                Log.warning(f'Failed checking remote permissions (1): {e!s}')
                 # TODO: Writing the test, it become confusing as to why we are removing,
                 #       then trying again -- if it failed on the first try, we cannot really
                 #       assume mkdir or rmdir failed, but yes that there is an I/O problem,
@@ -1671,7 +1671,7 @@ class ParamikoPlatform(Platform):
                 self._ftpChannel.rmdir(path)
             return True
         except Exception as e:
-            Log.warning(f'Failed checking remote permissions (2): {str(e)}')
+            Log.warning(f'Failed checking remote permissions (2): {e!s}')
         return False
 
     def check_remote_log_dir(self):
@@ -1699,7 +1699,7 @@ class ParamikoPlatform(Platform):
             with self._ftpChannel.file(str(src), "r") as file:
                 return file.read(size=max_size)
         except Exception as e:
-            Log.debug(f"Error reading file {src}: {str(e)}")
+            Log.debug(f"Error reading file {src}: {e!s}")
             return None
 
     def compress_file(self, file_path):

@@ -1011,7 +1011,7 @@ class Job:
             script_file = open(os.path.join(as_conf.get_project_dir(), script_path), 'r')
         except Exception as e:
             # We stop Autosubmit if we don't find the script
-            raise AutosubmitCritical(f"Extended {error_message_type} script: failed to fetch {str(e)} \n", 7014)
+            raise AutosubmitCritical(f"Extended {error_message_type} script: failed to fetch {e!s} \n", 7014)
         for line in script_file:
             if line[:2] != "#!":
                 script += line
@@ -2615,7 +2615,7 @@ class Job:
                     else:
                         template = ''
             except Exception as e:
-                Log.warning(f'Failed to create the template script {self.file}: {str(e)}')
+                Log.warning(f'Failed to create the template script {self.file}: {e!s}')
                 template = ''
 
         snippet = get_template_snippet(self.type)
@@ -2712,7 +2712,7 @@ class Job:
             compile(content, '<string>', 'exec')
             return True
         except (ValueError, SyntaxError) as e:
-            raise AutosubmitCritical(f"Syntax error in generated Python script for job {self.name}: {str(e)}", 7014)
+            raise AutosubmitCritical(f"Syntax error in generated Python script for job {self.name}: {e!s}", 7014)
 
     def _is_valid_r(self, content: str) -> bool:
         """Check if the given content is valid R code.
@@ -2888,7 +2888,7 @@ class Job:
                              f"of parameters set, and will be replaced by a blank value: {self.undefined_variables}", 5013)
                 if not set(variables).issuperset(set(parameters)):
                     Log.printlog(
-                        f"The following set of variables are not being used in the templates: {str(set(parameters) - set(variables))}",
+                        f"The following set of variables are not being used in the templates: {set(parameters) - set(variables)!s}",
                         5013)
 
         return out

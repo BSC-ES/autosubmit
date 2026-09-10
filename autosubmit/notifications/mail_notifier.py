@@ -291,7 +291,7 @@ class MailNotifier:
         try:
             self._send_mail(mail_from, formatted_addresses, message)
         except smtplib.SMTPException as e:
-            Log.printlog(f'Trace:{str(e)}\nAn error has occurred while sending a warning mail '
+            Log.printlog(f'Trace:{e!s}\nAn error has occurred while sending a warning mail '
                     'about remote_platform', 6011)
 
     def _send_mail(self, mail_from, mail_to, message):

@@ -193,7 +193,7 @@ class UserMetricProcessor:
             ]
         except Exception as exc:
             Log.printlog("Invalid or missing metrics section", code=6019)
-            raise ValueError(f"Invalid or missing metrics section: {str(exc)}")
+            raise ValueError(f"Invalid or missing metrics section: {exc!s}")
 
         metrics_specs: list[MetricSpec] = []
         for raw_metric in raw_metrics:
@@ -204,7 +204,7 @@ class UserMetricProcessor:
                 spec = MetricSpec.load(raw_metric)
                 metrics_specs.append(spec)
             except Exception as e:
-                Log.printlog(f"Invalid metric spec: {str(raw_metric)}: {str(e)}", code=6019)
+                Log.printlog(f"Invalid metric spec: {raw_metric!s}: {e!s}", code=6019)
 
         return metrics_specs
 
@@ -248,7 +248,7 @@ class UserMetricProcessor:
                 ).strip()
             except Exception as exc:
                 Log.printlog(
-                    f"Error reading metric file at {spec_path}: {str(exc)}", code=6018
+                    f"Error reading metric file at {spec_path}: {exc!s}", code=6018
                 )
                 continue
 
@@ -269,7 +269,7 @@ class UserMetricProcessor:
                     self.store_metric(metric_spec.name, value)
                 except Exception as e:
                     Log.printlog(
-                        f"Error processing JSON content in file {spec_path}: {str(e)}", code=6018
+                        f"Error processing JSON content in file {spec_path}: {e!s}", code=6018
                     )
             else:
                 Log.printlog(

@@ -160,7 +160,7 @@ class AutosubmitConfig:
             return json.dumps(self.experiment_data)
         except Exception as e:
             Log.warning(f"Autosubmit was not able to retrieve and save the configuration "
-                        f"into the historical database: {str(e)}")
+                        f"into the historical database: {e!s}")
             return ""
 
     def get_project_dir(self) -> str:
@@ -213,12 +213,12 @@ class AutosubmitConfig:
                 else:
                     if must_exists:
                         raise AutosubmitCritical(
-                            f"[INDEX ERROR], {section_str} must exists. Check that {str(current_level)} is an section that exists.",
+                            f"[INDEX ERROR], {section_str} must exists. Check that {current_level!s} is an section that exists.",
                             7014)
         if must_exists and (current_level is None or (
                 not isinstance(current_level, numbers.Number) and len(current_level) == 0)):
             raise AutosubmitCritical(
-                f"{section_str} must exists. Check that subsection {str(current_level)} exists.", 7014)
+                f"{section_str} must exists. Check that subsection {current_level!s} exists.", 7014)
         if current_level is None or (not isinstance(current_level, numbers.Number) and len(current_level) == 0):
             return d_value
         return current_level
@@ -770,7 +770,7 @@ class AutosubmitConfig:
                 except IndexError as e:
                     Log.printlog(f"A job has an issue related to a FOR configuration. \n Please revise that the"
                                  f" number of elements matches, or if there is an unintended indentation."
-                                 f"\n Trace: {str(e)}", Log.ERROR)
+                                 f"\n Trace: {e!s}", Log.ERROR)
                     raise
             # Delete pointer, because we are going to use it in the next loop
             # for a different section, so we need to delete the pointer to
@@ -1560,7 +1560,7 @@ class AutosubmitConfig:
                 if platform_name.lower() == PlatformType.LOCAL:
                     raise AutosubmitCritical(
                         'The LOCAL platform does not support wrappers. '
-                        f'Please use another platform for your jobs: {str(jobs_in_wrapper)}.')
+                        f'Please use another platform for your jobs: {jobs_in_wrapper!s}.')
 
                 if not self.is_valid_jobs_in_wrapper(wrapper_values):
                     self.wrong_config["WRAPPERS"] += [[wrapper_name,
@@ -1933,7 +1933,7 @@ class AutosubmitConfig:
                     YAML().dump(self.experiment_data, stream)
                 self.metadata_folder.joinpath("experiment_data.yml").chmod(0o755)
             except Exception as e:
-                Log.warning(f"Failed to save experiment_data.yml: {str(e)}")
+                Log.warning(f"Failed to save experiment_data.yml: {e!s}")
                 if self.metadata_folder.joinpath("experiment_data.yml").exists():
                     os.remove(self.metadata_folder.joinpath("experiment_data.yml"))
                 self.data_changed = True
@@ -2385,7 +2385,7 @@ class AutosubmitConfig:
             else:
                 content = content + f"AS_COMMAND: {command}\n"
         except Exception as e:
-            Log.warning(f'Failed to set last Autosubmit command, using fallback: {str(e)}')
+            Log.warning(f'Failed to set last Autosubmit command, using fallback: {e!s}')
             content = f"AS_MISC: True\nAS_COMMAND: {command}\n"
         open(misc, 'w').write(content)
         os.chmod(misc, 0o755)
@@ -2403,7 +2403,7 @@ class AutosubmitConfig:
                 content = content.replace(re.search('AUTOSUBMIT_VERSION:.*', content).group(0),
                                           f"AUTOSUBMIT_VERSION: {autosubmit_version}")
         except Exception as e:
-            Log.warning(f'Failed to set Autosubmit version, using fallback: {str(e)}')
+            Log.warning(f'Failed to set Autosubmit version, using fallback: {e!s}')
             content = "CONFIG:\n  AUTOSUBMIT_VERSION: " + autosubmit_version + "\n"
         open(version_file, 'w').write(content)
         os.chmod(version_file, 0o755)
@@ -2727,7 +2727,7 @@ class AutosubmitConfig:
                 return parser
             except Exception as exp:
                 raise Exception(
-                    f"{str(exp)}\n This file and the correctness of its content are necessary.")
+                    f"{exp!s}\n This file and the correctness of its content are necessary.")
         return parser
 
     def calculate_auto_splits(self):
