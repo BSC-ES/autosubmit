@@ -27,8 +27,6 @@ from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
-from autosubmit.notifications.mail_notifier import MailNotifier
-from autosubmit.notifications.notifier import Notifier
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.paramiko_submitter import _get_host, get_platform_by_type
 from autosubmit.platforms.platform import Platform
@@ -105,97 +103,6 @@ def check_experiment_ownership(
     if not is_owner and raise_error:
         raise AutosubmitCritical(f"You don't own the experiment {expid}.", 7012)
     return is_owner, is_eadmin, current_owner_name
-
-
-def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=None):
-    Log.info("Checking the connection to all platforms in use")
-    issues = ""
-    ssh_config_issues = ""
-    private_key_error = (
-        "Please, add your private key to the ssh-agent ( ssh-add <path_to_key> ) or use "
-        "a non-encrypted key\nIf ssh agent is not initialized, prompt first eval `ssh-agent -s`"
-    )
-
-    for platform in platform_to_test:
-        platform_issues = ""
-        try:
-            message = platform.test_connection(as_conf)
-            if message is None:
-                message = "OK"
-            if message != "OK":
-                if message.find("doesn't accept remote connections") != -1:
-                    ssh_config_issues += message
-                elif message.find("Authentication failed") != -1:
-                    ssh_config_issues += message + (
-                        ". Please, check the user and project of this platform\n"
-                        "If it is correct, try another host"
-                    )
-                elif message.find("private key file is encrypted") != -1:
-                    if private_key_error not in ssh_config_issues:
-                        ssh_config_issues += private_key_error
-                elif message.find("Invalid certificate") != -1:
-                    ssh_config_issues += message + ".Please, the eccert expiration date"
-                else:
-                    ssh_config_issues += message + (
-                        f" this is an PARAMIKO SSHEXCEPTION: indicates that there is "
-                        f"something incompatible in the ssh_config for host:{platform.host}\n maybe"
-                        f" you need to contact your sysadmin"
-                    )
-        except Exception:
-            try:
-                if mail_notify:
-                    email = as_conf.get_mails_to()
-                    if "@" in email[0]:
-                        Notifier.notify_experiment_status(MailNotifier(), expid, email, platform)
-            platform_issues += f"\n[{platform.name}] Connection Unsuccessful to host {platform.host} "
-            issues += platform_issues
-            continue
-        if platform.check_remote_permissions():
-            Log.result(
-                f"[{platform.name}] Correct user privileges for host {platform.host}"
-            )
-        else:
-            platform_issues += (
-                f"\n[{platform.name}] has configuration issues.\n Check that the connection is"
-                f" passwd-less.(ssh {platform.user}@{platform.host})\n Check the parameters that"
-                f" build the root_path are correct:{{scratch_dir/project/user}} ="
-                f" {{{platform.scratch}/{platform.project}/{platform.user}}}"
-            )
-            issues += platform_issues
-        if platform_issues == "":
-            Log.printlog(
-                f"[{platform.name}] Connection successful to host {platform.host}",
-                Log.RESULT,
-            )
-        else:
-            if platform.connected:
-                platform.connected = False
-                Log.printlog(
-                    f"[{platform.name}] Connection successful to host {platform.host}, "
-                    f"however there are issues with %HPCROOT%",
-                    Log.WARNING,
-                )
-            else:
-                Log.printlog(
-                    f"[{platform.name}] Connection failed to host {platform.host}",
-                    Log.WARNING,
-                )
-    if issues != "":
-        if ssh_config_issues.find(private_key_error[:-2]) != -1:
-            raise AutosubmitCritical(
-                "Private key is encrypted, Autosubmit does not run in "
-                "interactive mode.\nPlease, add the key to the ssh agent(ssh-add "
-                "<path_to_key>).\nIt will remain open as long as session is active, "
-                "for force clean you can prompt ssh-add -D",
-                7073,
-                issues + "\n" + ssh_config_issues,
-            )
-        else:
-            raise AutosubmitCritical(
-                "Issues while checking the connectivity of platforms.",
-                7010,
-                issues + "\n" + ssh_config_issues,
-            )
 
 
 # Source: https://github.com/cylc/cylc-flow/blob/a722b265ad0bd68bc5366a8a90b1dbc76b9cd282/cylc/flow/tui/util.py#L226

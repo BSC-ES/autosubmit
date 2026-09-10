@@ -21,12 +21,12 @@ class Notifier:
         pass  # pragma: no cover
 
     @staticmethod
-    def notify_status_change(implementation, exp_id, job_name="", prev_status="", status="", notify_to=""):
-        implementation.notify_status_change(exp_id, job_name, prev_status, status, notify_to)
+    def notify_status_change(implementation, exp_id, job_name="", prev_status="", status="", notify_to="", attach_to_mail: bool = False):
+        implementation.notify_status_change(exp_id, job_name, prev_status, status, notify_to, attach_to_mail)
 
     @staticmethod
-    def notify_experiment_status(implementation, exp_id, notify_to="",platform=""):
-        implementation.notify_experiment_status(exp_id,notify_to,platform)
+    def notify_experiment_status(implementation, exp_id: str, notify_to: str = "",platform: str = "", attach_to_mail: bool = False):
+        implementation.notify_experiment_status(exp_id,notify_to,platform, attach_to_mail)
 
     @staticmethod
     def notify_cpmip_threshold_violations(

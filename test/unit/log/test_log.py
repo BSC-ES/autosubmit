@@ -449,8 +449,6 @@ def test__collect_logfiles(make_files: bool, mocker):
     BasicConfig.MAIL_FROM = "test@example.com"
     BasicConfig.SMTP_SERVER = "smtp.example.com"
 
-    mail_notifier = MailNotifier(BasicConfig)
-
     job_name = "Job1"
     expid = "a123"
 
@@ -464,12 +462,12 @@ def test__collect_logfiles(make_files: bool, mocker):
         path_to_attach_log.joinpath("test_run.out").touch(mode=0o666, exist_ok=True)
 
     message = MIMEMultipart("Generated message")
-    message["From"] = mail_notifier.config.MAIL_FROM
+    message["From"] = BasicConfig.MAIL_FROM
     message["Subject"] = f"[Autosubmit] The job {job_name} status has changed to Test"
 
     if make_files:
-        mail_notifier._collect_logfiles(message, exp_id=expid)
+        MailNotifier()._collect_logfiles(message, exp_id=expid)
     else:
-        mail_notifier._collect_logfiles(message, exp_id=expid)
+        MailNotifier()._collect_logfiles(message, exp_id=expid)
 
         assert "No Log files for the experiment" in mock_log_info.call_args.args[0]

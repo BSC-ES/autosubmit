@@ -54,7 +54,6 @@ class BasicConfig:
     CUSTOM_PLATFORMS_PATH = ''
     DEFAULT_JOBS_CONF = ''
     SMTP_SERVER = ''
-    ATTACHMENT = ''
     MAIL_FROM = ''
     ALLOWED_HOSTS: str | dict = ''
     DENIED_HOSTS: str | dict = ''
@@ -109,13 +108,12 @@ class BasicConfig:
             BasicConfig.DB_DIR, BasicConfig.DB_FILE)
 
     @staticmethod
-    def __read_file_config(file_path):
+    def __read_file_config(file_path: str):
         """
         Reads configuration file. If configuration file does not exist in given path,
         no error is raised. Configuration options also are not required to exist
 
         :param file_path: configuration file to read
-        :type file_path: str
         """
         if not os.path.isfile(file_path):
             return
@@ -147,8 +145,6 @@ class BasicConfig:
             BasicConfig.SMTP_SERVER = parser.get('mail', 'smtp_server')
         if parser.has_option('mail', 'mail_from'):
             BasicConfig.MAIL_FROM = parser.get('mail', 'mail_from')
-        if parser.has_option('mail', 'attachment'):
-            BasicConfig.MAIL_FROM = parser.get('mail', 'attachment')
         if parser.has_option('hosts', 'authorized'):
             list_command_allowed = parser.get('hosts', 'authorized').split('] ')
             i = 0

@@ -184,10 +184,6 @@ def configure(
         if not advanced and database_path is None and local_root_path is None:
             database_path = home_path / "autosubmit"
             local_root_path = home_path / "autosubmit"
-            global_logs_path = home_path / "autosubmit/logs"
-            structures_path = home_path / "autosubmit/metadata/structures"
-            historicdb_path = home_path / "autosubmit/metadata/data"
-            historiclog_path = home_path / "autosubmit/metadata/logs"
             database_filename = "autosubmit.db"
 
         if database_backend == "sqlite":

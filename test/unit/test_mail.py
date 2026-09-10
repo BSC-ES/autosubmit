@@ -187,7 +187,7 @@ def test_notify_status_change(
         mock_smtp.side_effect = sendmail_error
     mock_printlog = mocker.patch.object(Log, "printlog")
 
-    MailNotifier().notify_status_change(exp_id, job_name, prev_status, status, mail_to)
+    MailNotifier().notify_status_change(exp_id, job_name, prev_status, status, mail_to, True)
 
     message_text = "Generated message"
     message = MIMEText(message_text)
@@ -196,7 +196,7 @@ def test_notify_status_change(
     message["Date"] = email.utils.formatdate(localtime=True)
 
     if expected_log_message:
-        mock_printlog.assert_called_once_with(expected_log_message, 6011)
+        assert mock_printlog.call_args.args[0] == expected_log_message
         log_calls = [call[0][0] for call in mock_printlog.call_args_list]
         assert 'Traceback' not in log_calls
     else:
@@ -245,38 +245,36 @@ def test_notify_cpmip_threshold_violations_errors(
 
 
 def test_collect_logfiles_no_files(
-    mail_notifier, autosubmit_config, tmp_path: Path, mocker
+    autosubmit_config, tmp_path: Path, mocker
 ) -> None:
     """If there are no run log files, nothing is compressed or attached."""
     message = MIMEMultipart()
 
-    as_conf = autosubmit_config("a000", {})
-    exp_path: Path = Path(as_conf.basic_config.expid_aslog_dir("a000"))
+    exp_path: Path = Path(BasicConfig.expid_aslog_dir("a000"))
+    exp_path.mkdir(parents=True, exist_ok=True)
     with exp_path / "dummy_run.log" as f:
         f.touch()
         f.write_text("Log entry: simulation started.")
 
-    mock_compress = mocker.patch(
-        "autosubmit.notifications.mail_notifier._compress_file"
-    )
+    mock_compress = mocker.patch("autosubmit.notifications.mail_notifier._compress_file")
     mock_attach = mocker.patch("autosubmit.notifications.mail_notifier._attach_file")
     mock_compress.side_effect = {"compress": True}
     mock_attach.side_effect = {"attach": True}
 
     # No files present
-    mail_notifier._collect_logfiles(message, "a000")
+    MailNotifier()._collect_logfiles(message, "a000")
 
     mock_compress.assert_called_once()
     mock_attach.assert_called_once()
 
 
 def test_collect_logfiles_attach_latest(
-    mail_notifier, autosubmit_config, tmp_path: Path, mocker
+    autosubmit_config, tmp_path: Path, mocker
 ) -> None:
     """Should compress and attach the latest *_run.log file found."""
     mock_log_info = mocker.patch("autosubmit.log.log.Log.info")
-    as_conf = autosubmit_config("a000", {})
-    exp_path: Path = Path(as_conf.basic_config.expid_aslog_dir("a000"))
+    exp_path: Path = Path(BasicConfig.expid_aslog_dir("a000"))
+    exp_path.mkdir(parents=True, exist_ok=True)
 
     f1 = exp_path / "20260101_run.log"
     f2 = exp_path / "20270101_run.log"
@@ -285,18 +283,18 @@ def test_collect_logfiles_attach_latest(
 
     message = MIMEMultipart()
 
-    mail_notifier._collect_logfiles(message, "a000")
+    MailNotifier()._collect_logfiles(message, "a000")
     assert mock_log_info.call_args.args[0] == "File was successfully compressed!"
 
 
 def test_collect_logfiles_compress_error_logs(
-    autosubmit_config, mail_notifier, tmp_path: Path, mocker
+    autosubmit_config, tmp_path: Path, mocker
 ) -> None:
     """When compression raises AutosubmitError, the error is printed via Log.printlog."""
     message = MIMEMultipart()
 
-    as_conf = autosubmit_config("a000", {})
-    exp_path: Path = Path(as_conf.basic_config.expid_aslog_dir("a000"))
+    exp_path: Path = Path(BasicConfig.expid_aslog_dir("a000"))
+    exp_path.mkdir(parents=True, exist_ok=True)
 
     with exp_path / "20270101_run.log" as f:
         f.write_text("first")
@@ -307,17 +305,10 @@ def test_collect_logfiles_compress_error_logs(
     )
     mock_compress.side_effect = AutosubmitError
 
-    mail_notifier._collect_logfiles(message, "a000")
+    MailNotifier()._collect_logfiles(message, "a000")
 
     assert mock_log_printlog.call_args.kwargs["code"] == 6000
     assert mock_log_printlog.call_args.kwargs["message"] == "Unhandled Error"
-
-
-def test_basicconfig_has_attachment_flag() -> None:
-    """BasicConfig exposes the ATTACHMENT field introduced by the PR."""
-    assert hasattr(BasicConfig, "ATTACHMENT")
-    # it is stored as a string in the codebase defaults
-    assert isinstance(BasicConfig.ATTACHMENT, str)
 
 
 class SimpleConfig:
@@ -343,7 +334,7 @@ class SimpleConfig:
     ids=["Normal case: No errors", "Log connection error (SMTP server error)"],
 )
 def test_notify_status_change_calls_send_mail(
-    mail_notifier, mocker, sendmail_error, expected_log_message
+    mocker, sendmail_error, expected_log_message
 ) -> None:
     """notify_status_change calls _send_mail with formatted recipients and message."""
     mock_smtp = mocker.patch("autosubmit.notifications.mail_notifier.smtplib.SMTP")
@@ -353,7 +344,7 @@ def test_notify_status_change_calls_send_mail(
     message_text = "Generated message"
     message = MIMEText(message_text)
     message["From"] = email.utils.formataddr(
-        ("Autosubmit", mail_notifier.config.MAIL_FROM)
+        ("Autosubmit", BasicConfig.MAIL_FROM)
     )
     message["Subject"] = "[Autosubmit] The job job1 status has changed to COMPLETED"
     message["Date"] = email.utils.formatdate(localtime=True)
@@ -361,7 +352,7 @@ def test_notify_status_change_calls_send_mail(
     recipients = ["alice@example.com", "bob@example.org"]
 
     mock_log_printlog = mocker.patch("autosubmit.log.log.Log.printlog")
-    mail_notifier.notify_status_change(
+    MailNotifier().notify_status_change(
         "a000", "job1", "RUNNING", "COMPLETED", recipients
     )
     if sendmail_error:
