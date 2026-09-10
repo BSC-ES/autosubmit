@@ -10,6 +10,7 @@ several bug fixes and enhancements to improve the overall user experience.
 
 - Fix `autosubmit.lock` not being deleted after `create` and `run`; `archive` and `delete` now acquire it too #3033 #3055
 - Fix multi-member PJM job lookup output parsing #3255
+- Preserve the job list while calculating automatic split groups #3238
 - Remove the unrelated `--filter_status` option from `autosubmit expid` #3241
 - Fixed `DELAY_RETRY_TIME` not matching the documented `+N` and `*N` delay sequences #3138
 - Fix timeout guard is silently disabled for login/local jobs #3081
