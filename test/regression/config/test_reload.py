@@ -71,13 +71,13 @@ def prepare_custom_config_tests(
     :return: Updated default YAML file content.
     :rtype: Dict[str, Any]
     """
-    yaml_file_path = Path(f"{temp_folder!s}/test_exp_data.yml")
+    yaml_file_path = Path(f"{str(temp_folder)}/test_exp_data.yml")
     for path, content in project_yaml_files.items():
-        test_file_path = Path(f"{temp_folder!s}{path}")
+        test_file_path = Path(f"{str(temp_folder)}{path}")
         test_file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(test_file_path, "w") as f:
             f.write(str(content))
-    default_yaml_file["job"]["path"] = f"{temp_folder!s}/%NAME%/test.yml"
+    default_yaml_file["job"]["path"] = f"{str(temp_folder)}/%NAME%/test.yml"
     with yaml_file_path.open("w") as f:
         f.write(str(default_yaml_file))
     return default_yaml_file

@@ -88,7 +88,7 @@ def test_describe(
     else:
         locations = _location_lines(describe_log)
         for exp in exps:
-            assert f"{exp.exp_path!s}" in locations
+            assert f"{str(exp.exp_path)}" in locations
 
 
 def test_describe_unknown_expid_warns(

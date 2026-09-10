@@ -254,7 +254,7 @@ class ParamikoSubmitter:
                         f"PLATFORMS.{section_name}.TYPE: {platform_type} for {section_name} is not supported", 7012)
             except ParamikoPlatformException as e:
                 # This is raised only by the ``EcPlatform`` if the underlying platform type is missing.
-                Log.error(f"Queue exception: {e!s}")
+                Log.error(f"Queue exception: {str(e)}")
                 return
 
             # Set the type and version of the platform found
@@ -304,7 +304,7 @@ class ParamikoSubmitter:
                 self.platforms[platform_used] = remote_platform
             except Exception as e:
                 raise_message = (f"Error in the definition of PLATFORM in YAML: SCRATCH_DIR, PROJECT, USER, "
-                                 f"EXPID must be defined for platform {platform_used}: {e!s}")
+                                 f"EXPID must be defined for platform {platform_used}: {str(e)}")
 
         for serial, platforms_with_serial_options in platforms_serial_in_parallel.items():
             for platform_used in platforms_with_serial_options:

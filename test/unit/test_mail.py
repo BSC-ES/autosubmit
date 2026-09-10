@@ -209,7 +209,7 @@ def test_notify_status_change(
     message_text = "Generated message"
     message = MIMEText(message_text)
     message['From'] = email.utils.formataddr(('Autosubmit', mail_notifier.config.MAIL_FROM))
-    message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {status!s}'
+    message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {str(status)}'
     message['Date'] = email.utils.formatdate(localtime=True)
 
     if expected_log_message:

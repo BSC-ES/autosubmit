@@ -106,7 +106,7 @@ def test_custom_config_loaded_file(autosubmit_exp, tmp_path):
     )
 
     # Here, we must have the external config file included, as a link (i.e. we do not copy external files)
-    custom_config_id = f"file://{custom_config!s}"
+    custom_config_id = f"file://{str(custom_config)}"
     assert str(File(crate, custom_config_id).source) in data_entities_ids, (
         "Missing external custom config file (PRE)"
     )
@@ -284,7 +284,7 @@ def test_no_duplicate_ids(autosubmit_exp, tmp_path):
     assert crate is not None
     data_entities_ids = [data_entity["@id"] for data_entity in crate.data_entities]
     assert len(data_entities_ids) == len(set(data_entities_ids)), (
-        f"Duplicate IDs found in the RO-Crate data entities: {data_entities_ids!s}"
+        f"Duplicate IDs found in the RO-Crate data entities: {str(data_entities_ids)}"
     )
 
 

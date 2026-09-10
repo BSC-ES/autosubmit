@@ -163,7 +163,7 @@ def test_run_uninterrupted(
         as_exp.expid,
         run_type="split" if run_type == "split" else "simple",
     )
-    e_msg = f"Current folder: {run_tmpdir!s}\n"
+    e_msg = f"Current folder: {str(run_tmpdir)}\n"
     files_check_list = _check_files_recovered(
         as_conf, log_dir, expected_files=expected_db_entries * 2
     )

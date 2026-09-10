@@ -728,7 +728,7 @@ def _create_db_pg() -> bool:
             conn.execute(delete(tables.DBVersionTable))
             conn.execute(insert(tables.DBVersionTable).values({"version": 1}))
     except Exception as exc:
-        raise AutosubmitCritical(f"Database can not be created: {exc!s}", 7004, str(exc))
+        raise AutosubmitCritical(f"Database can not be created: {str(exc)}", 7004, str(exc))
 
     return True
 
@@ -879,7 +879,7 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
                 )
                 conn.execute(query)
             except Exception as e:
-                Log.debug(f"The experiment {experiment_id} has no status: {e!s}")
+                Log.debug(f"The experiment {experiment_id} has no status: {str(e)}")
 
         if cast(int, result.rowcount) > 0:
             Log.debug(f"The experiment {experiment_id} has been deleted!!!")
@@ -903,7 +903,7 @@ def _get_experiment_id_sqlalchemy(name: str) -> int:
 def check_db_path(db_path: Path | None, must_exists: bool = True) -> bool:
     """Check if the database path exists."""
     if db_path and not db_path.exists() and must_exists:
-        raise ValueError(f'Database path not found {db_path!s}!')
+        raise ValueError(f'Database path not found {str(db_path)}!')
     elif db_path and not db_path.exists() and not must_exists:
         return False
     else:

@@ -44,7 +44,7 @@ def handle_start_time(start_time: str) -> None:
             except (ValueError, TypeError, OverflowError, NotImplementedError) as e:
                 Log.critical(
                     "The string input provided as the starting time of your experiment must have the format 'H:M:S' or "
-                    f"'yyyy-mm-dd H:M:S'. Your input was '{start_time}': {e!s}")
+                    f"'yyyy-mm-dd H:M:S'. Your input was '{start_time}': {str(e)}")
                 return
         # Must be in the future
         if target_date < datetime.datetime.now():
@@ -112,10 +112,10 @@ def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> list[str
         runs_missing = [run_member for run_member in allowed_members if run_member not in as_conf.get_member_list()]
         if len(runs_missing) > 0:
             raise AutosubmitCritical(
-                f"Some of the members ({runs_missing!s}) in the list of allowed members you supplied do not exist in "
+                f"Some of the members ({str(runs_missing)}) in the list of allowed members you supplied do not exist in "
                 f"the current list of members specified in the conf files."
-                f"\nCurrent list of members: {as_conf.get_member_list()!s}")
+                f"\nCurrent list of members: {str(as_conf.get_member_list())}")
         if len(allowed_members) == 0:
-            raise AutosubmitCritical(f"Not a valid -rom --run_only_members input: {run_members!s}")
+            raise AutosubmitCritical(f"Not a valid -rom --run_only_members input: {str(run_members)}")
         return allowed_members
     return []

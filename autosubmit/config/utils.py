@@ -45,4 +45,4 @@ def copy_as_config(expid: str, copy_expid: str):
                 try:
                     ini_to_yaml(target_new_file)
                 except Exception as e:
-                    Log.warning(f"Error converting {target_new_file} to YAML: {e!s}")
+                    Log.warning(f"Error converting {target_new_file} to YAML: {str(e)}")

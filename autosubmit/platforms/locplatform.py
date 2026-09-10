@@ -210,7 +210,7 @@ class LocalPlatform(ParamikoPlatform):
             return False
         except Exception as e:
             if not ignore_log:
-                Log.error(f"Unexpected error executing command: {e!s}")
+                Log.error(f"Unexpected error executing command: {str(e)}")
             return False
 
     def send_file(self, filename: str, check: bool = True) -> bool:
@@ -362,7 +362,7 @@ class LocalPlatform(ParamikoPlatform):
             with open(src, "rb") as f:
                 return f.read(max_size)
         except Exception as e:
-            Log.debug(f"Error reading file {src}: {e!s}")
+            Log.debug(f"Error reading file {src}: {str(e)}")
         return None
 
     def compress_file(self, file_path: str) -> None:

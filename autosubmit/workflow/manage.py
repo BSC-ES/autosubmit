@@ -181,7 +181,7 @@ def _prepare_run(
             "Corrupted job_list, backup couldn't be restored", 7040, e.message
         )
     except Exception as e:
-        Log.debug(f"Error while loading job_list: {e!s}")
+        Log.debug(f"Error while loading job_list: {str(e)}")
         raise AutosubmitCritical(
             "Corrupted job_list, backup couldn't be restored", 7040, str(e)
         )
@@ -227,7 +227,7 @@ def _prepare_run(
         # This triggers the setter and main logic of the -rm feature.
         job_list.run_members = allowed_members
         Log.result(
-            f"Only jobs with member value in {allowed_members!s} or no member will be allowed in this "
+            f"Only jobs with member value in {str(allowed_members)} or no member will be allowed in this "
             f"run. Also, those jobs already SUBMITTED, QUEUING, or RUNNING will be allowed to complete and"
             f" will be tracked."
         )
@@ -336,7 +336,7 @@ def stop(
             killed_expids.append(expid_in_list)
         except Exception as e:
             Log.warning(
-                f"An error occurred while stopping the autosubmit process for expid '{expid_in_list}': {e!s}"
+                f"An error occurred while stopping the autosubmit process for expid '{expid_in_list}': {str(e)}"
             )
 
     for expid_in_list in killed_expids:
@@ -770,7 +770,7 @@ def run(
                             failed_names[job.name] = job.fail_count
                 except Exception as e:
                     Log.printlog(
-                        f"Error trying to store failed job count: {e!s}",
+                        f"Error trying to store failed job count: {str(e)}",
                         Log.WARNING,
                     )
                 Log.result("Storing failed job count...done")
@@ -805,10 +805,10 @@ def run(
                         Log.result(f"Recover of job_list has fail {e.message}")
                     except OSError as e:
                         recovery = False
-                        Log.result(f"Recover of job_list has fail {e!s}")
+                        Log.result(f"Recover of job_list has fail {str(e)}")
                     except Exception as e:
                         recovery = False
-                        Log.result(f"Recover of job_list has fail {e!s}")
+                        Log.result(f"Recover of job_list has fail {str(e)}")
                 # Restore platforms and try again to avoid endless loop with failed configuration.
                 # A hard limit is set.
                 reconnected = False
@@ -884,7 +884,7 @@ def run(
             try:
                 _finish_current_experiment_run(expid)
             except Exception as e:
-                Log.warning(f"Database is locked: {e!s}")
+                Log.warning(f"Database is locked: {str(e)}")
         rocrate_data = as_conf.experiment_data.get("ROCRATE", None)
         if rocrate_data:
             provenance(expid, create_rocrate=True)
@@ -1181,14 +1181,14 @@ def recover(
     except Exception as e:
         Log.warning(
             "An error has occurred while plotting the jobs list after recovery. "
-            f"Check if you have X11 redirection and an img viewer correctly set. Trace: {e!s}"
+            f"Check if you have X11 redirection and an img viewer correctly set. Trace: {str(e)}"
         )
     try:
         if detail:
             print_job_details(job_list)
     except Exception as e:
         Log.warning(
-            f"An error has occurred while generating the detailed view of the jobs after recovery. Trace: {e!s}"
+            f"An error has occurred while generating the detailed view of the jobs after recovery. Trace: {str(e)}"
         )
 
     return True
@@ -1321,7 +1321,7 @@ def inspect(
 
     if isinstance(jobs, type([])):
         for job in jobs:
-            file_paths += f"{tmp_path / (job.name + '.cmd')!s} | {job.file}\n"
+            file_paths += f"{str(tmp_path / (job.name + '.cmd'))} | {job.file}\n"
             job.status = Status.WAITING
 
         generate_scripts_andor_wrappers(
@@ -1329,7 +1329,7 @@ def inspect(
         )
     if len(jobs_cw) > 0:
         for job in jobs_cw:
-            file_paths += f"{tmp_path / (job.name + '.cmd')!s}\n"
+            file_paths += f"{str(tmp_path / (job.name + '.cmd'))}\n"
             job.status = Status.WAITING
         generate_scripts_andor_wrappers(as_conf, job_list, False)
     Log.info("No more scripts to generate, you can proceed to check them manually")

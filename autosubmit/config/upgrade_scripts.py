@@ -212,7 +212,7 @@ def upgrade_scripts(expid: str, files: list[str] | None) -> bool:
                 )
         except Exception as e:
             Log.warning(
-                f"Failed to fix placeholders in the new AS4 YAML file {template_path}: {e!s}"
+                f"Failed to fix placeholders in the new AS4 YAML file {template_path}: {str(e)}"
             )
 
     # We now must have new YAML files. Let's reload them.
@@ -237,7 +237,7 @@ def upgrade_scripts(expid: str, files: list[str] | None) -> bool:
                 )
         except Exception as e:
             Log.warning(
-                f"Failed to fix placeholders in template file {template_path}: {e!s}"
+                f"Failed to fix placeholders in template file {template_path}: {str(e)}"
             )
 
     if substituted:

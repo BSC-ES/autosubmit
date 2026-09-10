@@ -520,7 +520,7 @@ def create_rocrate_archive(
     for exported_key in exported_keys:
         for e_k, e_v in workflow_configuration[exported_key].items():
             param_name = '.'.join([exported_key, e_k])
-            Log.debug(f'Create input parameter for {param_name} = {e_v!s}'.replace('{', '{{').replace('}', '}}'))
+            Log.debug(f'Create input parameter for {param_name} = {str(e_v)}'.replace('{', '{{').replace('}', '}}'))
             python_type = type(e_v).__name__
             if python_type not in PARAMETER_TYPES_MAP:
                 raise AutosubmitCritical(

@@ -78,7 +78,7 @@ def restore_platforms(
                             MailNotifier(BasicConfig), expid, email, platform_to_test
                         )
             except Exception as e2:
-                Log.debug(f"Unexpected exception sending email notification: {e2!s}")
+                Log.debug(f"Unexpected exception sending email notification: {str(e2)}")
             platform_issues += f"\n[{platform_to_test.name}] Connection Unsuccessful to host {platform_to_test.host} "
             issues += platform_issues
             continue

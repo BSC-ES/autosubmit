@@ -370,7 +370,7 @@ def exit_from_error(e: BaseException) -> int:
             AutosubmitError | AutosubmitCritical, e
         )
         if as_error.trace:
-            Log.critical(f"Trace: {as_error.trace!s}")
+            Log.critical(f"Trace: {str(as_error.trace)}")
         Log.critical(f"{as_error.message} [eCode={as_error.code}]")
         err_code = as_error.code
 

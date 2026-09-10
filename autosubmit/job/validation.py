@@ -184,7 +184,7 @@ def _validate_chunk_formula(chunk_formula: str, validation_message: str) -> str:
         json_data = json.loads(create_json(chunk_formula))
     except Exception as e:
         validation_message += "\n\tMust follow chunk formula structure: [ DATE [ MEMBER [ CHUNKS ] ... ] ... ]"
-        validation_message += f"\n\tJSON Error: {e!s}"
+        validation_message += f"\n\tJSON Error: {str(e)}"
         return validation_message
 
     dates = "sds"

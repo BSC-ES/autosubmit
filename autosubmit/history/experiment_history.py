@@ -62,7 +62,7 @@ class ExperimentHistory:
             self.initialize_database()
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
             self.manager = None
 
     def initialize_database(self):
@@ -71,7 +71,7 @@ class ExperimentHistory:
             self.manager.initialize()
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
             self.manager = None
 
     def is_header_ready(self):
@@ -111,7 +111,7 @@ class ExperimentHistory:
             return self.manager.register_submitted_job_data_dc(job_data_dc)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
             return None
 
@@ -206,7 +206,7 @@ class ExperimentHistory:
             return self.manager.update_job_data_dc_by_job_id_name(job_data_dc)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
                          job_id: int = 0, wrapper_queue: str | None = None, wrapper_code: str | None = None,
@@ -238,7 +238,7 @@ class ExperimentHistory:
             return self.manager.update_job_data_dc_by_job_id_name(job_data_dc_last)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def write_finish_time(self, job_name: str, finish: int = 0, status: str = "UNKNOWN", job_id: int = 0,
                           out_file: str | None = None, err_file: str | None = None,
@@ -268,7 +268,7 @@ class ExperimentHistory:
 
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def write_platform_data_after_finish(self, job_data_dc, platform_obj):
         """
@@ -301,7 +301,7 @@ class ExperimentHistory:
             return self.manager.update_list_job_data_dc_by_each_id(job_data_dcs_to_update)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def _verify_slurm_monitor(self, slurm_monitor, job_data_dc):
         try:
@@ -315,7 +315,7 @@ class ExperimentHistory:
                     f'Number of steps {slurm_monitor.step_count}.')
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def process_status_changes(self, job_list=None, chunk_unit="NA", chunk_size=0, current_config="", create=False):
         """ Detect status differences between job_list and current job_data rows, and update. Creates a new run if necessary. """
@@ -338,7 +338,7 @@ class ExperimentHistory:
             return self.update_counts_on_experiment_run_dc(current_experiment_run_dc, job_list)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def _get_built_list_of_changes(self, job_list):
         """ Return: List of (current timestamp, current datetime str, status, rowstatus, id in job_data). One tuple per change. """
@@ -352,7 +352,7 @@ class ExperimentHistory:
             return self.update_counts_on_experiment_run_dc(current_experiment_run_dc, job_list)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {exp!s} {traceback.format_exc()}')
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def should_we_create_a_new_run(self, job_list, changes_count, current_experiment_run_dc, new_chunk_unit,
                                    new_chunk_size, create=False):
@@ -528,5 +528,5 @@ def get_historical_database(expid, job_list, as_conf):
         # Connection to status database ec_earth.db can fail.
         # API worker will fix the status.
         Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
-                  f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {e!s}", 7003)
+                  f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
     return exp_history

@@ -217,8 +217,8 @@ def test_inspect(
             assert f"HPCHOST={hpcarch_info['HOST']}" in content
             assert "HPCCUSTOM_DIR=test" in content
             assert "HPCCUSTOM_DIR_POINTS_TO_OTHER_DIR=OK" in content
-            assert f"HPCROOTDIR={expected_hpcrootdir!s}" in content
-            assert f"HPCLOGDIR={expected_hpclogdir!s}" in content
+            assert f"HPCROOTDIR={str(expected_hpcrootdir)}" in content
+            assert f"HPCLOGDIR={str(expected_hpclogdir)}" in content
 
 
 @pytest.mark.parametrize("additional_data", [

@@ -94,7 +94,7 @@ class SingleAssociationStrategy(Strategy):
             return [job_data_dc]
         except Exception as exp:
             Logging("strategies", self.historiclog_dir_path).log(
-                f"SingleAssociationStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {exp!s}",
+                f"SingleAssociationStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {str(exp)}",
                 traceback.format_exc())
             job_data_dc = self.set_job_data_dc_as_process_failed(job_data_dc, slurm_monitor.original_input)
             return [job_data_dc]
@@ -128,7 +128,7 @@ class StraightWrapperAssociationStrategy(Strategy):
             return result
         except Exception as exp:
             Logging("strategies", self.historiclog_dir_path).log(
-                f"StraightWrapperAssociationStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {exp!s}",
+                f"StraightWrapperAssociationStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {str(exp)}",
                 traceback.format_exc())
             job_data_dc = self.set_job_data_dc_as_process_failed(job_data_dc, slurm_monitor.original_input)
             return [job_data_dc]
@@ -154,7 +154,7 @@ class GeneralizedWrapperDistributionStrategy(Strategy):
             return result
         except Exception as exp:
             Logging("strategies", self.historiclog_dir_path).log(
-                f"GeneralizedWrapperDistributionStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {exp!s}",
+                f"GeneralizedWrapperDistributionStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {str(exp)}",
                 traceback.format_exc())
             job_data_dc = self.set_job_data_dc_as_process_failed(job_data_dc, slurm_monitor.original_input)
             return [job_data_dc]
@@ -188,7 +188,7 @@ class TwoDimWrapperDistributionStrategy(Strategy):
             return result
         except Exception as exp:
             Logging("strategies", self.historiclog_dir_path).log(
-                f"TwoDimWrapperDistributionStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {exp!s}",
+                f"TwoDimWrapperDistributionStrategy failed for {job_data_dc.job_name}. Using ssh_output: {slurm_monitor.original_input}. Exception message: {str(exp)}",
                 traceback.format_exc())
             job_data_dc = self.set_job_data_dc_as_process_failed(job_data_dc, slurm_monitor.original_input)
             return [job_data_dc]

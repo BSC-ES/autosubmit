@@ -42,7 +42,7 @@ def _write_test_files(expid, local_root_dir: Path):
             dedent(f"""\
                 STORAGE:
                     TYPE: sqlite
-                LOCAL_ROOT_DIR: {local_root_dir!s}
+                LOCAL_ROOT_DIR: {str(local_root_dir)}
                 LOCAL_ASLOG_DIR: {aslogs_dir}
                 LOCAL_TMP_DIR: {exp_tmp_dir}
                 PLATFORMS:

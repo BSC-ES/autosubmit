@@ -109,7 +109,7 @@ def test_git_local_dirty(
 
     experiment_data = _get_experiment_data(tmp_path)
     experiment_data["PROJECT"]["PROJECT_TYPE"] = project_type
-    experiment_data["GIT"]["PROJECT_ORIGIN"] = f"file://{git_repo!s}"
+    experiment_data["GIT"]["PROJECT_ORIGIN"] = f"file://{str(git_repo)}"
     experiment_data["LOCAL"] = {"PROJECT_PATH": str(git_repo)}
 
     as_exp = autosubmit_exp(expid, experiment_data)

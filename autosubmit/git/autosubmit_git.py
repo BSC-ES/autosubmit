@@ -179,7 +179,7 @@ def clean_git(as_conf: AutosubmitConfig) -> bool:
         raise AutosubmitCritical("Synchronization needed!", 7064)
 
     proj_dir = Path(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_PROJ_DIR)
-    Log.debug(f"Removing project directory {proj_dir!s}")  # pragma: no cover
+    Log.debug(f"Removing project directory {str(proj_dir)}")  # pragma: no cover
     rmtree(proj_dir)
 
     return True
@@ -213,7 +213,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
     try:
         submitter = ParamikoSubmitter(as_conf=as_conf)
     except Exception as e:
-        raise AutosubmitCritical(f"Failed to load the Autosubmit platforms: {e!s}")
+        raise AutosubmitCritical(f"Failed to load the Autosubmit platforms: {str(e)}")
 
     if hpcarch not in submitter.platforms:
         Log.warning(f"Platform {hpcarch} not found in configuration file, will fallback to the LOCAL platform")
@@ -341,7 +341,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
                 subprocess.check_output(command_1, shell=True)
             except BaseException as e:
                 submodule_failure = True
-                Log.printlog(f"Trace: {e!s}", 6014)
+                Log.printlog(f"Trace: {str(e)}", 6014)
                 Log.printlog(
                     f"Submodule has a wrong configuration.\n{command_1}", 6014)
         else:

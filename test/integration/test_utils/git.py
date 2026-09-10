@@ -73,7 +73,7 @@ def create_git_repository(path: Path, bare=False, branch='master') -> None:
         #       branch. We do it here, since Autosubmit uses ``-b`` by default.
         with TemporaryDirectory() as td:
             clone_repo = Path(td, 'clone')
-            git_clone_repository(f'file:///{path!s}', clone_repo)
+            git_clone_repository(f'file:///{str(path)}', clone_repo)
 
             with open(clone_repo / 'README.md', 'w') as f:
                 f.write('This is a test repository of Autosubmit.')
@@ -83,7 +83,7 @@ def create_git_repository(path: Path, bare=False, branch='master') -> None:
     # git-http-backend (which comes with Git) may have issues with directory
     # permissions depending on the settings and file system permissions.
     # Thus, we chmod everything to 0x777 here.
-    system(f'chmod -R 0777 {path!s}')
+    system(f'chmod -R 0777 {str(path)}')
 
 
 def git_clone_repository(url: str, path: Path) -> None:
@@ -95,7 +95,7 @@ def git_clone_repository(url: str, path: Path) -> None:
         raise ValueError(f'You must provide a valid URL to be cloned: {url}')
 
     commands = [
-        f'git clone {url} {path!s}'
+        f'git clone {url} {str(path)}'
     ]
 
     command = ' '.join(commands)

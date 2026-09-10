@@ -91,7 +91,7 @@ def check_experiment_ownership(
         current_owner_name = pwd.getpwuid(os.stat(os.path.join(basic_config.LOCAL_ROOT_DIR, expid)).st_uid).pw_name
     except Exception as e:
         if logger:
-            logger.info(f"Error while trying to get the experiment's owner information: {e!s}")
+            logger.info(f"Error while trying to get the experiment's owner information: {str(e)}")
     finally:
         if current_owner_id <= 0 and logger:
             logger.info(f"Current owner '{current_owner_name}' of experiment {expid} does not exist anymore.")
@@ -143,7 +143,7 @@ def restore_platforms(platform_to_test, mail_notify=False, as_conf=None, expid=N
                         Notifier.notify_experiment_status(MailNotifier(BasicConfig), expid, email, platform)
             platform_issues += f"\n[{platform.name}] Connection Unsuccessful to host {platform.host} "
             issues += platform_issues
-            Log.warning(f"Error restoring platform [{platform.name}] host [{platform.host}]: {e!s}")
+            Log.warning(f"Error restoring platform [{platform.name}] host [{platform.host}]: {str(e)}")
             continue
         if platform.check_remote_permissions():
             Log.result(f"[{platform.name}] Correct user privileges for host {platform.host}")

@@ -170,7 +170,7 @@ class PythonWrapperBuilder(WrapperBuilder):
         node_id = "{random_alphanumeric}"
         wrapper_id = "{random_alphanumeric}_FAILED"
         # Defining scripts to be run
-        scripts= {self.job_scripts!s}
+        scripts= {str(self.job_scripts)}
         {os.linesep.ljust(13)}""")
 
     def build_wrapper_stat(self) -> str:
@@ -256,7 +256,7 @@ class PythonWrapperBuilder(WrapperBuilder):
     def build_cores_list(self):
         return textwrap.dedent(f"""
 total_cores = {self.num_procs_value}
-jobs_resources = {self.jobs_resources!s}
+jobs_resources = {str(self.jobs_resources)}
 processors_per_node = int(jobs_resources['PROCESSORS_PER_NODE'])
 idx = 0
 all_cores = []
@@ -546,7 +546,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 current = {thread}
                 current.start()
                 start = int(time.time())
-                current.join({self.wallclock_by_level!s})
+                current.join({str(self.wallclock_by_level)})
                 total_steps = total_steps + 1
         {os.linesep.ljust(13)}""")
 
@@ -610,10 +610,10 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 print(f"Running job {{self.template}} with fail count {{self.fail_count}}")
                 if self.fail_count > 0:
                     filedata = filedata.replace('_STAT_0', f'_STAT_{{self.fail_count}}')
-                print(f"timeout {self.wallclock_by_level!s} bash -s < <filedata> > {{out_path}} 2> {{err_path}}")
+                print(f"timeout {str(self.wallclock_by_level)} bash -s < <filedata> > {{out_path}} 2> {{err_path}}")
                 with open(out_path, 'w') as out_f, open(err_path, 'w') as err_f:
                     proc = subprocess.run(
-                        ['timeout', '{self.wallclock_by_level!s}', 'bash', '-s'],
+                        ['timeout', '{str(self.wallclock_by_level)}', 'bash', '-s'],
                         input=filedata,
                         stdout=out_f,
                         stderr=err_f,
@@ -871,7 +871,7 @@ class SrunWrapperBuilder(WrapperBuilder):
     def build_cores_list(self):
         return textwrap.dedent(f"""
 total_cores = {self.num_procs_value}
-jobs_resources = {self.jobs_resources!s}
+jobs_resources = {str(self.jobs_resources)}
 processors_per_node = int(jobs_resources['PROCESSORS_PER_NODE'])
 idx = 0
 all_cores = []
@@ -982,7 +982,7 @@ class SrunHorizontalWrapperBuilder(SrunWrapperBuilder):
         scripts_bash += ")"
         return textwrap.dedent(f"""
         # Defining scripts to be run
-        declare -a scripts={scripts_bash!s}
+        declare -a scripts={str(scripts_bash)}
         {os.linesep.ljust(13)}""")
 
     def build_srun_launcher(self, jobs_list, footer=True):
@@ -1035,7 +1035,7 @@ class SrunVerticalHorizontalWrapperBuilder(SrunWrapperBuilder):
                 built_array += str("\"" + script + "\"") + " "
             built_array += ")"
             scripts_bash += textwrap.dedent(f"""
-            declare -a scripts_{list_index!s}={built_array!s}
+            declare -a scripts_{str(list_index)}={str(built_array)}
             {os.linesep.ljust(13)}""")
             scripts_array_vars += f"\"scripts_{list_index}\" "
             scripts_array_index += f"\"{list_index}\" "
@@ -1043,8 +1043,8 @@ class SrunVerticalHorizontalWrapperBuilder(SrunWrapperBuilder):
         scripts_array_vars += ")"
         scripts_array_index += ")"
         scripts_bash += textwrap.dedent(f"""
-                   declare -a scripts_list={scripts_array_vars!s}
-                   declare -a scripts_index={scripts_array_index!s}
+                   declare -a scripts_list={str(scripts_array_vars)}
+                   declare -a scripts_index={str(scripts_array_index)}
                    {os.linesep.ljust(13)}""")
 
         total_threads = float(len(self.job_scripts))

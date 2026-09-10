@@ -62,7 +62,7 @@ def job_list(autosubmit_config, tmp_path):
             for member in ['m1', 'm2']:
                 for chunk in [1, 2]:
                     job = _create_dummy_job(
-                        f'expid_{date}_{member}_{chunk!s}_{section}',
+                        f'expid_{date}_{member}_{str(chunk)}_{section}',
                         Status.WAITING,
                         date,
                         member,
