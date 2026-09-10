@@ -63,12 +63,12 @@ def test_delete_experiment_removes_directory_metadata_update(
     # We can update the metadata successfully, so db_common.delete_experiment should be called without exceptions
     if update_metadata:
         mocked_delete_metadata = mocker.patch(
-            "autosubmit.experiment.manage.delete_experiment"
+            "autosubmit.database.db_common.delete_experiment"
         )
     # We simulate a failure updating the metadata, so db_common.delete_experiment should be called but raise an exception
     else:
         mocked_delete_metadata = mocker.patch(
-            "autosubmit.experiment.manage.delete_experiment",
+            "autosubmit.database.db_common.delete_experiment",
             side_effect=Exception("metadata update failed"),
         )
 
