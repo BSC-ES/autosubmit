@@ -13,8 +13,8 @@
 # GNU General Public License for more details.
 
 import traceback
-from time import time
 from pathlib import Path
+from time import time
 
 import autosubmit.history.database_managers.database_models as Models
 import autosubmit.history.utils as HUtils
