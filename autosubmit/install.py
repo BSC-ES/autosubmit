@@ -295,10 +295,6 @@ def configure(
                 )
 
             except OSError as e:
-                raise AutosubmitCritical(
-                    f"Can not write config file: {e.message}", 7012
-                )
-            except OSError as e:
                 raise AutosubmitCritical(f"Can not write config file: {e}", 7012)
     except (AutosubmitCritical, AutosubmitError):
         raise

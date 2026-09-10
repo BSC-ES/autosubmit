@@ -38,7 +38,7 @@ Core databases
 +===================+====================================+==========================================================================================================+
 | ``autosubmit.db`` | ``$HOME/autosubmit/autosubmit.db`` | The main database of Autosubmit. The location can be customized in the ``autosubmitrc`` file.            |
 +-------------------+------------------------------------+----------------------------------------------------------------------------------------------------------+
-| ``as_times.db``   | ``$HOME/autosubmit/as_times.db``   | Deprecated API. Used by Autosubmit API with Autosubmit ``3.x``. Kept for backward compatibility for now. |
+| ``as_times.db``   | ``$HOME/autosubmit/as_times.db``   | The secondary database of Autosubmit. Used to keep track of the experiment status.                       |
 +-------------------+------------------------------------+----------------------------------------------------------------------------------------------------------+
 
 Auxiliary databases

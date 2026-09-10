@@ -27,7 +27,7 @@ last available experiment ID. The code below shows an example of the latter:
 
 .. code-block:: python
 
-    from autosubmit.experiment.experiment_common import next_experiment_id
+    from autosubmit.experiment.utils import next_experiment_id
 
     expid = next_experiment_id('a000’)
     print(expid)  # prints 'a001’
