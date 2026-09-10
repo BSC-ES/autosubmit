@@ -15,8 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import annotations
-
 import email.utils
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -340,10 +338,10 @@ def test_collect_logfiles_compress_error_logs(
 
 
 def test_basicconfig_has_attachment_flag() -> None:
-    """BasicConfig exposes the ATTACHMENT field introduced by the PR."""
-    assert hasattr(BasicConfig, "ATTACHMENT")
+    """BasicConfig exposes the FAILURE_MAIL_ATTACHMENT field introduced by the PR."""
+    assert hasattr(BasicConfig, "FAILURE_MAIL_ATTACHMENT")
     # it is stored as a string in the codebase defaults
-    assert isinstance(BasicConfig.ATTACHMENT, str)
+    assert isinstance(BasicConfig.FAILURE_MAIL_ATTACHMENT, str)
 
 
 class SimpleConfig:

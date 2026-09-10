@@ -1325,7 +1325,7 @@ class AutosubmitConfig:
                 else:
                     mails = mails.split(' ')
                 self.experiment_data["MAIL"]["TO"] = mails
-                self.experiment_data["MAIL"]["ATTACHMENT"] = parser_data["MAIL"].get("ATTACHMENT", False)
+                self.experiment_data["MAIL"]["FAILURE_MAIL_ATTACHMENT"] = parser_data["MAIL"].get("FAILURE_MAIL_ATTACHMENT", False)
 
                 for mail in self.experiment_data["MAIL"]["TO"]:
                     if not self.is_valid_mail_address(mail):

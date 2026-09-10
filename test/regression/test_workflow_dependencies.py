@@ -69,7 +69,7 @@ def prepare_basic_config(current_tmpdir):
     BasicConfig.CUSTOM_PLATFORMS_PATH = ""
     BasicConfig.DEFAULT_JOBS_CONF = ""
     BasicConfig.SMTP_SERVER = ""
-    BasicConfig.ATTACHMENT = ""
+    BasicConfig.FAILURE_MAIL_ATTACHMENT = ""
     BasicConfig.MAIL_FROM = ""
     BasicConfig.ALLOWED_HOSTS = ""
     BasicConfig.DENIED_HOSTS = ""
