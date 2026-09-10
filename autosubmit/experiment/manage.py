@@ -1038,16 +1038,12 @@ def create(
             )
         Log.result("\nJob list created successfully")
         Log.warning("Remember to MODIFY the MODEL config files!")
-        # fh.flush()
-        # os.fsync(fh.fileno())
         if detail:
             print_job_details(job_list)
         return 0
     except KeyboardInterrupt:
         # Setting signal handler to handle subsequent CTRL-C
         signal.signal(signal.SIGINT, _signal_handler_create)
-        # fh.flush()
-        # os.fsync(fh.fileno())
         raise AutosubmitCritical("Stopped by user input", 7010)
 
 

@@ -28,6 +28,7 @@ from autosubmit.helpers.utils import build_and_connect_platform
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.platform_type import PlatformType
+from autosubmit.scripts._cli_function import _experiment_lock
 from autosubmit.workflow.manage import run, stop
 from test.integration.commands.run.conftest import (
     _assert_db_fields,
@@ -39,6 +40,10 @@ from test.integration.commands.run.conftest import (
 from test.integration.test_utils.misc import wait_locker
 
 # -- Tests
+def _run_locked(expid: str) -> None:
+    """Run the experiment while holding its lock, as ``autosubmit run`` does."""
+    with _experiment_lock(expid):
+        run(expid)
 
 
 @pytest.mark.parametrize(
@@ -256,7 +261,7 @@ def test_run_interrupted(
 
     # Run the experiment. This was not being interrupted, so we run it in a
     # child process and then stop it to simulate the interruption.
-    process = Process(target=run, args=(as_exp.expid,))
+    process = Process(target=_run_locked, args=(as_exp.expid,))
     process.start()
 
     max_waiting_time_seconds = 60
