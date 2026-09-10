@@ -192,6 +192,7 @@ def args_parser() -> ArgumentParser:
     group=CommandGroup.WORKFLOW,
     options_type=RecoveryOptions,
     validators=validate_expid,
+    lock=True,
 )
 def main(opts: RecoveryOptions) -> int | bool | None:
     from warnings import warn

@@ -19,12 +19,10 @@
 
 import traceback
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
-from contextlib import suppress
 from dataclasses import dataclass
 from difflib import get_close_matches
 from enum import Enum
 from inspect import cleandoc
-from pathlib import Path
 from re import split, sub
 from typing import Any, TypeVar, cast, get_type_hints
 
@@ -323,27 +321,14 @@ def create_argparse_parser(docs: str | None, *, add_help=True) -> ArgumentParser
     )
 
 
-def _delete_lock_file(
-    base_path: str = Log.file_path, lock_file: str = "autosubmit.lock"
-) -> None:
-    """Delete the lock file if it exists. Suppresses permission errors raised.
-
-    :param base_path: Base path to locate the lock file. Defaults to the experiment ``tmp`` directory.
-    :param lock_file: The name of the lock file. Defaults to ``autosubmit.lock``.
-    :return: None
-    """
-    with suppress(PermissionError):
-        Path(base_path, lock_file).unlink(missing_ok=True)
-
-
 def exit_from_error(e: BaseException) -> int:
     """Called by ``Autosubmit`` when an exception is raised during a command execution.
 
     Prints the exception in ``CRITICAL`` if it is an ``AutosubmitCritical`` or an
     ``AutosubmitError`` exception, including any trace attached to the exception.
 
-    Exceptions raised by ``porta-locker` library print a message informing the user
-    about the locked experiment. Other exceptions raised cause the lock to be deleted.
+    Exceptions raised by the ``portalocker`` library print a message informing the user
+    that another process holds the experiment lock.
 
     :param e: The exception being raised.
     """
@@ -359,11 +344,9 @@ def exit_from_error(e: BaseException) -> int:
 
     if isinstance(e, BaseLockException):
         Log.warning(
-            "Another Autosubmit instance using the experiment\n. Stop other Autosubmit instances that are "
-            "using the experiment or delete autosubmit.lock file located on the /tmp folder."
+            "Another Autosubmit process is using this experiment. Wait for it to finish, "
+            "or stop it, before running this command again."
         )
-    else:
-        _delete_lock_file()
 
     if is_autosubmit_error:
         as_error: AutosubmitError | AutosubmitCritical = cast(

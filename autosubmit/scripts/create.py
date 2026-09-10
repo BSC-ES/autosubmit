@@ -131,6 +131,7 @@ def args_parser() -> ArgumentParser:
     group=CommandGroup.EXPERIMENT,
     options_type=CreateOptions,
     validators=validate_expid,
+    lock=True,
 )
 def main(opts: CreateOptions) -> int | bool | None:
     from autosubmit.experiment.manage import create

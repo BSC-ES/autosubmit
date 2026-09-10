@@ -29,8 +29,6 @@ from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING
 
-from portalocker import Lock
-
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
@@ -604,294 +602,270 @@ def run(
     :param run_only_members: the members to run
     :param profiler: The optional instance. If set, the code will run with the profiler.
     :param stop_event: optional threading.Event used to signal interruption (e.g. from tests)
-    :raises BaseLockException: If the experiment is locked for another command.
+
     :raises AutosubmitCritical: In case of a failure during the execution of the workflow.
     :return: An integer representing the command exit status.
     """
     Scheduler.exit = False
 
-    # TODO: We can probably delete this? The CLI validators should be checking these paths already?
-    # Initialize common folders'
     try:
-        exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
-        tmp_path = os.path.join(exp_path, BasicConfig.LOCAL_TMP_DIR)
+        Log.debug("Preparing run")
+        # This function is called only once, when the experiment is started.
+        # It is used to initialise the experiment and to check the correctness of the configuration files.
+        # If there are issues while running, this function will be called again to reinitialise the experiment.
+        (
+            job_list,
+            submitter,
+            _exp_history,
+            _host,
+            as_conf,
+            platforms_to_test,
+            _,
+        ) = _prepare_run(expid, start_time, start_after, run_only_members)
     except Exception as e:
         raise AutosubmitCritical(
-            "Failure during the loading of the experiment configuration, check file paths",
-            7014,
-            str(e),
-        )
-
-    with Lock(os.path.join(tmp_path, "autosubmit.lock"), timeout=1):
+            "Error in run initialization", 7014, str(e)
+        )  # Changing default to 7014
+    as_conf_config = as_conf.experiment_data.get("CONFIG", {})
+    git_operational_check_enabled = as_conf_config.get(
+        "GIT_OPERATIONAL_CHECK_ENABLED", True
+    )
+    if git_operational_check_enabled:
+        Log.debug("Checking for dirty local Git repository")
+        check_unpushed_changes(expid, as_conf)
+    else:
+        Log.warning("Git operational check disabled by user")
+    Log.debug("Running main running loop")
+    #########################
+    # AUTOSUBMIT - MAIN LOOP
+    #########################
+    # Main loop
+    # Recovery retries, when platforms have issues. The hard limit is set just in case an Autosubmit bug or
+    # wrong configuration. The minimum duration is the weekend (72 h).
+    # Run experiment steps:
+    # 0. Prepare the experiment to start running it.
+    # 1. Check if there are jobs in the workflow that have to run (get_active)
+    # For each platform:
+    #  2. Check the status of all jobs in the current workflow that are queuing or running. Also updates
+    #  all workflow jobs status by checking the status in the platform machines and job parent status.
+    #  3. Submit jobs that are on ready status.
+    # 4. When there are no more active jobs, wait until all log recovery threads finish and exit Autosubmit.
+    # In case of issues, the experiment is reinitialised and the process starts with the last
+    # non-corrupted workflow status.
+    # User can always stop the run, and unless force killed, Autosubmit will exit in a clean way.
+    # Experiment run will always start from the last known workflow status.
+    # 3650 = (72h - 122h)
+    max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get(
+        "RECOVERY_RETRIALS", 3650
+    )
+    recovery_retrials = 0
+    if profiler is not None:
+        loaded_jobs = len(job_list.get_job_list())
+        loaded_edges = 0
+        for job in job_list.get_job_list():
+            loaded_edges += len(job.children)
+    as_conf.set_platform_parameters(job_list, submitter.platforms)
+    # Save metadata.
+    as_conf.save()
+    job_changes_tracker = {}
+    _save_historical_edges(expid)
+    job_list.recover_logs(from_db=True)
+    job_list.reset_updated_logs()
+    job_list.load_wrappers()
+    while job_list.continue_run():
         try:
-            Log.debug("Preparing run")
-            # This function is called only once, when the experiment is started.
-            # It is used to initialise the experiment and to check the correctness of the configuration files.
-            # If there are issues while running, this function will be called again to reinitialise the experiment.
-            (
-                job_list,
-                submitter,
-                _exp_history,
-                _host,
-                as_conf,
-                platforms_to_test,
-                _,
-            ) = _prepare_run(expid, start_time, start_after, run_only_members)
-        except Exception as e:
-            raise AutosubmitCritical(
-                "Error in run initialization", 7014, str(e)
-            )  # Changing default to 7014
-
-        as_conf_config = as_conf.experiment_data.get("CONFIG", {})
-        git_operational_check_enabled = as_conf_config.get(
-            "GIT_OPERATIONAL_CHECK_ENABLED", True
-        )
-
-        if git_operational_check_enabled:
-            Log.debug("Checking for dirty local Git repository")
-            check_unpushed_changes(expid, as_conf)
-        else:
-            Log.warning("Git operational check disabled by user")
-
-        Log.debug("Running main running loop")
-        #########################
-        # AUTOSUBMIT - MAIN LOOP
-        #########################
-        # Main loop
-        # Recovery retries, when platforms have issues. The hard limit is set just in case an Autosubmit bug or
-        # wrong configuration. The minimum duration is the weekend (72 h).
-        # Run experiment steps:
-        # 0. Prepare the experiment to start running it.
-        # 1. Check if there are jobs in the workflow that have to run (get_active)
-        # For each platform:
-        #  2. Check the status of all jobs in the current workflow that are queuing or running. Also updates
-        #  all workflow jobs status by checking the status in the platform machines and job parent status.
-        #  3. Submit jobs that are on ready status.
-        # 4. When there are no more active jobs, wait until all log recovery threads finish and exit Autosubmit.
-        # In case of issues, the experiment is reinitialised and the process starts with the last
-        # non-corrupted workflow status.
-        # User can always stop the run, and unless force killed, Autosubmit will exit in a clean way.
-        # Experiment run will always start from the last known workflow status.
-
-        # 3650 = (72h - 122h)
-        max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get(
-            "RECOVERY_RETRIALS", 3650
-        )
-        recovery_retrials = 0
-        if profiler is not None:
-            loaded_jobs = len(job_list.get_job_list())
-            loaded_edges = 0
-            for job in job_list.get_job_list():
-                loaded_edges += len(job.children)
-        as_conf.set_platform_parameters(job_list, submitter.platforms)
-        # Save metadata.
-        as_conf.save()
-        job_changes_tracker = {}
-        _save_historical_edges(expid)
-        job_list.recover_logs(from_db=True)
-        job_list.reset_updated_logs()
-        job_list.load_wrappers()
-        while job_list.continue_run():
-            try:
-                if profiler is not None:
-                    Scheduler.exit = profiler.iteration_checkpoint(
-                        loaded_jobs, loaded_edges
-                    )
-
-                if stop_event and stop_event.is_set():
-                    Scheduler.exit = True
-
-                # TODO fix in another PR, this is a workaround to avoid having mismatching job_list and platform experiment_data
-                if as_conf.needs_reload():
-                    as_conf.reload()
-                    as_conf.set_platform_parameters(job_list, submitter.platforms)
-                    job_list.update_as_conf(as_conf)
-                    for p in platforms_to_test:
-                        p.update_as_conf(as_conf)
-
-                # Submit ready jobs
-                if len(job_list.get_ready()) > 0:
-                    submit_ready_jobs(as_conf, job_list, platforms_to_test)
-                    save_jobs = job_list.update_list(as_conf)
-                    if save_jobs:
-                        job_list.save_jobs()
-
-                # Check wrappers status and inner jobs
-                _, _wrapper_job_changes = check_wrappers(as_conf, job_list, expid)
-                # Check non-wrapped jobs
-                check_non_wrapped_jobs(platforms_to_test, job_list, as_conf, expid)
-                # Safe spot to store changes
-                try:
-                    # Track all jobs change for GUI
-                    job_changes_tracker = {}
-                    for job in [
-                        job
-                        for job in job_list.get_job_list()
-                        if job.prev_status is not None and job.prev_status != job.status
-                    ]:
-                        job_changes_tracker[job.name] = (
-                            Status.VALUE_TO_KEY[job.prev_status],
-                            Status.VALUE_TO_KEY[job.status],
-                        )
-                    _process_historical_data_iteration(
-                        job_list, job_changes_tracker, expid
-                    )
-                except Exception:
-                    Log.printlog(
-                        "Historic database seems corrupted, AS will repair it and resume the run",
-                        Log.INFO,
-                    )
-                    Log.warning(
-                        "Couldn't recover the Historical database, AS will continue without it, GUI may be affected"
-                    )
-                if Scheduler.exit:
-                    job_list.update_db_wrappers()
-                    job_list.save_jobs()
-                    as_conf.save()
-                    break
-                else:
-                    safetysleeptime = as_conf.get_safetysleeptime()
-                    time.sleep(safetysleeptime)
-
-            except (
-                AutosubmitError
-            ) as ae:  # If an error is detected, restore all connections and job_list
-                Log.error(f"Trace: {ae.trace}")
-                Log.error(f"{ae.message} [eCode={ae.code}]")
-                # No need to wait until the remote platform reconnection
-                recovery = False
-                as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
-                consecutive_retrials = 1
-                failed_names = {}
-                Log.info("Storing failed job count...")
-                try:
-                    for job in job_list.get_job_list():
-                        if job.fail_count > 0:
-                            failed_names[job.name] = job.fail_count
-                except Exception as e:
-                    Log.printlog(
-                        f"Error trying to store failed job count: {str(e)}",
-                        Log.WARNING,
-                    )
-                Log.result("Storing failed job count...done")
-                while not recovery and (
-                    recovery_retrials < max_recovery_retrials
-                    or max_recovery_retrials <= 0
-                ):
-                    delay = min(15 * consecutive_retrials, 120)
-                    recovery_retrials += 1
-                    sleep(delay)
-                    consecutive_retrials = consecutive_retrials + 1
-                    Log.info(f"Waiting {delay} seconds before continue")
-                    try:
-                        (
-                            job_list,
-                            submitter,
-                            _,
-                            _,
-                            as_conf,
-                            platforms_to_test,
-                            recovery,
-                        ) = _prepare_run(
-                            expid,
-                            start_time,
-                            start_after,
-                            run_only_members,
-                            recover=True,
-                            submitter=submitter,
-                        )
-                    except AutosubmitError as e:
-                        recovery = False
-                        Log.result(f"Recover of job_list has fail {e.message}")
-                    except OSError as e:
-                        recovery = False
-                        Log.result(f"Recover of job_list has fail {str(e)}")
-                    except Exception as e:
-                        recovery = False
-                        Log.result(f"Recover of job_list has fail {str(e)}")
-                # Restore platforms and try again to avoid endless loop with failed configuration.
-                # A hard limit is set.
-                reconnected = False
-                times = 0
-                max_times = 10
-                Log.info("Restoring the connection to all experiment platforms")
-                consecutive_retrials = 1
-                delay = min(15 * consecutive_retrials, 120)
-                while not reconnected and (
-                    recovery_retrials < max_recovery_retrials
-                    or max_recovery_retrials <= 0
-                ):
-                    recovery_retrials += 1
-                    Log.info("Recovering the remote platform connection")
-                    Log.info(f"Waiting {delay} seconds before continue")
-                    sleep(delay)
-                    consecutive_retrials = consecutive_retrials + 1
-                    try:
-                        if times % max_times == 0:
-                            mail_notify = True
-                            max_times = max_times + max_times
-                            times = 0
-                        else:
-                            mail_notify = False
-                        times = times + 1
-                        restore_platforms(
-                            platforms_to_test,
-                            mail_notify=mail_notify,
-                            as_conf=as_conf,
-                            expid=expid,
-                        )
-                        reconnected = True
-                    except AutosubmitCritical as e:
-                        # Message prompt by restore_platforms.
-                        Log.info(
-                            f"{e.message}\nCouldn't recover the platforms, retrying in 15seconds..."
-                        )
-                        reconnected = False
-                    except OSError:
-                        reconnected = False
-                    except Exception:
-                        reconnected = False
-                if (
-                    recovery_retrials == max_recovery_retrials
-                    and max_recovery_retrials > 0
-                ):
-                    raise AutosubmitCritical(
-                        f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials * 120} reached",
-                        7051,
-                        ae.message,
-                    )
-            except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
-                raise AutosubmitCritical(e.message, e.code, e.trace)
-
-        Log.result("No more jobs to run.")
-        # search hint - finished run
-        Log.info("Waiting for all logs to be updated")
-        for p in platforms_to_test:
-            p.clean_log_recovery_process()
-        _process_historical_data_iteration(job_list, job_changes_tracker, expid)
-
-        for p in platforms_to_test:
-            p.close_connection()
-        if len(job_list.get_failed_from_db()) > 0:
-            Log.info("Some jobs have failed and reached maximum retrials")
-        else:
-            Log.result("Run successful")
-            if profiler:
-                profiler.iteration_checkpoint(
-                    len(job_list.graph.nodes()), len(job_list.graph_dict)
+            if profiler is not None:
+                Scheduler.exit = profiler.iteration_checkpoint(
+                    loaded_jobs, loaded_edges
                 )
-            # Updating finish time for job data header
+            if stop_event and stop_event.is_set():
+                Scheduler.exit = True
+            # TODO fix in another PR, this is a workaround to avoid having mismatching job_list and platform experiment_data
+            if as_conf.needs_reload():
+                as_conf.reload()
+                as_conf.set_platform_parameters(job_list, submitter.platforms)
+                job_list.update_as_conf(as_conf)
+                for p in platforms_to_test:
+                    p.update_as_conf(as_conf)
+            # Submit ready jobs
+            if len(job_list.get_ready()) > 0:
+                submit_ready_jobs(as_conf, job_list, platforms_to_test)
+                save_jobs = job_list.update_list(as_conf)
+                if save_jobs:
+                    job_list.save_jobs()
+            # Check wrappers status and inner jobs
+            _, _wrapper_job_changes = check_wrappers(as_conf, job_list, expid)
+            # Check non-wrapped jobs
+            check_non_wrapped_jobs(platforms_to_test, job_list, as_conf, expid)
+            # Safe spot to store changes
             try:
-                _finish_current_experiment_run(expid)
+                # Track all jobs change for GUI
+                job_changes_tracker = {}
+                for job in [
+                    job
+                    for job in job_list.get_job_list()
+                    if job.prev_status is not None and job.prev_status != job.status
+                ]:
+                    job_changes_tracker[job.name] = (
+                        Status.VALUE_TO_KEY[job.prev_status],
+                        Status.VALUE_TO_KEY[job.status],
+                    )
+                _process_historical_data_iteration(
+                    job_list, job_changes_tracker, expid
+                )
+            except Exception:
+                Log.printlog(
+                    "Historic database seems corrupted, AS will repair it and resume the run",
+                    Log.INFO,
+                )
+                Log.warning(
+                    "Couldn't recover the Historical database, AS will continue without it, GUI may be affected"
+                )
+            if Scheduler.exit:
+                job_list.update_db_wrappers()
+                job_list.save_jobs()
+                as_conf.save()
+                break
+            else:
+                safetysleeptime = as_conf.get_safetysleeptime()
+                time.sleep(safetysleeptime)
+        except (
+            AutosubmitError
+        ) as ae:  # If an error is detected, restore all connections and job_list
+            Log.error(f"Trace: {ae.trace}")
+            Log.error(f"{ae.message} [eCode={ae.code}]")
+            # No need to wait until the remote platform reconnection
+            recovery = False
+            as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+            consecutive_retrials = 1
+            failed_names = {}
+            Log.info("Storing failed job count...")
+            try:
+                for job in job_list.get_job_list():
+                    if job.fail_count > 0:
+                        failed_names[job.name] = job.fail_count
             except Exception as e:
-                Log.warning(f"Database is locked: {str(e)}")
-        rocrate_data = as_conf.experiment_data.get("ROCRATE", None)
-        if rocrate_data:
-            provenance(expid, create_rocrate=True)
-        else:
-            Log.info(
-                "ROCRATE not present in experiment YAML configuration. No RO-Crate archive created."
+                Log.printlog(
+                    f"Error trying to store failed job count: {str(e)}",
+                    Log.WARNING,
+                )
+            Log.result("Storing failed job count...done")
+            while not recovery and (
+                recovery_retrials < max_recovery_retrials
+                or max_recovery_retrials <= 0
+            ):
+                delay = min(15 * consecutive_retrials, 120)
+                recovery_retrials += 1
+                sleep(delay)
+                consecutive_retrials = consecutive_retrials + 1
+                Log.info(f"Waiting {delay} seconds before continue")
+                try:
+                    (
+                        job_list,
+                        submitter,
+                        _,
+                        _,
+                        as_conf,
+                        platforms_to_test,
+                        recovery,
+                    ) = _prepare_run(
+                        expid,
+                        start_time,
+                        start_after,
+                        run_only_members,
+                        recover=True,
+                        submitter=submitter,
+                    )
+                except AutosubmitError as e:
+                    recovery = False
+                    Log.result(f"Recover of job_list has fail {e.message}")
+                except OSError as e:
+                    recovery = False
+                    Log.result(f"Recover of job_list has fail {str(e)}")
+                except Exception as e:
+                    recovery = False
+                    Log.result(f"Recover of job_list has fail {str(e)}")
+            # Restore platforms and try again to avoid endless loop with failed configuration.
+            # A hard limit is set.
+            reconnected = False
+            times = 0
+            max_times = 10
+            Log.info("Restoring the connection to all experiment platforms")
+            consecutive_retrials = 1
+            delay = min(15 * consecutive_retrials, 120)
+            while not reconnected and (
+                recovery_retrials < max_recovery_retrials
+                or max_recovery_retrials <= 0
+            ):
+                recovery_retrials += 1
+                Log.info("Recovering the remote platform connection")
+                Log.info(f"Waiting {delay} seconds before continue")
+                sleep(delay)
+                consecutive_retrials = consecutive_retrials + 1
+                try:
+                    if times % max_times == 0:
+                        mail_notify = True
+                        max_times = max_times + max_times
+                        times = 0
+                    else:
+                        mail_notify = False
+                    times = times + 1
+                    restore_platforms(
+                        platforms_to_test,
+                        mail_notify=mail_notify,
+                        as_conf=as_conf,
+                        expid=expid,
+                    )
+                    reconnected = True
+                except AutosubmitCritical as e:
+                    # Message prompt by restore_platforms.
+                    Log.info(
+                        f"{e.message}\nCouldn't recover the platforms, retrying in 15seconds..."
+                    )
+                    reconnected = False
+                except OSError:
+                    reconnected = False
+                except Exception:
+                    reconnected = False
+            if (
+                recovery_retrials == max_recovery_retrials
+                and max_recovery_retrials > 0
+            ):
+                raise AutosubmitCritical(
+                    f"Autosubmit Encounter too much errors during running time, limit of {max_recovery_retrials * 120} reached",
+                    7051,
+                    ae.message,
+                )
+        except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
+            raise AutosubmitCritical(e.message, e.code, e.trace)
+    Log.result("No more jobs to run.")
+    # search hint - finished run
+    Log.info("Waiting for all logs to be updated")
+    for p in platforms_to_test:
+        p.clean_log_recovery_process()
+    _process_historical_data_iteration(job_list, job_changes_tracker, expid)
+    for p in platforms_to_test:
+        p.close_connection()
+    if len(job_list.get_failed_from_db()) > 0:
+        Log.info("Some jobs have failed and reached maximum retrials")
+    else:
+        Log.result("Run successful")
+        if profiler:
+            profiler.iteration_checkpoint(
+                len(job_list.graph.nodes()), len(job_list.graph_dict)
             )
+        # Updating finish time for job data header
+        try:
+            _finish_current_experiment_run(expid)
+        except Exception as e:
+            Log.warning(f"Database is locked: {str(e)}")
+    rocrate_data = as_conf.experiment_data.get("ROCRATE", None)
+    if rocrate_data:
+        provenance(expid, create_rocrate=True)
+    else:
+        Log.info(
+            "ROCRATE not present in experiment YAML configuration. No RO-Crate archive created."
+        )
 
     # Suppress in case ``job_list`` was not defined yet...
     with suppress(NameError):

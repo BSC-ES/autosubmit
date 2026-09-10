@@ -116,6 +116,7 @@ def _validate(_: str, opts: RunOptions):
     group=CommandGroup.WORKFLOW,
     options_type=RunOptions,
     validators=[validate_expid, _validate],
+    lock=True,
 )
 def main(opts: RunOptions) -> int | bool | None:
     from autosubmit.workflow.manage import run

@@ -79,6 +79,7 @@ def args_parser() -> ArgumentParser:
     group=CommandGroup.EXPERIMENT,
     options_type=DeleteOptions,
     validators=validate_expid,
+    lock=True,
 )
 def main(opts: DeleteOptions) -> int | bool | None:
     from autosubmit.experiment.manage import delete_experiment
