@@ -60,7 +60,7 @@ def test_restore_platforms_connection_on_issues(
     get_next_expid, autosubmit_exp, mocker, message_fragment: str, expected_log, expected_cm: str, connected: bool,
 ) -> None:
     """When a platform yields a problematic message, an AutosubmitCritical is raised."""
-    exp = autosubmit_exp(get_next_expid(), experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     exp.platform = mocker.Mock()
     exp.platform.test_connection.return_value = message_fragment
     exp.platform.check_remote_permissions.return_value = connected
@@ -89,7 +89,7 @@ def test_restore_platforms_connection_no_issues(
     get_next_expid, autosubmit_exp, mocker, message_fragment: str, expected_log, connected: bool,
 ) -> None:
     """When a platform yields a problematic message, an AutosubmitCritical is raised."""
-    exp = autosubmit_exp(get_next_expid(), experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     exp.platform = mocker.Mock()
     exp.platform.name = "MN5"
     exp.platform.host = "test"
@@ -119,7 +119,7 @@ def test_restore_platforms_connection_exception_on_exception(
     get_next_expid, autosubmit_exp, mocker, exception, expected_log, expected_cm: str, connected: bool,
 ) -> None:
     """When a platform yields a problematic message, an AutosubmitCritical is raised."""
-    exp = autosubmit_exp(get_next_expid(), experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     exp.platform = mocker.Mock()
     exp.platform.test_connection.return_value = exception
     exp.platform.check_remote_permissions.return_value = connected
@@ -137,10 +137,9 @@ def test_restore_platforms_connection_exception_on_exception(
     assert expected_log in mock_log_printlog.call_args.args[0]
 
 
-def test_restore_platforms_raises(get_next_expid, autosubmit_exp, mocker) -> None:
+def test_restore_platforms_raises( autosubmit_exp, mocker) -> None:
     """When a platform yields a problematic message, an AutosubmitCritical is raised."""
-    #needs to be finished
-    exp = autosubmit_exp(get_next_expid(), experiment_data={})
+    exp = autosubmit_exp(experiment_data={})
     exp.platform = mocker.Mock()
     exp.platform.test_connection.return_value = Exception("Something went wrong.")
 
@@ -152,16 +151,14 @@ def test_restore_platforms_raises(get_next_expid, autosubmit_exp, mocker) -> Non
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
-def test_restore_platforms(get_next_expid, autosubmit_exp):
-    expid = get_next_expid()
+def test_restore_platforms( autosubmit_exp):
     exp = autosubmit_exp(
-        expid,
         experiment_data={
             "DEFAULT": {"CUSTOM_CONFIG": "test"},
             "MAIL": {
                 "NOTIFICATIONS": "True",
                 "TO": "uhu@uhu.com",
-                "ATTACHMENT": "True",
+                "FAILURE_MAIL_ATTACHMENT": "True",
             },
             "JOBS": {
                 "LOCAL_SEND_INITIAL": {
@@ -183,13 +180,13 @@ def test_restore_platforms(get_next_expid, autosubmit_exp):
         },
         include_jobs=True,
     )
-    assert exp.as_conf.experiment_data["MAIL"]["ATTACHMENT"]
+    assert exp.as_conf.experiment_data["MAIL"]["FAILURE_MAIL_ATTACHMENT"]
 
     with pytest.raises(AutosubmitCritical) as cm:
         restore_platforms(
             platforms_to_test=[exp.platform],
             mail_notify=True,
             as_conf=exp.as_conf,
-            expid=expid,
+            expid=exp.expid,
         )
     assert cm.value.args[0] == "Issues while checking the connectivity of platforms."

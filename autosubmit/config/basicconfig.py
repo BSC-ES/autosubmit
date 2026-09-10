@@ -58,7 +58,7 @@ class BasicConfig:
     CUSTOM_PLATFORMS_PATH = ''
     DEFAULT_JOBS_CONF = ''
     SMTP_SERVER = ''
-    ATTACHMENT = ''
+    FAILURE_MAIL_ATTACHMENT = ''
     MAIL_FROM = ''
     ALLOWED_HOSTS: str | dict = ''
     DENIED_HOSTS: str | dict = ''
@@ -133,7 +133,7 @@ class BasicConfig:
         if parser.has_option('mail', 'mail_from'):
             BasicConfig.MAIL_FROM = parser.get('mail', 'mail_from')
         if parser.has_option('mail', 'attachment'):
-            BasicConfig.MAIL_FROM = parser.get('mail', 'attachment')
+            BasicConfig.FAILURE_MAIL_ATTACHMENT = parser.get('mail', 'failure_mail_attachment')
         if parser.has_option('hosts', 'authorized'):
             list_command_allowed = parser.get('hosts', 'authorized').split('] ')
             i = 0
