@@ -283,6 +283,24 @@ def test_automatic_grouping_all(job_list, mocker):
     assert grouped["jobs"] == groups_dict["jobs"]
 
 
+def test_create_splits_groups_preserves_jobs(job_list):
+    job_list.add_job(_create_dummy_job(
+        'expid_19000101_m1_1_1_CMORATM',
+        Status.WAITING,
+        '19000101',
+        'm1',
+        1,
+        1))
+    jobs = job_list.get_job_list()
+    original_jobs = jobs.copy()
+    job_grouping = JobGrouping('automatic', jobs, job_list)
+
+    job_grouping._create_splits_groups()
+
+    assert job_grouping.jobs is jobs
+    assert job_grouping.jobs == original_jobs
+
+
 def test_automatic_grouping_not_ini(job_list, mocker):
     job_list.get_job_by_name('expid_19000101_m1_INI').status = Status.READY
     job_list.get_job_by_name('expid_19000101_m2_INI').status = Status.READY
