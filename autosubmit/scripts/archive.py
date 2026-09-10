@@ -70,6 +70,7 @@ def args_parser() -> ArgumentParser:
     group=CommandGroup.EXPERIMENT,
     options_type=ArchiveOptions,
     validators=validate_expid,
+    lock=True,
 )
 def main(opts: ArchiveOptions) -> int | bool | None:
     from autosubmit.experiment.manage import archive

@@ -213,6 +213,7 @@ def args_parser() -> ArgumentParser:
     group=CommandGroup.WORKFLOW,
     options_type=SetstatusOptions,
     validators=validate_expid,
+    lock=True,
 )
 def main(opts: SetstatusOptions) -> int | bool | None:
     from autosubmit.job.manage import set_status
