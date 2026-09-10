@@ -129,9 +129,9 @@ Autosubmit configuration
         # Default:0
         RETRIALS:0
         ##  Allows to put a delay between retries, of retries if a job fails. If not specified, it will be static
-        # DELAY_RETRY_TIME:11
-        # DELAY_RETRY_TIME:+11 # will wait 11,22,33,44...
-        # DELAY_RETRY_TIME:*11 # will wait 11,110,1110,11110...
+        # DELAY_RETRY_TIME:11 # static: always N seconds
+        # DELAY_RETRY_TIME:+11 # will wait 11,22,33,44... # linear: N * retry   
+        # DELAY_RETRY_TIME:*11 # will wait 11,110,1100,11000... # exponential: N * 10^(retry-1)
         # Default output type for CREATE, MONITOR, SET STATUS, RECOVERY. Available options: pdf, svg, png, ps, txt
         # Default:pdf
         OUTPUT:pdf
