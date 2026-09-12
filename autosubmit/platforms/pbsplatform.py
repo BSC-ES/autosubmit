@@ -293,11 +293,10 @@ class PBSPlatform(ParamikoPlatform):
         """Get the variable remote_log_dir that stores the directory of the Log of the experiment.
 
         :return: The remote_log_dir variable.
-        :rtype: str
         """
         return self.remote_log_dir
 
-    def parse_all_jobs_output(self, output: str, job_id: str) -> str:
+    def parse_all_jobs_output(self, output: str, job_id: str) -> list[str] | str:
         """Filter one or more status of a specific Job ID.
 
         :param output: Output of the status of the jobs.
@@ -305,7 +304,6 @@ class PBSPlatform(ParamikoPlatform):
         :param job_id: job ID.
         :type job_id: int
         :return: All status related to a Job.
-        :rtype: str
         """
         with suppress(Exception):
             output_lines = output.lower().split('\n')
@@ -318,24 +316,22 @@ class PBSPlatform(ParamikoPlatform):
                     return status.upper()
         return ''
 
-    def get_submitted_job_id(self, output_lines: str, x11: bool = False) -> list[int]:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[int]:
         """Iterate through jobs that didn't fail the submission and retrieve their ID.
 
-        :param output_lines: Output of the ssh command.
-        :type output_lines: str
+        :param output: Output of the ssh command.
         :param x11: Enable x11 forwarding, to enable graphical jobs.
-        :type x11: bool
+
         :return: List of job ids that got submitted and had an output.
-        :rtype: list[int]
         """
         try:
-            output_lines = output_lines.lower()
+            output_lines = output.lower()
             if output_lines.find("failed") != -1:
                 raise AutosubmitCritical(
                     "Submission failed. Command Failed", 7014)
             jobs_id = []
-            for output in output_lines.splitlines():
-                jobs_id.append(int(output.split('.')[0]))
+            for output_split in output_lines.splitlines():
+                jobs_id.append(int(output_split.split('.')[0]))
             return jobs_id
         except IndexError as exc:
             raise AutosubmitCritical("Submission failed. There are issues on your config file", 7014) from exc
@@ -344,10 +340,8 @@ class PBSPlatform(ParamikoPlatform):
         """Generate qstat command for all the jobs passed down.
 
         :param jobs_id: ID of one or more jobs.
-        :param jobs_id: str
 
         :return: qstat command to all jobs.
-        :rtype: str
         """
         jobs_id = jobs_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat {jobs_id} | awk" + " '{print $1, $3}' && " + f"qstat -H {jobs_id} | awk" + " '{print $1, $3}'"
@@ -356,9 +350,8 @@ class PBSPlatform(ParamikoPlatform):
         """Get an estimated queue time to the job selected.
 
         :param job_id: ID of a job.
-        :param job_id: str
+
         :return: Gets estimated queue time.
-        :rtype: str
         """
         job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat -f {job_id} | grep 'eligible_time = [0-9:0-9:0-9]*' && echo \"BREAK\" && " + f"qstat -H -f {job_id} | grep 'eligible_time = [0-9:0-9:0-9]*'"
@@ -369,11 +362,9 @@ class PBSPlatform(ParamikoPlatform):
         """Parse the queue reason from the output of the command.
 
         :param output: output of the command.
-        :type output: str
         :param job_id: job id
-        :type job_id: str
+
         :return: queue reason.
-        :rtype: str
         """
         reason = [x.split(',')[1] for x in output.splitlines()
                   if x.split(',')[0] == str(job_id)]
@@ -388,9 +379,8 @@ class PBSPlatform(ParamikoPlatform):
         """Generate the header of the wrapper configuring it to execute the Experiment.
 
         :param kwargs: Key arguments associated to the Job/Experiment to configure the wrapper.
-        :type kwargs: Any
+
         :return: a sequence of PBS commands.
-        :rtype: str
         """
         return self._header.wrapper_header(**kwargs)
 
