@@ -218,9 +218,9 @@ class ExperimentStatus:
         """
         self.manager.set_exp_status(self.expid, Models.RunningStatus.ARCHIVED)
 
-    def update_heartbeat(self) -> None:
+    def update_heartbeat(self) -> int:
         """Refresh the heartbeat timestamp for the experiment in as_times.db."""
-        self.manager.update_heartbeat(self.expid)
+        return self.manager.update_heartbeat(self.expid)
 
     def heartbeat_monitor(
         self, interval_seconds: int = 120

@@ -79,13 +79,14 @@ class DatabaseManager(metaclass=ABCMeta):
             conn.close()
 
     def execute_statement_with_arguments_on_dbfile(self, path, statement, arguments):
-        # type : (str, str, Tuple) -> None
+        # type : (str, str, Tuple) -> int
         """ Executes a statement with arguments on a database file specified by path. """
         conn = self.get_connection(path)
         try:
             cursor = conn.cursor()
             cursor.execute(statement, arguments)
             conn.commit()
+            return cursor.rowcount
         except Exception:
             conn.rollback()
             raise

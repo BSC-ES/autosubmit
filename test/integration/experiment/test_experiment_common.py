@@ -57,7 +57,7 @@ def test_delete_experiment_that_is_running(autosubmit_exp, mocker):
 def test_delete_experiment_removes_directory_metadata_update(
     autosubmit_exp, mocker, update_metadata
 ):
-    """Test that the experiment directory is removed after deletion and logs are displayed."""
+    """Test deletion ordering and retryable metadata failures."""
     exp = autosubmit_exp(experiment_data={})
     mocked_log = mocker.patch("autosubmit.experiment.manage.Log")
     # We can update the metadata successfully, so db_common.delete_experiment should be called without exceptions
@@ -72,16 +72,16 @@ def test_delete_experiment_removes_directory_metadata_update(
             side_effect=Exception("metadata update failed"),
         )
 
-    # Check that the experiment directory is correctly removed
+    # Metadata is updated before filesystem cleanup
     assert exp.exp_path.exists()
     result = delete_experiment(exp.expid, force=True)
-    assert not exp.exp_path.exists()
-    mocked_log.info.assert_any_call("Removing experiment directory...")
     mocked_log.info.assert_any_call("Updating experiment status in sqlite database...")
 
     # Check that metadata update is attempted in both cases
     if update_metadata:
         assert result
+        assert not exp.exp_path.exists()
+        mocked_log.info.assert_any_call("Removing experiment directory...")
         mocked_delete_metadata.assert_called_once_with(exp.expid)
         mocked_log.info.assert_any_call(f"Experiment {exp.expid} has been deleted")
         mocked_log.result.assert_any_call(
@@ -89,5 +89,6 @@ def test_delete_experiment_removes_directory_metadata_update(
         )
     else:
         assert not result
+        assert exp.exp_path.exists()
         mocked_delete_metadata.assert_called_once_with(exp.expid)
         mocked_log.error.assert_called()

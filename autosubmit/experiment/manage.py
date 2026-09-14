@@ -564,8 +564,16 @@ def _perform_deletion(
     :return: An error message if any errors occurred during deletion, otherwise an empty string.
     """
     error_message = []
-
     is_sqlite = BasicConfig.DATABASE_BACKEND == "sqlite"
+
+    Log.info(
+        f"Updating experiment status in {BasicConfig.DATABASE_BACKEND} database..."
+    )
+    try:
+        db_common.delete_experiment(expid_delete)
+        Log.result(f"Experiment {expid_delete} marked as deleted in database")
+    except Exception as e:
+        return f"Cannot update experiment metadata: {e}"
 
     Log.info("Removing experiment directory...")
     try:
@@ -586,17 +594,6 @@ def _perform_deletion(
         db_path.unlink(missing_ok=True)
         sql_path.unlink(missing_ok=True)
         Log.info(f"Experiment {expid_delete} job_data db deleted")
-
-    # Mark experiment status as deleted only after cleanup successful
-    if not error_message:
-        Log.info(
-            f"Updating experiment status in {BasicConfig.DATABASE_BACKEND} database..."
-        )
-        try:
-            db_common.delete_experiment(expid_delete)
-            Log.result(f"Experiment {expid_delete} marked as deleted in database")
-        except Exception as e:
-            error_message.append(f"Cannot update experiment metadata: {e}")
 
     return "\n".join(error_message)
 

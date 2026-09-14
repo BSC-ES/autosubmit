@@ -43,57 +43,38 @@ if TYPE_CHECKING:
     
 def _create_experiment_status_db_manager_and_rows(
     as_db: str,
-    tmp_path: Path,
     expids: list[str],
-    autosubmit_exp=None,
+    autosubmit_exp,
 ):
     """Create a status manager and the experiment rows for sqlite or postgres."""
+    for expid in expids:
+        autosubmit_exp(expid=expid, include_jobs=True)
+
     options = {"expid": expids[0]}
 
     if as_db == "sqlite":
-        db_dir = tmp_path / "db"
-        db_dir.mkdir()
-        local_root_dir = tmp_path / "local"
-        local_root_dir.mkdir()
-
-        autosubmit_db_path = db_dir / "test.db"
-        with sqlite3.connect(autosubmit_db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                CREATE TABLE experiment (
-                    id INTEGER PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    description TEXT NOT NULL,
-                    autosubmit_version TEXT
-                )
-                """
-            )
-            cursor.executemany(
-                "INSERT INTO experiment (id, name, description, autosubmit_version) VALUES (?, ?, ?, ?)",
-                [(index + 1, expid, "test", "4.1.10") for index, expid in enumerate(expids)],
-            )
-            conn.commit()
-
-        options["db_dir_path"] = str(db_dir)
-        options["local_root_dir_path"] = str(local_root_dir)
-        options["main_db_name"] = "test.db"
-    else:
-        if autosubmit_exp is None:
-            raise ValueError("autosubmit_exp is required when using postgres")
-
-        for expid in expids:
-            autosubmit_exp(expid=expid, include_jobs=True)
+        options["db_dir_path"] = BasicConfig.DB_DIR
+        options["local_root_dir_path"] = BasicConfig.LOCAL_ROOT_DIR
+        options["main_db_name"] = BasicConfig.DB_FILE
 
     database_manager = create_experiment_status_db_manager(as_db, **options)
+    _clear_experiment_status_rows(database_manager, as_db, expids)
 
+    experiment_rows = [database_manager.get_experiment_row_by_expid(expid) for expid in expids]
+    return database_manager, experiment_rows
+
+
+def _clear_experiment_status_rows(database_manager, as_db: str, expids: list[str]) -> None:
+    """Delete the experiment_status rows created."""
     if as_db == "postgres":
         with database_manager.engine.begin() as conn:
             for expid in expids:
                 conn.execute(text("DELETE FROM experiment_status WHERE name = :name"), {"name": expid})
-
-    experiment_rows = [database_manager.get_experiment_row_by_expid(expid) for expid in expids]
-    return database_manager, experiment_rows
+    else:
+        as_times_db_path = Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB
+        with sqlite3.connect(as_times_db_path) as conn:
+            for expid in expids:
+                conn.execute("DELETE FROM experiment_status WHERE name = ?", (expid,))
 
 
 @pytest.mark.docker
@@ -158,11 +139,10 @@ def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, use_sql
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_experiment_status_name_is_unique(tmp_path: "LocalPath", as_db: str, autosubmit_exp, get_next_expid):
-    """Test that experiment_status.name is enforced as unique."""
+def test_create_exp_status_duplicate_exp_id_raises(as_db: str, autosubmit_exp, get_next_expid):
+    """Test that inserting a duplicate experiment_status row for the same exp_id raises."""
     database_manager, experiments = _create_experiment_status_db_manager_and_rows(
         as_db=as_db,
-        tmp_path=tmp_path,
         expids=["a000"],
         autosubmit_exp=autosubmit_exp,
     )
@@ -221,7 +201,7 @@ def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
                 """)
             conn.commit()
 
-        # Initialize the manager
+        # Initialise the manager
         database_manager = ExperimentStatusDbManager(
             expid="a000",
             db_dir_path=str(db_dir),
@@ -264,13 +244,85 @@ def test_experiment_status_db_manager_adds_last_heartbeat_column_if_missing(
         assert isinstance(database_manager, SqlAlchemyExperimentStatusDbManager)
 
 
+def test_set_exp_status_on_legacy_table_without_primary_key(tmp_path: Path):
+    """``experiment_status`` is keyed by ``name``, not by ``exp_id``.
+
+    Legacy ``as_times.db`` files have no primary key or unique index on ``exp_id``
+    (and may contain duplicate rows or stale ids), so ``set_exp_status`` must update
+    the existing rows instead of inserting a duplicate.
+    """
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    as_times_db_path = db_dir / BasicConfig.AS_TIMES_DB
+
+    with sqlite3.connect(as_times_db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE experiment (
+                id INTEGER NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                autosubmit_version TEXT
+            );
+            -- Legacy schema: no PRIMARY KEY nor unique index.
+            CREATE TABLE experiment_status (
+                exp_id integer NOT NULL,
+                name text NOT NULL,
+                status text NOT NULL,
+                seconds_diff integer NOT NULL,
+                modified text NOT NULL
+            );
+            INSERT INTO experiment (id, name, description, autosubmit_version)
+                VALUES (42, 'a000', 'test', '4.1.10');
+            INSERT INTO experiment (id, name, description, autosubmit_version)
+                VALUES (43, 'a001', 'test', '4.1.10');
+            INSERT INTO experiment_status (exp_id, name, status, seconds_diff, modified)
+                VALUES (1, 'a000', 'NOT RUNNING', 0, '2020-01-01T00:00:00+0000');
+            INSERT INTO experiment_status (exp_id, name, status, seconds_diff, modified)
+                VALUES (2, 'a000', 'RUNNING', 0, '2020-01-02T00:00:00+0000');
+            """
+        )
+
+    # ``main_db_name`` points to the same file so the ``experiment`` lookup works.
+    database_manager = ExperimentStatusDbManager(
+        expid="a000",
+        db_dir_path=str(db_dir),
+        main_db_name=BasicConfig.AS_TIMES_DB,
+        local_root_dir_path=str(tmp_path),
+    )
+
+    # An existing (duplicated, stale id) row must be updated, not duplicated.
+    database_manager.set_exp_status("a000", "ARCHIVED")
+
+    with sqlite3.connect(as_times_db_path) as conn:
+        rows = conn.execute(
+            "SELECT exp_id, name, status FROM experiment_status WHERE name = 'a000'"
+        ).fetchall()
+
+    assert len(rows) == 1, "duplicate experiment_status rows were not collapsed"
+    assert rows[0] == (42, "a000", "ARCHIVED"), "the row was not updated in place"
+
+    # A missing row is still inserted (a plain INSERT cannot fail on this schema).
+    database_manager.set_exp_status("a001", "RUNNING")
+
+    with sqlite3.connect(as_times_db_path) as conn:
+        rows = conn.execute(
+            "SELECT exp_id, name, status, last_heartbeat "
+            "FROM experiment_status WHERE name = 'a001'"
+        ).fetchall()
+
+    assert len(rows) == 1
+    exp_id, name, status, last_heartbeat = rows[0]
+    assert (exp_id, name, status) == (43, "a001", "RUNNING")
+    assert last_heartbeat is not None
+
+
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", as_db: str, autosubmit_exp, mocker):
+def test_update_heartbeat_stores_last_heartbeat(as_db: str, autosubmit_exp, mocker):
     """Test that update_heartbeat() stores the last heartbeat timestamp in the database."""
     database_manager, experiments = _create_experiment_status_db_manager_and_rows(
         as_db=as_db,
-        tmp_path=tmp_path,
         expids=["a000"],
         autosubmit_exp=autosubmit_exp,
     )
@@ -282,7 +334,7 @@ def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", as_db: st
         "2026-05-08T10:00:02+00:00",
     ]
     mocker.patch(
-        "autosubmit.history.database_managers.experiment_status_db_manager.HUtils.get_current_datetime",
+        "autosubmit.history.database_managers.experiment_status_db_manager.HUtils.get_current_datetime_utc",
         side_effect=timestamps,
     )
 
@@ -314,12 +366,11 @@ def test_update_heartbeat_stores_last_heartbeat(tmp_path: "LocalPath", as_db: st
 )
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_concurrent_heartbeat_updates(tmp_path: "LocalPath", as_db: str, autosubmit_exp, mocker, exp_count, update_expids):
+def test_concurrent_heartbeat_updates(as_db: str, autosubmit_exp, mocker, exp_count, update_expids):
     """Test that concurrent heartbeat updates do not cause race conditions."""
     unique_expids = list(dict.fromkeys(update_expids))
     database_manager, experiments = _create_experiment_status_db_manager_and_rows(
         as_db=as_db,
-        tmp_path=tmp_path,
         expids=unique_expids,
         autosubmit_exp=autosubmit_exp,
     )
@@ -359,12 +410,11 @@ def test_concurrent_heartbeat_updates(tmp_path: "LocalPath", as_db: str, autosub
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_update_exp_status_updates_last_heartbeat_only_when_running(
-    tmp_path: "LocalPath", as_db: str, autosubmit_exp, mocker
+    as_db: str, autosubmit_exp, mocker
 ):
     """Test that RUNNING status creation and updates store a last_heartbeat value."""
     database_manager, experiments = _create_experiment_status_db_manager_and_rows(
         as_db=as_db,
-        tmp_path=tmp_path,
         expids=["a000"],
         autosubmit_exp=autosubmit_exp,
     )
@@ -375,9 +425,10 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(
         "2026-05-08T10:00:01+00:00",
         "2026-05-08T10:00:02+00:00",
         "2026-05-08T10:00:03+00:00",
+        "2026-05-08T10:00:04+00:00",
     ]
     mocker.patch(
-        "autosubmit.history.database_managers.experiment_status_db_manager.HUtils.get_current_datetime",
+        "autosubmit.history.database_managers.experiment_status_db_manager.HUtils.get_current_datetime_utc",
         side_effect=timestamps,
     )
 
@@ -401,35 +452,42 @@ def test_update_exp_status_updates_last_heartbeat_only_when_running(
     assert after_not_running.status == "NOT RUNNING"
     assert after_not_running.last_heartbeat == initial_heartbeat
 
+    heartbeat_update_count = database_manager.update_heartbeat("a000")
+    after_heartbeat = database_manager.get_experiment_status_row_by_exp_id(exp_id)
+    assert heartbeat_update_count == 0
+    assert after_heartbeat is not None
+    assert after_heartbeat.status == "NOT RUNNING"
+    assert after_heartbeat.last_heartbeat == initial_heartbeat
+
     # Update again with RUNNING status. Should update last_heartbeat
     database_manager.update_exp_status("a000", "RUNNING")
 
     after_running = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     assert after_running is not None
     assert after_running.status == "RUNNING"
-    assert after_running.last_heartbeat == timestamps[3]
+    assert after_running.last_heartbeat == timestamps[4]
 
 
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_set_exp_status_creates_running_with_heartbeat(
-    tmp_path: "LocalPath", as_db: str, autosubmit_exp, mocker
+    as_db: str, autosubmit_exp, mocker
 ):
     """Test that set_exp_status creates a new RUNNING status with heartbeat when status doesn't exist."""
     database_manager, _ = _create_experiment_status_db_manager_and_rows(
         as_db=as_db,
-        tmp_path=tmp_path,
         expids=["a000"],
         autosubmit_exp=autosubmit_exp,
     )
 
     # Make it deterministic, ensure ordering is stable across diff runs
     timestamps = [
-        "2026-05-08T10:00:00+00:00",  # create_exp_status (modified)
-        "2026-05-08T10:00:01+00:00",  # update_heartbeat (called by set_exp_status)
+        "2026-05-08T10:00:00+00:00", # update_exp_status (no row matched)
+        "2026-05-08T10:00:01+00:00", # create_exp_status (modified)
+        "2026-05-08T10:00:02+00:00", # update_heartbeat (called by set_exp_status)
     ]
     mocker.patch(
-        "autosubmit.history.database_managers.experiment_status_db_manager.HUtils.get_current_datetime",
+        "autosubmit.history.database_managers.experiment_status_db_manager.HUtils.get_current_datetime_utc",
         side_effect=timestamps,
     )
 
@@ -447,7 +505,7 @@ def test_set_exp_status_creates_running_with_heartbeat(
     final_status = database_manager.get_experiment_status_row_by_exp_id(exp_id)
     assert final_status is not None
     assert final_status.status == "RUNNING"
-    assert final_status.last_heartbeat == timestamps[1]
+    assert final_status.last_heartbeat == timestamps[2]
 
 
 @pytest.mark.docker
