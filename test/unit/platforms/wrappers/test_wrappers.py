@@ -1228,14 +1228,20 @@ class TestWrappers:
             returned_packages = self.job_packager._build_vertical_packages(
                 section_list, wrapper_limits, wrapper_info=self.wrapper_info)
 
-            package_m1_s2_s3 = [d1_m1_2_s3, d1_m1_3_s3, d1_m1_4_s2, d1_m1_4_s3]
+            # A vertical wrapper is a single dependent lineage, so independent
+            # ready roots are not merged: d1_m1_2_s3 and d1_m1_4_s2 seed their own
+            # packages, while d1_m1_4_s3 joins the 4_s2 lineage.
+            package_m1_2_s3 = [d1_m1_2_s3]
+            package_m1_s2_s3 = [d1_m1_4_s2, d1_m1_4_s3]
             package_m2_s2_s3 = [d1_m2_3_s2, d1_m2_3_s3, d1_m2_4_s2, d1_m2_4_s3]
 
             packages = [JobPackageVertical(
-                package_m1_s2_s3, configuration=self.as_conf, wrapper_info=self.wrapper_info),
+                package_m1_2_s3, configuration=self.as_conf, wrapper_info=self.wrapper_info),
+                JobPackageVertical(package_m1_s2_s3, configuration=self.as_conf, wrapper_info=self.wrapper_info),
                 JobPackageVertical(package_m2_s2_s3, configuration=self.as_conf, wrapper_info=self.wrapper_info)]
 
             # returned_packages = returned_packages[0]
+            assert len(returned_packages) == len(packages)
             for i in range(len(returned_packages)):
                 assert returned_packages[i]._jobs == packages[i]._jobs
 

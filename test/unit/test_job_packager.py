@@ -22,7 +22,7 @@ import pytest
 
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_packager import JobPackager
+from autosubmit.job.job_packager import JobPackager, JobPackagerVertical
 from autosubmit.job.job_packages import JobPackageVertical
 
 
@@ -152,3 +152,126 @@ def test_is_deadlock(packager, mocker, any_simple, queue_len, jobs_config, not_w
         not_wrappeable_package_info=not_wrappable,
         built_packages_tmp=built,
     ) is expected
+
+
+def _vertical_job(name, status, parents=(), wallclock="00:10", chunk=None):
+    """Build a Job for vertical packaging tests, wiring its static dependencies."""
+    job = Job(name, 0, status, 0)
+    job.section = "SIM"
+    job.wallclock = wallclock
+    job.chunk = chunk
+    for parent in parents:
+        job.add_parent(parent)
+    return job
+
+
+def _vertical_wrapper_limits():
+    return {"max": 9999, "max_v": 9999, "max_by_section": {"SIM": 9999}}
+
+
+def _build_vertical_chain(seed, candidates, mocker):
+    """Seed a vertical package over the given (date, member) candidates."""
+    dict_jobs = {"d1": {"m1": [seed] + candidates}}
+    wrapper_info = [mocker.MagicMock()]
+    packager = JobPackagerVertical(dict_jobs, seed, [seed], "00:00", 100, _vertical_wrapper_limits(), "",
+                                   wrapper_info)
+    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value={})
+    return packager.build_vertical_package(seed, wrapper_info)
+
+
+def _make_parallel_branches(n_branches, chain_len):
+    """Build ``n_branches`` independent (date, member) lineages of ``chain_len`` jobs."""
+    completed = _vertical_job("PREV_DONE", Status.COMPLETED)
+    branches = []
+    seeds = []
+    candidates = []
+    for branch in range(n_branches):
+        root = _vertical_job(f"SIM_{branch}_0", Status.READY, parents=[completed], chunk=branch + 1)
+        branches.append([root])
+        seeds.append(root)
+        candidates.append(root)
+        previous = root
+        for index in range(1, chain_len):
+            job = _vertical_job(f"SIM_{branch}_{index}", Status.WAITING, parents=[previous], chunk=branch + 1)
+            branches[-1].append(job)
+            candidates.append(job)
+            previous = job
+    return branches, seeds, candidates
+
+
+def test_vertical_chain_only_absorbs_dependent_descendants(mocker):
+    """A vertical wrapper must be a single dependent lineage: an independent
+    READY job whose parents are only COMPLETED never joins the chain."""
+    completed = _vertical_job("PREV_DONE", Status.COMPLETED)
+    seed = _vertical_job("SIM_1", Status.READY, parents=[completed])
+    child = _vertical_job("SIM_2", Status.WAITING, parents=[seed])
+    independent = _vertical_job("SIM_INDEP", Status.READY, parents=[completed])
+
+    result = _build_vertical_chain(seed, [child, independent], mocker)
+
+    assert result == [seed, child]
+    assert independent not in result
+    assert independent.packed_during_building is False
+
+
+def test_vertical_chain_wraps_serialized_lineage(mocker):
+    """A serialized chain of dependent jobs (static DB dependencies) is still
+    wrapped together in a single vertical package."""
+    completed = _vertical_job("PREV_DONE", Status.COMPLETED)
+    seed = _vertical_job("SIM_1", Status.READY, parents=[completed])
+    child2 = _vertical_job("SIM_2", Status.WAITING, parents=[seed])
+    child3 = _vertical_job("SIM_3", Status.WAITING, parents=[child2])
+    child4 = _vertical_job("SIM_4", Status.WAITING, parents=[child3])
+
+    result = _build_vertical_chain(seed, [child2, child3, child4], mocker)
+
+    assert result == [seed, child2, child3, child4]
+
+
+@pytest.mark.parametrize("candidate_chunk, candidate_parent, expected_in_chain", [
+    (2, "seed", True),        # different chunk, but a parent is in the chain: joins
+    (2, "completed", False),  # different chunk, parents only COMPLETED: excluded
+], ids=["cross-chunk-dependent", "cross-chunk-independent"])
+def test_vertical_chain_chunk_is_not_a_boundary(mocker, candidate_chunk, candidate_parent, expected_in_chain):
+    """Chunk is not an isolation boundary for vertical wrappers: cross-chunk
+    jobs join only when the static dependency links them to the chain."""
+    completed = _vertical_job("PREV_DONE", Status.COMPLETED)
+    seed = _vertical_job("SIM_1", Status.READY, parents=[completed], chunk=1)
+    parents = [seed] if candidate_parent == "seed" else [completed]
+    candidate = _vertical_job("SIM_X", Status.WAITING, parents=parents, chunk=candidate_chunk)
+
+    result = _build_vertical_chain(seed, [candidate], mocker)
+
+    assert result == ([seed, candidate] if expected_in_chain else [seed])
+
+
+@pytest.mark.parametrize("n_siblings", [2, 3])
+def test_vertical_chain_absorbs_sibling_descendants(mocker, n_siblings):
+    """Jobs that are descendants of the seed (even parallel siblings sharing an
+    in-chain parent) belong to the same lineage and join the wrapper."""
+    completed = _vertical_job("PREV_DONE", Status.COMPLETED)
+    seed = _vertical_job("SIM_1", Status.READY, parents=[completed])
+    siblings = [_vertical_job(f"SIM_SIBLING_{index}", Status.WAITING, parents=[seed]) for index in range(n_siblings)]
+
+    result = _build_vertical_chain(seed, siblings, mocker)
+
+    assert result == [seed, *siblings]
+
+
+@pytest.mark.parametrize("n_branches, chain_len", [(1, 1), (2, 3), (3, 4)])
+def test_build_vertical_packages_one_per_lineage(packager, mocker, n_branches, chain_len):
+    """``_build_vertical_packages`` produces one package per independent lineage,
+    never merging parallel branches that share a (date, member) bucket."""
+    branches, seeds, candidates = _make_parallel_branches(n_branches, chain_len)
+    packager.current_wrapper_section = "WRAPPER_A"
+    packager._jobs_list.get_ordered_jobs_by_date_member.return_value = {"d1": {"m1": candidates}}
+    packager._platform.max_wallclock = "48:00"
+    mocker.patch("autosubmit.job.job.Job.update_parameters", return_value={})
+    mocker.patch("autosubmit.job.job_packager.JobPackageVertical", side_effect=lambda jobs, **kwargs: list(jobs))
+
+    packages = packager._build_vertical_packages(
+        seeds, _vertical_wrapper_limits(), wrapper_info=[mocker.MagicMock()])
+
+    assert len(packages) == n_branches
+    for package, branch in zip(packages, branches):
+        assert package == branch
