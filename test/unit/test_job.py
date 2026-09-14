@@ -2582,7 +2582,8 @@ def test_check_completion(completed_names, default_status, expected, mocker):
     platform.get_completed_job_names.assert_called_once_with([job.name])
 
 
-def test_update_platform_associated_parameters(mocker):
+@pytest.mark.parametrize("exclusivity_key", ["CURRENT_EXCLUSIVE", "CURRENT_EXCLUSIVITY"])
+def test_update_platform_associated_parameters(mocker, exclusivity_key):
     job = Job("A", 1, Status.WAITING, 0)
     as_conf = mocker.MagicMock(spec=AutosubmitConfig)
     as_conf.get_project_type.return_value = "none"
@@ -2596,7 +2597,7 @@ def test_update_platform_associated_parameters(mocker):
         "CURRENT_SHAPE": "rect",
         "CURRENT_PROCESSORS_PER_NODE": "2",
         "CURRENT_NODES": "1",
-        "CURRENT_EXCLUSIVE": True,
+        exclusivity_key: True,
         "CURRENT_THREADS": "8",
         "CURRENT_TASKS": "16",
         "CURRENT_RESERVATION": "resv",

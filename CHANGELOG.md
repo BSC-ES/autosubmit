@@ -8,6 +8,7 @@ several bug fixes and enhancements to improve the overall user experience.
 
 **Bug fixes:**
 
+- Preserve platform exclusivity when refreshing job parameters #3234
 - Remove the unrelated `--filter_status` option from `autosubmit expid` #3241
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
