@@ -28,10 +28,10 @@ if TYPE_CHECKING:
 
 class JobGrouping:
 
-    def __init__(self, group_by: str, jobs: list["Job"], job_list: "JobList", expand_list: list | None = None,
-                 expanded_status: list | None = None):
+    def __init__(self, group_by: str, jobs: list["Job"], job_list: "JobList", expand_list: str | None = None,
+                 expanded_status: list[int] | None = None):
         if not expand_list:
-            expand_list = []
+            expand_list = ""
         if not expanded_status:
             expanded_status = []
 
@@ -42,17 +42,17 @@ class JobGrouping:
         self.expand_list = expand_list
         self.expand_status = expanded_status
         self.automatic = False
-        self.group_status_dict = {}
-        self.ungrouped_jobs = []
+        self.group_status_dict: dict[str, Any] = {}
+        self.ungrouped_jobs: list[str] = []
 
     def group_jobs(self) -> dict[str, Any]:
         if self.expand_list:
             self._set_expanded_jobs()
 
-        jobs_group_dict = {}
-        blacklist = []
+        jobs_group_dict: dict[str, list[str]] = {}
+        blacklist: list[str] = []
 
-        groups_map = {}
+        groups_map: dict[str, str] = {}
         if self.group_by == 'automatic':
             self.automatic = True
             jobs_group_dict = self._automatic_grouping(groups_map)
@@ -63,7 +63,7 @@ class JobGrouping:
                 status = self._set_group_status(statuses)
                 self.group_status_dict[group] = status
 
-        final_jobs_group = {}
+        final_jobs_group: dict[str, list[str]] = {}
         for job, groups in jobs_group_dict.items():
             for group in groups:
                 if group not in blacklist:
@@ -178,7 +178,7 @@ class JobGrouping:
         for i in reversed(range(len(self.jobs))):
             job = self.jobs[i]
 
-            groups = []
+            groups: list[str] = []
             if not self._check_synchronized_job(job, groups):
                 if self.group_by == 'split':
                     if job.split is not None and job.split > 0:
@@ -249,10 +249,8 @@ class JobGrouping:
         :return: Mapping of job names to the list of resolved groups.
         """
         split_groups, split_groups_status = self._create_splits_groups()
-        # TODO: (See why) Apparently, the splits_groups depletes the self.jobs, so we need to restore it
-        self.jobs = self.job_list.job_list
-        blacklist = []
-        jobs_group_dict = {}
+        blacklist: list[str] = []
+        jobs_group_dict: dict[str, list[str]] = {}
         self.group_status_dict = {}
         self.group_by = 'chunk'
 
@@ -276,10 +274,14 @@ class JobGrouping:
         return jobs_group_dict
 
     def _create_splits_groups(self):
-        jobs_group_dict = {}
-
-        self.group_by = 'split'
-        self._create_groups(jobs_group_dict, [])
+        jobs_group_dict: dict[str, list[str]] = {}
+        jobs = self.jobs
+        self.jobs = jobs.copy()
+        try:
+            self.group_by = 'split'
+            self._create_groups(jobs_group_dict, [])
+        finally:
+            self.jobs = jobs
         return jobs_group_dict, self.group_status_dict
 
     def _fix_splits_automatic_grouping(self, split_groups, split_groups_status, jobs_group_dict):
