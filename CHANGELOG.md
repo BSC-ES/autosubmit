@@ -53,7 +53,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - stale-data recovery on set-status runs only for final targets (_FINAL_STATUSES) in job/manage.py instead of the autosubmit.py monolith. #3231
 - Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly (with edge-completion reconciliation), never loaded into the graph. #3231
 
-### 4.1.17: (#3181)
+### 4.1.17.1: Bug fixes and enhancements (#3181)
 
 **Bug fixes:**
 
