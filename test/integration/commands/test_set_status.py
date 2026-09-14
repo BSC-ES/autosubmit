@@ -39,6 +39,13 @@ def reset(as_exp_, target="WAITING"):
         as_exp_.expid, as_exp_.as_conf, new=False, full_load=True,
         check_failed_jobs=True)
 
+    if target.upper() == "RUNNING":
+        # Active statuses cannot be set via set_status, so emulate the online state directly.
+        for job in job_list_.get_job_list():
+            job.status = Status.RUNNING
+        job_list_.save_jobs(reset_log_counters=True)
+        return job_list_
+
     job_names = " ".join([job.name for job in job_list_.get_job_list()])
     do_setstatus(as_exp_, fl=job_names, target=target)
     return job_list_
@@ -667,3 +674,33 @@ def test_set_status_noplot_calls_generate_output(as_exp, mocker, noplot):
         mock_generate_output.assert_not_called()
     else:
         mock_generate_output.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "target, recovery_expected",
+    [
+        ("COMPLETED", True),
+        ("FAILED", True),
+        ("WAITING", False),
+        ("READY", False),
+    ],
+    ids=["completed", "failed", "waiting", "ready"],
+)
+def test_set_status_recovery_only_for_final_targets(
+    as_exp, mocker, target, recovery_expected
+):
+    """Stale-job data recovery must only run when the target status is a final status."""
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        as_exp.expid, BasicConfig.JOBDATA_DIR, f"job_data_{as_exp.expid}.db"
+    )
+    db_manager.initialize()
+
+    reset(as_exp, "WAITING")
+
+    mock_recover_last_data = mocker.patch(
+        "autosubmit.job.job_list.JobList.recover_last_data"
+    )
+
+    do_setstatus(as_exp, fl="Any", target=target)
+
+    assert mock_recover_last_data.called is recovery_expected

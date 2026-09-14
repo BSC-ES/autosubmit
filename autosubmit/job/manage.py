@@ -19,7 +19,6 @@
 
 import copy
 import time
-from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -37,14 +36,14 @@ from autosubmit.job.filters import (
 from autosubmit.job.job_common import Status, get_job_status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import load_job_list
+from autosubmit.job.job_utils import change_jobs_status
 from autosubmit.job.validation import validate_job_filters
-from autosubmit.log.log import Log
+from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.manage import restore_platforms
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
-    from autosubmit.platforms.paramiko_platform import ParamikoPlatform
 
 __all__ = ["change_status", "set_status"]
 
@@ -134,7 +133,6 @@ def set_status(
             Log.debug(f"Status of jobs to change: {filter_status}")
             Log.debug(f"Sections to change: {filter_section}")
 
-            wrongExpid = 0
             as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
             as_conf.check_conf_files(True)
 
@@ -186,6 +184,17 @@ def set_status(
             jobs_to_set_status = job_list.get_job_list()
             selected_job_names = {job.name for job in jobs_to_set_status}
             final_status = get_job_status(final)
+            if final_status is None:
+                raise AutosubmitCritical(
+                    f"Invalid status '{final}'. Expected one of {Status.VALUE_TO_KEY.keys()}",
+                    7011,
+                )
+            if final_status in Status.ACTIVE:
+                raise AutosubmitCritical(
+                    f"Cannot set jobs to the active status '{final}'. Active statuses "
+                    f"(SUBMITTED, QUEUING, RUNNING) cannot be set via set_status.",
+                    7011,
+                )
 
             Log.info("Filtering jobs...")
 
@@ -208,7 +217,7 @@ def set_status(
             # Time to change status
             Log.info(f"The selected number of jobs to change is: {len(final_list)}")
             performed_changes = change_status(
-                final, final_status, final_list, save, definitive_platforms, platforms
+                final, final_status, final_list, save, definitive_platforms
             )
 
             if performed_changes:
@@ -229,14 +238,10 @@ def set_status(
             Log.info(f"Updating JobList for experiment {expid}...")
             job_list.update_list(as_conf, False, True)
             start = time.time()
-            if save and wrongExpid == 0:
-                job_list.recover_last_data(final_list)
-                for job in final_list:
-                    job.fail_count = 0
-                    job.log_recovery_call_count = 0
-                    job.wrapper_type = None
-                    job.id = None
-                job_list.save_jobs(reset_log_counters=True)
+            if save:
+                if final_status in job_list._FINAL_STATUSES:
+                    job_list.recover_last_data(final_list)
+                job_list.save_jobs(reset_log_counters=final_status in Status.RE_RUNNABLE)
                 end = time.time()
                 Log.info(f"JobList saved in {end - start:.2f} seconds.")
                 exp_history = ExperimentHistory(expid)
@@ -295,36 +300,26 @@ def change_status(
     final_list: list["Job"],
     save: bool,
     definitive_platforms: list[str],
-    platforms: dict[str, "ParamikoPlatform"],
 ) -> dict[str, str]:
     """Apply a status change to all jobs in final_list and cancel active jobs on their platforms.
 
-    Iterates over ``final_list``, skipping jobs already at ``final_status``.
-    For jobs moving out of an active status, the platform connection is verified
-    and a batch cancel command is queued. All queued cancels are dispatched
-    once after the loop.
+    Iterates over ``final_list``, skipping jobs already at ``final_status``. For jobs whose
+    current status is ACTIVE, the platform connection is verified against ``definitive_platforms``
+    and the job is skipped if it cannot be reached. The actual cancellation (batched per
+    platform) and status application are delegated to :func:`change_jobs_status`.
 
     :param final: Human-readable name of the target status.
     :param final_status: Numeric status value to assign.
     :param final_list: Jobs selected for the status change.
     :param save: Whether changes should be persisted.
     :param definitive_platforms: Names of platforms with a confirmed connection.
-    :param platforms: Mapping of platform name to Platform instance.
     :return: Mapping of job name to ``"old_status -> new_status"`` strings.
     """
-    performed_changes: dict[str, str] = {}
-    batch_cancel_commands: dict[str, list[str]] = defaultdict(list)
-    _active_statuses = {Status.QUEUING, Status.RUNNING, Status.SUBMITTED}
-
+    job_status_pairs: list[tuple["Job", int]] = []
     for job in final_list:
         if job.status == final_status:
             continue
-
-        if (
-            save
-            and job.status in _active_statuses
-            and final_status not in _active_statuses
-        ):
+        if save and job.status in Status.ACTIVE:
             if job.platform.name not in definitive_platforms:
                 Log.error(
                     f"Cannot change status of job [{job.name}] because the connection to its "
@@ -336,24 +331,10 @@ def change_status(
                     f"Job [{job.name}] status will remain as {Status.VALUE_TO_KEY[job.status]}."
                 )
                 continue
-            batch_cancel_commands[job.platform.name].append(
-                f"{job.platform.cancel_cmd} {job.id}; "
-            )
+        job_status_pairs.append((job, final_status))
 
-        performed_changes[job.name] = f"{Status.VALUE_TO_KEY[job.status]} -> {final}"
-        job.status = final_status
-        Log.info(f"CHANGED: job: {job.name} status to: {final}")
-        Log.status(f"CHANGED: job: {job.name} status to: {final}")
-
-    if save and batch_cancel_commands:
-        for platform_name, cancel_cmds in batch_cancel_commands.items():
-            try:
-                platforms[platform_name].send_command(
-                    "".join(cancel_cmds), ignore_log=True
-                )
-            except Exception as e:
-                Log.error(
-                    f"Failed to send batch cancel command to platform {platform_name}: {e}"
-                )
-
+    performed_changes = change_jobs_status(job_status_pairs, cancel_active=save)
+    for job_name in performed_changes:
+        Log.info(f"CHANGED: job: {job_name} status to: {final}")
+        Log.status(f"CHANGED: job: {job_name} status to: {final}")
     return performed_changes
