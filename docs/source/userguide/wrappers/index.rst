@@ -373,6 +373,15 @@ in the wallclock time.
 
 Autosubmit supports wrapping together vertically jobs of different types.
 
+A vertical wrapper always wraps a **single dependent lineage** (1xN) and runs its
+inner jobs sequentially, one job per level: each added job only depends on jobs
+already inside the wrapper or already completed. In practice:
+
+- The lineage may span different dates, members, chunks and splits whenever the
+  workflow dependencies serialize them.
+- An independent branch (a job whose dependencies are all already completed
+  outside the wrapper) starts its own vertical wrapper.
+
 .. tab-set-code::
 
     .. code-block:: yaml
@@ -584,4 +593,3 @@ Considering the following configuration:
     :width: 100%
     :align: center
     :alt: crossdate-example
-
