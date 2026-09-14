@@ -880,6 +880,8 @@ class AutosubmitConfig:
             dynamic_variables = dynamic_variables_
             max_deep -= 1
 
+        if max_deep == 0:
+            Log.error(f"The Dynamic Variable recursion reach its limits of recursion to the variable: {dynamic_variables}")
         self.dynamic_variables = dynamic_variables
 
         self.clean_dynamic_variables(pattern)
@@ -2016,7 +2018,11 @@ class AutosubmitConfig:
         for key in starter_conf.keys():
             if key not in experiment_data:
                 experiment_data[key] = starter_conf[key]
-            elif isinstance(starter_conf[key], collections.abc.Mapping):
+                if isinstance(experiment_data[key], dict):
+                    experiment_data[key] = self.deep_add_missing_starter_conf(
+                        experiment_data[key], starter_conf[key]
+                    )
+            elif isinstance(starter_conf[key], dict):
                 experiment_data[key] = self.deep_add_missing_starter_conf(experiment_data[key], starter_conf[key])
             # This validation checks whether a `dynamic variable` references itself, which would create an infinite loop.
             # During validation, all variable names are prefixed with `current_` hence the [8:].

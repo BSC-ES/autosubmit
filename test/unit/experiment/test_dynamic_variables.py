@@ -91,3 +91,28 @@ def test_infinite_loop_dynamic_variable(
             general_data, as_conf.experiment_data
         )
     assert "causing infinite recursion during evaluation" in ac.value.message
+
+
+def test_infinite_loop_dynamic_variable_reload(
+    autosubmit_config, mocker
+):
+    as_conf = autosubmit_config(
+        "t000",
+        {},
+    )
+
+    mocked_log_error = mocker.patch('autosubmit.log.log.Log.error')
+
+    as_conf.unify_conf(current_data={}, new_data={
+            "JOBS":{
+                "A":{
+                    "SCRIPT": "OK %TEST.TE_ME%",
+                },
+            },
+            'TEST':{
+                'NAME': "AUTOSUBMIT",
+                'TE_ME': "Hi %TEST.TE_ME%",
+            },
+    })
+    assert mocked_log_error.called
+    assert "The Dynamic Variable recursion reach its limits of recursion to the variable: " in mocked_log_error.call_args_list[0][0][0]
