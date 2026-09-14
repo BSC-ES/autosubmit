@@ -180,7 +180,6 @@ def _build_vertical_chain(seed, candidates, mocker):
 
 
 def _make_parallel_branches(n_branches, chain_len):
-    """Build ``n_branches`` independent (date, member) lineages of ``chain_len`` jobs."""
     completed = _vertical_job("PREV_DONE", Status.COMPLETED)
     branches = []
     seeds = []
@@ -229,8 +228,8 @@ def test_vertical_chain_wraps_serialized_lineage(mocker):
 
 
 @pytest.mark.parametrize("candidate_chunk, candidate_parent, expected_in_chain", [
-    (2, "seed", True),        # different chunk, but a parent is in the chain: joins
-    (2, "completed", False),  # different chunk, parents only COMPLETED: excluded
+    (2, "seed", True),
+    (2, "completed", False),
 ], ids=["cross-chunk-dependent", "cross-chunk-independent"])
 def test_vertical_chain_chunk_is_not_a_boundary(mocker, candidate_chunk, candidate_parent, expected_in_chain):
     """Chunk is not an isolation boundary for vertical wrappers: cross-chunk

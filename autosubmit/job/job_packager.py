@@ -1031,9 +1031,7 @@ class JobPackagerVertical:
         self.wrapper_info = wrapper_info
         # Last date from the ordering
         date = list(dict_jobs.keys())[-1]
-        # Last member from the last date from the ordering
         member = list(dict_jobs[date].keys())[-1]
-        # If job to be wrapped has date and member, use those
         if ready_job.date is not None and len(str(ready_job.date)) > 0:
             date = ready_job.date
         if ready_job.member is not None and len(str(ready_job.member)) > 0:
