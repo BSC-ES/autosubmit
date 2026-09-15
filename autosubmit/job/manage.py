@@ -194,7 +194,7 @@ def set_status(
         # Time to change status
         Log.info(f"The selected number of jobs to change is: {len(final_list)}")
         performed_changes = change_status(
-            final, final_status, final_list, save, definitive_platforms, platforms
+            final, final_status, final_list, save, definitive_platforms
         )
         if performed_changes:
             if detail:
