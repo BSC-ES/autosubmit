@@ -29,6 +29,8 @@ from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING
 
+import paramiko
+
 import autosubmit.helpers.autosubmit_helper as AutosubmitHelper
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig

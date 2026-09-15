@@ -36,7 +36,7 @@ from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import load_job_list
 from autosubmit.job.job_utils import change_jobs_status
 from autosubmit.job.validation import validate_job_filters
-from autosubmit.log.log import AutosubmitCritical, Log
+from autosubmit.log.log import Log
 from autosubmit.platforms.manage import restore_platforms
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 
