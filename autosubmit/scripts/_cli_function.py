@@ -149,7 +149,7 @@ def cli_function(
             # TODO: Autosubmit._check_folders(expid, as_conf) (we already knows they are the owner!)
 
             # Run the command with a profiler if requested.
-            profiler: "Profiler | None" = None
+            profiler: Profiler | None = None
 
             try:
                 if opts.profile:

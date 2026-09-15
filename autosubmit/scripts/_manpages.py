@@ -129,7 +129,7 @@ def write_man_pages(
     count += 1
 
     command: str
-    module: "ModuleType"
+    module: ModuleType
     for command, _, module, _ in iter_commands(commands):
         parser = module.main.build_parser()
         parser.prog = f"autosubmit {command}"
