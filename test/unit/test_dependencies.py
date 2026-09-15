@@ -5,7 +5,7 @@ from networkx import DiGraph  # type: ignore
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status
+from autosubmit.job.job_common import Status, is_edge_satisfied
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import Dependency
@@ -875,7 +875,11 @@ def test_normalize_auto_keyword(as_conf, mocker):
                 (Status.RUNNING, "RUNNING", 0, False),
             ], 0, False,
         ),
-        ([(Status.COMPLETED, "RUNNING", 0, False)] * 3, 0, True),
+        ([(Status.COMPLETED, "RUNNING", 0, False)] * 3, 0, False),
+        ([(Status.COMPLETED, "RUNNING", 0, True)] * 3, 0, True),
+        ([(Status.SKIPPED, "RUNNING", 0, False)] * 3, 0, False),
+        ([(Status.RUNNING, "RUNNING", 0, True)] * 3, 0, True),
+        ([(Status.FAILED, "RUNNING", 0, True)] * 3, 0, True),
         (
             [
                 (Status.SUSPENDED, "RUNNING", 0, False),
@@ -918,12 +922,19 @@ def test_normalize_auto_keyword(as_conf, mocker):
         ([(Status.COMPLETED, "FAILED", 0, True)] * 3, 0, True),
         ([(Status.COMPLETED, "FAILED", 0, False)] * 3, 0, False),
 
+        ([(Status.QUEUING, "QUEUING", 0, False)] * 3, 0, True),
+        ([(Status.COMPLETED, "QUEUING", 0, False)] * 3, 0, False),
+        ([(Status.COMPLETED, "QUEUING", 0, True)] * 3, 0, True),
+        ([(Status.RUNNING, "QUEUING", 0, False)] * 3, 0, False),
+        ([(Status.SKIPPED, "COMPLETED", 0, False)] * 3, 0, True),
+        ([(Status.COMPLETED, "SKIPPED", 0, False)] * 3, 0, True),
+
         ([(Status.RUNNING, "RUNNING", 3, False)], 0, False),
         ([(Status.RUNNING, "RUNNING", 3, False)], 3, True),
         ([(Status.RUNNING, "RUNNING", 3, False)], 5, True),
         ([(Status.RUNNING, "RUNNING", 5, False)], 3, False),
 
-        ([(Status.COMPLETED, "FAILED", 1, False)], 3, True),
+        ([(Status.COMPLETED, "FAILED", 1, False)], 3, False),
     ],
     ids=[
         "all_running_with_edge",
@@ -931,7 +942,11 @@ def test_normalize_auto_keyword(as_conf, mocker):
         "completed_parent_without_edge_counted",
         "suspended_with_completed_sibling_blocks",
         "running_parent_without_edge_uncounted",
-        "all_completed_with_edge",
+        "completed_parent_blocks_strict_running",
+        "completed_parent_satisfies_weak_running",
+        "skipped_parent_blocks_strict_running",
+        "running_parent_satisfies_weak_running",
+        "failed_parent_satisfies_weak_running",
         "first_parent_suspended_blocks",
         "all_suspended_blocks",
         "completed_running_suspended_blocks",
@@ -944,11 +959,17 @@ def test_normalize_auto_keyword(as_conf, mocker):
         "mixed_failed_no_fail_ok_blocks_child",
         "completed_parent_fail_ok_meets_failed_edge",
         "completed_parent_no_fail_ok_blocked_by_failed_edge",
+        "queuing_parent_meets_queuing_edge",
+        "completed_parent_blocks_strict_queuing",
+        "completed_parent_satisfies_weak_queuing",
+        "running_parent_blocks_queuing",
+        "skipped_parent_meets_completed_edge",
+        "completed_parent_meets_skipped_edge",
         "running_from_step_not_reached",
         "running_from_step_exactly_reached",
         "running_from_step_exceeded",
         "running_from_step_partially_reached",
-        "completed_failed_edge_no_fail_ok_but_checkpoint_met",
+        "completed_failed_edge_blocks_even_with_checkpoint",
     ],
 )
 def test_check_special_status(
@@ -984,6 +1005,81 @@ def test_check_special_status(
 
     result = joblist.check_special_status()
     assert (child in result) is expected
+
+
+@pytest.mark.parametrize(
+    "parent_status,min_trigger_status,fail_ok,from_step,child_checkpoint_step,expected",
+    [
+        ("RUNNING", "RUNNING", False, 0, 0, True),
+        ("RUNNING", "RUNNING", False, 3, 3, True),
+        ("RUNNING", "RUNNING", False, 3, 0, False),
+        ("RUNNING", "RUNNING", True, 0, 0, True),
+        ("COMPLETED", "RUNNING", False, 0, 0, False),
+        ("COMPLETED", "RUNNING", True, 0, 0, True),
+        ("SKIPPED", "RUNNING", False, 0, 0, False),
+        ("SKIPPED", "RUNNING", True, 0, 0, True),
+        ("FAILED", "RUNNING", False, 0, 0, False),
+        ("FAILED", "RUNNING", True, 0, 0, True),
+        ("QUEUING", "RUNNING", False, 0, 0, False),
+        ("SUBMITTED", "RUNNING", False, 0, 0, False),
+        ("READY", "RUNNING", False, 0, 0, False),
+        ("QUEUING", "QUEUING", False, 0, 0, True),
+        ("COMPLETED", "QUEUING", False, 0, 0, False),
+        ("COMPLETED", "QUEUING", True, 0, 0, True),
+        ("RUNNING", "QUEUING", False, 0, 0, False),
+        ("QUEUING", "SUBMITTED", False, 0, 0, False),
+        ("READY", "SUBMITTED", False, 0, 0, False),
+        ("COMPLETED", "COMPLETED", False, 0, 0, True),
+        ("COMPLETED", "SKIPPED", False, 0, 0, True),
+        ("SKIPPED", "COMPLETED", False, 0, 0, True),
+        ("FAILED", "FAILED", False, 0, 0, True),
+        ("COMPLETED", "FAILED", False, 0, 0, False),
+        ("COMPLETED", "FAILED", True, 0, 0, True),
+        (Status.RUNNING, Status.RUNNING, False, 0, 0, True),
+        (Status.COMPLETED, Status.RUNNING, False, 0, 0, False),
+    ],
+    ids=[
+        "running_strict",
+        "running_strict_checkpoint_reached",
+        "running_strict_checkpoint_pending",
+        "running_weak",
+        "completed_blocks_strict_running",
+        "completed_satisfies_weak_running",
+        "skipped_blocks_strict_running",
+        "skipped_satisfies_weak_running",
+        "failed_blocks_strict_running",
+        "failed_satisfies_weak_running",
+        "queuing_blocks_running",
+        "submitted_blocks_running",
+        "ready_blocks_running",
+        "queuing_meets_queuing",
+        "completed_blocks_strict_queuing",
+        "completed_satisfies_weak_queuing",
+        "running_blocks_queuing",
+        "queuing_blocks_submitted",
+        "ready_blocks_submitted",
+        "completed_satisfies_completed",
+        "completed_satisfies_skipped",
+        "skipped_satisfies_completed",
+        "failed_satisfies_failed",
+        "completed_blocks_strict_failed",
+        "completed_satisfies_weak_failed",
+        "int_running_strict",
+        "int_completed_blocks_strict_running",
+    ],
+)
+def test_is_edge_satisfied(
+    parent_status: int | str,
+    min_trigger_status: int | str,
+    fail_ok: bool,
+    from_step: int,
+    child_checkpoint_step: int,
+    expected: bool,
+) -> None:
+    """is_edge_satisfied accepts both status codes and names and strict/weak RUNNING."""
+    assert is_edge_satisfied(
+        parent_status, min_trigger_status, fail_ok, from_step, child_checkpoint_step
+    ) is expected
 
 
 @pytest.mark.parametrize("steps_back,job_split,total_splits,expected_split", [

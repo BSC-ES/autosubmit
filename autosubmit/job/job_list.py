@@ -38,7 +38,7 @@ from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
-from autosubmit.job.job_common import Status, bcolors
+from autosubmit.job.job_common import Status, bcolors, is_edge_satisfied
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_utils import Dependency, change_jobs_status
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -3242,71 +3242,27 @@ class JobList:
             parents_edge_info: dict,
             parents_nodes: dict
     ) -> tuple[list[Job], list[Job]]:
-        """Count the number of completed and non-completed parent jobs for a given job.
+        """Split the parents of a job into completed and non-completed ones.
 
-        :param job: The job whose parent statuses are to be checked.
-        :type job: Job
-        :param parents_edge_info: Dictionary or list containing information about the edges from parent jobs.
-        :type parents_edge_info: dict
-        :param parents_nodes: Dictionary mapping parent job names to Job objects.
-        :type parents_nodes: dict
-        :return A tuple containing two lists: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
-        :rtype: Tuple[List[Job], List[Job]]
+        A parent counts as completed when :func:`is_edge_satisfied` accepts it for its edge.
+
+        :param job: The job whose parents are being checked.
+        :param parents_edge_info: Edge data (``min_trigger_status``, ``fail_ok``, ``from_step``) per parent name.
+        :param parents_nodes: Mapping of parent name to its ``Job`` instance.
+        :return: A ``(non_completed, completed)`` tuple of parent lists.
         """
-        non_completed = []
         completed = []
+        non_completed = []
         for parent_name, edge_info in parents_edge_info.items():
             parent = parents_nodes[parent_name]
-            p_status = parent.status
-            edge_status = Status.KEY_TO_VALUE.get(edge_info.get("min_trigger_status", "COMPLETED").upper(), Status.COMPLETED)
-            fail_ok = edge_info.get("fail_ok", False)
-            from_step = edge_info.get("from_step", 0)
-
-            # SUSPENDED
-            if p_status == Status.SUSPENDED:
-                non_completed.append(parent)
-            # COMPLETED or SKIPPED
-            elif p_status in [Status.COMPLETED, Status.SKIPPED]:
-                if edge_status in [Status.COMPLETED, Status.SKIPPED] or edge_status == Status.FAILED and fail_ok or (job.current_checkpoint_step >= from_step > 0):
-                    completed.append(parent)
-                elif Status.VALUE_TO_KEY.get(edge_status, '') in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW:
-                    # COMPLETED/SKIPPED parent has surpassed any intermediate success-workflow status trigger.
-                    completed.append(parent)
-                else:
-                    non_completed.append(parent)
-            # FAILED
-            elif p_status == Status.FAILED:
-                if edge_status == Status.FAILED:
-                    completed.append(parent)
-                elif edge_status in [Status.COMPLETED, Status.SKIPPED]:
-                    if fail_ok or (job.current_checkpoint_step >= from_step > 0):
-                        completed.append(parent)
-                    else:
-                        non_completed.append(parent)
-                else:
-                    non_completed.append(parent)
-            # RUNNING
-            elif p_status == Status.RUNNING:
-                if edge_status == Status.RUNNING:
-                    if job.current_checkpoint_step >= from_step > 0 or from_step == 0:
-                        completed.append(parent)
-                    else:
-                        non_completed.append(parent)
-                else:
-                    non_completed.append(parent)
-            # Other statuses
-            else:
-                if p_status == edge_status:
-                    completed.append(parent)
-                elif Status.VALUE_TO_KEY[p_status] in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW:
-                    idx_parent = Status.LOGICAL_ORDER.index(Status.VALUE_TO_KEY[p_status])
-                    idx_edge = Status.LOGICAL_ORDER.index(Status.VALUE_TO_KEY[edge_status])
-                    if idx_parent >= idx_edge:
-                        completed.append(parent)
-                    else:
-                        non_completed.append(parent)
-                else:
-                    non_completed.append(parent)
+            satisfied = is_edge_satisfied(
+                parent.status,
+                edge_info.get("min_trigger_status", "COMPLETED"),
+                edge_info.get("fail_ok", False),
+                edge_info.get("from_step", 0),
+                job.current_checkpoint_step,
+            )
+            (completed if satisfied else non_completed).append(parent)
 
         return non_completed, completed
 

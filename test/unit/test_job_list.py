@@ -23,9 +23,8 @@ import pytest
 from sqlalchemy import create_engine
 
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_manager_job_list import _edge_satisfied
 from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status
+from autosubmit.job.job_common import Status, is_edge_satisfied
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_packages import JobPackageThread
@@ -158,7 +157,7 @@ def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool,
                 if child.name in {j.name for j in view_original}:
                     continue
                 edge = job_list.graph.edges.get((job.name, child.name), {})
-                if _edge_satisfied(
+                if is_edge_satisfied(
                     parent_status=Status.VALUE_TO_KEY.get(job.status, ''),
                     min_trigger_status=edge.get("min_trigger_status", "COMPLETED"),
                     fail_ok=bool(edge.get("fail_ok", False)) if edge.get("fail_ok") is not None else False,
@@ -618,18 +617,32 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
 
 
 @pytest.mark.parametrize(
-    "parent_statuses,fail_ok,expected",
+    "parent_statuses,fail_ok,min_trigger_status,expected",
     [
-        ([], False, True),
-        ([Status.COMPLETED], False, True),
-        ([Status.COMPLETED, Status.COMPLETED], False, True),
-        ([Status.COMPLETED, Status.SKIPPED], False, True),
-        ([Status.FAILED], True, True),
-        ([Status.FAILED, Status.COMPLETED], True, True),
-        ([Status.FAILED], False, False),
-        ([Status.FAILED, Status.RUNNING], True, False),
-        ([Status.COMPLETED, Status.FAILED], True, True),
-        ([Status.COMPLETED, Status.FAILED], False, False),
+        ([], False, "COMPLETED", True),
+        ([Status.COMPLETED], False, "COMPLETED", True),
+        ([Status.COMPLETED, Status.COMPLETED], False, "COMPLETED", True),
+        ([Status.COMPLETED, Status.SKIPPED], False, "COMPLETED", True),
+        ([Status.FAILED], True, "COMPLETED", True),
+        ([Status.FAILED, Status.COMPLETED], True, "COMPLETED", True),
+        ([Status.FAILED], False, "COMPLETED", False),
+        ([Status.FAILED, Status.RUNNING], True, "COMPLETED", False),
+        ([Status.COMPLETED, Status.FAILED], True, "COMPLETED", True),
+        ([Status.COMPLETED, Status.FAILED], False, "COMPLETED", False),
+        ([Status.RUNNING], False, "RUNNING", True),
+        ([Status.RUNNING], True, "RUNNING", True),
+        ([Status.COMPLETED], False, "RUNNING", False),
+        ([Status.COMPLETED], True, "RUNNING", True),
+        ([Status.SKIPPED], False, "RUNNING", False),
+        ([Status.SKIPPED], True, "RUNNING", True),
+        ([Status.FAILED], False, "RUNNING", False),
+        ([Status.FAILED], True, "RUNNING", True),
+        ([Status.QUEUING], False, "RUNNING", False),
+        ([Status.READY], False, "RUNNING", False),
+        ([Status.QUEUING], False, "QUEUING", True),
+        ([Status.COMPLETED], False, "QUEUING", False),
+        ([Status.COMPLETED], True, "QUEUING", True),
+        ([Status.RUNNING], False, "QUEUING", False),
     ],
     ids=[
         "no_parents",
@@ -642,6 +655,20 @@ def test_save_wrappers_casts_id_to_int(fake_job_list, mocker) -> None:
         "all_failed_fail_ok",
         "mixed_fail_ok",
         "mixed_no_fail_ok_blocks",
+        "running_parent_strict",
+        "running_parent_weak",
+        "completed_parent_blocks_strict_running",
+        "completed_parent_satisfies_weak_running",
+        "skipped_parent_blocks_strict_running",
+        "skipped_parent_satisfies_weak_running",
+        "failed_parent_blocks_strict_running",
+        "failed_parent_satisfies_weak_running",
+        "queuing_parent_blocks_running",
+        "ready_parent_blocks_running",
+        "queuing_parent_strict",
+        "completed_parent_blocks_strict_queuing",
+        "completed_parent_satisfies_weak_queuing",
+        "running_parent_blocks_queuing",
     ]
 )
 def test_update_waiting_and_delayed_jobs(
@@ -649,9 +676,10 @@ def test_update_waiting_and_delayed_jobs(
     tmp_path,
     parent_statuses: Any,
     fail_ok: bool,
+    min_trigger_status: str,
     expected: bool,
 ) -> None:
-    """Test _update_waiting_and_delayed_jobs with different parent/fail_ok combinations."""
+    """Test _update_waiting_and_delayed_jobs with different parent/edge combinations."""
     job_list = JobList("a000", as_conf, YAMLParserFactory())
     job_list.graph = networkx.DiGraph()
     child = Job("child", 99, Status.WAITING, 0)
@@ -660,7 +688,9 @@ def test_update_waiting_and_delayed_jobs(
     for i, status in enumerate(parent_statuses):
         parent = Job(f"parent{i}", i, status, 0)
         job_list.add_job(parent)
-        job_list.graph.add_edge(parent.name, child.name, fail_ok=fail_ok)
+        job_list.graph.add_edge(
+            parent.name, child.name, fail_ok=fail_ok, min_trigger_status=min_trigger_status
+        )
 
     job_list.fill_parents_children()
     job_list._update_waiting_and_delayed_jobs()

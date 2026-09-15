@@ -306,7 +306,18 @@ See :ref:`job_status_reference` for a complete reference and meanings.
     * - ``SUSPENDED``
       - The task is suspended.
 
-The status are ordered, so if you select ``RUNNING`` status, the task will be run if the parent is in any of the following statuses: ``RUNNING``, ``QUEUING``, ``HELD``, ``SUBMITTED``, ``READY``, ``PREPARED``, ``DELAYED``, ``WAITING``.
+Each ``STATUS`` is exact: the job runs only while the parent is in that status. Because statuses
+such as ``READY``, ``SUBMITTED``, ``QUEUING`` or ``RUNNING`` are transient, the job can miss the
+window and stay ``WAITING``.
+
+Adding ``?`` to the status makes the dependency weak, so a parent that already finished
+(``COMPLETED``, ``SKIPPED`` or ``FAILED``) also satisfies it:
+
+* ``RUNNING?`` runs the job while the parent is running, or once it has finished.
+* ``FAILED?`` runs the job if the parent failed, or if it completed.
+
+``COMPLETED`` (the default) and ``SKIPPED`` are both successful endings, so a parent in either one
+satisfies the other.
 
 .. code-block:: yaml
 
@@ -320,15 +331,25 @@ The status are ordered, so if you select ``RUNNING`` status, the task will be ru
         DEPENDENCIES: ini sim-1
         RUNNING: chunk
 
-      POSTPROCESS:
-        FILE: postprocess.sh
+      MONITOR:
+        FILE: monitor.sh
         DEPENDENCIES:
           SIM:
             STATUS: 'RUNNING'
         RUNNING: chunk
 
+      POSTPROCESS:
+        FILE: postprocess.sh
+        DEPENDENCIES:
+          SIM:
+            STATUS: 'RUNNING?'
+        RUNNING: chunk
 
-The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. The possible value is an integer. Additionally, the target dependency, must call to `%AS_CHECKPOINT%` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.
+In the example above, ``MONITOR`` starts only while ``SIM`` is running, while ``POSTPROCESS`` also
+starts if ``SIM`` already completed or failed.
+
+
+The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. It is used together with ``STATUS: 'RUNNING'``. The possible value is an integer. Additionally, the target dependency, must call to `%AS_CHECKPOINT%` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.
 
 .. code-block:: yaml
 
