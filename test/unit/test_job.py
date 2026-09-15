@@ -685,6 +685,54 @@ def test_reset_logs(autosubmit_config):
     assert job.packed_during_building is False
 
 
+@pytest.mark.parametrize(
+    "new_status",
+    list(Status.RE_RUNNABLE),
+    ids=lambda s: Status.VALUE_TO_KEY[s].lower(),
+)
+def test_apply_status_resets_attempt_state_for_rerunnable(new_status):
+    """Test that a re-runnable status clears the per-attempt state of the job."""
+    job = Job("job1", "42", Status.COMPLETED, 0)
+    job.fail_count = 3
+    job.updated_log = 2
+    job.prev_status = None
+
+    job.apply_status(new_status)
+
+    assert job.status == new_status
+    assert job.prev_status == Status.COMPLETED
+    assert job.fail_count == 0
+    assert job.updated_log == 0
+    assert job.log_recovery_call_count == 0
+    assert job.wrapper_type is None
+    assert job.id is None
+
+
+@pytest.mark.parametrize(
+    "new_status",
+    [Status.COMPLETED, Status.FAILED, Status.SKIPPED, Status.QUEUING],
+    ids=lambda s: Status.VALUE_TO_KEY[s].lower(),
+)
+def test_apply_status_keeps_attempt_state_for_non_rerunnable(new_status):
+    """Test that a non re-runnable status preserves the per-attempt state of the job."""
+    job = Job("job1", "42", Status.WAITING, 0)
+    job.fail_count = 3
+    job.updated_log = 2
+    job.log_recovery_call_count = 5
+    job.wrapper_type = "vertical"
+    job.prev_status = None
+
+    job.apply_status(new_status)
+
+    assert job.status == new_status
+    assert job.prev_status == Status.WAITING
+    assert job.fail_count == 3
+    assert job.updated_log == 2
+    assert job.log_recovery_call_count == 5
+    assert job.wrapper_type == "vertical"
+    assert job.id == "42"
+
+
 def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker, autosubmit_config):
     job = Job("job1", "1", Status.READY, 0)
     # arrange
