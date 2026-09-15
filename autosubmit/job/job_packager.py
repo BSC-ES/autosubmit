@@ -289,23 +289,17 @@ class JobPackager:
                         break
 
             min_v, min_h, balanced = self.check_real_package_wrapper_limits(p)
-            # if the quantity is enough, make the wrapper (or below min but no more jobs can come)
-            if (len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and min_h >=
-                wrapper_limits["min_h"] and not failed_innerjobs) or \
-                (not failed_innerjobs and
-                 self._jobs_list.dbmanager.remaining_blocked_by_package(
-                    self._jobs_list.get_jobs_by_section_db(
-                        self.jobs_in_wrapper[self.current_wrapper_section],
-                        [job.name for job in p.jobs],
-                        True
-                    ) if not self._jobs_list.disable_save else
-                    {j.name for j in self._jobs_list.get_jobs_by_section(
-                        self.jobs_in_wrapper[self.current_wrapper_section],
-                        [job.name for job in p.jobs],
-                        True
-                    )},
-                    {job.name for job in p.jobs}
-                )):
+            enough_jobs = (len(p.jobs) >= wrapper_limits["real_min"] and min_v >= wrapper_limits["min_v"] and
+                           min_h >= wrapper_limits["min_h"] and not failed_innerjobs)
+            blocked_by_package = False
+            if not enough_jobs and not failed_innerjobs:
+                remaining_names = self._jobs_list.get_pending_job_names(
+                    self.jobs_in_wrapper[self.current_wrapper_section],
+                    [job.name for job in p.jobs],
+                )
+                blocked_by_package = self._jobs_list.remaining_blocked_by_package(
+                    remaining_names, {job.name for job in p.jobs})
+            if enough_jobs or blocked_by_package:
                 for job in p.jobs:
                     job.wrapper_type = p.wrapper_type
 
@@ -511,12 +505,15 @@ class JobPackager:
                 if self._jobs_list.dbmanager.count_non_completed_parents_not_in_memory(
                         {j.name for j in remaining}, loaded_names) > 0:
                     remaining = None
+            blocked_by_package = (
+                remaining is not None
+                and self._jobs_list.remaining_blocked_by_package(
+                    {j.name for j in remaining}, package_names)
+            )
             if (
                 remaining is not None
                 and all(j.status == Status.WAITING for j in remaining)
-                and self._jobs_list.dbmanager.remaining_blocked_by_package(
-                    {j.name for j in remaining}, package_names,
-                )
+                and blocked_by_package
                 and len(p.jobs) >= wrapper_limits.get("min", 1)
             ):
                 max_jobs_to_submit = self.submit_remaining_jobs(p, packages_to_submit, max_jobs_to_submit)

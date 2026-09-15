@@ -731,6 +731,65 @@ def test_run_uninterrupted_multiple_vertical_wrappers(
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh
+def test_run_vertical_wrapper_single_lineage_parallel_chunks(
+        autosubmit_exp: 'AutosubmitExperimentFixture',
+        slurm_server: 'Container',
+        prepare_scratch,
+        general_data: dict,
+) -> None:
+    """Vertical wrappers over independent chunk jobs form single-job lineages.
+
+    With single-lineage wrapping each chunk is its own lineage, so the packages
+    stay below ``MIN_WRAPPED``. The run must still submit them and complete (no
+    deadlock/hang), and the wrapper tables must record one wrapper per chunk.
+
+    :param autosubmit_exp: Fixture that creates and manages an Autosubmit experiment.
+    :param slurm_server: Docker container running the Slurm scheduler.
+    :param prepare_scratch: Fixture that sets up the scratch directory.
+    :param general_data: Common experiment configuration shared across tests.
+    """
+    jobs_data = dedent("""\
+    EXPERIMENT:
+        NUMCHUNKS: '3'
+    JOBS:
+        wjob:
+            SCRIPT: |
+                echo "Hello from independent chunk=%CHUNK%"
+                sleep 1
+            PLATFORM: TEST_SLURM
+            RUNNING: chunk
+            wallclock: 00:01
+    wrappers:
+        wrapper_w:
+            JOBS_IN_WRAPPER: wjob
+            TYPE: vertical
+            policy: flexible
+    """)
+    yaml = YAML(typ='rt')
+    as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
+    prepare_scratch(expid=as_exp.expid)
+    as_conf = as_exp.as_conf
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+    tmp_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR)
+    log_dir = tmp_path / f"LOG_{as_exp.expid}"
+    as_conf.set_last_as_command('run')
+
+    exit_code = run(expid=as_exp.expid)
+    _assert_exit_code("COMPLETED", exit_code)
+
+    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+    db_check_list = _check_db_fields(run_tmpdir, 3, as_exp.expid, "vertical")
+    files_check_list = _check_files_recovered(as_conf, log_dir, expected_files=3 * 2)
+    assert_run_results(db_check_list, files_check_list, run_tmpdir, as_exp.expid)
+
+    wrapper_db_check_list = _check_wrapper_db_fields(
+        run_tmpdir, as_exp.expid, preview=False, expected_wrappers=3, expected_inner_jobs=3)
+    _assert_wrapper_db_fields(wrapper_db_check_list)
+
+
+@pytest.mark.docker
+@pytest.mark.slurm
+@pytest.mark.ssh
 @pytest.mark.parametrize(
     "jobs_data,expected_db_entries,final_status,wrapper_type",
     _MULTIPLE_VERTICAL_WRAPPERS_PARAMS,
