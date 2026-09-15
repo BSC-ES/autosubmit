@@ -71,17 +71,20 @@ class HistoricalDbManager(DbManager):
         self._save_historical_edges(graph, run_id)
 
     def _save_historical_edges(self, graph: list[dict[str, Any]], run_id: int):
-        """Save edge jobs to the historical database with the associated run_id."""
+        """Save edge jobs to the historical database with the associated run_id.
+
+        :param graph: Edges to persist.
+        :param run_id: Identifier of the experiment run the edges belong to.
+        """
         table_name = "structure_data"
         edge_data = [
             {
                 "run_id": run_id,
                 "e_from": edge["e_from"],
                 "e_to": edge["e_to"],
-                "min_trigger_status": edge.get("min_trigger_status"),
-                "completion_status": edge.get("completion_status"),
+                "accepted_statuses": edge.get("accepted_statuses"),
+                "is_satisfied": edge.get("is_satisfied", False),
                 "from_step": edge.get("from_step"),
-                "fail_ok": edge.get("fail_ok"),
             }
             for edge in graph
         ]

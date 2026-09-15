@@ -32,7 +32,12 @@ import py3dotplus as pydotplus
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.utils import NaturalSort, check_experiment_ownership
 from autosubmit.job.job import Job, WrapperJob
-from autosubmit.job.job_common import Status
+from autosubmit.job.job_common import (
+    DEFAULT_START_CONDITION,
+    SUCCEEDED_ENDINGS,
+    Status,
+    parse_start_conditions,
+)
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.monitor.diagram import create_stats_report
 
@@ -239,7 +244,7 @@ def _check_final_status(
 
     :param job_edges_info: List of edge information dictionaries.
     :param child: The child job.
-    :return: Tuple of color, label, and ``fail_ok`` flag, or (``None``, ``None``, ``None``) if not found.
+    :return: Tuple of color, label, and ``dotted`` flag, or (``None``, ``None``, ``None``) if not found.
     """
     if not job_edges_info:
         return None, None, None
@@ -254,18 +259,28 @@ def _check_final_status(
     if not child_edge_info:
         return None, None, None
 
-    status_id = Status.KEY_TO_VALUE[child_edge_info["min_trigger_status"]]
-    if child_edge_info["min_trigger_status"] == "COMPLETED":
-        # Avoid "yellow" arrows for completed jobs (old normal behaviour)
-        edge_color = "black"
+    raw_status = child_edge_info.get("accepted_statuses", DEFAULT_START_CONDITION)
+    try:
+        statuses = parse_start_conditions(raw_status)
+    except ValueError as error:
+        raise AutosubmitCritical(
+            f"Invalid start condition '{raw_status}' in the edge to '{child.name}'.",
+            7014,
+        ) from error
+    non_success = [status for status in statuses if status not in SUCCEEDED_ENDINGS]
+    if non_success:
+        # The most severe accepted status decides the colour, regardless of the list order.
+        selected = max(non_success, key=Status.LOGICAL_ORDER.index)
+        edge_color = _color_status(Status.KEY_TO_VALUE[selected])
     else:
-        edge_color = _color_status(status_id)
+        # Avoid "yellow" arrows for successful conditions (old normal behaviour).
+        edge_color = "black"
     label = (
         str(child_edge_info["from_step"]) if child_edge_info["from_step"] > 0 else None
     )
-    fail_ok = child_edge_info.get("fail_ok", False)
+    dotted = len(statuses) > 1 and not set(statuses) <= SUCCEEDED_ENDINGS
 
-    return edge_color, label, fail_ok
+    return edge_color, label, dotted
 
 
 def _delete_files_but_two_newest(
@@ -497,10 +512,10 @@ class Monitor:
         if job.has_children() != 0:
             for child in sorted(job.children, key=lambda k: NaturalSort(k.name)):
                 node_child, skip = _check_node_exists(exp, child, groups, hide_groups)
-                color, label, fail_ok = _check_final_status(
+                color, label, dotted = _check_final_status(
                     self.edge_info.get(job.name, None), child
                 )
-                if fail_ok:
+                if dotted:
                     style = "dotted"
                 else:
                     style = "solid"

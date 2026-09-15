@@ -17,16 +17,24 @@
 
 import datetime
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
+from functools import lru_cache
+
+from autosubmit.log.log import AutosubmitCritical
 
 __all__ = [
+    "DEFAULT_START_CONDITION",
+    "START_CONDITION_ALIASES",
+    "SUCCEEDED_ENDINGS",
     "Status",
     "Type",
     "bcolors",
     "get_job_status",
     "increase_wallclock_by_chunk",
+    "is_edge_satisfied",
     "max_wallclock_seconds",
     "parse_output_number",
+    "parse_start_conditions",
     "separate_section_entries",
     "wallclock_to_seconds",
 ]
@@ -94,7 +102,6 @@ class Status:
                     'QUEUING': 3, 'RUNNING': 4, 'COMPLETED': 5, 'HELD': 6, 'PREPARED': 7, 'SKIPPED': 8, 'DELAYED': 9}
     LOGICAL_ORDER = ["SUSPENDED", "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED",
                      "FAILED", "UNKNOWN", "COMPLETED"]
-    LOGICAL_ORDER_SUCCESS_WORKFLOW = ["WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED", "COMPLETED"]
     # Statuses with a job running on the platform that must be cancelled before leaving them.
     ACTIVE = (SUBMITTED, QUEUING, RUNNING)
     # Statuses that will be scheduled again: per-attempt state must be reset when entering them.
@@ -102,6 +109,162 @@ class Status:
 
     def retval(self, value):
         return getattr(self, value)
+
+
+START_CONDITION_ALIASES: dict[str, tuple[str, ...]] = {
+    "SUCCEEDED": ("COMPLETED", "SKIPPED"),
+    "FINISHED": ("COMPLETED", "SKIPPED", "FAILED"),
+}
+"""Aliases users can combine with exact status names."""
+
+SUCCEEDED_ENDINGS = frozenset(START_CONDITION_ALIASES["SUCCEEDED"])
+"""Statuses that always count as a successful ending."""
+
+DEFAULT_START_CONDITION = ",".join(START_CONDITION_ALIASES["SUCCEEDED"])
+"""The default start condition accepts any successful ending."""
+
+_ALLOWED_START_CONDITIONS = frozenset(Status.KEY_TO_VALUE) - {"UNKNOWN", "SUSPENDED"}
+"""Statuses that can be used as a start condition. ``UNKNOWN`` and ``SUSPENDED`` never are."""
+
+
+def _status_name(status: int | str | None) -> str | None:
+    """Return the canonical ``Status`` name for an integer code or a status name.
+
+    :param status: A ``Status`` code, a status name, or ``None``.
+    :return: The canonical status name, or ``None`` when it is unknown.
+    """
+    if isinstance(status, bool):
+        return None
+    if isinstance(status, str):
+        name = status.upper()
+        return name if name in Status.KEY_TO_VALUE else None
+    if isinstance(status, int):
+        return Status.VALUE_TO_KEY.get(status)
+    return None
+
+
+def _start_condition_tokens(value: int | str | Sequence[str | int]) -> Iterable[str]:
+    """Yield the raw start condition tokens from a scalar or ordered sequence.
+
+    :param value: Status name, status code, comma separated string, or sequence of those.
+    :return: Raw tokens as strings, without normalizing case or expanding aliases.
+    :raise ValueError: If the value is a boolean, an unordered container or an invalid code.
+    """
+    if isinstance(value, bool):
+        raise ValueError(f"Invalid STATUS code '{value}'.")
+    if isinstance(value, (set, frozenset, dict)):
+        raise ValueError(
+            "Invalid STATUS value. Use a status name or an ordered list of status names."
+        )
+    if isinstance(value, int):
+        name = Status.VALUE_TO_KEY.get(value)
+        if name is None:
+            raise ValueError(f"Invalid STATUS code '{value}'.")
+        yield name
+        return
+    if isinstance(value, str):
+        for token in value.split(","):
+            token = token.strip()
+            if token:
+                yield token
+        return
+    for item in value:
+        yield from _start_condition_tokens(item)
+
+
+def _expand_start_conditions(tokens: Iterable[str]) -> list[str]:
+    """Expand aliases and deduplicate the given start condition tokens.
+
+    :param tokens: Raw status names, without normalizing case or expanding aliases.
+    :return: Canonical status names, or the default condition when no token is given.
+    :raise ValueError: If a token is not a valid start condition status.
+    """
+    names: list[str] = []
+    for token in tokens:
+        name = token.upper()
+        expanded = START_CONDITION_ALIASES.get(name, (name,))
+        for status_name in expanded:
+            if status_name not in _ALLOWED_START_CONDITIONS:
+                allowed = ", ".join(sorted(_ALLOWED_START_CONDITIONS | set(START_CONDITION_ALIASES)))
+                raise ValueError(
+                    f"Invalid STATUS '{name}'. Allowed values are: {allowed}."
+                )
+            if status_name not in names:
+                names.append(status_name)
+    return names or list(START_CONDITION_ALIASES["SUCCEEDED"])
+
+
+@lru_cache(maxsize=1024)
+def _parse_start_condition_string(value: str) -> tuple[str, ...]:
+    """Return the canonical status names for a comma separated start condition.
+
+    :param value: Comma separated status names or aliases.
+    :return: Canonical status names accepted by the condition.
+    :raise ValueError: If a token is not a valid start condition status.
+    """
+    tokens = [token.strip() for token in value.split(",") if token.strip()]
+    return tuple(_expand_start_conditions(tokens))
+
+
+def parse_start_conditions(
+    value: int | str | Sequence[str | int] | None,
+) -> list[str]:
+    """Return the canonical status names accepted by a start condition.
+
+    ``SUCCEEDED`` expands to ``COMPLETED, SKIPPED`` and ``FINISHED`` expands to
+    ``COMPLETED, SKIPPED, FAILED``. Names are case-insensitive, can come as a comma separated
+    string or an ordered sequence, and are deduplicated preserving their order. An empty value
+    returns the default condition, ``COMPLETED, SKIPPED``.
+
+    :param value: Status name, status code, comma separated string, sequence of those, or ``None``.
+    :return: Canonical status names accepted by the condition.
+    :raise ValueError: If a token is not a valid start condition status.
+    """
+    if value is None:
+        return list(START_CONDITION_ALIASES["SUCCEEDED"])
+    if isinstance(value, str):
+        return list(_parse_start_condition_string(value))
+    return _expand_start_conditions(_start_condition_tokens(value))
+
+
+def is_edge_satisfied(
+    parent_status: int | str,
+    accepted_statuses: int | str | Sequence[str | int] | None,
+    from_step: int = 0,
+    child_checkpoint_step: int = 0,
+) -> bool:
+    """Return whether a parent satisfies the start condition of a dependency edge.
+
+    ``STATUS`` is a set of exact statuses. When no condition is given, the edge waits for a
+    successful ending (``COMPLETED`` or ``SKIPPED``). ``COMPLETED``, ``SKIPPED`` and ``FAILED``
+    are distinct statuses. ``RUNNING`` is the only status that uses the ``FROM_STEP`` checkpoint.
+
+    :param parent_status: Current status of the parent job, as a ``Status`` code or its name.
+    :param accepted_statuses: Accepted statuses, as names, codes, a comma separated string or an
+        ordered sequence of those.
+    :param from_step: Internal step the parent must have reached, used with ``RUNNING``.
+    :param child_checkpoint_step: Checkpoint step recorded for the child job.
+    :return: ``True`` if the parent satisfies the edge, ``False`` otherwise.
+    :raise AutosubmitCritical: If the start condition is not valid.
+    """
+    parent = _status_name(parent_status)
+    if parent is None or parent in ("SUSPENDED", "UNKNOWN"):
+        return False
+    try:
+        accepted = set(parse_start_conditions(accepted_statuses))
+    except ValueError as error:
+        raise AutosubmitCritical(
+            f"Invalid start condition '{accepted_statuses}'. {error}",
+            7014,
+        ) from error
+    if parent not in accepted:
+        return False
+    if parent != "RUNNING":
+        return True
+    threshold = int(from_step or 0)
+    if threshold == 0:
+        return True
+    return int(child_checkpoint_step or 0) >= threshold
 
 
 class bcolors:

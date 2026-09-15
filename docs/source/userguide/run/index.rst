@@ -80,6 +80,8 @@ This is due to how Autosubmit saves internally the data, which can be incompatib
 The steps above represent the process to re-create (1) these internal data structures and to recover (2) the previous
 status of your experiment.
 
+To upgrade an experiment created with 4.1, see :ref:`upgrading_from_4_1`.
+
 Running an experiment created with version 4.0.0 or earlier
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

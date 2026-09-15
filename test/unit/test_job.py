@@ -1176,17 +1176,15 @@ def test_sub_job_manager(load_wrapper, tmp_path):
             "e_to": "a000_20000101_fc0_1_WRAPPED",
             "e_from": "a000_20000101_fc0_2_WRAPPED",
             "from_step": "0",
-            "min_trigger_status": "COMPLETED",
-            "completion_status": "WAITING",
-            "fail_ok": False
+            "accepted_statuses": "COMPLETED",
+            "is_satisfied": False
         },
         {
             "e_to": "a000_20000101_fc0_1_WRAPPED",
             "e_from": "a000_20000101_fc0_3_WRAPPED",
             "from_step": "0",
-            "min_trigger_status": "COMPLETED",
-            "completion_status": "WAITING",
-            "fail_ok": False
+            "accepted_statuses": "COMPLETED",
+            "is_satisfied": False
         },
     ]
 

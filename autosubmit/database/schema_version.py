@@ -63,8 +63,8 @@ from autosubmit.database.models.tables import schema_version_table
 # Schema versions for every target. Each target has an independent migration
 # sequence, even when several targets share a PostgreSQL schema.
 GENERAL_SCHEMA_VERSION = 1
-JOB_LIST_SCHEMA_VERSION = 1
-HISTORY_SCHEMA_VERSION = 21
+JOB_LIST_SCHEMA_VERSION = 2
+HISTORY_SCHEMA_VERSION = 22
 
 __all__ = [
     "GENERAL_SCHEMA_VERSION",

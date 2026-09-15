@@ -234,8 +234,8 @@ def get_workflow_folder() -> list[str]:
 
 
 @pytest.mark.parametrize("expid", get_workflow_folder())
-def x(prepare_workflow_runs: Any, expid: str, current_tmpdir: Path, mocker: Any,
-                                prepare_basic_config: Any) -> None:
+def test_workflow_dependencies(prepare_workflow_runs: Any, expid: str, current_tmpdir: Path, mocker: Any,
+                               prepare_basic_config: Any) -> None:
     """Compare current workflow dependencies with the reference ones.
 
     :param prepare_workflow_runs: Fixture to prepare workflow runs.

@@ -187,6 +187,47 @@ def test_select_job_names_by_sections(tmp_path):
         assert mgr.select_job_names_by_sections(["SEC1", "SEC2"]) == {"job1", "job2", "job3"}
 
 
+@pytest.mark.parametrize(
+    "accepted_statuses,expect_child",
+    [
+        ("RUNNING", False),
+        ("RUNNING,SUCCEEDED", True),
+        ("COMPLETED", True),
+        ("SKIPPED", False),
+    ],
+    ids=["strict_running", "relaxed_running", "strict_completed", "strict_skipped"],
+)
+def test_select_children_jobs_honours_start_conditions(
+    tmp_path, accepted_statuses, expect_child
+):
+    """select_children_jobs uses the exact start condition of the edge."""
+    with patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path)):
+        mgr = JobsDbManager(schema="test_schema_children")
+        mgr.create_table(JobsTable.name)
+        mgr.create_table(ExperimentStructureTable.name)
+        jobs_table = mgr.table_registry.get(JobsTable.name)
+        mgr.upsert_many(jobs_table.name, [
+            {"name": "parent", "status": "COMPLETED", "fail_count": 0},
+            {"name": "child", "status": "WAITING", "fail_count": 0},
+        ], ["name"])
+        structure = mgr.table_registry.get(ExperimentStructureTable.name)
+        mgr.insert_many(structure.name, [{
+            "e_from": "parent",
+            "e_to": "child",
+            "accepted_statuses": accepted_statuses,
+            "from_step": 0,
+            "is_satisfied": False,
+        }])
+
+        result = mgr.select_children_jobs([{"name": "parent", "status": "COMPLETED"}])
+        names = [
+            job["name"] if isinstance(job, dict) else dict(job)["name"]
+            for job in result
+        ]
+
+        assert ("child" in names) is expect_child
+
+
 def test_remaining_blocked_by_package(tmp_path):
     """remaining_blocked_by_package returns True only when all parents are within package/remaining/COMPLETED."""
     with patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path)):

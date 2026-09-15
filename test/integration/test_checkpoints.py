@@ -106,58 +106,57 @@ def init_jobs(setup_job_list: tuple[Any, Any, dict[str, Any]]) -> tuple[Job, Job
 # TODO: missing scenarios
 # 1) Cases when job_c.status remains in WAITING.
 # 2) Cases when job_a or job_b status doesn't match the edge_info target status.
-# 3) fail_ok edges and their handling.
-# 4) From step higher than 0. (update job.checkpoint)
+# 3) From step higher than 0. (update job.checkpoint)
 @pytest.mark.parametrize(
     'job_a_edge_info,job_b_edge_info',
     [
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "PARENT_STATUS": "COMPLETED"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "PARENT_STATUS": "RUNNING"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "PARENT_STATUS": "RUNNING"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "PARENT_STATUS": "COMPLETED"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "PARENT_STATUS": "RUNNING"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "PARENT_STATUS": "RUNNING"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "PARENT_STATUS": "COMPLETED"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "PARENT_STATUS": "COMPLETED"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "PARENT_STATUS": "COMPLETED"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "PARENT_STATUS": "WAITING"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "PARENT_STATUS": "WAITING"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "PARENT_STATUS": "COMPLETED"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "PARENT_STATUS": "WAITING"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "PARENT_STATUS": "RUNNING"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "PARENT_STATUS": "WAITING"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "PARENT_STATUS": "WAITING"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "PARENT_STATUS": "FAILED"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "PARENT_STATUS": "WAITING"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "COMPLETION_STATUS": "WAITING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.WAITING], "FROM_STEP": 0, "PARENT_STATUS": "WAITING"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "PARENT_STATUS": "FAILED"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "PARENT_STATUS": "FAILED"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "PARENT_STATUS": "RUNNING"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "COMPLETION_STATUS": "RUNNING"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.RUNNING], "FROM_STEP": 0, "PARENT_STATUS": "RUNNING"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "PARENT_STATUS": "FAILED"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "PARENT_STATUS": "FAILED"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "PARENT_STATUS": "COMPLETED"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "PARENT_STATUS": "COMPLETED"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "PARENT_STATUS": "FAILED"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "COMPLETION_STATUS": "COMPLETED"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "PARENT_STATUS": "FAILED"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.COMPLETED], "FROM_STEP": 0, "PARENT_STATUS": "COMPLETED"}),
 
-        ({"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"},
-         {"MIN_TRIGGER_STATUS": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "COMPLETION_STATUS": "FAILED"}),
+        ({"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "PARENT_STATUS": "FAILED"},
+         {"ACCEPTED_STATUSES": Status.VALUE_TO_KEY[Status.FAILED], "FROM_STEP": 0, "PARENT_STATUS": "FAILED"}),
     ],
     ids=[
         "1. JOB A COMPLETED, JOB B RUNNING",
@@ -197,33 +196,16 @@ def test_handle_special_checkpoint_jobs_matching_parent_status_with_target_and_n
     """
     job_list, job_a, job_b, job_c = init_jobs
 
-    def get_completed_status(status_key: str) -> str:
-        """
-        Determine the completed status for the edge based on the status key.
-
-        :param status_key: Status key from edge info.
-        :type status_key: str
-        :return: Completed status value.
-        :rtype: str
-        """
-        if status_key in (Status.VALUE_TO_KEY[Status.COMPLETED], Status.VALUE_TO_KEY[Status.WAITING]):
-            return status_key
-        return Status.VALUE_TO_KEY[Status.RUNNING]
-
     job_list.graph.edges[job_a.name, job_c.name].update(
-        min_trigger_status=job_a_edge_info["MIN_TRIGGER_STATUS"],
+        accepted_statuses=job_a_edge_info["ACCEPTED_STATUSES"],
         from_step=job_a_edge_info["FROM_STEP"],
-        fail_ok=False,
-        completion_status=get_completed_status(job_a_edge_info["COMPLETION_STATUS"])
     )
     job_list.graph.edges[job_b.name, job_c.name].update(
-        min_trigger_status=job_b_edge_info["MIN_TRIGGER_STATUS"],
+        accepted_statuses=job_b_edge_info["ACCEPTED_STATUSES"],
         from_step=job_b_edge_info["FROM_STEP"],
-        fail_ok=False,
-        completion_status=get_completed_status(job_b_edge_info["COMPLETION_STATUS"])
     )
 
-    job_a.status = Status.KEY_TO_VALUE[job_a_edge_info["COMPLETION_STATUS"]]
-    job_b.status = Status.KEY_TO_VALUE[job_b_edge_info["COMPLETION_STATUS"]]
+    job_a.status = Status.KEY_TO_VALUE[job_a_edge_info["PARENT_STATUS"]]
+    job_b.status = Status.KEY_TO_VALUE[job_b_edge_info["PARENT_STATUS"]]
     job_list._handle_special_checkpoint_jobs()
     assert job_c.status == Status.READY

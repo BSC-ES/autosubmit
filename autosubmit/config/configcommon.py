@@ -42,6 +42,7 @@ from autosubmit.config.runtime import RuntimeConfig
 from autosubmit.config.utils import as_bool, as_mapping
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.helpers.enums import ChunkUnit
+from autosubmit.job.job_common import parse_start_conditions
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.platform_type import PlatformType
@@ -532,9 +533,16 @@ class AutosubmitConfig:
             data_fixed["JOBS"][job_section]["NOTIFY_ON"] = [status.strip(" ").upper() for status in notify_on]
 
     def _normalize_jobs_section(self, data_fixed: dict, must_exists: bool) -> None:
+        """Normalize the ``JOBS`` section of the experiment data in place.
+
+        :param data_fixed: Experiment data whose ``JOBS`` section is normalized.
+        :param must_exists: Whether the jobs section must be created even when missing.
+        """
         for job, job_data in data_fixed.get("JOBS", {}).items():
             if "DEPENDENCIES" in job_data or must_exists:
-                data_fixed["JOBS"][job]["DEPENDENCIES"] = self._normalize_dependencies(job_data.get("DEPENDENCIES", {}))
+                data_fixed["JOBS"][job]["DEPENDENCIES"] = self._normalize_dependencies(
+                    job_data.get("DEPENDENCIES", {}), job
+                )
 
             if "CUSTOM_DIRECTIVES" in job_data:
                 custom_directives = job_data.get("CUSTOM_DIRECTIVES", "")
@@ -581,38 +589,155 @@ class AutosubmitConfig:
                 data_fixed["JOBS"][job]["WALLCLOCK"] = ":".join(wallclock.split(":")[:2])
 
     @staticmethod
-    def _normalize_dependencies(dependencies: str | dict) -> dict:
+    def _parse_start_condition_value(
+        status: str | list[str] | tuple[str, ...] | None,
+        job_name: str | None,
+    ) -> list[str]:
+        """Return the canonical status names configured for a dependency.
+
+        The value can be a status name, a comma or whitespace separated string, or a list of
+        those. Empty tokens are ignored.
+
+        :param status: Raw ``STATUS``/``ACCEPTED_STATUSES`` value.
+        :param job_name: Name of the job the dependency belongs to, used in messages.
+        :return: Canonical status names, or an empty list when the status is absent.
+        :raises AutosubmitCritical: If a status is not a valid start condition.
+        """
+        if status is None:
+            return []
+        values = status if isinstance(status, (list, tuple)) else [status]
+        tokens: list[str] = []
+        for value in values:
+            if not isinstance(value, str):
+                raise AutosubmitCritical(
+                    f"Invalid STATUS '{value}' in the dependencies of job '{job_name}'. "
+                    "Use a status name or a list of status names.",
+                    7014,
+                )
+            for token in value.replace(",", " ").split():
+                if token.endswith("?"):
+                    raise AutosubmitCritical(
+                        f"The '?' suffix in the dependencies of job '{job_name}' is no longer "
+                        "supported. Use an explicit STATUS list instead, for example "
+                        "STATUS: FINISHED when failures should be accepted.",
+                        7014,
+                    )
+                tokens.append(token)
+        if not tokens:
+            return []
+        try:
+            return parse_start_conditions(tokens)
+        except ValueError as error:
+            raise AutosubmitCritical(
+                f"{error} Check the dependencies of job '{job_name}'.",
+                7014,
+            ) from error
+
+    _START_CONDITION_KEYS = frozenset({
+        "STATUS",
+        "ACCEPTED_STATUSES",
+        "FROM_STEP",
+        "FAIL_OK",
+        "OPTIONAL",
+        "DATES_FROM",
+        "MEMBERS_FROM",
+        "CHUNKS_FROM",
+        "SPLITS_FROM",
+    })
+    """Dependency keys that are normalized to uppercase."""
+
+    @staticmethod
+    def _normalize_start_condition_block(block: dict, job_name: str | None) -> None:
+        """Normalize start conditions in a dependency block and its nested filters.
+
+        :param block: Dependency data, possibly with nested ``*_FROM`` filters.
+        :param job_name: Name of the job the dependency belongs to, used in messages.
+        :raises AutosubmitCritical: If a status is not a valid start condition or a legacy
+            ``FAIL_OK``/``OPTIONAL`` flag is enabled.
+        """
+        for key in list(block):
+            if isinstance(key, str) and key.upper() in AutosubmitConfig._START_CONDITION_KEYS:
+                block[key.upper()] = block.pop(key)
+        if "STATUS" in block:
+            if "ACCEPTED_STATUSES" in block:
+                raise AutosubmitCritical(
+                    f"Both STATUS and ACCEPTED_STATUSES are set in the dependencies of job "
+                    f"'{job_name}'. Use only STATUS.",
+                    7014,
+                )
+            block["ACCEPTED_STATUSES"] = block.pop("STATUS")
+        statuses = AutosubmitConfig._parse_start_condition_value(
+            block.pop("ACCEPTED_STATUSES", None), job_name
+        )
+        if statuses:
+            block["ACCEPTED_STATUSES"] = ",".join(statuses)
+        for key in ("FAIL_OK", "OPTIONAL"):
+            if key not in block:
+                continue
+            value = block.pop(key)
+            if isinstance(value, str):
+                enabled = (
+                    as_bool(
+                        value,
+                        default=True,
+                        name=f"{key} in the dependencies of job '{job_name}'",
+                    )
+                    if value
+                    else False
+                )
+            else:
+                enabled = bool(value)
+            if enabled:
+                raise AutosubmitCritical(
+                    f"{key} is no longer supported in the dependencies of job '{job_name}'. "
+                    "Use an explicit STATUS list instead, for example STATUS: FINISHED when "
+                    "failures should be accepted.",
+                    7014,
+                )
+        for value in block.values():
+            if isinstance(value, dict):
+                AutosubmitConfig._normalize_start_condition_block(value, job_name)
+
+    @staticmethod
+    def _normalize_dependencies(dependencies: str | dict, job_name: str | None = None) -> dict:
         """Normalize the dependencies to a consistent format.
 
         This function takes a string or dictionary of dependencies and normalizes them to a dictionary format.
         If the input is a string, it splits the string by spaces and converts each dependency to uppercase.
-        If the input is a dictionary, it converts each dependency key to uppercase and processes the status.
+        If the input is a dictionary, it uppercases the dependency keys and the keyword names and processes
+        the status.
 
-        Additionally, it checks for a ``?`` suffix in ``MIN_TRIGGER_STATUS``/``STATUS`` to set ``FAIL_OK``.
+        ``STATUS`` accepts one or more status names, as a comma or whitespace separated string, or
+        a list. The user-facing ``STATUS`` keyword is mapped to the internal ``ACCEPTED_STATUSES``
+        key and the configured statuses are stored as a canonical comma separated string.
 
         :param dependencies: The dependencies to normalize, either as a string or a dictionary.
-        :type dependencies: Union[str, dict]
+        :param job_name: Name of the job the dependencies belong to, used in error messages.
         :return: A dictionary with normalized dependencies.
-        :rtype: dict
+        :raises AutosubmitCritical: If a ``STATUS`` is not a valid start condition, if a
+            dependency name contains a ``?``, or if a legacy ``FAIL_OK``/``OPTIONAL`` flag is
+            enabled.
         """
-        aux_dependencies = {}
+        aux_dependencies: dict[str, Any] = {}
         if isinstance(dependencies, str):
-            for dependency in dependencies.upper().split(" "):
+            for dependency in dependencies.upper().split():
                 aux_dependencies[dependency] = {}
         elif isinstance(dependencies, dict):
             for dependency, dependency_data in dependencies.items():
+                if isinstance(dependency_data, dict):
+                    # Keyword names are case-insensitive.
+                    dependency_data = {keyword.upper(): value for keyword, value in dependency_data.items()}
+                    AutosubmitConfig._normalize_start_condition_block(dependency_data, job_name)
                 aux_dependencies[dependency.upper()] = dependency_data
-                if type(dependency_data) is dict:
-                    # Backwards compatibility
-                    user_set_status = dependency_data.pop("MIN_TRIGGER_STATUS", dependency_data.pop("STATUS", None))
-                    if user_set_status:
-                        dependency_data["MIN_TRIGGER_STATUS"] = user_set_status.upper()
-                        # Backwards compatibility
-                        fail_ok = dependency_data.get("FAIL_OK", dependency_data.get("OPTIONAL", False))
-                        dependency_data["FAIL_OK"] = fail_ok
-                        if dependency_data["MIN_TRIGGER_STATUS"][-1] == "?":
-                            dependency_data["MIN_TRIGGER_STATUS"] = dependency_data["MIN_TRIGGER_STATUS"][:-1]
-                            dependency_data["FAIL_OK"] = True
+
+        for dependency in aux_dependencies:
+            if "?" in dependency:
+                raise AutosubmitCritical(
+                    f"The '?' suffix in dependency '{dependency}' of job '{job_name}' is no longer "
+                    "supported. Use an explicit STATUS list instead, for example STATUS: FINISHED "
+                    "when failures should be accepted.",
+                    7014,
+                )
 
         return aux_dependencies
 
@@ -1436,8 +1561,6 @@ class AutosubmitConfig:
                             dependency = dependency.split('+')[0]
                         elif '*' in dependency:
                             dependency = dependency.split('*')[0]
-                        elif '?' in dependency:
-                            dependency = dependency.split('?')[0]
                         if '[' in dependency:
                             dependency = dependency[:dependency.find('[')]
                         if dependency.upper() not in parser["JOBS"].keys():

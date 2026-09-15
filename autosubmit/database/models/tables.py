@@ -194,10 +194,9 @@ ExperimentStructureTable = Table(
     metadata_obj,
     Column("e_from", String, nullable=False, primary_key=True, index=True),
     Column("e_to", String, nullable=False, primary_key=True, index=True),
-    Column("min_trigger_status", String),
-    Column("completion_status", String),
+    Column("accepted_statuses", String),
+    Column("is_satisfied", Boolean, nullable=False, default=False),
     Column("from_step", Integer),
-    Column("fail_ok", Boolean),
     UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
 )
 
@@ -211,10 +210,9 @@ StructureDataTable = Table(
     Column("run_id", Integer, ForeignKey("experiment_run.run_id"), nullable=False, primary_key=True, index=True),
     Column("e_from", String, nullable=False, primary_key=True, index=True),
     Column("e_to", String, nullable=False, primary_key=True, index=True),
-    Column("min_trigger_status", String),
-    Column("completion_status", String),
+    Column("accepted_statuses", String),
+    Column("is_satisfied", Boolean, nullable=False, default=False),
     Column("from_step", Integer),
-    Column("fail_ok", Boolean),
     UniqueConstraint("run_id", "e_from", "e_to", name="unique_structure_data_run_id_e_from_and_e_to"),
 )
 
