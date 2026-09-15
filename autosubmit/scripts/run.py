@@ -54,6 +54,8 @@ from autosubmit.scripts._validation import validate_expid
 class RunOptions(ExpidOptions):
     """Options for the run command."""
 
+    acquires_lock = True
+
     start_time: str
     start_after: str
     run_only_members: str

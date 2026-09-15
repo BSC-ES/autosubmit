@@ -44,6 +44,8 @@ class DeleteOptions(AutosubmitOptions):
     (OOP class hierarchy here is not too important as it is internal code.)
     """
 
+    acquires_lock = True
+    
     profile: bool
     """Whether to profile the command execution."""
     # These are not passed via the command line.

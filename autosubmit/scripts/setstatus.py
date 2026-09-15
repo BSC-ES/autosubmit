@@ -56,6 +56,8 @@ from autosubmit.scripts._validation import validate_expid
 class SetstatusOptions(ExpidOptions):
     """Options for the setstatus command."""
 
+    acquires_lock = True
+    
     noplot: bool
     plot: bool
     save: bool

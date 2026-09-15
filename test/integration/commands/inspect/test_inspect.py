@@ -48,22 +48,6 @@ def cleanup_cmds(templates_dir: Path) -> None:
                 pass
 
 
-# TODO: this will not be necessary once the lock file is deleted correctly
-def cleanup_lock(as_exp) -> None:
-    """Remove the inspect lock file if the fixture created one."""
-    lock_file = (
-        Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
-        / as_exp.expid
-        / BasicConfig.LOCAL_TMP_DIR
-        / "autosubmit.lock"
-    )
-    if lock_file.exists():
-        try:
-            lock_file.unlink()
-        except Exception:
-            pass
-
-
 def do_inspect(
     as_exp, fl=None, fc=None, fs=None, ft=None, quick=False, check_wrapper=False
 ):
@@ -75,7 +59,6 @@ def do_inspect(
         / BasicConfig.LOCAL_TMP_DIR
     )
     cleanup_cmds(templates)
-    cleanup_lock(as_exp)
 
     inspect(
         expid=as_exp.expid,
