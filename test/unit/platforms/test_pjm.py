@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import subprocess
 from collections import OrderedDict
 from pathlib import Path
 
@@ -290,14 +291,50 @@ def test_get_job_names_cmd_empty_list_returns_empty(
 def test_get_job_names_cmd_nonempty(
         pjm_platform: PJMPlatform,
 ) -> None:
-    """grouping for a non-empty job-name list.
+    """Group each query under the requested, untruncated job name.
 
     :param pjm_platform: PJM platform under test.
     """
-    cmd = pjm_platform._get_job_names_cmd(["job_a", "job_b"])
+    job_a = "abnk_20120101_fc1_ENSEMBLE_INI"
+    job_b = "abnk_20120101_fc2_ENSEMBLE_INI"
+    cmd = pjm_platform._get_job_names_cmd([job_a, job_b])
 
-    assert "job_a" in cmd
-    assert "job_b" in cmd
+    assert cmd.startswith("{ ")
+    assert cmd.endswith("; }")
+    assert cmd.count("pjstat -v --choose jid,jnam") == 2
+    assert cmd.count("| awk -v job_name=") == 2
+    assert f"-v job_name={job_a}" in cmd
+    assert f"-v job_name={job_b}" in cmd
+    assert "$NF" not in cmd
+
+
+def test_get_job_names_cmd_preserves_names_when_pjstat_truncates_them(
+        pjm_platform: PJMPlatform,
+) -> None:
+    """Use requested names instead of PJM's truncated display column."""
+    job_a = "abnk_20120101_fc1_ENSEMBLE_INI"
+    job_b = "abnk_20120101_fc2_ENSEMBLE_INI"
+    cmd = pjm_platform._get_job_names_cmd([job_a, job_b])
+    fake_pjstat = r'''
+pjstat() {
+    case "$*" in
+        *fc1*) printf 'JOB_ID JOB_NAME\n51509743 abnk_20120\n51509744 abnk_20120\n' ;;
+        *fc2*) printf 'JOB_ID JOB_NAME\n51509745 abnk_20120\n' ;;
+    esac
+}
+'''
+
+    result = subprocess.run(
+        ["bash", "-c", f"{fake_pjstat}\n{cmd}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert set(result.stdout.splitlines()) == {
+        f"{job_a}:51509743,51509744",
+        f"{job_b}:51509745",
+    }
 
 
 def test_cancel_jobs_empty_list_sends_no_command(
