@@ -569,10 +569,6 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
 
             {os.linesep.ljust(13)}"""), 8)
             sequential_threads_launcher += self._indent(textwrap.dedent(f"""
-            from pathlib import Path
-            fail_count = 0
-            while fail_count <= job_retrials:
-                fail_count = fail_count + 1
             if not os.path.exists(completed_path):
                 open(failed_wrapper,'wb').close()
                 open(failed_path, 'wb').close()
@@ -610,7 +606,6 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 print(f"Running job {{self.template}} with fail count {{self.fail_count}}")
                 if self.fail_count > 0:
                     filedata = filedata.replace('_STAT_0', f'_STAT_{{self.fail_count}}')
-                print(f"timeout {str(self.wallclock_by_level)} bash -s < <filedata> > {{out_path}} 2> {{err_path}}")
                 with open(out_path, 'w') as out_f, open(err_path, 'w') as err_f:
                     proc = subprocess.run(
                         ['timeout', '{str(self.wallclock_by_level)}', 'bash', '-s'],
