@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import datetime
 from typing import Any
 from unittest.mock import patch
 
@@ -688,78 +687,288 @@ def test_recover_last_data_on_old_schema(tmp_path, as_conf):
     job_list.recover_last_data()
 
 
-@pytest.fixture
-def failed_job(mocker):
-    """Build a FAILED job and the JobList/as_conf pair ``_update_failed_jobs`` needs."""
-    def _build(delay_retry_time="0", fail_count=0, retrials=4, parents=None, wrapper_type=None):
-        job = Job("t000_SIM", "1", Status.FAILED, 0)
-        job.section = "SIM"
-        job.parents = parents or set()
-        job.fail_count = fail_count
-        job.delay_retrials = None
-        job.wrapper_type = wrapper_type
+def test_recover_logs_skips_jobs_without_valid_id_or_submit_time(as_conf, mocker):
+    """Jobs without a valid scheduler id or submit time are not handed to log recovery."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    invalid = Job("bad_job", None, Status.COMPLETED, 0)
+    valid = Job("good_job", "42", Status.FAILED, 0)
+    valid.submit_time_timestamp = "20200101000000"
+    for job in (invalid, valid):
+        job_list.add_job(job)
 
-        as_conf = mocker.MagicMock()
-        as_conf.jobs_data = {"SIM": {}}
-        as_conf.get_retrials.return_value = retrials
-        as_conf.get_delay_retry_time.return_value = delay_retry_time
+    mocked_recover_log = mocker.patch.object(Job, "recover_log", return_value=None)
+    mocked_save = mocker.patch.object(job_list, "save_jobs")
 
-        job_list = mocker.MagicMock()
-        job_list.get_failed.return_value = [job]
-        job_list.is_wrapper_still_running.return_value = False
-        return job_list, as_conf, job
+    assert job_list.recover_logs() is True
 
-    return _build
+    assert invalid.updated_log == invalid.fail_count + 1
+    assert valid.updated_log == 0
+    assert mocked_recover_log.call_count == 1
+    mocked_save.assert_called_once()
+
+
+def test_recover_last_data_restores_and_marks_finished_jobs(as_conf, mocker):
+    """recover_last_data leaves meaningful jobs untouched and restores/marks the rest."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    meaningful = Job("meaningful", "5", Status.COMPLETED, 0)
+    meaningful.submit_time_timestamp = "20200101000000"
+    meaningful.updated_log = 0
+    lost = Job("lost", None, Status.FAILED, 0)
+    job_list.add_job(meaningful)
+    job_list.add_job(lost)
+
+    mocked_history = mocker.patch("autosubmit.job.job_list.ExperimentHistory")
+    mocked_history.return_value.manager.get_jobs_data_last_row.return_value = {
+        lost.name: {"job_id": 7, "out": "out.log", "err": "err.log", "submit": 1600000000},
+    }
+
+    job_list.recover_last_data([meaningful, lost])
+
+    assert meaningful.id == "5"
+    assert meaningful.updated_log == 0
+    assert lost.id == 7
+    assert lost.local_logs == "out.log"
+    assert lost.remote_logs == "err.log"
+    assert lost.has_valid_submit_time()
+    assert lost.updated_log == lost.fail_count + 1
+
+
+def _mock_platform(mocker, connected: bool = True, name: str = "pl"):
+    platform = mocker.MagicMock()
+    platform.name = name
+    platform.connected = connected
+    platform.serial_platform = platform
+    return platform
+
+
+def test_update_from_file_applies_case_insensitive_changes(as_conf, mocker, tmp_path):
+    """update_from_file parses job names and statuses case-insensitively and archives the file."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    job = Job("MyJob", "1", Status.WAITING, 0)
+    job_list.add_job(job)
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text("myjob COMPLETED\n", encoding="utf-8")
+    mocked_change = mocker.patch("autosubmit.job.job_list.change_jobs_status")
+
+    assert job_list.update_from_file() is True
+    assert mocked_change.call_args.args[0] == [(job, Status.COMPLETED)]
+    assert not update_path.exists()
+    assert list(tmp_path.glob("updated_list_a000.txt_*"))
 
 
 @pytest.mark.parametrize(
-    "delay_retry_time, expected",
+    "line, expected_status",
     [
-        ("11", [11, 11, 11, 11]),
-        ("+11", [11, 22, 33, 44]),
-        ("*11", [11, 110, 1100, 11000]),
-        ("+5", [5, 10, 15, 20]),
-        ("*2", [2, 20, 200, 2000]),
+        ("job1 RUNNING", Status.WAITING),  # active targets are rejected
+        ("job1 BOGUS", Status.WAITING),  # unknown status is skipped
+        ("ghost COMPLETED", None),  # unknown job is skipped
     ],
-    ids=["constant", "linear", "exponential", "linear_single_digit", "exponential_single_digit"],
+    ids=["active-target-rejected", "unknown-status", "unknown-job"],
 )
-def test_delay_retry_time_matches_documented_sequence(failed_job, delay_retry_time, expected):
-    """DELAY_RETRY_TIME must produce the sequences documented in the configuration reference."""
-    job_list, as_conf, job = failed_job(delay_retry_time, retrials=len(expected) + 1)
-    delays = []
-    for _ in expected:
-        before = datetime.datetime.now()
-        JobList._update_failed_jobs(job_list, as_conf)
-        delays.append(round((job.delay_end - before).total_seconds()))
-    assert delays == expected
+def test_update_from_file_skips_invalid_entries(as_conf, mocker, tmp_path, line, expected_status):
+    """update_from_file warns and skips entries it cannot apply."""
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    job = Job("job1", "1", Status.WAITING, 0)
+    job_list.add_job(job)
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text(f"{line}\n", encoding="utf-8")
+
+    assert job_list.update_from_file(store_change=False) is True
+    if expected_status is not None:
+        assert job.status == expected_status
+    else:
+        assert job.status == Status.WAITING
 
 
-def test_zero_delay_sets_job_to_ready(failed_job):
-    """A job with no delay configured is retried immediately."""
-    job_list, as_conf, job = failed_job("0")
-    assert JobList._update_failed_jobs(job_list, as_conf) is True
-    assert job.status == Status.READY
-    assert job.id is None
+@pytest.mark.parametrize(
+    "connected, expected_status, cancel_expected",
+    [
+        (True, Status.COMPLETED, True),
+        (False, Status.RUNNING, False),
+    ],
+    ids=["platform-connected", "platform-not-connected"],
+)
+def test_update_from_file_handles_active_job_by_connection(
+    as_conf, mocker, tmp_path, connected, expected_status, cancel_expected
+):
+    """Active jobs are cancelled (via the shared helper) only when their platform is reachable."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    platform = _mock_platform(mocker, connected=connected)
+    active = Job("job_active", "77", Status.RUNNING, 0)
+    active.platform = platform
+    job_list.add_job(active)
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text("job_active COMPLETED\n", encoding="utf-8")
+
+    assert job_list.update_from_file(store_change=False) is True
+    assert active.status == expected_status
+    if cancel_expected:
+        platform.cancel_jobs.assert_called_once_with(["77"])
+    else:
+        platform.cancel_jobs.assert_not_called()
 
 
-def test_job_waits_for_uncompleted_parents(failed_job):
-    """A failed job whose parents are not all COMPLETED goes back to WAITING."""
-    job_list, as_conf, job = failed_job(parents={Job("t000_INI", "2", Status.FAILED, 0)})
-    assert JobList._update_failed_jobs(job_list, as_conf) is True
-    assert job.status == Status.WAITING
+def test_update_from_file_applies_change_to_job_stored_only_in_database(as_conf, mocker, tmp_path):
+    """update_from_file resolves jobs absent from memory against the database, resets the
+    per-attempt state for re-runnable targets and does not load them into the graph."""
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    stored = Job("STOREDJOB", 9, Status.COMPLETED, 0)
+    job_list.dbmanager.save_jobs([stored])
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text("storedjob WAITING\n", encoding="utf-8")
+
+    assert job_list.update_from_file() is True
+
+    row = job_list.dbmanager.load_job_by_name("STOREDJOB")
+    assert row["status"] == "WAITING"
+    assert row["id"] is None
+    assert row["fail_count"] == 0
+    assert row["updated_log"] == 0
+    assert job_list.get_job_by_name("STOREDJOB") is None
+    assert not update_path.exists()
 
 
-def test_job_stays_failed_when_retrials_are_exhausted(failed_job):
-    """Once fail_count reaches RETRIALS the job is not retried again."""
-    job_list, as_conf, job = failed_job(fail_count=4, retrials=4)
-    assert JobList._update_failed_jobs(job_list, as_conf) is True
-    assert job.status == Status.FAILED
-    assert job.fail_count == 4
+@pytest.mark.parametrize(
+    "line, expected",
+    [
+        ("", None),
+        ("   \n", None),
+        ("# a comment", None),
+        ("   # indented comment", None),
+        ("job1", None),
+        ("job1 COMPLETED trailing", ("JOB1", "COMPLETED")),
+        ("myjob waiting", ("MYJOB", "WAITING")),
+    ],
+    ids=["blank", "whitespace", "comment", "indented-comment", "missing-status",
+         "extra-tokens", "uppercased"],
+)
+def test_parse_update_line(line, expected):
+    """_parse_update_line strips, uppercases and ignores blank/comment/malformed lines."""
+    assert JobList._parse_update_line(line, "updated_list_a000.txt") == expected
 
 
-def test_vertical_wrapper_inner_job_is_not_retried(failed_job):
-    """Vertical wrapper inner jobs are retried by the wrapper, not externally."""
-    job_list, as_conf, job = failed_job(fail_count=1, wrapper_type="vertical")
-    assert JobList._update_failed_jobs(job_list, as_conf) is True
-    assert job.status == Status.FAILED
+@pytest.mark.parametrize(
+    "memory_job, db_node, lookup_name, expected_name, expected_from_db",
+    [
+        pytest.param(Job("MEM", 1, Status.WAITING, 0), None, "MEM", "MEM", False,
+                     id="in-memory-first"),
+        pytest.param(None, Job("ONLYDB", 9, Status.COMPLETED, 0).__getstate__(),
+                     "ONLYDB", "ONLYDB", True, id="from-database"),
+        pytest.param(None, None, "GHOST", None, False, id="unknown-everywhere"),
+    ],
+)
+def test_resolve_update_job(as_conf, mocker, memory_job, db_node, lookup_name,
+                            expected_name, expected_from_db):
+    """_resolve_update_job checks memory first, then the database, and yields None when unknown."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    index = {memory_job.name.upper(): memory_job} if memory_job else {}
+    mocked_db = mocker.patch.object(job_list.dbmanager, "load_job_by_name", return_value=db_node)
 
+    job, from_db = job_list._resolve_update_job(lookup_name, index)
+
+    assert from_db is expected_from_db
+    if expected_name is None:
+        assert job is None
+    elif memory_job is not None:
+        assert job is memory_job
+        mocked_db.assert_not_called()
+    else:
+        assert job is not None
+        assert job.name == expected_name
+        assert job.status == Status.COMPLETED
+
+
+def test_persist_unloaded_job_changes_splits_reset_and_edge_updates(as_conf, mocker):
+    """Unloaded changes are saved with reset counters for re-runnable targets and reconcile
+    the DB edges of final targets, keeping everything else untouched."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+    mocked_save = mocker.patch.object(job_list.dbmanager, "save_jobs")
+    mocked_edges = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_completion")
+    rerunnable = Job("RERUN", None, Status.READY, 0)
+    final = Job("DONE", 5, Status.COMPLETED, 0)
+    other = Job("UNKNOWN_STATE", None, Status.UNKNOWN, 0)
+    pairs = [(rerunnable, Status.READY), (final, Status.COMPLETED), (other, Status.UNKNOWN)]
+
+    job_list._persist_unloaded_job_changes(pairs)
+
+    mocked_save.assert_has_calls([
+        mocker.call([rerunnable], reset_log_counters=True),
+        mocker.call([final, other], reset_log_counters=False),
+    ])
+    mocked_edges.assert_called_once_with("DONE", "COMPLETED")
+
+
+def test_persist_unloaded_job_changes_skipped_when_saving_disabled(as_conf, mocker):
+    """Unloaded changes are not persisted when saving is disabled."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    mocked_save = mocker.patch.object(job_list.dbmanager, "save_jobs")
+    mocked_edges = mocker.patch.object(job_list.dbmanager, "update_outgoing_edges_completion")
+
+    job_list._persist_unloaded_job_changes([(Job("X", None, Status.COMPLETED, 0), Status.COMPLETED)])
+
+    mocked_save.assert_not_called()
+    mocked_edges.assert_not_called()
+
+
+def test_update_from_file_returns_false_without_update_file(as_conf, tmp_path):
+    """update_from_file returns False and changes nothing when no update file exists."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    job_list._update_file_path = tmp_path / "updated_list_a000.txt"
+
+    assert job_list.update_from_file() is False
+
+
+@pytest.mark.parametrize("store_change, file_kept", [(False, True), (True, False)])
+def test_update_from_file_store_change_controls_archiving(as_conf, tmp_path, store_change, file_kept):
+    """store_change controls whether the update file is archived after processing."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    job = Job("job1", "1", Status.WAITING, 0)
+    job_list.add_job(job)
+    update_path = tmp_path / "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    update_path.write_text("job1 COMPLETED\n", encoding="utf-8")
+
+    assert job_list.update_from_file(store_change=store_change) is True
+    assert job.status == Status.COMPLETED
+    assert update_path.exists() is file_kept
+    assert bool(list(tmp_path.glob("updated_list_a000.txt_*"))) is not file_kept
+
+
+def test_collect_update_changes_ignores_unchanged_targets(as_conf, mocker):
+    """Lines targeting the job's current status are ignored, producing no change."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    update_path = mocker.MagicMock()
+    update_path.name = "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    stored = Job("DUP", 5, Status.COMPLETED, 0)
+    mocker.patch.object(job_list.dbmanager, "load_job_by_name", return_value=stored.__getstate__())
+
+    pairs, unloaded_pairs = job_list._collect_update_changes(["DUP COMPLETED"])
+
+    assert pairs == []
+    assert unloaded_pairs == []
+
+
+def test_collect_update_changes_duplicate_lines_last_wins(as_conf, mocker):
+    """When a job appears more than once only the last line is applied."""
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    update_path = mocker.MagicMock()
+    update_path.name = "updated_list_a000.txt"
+    job_list._update_file_path = update_path
+    stored = Job("DUP", 5, Status.WAITING, 0)
+    mocker.patch.object(job_list.dbmanager, "load_job_by_name", return_value=stored.__getstate__())
+
+    pairs, unloaded_pairs = job_list._collect_update_changes(
+        ["DUP COMPLETED", "dup WAITING", "DUP FAILED"]
+    )
+
+    assert len(pairs) == 1
+    assert len(unloaded_pairs) == 1
+    assert pairs[0][0] is not None
+    assert pairs[0][1] == Status.FAILED
