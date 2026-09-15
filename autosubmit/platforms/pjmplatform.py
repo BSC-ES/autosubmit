@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
+import shlex
 import textwrap
 from pathlib import Path
 from time import sleep
@@ -156,7 +157,7 @@ class PJMPlatform(ParamikoPlatform):
             return status
         return status[0]
 
-    def parse_job_list(self, job_list: list[list["Job"]]) -> str:
+    def parse_job_list(self, job_list: list["Job"]) -> str:
         """Convert a list of job_list to job_list_cmd.
 
         :param job_list: list of jobs
@@ -362,21 +363,20 @@ class PJMPlatform(ParamikoPlatform):
         if not job_names:
             return ""
 
-        commands = "; ".join(
-            f'pjstat -v --choose jid,jnam --filter "jnam={job_name}"'
-            for job_name in job_names
-        )
+        commands = []
+        for job_name in job_names:
+            job_filter = shlex.quote(f"jnam={job_name}")
+            awk_job_name = shlex.quote(job_name)
+            commands.append(
+                f"pjstat -v --choose jid,jnam --filter {job_filter} | "
+                f"awk -v job_name={awk_job_name} '$1 ~ /^[0-9]+$/ {{"
+                'ids = ids ? ids "," $1 : $1'
+                "} END {"
+                'if (ids) print job_name ":" ids'
+                "}'"
+            )
 
-        return (
-            f"{commands} | "
-            "awk '$1 ~ /^[0-9]+$/ {"
-            "job_name = $NF; "
-            "sub(/\\.cmd$/, \"\", job_name); "
-            "jobs[job_name] = jobs[job_name] ? jobs[job_name] \",\" $1 : $1"
-            "} END {"
-            "for (name in jobs) print name \":\" jobs[name]"
-            "}'"
-        )
+        return f"{{ {'; '.join(commands)}; }}"
 
     def cancel_jobs(self, job_ids: list[str]) -> None:
         """Cancel PJM jobs by their IDs.

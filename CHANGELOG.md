@@ -8,6 +8,7 @@ several bug fixes and enhancements to improve the overall user experience.
 
 **Bug fixes:**
 
+- Fix multi-member PJM job lookup output parsing #3255
 - Remove the unrelated `--filter_status` option from `autosubmit expid` #3241
 - Fixed `DELAY_RETRY_TIME` not matching the documented `+N` and `*N` delay sequences #3138
 - Fix timeout guard is silently disabled for login/local jobs #3081
