@@ -336,7 +336,7 @@ def test_get_summary_as_list(statistics: Statistics, summary_as_list: list[str],
     statistics.calculate_summary()
     summary_as_list = statistics.summary_list
 
-    assert summary_as_list == summary_as_list
+    assert summary_as_list
 
 
 @pytest.mark.parametrize("create_jobs", [[5, 20]], indirect=True)

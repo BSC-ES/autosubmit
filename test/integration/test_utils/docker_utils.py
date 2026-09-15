@@ -516,9 +516,9 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
                     try:
                         container.stop(timeout=stop_timeout)
                     except ContainerError as e:
-                        print(f'Failed to stop container {container.id}: {e!s}')
+                        print(f'Failed to stop container {container.id}: {str(e)}')
         except ContainerError as e:
-            print(f'Failed to list containers with label {label}: {e!s}')
+            print(f'Failed to list containers with label {label}: {str(e)}')
 
     # Loop to wait for all containers to have really stopped.
     start = time()
@@ -542,4 +542,4 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
 
             sleep(1)
         except ContainerError as e:
-            print(f'Failed to list containers with label {label}: {e!s}')
+            print(f'Failed to list containers with label {label}: {str(e)}')
