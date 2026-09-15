@@ -174,7 +174,7 @@ def cli_function(
 
                 with (
                     experiment_lock(opts.expid)
-                    if options_type.acquires_lock
+                    if getattr(options_type, "acquires_lock", False)
                     else nullcontext()
                 ):
                     return_value = func(opts, **kwargs)

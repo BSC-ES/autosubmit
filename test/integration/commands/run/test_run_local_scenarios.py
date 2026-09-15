@@ -23,12 +23,12 @@ import pytest
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.lock import experiment_lock
 from autosubmit.experiment.manage import create
 from autosubmit.helpers.utils import build_and_connect_platform
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.platform_type import PlatformType
-from autosubmit.experiment.lock import experiment_lock
 from autosubmit.workflow.manage import run, stop
 from test.integration.commands.run.conftest import (
     _assert_db_fields,

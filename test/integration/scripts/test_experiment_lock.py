@@ -19,8 +19,8 @@
 
 from pathlib import Path
 
-from autosubmit.log.log import AutosubmitCritical
 from autosubmit.experiment.lock import experiment_lock
+from autosubmit.log.log import AutosubmitCritical
 from autosubmit.scripts.create import main as create_main
 
 
