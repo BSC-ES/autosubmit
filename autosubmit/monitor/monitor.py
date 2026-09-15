@@ -253,9 +253,13 @@ def _check_final_status(
     else:
         edge_color = _color_status(status_id)
     label = str(child_edge_info['from_step']) if child_edge_info['from_step'] > 0 else None
-    fail_ok = child_edge_info.get('fail_ok', False)
+    # ``?`` is a no-op for COMPLETED/SKIPPED (they already satisfy each other), so do not mark them weak.
+    weak = (
+        child_edge_info.get('weak', False)
+        and child_edge_info['min_trigger_status'] not in ("COMPLETED", "SKIPPED")
+    )
 
-    return edge_color, label, fail_ok
+    return edge_color, label, weak
 
 
 def _delete_files_but_two_newest(
@@ -450,15 +454,24 @@ class Monitor:
         Log.debug('Graph definition finalized')
         return graph
 
-    def _add_children(self, job, exp, node_job, groups, hide_groups):
+    def _add_children(self, job: Job, exp: pydotplus.Subgraph, node_job: pydotplus.Node,
+                      groups: dict[str, Any], hide_groups: bool):
+        """Add the children of a job to the graph.
+
+        :param job: Job whose children are added.
+        :param exp: Subgraph where the nodes and edges are added.
+        :param node_job: Node representing ``job``.
+        :param groups: Groups used to build the graph.
+        :param hide_groups: Whether grouped jobs are hidden.
+        """
         if job in self.nodes_plotted:
             return
         self.nodes_plotted.add(job)
         if job.has_children() != 0:
             for child in sorted(job.children, key=lambda k: NaturalSort(k.name)):
                 node_child, skip = _check_node_exists(exp, child, groups, hide_groups)
-                color, label, fail_ok = _check_final_status(self.edge_info.get(job.name, None), child)
-                if fail_ok:
+                color, label, weak = _check_final_status(self.edge_info.get(job.name, None), child)
+                if weak:
                     style = "dotted"
                 else:
                     style = "solid"

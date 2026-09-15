@@ -106,7 +106,7 @@ def init_jobs(setup_job_list: tuple[Any, Any, dict[str, Any]]) -> tuple[Job, Job
 # TODO: missing scenarios
 # 1) Cases when job_c.status remains in WAITING.
 # 2) Cases when job_a or job_b status doesn't match the edge_info target status.
-# 3) fail_ok edges and their handling.
+# 3) weak edges and their handling.
 # 4) From step higher than 0. (update job.checkpoint)
 @pytest.mark.parametrize(
     'job_a_edge_info,job_b_edge_info',
@@ -213,13 +213,13 @@ def test_handle_special_checkpoint_jobs_matching_parent_status_with_target_and_n
     job_list.graph.edges[job_a.name, job_c.name].update(
         min_trigger_status=job_a_edge_info["MIN_TRIGGER_STATUS"],
         from_step=job_a_edge_info["FROM_STEP"],
-        fail_ok=False,
+        weak=False,
         completion_status=get_completed_status(job_a_edge_info["COMPLETION_STATUS"])
     )
     job_list.graph.edges[job_b.name, job_c.name].update(
         min_trigger_status=job_b_edge_info["MIN_TRIGGER_STATUS"],
         from_step=job_b_edge_info["FROM_STEP"],
-        fail_ok=False,
+        weak=False,
         completion_status=get_completed_status(job_b_edge_info["COMPLETION_STATUS"])
     )
 

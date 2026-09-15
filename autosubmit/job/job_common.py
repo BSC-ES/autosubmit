@@ -25,6 +25,7 @@ __all__ = [
     "bcolors",
     "get_job_status",
     "increase_wallclock_by_chunk",
+    "is_edge_satisfied",
     "max_wallclock_seconds",
     "parse_output_number",
     "separate_section_entries",
@@ -94,7 +95,6 @@ class Status:
                     'QUEUING': 3, 'RUNNING': 4, 'COMPLETED': 5, 'HELD': 6, 'PREPARED': 7, 'SKIPPED': 8, 'DELAYED': 9}
     LOGICAL_ORDER = ["SUSPENDED", "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED",
                      "FAILED", "UNKNOWN", "COMPLETED"]
-    LOGICAL_ORDER_SUCCESS_WORKFLOW = ["WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED", "COMPLETED"]
     # Statuses with a job running on the platform that must be cancelled before leaving them.
     ACTIVE = (SUBMITTED, QUEUING, RUNNING)
     # Statuses that will be scheduled again: per-attempt state must be reset when entering them.
@@ -102,6 +102,65 @@ class Status:
 
     def retval(self, value):
         return getattr(self, value)
+
+
+_SUCCESS_ENDINGS = frozenset({"COMPLETED", "SKIPPED"})
+
+
+def _status_name(status: int | str | None) -> str | None:
+    """Return the canonical ``Status`` name for an integer code or a status name.
+
+    :param status: A ``Status`` code, a status name, or ``None``.
+    :return: The canonical status name, or ``None`` when it is unknown.
+    """
+    if isinstance(status, str):
+        name = status.upper()
+        return name if name in Status.KEY_TO_VALUE else None
+    if isinstance(status, int):
+        return Status.VALUE_TO_KEY.get(status)
+    return None
+
+
+def is_edge_satisfied(
+    parent_status: int | str,
+    min_trigger_status: int | str | None,
+    weak: bool = False,
+    from_step: int = 0,
+    child_checkpoint_step: int = 0,
+) -> bool:
+    """Return whether a parent satisfies the start condition of a dependency edge.
+
+    A ``STATUS`` is exact: the job runs only while the parent is in that status. A weak dependency
+    (``?`` suffix or ``WEAK: true``) also accepts a parent that already finished successfully
+    (``COMPLETED`` or ``SKIPPED``); a failed parent is accepted by ``FAILED``/``FAILED?``.
+    ``COMPLETED`` and ``SKIPPED`` are both successful endings and satisfy each other. ``RUNNING`` is
+    the only status that uses the ``FROM_STEP`` checkpoint.
+
+    :param parent_status: Current status of the parent job, as a ``Status`` code or its name.
+    :param min_trigger_status: Status the edge waits for, as a ``Status`` code or its name.
+    :param weak: Whether an already finished parent is acceptable (weak dependency, ``?``).
+    :param from_step: Internal step the parent must have reached, used with ``RUNNING``.
+    :param child_checkpoint_step: Checkpoint step recorded for the child job.
+    :return: ``True`` if the parent satisfies the edge, ``False`` otherwise.
+    """
+    parent = _status_name(parent_status)
+    trigger = _status_name(min_trigger_status) or "COMPLETED"
+    from_step = int(from_step or 0)
+
+    if parent is None or parent in ("SUSPENDED", "UNKNOWN"):
+        return False
+
+    if trigger == "RUNNING":
+        if parent != "RUNNING":
+            return weak and parent in _SUCCESS_ENDINGS
+        checkpoint_reached = from_step > 0 and int(child_checkpoint_step or 0) >= from_step
+        return from_step == 0 or checkpoint_reached
+
+    if parent == trigger:
+        return True
+    if parent in _SUCCESS_ENDINGS and trigger in _SUCCESS_ENDINGS:
+        return True
+    return weak and parent in _SUCCESS_ENDINGS
 
 
 class bcolors:
