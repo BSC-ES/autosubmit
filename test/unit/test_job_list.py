@@ -15,10 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import datetime
 from typing import Any
 from unittest.mock import patch
 
-import datetime
 import networkx
 import pytest
 from sqlalchemy import create_engine
