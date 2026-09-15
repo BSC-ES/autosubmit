@@ -58,6 +58,8 @@ from autosubmit.scripts._validation import validate_expid
 class RecoveryOptions(ExpidOptions):
     """Options for the recovery command."""
 
+    acquires_lock = True
+    
     noplot: bool
     plot: bool
     all: bool
@@ -192,7 +194,6 @@ def args_parser() -> ArgumentParser:
     group=CommandGroup.WORKFLOW,
     options_type=RecoveryOptions,
     validators=validate_expid,
-    lock=True,
 )
 def main(opts: RecoveryOptions) -> int | bool | None:
     from warnings import warn

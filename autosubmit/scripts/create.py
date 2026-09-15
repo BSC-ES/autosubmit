@@ -48,6 +48,8 @@ from autosubmit.scripts._validation import validate_expid
 class CreateOptions(ExpidOptions):
     """Options for the create command."""
 
+    acquires_lock = True
+
     noplot: bool
     hide: bool
     output: str
@@ -131,7 +133,6 @@ def args_parser() -> ArgumentParser:
     group=CommandGroup.EXPERIMENT,
     options_type=CreateOptions,
     validators=validate_expid,
-    lock=True,
 )
 def main(opts: CreateOptions) -> int | bool | None:
     from autosubmit.experiment.manage import create

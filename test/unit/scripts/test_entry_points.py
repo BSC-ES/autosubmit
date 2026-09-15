@@ -287,3 +287,12 @@ def test_entry_points_have_short_names():
             # first string after the three double-quotes in a docstring) must be the
             # sub-command short name.
             assert doc.title == cmd
+
+
+_LOCKED_COMMANDS = {"create", "recovery", "run", "setstatus","archive","delete"}
+
+
+@pytest.mark.parametrize("cmd", sorted(get_commands()))
+def test_command_lock_declaration(cmd):
+    """Only commands that change the experiment state hold the experiment lock."""
+    assert getattr(get_commands()[cmd].load(), "lock", False) == (cmd in _LOCKED_COMMANDS)

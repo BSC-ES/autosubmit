@@ -36,6 +36,8 @@ from autosubmit.scripts._validation import validate_expid
 class ArchiveOptions(ExpidOptions):
     """Options for the archive command."""
 
+    acquires_lock = True
+    
     noclean: bool
     uncompress: bool
     rocrate: bool
@@ -70,7 +72,6 @@ def args_parser() -> ArgumentParser:
     group=CommandGroup.EXPERIMENT,
     options_type=ArchiveOptions,
     validators=validate_expid,
-    lock=True,
 )
 def main(opts: ArchiveOptions) -> int | bool | None:
     from autosubmit.experiment.manage import archive

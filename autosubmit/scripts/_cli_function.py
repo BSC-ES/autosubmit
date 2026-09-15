@@ -19,12 +19,11 @@
 
 from argparse import ArgumentParser
 from collections.abc import Callable
-from contextlib import AbstractContextManager, nullcontext
+from contextlib import nullcontext
 from functools import wraps
-from portalocker import TemporaryFileLock
 from typing import TYPE_CHECKING
 
-from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.experiment.lock import experiment_lock
 from autosubmit.log import setup_log_files
 from autosubmit.scripts._args import (
     CommandGroup,
@@ -47,33 +46,12 @@ if TYPE_CHECKING:
 __all__ = ["cli_function"]
 
 
-def _experiment_lock(expid: str) -> AbstractContextManager:
-    """Return the lock that stops two commands from modifying one experiment at once.
-
-    ``TemporaryFileLock`` deletes ``autosubmit.lock`` on release, including when the
-    command raises. From portalocker 4.0 the file is unlinked while the lock is still
-    held, so no other process can end up locking a stale copy of it.
-
-    ``timeout=1`` with ``fail_when_locked=False`` keeps the previous behaviour: retry
-    for one second, then raise ``AlreadyLocked``, which ``exit_from_error`` reports.
-
-    :param expid: The experiment identifier.
-    :return: A context manager that holds the experiment lock.
-    """
-    return TemporaryFileLock(
-        str(BasicConfig.expid_lock_file(expid)),
-        timeout=1,
-        fail_when_locked=False
-    )
-
-
 def cli_function(
     *,
     args_parser: Callable[[], ArgumentParser],
     options_type: type["AutosubmitOptions"],
     validators: "Validator[OptionsT] | list[Validator[OptionsT]] | None" = None,
     group: "CommandGroup" = CommandGroup.GENERAL,
-    lock: bool = False,
 ) -> Callable:
     """Decorator for Autosubmit CLI functions.
 
@@ -84,14 +62,13 @@ def cli_function(
     * parsing command-line arguments;
     * validating options;
     * handling command exceptions;
-    * holding the experiment lock while the command runs, if ``lock`` is set;
+    * holding the experiment lock while the command runs, if the options declare it;
     * converting command return values into process exit codes.
 
     :param args_parser: The argparse parser for the sub-command.
     :param options_type: The type of the options for the sub-command.
     :param validators: A validation function for the sub-command.
     :param group: CLI command group. Default is general.
-    :param lock: Whether the sub-command holds ``<EXPID>/tmp/autosubmit.lock`` while it runs.
     :raises ValueError: If ``options_type`` or ``args_parser`` are not provided.
     """
     if options_type is None:
@@ -195,7 +172,11 @@ def cli_function(
 
                     opts._profiler = profiler
 
-                with _experiment_lock(opts.expid) if lock else nullcontext():
+                with (
+                    experiment_lock(opts.expid)
+                    if options_type.acquires_lock
+                    else nullcontext()
+                ):
                     return_value = func(opts, **kwargs)
 
                 return normalise_return_value(return_value)

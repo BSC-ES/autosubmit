@@ -44,6 +44,8 @@ class DeleteOptions(AutosubmitOptions):
     (OOP class hierarchy here is not too important as it is internal code.)
     """
 
+    acquires_lock = True
+    
     profile: bool
     """Whether to profile the command execution."""
     # These are not passed via the command line.
@@ -79,7 +81,6 @@ def args_parser() -> ArgumentParser:
     group=CommandGroup.EXPERIMENT,
     options_type=DeleteOptions,
     validators=validate_expid,
-    lock=True,
 )
 def main(opts: DeleteOptions) -> int | bool | None:
     from autosubmit.experiment.manage import delete_experiment

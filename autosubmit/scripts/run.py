@@ -54,6 +54,8 @@ from autosubmit.scripts._validation import validate_expid
 class RunOptions(ExpidOptions):
     """Options for the run command."""
 
+    acquires_lock = True
+
     start_time: str
     start_after: str
     run_only_members: str
@@ -116,7 +118,6 @@ def _validate(_: str, opts: RunOptions):
     group=CommandGroup.WORKFLOW,
     options_type=RunOptions,
     validators=[validate_expid, _validate],
-    lock=True,
 )
 def main(opts: RunOptions) -> int | bool | None:
     from autosubmit.workflow.manage import run

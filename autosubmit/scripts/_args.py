@@ -70,6 +70,8 @@ class DefaultOptions(AutosubmitOptions):
     """Whether or not the sub-command accepts multiple expids. Default is no."""
     accepts_other_users = False
     """Whether or not the sub-command accepts other users. Default is no."""
+    acquires_lock = False
+    """Whether or not the sub-command holds the experiment lock while it runs. Default is no."""
 
     _profiler: Profiler | None = None
     """The profiler instance if set."""
