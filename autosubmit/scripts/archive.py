@@ -35,7 +35,7 @@ from autosubmit.scripts._validation import validate_expid
 
 class ArchiveOptions(ExpidOptions):
     """Options for the archive command."""
-    
+
     noclean: bool
     uncompress: bool
     rocrate: bool

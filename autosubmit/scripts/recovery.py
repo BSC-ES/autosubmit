@@ -57,7 +57,7 @@ from autosubmit.scripts._validation import validate_expid
 
 class RecoveryOptions(ExpidOptions):
     """Options for the recovery command."""
-    
+
     noplot: bool
     plot: bool
     all: bool

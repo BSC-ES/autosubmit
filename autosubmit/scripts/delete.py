@@ -43,7 +43,7 @@ class DeleteOptions(AutosubmitOptions):
 
     (OOP class hierarchy here is not too important as it is internal code.)
     """
-    
+
     profile: bool
     """Whether to profile the command execution."""
     # These are not passed via the command line.
@@ -56,6 +56,7 @@ class DeleteOptions(AutosubmitOptions):
     """Whether or not the sub-command accepts other users. Default is no."""
     acquires_lock = True
     """Whether or not the sub-command holds the experiment lock while it runs. Default is no."""
+
     expid: str
     """Experiment identifiers separated by commas."""
 
