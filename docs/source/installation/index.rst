@@ -12,7 +12,7 @@ Autosubmit is free software, licensed under |license|.
    These must be available on the host machine:
 
    .. system_dependencies::
-    
+
 .. note:: The ``dot -v`` command should list ``dot``, ``pdf``, ``png``, ``SVG`` and ``Xlib`` in the device section.
 
 .. important:: The host machine must be able to reach HPCs and clusters via password-less SSH. Generate a PEM-format key with ``ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM``.

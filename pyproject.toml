@@ -260,3 +260,21 @@ ignore = [
 [tool.vulture]
 exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
 min_confidence = 70
+
+[external]
+dependencies = [
+    "dep:generic/bash",
+    "dep:generic/curl",
+    "dep:generic/dialog",
+    "dep:generic/git@>=2.32",
+    "dep:generic/graphviz@>=2.38",
+    "dep:generic/rsync",
+    "dep:generic/sqlite3",
+    "dep:generic/subversion",
+    "dep:generic/tk",
+]
+
+[tool.autosubmit.docs.system-dependencies]
+git = { check = "git --version" }
+graphviz = { note = "2.40 is known not to work", check = "dot -v" }
+tk = { note = "python-tk on Debian and Ubuntu, tkinter on CentOS" }

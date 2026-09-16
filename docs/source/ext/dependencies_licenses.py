@@ -18,9 +18,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, metadata
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import tomli
 from docutils import nodes  # type: ignore
@@ -49,32 +50,6 @@ _MAX_LICENSE_NAME_LENGTH = 64
 # Carries no information beyond what the other classifiers already say.
 _UNSPECIFIC_CLASSIFIERS = frozenset({"License :: OSI Approved"})
 
-# Non-Python packages Autosubmit needs on the host machine.
-#
-# Written as PEP 725 DepURLs so that, once ``pyproject.toml`` carries an
-# ``[external]`` table, this constant can be replaced by a read of that table
-# without touching the directives or the page. See issue #3195.
-_SYSTEM_DEPENDENCIES: tuple[str, ...] = (
-    "dep:generic/bash",
-    "dep:generic/curl",
-    "dep:generic/dialog",
-    "dep:generic/git@>=2.32",
-    "dep:generic/graphviz@>=2.38",
-    "dep:generic/rsync",
-    "dep:generic/sqlite3",
-    "dep:generic/subversion",
-    "dep:generic/tk",
-)
-
-# PEP 725 forbids fields it does not define inside ``[external]``, so these
-# cannot migrate there alongside the list above. They will need a companion
-# ``[tool.autosubmit]`` table.
-_SYSTEM_DEPENDENCY_NOTES: dict[str, dict[str, str]] = {
-    "git": {"check": "git --version"},
-    "graphviz": {"note": "2.40 is known not to work", "check": "dot -v"},
-    "tk": {"note": "python-tk on Debian and Ubuntu, tkinter on CentOS"},
-}
-
 _PYTHON_SUBSTITUTIONS = """
 
 .. |python_min| replace:: {minimum}
@@ -84,6 +59,7 @@ _PYTHON_SUBSTITUTIONS = """
 """
 
 
+@lru_cache(maxsize=1)
 def _load_pyproject() -> dict:
     """Read ``pyproject.toml`` from the project root, or return an empty dict."""
     pyproject_path: Path = Path(_PROJECT_ROOTDIR, "pyproject.toml")
@@ -104,7 +80,7 @@ def _license_from_metadata(md) -> str:
     legacy free-form ``License`` field.
     """
     # 1) PEP 639 License-Expression (Metadata 2.4+).
-    license_expression: Optional[str] = md.get("License-Expression", None)
+    license_expression: str | None = md.get("License-Expression", None)
     if license_expression and license_expression.strip():
         return license_expression.strip()
 
@@ -154,6 +130,10 @@ def _parse_depurl(specifier: str) -> tuple[str, str]:
     A deliberately small subset, enough for ``dep:generic/name@>=1.2``. Swap for
     ``pyproject-external`` if a new docs dependency ever becomes acceptable.
     """
+    if not isinstance(specifier, str):
+        logger.warning(f"Expected a DepURL string, got {type(specifier).__name__}: {specifier!r}")
+        return "", ""
+
     body: str = specifier.split(";", 1)[0].strip()
     if not body.startswith("dep:"):
         logger.warning(f"Not a DepURL, skipping: {specifier!r}")
@@ -161,6 +141,15 @@ def _parse_depurl(specifier: str) -> tuple[str, str]:
 
     name_part, _, version = body[len("dep:"):].partition("@")
     return name_part.rsplit("/", 1)[-1], version.strip()
+
+
+def _system_dependencies() -> tuple[list[str], dict[str, dict[str, str]]]:
+    """Read PEP 725 external dependencies and their docs annotations."""
+    data: dict = _load_pyproject()
+    return (
+        data.get("external", {}).get("dependencies", []),
+        data.get("tool", {}).get("autosubmit", {}).get("docs", {}).get("system-dependencies", {}),
+    )
 
 
 def inject_python_substitutions(app, config) -> None:
@@ -173,10 +162,10 @@ def inject_python_substitutions(app, config) -> None:
     requires_python: str = project.get("requires-python", "")
     license_: str = project.get("license", "")
     if not requires_python:
-         logger.warning("No requires-python found in pyproject.toml")
+        logger.warning("No requires-python found in pyproject.toml")
 
-    minimum, maximum = _python_bounds(requires_python)
-    if not minimum or not maximum:
+    minimum, maximum = _python_bounds(requires_python) if requires_python else ("", "")
+    if requires_python and (not minimum or not maximum):
         logger.warning(
             f"Could not derive both Python bounds from requires-python={requires_python!r}"
         )
@@ -197,7 +186,8 @@ def inject_dependency_substitutions(app, config) -> None:
     """
     lines: list[str] = []
 
-    for specifier in _SYSTEM_DEPENDENCIES:
+    dependencies, _ = _system_dependencies()
+    for specifier in dependencies:
         name, version = _parse_depurl(specifier)
         if not name:
             continue
@@ -217,15 +207,12 @@ def inject_dependency_substitutions(app, config) -> None:
 
 class AutosubmitDependenciesLicensesDirective(SphinxDirective):
     """An Autosubmit directive to print the runtime dependencies and their licenses."""
-    has_content: bool = True
+    has_content: bool = False
     required_arguments: int = 0
-    optional_arguments: int = 99
+    optional_arguments: int = 0
     final_argument_whitespace: bool = False
 
     option_spec: dict[str, Callable[[str], object]] = {}
-
-    options: dict[str, object]
-    arguments: list[str]
 
     def run(self) -> list[Node]:
         deps: list[str] = _load_pyproject().get("project", {}).get("dependencies", [])
@@ -291,9 +278,10 @@ class AutosubmitSystemDependenciesDirective(SphinxDirective):
     option_spec: dict[str, Callable[[str], object]] = {}
 
     def run(self) -> list[Node]:
+        dependencies, annotations = _system_dependencies()
         parsed: list[tuple[str, str]] = [
             (name, version)
-            for name, version in map(_parse_depurl, _SYSTEM_DEPENDENCIES)
+            for name, version in map(_parse_depurl, dependencies)
             if name
         ]
         if not parsed:
@@ -308,7 +296,7 @@ class AutosubmitSystemDependenciesDirective(SphinxDirective):
             if version:
                 paragraph += nodes.Text(f" {version}")
 
-            annotation: dict[str, str] = _SYSTEM_DEPENDENCY_NOTES.get(name, {})
+            annotation: dict[str, str] = annotations.get(name, {})
             note: str = annotation.get("note", "")
             check: str = annotation.get("check", "")
 
