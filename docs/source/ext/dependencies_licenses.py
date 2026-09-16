@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, metadata
 from pathlib import Path
-from typing import Callable, Literal, Optional
+from typing import Literal, Optional
 
 import tomli
 from docutils import nodes  # type: ignore
@@ -49,11 +49,38 @@ _MAX_LICENSE_NAME_LENGTH = 64
 # Carries no information beyond what the other classifiers already say.
 _UNSPECIFIC_CLASSIFIERS = frozenset({"License :: OSI Approved"})
 
+# Non-Python packages Autosubmit needs on the host machine.
+#
+# Written as PEP 725 DepURLs so that, once ``pyproject.toml`` carries an
+# ``[external]`` table, this constant can be replaced by a read of that table
+# without touching the directives or the page. See issue #3195.
+_SYSTEM_DEPENDENCIES: tuple[str, ...] = (
+    "dep:generic/bash",
+    "dep:generic/curl",
+    "dep:generic/dialog",
+    "dep:generic/git@>=2.32",
+    "dep:generic/graphviz@>=2.38",
+    "dep:generic/rsync",
+    "dep:generic/sqlite3",
+    "dep:generic/subversion",
+    "dep:generic/tk",
+)
+
+# PEP 725 forbids fields it does not define inside ``[external]``, so these
+# cannot migrate there alongside the list above. They will need a companion
+# ``[tool.autosubmit]`` table.
+_SYSTEM_DEPENDENCY_NOTES: dict[str, dict[str, str]] = {
+    "git": {"check": "git --version"},
+    "graphviz": {"note": "2.40 is known not to work", "check": "dot -v"},
+    "tk": {"note": "python-tk on Debian and Ubuntu, tkinter on CentOS"},
+}
+
 _PYTHON_SUBSTITUTIONS = """
 
 .. |python_min| replace:: {minimum}
 .. |python_max| replace:: {maximum}
 .. |python_requires| replace:: {requires}
+.. |license| replace:: {license}
 """
 
 
@@ -121,16 +148,32 @@ def _python_bounds(requires_python: str) -> tuple[str, str]:
     return minimum, maximum
 
 
+def _parse_depurl(specifier: str) -> tuple[str, str]:
+    """Split a PEP 725 DepURL into its name and version range.
+
+    A deliberately small subset, enough for ``dep:generic/name@>=1.2``. Swap for
+    ``pyproject-external`` if a new docs dependency ever becomes acceptable.
+    """
+    body: str = specifier.split(";", 1)[0].strip()
+    if not body.startswith("dep:"):
+        logger.warning(f"Not a DepURL, skipping: {specifier!r}")
+        return "", ""
+
+    name_part, _, version = body[len("dep:"):].partition("@")
+    return name_part.rsplit("/", 1)[-1], version.strip()
+
+
 def inject_python_substitutions(app, config) -> None:
     """Define ``|python_min|``, ``|python_max|`` and ``|python_requires|``.
 
     The values come from ``project.requires-python`` in ``pyproject.toml``, so
     the docs cannot drift from the packaging metadata.
     """
-    requires_python: str = _load_pyproject().get("project", {}).get("requires-python", "")
+    project: dict = _load_pyproject().get("project", {})
+    requires_python: str = project.get("requires-python", "")
+    license_: str = project.get("license", "")
     if not requires_python:
-        logger.warning("No requires-python found in pyproject.toml")
-        return
+         logger.warning("No requires-python found in pyproject.toml")
 
     minimum, maximum = _python_bounds(requires_python)
     if not minimum or not maximum:
@@ -142,7 +185,34 @@ def inject_python_substitutions(app, config) -> None:
         minimum=minimum or requires_python,
         maximum=maximum or requires_python,
         requires=requires_python,
+        license=license_ or "GPL-3.0-or-later",
     )
+
+
+def inject_dependency_substitutions(app, config) -> None:
+    """Define ``|graphviz|``, ``|graphviz_version|`` and friends.
+
+    One substitution per dependency, so a name or version can be dropped into
+    prose anywhere on the page without repeating the value.
+    """
+    lines: list[str] = []
+
+    for specifier in _SYSTEM_DEPENDENCIES:
+        name, version = _parse_depurl(specifier)
+        if not name:
+            continue
+        lines.append(f".. |{name}| replace:: ``{name}``")
+        if version:
+            lines.append(f".. |{name}_version| replace:: {version}")
+
+    for dep in _load_pyproject().get("project", {}).get("dependencies", []):
+        req: Requirement = Requirement(dep)
+        key: str = canonicalize_name(req.name).replace("-", "_")
+        lines.append(f".. |{key}| replace:: ``{req.name}``")
+        if req.specifier:
+            lines.append(f".. |{key}_version| replace:: {req.specifier}")
+
+    config.rst_epilog = (config.rst_epilog or "") + "\n" + "\n".join(lines) + "\n"
 
 
 class AutosubmitDependenciesLicensesDirective(SphinxDirective):
@@ -212,12 +282,60 @@ class AutosubmitDependenciesLicensesDirective(SphinxDirective):
         return [table]
 
 
+class AutosubmitSystemDependenciesDirective(SphinxDirective):
+    """An Autosubmit directive to print the required non-Python packages."""
+    has_content: bool = False
+    required_arguments: int = 0
+    optional_arguments: int = 0
+
+    option_spec: dict[str, Callable[[str], object]] = {}
+
+    def run(self) -> list[Node]:
+        parsed: list[tuple[str, str]] = [
+            (name, version)
+            for name, version in map(_parse_depurl, _SYSTEM_DEPENDENCIES)
+            if name
+        ]
+        if not parsed:
+            logger.warning("No system dependencies could be parsed")
+            return []
+
+        bullets: nodes.bullet_list = nodes.bullet_list()
+
+        for name, version in sorted(parsed):
+            paragraph: nodes.paragraph = nodes.paragraph()
+            paragraph += nodes.literal(text=name)
+            if version:
+                paragraph += nodes.Text(f" {version}")
+
+            annotation: dict[str, str] = _SYSTEM_DEPENDENCY_NOTES.get(name, {})
+            note: str = annotation.get("note", "")
+            check: str = annotation.get("check", "")
+
+            if note:
+                paragraph += nodes.Text(f" — {note}")
+            if check:
+                paragraph += nodes.Text("; check with " if note else " — check with ")
+                paragraph += nodes.literal(text=check)
+
+            item: nodes.list_item = nodes.list_item()
+            item += paragraph
+            bullets += item
+
+        return [bullets]
+
+    
 def setup(app) -> dict[str, object]:
     app.add_directive(
         "dependencies_licenses",
         AutosubmitDependenciesLicensesDirective
     )
+    app.add_directive(
+        "system_dependencies",
+        AutosubmitSystemDependenciesDirective
+    )
     app.connect("config-inited", inject_python_substitutions)
+    app.connect("config-inited", inject_dependency_substitutions)
     return {
         "version": __version__,
         "parallel_read_safe": True,
