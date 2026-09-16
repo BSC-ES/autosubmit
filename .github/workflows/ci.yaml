@@ -145,7 +145,8 @@ jobs:
           pytest \
             -n $(nproc) \
             test/integration \
-            -m "${{ matrix.pytest-markers }}"
+            -m "${{ matrix.pytest-markers }}"\
+            --durations=0
 
       - name: Coverage report
         run: |
