@@ -133,7 +133,7 @@ For jobs running in HPC platforms, usually you have to provide information about
 
     #DELAY_RETRY_TIME: 11
     #DELAY_RETRY_TIME: +11 # will wait 11 + number specified
-    #DELAY_RETRY_TIME:*11 # will wait 11,110,1110,11110...* by 10 to prevent a too big number
+    #DELAY_RETRY_TIME:*11 # will wait 11,110,1100,11000...* by 10 to prevent a too big number
 
 
 There are also other, less used features that you can use:
