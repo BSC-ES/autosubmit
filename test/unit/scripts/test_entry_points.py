@@ -32,6 +32,8 @@ from autosubmit.scripts._entry_points import (
     parse_docstring,
 )
 
+_LOCKED_COMMANDS = {"create", "recovery", "run", "setstatus","archive","delete"}
+
 
 def test_execute_cmd_missing_dependency(capsys, mocker):
     """Test a command that requires a missing optional dependency."""
@@ -291,7 +293,7 @@ def test_entry_points_have_short_names():
 
 @pytest.mark.parametrize("cmd", sorted(get_commands()))
 def test_command_lock_declaration(cmd):
-    """"Every sub-command declares whether it holds the experiment lock."""
+    """Only commands that change the experiment state hold the experiment lock."""
     options_type = get_commands()[cmd].load().options_type
-    assert isinstance(getattr(options_type, "acquires_lock", False), bool)
+    assert getattr(options_type, "acquires_lock", False) == (cmd in _LOCKED_COMMANDS)
 
