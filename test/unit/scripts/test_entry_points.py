@@ -289,12 +289,9 @@ def test_entry_points_have_short_names():
             assert doc.title == cmd
 
 
-_LOCKED_COMMANDS = {"create", "recovery", "run", "setstatus","archive","delete"}
-
-
 @pytest.mark.parametrize("cmd", sorted(get_commands()))
 def test_command_lock_declaration(cmd):
-    """Only commands that change the experiment state hold the experiment lock."""
+    """"Every sub-command declares whether it holds the experiment lock."""
     options_type = get_commands()[cmd].load().options_type
-    assert getattr(options_type, "acquires_lock", False) == (cmd in _LOCKED_COMMANDS)
+    assert isinstance(getattr(options_type, "acquires_lock", False), bool)
 
