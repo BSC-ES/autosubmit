@@ -903,6 +903,7 @@ def create(
                 code=7015,
             )
         output_type = as_conf.get_output_type()
+
         if not os.path.exists(os.path.join(exp_path, "db")):
             raise AutosubmitCritical(
                 f"The db folder does not exists. Make sure that the 'db'"
@@ -915,9 +916,11 @@ def create(
                 f" folder exists in the following path: {exp_path}",
                 code=6013,
             )
+
         # Load parameters
         Log.info("Loading parameters...")
         parameters = as_conf.load_parameters()
+
         date_list = as_conf.get_date_list()
         if len(date_list) != len(set(date_list)):
             raise AutosubmitCritical("There are repeated start dates!", 7014)
@@ -928,6 +931,7 @@ def create(
         if len(member_list) != len(set(member_list)):
             raise AutosubmitCritical("There are repeated member names!")
         rerun = as_conf.get_rerun()
+
         Log.info("\nCreating the jobs list...")
         job_list = JobList(expid, as_conf, YAMLParserFactory())
         date_format = ""
@@ -938,6 +942,7 @@ def create(
                 date_format = "H"
             if date.minute > 1:
                 date_format = "M"
+
         job_list.generate(
             as_conf,
             date_list,
@@ -961,12 +966,14 @@ def create(
                 job.wrapper_type = None
                 job.packed = False
         as_conf.save()
+
         groups_dict = {}
         # Setting up job historical database header. Must create a new run.
         # Historical Database: Setup new run
         try:
             exp_history = ExperimentHistory(expid)
             exp_history.initialize_database()
+
             # exp_history.create_new_experiment_run(as_conf.get_chunk_size_unit(), as_conf.get_chunk_size(), as_conf.get_full_config_as_json(), job_list.get_job_list())
             run_dc = exp_history.process_status_changes(
                 job_list.get_job_list(),
@@ -1007,13 +1014,16 @@ def create(
                 job_list.load_wrappers(preview=check_wrappers)
         except AutosubmitCritical as e:
             Log.warning(f"Couldn't generate a preview of the wrappers due: {e}")
+
         if not noplot:
             from autosubmit.monitor.monitor import Monitor
+
             if group_by:
                 status = []
                 if expand_status:
                     for s in expand_status.split():
                         status.append(get_job_status(s.upper()))
+
                 job_grouping = JobGrouping(
                     group_by,
                     copy.deepcopy(job_list.get_job_list()),

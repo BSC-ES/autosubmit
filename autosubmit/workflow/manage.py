@@ -628,15 +628,18 @@ def run(
         raise AutosubmitCritical(
             "Error in run initialization", 7014, str(e)
         )  # Changing default to 7014
+
     as_conf_config = as_conf.experiment_data.get("CONFIG", {})
     git_operational_check_enabled = as_conf_config.get(
         "GIT_OPERATIONAL_CHECK_ENABLED", True
     )
+
     if git_operational_check_enabled:
         Log.debug("Checking for dirty local Git repository")
         check_unpushed_changes(expid, as_conf)
     else:
         Log.warning("Git operational check disabled by user")
+
     Log.debug("Running main running loop")
     #########################
     # AUTOSUBMIT - MAIN LOOP
@@ -656,6 +659,7 @@ def run(
     # non-corrupted workflow status.
     # User can always stop the run, and unless force killed, Autosubmit will exit in a clean way.
     # Experiment run will always start from the last known workflow status.
+
     # 3650 = (72h - 122h)
     max_recovery_retrials = as_conf.experiment_data.get("CONFIG", {}).get(
         "RECOVERY_RETRIALS", 3650
@@ -680,8 +684,10 @@ def run(
                 Scheduler.exit = profiler.iteration_checkpoint(
                     loaded_jobs, loaded_edges
                 )
+
             if stop_event and stop_event.is_set():
                 Scheduler.exit = True
+
             # TODO fix in another PR, this is a workaround to avoid having mismatching job_list and platform experiment_data
             if as_conf.needs_reload():
                 as_conf.reload()
@@ -689,12 +695,14 @@ def run(
                 job_list.update_as_conf(as_conf)
                 for p in platforms_to_test:
                     p.update_as_conf(as_conf)
+
             # Submit ready jobs
             if len(job_list.get_ready()) > 0:
                 submit_ready_jobs(as_conf, job_list, platforms_to_test)
                 save_jobs = job_list.update_list(as_conf)
                 if save_jobs:
                     job_list.save_jobs()
+
             # Check wrappers status and inner jobs
             _, _wrapper_job_changes = check_wrappers(as_conf, job_list, expid)
             # Check non-wrapped jobs
@@ -731,6 +739,7 @@ def run(
             else:
                 safetysleeptime = as_conf.get_safetysleeptime()
                 time.sleep(safetysleeptime)
+
         except (
             AutosubmitError
         ) as ae:  # If an error is detected, restore all connections and job_list
@@ -840,12 +849,14 @@ def run(
                 )
         except AutosubmitCritical as e:  # Critical errors can't be recovered. Failed configuration or autosubmit error
             raise AutosubmitCritical(e.message, e.code, e.trace)
+
     Log.result("No more jobs to run.")
     # search hint - finished run
     Log.info("Waiting for all logs to be updated")
     for p in platforms_to_test:
         p.clean_log_recovery_process()
     _process_historical_data_iteration(job_list, job_changes_tracker, expid)
+
     for p in platforms_to_test:
         p.close_connection()
     if len(job_list.get_failed_from_db()) > 0:

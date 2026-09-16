@@ -117,7 +117,6 @@ def set_status(
 
     exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / expid
     try:
-        
 
         Log.debug(f"Exp ID: {expid}")
         Log.debug(f"Save: {save}")
@@ -126,8 +125,10 @@ def set_status(
         Log.debug(f"Chunks to change: {filter_chunk_section_split}")
         Log.debug(f"Status of jobs to change: {filter_status}")
         Log.debug(f"Sections to change: {filter_section}")
+
         as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
         as_conf.check_conf_files(True)
+
         # Getting output type from configuration
         output_type = as_conf.get_output_type()
         # Getting db connections
@@ -187,7 +188,9 @@ def set_status(
                 f"(SUBMITTED, QUEUING, RUNNING) cannot be set via set_status.",
                 7011,
             )
+
         Log.info("Filtering jobs...")
+
         selected_job_names = apply_job_filters(
             job_list=job_list,
             base_job_names=selected_job_names,
@@ -199,6 +202,7 @@ def set_status(
             filter_chunks_fn=filter_jobs_by_chunks_splits,
             status_from_str_fn=get_job_status,
         )
+
         # preserve job list ordering
         final_list = [
             job for job in jobs_to_set_status if job.name in selected_job_names
@@ -208,6 +212,7 @@ def set_status(
         performed_changes = change_status(
             final, final_status, final_list, save, definitive_platforms
         )
+
         if performed_changes:
             if detail:
                 current_length = len(job_list.get_job_list())
@@ -249,12 +254,14 @@ def set_status(
         # Visualization stuff that should be in a function common to monitor , create, -cw flag, inspect and so on
         if not noplot:
             from autosubmit.monitor.monitor import Monitor
+
             groups_dict = {}
             if group_by:
                 status = []
                 if expand_status:
                     for s in expand_status.split():
                         status.append(get_job_status(s.upper()))
+
                 job_grouping = JobGrouping(
                     group_by,
                     copy.deepcopy(job_list.get_job_list()),

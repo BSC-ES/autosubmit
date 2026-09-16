@@ -77,7 +77,6 @@ class RecoveryOptions(ExpidOptions):
 
     acquires_lock = True
 
-
 def args_parser() -> ArgumentParser:
     parser = create_argparse_parser(__doc__)
 
