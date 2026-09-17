@@ -23,10 +23,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from sqlalchemy import inspect, select, text
+from sqlalchemy import delete, inspect, select, text
 from sqlalchemy.schema import CreateSchema
 
-from autosubmit.database.tables import get_table_with_schema
+from autosubmit.database.tables import JobDataTable, get_table_with_schema
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers import experiment_history_db_manager
@@ -68,6 +68,16 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
     # assert not database_manager.my_database_exists()
     database_manager.initialize()
     assert database_manager.my_database_exists()
+    if is_sqlalchemy:
+        # The SQLAlchemy manager tracks a portable schema version and creates the job_data index.
+        assert database_manager.is_current_version() is True
+        assert database_manager.is_header_ready_db_version() is True
+        inspector = inspect(database_manager.engine)
+        index_names = {
+            index['name'] for index in inspector.get_indexes(JobDataTable.name, schema=database_manager.schema)
+        }
+        # Postgres schema-qualifies index names (e.g. ``ix_<schema>_job_data_job_name``).
+        assert any(name.endswith('job_data_job_name') for name in index_names)
     # Test that .db file was created or not depending on the database engine
     db_file_path = Path(tmp_test_dir, f"job_data_{options['expid']}.db")
     if is_sqlalchemy:
@@ -143,6 +153,27 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
         assert curr_job.modified == "2024-01-01-00:00:00"
         assert curr_job.status == "COMPLETED"
         assert curr_job.rowstatus == i
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_sqlalchemy_schema_version_is_isolated_per_tenant(as_db: str):
+    """Each experiment schema records its own schema version."""
+    if as_db != "postgres":
+        pytest.skip("Only relevant for the PostgreSQL backend")
+
+    first = create_experiment_history_db_manager(as_db, expid="test_iso_first")
+    second = create_experiment_history_db_manager(as_db, expid="test_iso_second")
+    assert isinstance(first, SqlAlchemyExperimentHistoryDbManager)
+    assert isinstance(second, SqlAlchemyExperimentHistoryDbManager)
+    first.initialize()
+    second.initialize()
+
+    with first.engine.begin() as conn:
+        conn.execute(delete(first._version_table))
+
+    assert first.is_current_version() is False
+    assert second.is_current_version() is True
 
 
 def test_sqlite_initialize_no_db(autosubmit_exp, mocker, tmp_path):

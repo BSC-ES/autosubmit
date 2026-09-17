@@ -36,6 +36,10 @@ from sqlalchemy.schema import CreateSchema, CreateTable, DropTable
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
+from autosubmit.database.migrations import (
+    record_migration,
+    schema_migrations_table,
+)
 from autosubmit.database.tables import GENERALTABLES, Table, TableRegistry
 
 
@@ -45,6 +49,16 @@ class DbManager:
     It can be used with any engine supported by SQLAlchemy, such
     as Postgres, Mongo, MySQL, etc.
     """
+
+    # Schema version of the database managed by this class. When set, the manager
+    # records it in a ``schema_migrations`` table inside the target database.
+    # Subclasses that own a target set it to their current version.
+    SCHEMA_VERSION: int | None = None
+
+    # Name of the per-target ``schema_migrations`` table. Targets that share a
+    # schema (for example job_list and history on PostgreSQL) must use different
+    # names to avoid clashing.
+    SCHEMA_MIGRATIONS_TABLE_NAME = "schema_migrations"
 
     def __init__(self, db_path: str, schema: str | None = None, historical: bool | None = False) -> None:
         self.engine = None
@@ -62,6 +76,26 @@ class DbManager:
         self.schema = schema if BasicConfig.DATABASE_BACKEND != "sqlite" else None
         self.restore_path = Path(BasicConfig.DB_PATH) / "autosubmit_db.sql"
         self.table_registry = TableRegistry(self.schema)
+        self._schema_migrations_table = schema_migrations_table(
+            self.table_registry.metadata, name=self.SCHEMA_MIGRATIONS_TABLE_NAME
+        )
+        self._schema_version_ensured = False
+
+    def _target_engine(self) -> Engine:
+        """Return the engine that owns the tables managed by this instance."""
+        return self.engine_historical or self.engine
+
+    def _ensure_schema_version(self) -> None:
+        """Ensure the ``schema_migrations`` table exists and records the current version."""
+        if self.SCHEMA_VERSION is None or self._schema_version_ensured:
+            return
+        engine = self._target_engine()
+        with engine.begin() as conn:
+            if self.schema:
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            conn.execute(CreateTable(self._schema_migrations_table, if_not_exists=True))
+            record_migration(conn, self._schema_migrations_table, self.SCHEMA_VERSION)
+        self._schema_version_ensured = True
 
     def _get_engine(self, table_name: str | None = None) -> Engine:
         """Return the appropriate engine based on context.
@@ -74,6 +108,7 @@ class DbManager:
         return self.engine
 
     def create_table(self, table_name: str) -> None:
+        self._ensure_schema_version()
         table = self.table_registry.get(table_name)
         with self._get_engine(table_name).begin() as conn:
             if self.schema:
