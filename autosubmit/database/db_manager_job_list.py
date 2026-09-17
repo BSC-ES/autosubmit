@@ -95,6 +95,12 @@ class JobsDbManager(DbManager):
     as Postgres, Mongo, MySQL, etc.
     """
 
+    # Schema version of the job_list database, recorded in ``schema_migrations``.
+    SCHEMA_VERSION = 1
+
+    # The job_list schema is shared with the history tables on PostgreSQL.
+    SCHEMA_MIGRATIONS_TABLE_NAME = "job_list_schema_migrations"
+
     def __init__(self, schema: str | None = None) -> None:
         if BasicConfig.DATABASE_BACKEND == 'sqlite':
             persistence_full_path = Path(Path(BasicConfig.LOCAL_ROOT_DIR, schema, "db"), Path("job_list.db"))
