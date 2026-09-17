@@ -20,6 +20,7 @@ from typing import Protocol
 import pytest
 
 from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_packager import JobPackager
@@ -220,3 +221,137 @@ def test_calculate_job_limits_max_waiting_jobs(create_packager: CreatePackagerFi
     job_packager.calculate_job_limits(job_packager._platform)
     assert job_packager._max_wait_jobs_to_submit == expected_max_waiting_jobs
 
+
+_VERTICAL_WRAPPER_EXPERIMENT = {
+    "EXPERIMENT": {
+        "DATELIST": "19900101",
+        "MEMBERS": "fc0",
+        "NUMCHUNKS": "1",
+    },
+    "PLATFORMS": {
+        "TEST_SLURM": {
+            "ADD_PROJECT_TO_HOST": "False",
+            "HOST": "127.0.0.1",
+            "MAX_WALLCLOCK": "00:10",
+            "PROJECT": "group",
+            "QUEUE": "gp_debug",
+            "SCRATCH_DIR": "/tmp/scratch/",
+            "TEMP_DIR": "",
+            "TYPE": "slurm",
+            "USER": "root",
+            "MAX_PROCESSORS": "4",
+            "PROCESSORS_PER_NODE": "4",
+        },
+    },
+    "JOBS": {
+        "OPERATOR": {
+            "PLATFORM": "TEST_SLURM",
+            "RUNNING": "chunk",
+            "SPLITS": "4",
+            "SCRIPT": 'echo "operator"',
+            "WALLCLOCK": "00:01",
+        },
+        "APPLICATION": {
+            "PLATFORM": "TEST_SLURM",
+            "RUNNING": "chunk",
+            "SPLITS": "4",
+            "SCRIPT": 'echo "application"',
+            "WALLCLOCK": "00:01",
+            "DEPENDENCIES": {
+                "OPERATOR": {
+                    "SPLITS_FROM": {
+                        "ALL": {
+                            "SPLITS_TO": "[1:4]*\\1",
+                        },
+                    },
+                },
+            },
+        },
+    },
+    "WRAPPERS": {
+        "WRAPPER_APPLICATION": {
+            "JOBS_IN_WRAPPER": "APPLICATION",
+            "TYPE": "vertical",
+            "POLICY": "strict",
+            "MIN_WRAPPED": "4",
+            "MAX_WRAPPED": "4",
+        },
+    },
+}
+
+
+def _jobs_in_section(job_list: JobList, section: str) -> list[Job]:
+    """Return the jobs that belong to ``section`` (case-insensitive)."""
+    return [job for job in job_list.get_job_list() if job.section.upper() == section]
+
+
+def _package_sizes(packages: list, section: str) -> list[int]:
+    """Return the job counts of the packages made only of ``section`` jobs."""
+    return [
+        len(package.jobs)
+        for package in packages
+        if package.jobs and all(job.section.upper() == section for job in package.jobs)
+    ]
+
+
+@pytest.fixture
+def wrappable_packager(create_packager: CreatePackagerFixture) -> JobPackager:
+    """Return a JobPackager for an experiment with one strict vertical wrapper."""
+    job_packager = create_packager(experiment_data=_VERTICAL_WRAPPER_EXPERIMENT)
+    jobs = job_packager._jobs_list.get_job_list()
+    assert {job.platform_name for job in jobs} == {"TEST_SLURM"}
+    job_packager._platform = jobs[0].platform
+    job_packager.calculate_job_limits(job_packager._platform)
+    return job_packager
+
+
+@pytest.mark.parametrize("parent_completed_in_db", [
+    pytest.param(True, id="parent-saved"),
+    pytest.param(False, id="parent-only-in-memory"),
+])
+def test_build_packages_loads_wrappable_child_with_stale_edge(
+    wrappable_packager: JobPackager, parent_completed_in_db: bool
+):
+    """A vertical wrapper must not hit a false deadlock while a child is only in the DB.
+
+    Regression test for the DestinE vertical-wrapper race: the parent is
+    COMPLETED in memory, but its edge ``completion_status`` is still ``WAITING``
+    in the database (``update_list`` runs after the packager). When
+    ``parent_completed_in_db`` is False the parent status is stale too, which is
+    the exact state that produced the ``strict`` policy 7014 in CI. The child
+    must be loaded from the DB so the wrapper can reach ``MIN_WRAPPED``.
+    """
+    job_list = wrappable_packager._jobs_list
+
+    # Keep the persisted edge completion status stale, as update_list has not run.
+    job_list.save_edges()
+
+    operators = _jobs_in_section(job_list, "OPERATOR")
+    applications = sorted(
+        _jobs_in_section(job_list, "APPLICATION"),
+        key=lambda job: int(job.split or 0),
+    )
+    assert len(operators) == 4
+    assert len(applications) == 4
+
+    for job in applications[:3]:
+        job.status = Status.READY
+    applications[3].status = Status.WAITING
+
+    parent_db_status = Status.COMPLETED if parent_completed_in_db else Status.WAITING
+    for job in operators:
+        job.status = parent_db_status
+    job_list.save_jobs()
+    for job in operators:
+        job.status = Status.COMPLETED
+
+    # Simulate the last application split not being loaded in memory yet.
+    job_list._remove_job_from_graph(applications[3].name)
+
+    packages = wrappable_packager.build_packages()
+
+    assert not wrappable_packager.wrappers_with_error, next(
+        iter(wrappable_packager.wrappers_with_error.values()), "unexpected strict policy error"
+    )
+    package_sizes = _package_sizes(packages, "APPLICATION")
+    assert 4 in package_sizes, f"Expected a 4-job APPLICATION wrapper, got sizes {package_sizes}"

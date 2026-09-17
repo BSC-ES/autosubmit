@@ -22,12 +22,16 @@ import traceback
 from collections import namedtuple
 from pathlib import Path
 from shutil import copy2
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import create_engine
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.experiment_history import ExperimentHistory
+from autosubmit.history.experiment_history import (
+    ExperimentHistory,
+    get_historical_database,
+)
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
 from autosubmit.history.strategies import (
@@ -75,7 +79,7 @@ def test_update_counts_uses_provided_status_counts():
     from unittest.mock import Mock
 
     exp_history = ExperimentHistory.__new__(ExperimentHistory)
-    exp_history.manager = Mock()
+    exp_history._manager = Mock()
     run_dc = Mock()
     counts = {
         "COMPLETED": 3, "FAILED": 0, "QUEUING": 0,
@@ -129,13 +133,6 @@ class TestExperimentHistory:
     def teardown_method(self):
         os.remove(self.target_path_tt00)
         os.remove(self.target_path_tt01)
-
-    def test_db_exists(self):
-        exp_history = ExperimentHistory("tt00")
-        exp_history.initialize_database()
-        assert exp_history.manager.my_database_exists() is True
-        exp_history = ExperimentHistory("tt99")
-        assert exp_history.manager.my_database_exists() is False
 
     def test_is_header_ready(self):
         exp_history = ExperimentHistory("tt00")
@@ -400,8 +397,8 @@ class TestLogging:
         self.log.log(self.exp_message, self.trace_message)
 
 
-def test_experiment_history_force_sqlalchemy_migrates_old_schema(tmp_path):
-    """ExperimentHistory with force_sql_alchemy=True migrates an old-schema database."""
+def test_experiment_history_migrates_old_schema(tmp_path):
+    """ExperimentHistory migrates an old-schema database."""
     db_dir = Path(tmp_path) / "metadata" / "data"
     db_dir.mkdir(parents=True, exist_ok=True)
     db_file = db_dir / "job_data_a000.db"
@@ -411,8 +408,191 @@ def test_experiment_history_force_sqlalchemy_migrates_old_schema(tmp_path):
     old_experiment_run_table.create(engine)
     engine.dispose()
 
-    exp_history = ExperimentHistory("a000", force_sql_alchemy=True)
+    exp_history = ExperimentHistory("a000")
     assert exp_history.manager is not None
 
     result = exp_history.manager.get_jobs_data_last_row(["nonexistent"])
     assert result == {}
+
+
+
+def test_get_finish_data_dc(tmp_path, monkeypatch):
+    """Test that get_finish_data_dc retrieves the correct JobData after a full submit/start/finish cycle.
+
+    :param tmp_path: Pytest fixture providing a temporary directory unique to the test invocation.
+    :param monkeypatch: Pytest fixture for monkeypatching attributes and environment variables.
+    :raises AssertionError: If the retrieved job data does not match the inserted job data.
+    """
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+    monkeypatch.setattr(BasicConfig, "HISTORICAL_LOG_DIR", str(tmp_path))
+
+    exp_history = ExperimentHistory("tt00")
+    exp_history.initialize_database()
+    # An experiment run must exist before job data can be written.
+    exp_history.create_new_experiment_run()
+
+    JOB_NAME = "a29z_20000101_fc2_1_SIM"
+    NCPUS = 128
+    PLATFORM_NAME = "marenostrum5"
+    JOB_ID = 101
+    FAIL_COUNT = 0
+
+    # write_submit_time maps any non-"COMPLETED" status to "FAILED" internally.
+    exp_history.write_submit_time(
+        JOB_NAME, time.time(), "COMPLETED", NCPUS, "00:30",
+        "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME,
+        JOB_ID, children="", fail_count=FAIL_COUNT
+    )
+    exp_history.write_start_time(
+        JOB_NAME, start=time.time(), status="RUNNING", qos="debug",
+        job_id=JOB_ID, children="", fail_count=FAIL_COUNT
+    )
+    inserted_job_data_dc = exp_history.write_finish_time(
+        JOB_NAME, finish=int(time.time()), status="COMPLETED",
+        job_id=JOB_ID, fail_count=FAIL_COUNT
+    )
+    assert inserted_job_data_dc is not None, "write_finish_time returned None; check for internal errors."
+
+    finish_data_dc = exp_history.get_finish_data_dc(JOB_NAME, fail_count=FAIL_COUNT)
+    assert finish_data_dc is not None, "get_finish_data_dc returned None; record not found."
+
+    assert finish_data_dc.job_name == inserted_job_data_dc.job_name
+    assert finish_data_dc.ncpus == inserted_job_data_dc.ncpus
+    assert finish_data_dc.children == inserted_job_data_dc.children
+    assert finish_data_dc.energy == inserted_job_data_dc.energy
+    assert finish_data_dc.platform == inserted_job_data_dc.platform
+    assert finish_data_dc.job_id == inserted_job_data_dc.job_id
+    assert finish_data_dc.status == inserted_job_data_dc.status
+    assert finish_data_dc.qos == inserted_job_data_dc.qos
+
+
+def test_update_submit_time(tmp_path, monkeypatch):
+    """Test that update_submit_time correctly updates the submit time of an existing job record.
+
+    :param tmp_path: Pytest fixture providing a temporary directory unique to the test invocation.
+    :param monkeypatch: Pytest fixture for monkeypatching attributes and environment variables.
+    :raises AssertionError: If the submit time is not updated correctly.
+    """
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+    exp_history = ExperimentHistory("tt00")
+    exp_history.initialize_database()
+    # An experiment run must exist before job data can be written.
+    exp_history.create_new_experiment_run()
+
+    JOB_NAME = "a29z_20000101_fc2_1_SIM"
+    NCPUS = 128
+    PLATFORM_NAME = "marenostrum5"
+    JOB_ID = 101
+    FAIL_COUNT = 0
+
+    initial_submit_time = int(time.time())
+    exp_history.write_submit_time(
+        JOB_NAME, initial_submit_time, "COMPLETED", NCPUS, "00:30",
+        "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME,
+        JOB_ID, children="", fail_count=FAIL_COUNT
+    )
+
+    new_submit_time = initial_submit_time + 3600  # Add 1 hour
+    exp_history.update_submit_time(JOB_NAME, new_submit_time, fail_count=FAIL_COUNT)
+
+    finish_data_dc = exp_history.get_finish_data_dc(JOB_NAME, fail_count=FAIL_COUNT)
+    assert finish_data_dc is not None, "get_finish_data_dc returned None; record not found."
+    assert finish_data_dc.submit == new_submit_time, f"Expected submit time {new_submit_time}, got {finish_data_dc.submit}"
+
+
+def test_update_submit_time_returns_none_when_not_found(tmp_path, monkeypatch):
+    """update_submit_time returns None when no record exists for that fail_count."""
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+    exp_history = ExperimentHistory("tt00")
+    exp_history.initialize_database()
+    exp_history.create_new_experiment_run()
+
+    JOB_NAME = "a29z_20000101_fc2_1_SIM"
+    NCPUS = 128
+    PLATFORM_NAME = "marenostrum5"
+    JOB_ID = 101
+
+    exp_history.write_submit_time(
+        JOB_NAME, int(time.time()), "COMPLETED", NCPUS, "00:30",
+        "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME,
+        JOB_ID, children="", fail_count=0
+    )
+
+    result = exp_history.update_submit_time(JOB_NAME, int(time.time()) + 3600, fail_count=1)
+
+    assert result is None, "update_submit_time should return None when fail_count=1 does not exist"
+
+    loaded = exp_history.get_finish_data_dc(JOB_NAME, fail_count=1)
+    assert loaded is None, "No record should exist for fail_count=1"
+
+
+def _bare_history(manager=None) -> ExperimentHistory:
+    """Build an ``ExperimentHistory``"""
+    exp = ExperimentHistory.__new__(ExperimentHistory)
+    exp.expid = "t000"
+    exp._log = MagicMock()
+    exp._manager = manager
+    return exp
+
+
+@pytest.mark.parametrize("method, args", [
+    ("get_submit_data_dc", ("job", 0)),
+    ("update_submit_time", ("job",)),
+    ("process_status_changes", ([],)),
+    ("process_job_list_changes_to_experiment_totals", ([],)),
+])
+def test_history_manager_errors_return_none(method, args) -> None:
+    """A manager failure makes the wrapped calls return ``None`` instead of raising."""
+    manager = MagicMock()
+    manager.get_last_job_data_dc_by_job_name_and_fail_counter.side_effect = Exception("boom")
+    manager.get_experiment_run_dc_with_max_id.side_effect = Exception("boom")
+    exp = _bare_history(manager)
+    exp.detect_changes_in_job_list = MagicMock(side_effect=Exception("boom"))
+
+    assert getattr(exp, method)(*args) is None
+
+
+def test_history_availability() -> None:
+    """The history reports availability based on its manager."""
+    exp = _bare_history()
+    with pytest.raises(RuntimeError):
+        _ = exp.manager
+    assert exp.is_header_ready() is False
+
+    manager = MagicMock()
+    manager.is_header_ready_db_version.return_value = True
+    assert _bare_history(manager).is_header_ready() is True
+
+
+def test_history_disables_manager_on_error(mocker, tmp_path, monkeypatch) -> None:
+    """A failure while initialising or creating the manager disables it."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+    mocker.patch("autosubmit.history.experiment_history.Logging")
+
+    manager = MagicMock()
+    manager.initialize.side_effect = Exception("boom")
+    exp = _bare_history(manager)
+    exp.initialize_database()
+    assert exp._manager is None
+
+    mocker.patch(
+        "autosubmit.history.experiment_history.SqlAlchemyExperimentHistoryDbManager",
+        side_effect=Exception("boom"),
+    )
+    assert ExperimentHistory("t000")._manager is None
+
+
+def test_get_historical_database_swallows_status_error(mocker) -> None:
+    """A failure while setting the experiment status is swallowed."""
+    exp = _bare_history(MagicMock())
+    exp.initialize_database = MagicMock()
+    exp.process_status_changes = MagicMock(return_value=MagicMock())
+    mocker.patch("autosubmit.history.experiment_history.ExperimentHistory", return_value=exp)
+    mocker.patch("autosubmit.history.experiment_history.ExperimentStatus", side_effect=Exception("boom"))
+    as_conf = MagicMock()
+    as_conf.get_chunk_size_unit.return_value = "month"
+    as_conf.get_chunk_size.return_value = 1
+    as_conf.get_full_config_as_json.return_value = {}
+
+    assert get_historical_database("t000", MagicMock(), as_conf) is exp

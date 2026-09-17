@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
+from collections.abc import Callable
 from typing import Any
 from unittest.mock import patch
 
@@ -24,7 +25,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_manager_job_list import _edge_satisfied
+from autosubmit.database.managers.job_list import _edge_satisfied
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs
@@ -145,15 +146,9 @@ def test_load(as_conf: Any, setup_job_list: Any, tmp_path: Any, full_load: bool,
     Test loading the job list with different full_load options.
 
     :param as_conf: Autosubmit configuration fixture.
-    :type as_conf: Any
     :param setup_job_list: Fixture to set up job list.
-    :type setup_job_list: Any
     :param tmp_path: Temporary path fixture.
-    :type tmp_path: Any
     :param full_load: Whether to fully load the graph.
-    :type full_load: bool
-    :return: None
-    :rtype: None
     """
     _jobs, _edges, job_list = setup_job_list
     job_list.save_jobs()
@@ -576,15 +571,10 @@ def test_is_wrapper_still_running(
     :param fake_job_list: Minimal JobList fixture.
     :param mocker: pytest-mock mocker fixture.
     :param job_id: Numeric job id.
-    :type job_id: int
     :param job_status: Status of the inner job.
-    :type job_status: Status
     :param wrapper_status: Status of the wrapper job in ``job_package_map``.
-    :type wrapper_status: Status
     :param in_map: Whether to place the wrapper in ``job_package_map``.
-    :type in_map: bool
     :param expected: Expected return value.
-    :type expected: bool
     """
     inner_job = Job('a000_20000101_fc0_1_SIM', job_id, job_status, 0)
     if in_map:
@@ -1199,3 +1189,51 @@ def test_finished_job_log_recovery_keeps_local_logs_in_db(as_conf, mocker, tmp_p
     assert row["local_logs_err"] == "a000_SIM.20260101000000.err"
     assert row["platform_name"] == "LOCAL"
 
+
+def _job_list_with_stale_parent_edge(as_conf) -> JobList:
+    """Return a JobList whose child is only in the DB and whose parent edge is stale."""
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
+
+    parent = Job("op4", 1, Status.COMPLETED, 0)
+    parent.section = "OPERATOR"
+    child = Job("app4", 2, Status.WAITING, 0)
+    child.section = "APPLICATION"
+    job_list.dbmanager.save_jobs([parent, child])
+    job_list.dbmanager.save_edges([{
+        "e_from": "op4",
+        "e_to": "app4",
+        "from_step": 0,
+        "min_trigger_status": "COMPLETED",
+        "completion_status": "WAITING",
+        "fail_ok": False,
+    }])
+
+    job_list.add_job(parent)
+    return job_list
+
+
+@pytest.mark.parametrize("load", [
+    pytest.param(
+        lambda job_list: job_list.load_wrappable_jobs_by_section("APPLICATION", set()),
+        id="parent-in-memory",
+    ),
+    pytest.param(
+        lambda job_list: job_list.load_inner_jobs_by_section(["APPLICATION"]),
+        id="parent-in-db",
+    ),
+])
+def test_wrappable_child_loaded_when_parent_completed_in_memory(
+    as_conf, load: Callable[[JobList], None]
+):
+    """Load a wrappable child when its parent is COMPLETED in memory, not only in the DB.
+
+    Regression test for the DestinE vertical-wrapper race: the parent job is
+    already COMPLETED in memory, but its edge ``completion_status`` has not been
+    persisted yet (``update_list`` runs after the packager). Neither loader may
+    skip the child in that window.
+    """
+    job_list = _job_list_with_stale_parent_edge(as_conf)
+
+    load(job_list)
+
+    assert job_list.get_job_by_name("app4") is not None
