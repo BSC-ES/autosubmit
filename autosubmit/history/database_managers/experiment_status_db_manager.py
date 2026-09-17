@@ -34,6 +34,10 @@ from autosubmit.history.database_managers.database_manager import (
     DatabaseManager,
 )
 
+# TODO(#3114): the as_times database (experiment_status) is not versioned yet.
+#             When it is, it should use the per-target schema_migrations helper
+#             from autosubmit.database.migrations.
+
 
 class ExperimentStatusDbManager(DatabaseManager):
     """ Manages the actions on the status database """

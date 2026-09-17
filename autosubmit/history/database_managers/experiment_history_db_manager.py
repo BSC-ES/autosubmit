@@ -24,12 +24,27 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Protocol, cast
 
-from sqlalchemy import and_, desc, func, insert, inspect, select, text, update
-from sqlalchemy.schema import CreateSchema, CreateTable
+from sqlalchemy import (
+    Connection,
+    and_,
+    desc,
+    func,
+    insert,
+    inspect,
+    select,
+    text,
+    update,
+)
+from sqlalchemy.schema import CreateIndex, CreateSchema, CreateTable
 
 import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
+from autosubmit.database.migrations import (
+    get_schema_version,
+    record_migration,
+    schema_migrations_table,
+)
 from autosubmit.database.tables import (
     ExperimentRunTable,
     JobDataTable,
@@ -611,19 +626,45 @@ class SqlAlchemyExperimentHistoryDbManager:
 
         self.table_registry = TableRegistry(schema=self.schema)
         self.engine = session.get_engine(db_path=db_path)
+        self._version_table = schema_migrations_table(
+            self.table_registry.metadata, name="history_schema_migrations"
+        )
 
-    def initialize(self):
+    def initialize(self) -> None:
         """Create the historical database tables if they do not exist, then migrate any missing columns."""
         self.create_historical_database()
         self._migrate_schema()
 
-    def _migrate_schema(self):
-        """Add missing columns to job_data and experiment_run tables.
+    def _create_indexes(self, conn: Connection) -> None:
+        """Create the indexes declared on the ``job_data`` table, if they do not exist.
 
-        Compares the SQLAlchemy model (JobDataTable, ExperimentRunTable) against
-        the live database schema and runs ALTER TABLE ADD COLUMN for any columns
-        that exist in the model but not in the DB.
+        ``CreateTable`` only emits the ``CREATE TABLE`` DDL, it does not emit the
+        indexes declared with ``Column(..., index=True)``. This method ensures the
+        ``job_data(job_name)`` index exists.
+
+        :param conn: An open SQLAlchemy connection.
         """
+        table = self.table_registry.get(JobDataTable.name)
+        for index in table.indexes:
+            conn.execute(CreateIndex(index, if_not_exists=True))
+
+    def _set_db_version(self, conn: Connection, version: int) -> None:
+        """Record the schema version as applied in the historical database.
+
+        :param conn: An open SQLAlchemy connection.
+        :param version: The schema version to record.
+        """
+        record_migration(conn, self._version_table, version)
+
+    def _get_db_version(self) -> int:
+        """Read the schema version recorded in the historical database.
+
+        :return: The recorded version, or 0 if it is unknown.
+        """
+        return get_schema_version(self.engine, self._version_table, self.schema)
+
+    def _migrate_schema(self) -> None:
+        """Add missing columns, ensure indexes and update the stored schema version."""
         inspector = inspect(self.engine)
         quote = self.engine.dialect.identifier_preparer.quote
         dialect = self.engine.dialect
@@ -654,34 +695,46 @@ class SqlAlchemyExperimentHistoryDbManager:
                     )
                 conn.commit()
 
+        if inspector.has_table(JobDataTable.name, schema=self.schema):
+            with self.engine.begin() as conn:
+                self._create_indexes(conn)
+                self._set_db_version(conn, CURRENT_DB_VERSION)
 
-    def my_database_exists(self):
+
+    def my_database_exists(self) -> bool:
         """Return ``True`` if the schema and tables exist in the database. ``False`` otherwise."""
         inspector = inspect(self.engine)
+        if self.schema is not None and self.schema not in inspector.get_schema_names():
+            return False
         return (
-                (self.schema in inspector.get_schema_names())
-                and inspector.has_table(ExperimentRunTable.name, schema=self.schema)
+                inspector.has_table(ExperimentRunTable.name, schema=self.schema)
                 and inspector.has_table(JobDataTable.name, schema=self.schema)
         )
 
-    def is_header_ready_db_version(self):
-        raise NotImplementedError("This feature has not been implemented yet with SQLAlchemy / Alembic.")
+    def is_header_ready_db_version(self) -> bool:
+        """Return ``True`` if the stored schema version is new enough for the completion trigger."""
+        return self._get_db_version() >= DB_EXPERIMENT_HEADER_SCHEMA_CHANGES
 
-    def is_current_version(self):
-        raise NotImplementedError("This feature has not been implemented yet with SQLAlchemy / Alembic.")
+    def is_current_version(self) -> bool:
+        """Return ``True`` if the stored schema version matches the current one."""
+        return self._get_db_version() == CURRENT_DB_VERSION
 
-    def create_historical_database(self):
-        with self.engine.connect() as conn:
-            with conn.begin():
-                if BasicConfig.DATABASE_BACKEND != "sqlite":
-                    conn.execute(CreateSchema(self.schema, if_not_exists=True))
-                conn.execute(CreateTable(self.table_registry.get(ExperimentRunTable.name), if_not_exists=True))
-                conn.execute(CreateTable(self.table_registry.get(JobDataTable.name), if_not_exists=True))
-            # TODO: implement db migrations?
-            # self._set_historical_pragma_version(CURRENT_DB_VERSION)
+    def create_historical_database(self) -> None:
+        """Create the historical tables, the version table and the indexes if they do not exist."""
+        with self.engine.begin() as conn:
+            if BasicConfig.DATABASE_BACKEND != "sqlite":
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            conn.execute(CreateTable(self.table_registry.get(ExperimentRunTable.name), if_not_exists=True))
+            conn.execute(CreateTable(self.table_registry.get(JobDataTable.name), if_not_exists=True))
+            conn.execute(CreateTable(self._version_table, if_not_exists=True))
+            self._create_indexes(conn)
+            self._set_db_version(conn, CURRENT_DB_VERSION)
+            # TODO: Implement SQLITE -> Postgres migration
 
-    def update_historical_database(self):
-        raise NotImplementedError("This feature has not been implemented yet with SQLAlchemy / Alembic.")
+    def update_historical_database(self) -> None:
+        """Bring an existing historical database up to date (missing columns, indexes and version)."""
+        self.create_historical_database()
+        self._migrate_schema()
 
     def get_experiment_run_dc_with_max_id(self):
         run = self._get_experiment_run_with_max_id()

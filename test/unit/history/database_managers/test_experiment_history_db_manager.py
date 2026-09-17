@@ -18,11 +18,13 @@
 import sqlite3
 
 import pytest
-from sqlalchemy import and_, create_engine, insert, inspect, select
+from sqlalchemy import and_, create_engine, delete, insert, inspect, select
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import JobDataTable, get_table_with_schema
 from autosubmit.history.database_managers.experiment_history_db_manager import (
+    CURRENT_DB_VERSION,
+    DB_EXPERIMENT_HEADER_SCHEMA_CHANGES,
     ExperimentHistoryDbManager,
     SqlAlchemyExperimentHistoryDbManager,
     create_experiment_history_db_manager,
@@ -132,18 +134,67 @@ def test_create_experiment_history_db_manager_invalid():
         create_experiment_history_db_manager('banana')
 
 
-def test_functions_not_implemented(mocker):
-    """Confirm that we do not implement a few functions for Postgres."""
-    mocker.patch('autosubmit.history.database_managers.experiment_history_db_manager.session')
-    db_manager = SqlAlchemyExperimentHistoryDbManager(None, BasicConfig.JOBDATA_DIR)
-    # NOTE: These are all parameter-less.
-    for fn in [
-        'is_header_ready_db_version',
-        'is_current_version',
-        'update_historical_database'
-    ]:
-        with pytest.raises(NotImplementedError):
-            getattr(db_manager, fn)()
+def _set_only_version(db_manager, version: int) -> None:
+    """Reset the recorded migrations and leave only ``version`` (test helper)."""
+    with db_manager.engine.begin() as conn:
+        conn.execute(delete(db_manager._version_table))
+        db_manager._set_db_version(conn, version)
+
+
+def test_sqlalchemy_create_creates_index_and_current_version(sqlalchemy_db_manager) -> None:
+    """A freshly initialized SQLAlchemy database is current and has the job_data index."""
+    assert sqlalchemy_db_manager.my_database_exists() is True
+    assert sqlalchemy_db_manager._get_db_version() == CURRENT_DB_VERSION
+    assert sqlalchemy_db_manager.is_current_version() is True
+    assert sqlalchemy_db_manager.is_header_ready_db_version() is True
+
+    inspector = inspect(sqlalchemy_db_manager.engine)
+    indexes = {idx['name'] for idx in inspector.get_indexes(JobDataTable.name)}
+    assert "ix_job_data_job_name" in indexes
+
+
+@pytest.mark.parametrize(
+    "stored_version, expected_current, expected_header_ready",
+    [
+        (0, False, False),
+        (DB_EXPERIMENT_HEADER_SCHEMA_CHANGES - 1, False, False),
+        (DB_EXPERIMENT_HEADER_SCHEMA_CHANGES, False, True),
+        (CURRENT_DB_VERSION, True, True),
+    ],
+)
+def test_sqlalchemy_version_checks(
+    sqlalchemy_db_manager, stored_version: int, expected_current: bool, expected_header_ready: bool
+) -> None:
+    """Report the current/header-ready flags based on the recorded schema version."""
+    _set_only_version(sqlalchemy_db_manager, stored_version)
+
+    assert sqlalchemy_db_manager.is_current_version() is expected_current
+    assert sqlalchemy_db_manager.is_header_ready_db_version() is expected_header_ready
+
+
+def test_sqlalchemy_update_historical_database_restamps_version(sqlalchemy_db_manager) -> None:
+    """update_historical_database() brings an outdated schema version back to the current one."""
+    _set_only_version(sqlalchemy_db_manager, 0)
+
+    sqlalchemy_db_manager.update_historical_database()
+
+    assert sqlalchemy_db_manager.is_current_version() is True
+    assert sqlalchemy_db_manager.is_header_ready_db_version() is True
+
+
+def test_sqlalchemy_no_database_reports_version_zero(tmp_path, monkeypatch) -> None:
+    """A manager pointing to a non-existent database reports version 0."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    db_manager = SqlAlchemyExperimentHistoryDbManager(
+        schema="t000",
+        jobdata_path=str(tmp_path / "wrong-folder"),
+        jobdata_file="job_data_t000.db",
+    )
+
+    assert db_manager.my_database_exists() is False
+    assert db_manager._get_db_version() == 0
+    assert db_manager.is_current_version() is False
+    assert db_manager.is_header_ready_db_version() is False
 
 
 def test_select_jobs_data_regression_sqlite_variable_limit(tmp_path, monkeypatch):

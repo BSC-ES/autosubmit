@@ -30,6 +30,7 @@ from sqlalchemy.schema import CreateTable
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session, tables
+from autosubmit.database.migrations import record_migration, schema_migrations_table
 from autosubmit.log.log import AutosubmitCritical, Log
 
 if TYPE_CHECKING:
@@ -40,6 +41,13 @@ if TYPE_CHECKING:
 CURRENT_DATABASE_VERSION = 1
 TIMEOUT = 15
 _SQLITE_MAX_VARIABLES = 999
+
+# The general database tracks its schema version in ``schema_migrations``.
+# TODO: the legacy ``db_version`` table is kept for compatibility until the
+#       SQLite/Postgres general paths are unified (see #3114 C5).
+_SCHEMA_MIGRATIONS_TABLE = schema_migrations_table(
+    tables.metadata_obj, name="general_schema_migrations"
+)
 
 
 def create_db(qry):
@@ -725,8 +733,10 @@ def _create_db_pg() -> bool:
         with _get_sqlalchemy_conn() as conn, conn.begin():
             for table in tables_to_create:
                 conn.execute(CreateTable(table, if_not_exists=True))
+            conn.execute(CreateTable(_SCHEMA_MIGRATIONS_TABLE, if_not_exists=True))
+            record_migration(conn, _SCHEMA_MIGRATIONS_TABLE, CURRENT_DATABASE_VERSION)
             conn.execute(delete(tables.DBVersionTable))
-            conn.execute(insert(tables.DBVersionTable).values({"version": 1}))
+            conn.execute(insert(tables.DBVersionTable).values({"version": CURRENT_DATABASE_VERSION}))
     except Exception as exc:
         raise AutosubmitCritical(f"Database can not be created: {str(exc)}", 7004, str(exc))
 

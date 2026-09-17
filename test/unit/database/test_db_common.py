@@ -22,12 +22,26 @@ the ``test/integration/test_db_common.py`` for more tests.
 """
 
 import inspect
+import sqlite3
 
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
 from autosubmit.log.log import AutosubmitCritical
+
+
+def test_install_creates_schema_migrations(autosubmit_config) -> None:
+    """install() creates the general database with a recorded schema version."""
+    autosubmit_config("a000", {})
+
+    conn = sqlite3.connect(BasicConfig.DB_PATH)
+    try:
+        rows = conn.execute("SELECT version FROM general_schema_migrations").fetchall()
+    finally:
+        conn.close()
+
+    assert rows == [(db_common.CURRENT_DATABASE_VERSION,)]
 
 
 @pytest.mark.parametrize(

@@ -18,7 +18,19 @@
 from unittest.mock import patch
 
 from autosubmit.database.db_manager_job_list import JobsDbManager
+from autosubmit.database.migrations import get_schema_version
 from autosubmit.database.tables import ExperimentStructureTable, JobsTable
+
+
+def test_jobs_db_manager_records_schema_version(tmp_path):
+    """JobsDbManager records its schema version in schema_migrations."""
+    with patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path)):
+        mgr = JobsDbManager(schema="test_schema_version")
+        mgr.create_table(JobsTable.name)
+
+        version = get_schema_version(mgr.engine, mgr._schema_migrations_table, mgr.schema)
+
+        assert version == JobsDbManager.SCHEMA_VERSION
 
 
 def test_save_job_log_includes_updated_stats(tmp_path):
