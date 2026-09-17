@@ -34,7 +34,7 @@ import setproctitle
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.runtime import LogRecoveryConfig, resolve_log_recovery_queue_size
-from autosubmit.database.db_manager_job_list import JobsDbManager
+from autosubmit.database.managers.job_list import JobsDbManager
 from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, Log
