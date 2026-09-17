@@ -20,7 +20,7 @@ Autosubmit is free software, licensed under |license|.
 Install Autosubmit
 ==================
 
-Autosubmit is distributed via PyPI and as source on GitHub. Choose one of the methods below.
+Autosubmit is distributed via `PyPI`_ and as source on `GitHub`_. Choose one of the methods below.
 The commands use ``apt`` and assume Ubuntu 22.04 LTS or 24.04 LTS, whose default ``python3`` falls within the supported range; adjust for other distributions.
 
 .. _install-with-pip:
@@ -52,7 +52,7 @@ Then proceed to :ref:`quick-setup` or :ref:`full-setup`.
 Build from source
 -----------------
 
-Clone `github.com/BSC-ES/autosubmit <https://github.com/BSC-ES/autosubmit>`_ and install with ``pip`` from a working copy. Install the same system dependencies as shown in :ref:`install-with-pip` first.
+Clone the source from `GitHub`_ and install with ``pip`` from a working copy.
 
 .. code-block:: bash
 
@@ -64,9 +64,6 @@ Then proceed to :ref:`quick-setup` or :ref:`full-setup`.
 
 Verify the install
 ------------------
-
-.. hint::
-    ``autosubmit -v`` prints the installed version, ``autosubmit readme`` prints the README, and ``autosubmit changelog`` prints the changelog.
 
 .. runcmd:: autosubmit -v
 
@@ -94,9 +91,6 @@ For a personal test with a user-level database. This creates ``$HOME/.autosubmit
 
     # Run the experiment
     autosubmit run a000
-
-.. important::
-    In Autosubmit ``<= 4.1.16``, ``autosubmit configure`` created the directories itself. From the next release onwards, that is the responsibility of ``autosubmit install``. If you are upgrading, run ``autosubmit install`` after ``autosubmit configure``.
 
 .. hint::
     The ``dialog`` (GUI) library is optional. Without it, ``autosubmit configure`` prompts on the CLI. Use ``autosubmit configure -h`` to see all options.
@@ -157,9 +151,9 @@ Example: user-level ``.autosubmitrc``
 Full setup
 ==========
 
-For a production environment with a shared database in ``/etc/autosubmitrc``, letting multiple users share and view others' experiments.
+Use this setup for production. Configuration goes in ``/etc/autosubmitrc``, which points every user on the machine at the same experiment database, so they can see and work with each other's experiments.
 
-Precedence between configuration files:
+Priority order of configuration files:
 
 ``AUTOSUBMIT_CONFIGURATION`` > ``$HOME/.autosubmitrc`` > ``/etc/autosubmitrc``
 
@@ -286,3 +280,6 @@ Dependencies and licenses
    Generated at build time from ``pyproject.toml``.
 
    .. dependencies_licenses::
+
+.. _PyPI: https://pypi.org/project/autosubmit/
+.. _GitHub: https://github.com/BSC-ES/autosubmit

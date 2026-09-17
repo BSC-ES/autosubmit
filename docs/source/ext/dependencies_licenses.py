@@ -45,7 +45,7 @@ ColumnWidth = Literal[30, 20, 50]
 
 # A ``License`` metadata field longer than this, or spanning several lines, is
 # the full licence text rather than a name, and is not usable as a table cell.
-_MAX_LICENSE_NAME_LENGTH = 64
+_MAX_LICENSE_NAME_LENGTH = 128
 
 # Carries no information beyond what the other classifiers already say.
 _UNSPECIFIC_CLASSIFIERS = frozenset({"License :: OSI Approved"})
