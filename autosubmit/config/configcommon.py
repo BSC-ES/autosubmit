@@ -2360,7 +2360,7 @@ class AutosubmitConfig:
             return self.experiment_data["DEFAULT"]["HPCARCH"].upper()
         except KeyError:
             raise AutosubmitCritical(
-                "Defaul HPCARCH not defined in the configuration file", 7014
+                "Default HPCARCH not defined in the configuration file", 7014
             )
         except Exception as exc:
             raise AutosubmitCritical(
@@ -2739,7 +2739,7 @@ class AutosubmitConfig:
         if not datelist or not chunks:
             return
 
-        if isinstance(datelist, str) or isinstance(datelist, int):
+        if isinstance(datelist, (str, int)):
             datelist = str(datelist).split()
 
         for section_name, section_data in self.jobs_data.items():

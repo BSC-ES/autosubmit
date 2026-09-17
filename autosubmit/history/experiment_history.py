@@ -12,8 +12,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import os
 import traceback
+from pathlib import Path
 from time import time
 
 import autosubmit.history.database_managers.database_models as Models
@@ -525,8 +525,10 @@ def get_historical_database(expid, job_list, as_conf):
     try:
         ExperimentStatus(expid).set_as_running()
     except Exception as e:
-        # Connection to status database ec_earth.db can fail.
+        # Connection to status database as_times.db can fail.
         # API worker will fix the status.
-        Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
-                  f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
+        Log.debug(
+            f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
+            f"{Path(BasicConfig.DB_DIR) / BasicConfig.AS_TIMES_DB}. Exception: {str(e)}"
+        )
     return exp_history

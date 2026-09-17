@@ -49,6 +49,11 @@ def get_current_datetime() -> str:
     return datetime.now(LOCAL_TZ).strftime(DATETIME_FORMAT)
 
 
+def get_current_datetime_utc() -> str:
+    """Returns the current UTC time in format '%Y-%m-%dT%H:%M:%S%z'."""
+    return datetime.now(timezone.utc).strftime(DATETIME_FORMAT)
+
+
 def get_current_datetime_if_none(argument: Any) -> str | None:
     # type : (Any) -> Union[Any, str]
     """ Returns the current time in format '%Y-%m-%dT%H:%M:%S%z' if the supplied argument is None, else return argument. """

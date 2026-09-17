@@ -35,7 +35,7 @@ from autosubmit.history.strategies import (
     PlatformInformationHandler,
     StraightWrapperAssociationStrategy,
 )
-from autosubmit.history.utils import get_current_datetime
+from autosubmit.history.utils import get_current_datetime, get_current_datetime_utc
 from test._oldschema import old_experiment_run_table, old_job_data_table
 
 EXPID_TT00_SOURCE = "test_database.db~"
@@ -52,6 +52,13 @@ def test_get_current_datetime():
     current_datetime = get_current_datetime()
     assert isinstance(current_datetime, str)
     pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$"
+    assert re.match(pattern, current_datetime) is not None
+
+
+def test_get_current_datetime_utc():
+    current_datetime = get_current_datetime_utc()
+    assert isinstance(current_datetime, str)
+    pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0000$"
     assert re.match(pattern, current_datetime) is not None
 
 

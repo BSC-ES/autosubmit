@@ -64,6 +64,7 @@ from autosubmit.helpers.version import get_version
 from autosubmit.history.experiment_history import (
     ExperimentHistory,
 )
+from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.job.job_common import get_job_status
 from autosubmit.job.job_grouping import JobGrouping
 from autosubmit.job.job_list import JobList, load_job_list
@@ -335,6 +336,14 @@ def expid_fn(
         )
         Log.debug(f"Error calling save_update_details: {str(e)}")
 
+    try:
+        ExperimentStatus(exp_id).set_as_not_running()
+    except Exception as e:
+        Log.warning(
+            f"Could not update the status of experiment {exp_id}. "
+            f"The status will be fixed by the API worker. Error: {str(e)}"
+        )
+
     Log.result(f"Experiment {exp_id} created")
     return exp_id
 
@@ -441,13 +450,6 @@ def _delete_experiment(expid: str, force: bool) -> None:
 
     Log.info(f"Deleting experiment {expid}")
 
-    # Try to delete the experiment details
-    try:
-        ExperimentDetails(expid).delete_details()
-    except Exception as e:
-        Log.warning(f"Failed to delete DB details for experiment {expid}: {str(e)}")
-        raise
-
     try:
         _delete_expid(expid, force)
         Log.info(f"Experiment {expid} has been deleted")
@@ -458,7 +460,7 @@ def _delete_experiment(expid: str, force: bool) -> None:
 
 
 def _delete_expid(expid_delete: str, force: bool = False) -> None:
-    """Removes an experiment from the path and database.
+    """Removes an experiment from the path and marks it as deleted in the database.
 
     If the current user is eadmin and the -f flag has been sent, it deletes regardless of experiment owner.
 
@@ -517,7 +519,7 @@ def _delete_expid(expid_delete: str, force: bool = False) -> None:
             )
 
     message_parts = [
-        f"The {expid_delete} experiment was removed from the local disk and from the database.",
+        f"The {expid_delete} experiment was removed from local disk and marked as deleted in the database.",
         "Note that this action does not delete any data written by the experiment.",
         "Complete list of files/directories deleted:",
         "",
@@ -562,15 +564,16 @@ def _perform_deletion(
     :return: An error message if any errors occurred during deletion, otherwise an empty string.
     """
     error_message = []
-
     is_sqlite = BasicConfig.DATABASE_BACKEND == "sqlite"
 
-    Log.info(f"Deleting experiment from {BasicConfig.DATABASE_BACKEND} database...")
+    Log.info(
+        f"Updating experiment status in {BasicConfig.DATABASE_BACKEND} database..."
+    )
     try:
         db_common.delete_experiment(expid_delete)
-        Log.result(f"Experiment {expid_delete} deleted from database")
+        Log.result(f"Experiment {expid_delete} marked as deleted in database")
     except Exception as e:
-        error_message.append(f"Cannot delete experiment entry: {e}")
+        return f"Cannot update experiment metadata: {e}"
 
     Log.info("Removing experiment directory...")
     try:
@@ -1055,6 +1058,13 @@ def create(
                 )
             Log.result("\nJob list created successfully")
             Log.warning("Remember to MODIFY the MODEL config files!")
+            try:
+                ExperimentStatus(expid).set_as_not_running()
+            except Exception as e:
+                Log.warning(
+                    f"Could not update the status of experiment {expid}. "
+                    f"The status will be fixed by the API worker. Error: {str(e)}"
+                )
             fh.flush()
             os.fsync(fh.fileno())
             if detail:
@@ -1078,6 +1088,11 @@ def archive(expid: str, noclean=True, uncompress=True, create_rocrate=False) -> 
     :param create_rocrate: flag to enable RO-Crate
     :return: ``True`` if the experiment has been successfully archived. ``False`` otherwise.
     """
+    if process_id(expid) is not None:
+        raise AutosubmitCritical(
+            "Ensure no processes are running in the experiment directory", 7076
+        )
+
     exp_folder = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(expid)
 
     if not noclean:
@@ -1159,6 +1174,13 @@ def archive(expid: str, noclean=True, uncompress=True, create_rocrate=False) -> 
                 )
 
     Log.result("Experiment archived successfully")
+    try:
+        ExperimentStatus(expid).set_as_archived()
+    except Exception as e:
+        Log.warning(
+            f"Could not mark experiment {expid} as archived. "
+            f"The status will be fixed by the API worker. Error: {str(e)}"
+        )
     return True
 
 
@@ -1218,6 +1240,14 @@ def unarchive(experiment_id: str, uncompressed=True, create_rocrate=False) -> bo
         return False
 
     Log.info("Unpacking finished")
+
+    try:
+        ExperimentStatus(experiment_id).set_as_not_running()
+    except Exception as e:
+        Log.warning(
+            f"Could not update the status of experiment {experiment_id}. "
+            f"The status will be fixed by the API worker. Error: {str(e)}"
+        )
 
     try:
         archive_path.unlink()

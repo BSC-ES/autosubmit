@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -15,13 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import sqlite3
 import textwrap
 from pathlib import Path
 from typing import Protocol, cast
 
-from sqlalchemy import select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy import insert, select, text, update
+from sqlalchemy.exc import (
+    DBAPIError as SqlAlchemyDBAPIError,
+    IntegrityError as SqlAlchemyIntegrityError,
+)
 from sqlalchemy.schema import CreateTable
 
 import autosubmit.history.utils as HUtils
@@ -33,6 +36,7 @@ from autosubmit.history.database_managers.database_manager import (
     DEFAULT_LOCAL_ROOT_DIR,
     DatabaseManager,
 )
+from autosubmit.log.log import Log
 
 
 class ExperimentStatusDbManager(DatabaseManager):
@@ -55,31 +59,33 @@ class ExperimentStatusDbManager(DatabaseManager):
         self._validate_status_database()
 
     def _validate_status_database(self):
-        """ Creates experiment_status table if it does not exist """
-        create_table_query = textwrap.dedent(
-            '''CREATE TABLE
+        """Creates experiment_status table if it does not exist"""
+        create_table_query = textwrap.dedent("""CREATE TABLE
                 IF NOT EXISTS experiment_status (
                 exp_id integer PRIMARY KEY,
                 name text NOT NULL,
                 status text NOT NULL,
                 seconds_diff integer NOT NULL,
-                modified text NOT NULL
-            );'''
-        )
+                modified text NOT NULL,
+                last_heartbeat text
+            );""")
         self.execute_statement_on_dbfile(self._as_times_file_path, create_table_query)
 
-    def set_existing_experiment_status_as_running(self, expid: str) -> None:
-        """ Set the experiment_status row as running. """
-        self.update_exp_status(expid, Models.RunningStatus.RUNNING)
+        # backward compatibility
+        # TODO(#1286): replace with a proper DB migration
+        self._add_column_if_missing("last_heartbeat", "text")
 
-    def create_experiment_status_as_running(self, experiment: Models.ExperimentRow) -> None:
-        """ Create a new experiment_status row for the Models.Experiment item."""
-        self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
 
-    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None:
-        """Get Models.ExperimentRow by expid."""
-        experiment_row = self.get_experiment_row_by_expid(expid)
-        return self.get_experiment_status_row_by_exp_id(experiment_row.id)
+    def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
+        """Add a column to the experiment_status table if it is missing."""        
+        try:
+            self.execute_statement_on_dbfile(
+                self._as_times_file_path,
+                f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type}",
+            )
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e):
+                raise
 
     def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow:
         """Get the experiment from ecearth.db by expid as Models.ExperimentRow."""
@@ -101,30 +107,89 @@ class ExperimentStatusDbManager(DatabaseManager):
         return Models.ExperimentStatusRow(*current_rows[0])
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int:
-        """Create experiment status."""
-        statement = ''' INSERT INTO experiment_status(exp_id, name,
-        status, seconds_diff, modified) VALUES(?,?,?,?,?) '''
-        arguments = (exp_id, expid, status, 0, HUtils.get_current_datetime())
-        return self.insert_statement_with_arguments(self._as_times_file_path, statement, arguments)
+        """Insert a new experiment status row in the database.
 
-    def update_exp_status(self, expid: str, status="RUNNING") -> None:
+        Raises IntegrityError if a row with the same exp_id already exists
+        (in databases where the primary key is enforced).
         """
-        Update status, seconds_diff, modified in experiment_status.
+        statement = """
+            INSERT INTO experiment_status(exp_id, name, status, seconds_diff, modified)
+            VALUES(?, ?, ?, ?, ?)
         """
-        statement = ''' UPDATE experiment_status SET status = ?, 
-        seconds_diff = ?, modified = ? WHERE name = ? '''
-        arguments = (status, 0, HUtils.get_current_datetime(), expid)
+        arguments = (exp_id, expid, status, 0, HUtils.get_current_datetime_utc())
+        return self.insert_statement_with_arguments(
+            self._as_times_file_path, statement, arguments
+        )
+
+    def update_exp_status(
+        self,
+        expid: str,
+        status: str = Models.RunningStatus.RUNNING,
+        exp_id: int | None = None,
+    ) -> int:
+        """Update the status and heartbeat of an experiment, keyed by ``name``.
+
+        :return: The number of rows updated.
+        """
+        now = HUtils.get_current_datetime_utc()
+        statement = """
+            UPDATE experiment_status
+            SET exp_id = COALESCE(?, exp_id),
+                status = ?,
+                seconds_diff = ?,
+                modified = ?,
+                last_heartbeat = CASE WHEN ? = ? THEN ? ELSE last_heartbeat END
+            WHERE name = ?
+        """
+        arguments = (
+            exp_id,
+            status,
+            0,
+            now,
+            status,
+            Models.RunningStatus.RUNNING,
+            now,
+            expid,
+        )
+        return self.execute_statement_with_arguments_on_dbfile(
+            self._as_times_file_path, statement, arguments
+        )
+
+    def set_exp_status(self, expid: str, status: str) -> None:
+        """Set the status of ``expid``.
+
+        Legacy ``as_times.db`` files may have duplicate rows for an experiment, so
+        they are collapsed.
+        """
+        if _set_experiment_status(self, expid, status) > 1:
+            self._deduplicate_exp_status_rows(expid)
+
+    def _deduplicate_exp_status_rows(self, expid: str) -> None:
+        """Keep only the most recently inserted ``experiment_status`` row.
+
+        Legacy ``as_times.db`` files have no primary key or unique index, so they can
+        have more than one row per experiment. This collapses them, keeping the last
+        inserted one.
+        """
         self.execute_statement_with_arguments_on_dbfile(
-            self._as_times_file_path, statement, arguments)
+            self._as_times_file_path,
+            """DELETE FROM experiment_status
+               WHERE name = ?
+                 AND rowid NOT IN (SELECT MAX(rowid) FROM experiment_status WHERE name = ?)""",
+            (expid, expid),
+        )
+
+    def update_heartbeat(self, expid: str) -> int:
+        now = HUtils.get_current_datetime_utc()
+        statement = """ UPDATE experiment_status SET last_heartbeat = ?, modified = ?
+        WHERE name = ? AND status = ?"""
+        arguments = (now, now, expid, Models.RunningStatus.RUNNING)
+        return self.execute_statement_with_arguments_on_dbfile(
+            self._as_times_file_path, statement, arguments
+        )
 
 
 class ExperimentStatusDatabaseManager(Protocol):
-
-    def set_existing_experiment_status_as_running(self, expid: str) -> None: ...
-
-    def create_experiment_status_as_running(self, experiment: Models.ExperimentRow) -> None: ...
-
-    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None: ...
 
     def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow: ...
 
@@ -132,7 +197,52 @@ class ExperimentStatusDatabaseManager(Protocol):
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int: ...
 
-    def update_exp_status(self, expid: str, status="RUNNING") -> None: ...
+    def set_exp_status(self, expid: str, status: str) -> None: ...
+
+    def update_exp_status(
+        self,
+        expid: str,
+        status: str = Models.RunningStatus.RUNNING,
+        exp_id: int | None = None,
+    ) -> int: ...
+
+    def update_heartbeat(self, expid: str) -> int: ...
+
+
+def _set_experiment_status(
+    manager: ExperimentStatusDatabaseManager, expid: str, status: str
+) -> int:
+    """Set the status of ``expid``, keyed by the experiment name.
+
+    The ``experiment_status`` table is identified by ``name``: legacy ``as_times.db``
+    have no primary key, so a plain ``INSERT`` never conflicts and an upsert cannot be used. 
+    The existing rows are updated first and a new row is inserted if nothing matched.
+
+    :param manager: The experiment status database manager.
+    :param expid: The experiment identifier (the ``name`` column).
+    :param status: The new status.
+    :return: The number of existing rows that matched the experiment name (``0`` when a
+        new row was inserted).
+    """
+    try:
+        exp_id = manager.get_experiment_row_by_expid(expid).id
+    except ValueError as e:
+        Log.warning(
+            f"Experiment {expid} not found when trying to set status. Exception: {str(e)}"
+        )
+        return 0
+
+    matched = manager.update_exp_status(expid, status, exp_id)
+    if matched == 0:
+        try:
+            manager.create_exp_status(exp_id, expid, status)
+        except (sqlite3.IntegrityError, SqlAlchemyIntegrityError):
+            # Another process created the row after our update: update it instead.
+            matched = manager.update_exp_status(expid, status, exp_id)
+        else:
+            if status == Models.RunningStatus.RUNNING:
+                manager.update_heartbeat(expid)
+    return matched
 
 
 class SqlAlchemyExperimentStatusDbManager:
@@ -151,18 +261,29 @@ class SqlAlchemyExperimentStatusDbManager:
         self.engine = session.get_engine(
             db_path=Path(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)
         )
+        self._validate_status_database()
+
+    def _validate_status_database(self) -> None:
+        """Creates experiment_status table if it does not exist"""
         with self.engine.connect() as conn, conn.begin():
             conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
 
-    def set_existing_experiment_status_as_running(self, expid):
-        self.update_exp_status(expid, Models.RunningStatus.RUNNING)
+        # TODO(#1286): replace with a proper DB migration
+        self._add_column_if_missing("last_heartbeat", "TEXT")
 
-    def create_experiment_status_as_running(self, experiment):
-        self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
 
-    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None:
-        experiment_row = self.get_experiment_row_by_expid(expid)
-        return self.get_experiment_status_row_by_exp_id(experiment_row.id)
+    def _add_column_if_missing(self, column_name: str, column_type: str) -> None:
+        """Add a column to the experiment_status table if it is missing."""        try:
+            with self.engine.connect() as conn, conn.begin():
+                conn.execute(
+                    text(
+                        f"ALTER TABLE experiment_status ADD COLUMN {column_name} {column_type}"
+                    )
+                )
+        except SqlAlchemyDBAPIError as e:
+            message = str(e).lower()
+            if "duplicate column" not in message and "already exists" not in message:
+                raise
 
     def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow:
         query = (
@@ -173,7 +294,12 @@ class SqlAlchemyExperimentStatusDbManager:
             row = conn.execute(query).first()
             if not row:
                 raise ValueError(f"Experiment {expid} not found in Postgres {expid}")
-        return Models.ExperimentRow(*row)
+        return Models.ExperimentRow(
+            id=row.id,
+            name=row.name,
+            autosubmit_version=row.autosubmit_version,
+            description=row.description,
+        )
 
     def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Models.ExperimentStatusRow | None:
         query = (
@@ -187,49 +313,70 @@ class SqlAlchemyExperimentStatusDbManager:
         return Models.ExperimentStatusRow(*row)
 
     def create_exp_status(self, exp_id: int, expid: str, status: str) -> int:
-        """Upsert a new experiment status row in the database. If the row already exists, it will be updated."""
-        if BasicConfig.DATABASE_BACKEND == "postgres":
-            _insert_fn = pg_insert
-        else:
-            _insert_fn = sqlite_insert
-        query = (
-            _insert_fn(ExperimentStatusTable)
-            .values(
-                exp_id=exp_id,
-                name=expid,
-                status=status,
-                seconds_diff=0,
-                modified=HUtils.get_current_datetime(),
-            )
-            .on_conflict_do_update(
-                index_elements=[ExperimentStatusTable.c.exp_id],  # type: ignore
-                set_={
-                    "name": expid,
-                    "status": status,
-                    "seconds_diff": 0,
-                    "modified": HUtils.get_current_datetime(),
-                },
-            )
-        )
-        with self.engine.connect() as conn:
-            with conn.begin():
-                result = conn.execute(query)
-                # NOTE: SQLite == rowcount(), PG == rowcount. Intriguing.
-                row_count = result.rowcount() if callable(result.rowcount) else result.rowcount
-        return row_count
+        """Insert a new experiment status row in the database.
 
-    def update_exp_status(self, expid: str, status="RUNNING") -> None:
-        query = (
-            update(ExperimentStatusTable).
-            where(ExperimentStatusTable.c.name == expid).  # type: ignore
-            values(
-                status=status,
-                seconds_diff=0,
-                modified=HUtils.get_current_datetime()
-            )
+        Raises IntegrityError if a row with the same exp_id already exists
+        (in databases where the primary key is enforced).
+        """
+        query = insert(ExperimentStatusTable).values(
+            exp_id=exp_id,
+            name=expid,
+            status=status,
+            seconds_diff=0,
+            modified=HUtils.get_current_datetime_utc(),
         )
         with self.engine.connect() as conn, conn.begin():
-            conn.execute(query)
+            row_count = conn.execute(query).rowcount
+        return row_count
+
+    def update_exp_status(
+        self,
+        expid: str,
+        status: str = Models.RunningStatus.RUNNING,
+        exp_id: int | None = None,
+    ) -> int:
+        """Update the status and heartbeat of an experiment, keyed by ``name``.
+
+        :return: The number of rows updated.
+        """
+        now = HUtils.get_current_datetime_utc()
+        query = (
+            update(ExperimentStatusTable)
+            .where(ExperimentStatusTable.c.name == expid)  # type: ignore
+            .values(
+                status=status,
+                seconds_diff=0,
+                modified=now,
+                last_heartbeat=now
+                if status == Models.RunningStatus.RUNNING
+                else ExperimentStatusTable.c.last_heartbeat,  # type: ignore
+            )
+        )
+        if exp_id is not None:
+            query = query.values(exp_id=exp_id)
+        with self.engine.connect() as conn, conn.begin():
+            return conn.execute(query).rowcount or 0
+
+    def set_exp_status(self, expid: str, status: str) -> None:
+        """Set the status of ``expid``.
+
+        Postgres tables are always created with ``exp_id`` as primary key, so there
+        is no need to collapse duplicate rows as in the legacy SQLite databases.
+        """
+        _set_experiment_status(self, expid, status)
+
+    def update_heartbeat(self, expid: str) -> int:
+        now = HUtils.get_current_datetime_utc()
+        query = (
+            update(ExperimentStatusTable)
+            .where(
+                (ExperimentStatusTable.c.name == expid)  # type: ignore
+                & (ExperimentStatusTable.c.status == Models.RunningStatus.RUNNING)  # type: ignore
+            )
+            .values(last_heartbeat=now, modified=now)
+        )
+        with self.engine.connect() as conn, conn.begin():
+            return conn.execute(query).rowcount or 0
 
 
 def create_experiment_status_db_manager(db_engine: str, **options) -> ExperimentStatusDatabaseManager:
