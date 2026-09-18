@@ -60,6 +60,7 @@ class RunOptions(ExpidOptions):
     profile_trace: bool
     profile_max_iterations: int
 
+    acquires_lock = True
 
 def args_parser() -> ArgumentParser:
     parser = create_argparse_parser(__doc__)

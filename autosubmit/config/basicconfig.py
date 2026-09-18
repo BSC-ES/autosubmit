@@ -76,6 +76,10 @@ class BasicConfig:
         return BasicConfig.expid_dir(exp_id).joinpath(BasicConfig.LOCAL_TMP_DIR)
 
     @staticmethod
+    def expid_lock_file(exp_id):
+        return BasicConfig.expid_tmp_dir(exp_id).joinpath('autosubmit.lock')
+
+    @staticmethod
     def expid_log_dir(exp_id):
         return BasicConfig.expid_tmp_dir(exp_id).joinpath(f'LOG_{exp_id}')
 

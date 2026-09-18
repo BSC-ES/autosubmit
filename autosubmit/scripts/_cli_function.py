@@ -19,9 +19,11 @@
 
 from argparse import ArgumentParser
 from collections.abc import Callable
+from contextlib import nullcontext
 from functools import wraps
 from typing import TYPE_CHECKING
 
+from autosubmit.experiment.lock import experiment_lock
 from autosubmit.log import setup_log_files
 from autosubmit.scripts._args import (
     CommandGroup,
@@ -60,6 +62,7 @@ def cli_function(
     * parsing command-line arguments;
     * validating options;
     * handling command exceptions;
+    * holding the experiment lock while the command runs, if the options declare it;
     * converting command return values into process exit codes.
 
     :param args_parser: The argparse parser for the sub-command.
@@ -169,7 +172,12 @@ def cli_function(
 
                     opts._profiler = profiler
 
-                return_value = func(opts, **kwargs)
+                with (
+                    experiment_lock(opts.expid)
+                    if getattr(options_type, "acquires_lock", False)
+                    else nullcontext()
+                ):
+                    return_value = func(opts, **kwargs)
 
                 return normalise_return_value(return_value)
             except KeyboardInterrupt:
