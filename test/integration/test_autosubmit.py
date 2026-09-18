@@ -682,7 +682,6 @@ def test_set_status_with_detail(autosubmit_exp):
     assert result is True
 
 
-
 def test_infinite_loop_dynamic_variable(autosubmit_exp):
     with pytest.raises(AutosubmitCritical) as ac:
         autosubmit_exp(experiment_data={
@@ -692,4 +691,4 @@ def test_infinite_loop_dynamic_variable(autosubmit_exp):
                 }
             }
         })
-    assert "Dynamic variables FDB_COPY_BIN causing infinite recursion during evaluation of the element %CURRENT_FDB_COPY_BIN%/fdb-copy" == str(ac.value.message)
+    assert "Dynamic variable FDB_COPY_BIN causing infinite recursion during evaluation of the element %CURRENT_FDB_COPY_BIN%/fdb-copy" == str(ac.value.message)
