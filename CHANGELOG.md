@@ -14,6 +14,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
+- Vertical wrappers no longer merge independent/parallel jobs into a single package; each wrapper now wraps a single dependency lineage #3106
 
 **New Features:**
 
@@ -54,6 +55,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Centralized Job.apply_status / Status.ACTIVE/RE_RUNNABLE #3231
 - stale-data recovery on set-status runs only for final targets (_FINAL_STATUSES) in job/manage.py instead of the autosubmit.py monolith. #3231
 - Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly (with edge-completion reconciliation), never loaded into the graph. #3231
+- Unified `JobPackagerVertical` and `JobPackagerVerticalMixed` into a single vertical packager #3106
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 

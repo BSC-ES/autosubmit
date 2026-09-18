@@ -2838,6 +2838,51 @@ class JobList:
                     jobs.append(job)
         return jobs
 
+    def get_pending_job_names(self, section_list: list, banned_jobs: list | None = None) -> set[str]:
+        """Names of the non-completed jobs of the given sections.
+
+        Uses the database when jobs may be unloaded (real runs); resolves them in
+        memory otherwise (e.g. ``create -cw`` preview), where the database statuses
+        are stale because the simulation is not persisted.
+
+        :param section_list: List of sections to filter jobs by.
+        :param banned_jobs: Job names to exclude from the result.
+        :return: Set of pending job names.
+        """
+        if not self.disable_save and self.dbmanager is not None:
+            return self.get_jobs_by_section_db(section_list, banned_jobs, get_only_non_completed=True)
+        return {job.name for job in self.get_jobs_by_section(section_list, banned_jobs, get_only_non_completed=True)}
+
+    def remaining_blocked_by_package(self, remaining_names: set[str], package_names: set[str]) -> bool:
+        """Return True when no non-COMPLETED parent outside the package or the
+        remaining chain can still feed the wrapper (i.e. no more jobs can come).
+
+        Delegates to the database when jobs may be unloaded (real runs); otherwise
+        resolves it in memory (e.g. ``create -cw`` preview), where the database
+        statuses are stale because the simulation is not persisted.
+
+        :param remaining_names: Names of the jobs still pending in the wrapper sections.
+        :param package_names: Names of the jobs already in the current package.
+        :return: True if the remaining jobs are blocked by the package dependencies.
+        """
+        if not self.disable_save and self.dbmanager is not None:
+            return self.dbmanager.remaining_blocked_by_package(remaining_names, package_names)
+        return self._remaining_blocked_by_package_in_memory(remaining_names, package_names)
+
+    def _remaining_blocked_by_package_in_memory(self, remaining_names: set[str], package_names: set[str]) -> bool:
+        """Requires the whole workflow to be loaded in memory.
+
+        :param remaining_names: Names of the jobs still pending in the wrapper sections.
+        :param package_names: Names of the jobs already in the current package.
+        :return: True if the remaining jobs are blocked by the package dependencies.
+        """
+        allowed_names = package_names | remaining_names
+        return all(
+            parent.status == Status.COMPLETED or parent.name in allowed_names
+            for job in self.job_list if job.name in remaining_names
+            for parent in job.parents
+        )
+
     def get_jobs_by_section_db(
             self,
             section_list: list,

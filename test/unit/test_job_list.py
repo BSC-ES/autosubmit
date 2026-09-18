@@ -455,6 +455,28 @@ def test_get_jobs_by_section_db(setup_job_list):
         )
 
 
+def test_remaining_blocked_by_package_in_memory(as_conf):
+    """In-memory counterpart of the DB check: blocked only when no non-COMPLETED
+    parent outside the package/remaining chain can still feed the wrapper."""
+    job_list = JobList(_EXPID, as_conf, YAMLParserFactory())
+    job_list.graph = networkx.DiGraph()
+    job_list.disable_save = True  # preview mode: resolve in memory, not via the DB
+
+    external = Job('external', 1, Status.WAITING, 0)
+    root = Job('root', 2, Status.WAITING, 0)
+    child = Job('child', 3, Status.WAITING, 0)
+    root.add_parent(external)
+    child.add_parent(root)
+    for job in (external, root, child):
+        job_list.add_job(job)
+
+    # `root` depends on a non-completed external job -> more jobs can still come.
+    assert job_list.remaining_blocked_by_package({'root', 'child'}, {'child'}) is False
+
+    external.status = Status.COMPLETED
+    assert job_list.remaining_blocked_by_package({'root', 'child'}, {'child'}) is True
+
+
 @pytest.mark.parametrize(
     'make_exception,seconds',
     [
