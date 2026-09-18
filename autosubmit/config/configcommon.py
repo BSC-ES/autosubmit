@@ -42,11 +42,13 @@ from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.platform_type import PlatformType
+from autosubmit.utils import validate_dependencies
 
 if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
     from autosubmit.platforms.platform import Platform
 
+REFERENCE_PATTERN = re.compile(r"%(.*?)%")
 
 class AutosubmitConfig:
     """Class to handle experiment configuration coming from a file or database.
@@ -859,6 +861,7 @@ class AutosubmitConfig:
         :returns: Current loaded experiment data  with substituted dynamic variables.
         :rtype: dict
         """
+        validate_dependencies(parameters)
         max_deep += len(self.dynamic_variables)
 
         dynamic_variables, pattern, start_long = self._initialize_variables()
@@ -880,8 +883,6 @@ class AutosubmitConfig:
             dynamic_variables = dynamic_variables_
             max_deep -= 1
 
-        if max_deep == 0:
-            Log.error(f"The Dynamic Variable recursion reach its limits of recursion to the variable: {dynamic_variables}")
         self.dynamic_variables = dynamic_variables
 
         self.clean_dynamic_variables(pattern)
@@ -982,24 +983,16 @@ class AutosubmitConfig:
         Substitute dynamic variables in the given keys.
 
         :param keys: List of keys to be processed.
-        :type keys: list[str]
         :param dynamic_var: Tuple containing the dynamic variable and its value.
-        :type dynamic_var: tuple[str, Any]
         :param parameters: Dictionary containing the parameters to be substituted.
-        :type parameters: dict[str, Any]
         :param pattern: Regex pattern to identify dynamic variables.
-        :type pattern: str
         :param start_long: Start index for long key format.
-        :type start_long: int
         :param dict_keys_type: Type of keys in the parameters dictionary, either "long" or "short".
-        :type dict_keys_type: str
         :param processed_dynamic_variables: Dictionary of already processed dynamic variables.
-        :type processed_dynamic_variables: dict[str, Any]
         :param in_the_end: Flag indicating whether to include special dynamic variables for substitution.
-        :type in_the_end: bool
         :return: A tuple containing the updated processed dynamic variables and parameters.
-        :rtype: tuple[dict[str, Any], dict[str, Any]]
         """
+        
         for i, key in enumerate(filter(None, keys)):
             matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
             if in_the_end and "^" in key:
@@ -2029,7 +2022,7 @@ class AutosubmitConfig:
             # However, special variables start with `^` that can break this logic since
             # it becomes part of the generated reference name.
             key_experiment_data = experiment_data[key]
-            if isinstance(key_experiment_data, str) and "%" in key_experiment_data:
+            if isinstance(key_experiment_data, str) and REFERENCE_PATTERN.findall(key_experiment_data):
                 try:
                     check_value = key_experiment_data.split("%")[1]
                     special_var = check_value[0] == "^"
