@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -15,7 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import threading
+"""Autosubmit database session."""
+
+from enum import Enum
 from pathlib import Path
 
 from sqlalchemy import Engine, NullPool
@@ -23,13 +25,24 @@ from sqlalchemy import create_engine as sqlalchemy_create_engine
 
 from autosubmit.config.basicconfig import BasicConfig
 
-__all__ = ["_resolve_engine", "get_engine"]
+__all__ = ["get_engine"]
+
+
+class DatabaseType(str, Enum):
+    """Enum for the database engine."""
+
+    SQLITE = "sqlite"
+    """SQLite database."""
+
+    POSTGRES = "postgres"
+    """Postgres database."""
 
 
 def _resolve_engine(connection_url: str) -> Engine:
     """Create SQLAlchemy Core engine and resolves the connection pool class based on the backend.
 
-    :param connection_url: A SQLAlchemy connection URL.
+    :param connection_url: An SQLAlchemy connection URL.
+    :return: The SQLAlchemy engine instance.
     """
     if not connection_url:
         raise ValueError(f"Invalid SQLAlchemy connection URL: {connection_url}")
@@ -39,40 +52,28 @@ def _resolve_engine(connection_url: str) -> Engine:
     return sqlalchemy_create_engine(connection_url, poolclass=pool_class)
 
 
-class PostgreSQLEngineSingleton:
-    """Singleton class to manage a single instance of the PostgreSQL engine."""
-
-    _instance: Engine = None
-    _lock: threading.Lock = threading.Lock()
-
-    @classmethod
-    def get_instance(cls) -> Engine:
-        """Get the singleton instance of the PostgreSQL engine."""
-        with cls._lock:
-            if cls._instance is None:
-                connection_url = BasicConfig.DATABASE_CONN_URL
-                cls._instance = _resolve_engine(connection_url)
-        return cls._instance
-
-
 def get_engine(db_path: str | Path) -> Engine:
     """Get SQLAlchemy Core engine.
-    This will resolve which backend to use based on the AS configuration.
 
-    In case the backend is PostgreSQL, the connection URL will be read from the environment variable,
-    and the engine will be reutilized from the global variable to use the same connection pool.
+    This will resolve which backend to use based on the Autosubmit configuration.
 
-    In case the backend is SQLite, a new engine will be created for each call based on the provided database path
-    with a NullPool to avoid accumulating open file descriptors.
+    If the backend is Postgres, Autosubmit will load the settings from the configuration file
+    and an engine will be created. Users are expected to control the engine, manage
+    if they need to recreate or dispose it.
+
+    If the backend is SQLite, a new engine is created for each call. It uses
+    the provided database path and a ``NullPool`` to reduce the number of
+    open file descriptors.
 
     :param db_path: Path to the database file, only used for SQLite.
+    :return: SQLAlchemy Core engine.
     """
     db_backend = BasicConfig.DATABASE_BACKEND
 
-    if db_backend == "sqlite":
+    if db_backend == DatabaseType.SQLITE:
         db_path = Path(db_path) if isinstance(db_path, str) else db_path
         db_path = db_path.resolve()
-        
+
         if not db_path.exists():
             if not db_path.parent.exists():
                 db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -82,8 +83,7 @@ def get_engine(db_path: str | Path) -> Engine:
 
         connection_url = f"sqlite:///{db_path}"
         return _resolve_engine(connection_url)
-    elif db_backend == "postgres":
-        # Get from singleton engine
-        return PostgreSQLEngineSingleton.get_instance()
-    else:
-        raise ValueError(f"Unsupported database backend: {db_backend}")
+    elif db_backend == DatabaseType.POSTGRES:
+        return _resolve_engine(BasicConfig.DATABASE_CONN_URL)
+
+    raise ValueError(f"Unsupported database backend: {db_backend}")
