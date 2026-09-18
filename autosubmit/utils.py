@@ -15,13 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import re
 from pathlib import Path
 
+import networkx as nx
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
+
+REFERENCE_PATTERN = re.compile(r"%(.*?)%")
 
 __all__ = [
     "as_conf_default_values",
@@ -32,59 +36,66 @@ __all__ = [
 ]
 
 
-def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", minimal_configuration: bool = False,
-                           git_repo: str = "", git_branch: str = "main", git_as_conf: str = "") -> None:
+def as_conf_default_values(
+    autosubmit_version: str,
+    exp_id: str,
+    hpc: str = "",
+    git_repo: str = "",
+    git_branch: str = "main",
+    git_as_conf: str = "",
+) -> None:
     """Replace default values in as_conf files.
 
     :param autosubmit_version: autosubmit version
     :param exp_id: experiment id
     :param hpc: platform
-    :param minimal_configuration: minimal configuration
     :param git_repo: path to project git repository
     :param git_branch: main branch
     :param git_as_conf: path to as_conf file in git repository
     :return: None
     """
     # open and replace values
-    yaml = YAML(typ='rt')
+    yaml = YAML(typ="rt")
     for as_conf_file in Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp_id}/conf").iterdir():
         as_conf_file_name = as_conf_file.name.lower()
-        if as_conf_file_name.endswith(('.yml', '.yaml')):
-            with open(as_conf_file, 'r+') as file:
+        if as_conf_file_name.endswith((".yml", ".yaml")):
+            with open(as_conf_file, "r+") as file:
                 yaml_data = yaml.load(file)
-                if 'CONFIG' in yaml_data:
-                    yaml_data['CONFIG']['AUTOSUBMIT_VERSION'] = autosubmit_version
+                if "CONFIG" in yaml_data:
+                    yaml_data["CONFIG"]["AUTOSUBMIT_VERSION"] = autosubmit_version
 
-                if 'MAIL' in yaml_data:
-                    yaml_data['MAIL']['NOTIFICATIONS'] = False
-                    yaml_data['MAIL']['TO'] = ""
+                if "MAIL" in yaml_data:
+                    yaml_data["MAIL"]["NOTIFICATIONS"] = False
+                    yaml_data["MAIL"]["TO"] = ""
 
-                if 'DEFAULT' in yaml_data:
-                    yaml_data['DEFAULT']['EXPID'] = exp_id
+                if "DEFAULT" in yaml_data:
+                    yaml_data["DEFAULT"]["EXPID"] = exp_id
                     if hpc != "":
-                        yaml_data['DEFAULT']['HPCARCH'] = hpc
-                    elif not yaml_data['DEFAULT']['HPCARCH']:
-                        yaml_data['DEFAULT']['HPCARCH'] = LocalPlatform.TYPE.value
+                        yaml_data["DEFAULT"]["HPCARCH"] = hpc
+                    elif not yaml_data["DEFAULT"]["HPCARCH"]:
+                        yaml_data["DEFAULT"]["HPCARCH"] = LocalPlatform.TYPE.value
 
-                if 'LOCAL' in yaml_data:
-                    yaml_data['LOCAL']['PROJECT_PATH'] = ""
+                if "LOCAL" in yaml_data:
+                    yaml_data["LOCAL"]["PROJECT_PATH"] = ""
 
-                if 'GIT' in yaml_data:
+                if "GIT" in yaml_data:
                     if git_repo != "":
-                        yaml_data['GIT']['PROJECT_ORIGIN'] = f'{git_repo}'
+                        yaml_data["GIT"]["PROJECT_ORIGIN"] = f"{git_repo}"
                     if git_branch != "":
-                        yaml_data['GIT']['PROJECT_BRANCH'] = f'{git_branch}'
-                
-                if 'PROJECT' in yaml_data:
+                        yaml_data["GIT"]["PROJECT_BRANCH"] = f"{git_branch}"
+
+                if "PROJECT" in yaml_data:
                     if git_repo != "":
-                        yaml_data['PROJECT']['PROJECT_TYPE'] = 'git'
-                        destination = yaml_data['PROJECT'].get('PROJECT_DESTINATION', '')
+                        yaml_data["PROJECT"]["PROJECT_TYPE"] = "git"
+                        destination = yaml_data["PROJECT"].get(
+                            "PROJECT_DESTINATION", ""
+                        )
                         # Overwrite only if empty
                         if not str(destination).strip():
-                            yaml_data['PROJECT']['PROJECT_DESTINATION'] = 'git_project'
+                            yaml_data["PROJECT"]["PROJECT_DESTINATION"] = "git_project"
 
-                if 'DEFAULT' in yaml_data and git_repo and git_as_conf:
-                    yaml_data['DEFAULT']['CUSTOM_CONFIG'] = f"%PROJDIR%/{git_as_conf}"
+                if "DEFAULT" in yaml_data and git_repo and git_as_conf:
+                    yaml_data["DEFAULT"]["CUSTOM_CONFIG"] = f"%PROJDIR%/{git_as_conf}"
 
             yaml.dump(yaml_data, as_conf_file)
 
@@ -214,3 +225,78 @@ def create_json(text: str):
     sds = {"sds": data}
     result = json.dumps(sds)
     return result
+
+def resolve_path(data, path):
+    """Resolve a dotted path, such as B.E.F, in a nested dictionary."""
+    current = data
+
+    for key in path.split("."):
+        if not isinstance(current, dict) or key not in current:
+            return False, None
+
+        current = current[key]
+
+    return True, current
+
+
+def build_dependency_graph(data):
+    """
+    Build a directed graph from a nested dictionary.
+
+    An edge A -> B means that evaluating A requires B.
+    """
+    graph = nx.DiGraph()
+    unresolved = []
+
+    def visit(value, path):
+        graph.add_node(path)
+
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_path = f"{path}.{key}" if path else str(key)
+
+                # Evaluating a dictionary requires evaluating its children.
+                graph.add_edge(path, child_path, kind="structure")
+
+                visit(child, child_path)
+
+        elif isinstance(value, str):
+            for reference in REFERENCE_PATTERN.findall(value):
+                reference = reference.strip()
+
+                exists, _ = resolve_path(data, reference)
+
+                if exists:
+                    graph.add_edge(
+                        path,
+                        reference,
+                        kind="reference",
+                    )
+                else:
+                    unresolved.append((path, reference))
+
+    for key, value in data.items():
+        visit(value, str(key))
+
+    return graph, unresolved
+
+
+def validate_dependencies(data):
+    graph, unresolved = build_dependency_graph(data)
+    # Find cycles in the directed graph.
+    cycles = list(nx.simple_cycles(graph))
+
+    if unresolved:
+        for variable in unresolved:
+            path_current = path_normal = variable[1]
+
+            aux_current_path = "CURRENT_"+path_current.split(".")[-1]
+            final_current_path = path_current.split(".")[-1] = aux_current_path
+
+            invalid_normal_path, _ = resolve_path(data, path_normal)
+            invalid_current_path, _ = resolve_path(data, final_current_path)
+
+            if invalid_normal_path or invalid_current_path or cycles:
+                raise AutosubmitCritical(
+                    f"Recursion was found validating the configuration files! \nPlease double check the following variable(s) {cycles}"
+                )

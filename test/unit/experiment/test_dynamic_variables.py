@@ -77,7 +77,7 @@ from autosubmit.log.log import AutosubmitCritical
         "Scripts upper/lower",
     ],
 )
-def test_infinite_loop_dynamic_variable(
+def test_dynamic_variable_deep_add_missing_starter_conf(
     autosubmit_config, general_data, experiment_data
 ):
     as_conf = autosubmit_config(
@@ -93,26 +93,167 @@ def test_infinite_loop_dynamic_variable(
     assert "causing infinite recursion during evaluation" in ac.value.message
 
 
-def test_infinite_loop_dynamic_variable_reload(
-    autosubmit_config, mocker
+@pytest.mark.parametrize(
+    "new_data",
+    [
+        {
+            "JOBS": {
+                "A": {
+                    "SCRIPT": "OK %TEST.TE_ME%",
+                },
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TE_ME": "Hi %TEST.TE_ME%",
+                "CHUNK": "%CHUNK%",
+            },
+        },
+        {
+            "JOBS": {
+                "A": {
+                    "SCRIPT": {"TEST": "OK %TEST.TEST_ME.TE_ME%"},
+                },
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TEST_ME": {"TE_ME": "Hi %TEST.TEST_ME.TE_ME%", "CHUNK": "%CHUNK%"},
+            },
+        },
+        {
+            "JOBS": {
+                "A": {"SCRIPT": "OK %TEST.TE_ME%", "CHUNK": "%CHUNK%"},
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TE_ME": "Hi %JOBS.A.SCRIPT%",
+            },
+        },
+        {
+            "JOBS": {
+                "A": {"SCRIPT": "OK %TEST.CURRENT_TE_ME%", "CHUNK": "%CHUNK%"},
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TE_ME": "Hi %JOBS.A.SCRIPT%",
+                "CURRENT_TE_ME": "Hi %JOBS.A.SCRIPT%",
+            },
+        },
+    ],
+    ids=[
+        "Special Dynamic Variable",
+        "Special Deeper Dynamic Variable",
+        "Full Cycle Dynamic Variable",
+        "Full Cycle Current Dynamic Variable",
+    ],
+)
+def test_infinite_loop_dynamic_variable_unify_conf(
+    autosubmit_config, mocker, new_data
 ):
     as_conf = autosubmit_config(
         "t000",
         {},
     )
 
-    mocked_log_error = mocker.patch('autosubmit.log.log.Log.error')
+    with pytest.raises(AutosubmitCritical) as ac:
+        as_conf.unify_conf(current_data={}, new_data=new_data)
+    assert "Recursion was found validating the configuration files! " in ac.value.message
 
-    as_conf.unify_conf(current_data={}, new_data={
-            "JOBS":{
-                "A":{
+
+@pytest.mark.parametrize(
+    "new_data,result",
+    [
+        ({
+            "JOBS": {
+                "A": {
                     "SCRIPT": "OK %TEST.TE_ME%",
+                    "B": 'OK'
                 },
             },
-            'TEST':{
-                'NAME': "AUTOSUBMIT",
-                'TE_ME': "Hi %TEST.TE_ME%",
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TE_ME": "Hi %JOBS.A.B%",
             },
-    })
-    assert mocked_log_error.called
-    assert "The Dynamic Variable recursion reach its limits of recursion to the variable: " in mocked_log_error.call_args_list[0][0][0]
+        },{
+            "JOBS": {
+                "A": {
+                    "SCRIPT": "OK Hi OK",
+                    "B": 'OK'
+                },
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TE_ME": "Hi OK",
+            },
+        },),
+        ({
+            "JOBS": {
+                "A": {
+                    "SCRIPT": {
+                        "TEST": "OK %TEST.NAME%"
+                    },
+                },
+                "B": "Ok"
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TEST_ME": {
+                    "TE_ME": "Hi %JOBS.B%",
+                }
+            },
+        },{
+            "JOBS": {
+                "A": {
+                    "SCRIPT": {
+                        "TEST": "OK AUTOSUBMIT"
+                    },
+                },
+                "B": "Ok"
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TEST_ME": {
+                    "TE_ME": "Hi Ok",
+                }
+            },
+        },),
+        ({
+            "JOBS": {
+                "A": {
+                    "SCRIPT": "OK %TEST.TEST.TE_ME%",
+                    "CHUNK": "%CHUNK%"
+                },
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TE_ME": "Hi %JOBS.A.SCRIPT%",
+            },
+        },{
+            "JOBS": {
+                "A": {
+                    "SCRIPT": "OK %TEST.TEST.TE_ME%",
+                    "CHUNK": "%CHUNK%"
+                },
+            },
+            "TEST": {
+                "NAME": "AUTOSUBMIT",
+                "TE_ME": "Hi OK %TEST.TEST.TE_ME%",
+            },
+        },),
+    ],
+    ids=[
+        "Special Dynamic Variable",
+        "Special Deeper Dynamic Variable",
+        "Wrong Substitution Dynamic Variable",
+    ],
+)
+def test_finite_loop_dynamic_variable_unify_conf(
+    autosubmit_config, new_data, result
+):
+    as_conf = autosubmit_config(
+        "t000",
+        {},
+    )
+
+    parameters = as_conf.unify_conf(current_data={}, new_data=new_data)
+    assert isinstance(parameters, dict)
+    assert parameters == result
