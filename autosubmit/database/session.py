@@ -71,10 +71,6 @@ def get_engine(db_path: str | Path) -> Engine:
     db_backend = BasicConfig.DATABASE_BACKEND
 
     if db_backend == "sqlite":
-        if str(db_path) == ":memory:":
-            # SQLite in-memory sentinel: do not materialize it as a file on disk.
-            return _resolve_engine("sqlite:///:memory:")
-
         db_path = Path(db_path) if isinstance(db_path, str) else db_path
         db_path = db_path.resolve()
 
