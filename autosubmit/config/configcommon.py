@@ -577,9 +577,9 @@ class AutosubmitConfig:
         the status.
 
         Additionally, it checks for a ``?`` suffix in ``MIN_TRIGGER_STATUS``/``STATUS`` and for the
-        ``WEAK`` keyword to mark the dependency as weak. The deprecated aliases ``STATUS``,
-        ``FAIL_OK`` and ``OPTIONAL`` are mapped to their canonical form and removed, so the returned
-        dependencies only contain the canonical keys.
+        ``WEAK`` keyword to mark the dependency as weak. The user-facing ``STATUS`` keyword is mapped
+        to the internal ``MIN_TRIGGER_STATUS`` key, and the removed ``FAIL_OK``/``OPTIONAL`` keywords
+        are dropped.
 
         :param dependencies: The dependencies to normalize, either as a string or a dictionary.
         :param job_name: Name of the job the dependencies belong to, used in error messages.
@@ -595,18 +595,18 @@ class AutosubmitConfig:
                 if isinstance(dependency_data, dict):
                     # Keyword names are case-insensitive.
                     dependency_data = {keyword.upper(): value for keyword, value in dependency_data.items()}
-                    # Backwards compatibility: map deprecated keyword names to their canonical form and
-                    # drop the aliases so the normalized dependencies contain no alias noise.
+                    # ``STATUS`` is the user-facing keyword; ``MIN_TRIGGER_STATUS`` is its internal form.
                     if "STATUS" in dependency_data:
                         dependency_data.setdefault("MIN_TRIGGER_STATUS", dependency_data.pop("STATUS"))
-                    for alias in ("FAIL_OK", "OPTIONAL"):
-                        if alias in dependency_data:
-                            dependency_data.setdefault("WEAK", dependency_data.pop(alias))
+                    # ``FAIL_OK``/``OPTIONAL`` were removed before 4.2.0 was released; drop them so the
+                    # normalized dependencies contain no alias noise.
+                    dependency_data.pop("FAIL_OK", None)
+                    dependency_data.pop("OPTIONAL", None)
 
                     status = dependency_data.pop("MIN_TRIGGER_STATUS", None)
                     if status:
                         status = status.upper()
-                        weak = bool(dependency_data.pop("WEAK", False))
+                        weak = str(dependency_data.pop("WEAK", False)).strip().lower() == "true"
                         if status.endswith("?"):
                             status, weak = status[:-1], True
                         if status not in _ALLOWED_START_CONDITIONS:

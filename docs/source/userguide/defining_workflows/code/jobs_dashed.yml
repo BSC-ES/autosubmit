@@ -10,6 +10,9 @@ JOBS:
 
   CALC_STATS:
     SCRIPT: 'sleep 0'
-    DEPENDENCIES: IT GET_FILES ?
+    DEPENDENCIES:
+      IT:
+      GET_FILES:
+        STATUS: 'FAILED?'
     RUNNING: chunk
     SYNCHRONIZE: member

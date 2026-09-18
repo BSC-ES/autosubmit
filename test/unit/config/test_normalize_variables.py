@@ -418,41 +418,6 @@ from autosubmit.log.log import AutosubmitCritical, Log
                 "JOBS": {
                     "job1": {
                         "FILE": "FILE1",
-                        "DEPENDENCIES": {
-                            "job2": {"STATUS": "RUNNING", "FAIL_OK": True},
-                            "job3": {"STATUS": "RUNNING", "OPTIONAL": True},
-                            "job4": {"MIN_TRIGGER_STATUS": "RUNNING", "WEAK": False, "FAIL_OK": True},
-                        },
-                    }
-                },
-                'STORAGE': {
-                    'TYPE': 'sqlite'
-                }
-            },
-            {
-                'JOBS': {
-                    'JOB1': {
-                        'FILE': 'FILE1',
-                        'ADDITIONAL_FILES': [],
-                        'DEPENDENCIES': {
-                            'JOB2': {'MIN_TRIGGER_STATUS': 'RUNNING', 'WEAK': True},
-                            'JOB3': {'MIN_TRIGGER_STATUS': 'RUNNING', 'WEAK': True},
-                            'JOB4': {'MIN_TRIGGER_STATUS': 'RUNNING', 'WEAK': False},
-                        },
-                    },
-                },
-                'STORAGE': {
-                    'TYPE': 'sqlite'
-                }
-            },
-            True,
-            id="dependencies_deprecated_aliases"
-        ),
-        pytest.param(
-            {
-                "JOBS": {
-                    "job1": {
-                        "FILE": "FILE1",
                         "NOTIFY_ON": ["running", "COmpLETED"]
                     }
                 },

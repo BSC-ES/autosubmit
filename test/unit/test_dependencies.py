@@ -1362,7 +1362,7 @@ def test_apply_splits_filter(as_conf, filter_value, split_values, child_split, e
         id="filters_out_non_to_keys",
     ),
     pytest.param(
-        {"WEAK": True, "OPTIONAL": False, "FROM_STEP": 5},
+        {"WEAK": True, "FROM_STEP": 5},
         {},
         id="only_non_to_keys_returns_empty",
     ),

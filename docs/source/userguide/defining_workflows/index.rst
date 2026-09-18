@@ -321,9 +321,8 @@ does not mark those edges as weak.
 .. note::
    Since 4.2.0 ``STATUS`` is exact; previously a parent that had already moved past the selected
    status also satisfied the dependency, and weak dependencies accepted a failed parent. The
-   keyword is now ``WEAK`` (case-insensitive); the deprecated names ``FAIL_OK`` and ``OPTIONAL``
-   are still accepted as aliases and normalized to ``WEAK``. ``UNKNOWN`` and ``SUSPENDED`` are not
-   valid ``STATUS`` values and raise an ``AutosubmitCritical`` error.
+   keyword is now ``WEAK`` (case-insensitive); ``UNKNOWN`` and ``SUSPENDED`` are not valid ``STATUS`` values and raise an
+   ``AutosubmitCritical`` error.
 
 .. code-block:: yaml
 
@@ -352,7 +351,7 @@ does not mark those edges as weak.
         RUNNING: chunk
 
 In the example above, ``MONITOR`` starts only while ``SIM`` is running, while ``POSTPROCESS`` also
-starts if ``SIM`` already completed or failed.
+starts if ``SIM`` already completed or was skipped.
 
 
 The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. It is used together with ``STATUS: 'RUNNING'``. The possible value is an integer. Additionally, the target dependency, must call to `%AS_CHECKPOINT%` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.

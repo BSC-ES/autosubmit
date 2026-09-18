@@ -66,7 +66,7 @@ JOBS:
     DEPENDENCIES:
       SIM:
         STATUS: RUNNING
-        OPTIONAL: true
+        WEAK: true
     RUNNING: chunk
     WALLCLOCK: 00:30
     CHECK: on_submission
