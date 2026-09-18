@@ -204,7 +204,7 @@ ExperimentStructureTable = Table(
     Column("min_trigger_status", String),
     Column("completion_status", String),
     Column("from_step", Integer),
-    Column("fail_ok", Boolean),
+    Column("weak", Boolean),
     UniqueConstraint("e_from", "e_to", name="unique_e_from_and_e_to"),
 )
 
@@ -221,7 +221,7 @@ StructureDataTable = Table(
     Column("min_trigger_status", String),
     Column("completion_status", String),
     Column("from_step", Integer),
-    Column("fail_ok", Boolean),
+    Column("weak", Boolean),
     UniqueConstraint("run_id", "e_from", "e_to", name="unique_structure_data_run_id_e_from_and_e_to"),
 )
 

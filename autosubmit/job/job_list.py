@@ -38,7 +38,7 @@ from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
-from autosubmit.job.job_common import Status, bcolors
+from autosubmit.job.job_common import Status, bcolors, is_edge_satisfied
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_utils import Dependency, change_jobs_status
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -107,21 +107,21 @@ class JobList:
                 "e_to": e_to,
                 "min_trigger_status": attributes.get("min_trigger_status", "COMPLETED"),
                 "from_step": attributes.get("from_step", 0),
-                "fail_ok": attributes.get("fail_ok", False),
+                "weak": attributes.get("weak", False),
                 "completion_status": attributes.get("completion_status", "WAITING"),
                 # check if the edge completion status is fullfilled or not
             })
         return edges_dict
 
     @graph_dict.setter
-    def graph_dict(self, value):
+    def graph_dict(self, value: list[dict[str, Any]]):
         """
         Prevent direct modification of the graph_dict.
         """
         raise AttributeError("graph_dict is a dynamic view and cannot be directly modified.")
 
     @property
-    def graph_dict_by_job_name(self):
+    def graph_dict_by_job_name(self) -> dict[str, list[dict[str, Any]]]:
         """
         Converts the graph edges into a dictionary structure matching the ExperimentStructureTable.
         :return: A list of dictionaries representing the edges.
@@ -135,14 +135,14 @@ class JobList:
                 "e_to": e_to,
                 "min_trigger_status": attributes.get("min_trigger_status", "COMPLETED"),
                 "from_step": attributes.get("from_step", 0),
-                "fail_ok": attributes.get("fail_ok", False),
+                "weak": attributes.get("weak", False),
                 "completion_status": attributes.get("completion_status", "WAITING"),
                 # check if the edge completion status is fullfilled or not
             })
         return edges_by_job_name
 
     @graph_dict_by_job_name.setter
-    def graph_dict_by_job_name(self, value):
+    def graph_dict_by_job_name(self, value: dict[str, list[dict[str, Any]]]):
         """
         Prevent direct modification of the graph_dict.
         """
@@ -363,8 +363,7 @@ class JobList:
         """Add an edge to the graph and update the parent relationship for the job nodes.
 
         :param edge: Dictionary containing edge data with keys 'e_from', 'e_to', 'min_trigger_status', 'completion_status',
-                        'from_step', and 'fail_ok'.
-        :type edge: dict[str, Any]
+                        'from_step', and 'weak'.
         """
         edge = {
             'e_from': edge['e_from'],
@@ -372,7 +371,7 @@ class JobList:
             'from_step': edge.get('from_step', "0"),
             'min_trigger_status': edge.get('min_trigger_status', "COMPLETED"),
             'completion_status': edge.get('completion_status', "WAITING"),
-            'fail_ok': edge.get('fail_ok', False)
+            'weak': edge.get('weak', False)
         }
         if edge['e_from'] not in self.graph.nodes or edge['e_to'] not in self.graph.nodes:
             raise ValueError(f"Cannot add edge from {edge['e_from']} to {edge['e_to']}: "
@@ -384,14 +383,14 @@ class JobList:
                 min_trigger_status=edge["min_trigger_status"],
                 completion_status=edge["completion_status"],
                 from_step=edge["from_step"],
-                fail_ok=edge["fail_ok"]
+                weak=edge["weak"]
             )
         else:
             self.graph.edges[edge["e_from"], edge["e_to"]].update({
                 "min_trigger_status": edge["min_trigger_status"],
                 "completion_status": edge["completion_status"],
                 "from_step": edge["from_step"],
-                "fail_ok": edge["fail_ok"],
+                "weak": edge["weak"],
             })
         self.graph.nodes[edge["e_to"]]["job"].add_parent(self.graph.nodes[edge["e_from"]]["job"])
 
@@ -1401,18 +1400,15 @@ class JobList:
         Add special conditions to the edge between a parent job and a child job in the workflow graph.
 
         :param job: The child job to which special conditions are applied.
-        :type job: Job
-        :param special_conditions: Dictionary containing special condition parameters (e.g., STATUS, FROM_STEP, FAIL_OK).
-        :type special_conditions: Dict[str, Any]
+        :param special_conditions: Dictionary containing special condition parameters (e.g., STATUS, FROM_STEP, WEAK).
         :param parent: The parent job from which the edge originates.
-        :type parent: Job
         """
         min_trigger_status = special_conditions.get("MIN_TRIGGER_STATUS", "COMPLETED")
         from_step = int(special_conditions.get("FROM_STEP", 0))
-        fail_ok = special_conditions.get("FAIL_OK", False)
+        weak = special_conditions.get("WEAK", False)
         job.max_checkpoint_step = max(int(job.max_checkpoint_step), from_step)
         self.graph.edges[parent.name, job.name].update(min_trigger_status=min_trigger_status, from_step=from_step,
-                                                       fail_ok=fail_ok)
+                                                       weak=weak)
 
     def _apply_jobs_edge_info(self, job: Job, dependencies: dict[str, Dependency]) -> None:
         """Apply edge information to the job based on its dependencies.
@@ -1439,12 +1435,11 @@ class JobList:
                 (parents_by_section[self.graph.nodes[parent]['job'].section].add(self.graph.nodes[parent]['job']))
         for key, list_of_parents in parents_by_section.items():
             special_conditions = {}
-            min_trigger_status = filters_to_apply_by_section[key].get("MIN_TRIGGER_STATUS", "COMPLETED")
-            # "?" marks a weak dependency, here we're removing it from the name. ex: "STATUS: COMPLETED?" ( maybe this is already done in the as_conf)
-            min_trigger_status = min_trigger_status if "?" != min_trigger_status[-1] else min_trigger_status[:-1]
-            special_conditions["MIN_TRIGGER_STATUS"] = min_trigger_status
+            special_conditions["MIN_TRIGGER_STATUS"] = filters_to_apply_by_section[key].get(
+                "MIN_TRIGGER_STATUS", "COMPLETED"
+            )
             special_conditions["FROM_STEP"] = (filters_to_apply_by_section[key].pop("FROM_STEP", 0))
-            special_conditions["FAIL_OK"] = (filters_to_apply_by_section[key].pop("FAIL_OK", False))
+            special_conditions["WEAK"] = (filters_to_apply_by_section[key].pop("WEAK", False))
 
             for parent in list_of_parents:
                 self.add_special_conditions(job, special_conditions, parent)
@@ -3242,71 +3237,27 @@ class JobList:
             parents_edge_info: dict,
             parents_nodes: dict
     ) -> tuple[list[Job], list[Job]]:
-        """Count the number of completed and non-completed parent jobs for a given job.
+        """Split the parents of a job into completed and non-completed ones.
 
-        :param job: The job whose parent statuses are to be checked.
-        :type job: Job
-        :param parents_edge_info: Dictionary or list containing information about the edges from parent jobs.
-        :type parents_edge_info: dict
-        :param parents_nodes: Dictionary mapping parent job names to Job objects.
-        :type parents_nodes: dict
-        :return A tuple containing two lists: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
-        :rtype: Tuple[List[Job], List[Job]]
+        A parent counts as completed when :func:`is_edge_satisfied` accepts it for its edge.
+
+        :param job: The job whose parents are being checked.
+        :param parents_edge_info: Edge data (``min_trigger_status``, ``weak``, ``from_step``) per parent name.
+        :param parents_nodes: Mapping of parent name to its ``Job`` instance.
+        :return: A ``(non_completed, completed)`` tuple of parent lists.
         """
-        non_completed = []
-        completed = []
+        completed: list[Job] = []
+        non_completed: list[Job] = []
         for parent_name, edge_info in parents_edge_info.items():
             parent = parents_nodes[parent_name]
-            p_status = parent.status
-            edge_status = Status.KEY_TO_VALUE.get(edge_info.get("min_trigger_status", "COMPLETED").upper(), Status.COMPLETED)
-            fail_ok = edge_info.get("fail_ok", False)
-            from_step = edge_info.get("from_step", 0)
-
-            # SUSPENDED
-            if p_status == Status.SUSPENDED:
-                non_completed.append(parent)
-            # COMPLETED or SKIPPED
-            elif p_status in [Status.COMPLETED, Status.SKIPPED]:
-                if edge_status in [Status.COMPLETED, Status.SKIPPED] or edge_status == Status.FAILED and fail_ok or (job.current_checkpoint_step >= from_step > 0):
-                    completed.append(parent)
-                elif Status.VALUE_TO_KEY.get(edge_status, '') in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW:
-                    # COMPLETED/SKIPPED parent has surpassed any intermediate success-workflow status trigger.
-                    completed.append(parent)
-                else:
-                    non_completed.append(parent)
-            # FAILED
-            elif p_status == Status.FAILED:
-                if edge_status == Status.FAILED:
-                    completed.append(parent)
-                elif edge_status in [Status.COMPLETED, Status.SKIPPED]:
-                    if fail_ok or (job.current_checkpoint_step >= from_step > 0):
-                        completed.append(parent)
-                    else:
-                        non_completed.append(parent)
-                else:
-                    non_completed.append(parent)
-            # RUNNING
-            elif p_status == Status.RUNNING:
-                if edge_status == Status.RUNNING:
-                    if job.current_checkpoint_step >= from_step > 0 or from_step == 0:
-                        completed.append(parent)
-                    else:
-                        non_completed.append(parent)
-                else:
-                    non_completed.append(parent)
-            # Other statuses
-            else:
-                if p_status == edge_status:
-                    completed.append(parent)
-                elif Status.VALUE_TO_KEY[p_status] in Status.LOGICAL_ORDER_SUCCESS_WORKFLOW:
-                    idx_parent = Status.LOGICAL_ORDER.index(Status.VALUE_TO_KEY[p_status])
-                    idx_edge = Status.LOGICAL_ORDER.index(Status.VALUE_TO_KEY[edge_status])
-                    if idx_parent >= idx_edge:
-                        completed.append(parent)
-                    else:
-                        non_completed.append(parent)
-                else:
-                    non_completed.append(parent)
+            satisfied = is_edge_satisfied(
+                parent.status,
+                edge_info.get("min_trigger_status", "COMPLETED"),
+                edge_info.get("weak", False),
+                edge_info.get("from_step", 0),
+                job.current_checkpoint_step,
+            )
+            (completed if satisfied else non_completed).append(parent)
 
         return non_completed, completed
 

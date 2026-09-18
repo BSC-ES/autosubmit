@@ -1142,7 +1142,7 @@ def test_sub_job_manager(load_wrapper, tmp_path):
             "from_step": "0",
             "min_trigger_status": "COMPLETED",
             "completion_status": "WAITING",
-            "fail_ok": False
+            "weak": False
         },
         {
             "e_to": "a000_20000101_fc0_1_WRAPPED",
@@ -1150,7 +1150,7 @@ def test_sub_job_manager(load_wrapper, tmp_path):
             "from_step": "0",
             "min_trigger_status": "COMPLETED",
             "completion_status": "WAITING",
-            "fail_ok": False
+            "weak": False
         },
     ]
 

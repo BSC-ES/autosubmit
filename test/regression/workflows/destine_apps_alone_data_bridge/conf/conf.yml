@@ -29,29 +29,22 @@ JOBS:
     DEPENDENCIES:
       REMOTE_SETUP:
         STATUS: COMPLETED
-        OPTIONAL: false
       DN:
         SPLITS_FROM:
           ALL:
             SPLITS_TO: previous
       APP_ENERGY_ONSHORE-1:
         STATUS: FAILED
-        OPTIONAL: false
       APP_HYDROMET-1:
         STATUS: FAILED
-        OPTIONAL: false
       APP_HYDROLAND-1:
         STATUS: FAILED
-        OPTIONAL: false
       APP_WILDFIRES_FWI-1:
         STATUS: FAILED
-        OPTIONAL: false
       APP_ENERGY_OFFSHORE-1:
         STATUS: FAILED
-        OPTIONAL: false
       APP_WILDFIRES_WISE-1:
         STATUS: FAILED
-        OPTIONAL: false
     RUNNING: chunk
     WALLCLOCK: 02:00
     PLATFORM: TEST_SLURM

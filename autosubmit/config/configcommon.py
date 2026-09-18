@@ -39,6 +39,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.helpers.enums import ChunkUnit
+from autosubmit.job.job_common import Status
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.platform_type import PlatformType
@@ -46,6 +47,11 @@ from autosubmit.platforms.platform_type import PlatformType
 if TYPE_CHECKING:
     from autosubmit.job.job_list import JobList
     from autosubmit.platforms.platform import Platform
+
+
+# Statuses accepted as a start condition (``STATUS``). ``UNKNOWN`` and ``SUSPENDED`` can never be
+# observed as a usable parent status, so they are not selectable.
+_ALLOWED_START_CONDITIONS = frozenset(Status.KEY_TO_VALUE) - {"UNKNOWN", "SUSPENDED"}
 
 
 class AutosubmitConfig:
@@ -505,9 +511,16 @@ class AutosubmitConfig:
             data_fixed["JOBS"][job_section]["NOTIFY_ON"] = [status.strip(" ").upper() for status in notify_on]
 
     def _normalize_jobs_section(self, data_fixed: dict, must_exists: bool) -> None:
+        """Normalize the ``JOBS`` section of the experiment data in place.
+
+        :param data_fixed: Experiment data whose ``JOBS`` section is normalized.
+        :param must_exists: Whether the jobs section must be created even when missing.
+        """
         for job, job_data in data_fixed.get("JOBS", {}).items():
             if "DEPENDENCIES" in job_data or must_exists:
-                data_fixed["JOBS"][job]["DEPENDENCIES"] = self._normalize_dependencies(job_data.get("DEPENDENCIES", {}))
+                data_fixed["JOBS"][job]["DEPENDENCIES"] = self._normalize_dependencies(
+                    job_data.get("DEPENDENCIES", {}), job
+                )
 
             if "CUSTOM_DIRECTIVES" in job_data:
                 custom_directives = job_data.get("CUSTOM_DIRECTIVES", "")
@@ -555,19 +568,23 @@ class AutosubmitConfig:
                 data_fixed["JOBS"][job]["WALLCLOCK"] = ":".join(wallclock.split(":")[:2])
 
     @staticmethod
-    def _normalize_dependencies(dependencies: str | dict) -> dict:
+    def _normalize_dependencies(dependencies: str | dict, job_name: str | None = None) -> dict:
         """Normalize the dependencies to a consistent format.
 
         This function takes a string or dictionary of dependencies and normalizes them to a dictionary format.
         If the input is a string, it splits the string by spaces and converts each dependency to uppercase.
-        If the input is a dictionary, it converts each dependency key to uppercase and processes the status.
+        If the input is a dictionary, it uppercases the dependency keys and the keyword names and processes
+        the status.
 
-        Additionally, it checks for a ``?`` suffix in ``MIN_TRIGGER_STATUS``/``STATUS`` to set ``FAIL_OK``.
+        Additionally, it checks for a ``?`` suffix in ``MIN_TRIGGER_STATUS``/``STATUS`` and for the
+        ``WEAK`` keyword to mark the dependency as weak. The user-facing ``STATUS`` keyword is mapped
+        to the internal ``MIN_TRIGGER_STATUS`` key, and the removed ``FAIL_OK``/``OPTIONAL`` keywords
+        are dropped.
 
         :param dependencies: The dependencies to normalize, either as a string or a dictionary.
-        :type dependencies: Union[str, dict]
+        :param job_name: Name of the job the dependencies belong to, used in error messages.
         :return: A dictionary with normalized dependencies.
-        :rtype: dict
+        :raises AutosubmitCritical: If a ``STATUS`` is not a valid start condition.
         """
         aux_dependencies = {}
         if isinstance(dependencies, str):
@@ -575,18 +592,32 @@ class AutosubmitConfig:
                 aux_dependencies[dependency] = {}
         elif isinstance(dependencies, dict):
             for dependency, dependency_data in dependencies.items():
+                if isinstance(dependency_data, dict):
+                    # Keyword names are case-insensitive.
+                    dependency_data = {keyword.upper(): value for keyword, value in dependency_data.items()}
+                    # ``STATUS`` is the user-facing keyword; ``MIN_TRIGGER_STATUS`` is its internal form.
+                    if "STATUS" in dependency_data:
+                        dependency_data.setdefault("MIN_TRIGGER_STATUS", dependency_data.pop("STATUS"))
+                    # ``FAIL_OK``/``OPTIONAL`` were removed before 4.2.0 was released; drop them so the
+                    # normalized dependencies contain no alias noise.
+                    dependency_data.pop("FAIL_OK", None)
+                    dependency_data.pop("OPTIONAL", None)
+
+                    status = dependency_data.pop("MIN_TRIGGER_STATUS", None)
+                    if status:
+                        status = status.upper()
+                        weak = str(dependency_data.pop("WEAK", False)).strip().lower() == "true"
+                        if status.endswith("?"):
+                            status, weak = status[:-1], True
+                        if status not in _ALLOWED_START_CONDITIONS:
+                            raise AutosubmitCritical(
+                                f"Invalid STATUS '{status}' in the dependencies of job '{job_name}'. "
+                                f"Allowed values are: {', '.join(sorted(_ALLOWED_START_CONDITIONS))}.",
+                                7014,
+                            )
+                        dependency_data["MIN_TRIGGER_STATUS"] = status
+                        dependency_data["WEAK"] = weak
                 aux_dependencies[dependency.upper()] = dependency_data
-                if type(dependency_data) is dict:
-                    # Backwards compatibility
-                    user_set_status = dependency_data.pop("MIN_TRIGGER_STATUS", dependency_data.pop("STATUS", None))
-                    if user_set_status:
-                        dependency_data["MIN_TRIGGER_STATUS"] = user_set_status.upper()
-                        # Backwards compatibility
-                        fail_ok = dependency_data.get("FAIL_OK", dependency_data.get("OPTIONAL", False))
-                        dependency_data["FAIL_OK"] = fail_ok
-                        if dependency_data["MIN_TRIGGER_STATUS"][-1] == "?":
-                            dependency_data["MIN_TRIGGER_STATUS"] = dependency_data["MIN_TRIGGER_STATUS"][:-1]
-                            dependency_data["FAIL_OK"] = True
 
         return aux_dependencies
 

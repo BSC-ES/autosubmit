@@ -203,7 +203,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "nothing",
                         "from_step": 0,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[0][0],
                     }]
                 },
@@ -215,7 +215,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 0,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[0][0],
                     }]
                 },
@@ -227,7 +227,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[0][0],
                     }]
                 },
@@ -239,7 +239,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[1][0],
                     }]
                 },
@@ -251,7 +251,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[2][0],
                     }]
                 },
@@ -263,7 +263,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[3][0],
                     }]
                 },
@@ -275,7 +275,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[4][0],
                     }]
                 },
@@ -287,7 +287,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[5][0],
                     }]
                 },
@@ -299,7 +299,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[6][0],
                     }]
                 },
@@ -311,7 +311,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[7][0],
                     }]
                 },
@@ -323,7 +323,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[8][0],
                     }]
                 },
@@ -335,7 +335,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[9][0],
                     }]
                 },
@@ -347,7 +347,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[10][0],
                     }]
                 },
@@ -359,7 +359,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[11][0],
                     }]
                 },
@@ -371,7 +371,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": False,
+                        "weak": False,
                         "min_trigger_status": _COLORS[12][0],
                     }]
                 },
@@ -383,7 +383,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[0][0],
                     }]
                 },
@@ -395,7 +395,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[1][0],
                     }]
                 },
@@ -407,7 +407,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[2][0],
                     }]
                 },
@@ -419,7 +419,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[3][0],
                     }]
                 },
@@ -431,7 +431,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[4][0],
                     }]
                 },
@@ -443,7 +443,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[5][0],
                     }]
                 },
@@ -455,7 +455,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[6][0],
                     }]
                 },
@@ -467,7 +467,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[7][0],
                     }]
                 },
@@ -479,11 +479,11 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[8][0],
                     }]
                 },
-                (_COLORS[8][1], '1', True)
+                (_COLORS[8][1], '1', False)
         ),
         (
                 {
@@ -491,7 +491,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[9][0],
                     }]
                 },
@@ -503,7 +503,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[10][0],
                     }]
                 },
@@ -515,7 +515,7 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[11][0],
                     }]
                 },
@@ -527,11 +527,11 @@ _COLORS = [
                         "completion_status": "WAITING",
                         "e_to": "child_needle",
                         "from_step": 1,
-                        "fail_ok": True,
+                        "weak": True,
                         "min_trigger_status": _COLORS[12][0],
                     }]
                 },
-                (_COLORS[12][1], '1', True)
+                (_COLORS[12][1], '1', False)
         ),
 
     ],
@@ -539,19 +539,19 @@ _COLORS = [
         'Empty job_edges_info',
         'job name not found',
         'label == 0',
-        f'MIN_TRIGGER_STATUS: {_COLORS[0][0]} {_COLORS[0][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[1][0]} {_COLORS[1][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[2][0]} {_COLORS[2][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[3][0]} {_COLORS[3][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[4][0]} {_COLORS[4][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[5][0]} {_COLORS[5][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[6][0]} {_COLORS[6][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[7][0]} {_COLORS[7][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[8][0]} {_COLORS[8][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[9][0]} {_COLORS[9][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[10][0]} {_COLORS[10][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[11][0]} {_COLORS[11][1]}, label 1, FAIL_OK',
-        f'MIN_TRIGGER_STATUS: {_COLORS[12][0]} {_COLORS[12][1]}, label 1, FAIL_OK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[0][0]} {_COLORS[0][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[1][0]} {_COLORS[1][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[2][0]} {_COLORS[2][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[3][0]} {_COLORS[3][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[4][0]} {_COLORS[4][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[5][0]} {_COLORS[5][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[6][0]} {_COLORS[6][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[7][0]} {_COLORS[7][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[8][0]} {_COLORS[8][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[9][0]} {_COLORS[9][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[10][0]} {_COLORS[10][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[11][0]} {_COLORS[11][1]}, label 1, WEAK',
+        f'MIN_TRIGGER_STATUS: {_COLORS[12][0]} {_COLORS[12][1]}, label 1, WEAK',
         f'MIN_TRIGGER_STATUS: {_COLORS[0][0]} {_COLORS[0][1]}, label 1, MANDATORY',
         f'MIN_TRIGGER_STATUS: {_COLORS[1][0]} {_COLORS[1][1]}, label 1, MANDATORY',
         f'MIN_TRIGGER_STATUS: {_COLORS[2][0]} {_COLORS[2][1]}, label 1, MANDATORY',

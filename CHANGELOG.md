@@ -24,8 +24,10 @@ several bug fixes and enhancements to improve the overall user experience.
 - `autosubmit` Bash autocomplete #1227 #3171
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
 
-**Migration from `job_list.pkl` to Database**
+**Migration and behavior changes:**
 
+- Start conditions (`STATUS`) are now exact: a job runs only while the parent is in the selected status. Add `?` to the status (weak dependency) to also accept a parent that already finished successfully (`COMPLETED`/`SKIPPED`). A failed parent is accepted by `FAILED`/`FAILED?`. `UNKNOWN` and `SUSPENDED` are no longer valid `STATUS` values and raise `AutosubmitCritical`. #3262
+- Experiments using a non-default `STATUS` (for example `QUEUING`, `READY`) relied on the previous ordered behaviour where a parent that had already moved past the status still satisfied the dependency. After upgrading, add `?` (for example `STATUS: 'RUNNING?'`) if the job should also run once the parent has finished successfully.
 - All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted in significant changes to the code.
 
 **Memory and Performance Improvements**:

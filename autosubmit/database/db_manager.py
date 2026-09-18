@@ -74,6 +74,10 @@ class DbManager:
         return self.engine
 
     def create_table(self, table_name: str) -> None:
+        """Create the table if it does not exist and add any missing columns.
+
+        :param table_name: Name of the table to create.
+        """
         table = self.table_registry.get(table_name)
         with self._get_engine(table_name).begin() as conn:
             if self.schema:
@@ -82,11 +86,12 @@ class DbManager:
             # Auto-add missing columns for schema evolution
             schema_arg = {"schema": self.schema} if self.schema else {}
             existing = {col['name'] for col in inspect(conn).get_columns(table_name, **schema_arg)}
+            quote = conn.dialect.identifier_preparer.quote
+            qualified_name = f"{quote(self.schema)}.{quote(table_name)}" if self.schema else quote(table_name)
             for column in table.columns:
                 if column.name not in existing:
-                    qualified_name = f"{self.schema}.{table_name}" if self.schema else table_name
                     conn.execute(
-                        text(f"ALTER TABLE {qualified_name} ADD COLUMN {column.name} {column.type}")
+                        text(f"ALTER TABLE {qualified_name} ADD COLUMN {quote(column.name)} {column.type}")
                     )
 
     def drop_table(self, table_name: str) -> None:
