@@ -70,6 +70,9 @@ def get_engine(db_path: str | Path) -> Engine:
     db_backend = BasicConfig.DATABASE_BACKEND
 
     if db_backend == "sqlite":
+        if db_path == ":memory:":
+            return _resolve_engine("sqlite:///:memory:")
+
         db_path = Path(db_path) if isinstance(db_path, str) else db_path
         db_path = db_path.resolve()
         
