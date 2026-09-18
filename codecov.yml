@@ -1,6 +1,7 @@
 # If you modify this file, please validate it before committing:
 # curl --data-binary @codecov.yml https://codecov.io/validate
-
+#
+# Quick-start: https://docs.codecov.com/docs/quick-start
 
 codecov:
   notify:
@@ -27,5 +28,10 @@ flag_management:
   default_rules:
     carryforward: true
 
-# turn off comments to pull requests
-comment: true
+comment:
+  layout: " diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  hide_project_coverage: false
