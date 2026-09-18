@@ -316,7 +316,6 @@ def expid_fn(
             autosubmit_version,
             exp_id,
             hpc,
-            minimal_configuration,
             git_repo,
             git_branch,
             git_as_conf,
