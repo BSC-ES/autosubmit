@@ -244,45 +244,78 @@ def test_check_conf_files_errors(error: Exception, expected: Exception,
 
 
 @pytest.mark.parametrize(
-    'experiment_job,expected',
+    "experiment_job,expected",
     [
-        [{
-            'JOBS': {
-                'A': {
-                    'RUNNING': 'once',
-                    'FILE': 'test.sh'
+        [{"JOBS": {"A": {"RUNNING": "once", "FILE": "test.sh"}}}, False],
+        [
+            {
+                "JOBS": {
+                    "A": {
+                        "RUNNING": "once",
+                        "FILE": "test.sh",
+                        "CHECK": "False",
+                    }
                 }
-            }
-        }, False],
-        [{
-            'JOBS': {
-                'A': {
-                    'RUNNING': 'once',
-                    'FILE': 'test.sh',
-                    'CHECK': 'False',
+            },
+            False,
+        ],
+        [
+            {
+                "JOBS": {
+                    "A": {
+                        "RUNNING": "once",
+                        "FILE": "test.sh",
+                        "CHECK": "ON_SUBMISSION",
+                    }
                 }
-            }
-        }, False],
-        [{
-            'JOBS': {
-                'A': {
-                    'RUNNING': 'once',
-                    'FILE': 'test.sh',
-                    'CHECK': 'ON_SUBMISSION',
+            },
+            True,
+        ],
+        [
+            {
+                "JOBS": {
+                    "A": {
+                        "SCRIPT": "",
+                        "RUNNING": "once",
+                        "FILE": "test.sh",
+                        "RERUN_DEPENDENCIES": "RUNNING A",
+                    }
                 }
-            }
-        }, True],
-        [{
-            'JOBS': {
-                'A': {
-                    'SCRIPT': '',
-                    'RUNNING': 'once',
-                    'FILE': 'test.sh',
-                    'RERUN_DEPENDENCIES': 'RUNNING A'
-                }
-            }
-        }, True]
-    ]
+            },
+            True,
+        ],
+        [
+            {
+                "JOBS": {
+                    "A": {
+                        "SCRIPT": "",
+                        "RUNNING": "once",
+                        "FILE": "test.sh",
+                        "DEPENDENCIES": {
+                            "A" : "RUNNING A",
+                        },
+                    },
+                },
+            },
+            True,
+        ],
+        [
+            {
+                "JOBS": {
+                    "A": {
+                        "SCRIPT": "",
+                        "RUNNING": "once",
+                        "FILE": "test.sh",
+                        "DEPENDENCIES": {
+                            "1" : "RUNNING A",
+                            "2" : "RUNNING B",
+                        },
+                    },
+                },
+            },
+            True,
+        ],
+    ],
 )
 def test_set_version(autosubmit_config: 'AutosubmitConfigFactory', experiment_job, expected):
     as_conf: AutosubmitConfig = autosubmit_config(expid="a000", experiment_data=experiment_job)
