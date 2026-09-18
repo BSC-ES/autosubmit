@@ -63,7 +63,7 @@ class DbManager:
         self.restore_path = Path(BasicConfig.DB_PATH) / "autosubmit_db.sql"
         self.table_registry = TableRegistry(self.schema)
 
-    def _get_engine(self, table_name: str | None = None) -> Engine:
+    def _get_engine(self, table_name: str | None = None) -> Engine | None:
         """Return the appropriate engine based on context.
 
         :param table_name: If True, return the historical engine.

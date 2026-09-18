@@ -17,7 +17,6 @@
 
 """Autosubmit database session."""
 
-import threading
 from enum import Enum
 from pathlib import Path
 
@@ -43,6 +42,7 @@ def _resolve_engine(connection_url: str) -> Engine:
     """Create SQLAlchemy Core engine and resolves the connection pool class based on the backend.
 
     :param connection_url: An SQLAlchemy connection URL.
+    :return: The SQLAlchemy engine instance.
     """
     if not connection_url:
         raise ValueError(f"Invalid SQLAlchemy connection URL: {connection_url}")
@@ -52,56 +52,14 @@ def _resolve_engine(connection_url: str) -> Engine:
     return sqlalchemy_create_engine(connection_url, poolclass=pool_class)
 
 
-_postgres_engine: Engine | None = None
-"""Postgres engine single instance throughout the application."""
-_postgres_connection_url: str | None = None
-"""Postgres connection URL.
-
-This is used to create a new connection. If this value changes, the engine is recreated.
-The previous instance is properly terminated.
-"""
-_postgres_lock = threading.Lock()
-"""Lock to protect the singleton instance."""
-
-
-def _get_postgres_engine(connection_url: str) -> Engine:
-    """Get the PostgreSQL engine singleton.
-
-    Multithreaded through the use of a lock.
-
-    If this is a new connection URL, a new engine is created and
-    returned.
-
-    If the provided connection URL is different from the previous one,
-    the engine is recreated, disposing of the previous one.
-
-    :param connection_url: PostgreSQL connection URL.
-    :return: PostgreSQL SQLAlchemy engine.
-    """
-    global _postgres_engine, _postgres_connection_url
-
-    with _postgres_lock:
-        if _postgres_engine is None or _postgres_connection_url != connection_url:
-            new_engine = _resolve_engine(connection_url)
-
-            old_engine = _postgres_engine
-            _postgres_engine = new_engine
-            _postgres_connection_url = connection_url
-
-            if old_engine is not None:
-                old_engine.dispose()
-
-        return _postgres_engine  # type: ignore
-
-
 def get_engine(db_path: str | Path) -> Engine:
     """Get SQLAlchemy Core engine.
 
     This will resolve which backend to use based on the Autosubmit configuration.
 
     If the backend is Postgres, Autosubmit will load the settings from the configuration file
-    and an engine will be created. If the backend is changed, the engine will be disposed of.
-    If there were no changes and there is already an engine, it will be returned.
+    and an engine will be created. Users are expected to control the engine, manage
+    if they need to recreate or dispose it.
 
     If the backend is SQLite, a new engine is created for each call. It uses
     the provided database path and a ``NullPool`` to reduce the number of
@@ -126,6 +84,6 @@ def get_engine(db_path: str | Path) -> Engine:
         connection_url = f"sqlite:///{db_path}"
         return _resolve_engine(connection_url)
     elif db_backend == DatabaseType.POSTGRES:
-        return _get_postgres_engine(BasicConfig.DATABASE_CONN_URL)
+        return _resolve_engine(BasicConfig.DATABASE_CONN_URL)
 
     raise ValueError(f"Unsupported database backend: {db_backend}")
