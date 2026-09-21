@@ -24,7 +24,6 @@ import os
 import re
 from contextlib import suppress
 from pathlib import Path
-from time import sleep
 from typing import Any
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
@@ -309,50 +308,6 @@ class SlurmPlatform(ParamikoPlatform):
         :rtype: str
         """
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
-
-    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5,
-                          max_retries: int = 3, show_logs: bool = True) -> bool:
-        """Checks if a file exists on the FTP server.
-
-        :param src: The name of the file to check.
-        :type src: str
-        :param wrapper_failed: Whether the wrapper has failed. Defaults to False.
-        :type wrapper_failed: bool
-        :param sleeptime: Time to sleep between retries in seconds. Defaults to 5.
-        :type sleeptime: int
-        :param max_retries: Maximum number of retries. Defaults to 3.
-        :type max_retries: int
-        :param show_logs: Whether to show logs if the file does not exist. Defaults to True.
-        :type show_logs: bool
-
-        :return: True if the file exists, False otherwise
-        :rtype: bool
-        """
-        # TODO check the sleeptime retrials of these function, previously it was waiting a lot of time
-        file_exist = False
-        retries = 0
-        while not file_exist and retries < max_retries:
-            try:
-                # This return IOError if a path does not exist
-                self._ftpChannel.stat(os.path.join(
-                    self.get_files_path(), src))
-                file_exist = True
-            except OSError:  # File does not exist, retry in sleeptime
-                if not wrapper_failed:
-                    sleep(sleeptime)
-                    retries = retries + 1
-                else:
-                    sleep(2)
-                    retries = retries + 1
-            except Exception as e:
-                if "garbage" in str(e).lower():
-                    sleep(2)
-                    retries = retries + 1
-                else:
-                    raise
-        if not file_exist and show_logs:
-            Log.warning(f"File {src} couldn't be found")
-        return file_exist
 
     def _get_job_names_cmd(self, job_names: list[str]) -> str:
         """Return a command that groups Slurm job IDs by job name.

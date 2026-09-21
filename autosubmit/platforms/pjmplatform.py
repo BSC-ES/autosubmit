@@ -19,10 +19,8 @@ import re
 import shlex
 import textwrap
 from pathlib import Path
-from time import sleep
 from typing import TYPE_CHECKING
 
-from paramiko import SFTPError
 from paramiko.ssh_exception import SSHException
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
@@ -285,38 +283,6 @@ class PJMPlatform(ParamikoPlatform):
     @staticmethod
     def allocated_nodes():
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
-
-    def check_file_exists(
-        self,
-        src: str,
-        wrapper_failed: bool = False,
-        sleeptime: int = 5,
-        max_retries: int = 3,
-        show_logs: bool = True,
-    ):
-        file_exist = False
-        retries = 0
-
-        while not file_exist and retries < max_retries:
-            try:
-                # This return IOError if path does not exist
-                self._ftpChannel.stat(Path(self.get_files_path(), src))
-                file_exist = True
-            except OSError:  # File does not exist, retry in sleeptime
-                if not wrapper_failed:
-                    sleep(sleeptime)
-                    sleeptime = sleeptime + 5
-                    retries = retries + 1
-                else:
-                    retries = 9999
-            except SFTPError as e:  # Unrecoverable error
-                if "garbage" in str(e).lower() and not wrapper_failed:
-                    sleep(sleeptime)
-                    sleeptime = sleeptime + 5
-                    retries = retries + 1
-                else:
-                    raise
-        return file_exist
 
     def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
         """Get submitted PJM job IDs by script name.
