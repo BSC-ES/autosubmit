@@ -932,7 +932,6 @@ def _patch_process_without_fd_attributes(mocker):
 
     del proc.num_fds
     del proc.num_handles
-    return None
 
 
 @pytest.mark.parametrize("setup", [
