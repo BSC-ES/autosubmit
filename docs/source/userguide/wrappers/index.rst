@@ -317,6 +317,8 @@ Vertical wrappers are suited for sequential dependent jobs (e.x. chunks of SIM t
 
 Autosubmit supports wrapping together vertically jobs of different types.
 
+A vertical wrapper always wraps a **single dependent lineage** (1xN): starting from a ready job, it only follows jobs whose static dependencies link them to the chain. It may therefore span different dates, members, chunks or splits whenever the workflow dependencies serialize them, but it never merges independent or parallel branches into the same package. Independent ready jobs each start their own vertical wrapper.
+
 .. code-block:: YAML
 
   JOBS:
