@@ -838,7 +838,7 @@ def _last_name_used_sqlalchemy(test=False, operational=False, evaluation=False) 
     else:
         condition = tables.ExperimentTable.c.name.not_like(
             "t%"
-        ) & tables.ExperimentTable.c.name.not_like("o%")
+        ) & tables.ExperimentTable.c.name.not_like("o%") & tables.ExperimentTable.c.name.not_like("e%")
 
     sub_query = (
         select(func.max(tables.ExperimentTable.c.id).label("id"))
@@ -856,12 +856,9 @@ def _last_name_used_sqlalchemy(test=False, operational=False, evaluation=False) 
     with _get_sqlalchemy_conn() as conn:
         row = conn.execute(query).one_or_none()
 
-    if row is None:
+    if row is None or row.name[:1].isnumeric():
         return "empty"
 
-    # If starts by number (during 3.0 beta some jobs starting with numbers where created), returns empty.
-    if row.name.isnumeric():
-        return "empty"
     return row.name
 
 

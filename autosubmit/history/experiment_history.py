@@ -22,7 +22,8 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers.experiment_history_db_manager import (
-    ExperimentHistoryDatabaseManager,
+    ExperimentHistoryDbManager,
+    SqlAlchemyExperimentHistoryDbManager,
     create_experiment_history_db_manager,
 )
 from autosubmit.history.experiment_status import ExperimentStatus
@@ -50,7 +51,7 @@ class ExperimentHistory:
         self._job_data_file = f"job_data_{expid}.db" if BasicConfig.DATABASE_BACKEND == "sqlite" else ""
         self._historiclog_dir_path = BasicConfig.HISTORICAL_LOG_DIR
         self.force_sql_alchemy = force_sql_alchemy
-        self.manager: ExperimentHistoryDatabaseManager | None = None
+        self._manager: SqlAlchemyExperimentHistoryDbManager | ExperimentHistoryDbManager | None = None
         try:
             options = {
                 'expid': self.expid,
@@ -58,12 +59,22 @@ class ExperimentHistory:
                 'jobdata_file': self._job_data_file,
                 'force_sql_alchemy': self.force_sql_alchemy  # tmp, the idea is to move everything to sqlalchemy
             }
-            self.manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
+            self._manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
             self.initialize_database()
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
-            self.manager = None
+            self._manager = None
+
+    @property
+    def manager(self) -> SqlAlchemyExperimentHistoryDbManager | ExperimentHistoryDbManager:
+        """Return the history database manager.
+
+        :raises RuntimeError: If the manager could not be initialized.
+        """
+        if self._manager is None:
+            raise RuntimeError("The history database manager is not available.")
+        return self._manager
 
     def initialize_database(self):
         """Initialize the database manager, creating tables and running schema migrations."""
@@ -72,11 +83,11 @@ class ExperimentHistory:
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
-            self.manager = None
+            self._manager = None
 
     def is_header_ready(self):
-        if self.manager:
-            return self.manager.is_header_ready_db_version()
+        if self._manager:
+            return self._manager.is_header_ready_db_version()
         return False
 
     def write_submit_time(self, job_name, submit=0, status="UNKNOWN", ncpus=0, wallclock="00:00", qos="debug", date="",

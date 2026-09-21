@@ -115,6 +115,8 @@ def record_migration(conn: "Connection", table: Table, version: int) -> None:
     if exists:
         return
     conn.execute(table.insert().values(version=version, applied_at=_now()))
+    # TODO(#3114): make this atomic with a dialect upsert (on_conflict_do_nothing)
+    #             before the databases are written concurrently (engine/session step).
 
 
 def apply_ordered_migrations(

@@ -41,7 +41,6 @@ if TYPE_CHECKING:
     from py._path.local import LocalPath  # type: ignore
 
     from autosubmit.history.database_managers.experiment_history_db_manager import (
-        ExperimentHistoryDatabaseManager,
         ExperimentHistoryDbManager,
     )
 
@@ -62,7 +61,7 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
         options["jobdata_dir_path"] = str(tmp_test_dir)
 
     # Assert type of database manager
-    database_manager: ExperimentHistoryDatabaseManager = create_experiment_history_db_manager(as_db, **options)
+    database_manager: SqlAlchemyExperimentHistoryDbManager | ExperimentHistoryDbManager = create_experiment_history_db_manager(as_db, **options)
 
     # Test initialization of the table
     # assert not database_manager.my_database_exists()
