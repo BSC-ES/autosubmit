@@ -131,7 +131,7 @@ raw_graph_edges = [
         "e_from": "a01f_REMOTE_SETUP",
         "e_to": "a01f_20000101_fc0_INI",
         "from_step": 0,
-        "fail_ok": True,
+        "weak": True,
         "min_trigger_status": "COMPLETED",
     },
     {
@@ -139,7 +139,7 @@ raw_graph_edges = [
         "e_from": "a01f_LOCAL_SETUP",
         "e_to": "a01f_REMOTE_SETUP",
         "from_step": 0,
-        "fail_ok": True,
+        "weak": True,
         "min_trigger_status": "COMPLETED",
     },
     {
@@ -147,7 +147,7 @@ raw_graph_edges = [
         "e_from": "a01f_20000101_fc0_INI",
         "e_to": "a01f_SIM",
         "from_step": 0,
-        "fail_ok": True,
+        "weak": True,
         "min_trigger_status": "COMPLETED",
     },
 ]
@@ -283,7 +283,7 @@ def generate_job_list(as_conf, db_manager) -> JobList:
                 from_step=edge["from_step"],
                 min_trigger_status=edge["min_trigger_status"],
                 completion_status=edge["completion_status"],
-                fail_ok=edge["fail_ok"],
+                weak=edge["weak"],
             )
     return job_list
 
@@ -331,7 +331,7 @@ def test_db_job_list_edges(tmp_path: Path, full_load: bool, as_db: str, as_exp):
             "from_step",
             "min_trigger_status",
             "completion_status",
-            "fail_ok",
+            "weak",
         }
         assert edge["e_from"] == raw_graph_edges_local[i]["e_from"]
         assert edge["e_to"] == raw_graph_edges_local[i]["e_to"]
@@ -490,7 +490,7 @@ def test_db_job_list_jobs_and_edges_together(
             "from_step",
             "min_trigger_status",
             "completion_status",
-            "fail_ok",
+            "weak",
         }
 
 

@@ -356,18 +356,18 @@ from autosubmit.log.log import AutosubmitCritical, Log
                         'FILE': 'FILE1',
                         'ADDITIONAL_FILES': [],
                         'DEPENDENCIES': {
-                            'JOB2': {'MIN_TRIGGER_STATUS': 'FAILED', 'FAIL_OK': False},
-                            'JOB3': {'MIN_TRIGGER_STATUS': 'FAILED', 'FAIL_OK': True},
-                            'JOB4': {'MIN_TRIGGER_STATUS': 'RUNNING', 'FAIL_OK': False},
-                            'JOB5': {'MIN_TRIGGER_STATUS': 'COMPLETED', 'FAIL_OK': False},
-                            'JOB6': {'MIN_TRIGGER_STATUS': 'SKIPPED', 'FAIL_OK': False},
-                            'JOB7': {'MIN_TRIGGER_STATUS': 'READY', 'FAIL_OK': False},
-                            'JOB8': {'MIN_TRIGGER_STATUS': 'DELAYED', 'FAIL_OK': False},
-                            'JOB9': {'MIN_TRIGGER_STATUS': 'PREPARED', 'FAIL_OK': False},
-                            'JOB10': {'MIN_TRIGGER_STATUS': 'QUEUING', 'FAIL_OK': False},
-                            'JOB11': {'MIN_TRIGGER_STATUS': 'SUBMITTED', 'FAIL_OK': False},
-                            'JOB12': {'MIN_TRIGGER_STATUS': 'HELD', 'FAIL_OK': False},
-                            'JOB13': {'MIN_TRIGGER_STATUS': 'RUNNING', 'FAIL_OK': True},
+                            'JOB2': {'MIN_TRIGGER_STATUS': 'FAILED', 'WEAK': False},
+                            'JOB3': {'MIN_TRIGGER_STATUS': 'FAILED', 'WEAK': True},
+                            'JOB4': {'MIN_TRIGGER_STATUS': 'RUNNING', 'WEAK': False},
+                            'JOB5': {'MIN_TRIGGER_STATUS': 'COMPLETED', 'WEAK': False},
+                            'JOB6': {'MIN_TRIGGER_STATUS': 'SKIPPED', 'WEAK': False},
+                            'JOB7': {'MIN_TRIGGER_STATUS': 'READY', 'WEAK': False},
+                            'JOB8': {'MIN_TRIGGER_STATUS': 'DELAYED', 'WEAK': False},
+                            'JOB9': {'MIN_TRIGGER_STATUS': 'PREPARED', 'WEAK': False},
+                            'JOB10': {'MIN_TRIGGER_STATUS': 'QUEUING', 'WEAK': False},
+                            'JOB11': {'MIN_TRIGGER_STATUS': 'SUBMITTED', 'WEAK': False},
+                            'JOB12': {'MIN_TRIGGER_STATUS': 'HELD', 'WEAK': False},
+                            'JOB13': {'MIN_TRIGGER_STATUS': 'RUNNING', 'WEAK': True},
                         },
                     },
                 },
@@ -377,6 +377,41 @@ from autosubmit.log.log import AutosubmitCritical, Log
             },
             True,
             id="dependencies_status"
+        ),
+        pytest.param(
+            {
+                "JOBS": {
+                    "job1": {
+                        "FILE": "FILE1",
+                        "DEPENDENCIES": {
+                            "job2": {"MIN_TRIGGER_STATUS": "RUNNING", "weak": True},
+                            "job3": {"MIN_TRIGGER_STATUS": "RUNNING", "Weak": True},
+                            "job4": {"MIN_TRIGGER_STATUS": "RUNNING", "WEAK": False},
+                        },
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            {
+                'JOBS': {
+                    'JOB1': {
+                        'FILE': 'FILE1',
+                        'ADDITIONAL_FILES': [],
+                        'DEPENDENCIES': {
+                            'JOB2': {'MIN_TRIGGER_STATUS': 'RUNNING', 'WEAK': True},
+                            'JOB3': {'MIN_TRIGGER_STATUS': 'RUNNING', 'WEAK': True},
+                            'JOB4': {'MIN_TRIGGER_STATUS': 'RUNNING', 'WEAK': False},
+                        },
+                    },
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            True,
+            id="dependencies_weak_case_insensitive"
         ),
         pytest.param(
             {
@@ -576,6 +611,26 @@ def test_normalize_variables(autosubmit_config, data, expected_data, must_exists
     assert normalized_data == expected_data
     normalized_data = as_conf.normalize_variables(normalized_data, must_exists=must_exists)
     assert normalized_data == expected_data
+
+
+@pytest.mark.parametrize(
+    "status",
+    ["UNKNOWN", "SUSPENDED", "unknown", "suspended", "UNKNOWN?", "SUSPENDED?", "RUNNIG"],
+)
+def test_normalize_variables_rejects_invalid_start_condition(autosubmit_config, status):
+    """Invalid STATUS start conditions raise AutosubmitCritical."""
+    data = {
+        "JOBS": {
+            "job1": {
+                "FILE": "FILE1",
+                "DEPENDENCIES": {"job2": {"STATUS": status}},
+            }
+        },
+        "STORAGE": {"TYPE": "sqlite"},
+    }
+    as_conf = autosubmit_config(expid='t000', experiment_data=data)
+    with pytest.raises(AutosubmitCritical):
+        as_conf.normalize_variables(data, must_exists=True)
 
 
 def test_normalize_wrappers_jobs_in_wrapper(autosubmit_config):

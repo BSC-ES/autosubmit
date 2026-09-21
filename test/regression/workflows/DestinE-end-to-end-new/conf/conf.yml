@@ -48,7 +48,7 @@ JOBS:
     DEPENDENCIES:
       SIM:
         STATUS: RUNNING
-        OPTIONAL: true
+        WEAK: true
       DN:
         SPLITS_FROM:
           ALL:

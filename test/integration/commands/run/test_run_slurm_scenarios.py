@@ -1553,7 +1553,8 @@ PLATFORMS:
 
     """), 4, "COMPLETED", "simple"),
 
-    # Test Wrapper doesn't start until blocking_running_job is completed
+    # The weak RUNNING? start condition also accepts a parent that already finished, which is
+    # required here because the wrapper may not be formed while the short blocking job is running.
     (dedent("""\
         EXPERIMENT:
             NUMCHUNKS: '2'
@@ -1574,7 +1575,7 @@ PLATFORMS:
                 DEPENDENCIES:
                     job-1:
                     blocking_running_job:
-                        STATUS: RUNNING
+                        STATUS: 'RUNNING?'
 
                 PLATFORM: TEST_SLURM
                 RUNNING: chunk

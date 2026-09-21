@@ -5,7 +5,7 @@ from networkx import DiGraph  # type: ignore
 
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
-from autosubmit.job.job_common import Status
+from autosubmit.job.job_common import Status, is_edge_satisfied
 from autosubmit.job.job_dict import DicJobs
 from autosubmit.job.job_list import JobList
 from autosubmit.job.job_utils import Dependency
@@ -584,7 +584,7 @@ def _init_special_conditions(joblist: JobList) -> tuple[Job, Job, Job, dict, Job
     job.splits = 1
     job.max_checkpoint_step = 0
     job.status = Status.WAITING
-    special_conditions = {"MIN_TRIGGER_STATUS": "RUNNING", "FROM_STEP": "2", "FAIL_OK": False}
+    special_conditions = {"MIN_TRIGGER_STATUS": "RUNNING", "FROM_STEP": "2", "WEAK": False}
 
     parent = Job("parent", 1, Status.READY, 1)
     parent.section = "parent_one"
@@ -607,7 +607,7 @@ def _init_special_conditions(joblist: JobList) -> tuple[Job, Job, Job, dict, Job
     joblist.graph.add_edge(parent.name, job.name)
     joblist.graph.add_edge(parent2.name, job.name)
     joblist.add_special_conditions(job, special_conditions, parent)
-    special_conditions = {"MIN_TRIGGER_STATUS": "FAILED", "FROM_STEP": 0, "FAIL_OK": False}
+    special_conditions = {"MIN_TRIGGER_STATUS": "FAILED", "FROM_STEP": 0, "WEAK": False}
     joblist.add_special_conditions(job, special_conditions, parent2)
     return job, parent, parent2, special_conditions, joblist
 
@@ -619,14 +619,14 @@ def test_add_special_conditions(_init_special_conditions):
     assert job.max_checkpoint_step == 2
     assert edge.get("from_step") == 2
     assert edge.get("min_trigger_status") == "RUNNING"
-    assert not edge.get("fail_ok")
+    assert not edge.get("weak")
 
     edge = joblist.graph.edges[parent2.name, job.name]
     # Still 2 because it is the MAX value between all dependencies
     assert job.max_checkpoint_step == 2
     assert edge.get("from_step") == 0
     assert edge.get("min_trigger_status") == "FAILED"
-    assert not edge.get("fail_ok")
+    assert not edge.get("weak")
 
 
 def test_job_dict_get_jobs_filtered(mocker, joblist):
@@ -875,7 +875,11 @@ def test_normalize_auto_keyword(as_conf, mocker):
                 (Status.RUNNING, "RUNNING", 0, False),
             ], 0, False,
         ),
-        ([(Status.COMPLETED, "RUNNING", 0, False)] * 3, 0, True),
+        ([(Status.COMPLETED, "RUNNING", 0, False)] * 3, 0, False),
+        ([(Status.COMPLETED, "RUNNING", 0, True)] * 3, 0, True),
+        ([(Status.SKIPPED, "RUNNING", 0, False)] * 3, 0, False),
+        ([(Status.RUNNING, "RUNNING", 0, True)] * 3, 0, True),
+        ([(Status.FAILED, "RUNNING", 0, True)] * 3, 0, False),
         (
             [
                 (Status.SUSPENDED, "RUNNING", 0, False),
@@ -893,7 +897,8 @@ def test_normalize_auto_keyword(as_conf, mocker):
         ),
 
         ([(Status.FAILED, "FAILED", 0, False)] * 3, 0, True),
-        ([(Status.FAILED, "COMPLETED", 0, True)] * 3, 0, True),
+        ([(Status.FAILED, "FAILED", 0, True)] * 3, 0, True),
+        ([(Status.FAILED, "COMPLETED", 0, True)] * 3, 0, False),
         ([(Status.FAILED, "COMPLETED", 0, False)] * 3, 0, False),
         ([(Status.FAILED, "RUNNING", 0, False)] * 3, 0, False),
         (
@@ -904,7 +909,7 @@ def test_normalize_auto_keyword(as_conf, mocker):
         ),
         (
             [
-                (Status.FAILED, "COMPLETED", 0, True),
+                (Status.FAILED, "FAILED", 0, True),
                 (Status.RUNNING, "RUNNING", 0, False),
             ], 0, True,
         ),
@@ -918,12 +923,19 @@ def test_normalize_auto_keyword(as_conf, mocker):
         ([(Status.COMPLETED, "FAILED", 0, True)] * 3, 0, True),
         ([(Status.COMPLETED, "FAILED", 0, False)] * 3, 0, False),
 
+        ([(Status.QUEUING, "QUEUING", 0, False)] * 3, 0, True),
+        ([(Status.COMPLETED, "QUEUING", 0, False)] * 3, 0, False),
+        ([(Status.COMPLETED, "QUEUING", 0, True)] * 3, 0, True),
+        ([(Status.RUNNING, "QUEUING", 0, False)] * 3, 0, False),
+        ([(Status.SKIPPED, "COMPLETED", 0, False)] * 3, 0, True),
+        ([(Status.COMPLETED, "SKIPPED", 0, False)] * 3, 0, True),
+
         ([(Status.RUNNING, "RUNNING", 3, False)], 0, False),
         ([(Status.RUNNING, "RUNNING", 3, False)], 3, True),
         ([(Status.RUNNING, "RUNNING", 3, False)], 5, True),
         ([(Status.RUNNING, "RUNNING", 5, False)], 3, False),
 
-        ([(Status.COMPLETED, "FAILED", 1, False)], 3, True),
+        ([(Status.COMPLETED, "FAILED", 1, False)], 3, False),
     ],
     ids=[
         "all_running_with_edge",
@@ -931,24 +943,35 @@ def test_normalize_auto_keyword(as_conf, mocker):
         "completed_parent_without_edge_counted",
         "suspended_with_completed_sibling_blocks",
         "running_parent_without_edge_uncounted",
-        "all_completed_with_edge",
+        "completed_parent_blocks_strict_running",
+        "completed_parent_satisfies_weak_running",
+        "skipped_parent_blocks_strict_running",
+        "running_parent_satisfies_weak_running",
+        "failed_parent_blocks_weak_running",
         "first_parent_suspended_blocks",
         "all_suspended_blocks",
         "completed_running_suspended_blocks",
         "failed_parent_meets_failed_edge",
-        "failed_parent_fail_ok_meets_completed_edge",
-        "failed_parent_no_fail_ok_blocked_by_completed_edge",
+        "failed_parent_weak_meets_failed_edge",
+        "failed_parent_weak_blocks_completed_edge",
+        "failed_parent_strict_blocked_by_completed_edge",
         "failed_parent_with_running_edge_blocked",
         "mixed_failed_meets_failed_edge_and_running",
-        "mixed_failed_fail_ok_and_running",
-        "mixed_failed_no_fail_ok_blocks_child",
-        "completed_parent_fail_ok_meets_failed_edge",
-        "completed_parent_no_fail_ok_blocked_by_failed_edge",
+        "mixed_failed_weak_meets_failed_and_running",
+        "mixed_failed_strict_blocks_child",
+        "completed_parent_weak_meets_failed_edge",
+        "completed_parent_strict_blocked_by_failed_edge",
+        "queuing_parent_meets_queuing_edge",
+        "completed_parent_blocks_strict_queuing",
+        "completed_parent_satisfies_weak_queuing",
+        "running_parent_blocks_queuing",
+        "skipped_parent_meets_completed_edge",
+        "completed_parent_meets_skipped_edge",
         "running_from_step_not_reached",
         "running_from_step_exactly_reached",
         "running_from_step_exceeded",
         "running_from_step_partially_reached",
-        "completed_failed_edge_no_fail_ok_but_checkpoint_met",
+        "completed_failed_edge_blocks_even_with_checkpoint",
     ],
 )
 def test_check_special_status(
@@ -963,7 +986,7 @@ def test_check_special_status(
     non-completed parents, at least one completed parent).
 
     :param joblist: A fresh JobList fixture.
-    :param parents_config: List of ``(status, min_trigger_status, from_step, fail_ok)``
+    :param parents_config: List of ``(status, min_trigger_status, from_step, weak)``
         tuples, one per parent.
     :param checkpoint_step: Value assigned to ``child.current_checkpoint_step``.
     :param expected: Whether the child should appear in ``check_special_status()``.
@@ -972,18 +995,99 @@ def test_check_special_status(
     child.current_checkpoint_step = checkpoint_step
     joblist.graph.add_node(child.name, job=child)
 
-    for i, (p_status, min_trigger, from_step, fail_ok) in enumerate(parents_config):
+    for i, (p_status, min_trigger, from_step, weak) in enumerate(parents_config):
         parent = Job(f"parent{i + 1}", i + 1, p_status, 0)
         joblist.graph.add_node(parent.name, job=parent)
         joblist.graph.add_edge(
             parent.name, child.name,
             min_trigger_status=min_trigger,
             from_step=from_step,
-            fail_ok=fail_ok,
+            weak=weak,
         )
 
     result = joblist.check_special_status()
     assert (child in result) is expected
+
+
+@pytest.mark.parametrize(
+    "parent_status,min_trigger_status,weak,from_step,child_checkpoint_step,expected",
+    [
+        ("RUNNING", "RUNNING", False, 0, 0, True),
+        ("RUNNING", "RUNNING", False, 3, 3, True),
+        ("RUNNING", "RUNNING", False, 3, 0, False),
+        ("RUNNING", "RUNNING", True, 0, 0, True),
+        ("COMPLETED", "RUNNING", False, 0, 0, False),
+        ("COMPLETED", "RUNNING", True, 0, 0, True),
+        ("SKIPPED", "RUNNING", False, 0, 0, False),
+        ("SKIPPED", "RUNNING", True, 0, 0, True),
+        ("FAILED", "RUNNING", False, 0, 0, False),
+        ("FAILED", "RUNNING", True, 0, 0, False),
+        ("QUEUING", "RUNNING", False, 0, 0, False),
+        ("SUBMITTED", "RUNNING", False, 0, 0, False),
+        ("READY", "RUNNING", False, 0, 0, False),
+        ("QUEUING", "QUEUING", False, 0, 0, True),
+        ("COMPLETED", "QUEUING", False, 0, 0, False),
+        ("COMPLETED", "QUEUING", True, 0, 0, True),
+        ("SKIPPED", "QUEUING", True, 0, 0, True),
+        ("RUNNING", "QUEUING", False, 0, 0, False),
+        ("QUEUING", "SUBMITTED", False, 0, 0, False),
+        ("READY", "SUBMITTED", False, 0, 0, False),
+        ("COMPLETED", "COMPLETED", False, 0, 0, True),
+        ("COMPLETED", "SKIPPED", False, 0, 0, True),
+        ("SKIPPED", "COMPLETED", False, 0, 0, True),
+        ("FAILED", "FAILED", False, 0, 0, True),
+        ("FAILED", "FAILED", True, 0, 0, True),
+        ("FAILED", "COMPLETED", True, 0, 0, False),
+        ("COMPLETED", "FAILED", False, 0, 0, False),
+        ("COMPLETED", "FAILED", True, 0, 0, True),
+        (Status.RUNNING, Status.RUNNING, False, 0, 0, True),
+        (Status.COMPLETED, Status.RUNNING, False, 0, 0, False),
+    ],
+    ids=[
+        "running_strict",
+        "running_strict_checkpoint_reached",
+        "running_strict_checkpoint_pending",
+        "running_weak",
+        "completed_blocks_strict_running",
+        "completed_satisfies_weak_running",
+        "skipped_blocks_strict_running",
+        "skipped_satisfies_weak_running",
+        "failed_blocks_strict_running",
+        "failed_blocks_weak_running",
+        "queuing_blocks_running",
+        "submitted_blocks_running",
+        "ready_blocks_running",
+        "queuing_meets_queuing",
+        "completed_blocks_strict_queuing",
+        "completed_satisfies_weak_queuing",
+        "skipped_satisfies_weak_queuing",
+        "running_blocks_queuing",
+        "queuing_blocks_submitted",
+        "ready_blocks_submitted",
+        "completed_satisfies_completed",
+        "completed_satisfies_skipped",
+        "skipped_satisfies_completed",
+        "failed_satisfies_failed",
+        "failed_satisfies_weak_failed",
+        "failed_blocks_weak_completed",
+        "completed_blocks_strict_failed",
+        "completed_satisfies_weak_failed",
+        "int_running_strict",
+        "int_completed_blocks_strict_running",
+    ],
+)
+def test_is_edge_satisfied(
+    parent_status: int | str,
+    min_trigger_status: int | str,
+    weak: bool,
+    from_step: int,
+    child_checkpoint_step: int,
+    expected: bool,
+) -> None:
+    """is_edge_satisfied accepts both status codes and names and honours strict/weak edges."""
+    assert is_edge_satisfied(
+        parent_status, min_trigger_status, weak, from_step, child_checkpoint_step
+    ) is expected
 
 
 @pytest.mark.parametrize("steps_back,job_split,total_splits,expected_split", [
@@ -1249,7 +1353,7 @@ def test_apply_splits_filter(as_conf, filter_value, split_values, child_split, e
     ),
     pytest.param(
         {
-            "STATUS": "COMPLETED", "FAIL_OK": False, "OPTIONAL": True,
+            "STATUS": "COMPLETED", "WEAK": False,
             "FROM_STEP": 0, "MIN_TRIGGER_STATUS": "COMPLETED",
             "ANY_FINAL_STATUS_IS_VALID": True,
             "DATES_TO": "20220101",
@@ -1258,7 +1362,7 @@ def test_apply_splits_filter(as_conf, filter_value, split_values, child_split, e
         id="filters_out_non_to_keys",
     ),
     pytest.param(
-        {"FAIL_OK": True, "OPTIONAL": False, "FROM_STEP": 5},
+        {"WEAK": True, "FROM_STEP": 5},
         {},
         id="only_non_to_keys_returns_empty",
     ),

@@ -66,6 +66,7 @@ def get_engine(db_path: str | Path) -> Engine:
     with a NullPool to avoid accumulating open file descriptors.
 
     :param db_path: Path to the database file, only used for SQLite.
+    :return: An SQLAlchemy engine for the configured backend.
     """
     db_backend = BasicConfig.DATABASE_BACKEND
 
@@ -75,7 +76,7 @@ def get_engine(db_path: str | Path) -> Engine:
 
         db_path = Path(db_path) if isinstance(db_path, str) else db_path
         db_path = db_path.resolve()
-        
+
         if not db_path.exists():
             if not db_path.parent.exists():
                 db_path.parent.mkdir(parents=True, exist_ok=True)

@@ -49,14 +49,13 @@ JOBS:
     DEPENDENCIES:
       SIM:
         STATUS: RUNNING
-        OPTIONAL: true
+        WEAK: true
       DN:
         SPLITS_FROM:
           ALL:
             SPLITS_TO: previous
       APP_ENERGY_ONSHORE-1:
         STATUS: FAILED
-        OPTIONAL: false
     RUNNING: chunk
     WALLCLOCK: 02:00
     PLATFORM: TEST_SLURM
@@ -119,7 +118,7 @@ JOBS:
     DEPENDENCIES:
       SIM:
         STATUS: RUNNING
-        OPTIONAL: true
+        WEAK: true
     RUNNING: chunk
     WALLCLOCK: 00:30
     CHECK: on_submission

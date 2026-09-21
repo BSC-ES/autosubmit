@@ -34,7 +34,7 @@ _SAMPLE_EDGES: list[dict[str, Any]] = [
         "min_trigger_status": "COMPLETED",
         "completion_status": "WAITING",
         "from_step": 0,
-        "fail_ok": True,
+        "weak": True,
     },
     {
         "e_from": "a001_REMOTE_SETUP",
@@ -42,7 +42,7 @@ _SAMPLE_EDGES: list[dict[str, Any]] = [
         "min_trigger_status": "COMPLETED",
         "completion_status": "WAITING",
         "from_step": 0,
-        "fail_ok": False,
+        "weak": False,
     },
 ]
 
@@ -234,7 +234,7 @@ def test_save_historical_edges_upserts_on_conflict(autosubmit_exp) -> None:
 
     manager._save_historical_edges(_SAMPLE_EDGES, run_id)
     modified_edges = [
-        {**edge, "fail_ok": not edge.get("fail_ok")} for edge in _SAMPLE_EDGES
+        {**edge, "weak": not edge.get("weak")} for edge in _SAMPLE_EDGES
     ]
     manager._save_historical_edges(modified_edges, run_id)
 
@@ -310,7 +310,7 @@ def test_save_historical_edges_raises_without_run(autosubmit_exp) -> None:
                     "min_trigger_status": "COMPLETED",
                     "completion_status": "WAITING",
                     "from_step": 0,
-                    "fail_ok": True,
+                    "weak": True,
                 }
             ],
             id="single_edge",
@@ -323,7 +323,7 @@ def test_save_historical_edges_raises_without_run(autosubmit_exp) -> None:
                     "min_trigger_status": "COMPLETED",
                     "completion_status": "WAITING",
                     "from_step": i,
-                    "fail_ok": bool(i % 2),
+                    "weak": bool(i % 2),
                 }
                 for i in range(5)
             ],
