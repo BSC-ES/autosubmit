@@ -83,7 +83,7 @@ class DbManager:
 
     def _target_engine(self) -> Engine:
         """Return the engine that owns the tables managed by this instance."""
-        return self.engine_historical or self.engine
+        return cast(Engine, self.engine_historical or self.engine)
 
     def _ensure_schema_version(self) -> None:
         """Ensure the ``schema_migrations`` table exists and records the current version."""
@@ -93,6 +93,8 @@ class DbManager:
         with engine.begin() as conn:
             if self.schema:
                 conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            # TODO(#3114): centralize the table creation through
+            #             migrations.ensure_schema_migrations_table.
             conn.execute(CreateTable(self._schema_migrations_table, if_not_exists=True))
             record_migration(conn, self._schema_migrations_table, self.SCHEMA_VERSION)
         self._schema_version_ensured = True

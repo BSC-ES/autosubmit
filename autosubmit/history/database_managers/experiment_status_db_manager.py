@@ -17,7 +17,6 @@
 
 import textwrap
 from pathlib import Path
-from typing import Protocol, cast
 
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -122,23 +121,6 @@ class ExperimentStatusDbManager(DatabaseManager):
             self._as_times_file_path, statement, arguments)
 
 
-class ExperimentStatusDatabaseManager(Protocol):
-
-    def set_existing_experiment_status_as_running(self, expid: str) -> None: ...
-
-    def create_experiment_status_as_running(self, experiment: Models.ExperimentRow) -> None: ...
-
-    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None: ...
-
-    def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow: ...
-
-    def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Models.ExperimentStatusRow | None: ...
-
-    def create_exp_status(self, exp_id: int, expid: str, status: str) -> int: ...
-
-    def update_exp_status(self, expid: str, status="RUNNING") -> None: ...
-
-
 class SqlAlchemyExperimentStatusDbManager:
     """An experiment status database manager using SQLAlchemy.
     It contains the same public functions as ``ExperimentStatusDbManager``
@@ -236,7 +218,9 @@ class SqlAlchemyExperimentStatusDbManager:
             conn.execute(query)
 
 
-def create_experiment_status_db_manager(db_engine: str, **options) -> ExperimentStatusDatabaseManager:
+def create_experiment_status_db_manager(
+    db_engine: str, **options
+) -> SqlAlchemyExperimentStatusDbManager | ExperimentStatusDbManager:
     """Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
 
     Note that you must provide the options even if they are optional, in which case
@@ -245,18 +229,18 @@ def create_experiment_status_db_manager(db_engine: str, **options) -> Experiment
     TODO: better example and/or link to DbManager.
 
     :param db_engine: The database engine type.
-    :return: An ``ExperimentStatusDatabaseManager``.
+    :return: The database manager.
     :raises ValueError: If the database engine type is not valid.
     :raises KeyError: If the ``options`` dictionary is missing a required parameter for an engine.
     """
     if db_engine == "postgres":
-        return cast(ExperimentStatusDatabaseManager, SqlAlchemyExperimentStatusDbManager())
+        return SqlAlchemyExperimentStatusDbManager()
     elif db_engine == "sqlite":
-        return cast(ExperimentStatusDatabaseManager,
-                    ExperimentStatusDbManager(
-                        expid=options['expid'],
-                        db_dir_path=options['db_dir_path'],
-                        main_db_name=options['main_db_name'],
-                        local_root_dir_path=options['local_root_dir_path']))
+        return ExperimentStatusDbManager(
+            expid=options['expid'],
+            db_dir_path=options['db_dir_path'],
+            main_db_name=options['main_db_name'],
+            local_root_dir_path=options['local_root_dir_path'],
+        )
     else:
         raise ValueError(f"Invalid database engine: {db_engine}")

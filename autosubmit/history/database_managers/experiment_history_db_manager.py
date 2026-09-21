@@ -17,16 +17,14 @@
 
 import os
 import textwrap
-import time
 import traceback
-from collections.abc import Generator
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any
 
 from sqlalchemy import (
     Connection,
     and_,
+    bindparam,
     desc,
     func,
     insert,
@@ -40,6 +38,7 @@ from sqlalchemy.schema import CreateIndex, CreateSchema, CreateTable
 import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
+from autosubmit.database.db_utils import batch_size_for, chunked, max_params
 from autosubmit.database.migrations import (
     get_schema_version,
     record_migration,
@@ -540,58 +539,6 @@ class ExperimentHistoryDbManager(DatabaseManager):
         raise NotImplementedError("Not implemented for the non-SQLAlchemy manager.")
 
 
-class ExperimentHistoryDatabaseManager(Protocol):
-    def initialize(self): ...
-
-    def my_database_exists(self): ...
-
-    def is_header_ready_db_version(self): ...
-
-    def is_current_version(self): ...
-
-    def create_historical_database(self): ...
-
-    def update_historical_database(self): ...
-
-    def get_experiment_run_dc_with_max_id(self) -> ExperimentRun: ...
-
-    def get_experiment_run_dc_with_max_id_or_none(self) -> ExperimentRun | None: ...
-
-    def register_experiment_run_dc(self, experiment_run_dc): ...
-
-    def update_experiment_run_dc_by_id(self, experiment_run_dc): ...
-
-    def is_there_a_last_experiment_run(self): ...
-
-    def get_job_data_all(self): ...
-
-    def register_submitted_job_data_dc(self, job_data_dc): ...
-
-    def update_job_data_dc_by_job_id_name(self, job_data_dc: Any) -> Any: ...
-
-    def update_list_job_data_dc_by_each_id(self, job_data_dcs): ...
-
-    def get_job_data_dc_unique_latest_by_job_name(self, job_name): ...
-
-    def get_job_data_dcs_last_by_wrapper_code(self, wrapper_code): ...
-
-    def get_all_last_job_data_dcs(self): ...
-
-    def update_many_job_data_change_status(self, changes): ...
-
-    def get_job_data_by_job_id_name(self, job_id: int, job_name: str): ...
-
-    def get_job_data_max_counter(self, job_name: str | None = None) -> int: ...
-
-    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData: ...
-
-    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> JobData | None: ...
-
-    def get_stale_rows(self) -> list: ...
-
-    def update_job_data_values(self, job_name: str, fail_count: int, start: int, finish: int) -> int: ...
-
-
 class SqlAlchemyExperimentHistoryDbManager:
     """A SQLAlchemy experiment history database manager.
     Its interface was designed based on the SQLite database manager,
@@ -928,6 +875,8 @@ class SqlAlchemyExperimentHistoryDbManager:
     def _get_all_last_job_data_rows(self):
         """ Get List of Models.JobDataRow for last=1. """
         job_data_table = self.table_registry.get(JobDataTable.name)
+        # TODO(#3114): select only the needed columns once callers no longer
+        #             require a full Models.JobDataRow.
         query = (
             select(job_data_table).
             where(job_data_table.c.last == 1)  # type: ignore
@@ -981,25 +930,37 @@ class SqlAlchemyExperimentHistoryDbManager:
             result = conn.execute(insert_query)
         return result.lastrowid
 
-    def update_many_job_data_change_status(self, changes):
-        # type : (List[Tuple]) -> None
-        """
-        Update many job_data rows in bulk. Requires a changes list of argument tuples.
-        Only updates finish, modified, status, and rowstatus by id.
+    def update_many_job_data_change_status(self, changes) -> None:
+        """Update many job_data rows in bulk.
+
+        Requires a changes list of tuples ``(modified, status, rowstatus, id)``.
+        Only updates modified, status, and rowstatus by id.
+
+        :param changes: The list of change tuples to apply.
         """
         job_data_table = self.table_registry.get(JobDataTable.name)
-        with self.engine.connect() as conn, conn.begin():
-            for change in changes:
-                query = (
-                    update(job_data_table).
-                    where(job_data_table.c.id == change[3]).  # type: ignore
-                    values(
-                        modified=change[0],
-                        status=change[1],
-                        rowstatus=change[2]
-                    )
-                )
-                conn.execute(query)
+        query = (
+            update(job_data_table)
+            .where(job_data_table.c.id == bindparam("_id"))
+            .values(
+                modified=bindparam("_modified"),
+                status=bindparam("_status"),
+                rowstatus=bindparam("_rowstatus"),
+            )
+        )
+        params = [
+            {
+                "_id": change[3],
+                "_modified": change[0],
+                "_status": change[1],
+                "_rowstatus": change[2],
+            }
+            for change in changes
+        ]
+        batch_size = batch_size_for(4, self.engine.dialect.name)
+        with self.engine.begin() as conn:
+            for batch in chunked(params, batch_size):
+                conn.execute(query, batch)
 
     def _update_job_data_by_id(self, job_data_dc):
         job_data_table = self.table_registry.get(JobDataTable.name)
@@ -1034,7 +995,13 @@ class SqlAlchemyExperimentHistoryDbManager:
             conn.execute(query)
 
     def get_job_data_by_job_id_name(self, job_id: int, job_name: str) -> JobData:
-        """Get the job data by job ID and name."""
+        """Get the latest job data for a job ID and name.
+
+        :param job_id: The job ID.
+        :param job_name: The job name.
+        :return: The most recent JobData for the given job ID and name.
+        :raises Exception: If no job_data is found.
+        """
         job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table)
@@ -1044,7 +1011,9 @@ class SqlAlchemyExperimentHistoryDbManager:
         )
         with self.engine.connect() as conn:
             result = conn.execute(query).first()
-            return JobData.from_model(result)
+        if result is None:
+            raise Exception(f"No job_data found for job_id='{job_id}' and job_name='{job_name}'.")
+        return JobData.from_model(result)
 
     def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
         """Get the last job data by job name and fail_count.
@@ -1127,82 +1096,66 @@ class SqlAlchemyExperimentHistoryDbManager:
             raise Exception(f"No job_data found for job_name='{job_name}'.")
         return JobData.from_model(result)
 
-    def get_job_data_max_counter(self, job_name: str | None = None):
-        """ The max counter is the maximum count value for the count column in job_data. """
+    def get_job_data_max_counter(self, job_name: str | None = None) -> int:
+        """Get the maximum counter value in job_data.
+
+        :param job_name: Optional job name to filter by.
+        :return: The maximum counter, or the default when there is none.
+        """
         job_data_table = self.table_registry.get(JobDataTable.name)
-        query = select(func.max(job_data_table.c.counter).label("maxcounter"))
+        query = select(func.max(job_data_table.c.counter))
         if job_name:
             query = query.where(job_data_table.c.job_name == job_name)  # type: ignore
         with self.engine.connect() as conn:
-            result = conn.execute(query).first()
-        max_counter = result.maxcounter
+            max_counter = conn.execute(query).scalar()
         return max_counter if max_counter else DEFAULT_MAX_COUNTER
 
-    def get_jobs_data_last_row(self, job_names) -> dict[str, Any]:
-        job_data_table = self.table_registry.get(JobDataTable.name)
-        jobs_data = self.select_jobs_data(job_data_table, job_names)
-        jobs_data = [dict(job) for job in jobs_data]
-        jobs_data_by_name = {}
-        counters = {}
-        for job in jobs_data:
-            if job['job_name'] not in counters or job['counter'] > counters[job['job_name']]:
-                counters[job['job_name']] = job['counter']
-                jobs_data_by_name[job['job_name']] = job
+    # Columns needed to recover a job's log data. Selecting only these keeps the
+    # result small on large experiments.
+    _JOB_DATA_LAST_ROW_COLUMNS = ("job_name", "counter", "job_id", "out", "err", "submit", "status")
+
+    def get_jobs_data_last_row(self, job_names: list[str]) -> dict[str, Any]:
+        """Return the last job_data row for each requested job name.
+
+        :param job_names: The job names to look up.
+        :return: A mapping of job name to its last row as a dictionary.
+        """
+        rows = self.select_jobs_data(job_names, columns=list(self._JOB_DATA_LAST_ROW_COLUMNS))
+        jobs_data_by_name: dict[str, Any] = {}
+        counters: dict[str, int] = {}
+        for job in rows:
+            if job["job_name"] not in counters or job["counter"] > counters[job["job_name"]]:
+                counters[job["job_name"]] = job["counter"]
+                jobs_data_by_name[job["job_name"]] = job
         return jobs_data_by_name
 
-    @contextmanager
-    def _job_names_tmp_table(
-            self, job_names: list[str]
-    ) -> Generator[tuple[Any, Any], None, None]:
-        """Context manager that populates a temporary table with job names.
-
-        Yields ``(conn, tmp)`` where ``conn`` is the active SQLAlchemy connection
-        and ``tmp`` is a table expression for ``_tmp_job_names``.  The table is
-        created, cleared, populated, and dropped automatically, so callers only
-        need to write the query itself.
-
-        :param job_names: Job names to load into the temporary table.
-        :yields: ``(conn, tmp)`` — the connection and the temp table expression.
-        """
-        # Local import avoids shadowing any `table` / `column` parameter.
-        from sqlalchemy import column as _col
-        from sqlalchemy import table as _tbl
-
-        table_name = f"_tmp_job_names_{time.time_ns()}"
-        tmp = _tbl(table_name, _col("job_name"))
-        with self.engine.connect() as conn:
-            conn.execute(text(
-                f"CREATE TEMPORARY TABLE IF NOT EXISTS {table_name} (job_name TEXT)"
-            ))
-            conn.execute(text(f"DELETE FROM {table_name}"))
-            conn.execute(
-                text(f"INSERT INTO {table_name} (job_name) VALUES (:name)"),
-                [{"name": n} for n in job_names],
-            )
-            try:
-                yield conn, tmp
-            except Exception:
-                conn.rollback()
-                raise
-            finally:
-                conn.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
-                conn.commit()
-
-    def select_jobs_data(self, table, job_names: list[str]) -> list[tuple[str, Any]]:
+    def select_jobs_data(
+        self, job_names: list[str], columns: list[str] | None = None
+    ) -> list[dict[str, Any]]:
         """Return last=1 job_data rows for the requested job names.
 
-        :param table: The SQLAlchemy ``job_data`` Table object to query.
+        Job names are queried in chunks to stay below the maximum number of bound
+        parameters of the backend, without relying on temporary tables.
+
         :param job_names: Job names to look up.
-        :return: List of ``(column_name, value)`` tuples, one per matching row.
+        :param columns: Optional subset of columns to select. Defaults to all.
+        :return: One dictionary per matching row, keyed by column name.
         """
-        with self._job_names_tmp_table(job_names) as (conn, tmp):
-            rows = conn.execute(
-                select(table)
-                .join(tmp, table.c.job_name == tmp.c.job_name)
-                .where(table.c.last == 1)
-            ).fetchall()
-        columns = table.c.keys()
-        return [tuple(zip(columns, row)) for row in rows]
+        table = self.table_registry.get(JobDataTable.name)
+        selected = columns if columns is not None else list(table.c.keys())
+        selected_columns = [table.c[name] for name in selected]
+        # Leave one slot for the ``last == 1`` predicate.
+        batch_size = max(1, max_params(self.engine.dialect.name) - 1)
+        rows: list[dict[str, Any]] = []
+        with self.engine.connect() as conn:
+            for batch in chunked(job_names, batch_size):
+                query = (
+                    select(*selected_columns)
+                    .where(table.c.job_name.in_(batch))
+                    .where(table.c.last == 1)
+                )
+                rows.extend(dict(row) for row in conn.execute(query).mappings())
+        return rows
 
     def get_stale_rows(self) -> list:
         """Return all job_data rows with submit>0 and (start=0 or finish=0).
@@ -1264,14 +1217,15 @@ def get_last_run_id(expid: str) -> int | None:
         return None
 
 
-def create_experiment_history_db_manager(db_engine: str, **options: Any) -> ExperimentHistoryDatabaseManager:
+def create_experiment_history_db_manager(
+    db_engine: str, **options: Any
+) -> SqlAlchemyExperimentHistoryDbManager | ExperimentHistoryDbManager:
     use_sql_alchemy = options.get("force_sql_alchemy", False) or db_engine == 'postgres'
     jobdata_dir_path = options.get("jobdata_dir_path", BasicConfig.JOBDATA_DIR)
     if use_sql_alchemy:
         job_data_file = options.get("jobdata_file", None)
-        return cast(ExperimentHistoryDatabaseManager,
-                    SqlAlchemyExperimentHistoryDbManager(options["expid"], jobdata_dir_path, job_data_file))
+        return SqlAlchemyExperimentHistoryDbManager(options["expid"], jobdata_dir_path, job_data_file)
     elif db_engine == 'sqlite':
-        return cast(ExperimentHistoryDatabaseManager, ExperimentHistoryDbManager(options["expid"], jobdata_dir_path))
+        return ExperimentHistoryDbManager(options["expid"], jobdata_dir_path)
     else:
         raise ValueError(f"Invalid database engine: {db_engine}")
