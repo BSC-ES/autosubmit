@@ -156,7 +156,7 @@ def test_infinite_loop_dynamic_variable_unify_conf(
 
     with pytest.raises(AutosubmitCritical) as ac:
         as_conf.unify_conf(current_data={}, new_data=new_data)
-    assert "Recursion was found validating the configuration files! " in ac.value.message
+    assert "Recursion found validating the configuration files! " in ac.value.message
 
 
 @pytest.mark.parametrize(

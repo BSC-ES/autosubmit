@@ -15,18 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import re
 from pathlib import Path
 
 import networkx as nx
 from networkx import DiGraph
 from ruamel.yaml import YAML
 
-from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.config.basicconfig import REFERENCE_PATTERN, BasicConfig
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
-
-REFERENCE_PATTERN = re.compile(r"%(.*?)%")
 
 __all__ = [
     "as_conf_default_values",
@@ -276,6 +273,12 @@ def build_dependency_graph(data) -> tuple[DiGraph, list]:
 
 
 def validate_dependencies(data) -> None:
+    """
+    It'll create a graph and check it cycles itself or is a valid non-cyclical dependency.
+
+    :param data: Dictionary containing the parameters to be substituted. If None, it will use self.experiment_data.
+    :return: None
+    """
     graph, unresolved = build_dependency_graph(data)
     # Find cycles in the directed graph.
     cycles = list(nx.simple_cycles(graph))
@@ -287,6 +290,6 @@ def validate_dependencies(data) -> None:
 
             if invalid_normal_path or cycles:
                 raise AutosubmitCritical(
-                    f"Recursion was found validating the configuration files! \nPlease double check the following variable(s) {variable}."
+                    f"Recursion found validating the configuration files! \nPlease double check the following variable(s) {variable}."
                     f"\nThe cyclical variable found: {cycles}.\n."
                 )
