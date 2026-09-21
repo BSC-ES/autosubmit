@@ -400,15 +400,45 @@ def test_last_name_used_sqlalchemy(monkeypatch, tmp_path, as_db):
     db_manager.insert('experiment', {'name': 'texp2', 'autosubmit_version': 1, 'description': 'Second experiment'})
     db_manager.insert('experiment', {'name': 'eexp3', 'autosubmit_version': 1, 'description': 'Third experiment'})
     db_manager.insert('experiment', {'name': 'xp4', 'autosubmit_version': 1, 'description': 'Fourth experiment'})
+    # Inserted last, so it has the highest id: the default lookup must ignore it.
+    db_manager.insert('experiment', {'name': 'eexp5', 'autosubmit_version': 1, 'description': 'Fifth experiment'})
 
     last_name = _last_name_used_sqlalchemy(False, True, False)
     assert last_name == 'oexp1'
     last_name = _last_name_used_sqlalchemy(True, False, False)
     assert last_name == 'texp2'
     last_name = _last_name_used_sqlalchemy(False, False, True)
-    assert last_name == 'eexp3'
+    assert last_name == 'eexp5'
     last_name = _last_name_used_sqlalchemy(False, False, False)
     assert last_name == 'xp4'
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_last_name_used_sqlalchemy_skips_numeric_first_char(monkeypatch, tmp_path, as_db):
+    """A last experiment whose name starts with a digit is reported as empty."""
+    if as_db == "sqlite":
+        pytest.skip("Skipping SQLAlchemy specific test when using sqlite")
+    db_path = tmp_path / "tests.db"
+    db_manager = _create_db_manager(db_path)
+    db_manager.create_table('experiment')
+    db_manager.insert('experiment', {'name': '9exp', 'autosubmit_version': 1, 'description': 'Numeric start'})
+
+    assert _last_name_used_sqlalchemy(False, False, False) == 'empty'
+
+
+@pytest.mark.docker
+@pytest.mark.postgres
+def test_last_name_used_sqlalchemy_handles_empty_name(monkeypatch, tmp_path, as_db):
+    """An empty experiment name does not crash the lookup."""
+    if as_db == "sqlite":
+        pytest.skip("Skipping SQLAlchemy specific test when using sqlite")
+    db_path = tmp_path / "tests.db"
+    db_manager = _create_db_manager(db_path)
+    db_manager.create_table('experiment')
+    db_manager.insert('experiment', {'name': '', 'autosubmit_version': 1, 'description': 'Empty name'})
+
+    assert _last_name_used_sqlalchemy(False, False, False) == ''
 
 
 def test_delete_experiment_db(monkeypatch, tmp_path):

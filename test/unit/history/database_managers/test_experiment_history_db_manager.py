@@ -64,7 +64,7 @@ def test_sqlalchemy_initialize_migration(tmp_path, mocker):
     assert "splits" in cols
     assert "fail_count" in cols
 
-    rows = db_manager.select_jobs_data(get_table_with_schema(None, JobDataTable), ["nonexistent"])
+    rows = db_manager.select_jobs_data(["nonexistent"])
     assert rows == []
 
 
@@ -198,8 +198,10 @@ def test_sqlalchemy_no_database_reports_version_zero(tmp_path, monkeypatch) -> N
 
 
 def test_select_jobs_data_regression_sqlite_variable_limit(tmp_path, monkeypatch):
-    """Regression test: old IN-clause crashes above SQLite's variable-number limit.
-        The default limit varies by Python version and SQlite build, it is often 999 or 32766
+    """Regression test: a single IN-clause crashes above SQLite's variable-number limit.
+
+    ``select_jobs_data`` splits the job names into chunks instead, so it works
+    regardless of the backend limit (which varies by build, often 999 or 32766).
     """
     monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
 
@@ -237,7 +239,7 @@ def test_select_jobs_data_regression_sqlite_variable_limit(tmp_path, monkeypatch
         conn.execute(insert(job_data_table), rows)
         conn.commit()
 
-    # Old approach: IN-clause with N bound parameters must fail above the limit.
+    # A single IN-clause with all the names must fail above the limit.
     old_query = select(job_data_table).where(
         and_(
             job_data_table.c.last == 1,
@@ -248,11 +250,11 @@ def test_select_jobs_data_regression_sqlite_variable_limit(tmp_path, monkeypatch
         with pytest.raises(Exception, match="too many SQL variables|SQLITE_MAX_VARIABLE_NUMBER"):
             conn.execute(old_query).fetchall()
 
-    # New approach
-    result = db_manager.select_jobs_data(job_data_table, job_names)
+    # select_jobs_data chunks the names, so it succeeds.
+    result = db_manager.select_jobs_data(job_names)
 
     assert len(result) == n_jobs
-    assert all(dict(row)["last"] == 1 for row in result)
+    assert all(row["last"] == 1 for row in result)
 
 
 def _base_row(job_name: str, counter: int, job_id: int, status: str = "COMPLETED") -> dict:
@@ -507,3 +509,25 @@ def test_sqlite_get_last_job_data_dc_by_job_name_raises_when_not_found(sqlite_db
     """Raise an exception when no row exists for the given job_name."""
     with pytest.raises(Exception, match="No job_data found"):
         sqlite_db_manager.get_last_job_data_dc_by_job_name("nonexistent_job_name")
+
+
+def test_sqlalchemy_get_job_data_by_job_id_name_raises_when_not_found(sqlalchemy_db_manager) -> None:
+    """Raise an exception when no row matches the job id and name."""
+    with pytest.raises(Exception, match="No job_data found"):
+        sqlalchemy_db_manager.get_job_data_by_job_id_name(999, "nonexistent_job")
+
+
+def test_sqlalchemy_get_jobs_data_last_row_projects_columns(sqlalchemy_db_manager) -> None:
+    """get_jobs_data_last_row returns only the columns needed to recover logs."""
+    job_data_table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
+    job_name = "t001_20200101_fc0_20_SIM"
+    with sqlalchemy_db_manager.engine.connect() as conn:
+        conn.execute(insert(job_data_table), [_base_row(job_name, counter=1, job_id=70)])
+        conn.commit()
+
+    result = sqlalchemy_db_manager.get_jobs_data_last_row([job_name])
+
+    assert set(result[job_name].keys()) == set(
+        sqlalchemy_db_manager._JOB_DATA_LAST_ROW_COLUMNS
+    )
+    assert result[job_name]["job_id"] == 70
