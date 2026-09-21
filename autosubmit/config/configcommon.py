@@ -473,10 +473,11 @@ class AutosubmitConfig:
         :param section: The job section name to look up.
         :return: True if the section is found in at least one wrapper, False otherwise.
         """
-        for wrapper_data in self.experiment_data.get("WRAPPERS", {}).values():
-            if isinstance(wrapper_data, dict) and section in wrapper_data.get("JOBS_IN_WRAPPER", []):
-                return True
-        return False
+        return any(
+            isinstance(wrapper_data, dict)
+            and section in wrapper_data.get("JOBS_IN_WRAPPER", [])
+            for wrapper_data in self.experiment_data.get("WRAPPERS", {}).values()
+        )
 
     @staticmethod
     def _normalize_wrappers_section(data_fixed: dict, raise_exception: bool = False) -> None:
@@ -1829,8 +1830,6 @@ class AutosubmitConfig:
 
     def set_default_parameters(self) -> None:
         """Sets the default parameters for the experiment."""
-        self.default_parameters: dict = {'d': '%d%', 'd_': '%d_%', 'Y': '%Y%', 'Y_': '%Y_%', 'M': '%M%', 'M_': '%M_%',
-                                         'm': '%m%', 'm_': '%m_%'}
         user_defined = self.experiment_data.get("CONFIG", {}).get("SAFE_PLACEHOLDERS", [])
 
         if isinstance(user_defined, str):
@@ -1842,7 +1841,7 @@ class AutosubmitConfig:
         elif not isinstance(user_defined, list):
             raise AutosubmitCritical("CONFIG.SAFE_PLACEHOLDERS must be a list of placeholders names or a string.")
 
-        for param in (p for p in user_defined if p not in self.default_parameters):
+        for param in user_defined:
             self.default_parameters[param] = f"%{param}%"
 
     def _add_autosubmit_dict(self) -> None:
