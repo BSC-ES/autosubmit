@@ -132,9 +132,10 @@ def is_edge_satisfied(
 
     A ``STATUS`` is exact: the job runs only while the parent is in that status. A weak dependency
     (``?`` suffix or ``WEAK: true``) also accepts a parent that already finished successfully
-    (``COMPLETED`` or ``SKIPPED``); a failed parent is accepted by ``FAILED``/``FAILED?``.
-    ``COMPLETED`` and ``SKIPPED`` are both successful endings and satisfy each other. ``RUNNING`` is
-    the only status that uses the ``FROM_STEP`` checkpoint.
+    (``COMPLETED`` or ``SKIPPED``); a failed parent is accepted by ``FAILED``, and ``FAILED?`` also
+    accepts ``COMPLETED``/``SKIPPED`` (i.e. it is the "any finished status" form). ``COMPLETED`` and
+    ``SKIPPED`` are both successful endings and satisfy each other. ``RUNNING`` is the only status
+    that uses the ``FROM_STEP`` checkpoint.
 
     :param parent_status: Current status of the parent job, as a ``Status`` code or its name.
     :param min_trigger_status: Status the edge waits for, as a ``Status`` code or its name.

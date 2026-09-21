@@ -4355,6 +4355,9 @@ class JobList:
     def get_failed_from_db(self):
         return self.dbmanager.get_failed_job_data()
 
+    def get_waiting_from_db(self):
+        return self.dbmanager.get_waiting_job_data()
+
 
 def load_job_list(
     expid,

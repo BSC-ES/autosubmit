@@ -865,6 +865,12 @@ def run(
                 raise AutosubmitCritical(e.message, e.code, e.trace)
 
         Log.result("No more jobs to run.")
+        waiting_jobs = job_list.get_waiting_from_db()
+        if waiting_jobs:
+            Log.warning(
+                f"{len(waiting_jobs)} job(s) are still WAITING and their dependencies can no longer "
+                f"be satisfied: {', '.join(sorted(job['name'] for job in waiting_jobs))}"
+            )
         # search hint - finished run
         Log.info("Waiting for all logs to be updated")
         for p in platforms_to_test:

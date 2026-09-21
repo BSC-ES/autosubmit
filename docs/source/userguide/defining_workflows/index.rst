@@ -302,16 +302,23 @@ See :ref:`job_status_reference` for a complete reference and meanings.
     * - ``COMPLETED``
       - The task is completed. # Default
 
-Each ``STATUS`` is exact: the job runs only while the parent is in that status. Because statuses
-such as ``READY``, ``SUBMITTED``, ``QUEUING`` or ``RUNNING`` are transient, the job can miss the
-window and stay ``WAITING``.
+Each ``STATUS`` is exact: the job runs only while the parent is in that status. Autosubmit compares
+the start condition against the last status it sees for the parent on the platform, so if the
+platform moves the parent on faster than Autosubmit checks (for example, the parent goes from
+``WAITING`` to ``COMPLETED`` between two checks), the intermediate status is never observed and the
+job stays ``WAITING``.
 
 Adding ``?`` to the status (or ``WEAK: true`` to the dependency) makes the dependency weak, so a
 parent that already finished **successfully** (``COMPLETED`` or ``SKIPPED``) also satisfies it. For
 example, ``RUNNING?`` runs the job while the parent is running, or once it completed or was skipped.
+If both ``?`` and ``WEAK`` are set, ``?`` takes precedence.
 
-A failed parent is **not** accepted by ``?``. To run the job when the parent failed, use ``FAILED``
-(only on failure) or ``FAILED?`` (on failure, completion or skip).
+A failed parent is **not** accepted by ``?``. Use ``STATUS: 'FAILED'`` to run only when the parent
+failed, or ``STATUS: 'FAILED?'`` to run once the parent has finished **regardless of the outcome**
+(``COMPLETED``, ``SKIPPED`` or ``FAILED``).
+
+So ``FAILED?`` is the "any finished status" form; ``RUNNING?`` and the other statuses only add the
+successful endings (``COMPLETED``/``SKIPPED``).
 
 ``COMPLETED`` (the default) and ``SKIPPED`` are both successful endings, so a parent in either one
 satisfies the other. Because of this, ``?`` has no effect on ``COMPLETED`` or ``SKIPPED``: the
@@ -351,7 +358,8 @@ does not mark those edges as weak.
         RUNNING: chunk
 
 In the example above, ``MONITOR`` starts only while ``SIM`` is running, while ``POSTPROCESS`` also
-starts if ``SIM`` already completed or was skipped.
+starts if ``SIM`` already completed or was skipped. ``POSTPROCESS`` uses ``RUNNING?``, which only
+adds the successful endings; to also run it when ``SIM`` failed, use ``STATUS: 'FAILED?'``.
 
 
 The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. It is used together with ``STATUS: 'RUNNING'``. The possible value is an integer. Additionally, the target dependency, must call to `%AS_CHECKPOINT%` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.

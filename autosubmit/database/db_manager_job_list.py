@@ -885,3 +885,16 @@ class JobsDbManager(DbManager):
         ]
 
         return job_list_data
+
+    def get_waiting_job_data(self) -> list[dict[str, Any]]:
+        """Get the jobs that are still waiting.
+
+        :return: List of jobs that are still waiting.
+        """
+        table: Table = self.table_registry.get(JobsTable.name)
+        self.create_table(table.name)
+        job_list_data: list[dict[str, Any]] = [
+            dict(job) for job in self.select_where_with_columns(table, {'status': "WAITING"})
+        ]
+
+        return job_list_data

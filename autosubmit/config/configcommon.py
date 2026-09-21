@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 
 
 # Statuses accepted as a start condition (``STATUS``). ``UNKNOWN`` and ``SUSPENDED`` can never be
-# observed as a usable parent status, so they are not selectable.
+# observed as a usable parent status, so they are not valid ``STATUS`` values.
 _ALLOWED_START_CONDITIONS = frozenset(Status.KEY_TO_VALUE) - {"UNKNOWN", "SUSPENDED"}
 
 
@@ -588,7 +588,7 @@ class AutosubmitConfig:
         """
         aux_dependencies = {}
         if isinstance(dependencies, str):
-            for dependency in dependencies.upper().split(" "):
+            for dependency in dependencies.upper().split():
                 aux_dependencies[dependency] = {}
         elif isinstance(dependencies, dict):
             for dependency, dependency_data in dependencies.items():

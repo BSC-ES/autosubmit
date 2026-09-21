@@ -219,3 +219,20 @@ def test_remaining_blocked_by_package(tmp_path):
 
         # COMPLETED parent is allowed → blocked
         assert mgr.remaining_blocked_by_package({"rem_job"}, {"pkg_job"}) is True
+
+
+def test_get_waiting_job_data(tmp_path):
+    """get_waiting_job_data returns only the jobs that are still in WAITING."""
+    with patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path)):
+        mgr = JobsDbManager(schema="test_schema_waiting")
+        table = mgr.table_registry.get(JobsTable.name)
+        mgr.create_table(table.name)
+        mgr.upsert_many(table.name, [
+            {"name": "job_completed", "status": "COMPLETED", "fail_count": 0},
+            {"name": "job_waiting", "status": "WAITING", "fail_count": 0},
+            {"name": "job_failed", "status": "FAILED", "fail_count": 0},
+        ], ["name"])
+
+        waiting = mgr.get_waiting_job_data()
+
+        assert [job["name"] for job in waiting] == ["job_waiting"]

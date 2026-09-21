@@ -13,6 +13,6 @@ JOBS:
     DEPENDENCIES:
       IT:
       GET_FILES:
-        STATUS: 'FAILED?'
+        STATUS: 'FAILED?'   # run whether GET_FILES failed or finished (completed/skipped)
     RUNNING: chunk
     SYNCHRONIZE: member

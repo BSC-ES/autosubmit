@@ -128,6 +128,58 @@ from autosubmit.log.log import AutosubmitCritical, Log
         pytest.param(
             {
                 "JOBS": {
+                    "job1": {
+                        "DEPENDENCIES": "job2   job3"
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            {
+                "JOBS": {
+                    "JOB1": {
+                        'FILE': '',
+                        'ADDITIONAL_FILES': [],
+                        "DEPENDENCIES": {"JOB2": {}, "JOB3": {}}
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            True,
+            id="jobs_with_dependencies_repeated_spaces"
+        ),
+        pytest.param(
+            {
+                "JOBS": {
+                    "job1": {
+                        "DEPENDENCIES": ""
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            {
+                "JOBS": {
+                    "JOB1": {
+                        'FILE': '',
+                        'ADDITIONAL_FILES': [],
+                        "DEPENDENCIES": {}
+                    }
+                },
+                'STORAGE': {
+                    'TYPE': 'sqlite'
+                }
+            },
+            True,
+            id="jobs_with_empty_string_dependencies"
+        ),
+        pytest.param(
+            {
+                "JOBS": {
                     "job1": {}
                 },
                 'STORAGE': {
