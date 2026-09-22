@@ -20,69 +20,57 @@
 import os
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
 
 import pytest
 from sqlalchemy import delete, inspect, select, text
 from sqlalchemy.schema import CreateSchema
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import JobDataTable, get_table_with_schema
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.database_managers import experiment_history_db_manager
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     SqlAlchemyExperimentHistoryDbManager,
-    create_experiment_history_db_manager,
 )
 from test._oldschema import old_experiment_run_table, old_job_data_table
 
-if TYPE_CHECKING:
-    # noinspection PyProtectedMember
-    from py._path.local import LocalPath  # type: ignore
 
-    from autosubmit.history.database_managers.experiment_history_db_manager import (
-        ExperimentHistoryDbManager,
-    )
+def _create_db_manager(as_db: str, **options) -> SqlAlchemyExperimentHistoryDbManager:
+    """Create the SQLAlchemy history manager (``as_db`` is kept for readability)."""
+    jobdata_dir_path = options.get("jobdata_dir_path", BasicConfig.JOBDATA_DIR)
+    job_data_file = options.get("jobdata_file", None)
+    return SqlAlchemyExperimentHistoryDbManager(options["expid"], jobdata_dir_path, job_data_file)
 
 
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
-    """Test history database manager using the old (SQLite) and new (SQLAlchemy) implementations."""
+    """Test the SQLAlchemy history database manager on both backends."""
     expid = "test_schema_history"
-    options = {"expid": expid}
-    is_sqlalchemy = as_db != "sqlite"
     tmp_test_dir = os.path.join(str(tmp_path), "test_experiment_history_db_manager")
     os.mkdir(tmp_test_dir)
-    options["expid"] = expid
-    if not is_sqlalchemy:
-        # N.B.: We do it here, as we don't know the temporary path name until the fixture exists,
-        #       and because it's harmless to the Postgres test to have the tmp_path fixture.
-        options["jobdata_dir_path"] = str(tmp_test_dir)
 
-    # Assert type of database manager
-    database_manager: SqlAlchemyExperimentHistoryDbManager | ExperimentHistoryDbManager = create_experiment_history_db_manager(as_db, **options)
+    database_manager = _create_db_manager(as_db, expid=expid, jobdata_dir_path=tmp_test_dir)
 
     # Test initialization of the table
-    # assert not database_manager.my_database_exists()
     database_manager.initialize()
     assert database_manager.my_database_exists()
-    if is_sqlalchemy:
-        # The SQLAlchemy manager tracks a portable schema version and creates the job_data index.
-        assert database_manager.is_current_version() is True
-        assert database_manager.is_header_ready_db_version() is True
-        inspector = inspect(database_manager.engine)
-        index_names = {
-            index['name'] for index in inspector.get_indexes(JobDataTable.name, schema=database_manager.schema)
-        }
-        # Postgres schema-qualifies index names (e.g. ``ix_<schema>_job_data_job_name``).
-        assert any(name.endswith('job_data_job_name') for name in index_names)
-    # Test that .db file was created or not depending on the database engine
-    db_file_path = Path(tmp_test_dir, f"job_data_{options['expid']}.db")
-    if is_sqlalchemy:
-        assert not Path(db_file_path).exists()
+    # The manager tracks a portable schema version and creates the job_data index.
+    assert database_manager.is_current_version() is True
+    assert database_manager.is_header_ready_db_version() is True
+    inspector = inspect(database_manager.engine)
+    index_names = {
+        index['name'] for index in inspector.get_indexes(JobDataTable.name, schema=database_manager.schema)
+    }
+    # Postgres schema-qualifies index names (e.g. ``ix_<schema>_job_data_job_name``).
+    assert any(name.endswith('job_data_job_name') for name in index_names)
+
+    # The SQLite backend keeps the data in a local .db file; Postgres does not.
+    db_file_path = Path(tmp_test_dir, f"job_data_{expid}.db")
+    if as_db == "postgres":
+        assert not db_file_path.exists()
     else:
-        assert Path(db_file_path).exists()
+        assert db_file_path.exists()
 
     # Test experiment run history methods
     # Test run insertion
@@ -157,12 +145,9 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_sqlalchemy_schema_version_is_isolated_per_tenant(as_db: str):
-    """Each experiment schema records its own schema version."""
-    if as_db != "postgres":
-        pytest.skip("Only relevant for the PostgreSQL backend")
-
-    first = create_experiment_history_db_manager(as_db, expid="test_iso_first")
-    second = create_experiment_history_db_manager(as_db, expid="test_iso_second")
+    """Each experiment records its own schema version."""
+    first = _create_db_manager(as_db, expid="test_iso_first")
+    second = _create_db_manager(as_db, expid="test_iso_second")
     assert isinstance(first, SqlAlchemyExperimentHistoryDbManager)
     assert isinstance(second, SqlAlchemyExperimentHistoryDbManager)
     first.initialize()
@@ -175,137 +160,16 @@ def test_sqlalchemy_schema_version_is_isolated_per_tenant(as_db: str):
     assert second.is_current_version() is True
 
 
-def test_sqlite_initialize_no_db(autosubmit_exp, mocker, tmp_path):
-    exp = autosubmit_exp(experiment_data={})
-    wrong_folder = tmp_path / 'wrong-folder'
-    wrong_folder.mkdir()
-    db_manager = create_experiment_history_db_manager(
-        'sqlite',
-        schema=exp.expid,
-        expid=exp.expid,
-        jobdata_dir_path=str(wrong_folder)
-    )
-    create_historical_database_spy = mocker.spy(db_manager, "create_historical_database")
-    update_historical_database_spy = mocker.spy(db_manager, "update_historical_database")
-
-    db_manager.initialize()
-
-    assert create_historical_database_spy.called
-    assert not update_historical_database_spy.called
-
-
-def test_sqlite_initialize_wrong_version(autosubmit_exp, mocker, tmp_path, monkeypatch):
-    exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder / f'job_data_{exp.expid}.db'
-    Path(db_file).touch()
-    db_manager = create_experiment_history_db_manager(
-        'sqlite',
-        schema=exp.expid,
-        expid=exp.expid,
-        jobdata_dir_path=str(data_folder)
-    )
-    create_historical_database_spy = mocker.spy(db_manager, "create_historical_database")
-    update_historical_database_spy = mocker.spy(db_manager, "update_historical_database")
-
-    db_manager.initialize()
-
-    assert not create_historical_database_spy.called
-    assert not update_historical_database_spy.called
-
-    monkeypatch.setattr(experiment_history_db_manager, 'CURRENT_DB_VERSION', -99)
-    db_manager.initialize()
-
-    assert not create_historical_database_spy.called
-    assert update_historical_database_spy.called
-
-
-def test_sqlite_initialize_db_exists(autosubmit_exp, mocker, tmp_path):
-    exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder / f'job_data_{exp.expid}.db'
-    Path(db_file).touch()
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
-        'sqlite',
-        schema=exp.expid,
-        expid=exp.expid,
-        jobdata_dir_path=str(data_folder)
-    ))
-    create_historical_database_spy = mocker.spy(db_manager, "create_historical_database")
-    update_historical_database_spy = mocker.spy(db_manager, "update_historical_database")
-
-    db_manager.initialize()
-
-    assert not create_historical_database_spy.called
-    assert not update_historical_database_spy.called
-
-
-def test_sqlite_is_current_version_db_exists(autosubmit_exp, tmp_path):
-    exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder / f'job_data_{exp.expid}.db'
-    Path(db_file).touch()
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
-        'sqlite',
-        schema=exp.expid,
-        expid=exp.expid,
-        jobdata_dir_path=str(data_folder)
-    ))
-
-    assert db_manager.is_current_version()
-
-
-def test_sqlite_is_current_version_no_db(autosubmit_exp, tmp_path):
-    exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
-        'sqlite',
-        schema=exp.expid,
-        expid=exp.expid,
-        jobdata_dir_path=str(data_folder / 'wrong-folder')
-    ))
-
-    assert not db_manager.is_current_version()
-
-
-def test_sqlite_is_header_ready_db_version_db_exists(autosubmit_exp, tmp_path):
-    exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder
-    Path(db_file).touch()
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
-        'sqlite',
-        schema=exp.expid,
-        expid=exp.expid,
-        jobdata_dir_path=str(data_folder)
-    ))
-
-    assert db_manager.is_header_ready_db_version()
-
-
-def test_sqlite_is_header_ready_db_version_no_db(autosubmit_exp, tmp_path):
-    exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
-        'sqlite',
-        expid=exp.expid,
-        jobdata_dir_path=str(data_folder / 'wrong-folder')
-    ))
-
-    assert not db_manager.is_header_ready_db_version()
-
-
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_get_job_data_by_job_id_name(as_db: str, autosubmit_exp):
     exp = autosubmit_exp(experiment_data={})
 
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
+    db_manager = _create_db_manager(
         as_db,
-        schema=exp.expid,
         expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
-    ))
+    )
     db_manager.initialize()
 
     new_job = JobData(
@@ -339,12 +203,11 @@ def test_get_job_data_max_counter(as_db: str, job_name: str, counters: list[int]
     """Persists the job data for the given optional job name, and its counters to verify the max counter."""
     exp = autosubmit_exp(experiment_data={})
 
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
+    db_manager = _create_db_manager(
         as_db,
-        schema=exp.expid,
         expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
-    ))
+    )
     db_manager.initialize()
 
     sum_counters = max(counters) if counters else 0
@@ -365,21 +228,23 @@ def test_get_job_data_max_counter(as_db: str, job_name: str, counters: list[int]
 @pytest.mark.parametrize(
     "lasts",
     [
-        [1, 0]
+        [1, 0],
+        [1, 1],
+        [0, 0],
+        [1, 0, 1],
     ],
 )
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_get_all_last_job_data_dcs(as_db: str, lasts: list[bool], request, autosubmit_exp):
+def test_get_all_last_job_data_dcs(as_db: str, lasts: list[bool], autosubmit_exp):
     """Persists the job data for the given optional job name, and its counters to verify the max counter."""
     exp = autosubmit_exp(experiment_data={})
 
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
+    db_manager = _create_db_manager(
         as_db,
-        schema=exp.expid,
         expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
-    ))
+    )
     db_manager.initialize()
 
     last_rows = lasts.count(True)
@@ -410,12 +275,11 @@ def test_get_job_data_dcs_last_by_wrapper_code(as_db: str, wrapper_code: int, nu
     """Tests that we retrieve the expected number of entries (only when ``wrapper_code`` is greater than 2)."""
     exp = autosubmit_exp(experiment_data={})
 
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
+    db_manager = _create_db_manager(
         as_db,
-        schema=exp.expid,
         expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
-    ))
+    )
     db_manager.initialize()
 
     new_job = JobData(
@@ -431,17 +295,17 @@ def test_get_job_data_dcs_last_by_wrapper_code(as_db: str, wrapper_code: int, nu
     assert len(job_data_dcs) == number_of_expected
 
 
+@pytest.mark.docker
 @pytest.mark.postgres
 def test_get_job_data_dc_unique_latest_by_job_name(as_db: str, autosubmit_exp):
     """Tests that we retrieve the expected number of entries (only when ``wrapper_code`` is greater than 2)."""
     exp = autosubmit_exp(experiment_data={})
 
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
+    db_manager = _create_db_manager(
         as_db,
-        schema=exp.expid,
         expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
-    ))
+    )
     db_manager.initialize()
 
     job_name = 'test_job'
@@ -464,12 +328,11 @@ def test_update_job_data_dc_by_job_id_name(as_db: str, autosubmit_exp):
     """Tests that we retrieve the expected number of entries (only when ``wrapper_code`` is greater than 2)."""
     exp = autosubmit_exp(experiment_data={})
 
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
+    db_manager = _create_db_manager(
         as_db,
-        schema=exp.expid,
         expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
-    ))
+    )
     db_manager.initialize()
 
     job_name = 'test_job'
@@ -497,12 +360,11 @@ def test_update_list_job_data_dc_by_each_id(as_db: str, autosubmit_exp):
     """Tests that we retrieve the expected number of entries (only when ``wrapper_code`` is greater than 2)."""
     exp = autosubmit_exp(experiment_data={})
 
-    db_manager: ExperimentHistoryDbManager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
+    db_manager = _create_db_manager(
         as_db,
-        schema=exp.expid,
         expid=exp.expid,
         jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
-    ))
+    )
     db_manager.initialize()
 
     jobs = [
@@ -537,32 +399,6 @@ def test_update_list_job_data_dc_by_each_id(as_db: str, autosubmit_exp):
     assert retrieved_jobs_statuses == [new_status, new_status, new_status]
 
 
-def test_sqlite_pragma_version(autosubmit_exp, tmp_path: 'LocalPath'):
-    exp = autosubmit_exp(experiment_data={})
-    data_folder = Path(tmp_path, 'metadata/data')
-    db_file = data_folder / f'job_data_{exp.expid}.db'
-    Path(db_file).touch()
-    db_manager = cast('ExperimentHistoryDbManager', create_experiment_history_db_manager(
-        'sqlite',
-        schema=exp.expid,
-        expid=exp.expid,
-        jobdata_dir_path=str(data_folder)
-    ))
-
-    Path(db_file).unlink()
-    Path(db_file).touch()
-
-    db_manager.execute_statement_on_dbfile(db_manager.historicaldb_file_path, db_manager.create_table_header_query)
-    db_manager.execute_statement_on_dbfile(db_manager.historicaldb_file_path, db_manager.create_table_query)
-    db_manager.execute_statement_on_dbfile(db_manager.historicaldb_file_path, db_manager.create_index_query)
-    # Skipped _set_historical_pragma_version
-
-    with pytest.raises(Exception) as cm:
-        db_manager.is_header_ready_db_version()
-
-    assert 'pragma version' in str(cm.value)
-
-
 @pytest.mark.docker
 @pytest.mark.postgres
 def test_sqlalchemy_initialize_migration_postgres(as_db):
@@ -573,7 +409,7 @@ def test_sqlalchemy_initialize_migration_postgres(as_db):
     expid = "test_migration_add_cols"
     options = {"expid": expid}
 
-    db_manager = create_experiment_history_db_manager(as_db, **options)
+    db_manager = _create_db_manager(as_db, **options)
     assert isinstance(db_manager, SqlAlchemyExperimentHistoryDbManager)
     schema = db_manager.schema
 
@@ -618,7 +454,7 @@ def test_sqlalchemy_initialize_migration_twice_postgres(as_db):
     expid = "test_migration_twice"
     options = {"expid": expid}
 
-    db_manager = create_experiment_history_db_manager(as_db, **options)
+    db_manager = _create_db_manager(as_db, **options)
     assert isinstance(db_manager, SqlAlchemyExperimentHistoryDbManager)
     schema = db_manager.schema
 
@@ -653,7 +489,7 @@ def test_sqlalchemy_initialize_migration_preserves_data_postgres(as_db):
     expid = "test_migration_data"
     options = {"expid": expid}
 
-    db_manager = create_experiment_history_db_manager(as_db, **options)
+    db_manager = _create_db_manager(as_db, **options)
     assert isinstance(db_manager, SqlAlchemyExperimentHistoryDbManager)
     schema = db_manager.schema
 

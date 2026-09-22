@@ -12,7 +12,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import os
 import traceback
 from time import time
 
@@ -22,9 +21,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers.experiment_history_db_manager import (
-    ExperimentHistoryDbManager,
     SqlAlchemyExperimentHistoryDbManager,
-    create_experiment_history_db_manager,
 )
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.history.internal_logging import Logging
@@ -38,28 +35,20 @@ from autosubmit.history.strategies import (
 )
 from autosubmit.log.log import Log
 
-SECONDS_WAIT_PLATFORM = 60
-
 
 class ExperimentHistory:
-    def __init__(self, expid, force_sql_alchemy: bool = False):
-        # Unused arguments, but I didn't want to change every call to this class in this PR
+    def __init__(self, expid):
         self.expid = expid
         BasicConfig.read()
         self._log = Logging(expid, BasicConfig.HISTORICAL_LOG_DIR)
         self._job_data_dir_path = BasicConfig.JOBDATA_DIR
         self._job_data_file = f"job_data_{expid}.db" if BasicConfig.DATABASE_BACKEND == "sqlite" else ""
         self._historiclog_dir_path = BasicConfig.HISTORICAL_LOG_DIR
-        self.force_sql_alchemy = force_sql_alchemy
-        self._manager: SqlAlchemyExperimentHistoryDbManager | ExperimentHistoryDbManager | None = None
+        self._manager: SqlAlchemyExperimentHistoryDbManager | None = None
         try:
-            options = {
-                'expid': self.expid,
-                'jobdata_path': self._job_data_dir_path,
-                'jobdata_file': self._job_data_file,
-                'force_sql_alchemy': self.force_sql_alchemy  # tmp, the idea is to move everything to sqlalchemy
-            }
-            self._manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
+            self._manager = SqlAlchemyExperimentHistoryDbManager(
+                self.expid, self._job_data_dir_path, self._job_data_file
+            )
             self.initialize_database()
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
@@ -67,7 +56,7 @@ class ExperimentHistory:
             self._manager = None
 
     @property
-    def manager(self) -> SqlAlchemyExperimentHistoryDbManager | ExperimentHistoryDbManager:
+    def manager(self) -> SqlAlchemyExperimentHistoryDbManager:
         """Return the history database manager.
 
         :raises RuntimeError: If the manager could not be initialized.
@@ -147,18 +136,6 @@ class ExperimentHistory:
         """
         try:
             return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except Exception:
-            return None
-
-    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> JobData | None:
-        """Retrieve JobData by job_id and fail_count.
-
-        :param job_id: The scheduler job ID.
-        :param fail_count: The attempt (fail_count) to look up.
-        :return: The JobData instance, or None if not found.
-        """
-        try:
-            return self.manager.get_job_data_by_job_id_and_fail_count(job_id, fail_count)
         except Exception:
             return None
 
@@ -539,5 +516,5 @@ def get_historical_database(expid, job_list, as_conf):
         # Connection to status database ec_earth.db can fail.
         # API worker will fix the status.
         Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
-                  f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
+                  f"{BasicConfig.AS_TIMES_DB_PATH}. Exception: {str(e)}", 7003)
     return exp_history

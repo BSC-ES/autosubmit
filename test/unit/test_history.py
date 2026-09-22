@@ -364,8 +364,8 @@ class TestLogging:
         self.log.log(self.exp_message, self.trace_message)
 
 
-def test_experiment_history_force_sqlalchemy_migrates_old_schema(tmp_path):
-    """ExperimentHistory with force_sql_alchemy=True migrates an old-schema database."""
+def test_experiment_history_migrates_old_schema(tmp_path):
+    """ExperimentHistory migrates an old-schema database."""
     db_dir = Path(tmp_path) / "metadata" / "data"
     db_dir.mkdir(parents=True, exist_ok=True)
     db_file = db_dir / "job_data_a000.db"
@@ -375,7 +375,7 @@ def test_experiment_history_force_sqlalchemy_migrates_old_schema(tmp_path):
     old_experiment_run_table.create(engine)
     engine.dispose()
 
-    exp_history = ExperimentHistory("a000", force_sql_alchemy=True)
+    exp_history = ExperimentHistory("a000")
     assert exp_history.manager is not None
 
     result = exp_history.manager.get_jobs_data_last_row(["nonexistent"])

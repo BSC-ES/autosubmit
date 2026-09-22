@@ -19,10 +19,8 @@ import traceback
 from abc import ABCMeta, abstractmethod
 
 import autosubmit.history.database_managers.database_models as Models
-from autosubmit.history.database_managers.database_manager import (
-    DEFAULT_HISTORICAL_LOGS_DIR,
-)
 from autosubmit.history.internal_logging import Logging
+from autosubmit.history.utils import DEFAULT_HISTORICAL_LOGS_DIR
 
 
 class PlatformInformationHandler:

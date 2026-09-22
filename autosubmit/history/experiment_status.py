@@ -18,12 +18,8 @@
 import traceback
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.database_managers.database_manager import (
-    DEFAULT_HISTORICAL_LOGS_DIR,
-    DEFAULT_LOCAL_ROOT_DIR,
-)
 from autosubmit.history.database_managers.experiment_status_db_manager import (
-    create_experiment_status_db_manager,
+    SqlAlchemyExperimentStatusDbManager,
 )
 from autosubmit.history.internal_logging import Logging
 
@@ -31,26 +27,18 @@ from autosubmit.history.internal_logging import Logging
 class ExperimentStatus:
     """Represents the Experiment Status Mechanism that keeps track of currently active experiments."""
 
-    def __init__(self, expid, local_root_dir_path=DEFAULT_LOCAL_ROOT_DIR,
-                 historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
-        # type : (str) -> None
-        self.expid = expid  # type : str
+    def __init__(self, expid):
+        self.expid = expid
         BasicConfig.read()
+        self.manager: SqlAlchemyExperimentStatusDbManager | None = None
         try:
-            options = {
-                'expid': self.expid,
-                'db_dir_path': BasicConfig.DB_DIR,
-                'main_db_name': BasicConfig.DB_FILE,
-                'local_root_dir_path': BasicConfig.LOCAL_ROOT_DIR,
-            }
-            self.manager = create_experiment_status_db_manager(BasicConfig.DATABASE_BACKEND, **options)
+            self.manager = SqlAlchemyExperimentStatusDbManager()
         except Exception:
             message = f"Error while trying to update {str(self.expid)} in experiment_status."
             Logging(self.expid, BasicConfig.HISTORICAL_LOG_DIR).log(message, traceback.format_exc())
             self.manager = None
 
     def set_as_running(self):
-        # type : () -> None
         """ Set the status of the experiment in experiment_status of as_times.db as RUNNING. Creates the database, table and row if necessary."""
         if self.manager:
             exp_status_row = self.manager.get_experiment_status_row_by_expid(self.expid)

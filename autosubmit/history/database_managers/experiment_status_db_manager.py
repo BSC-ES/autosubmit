@@ -15,9 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import textwrap
-from pathlib import Path
-
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -28,116 +25,26 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.tables import ExperimentStatusTable, ExperimentTable
 from autosubmit.history.database_managers import database_models as Models
-from autosubmit.history.database_managers.database_manager import (
-    DEFAULT_LOCAL_ROOT_DIR,
-    DatabaseManager,
-)
 
 # TODO(#3114): the as_times database (experiment_status) is not versioned yet.
 #             When it is, it should use the per-target schema_migrations helper
 #             from autosubmit.database.migrations.
 
 
-class ExperimentStatusDbManager(DatabaseManager):
-    """ Manages the actions on the status database """
-
-    def __init__(
-            self,
-            expid: str,
-            db_dir_path: str,
-            main_db_name: str,
-            local_root_dir_path: str = DEFAULT_LOCAL_ROOT_DIR
-    ):
-        super().__init__(expid, local_root_dir_path=local_root_dir_path)
-        db_dir = Path(db_dir_path)
-        local_root = Path(local_root_dir_path)
-
-        self._as_times_file_path = db_dir / BasicConfig.AS_TIMES_DB
-        self._ecearth_file_path = db_dir / main_db_name
-        self._db_file_path = local_root / self.expid / "db" / f"job_list_{self.expid}.db"
-        self._validate_status_database()
-
-    def _validate_status_database(self):
-        """ Creates experiment_status table if it does not exist """
-        create_table_query = textwrap.dedent(
-            '''CREATE TABLE
-                IF NOT EXISTS experiment_status (
-                exp_id integer PRIMARY KEY,
-                name text NOT NULL,
-                status text NOT NULL,
-                seconds_diff integer NOT NULL,
-                modified text NOT NULL
-            );'''
-        )
-        self.execute_statement_on_dbfile(self._as_times_file_path, create_table_query)
-
-    def set_existing_experiment_status_as_running(self, expid: str) -> None:
-        """ Set the experiment_status row as running. """
-        self.update_exp_status(expid, Models.RunningStatus.RUNNING)
-
-    def create_experiment_status_as_running(self, experiment: Models.ExperimentRow) -> None:
-        """ Create a new experiment_status row for the Models.Experiment item."""
-        self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
-
-    def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None:
-        """Get Models.ExperimentRow by expid."""
-        experiment_row = self.get_experiment_row_by_expid(expid)
-        return self.get_experiment_status_row_by_exp_id(experiment_row.id)
-
-    def get_experiment_row_by_expid(self, expid: str) -> Models.ExperimentRow:
-        """Get the experiment from ecearth.db by expid as Models.ExperimentRow."""
-        statement = self.get_built_select_statement("experiment", "name=?")
-        current_rows = self.get_from_statement_with_arguments(self._ecearth_file_path, statement, (expid,))
-
-        if not current_rows:
-            raise ValueError(f"Experiment {expid} not found in {self._ecearth_file_path}")
-
-        return Models.ExperimentRow(*current_rows[0])
-
-    def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Models.ExperimentStatusRow | None:
-        """ Get Models.ExperimentStatusRow from as_times.db by exp_id (int)."""
-        statement = self.get_built_select_statement("experiment_status", "exp_id=?")
-        arguments = (exp_id,)
-        current_rows = self.get_from_statement_with_arguments(self._as_times_file_path, statement, arguments)
-        if len(current_rows) <= 0:
-            return None
-        return Models.ExperimentStatusRow(*current_rows[0])
-
-    def create_exp_status(self, exp_id: int, expid: str, status: str) -> int:
-        """Create experiment status."""
-        statement = ''' INSERT INTO experiment_status(exp_id, name,
-        status, seconds_diff, modified) VALUES(?,?,?,?,?) '''
-        arguments = (exp_id, expid, status, 0, HUtils.get_current_datetime())
-        return self.insert_statement_with_arguments(self._as_times_file_path, statement, arguments)
-
-    def update_exp_status(self, expid: str, status="RUNNING") -> None:
-        """
-        Update status, seconds_diff, modified in experiment_status.
-        """
-        statement = ''' UPDATE experiment_status SET status = ?, 
-        seconds_diff = ?, modified = ? WHERE name = ? '''
-        arguments = (status, 0, HUtils.get_current_datetime(), expid)
-        self.execute_statement_with_arguments_on_dbfile(
-            self._as_times_file_path, statement, arguments)
-
-
 class SqlAlchemyExperimentStatusDbManager:
     """An experiment status database manager using SQLAlchemy.
-    It contains the same public functions as ``ExperimentStatusDbManager``
-    (SQLite only), but uses SQLAlchemy instead of calling database
-    driver functions directly.
-    It can be used with any engine supported by SQLAlchemy, such
-    as Postgres, Mongo, MySQL, etc.
-    Some operations here may raise ``NotImplemented``, as they existed in
-    the ``ExperimentStatusDbManager`` but were never used in Autosubmit (i.e. we can
-    delete that code -- for later).
+
+    It can be used with any engine supported by SQLAlchemy, such as PostgreSQL
+    and SQLite.
     """
 
     def __init__(self) -> None:
-        self.engine = session.get_engine(
-            db_path=Path(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)
-        )
-        with self.engine.connect() as conn, conn.begin():
+        # ``experiment_status`` lives in the as_times database, while ``experiment``
+        # lives in the general database. On PostgreSQL both paths resolve to the
+        # same engine.
+        self.status_engine = session.get_engine(db_path=BasicConfig.AS_TIMES_DB_PATH)
+        self.general_engine = session.get_engine(db_path=BasicConfig.DB_PATH)
+        with self.status_engine.begin() as conn:
             conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
 
     def set_existing_experiment_status_as_running(self, expid):
@@ -155,10 +62,10 @@ class SqlAlchemyExperimentStatusDbManager:
             select(ExperimentTable).
             where(ExperimentTable.c.name == expid)  # type: ignore
         )
-        with self.engine.connect() as conn:
+        with self.general_engine.connect() as conn:
             row = conn.execute(query).first()
             if not row:
-                raise ValueError(f"Experiment {expid} not found in Postgres {expid}")
+                raise ValueError(f"Experiment {expid} not found in the database")
         return Models.ExperimentRow(*row)
 
     def get_experiment_status_row_by_exp_id(self, exp_id: int) -> Models.ExperimentStatusRow | None:
@@ -166,7 +73,7 @@ class SqlAlchemyExperimentStatusDbManager:
             select(ExperimentStatusTable).
             where(ExperimentStatusTable.c.exp_id == exp_id)  # type: ignore
         )
-        with self.engine.connect() as conn:
+        with self.status_engine.connect() as conn:
             row = conn.execute(query).first()
             if not row:
                 return None
@@ -197,7 +104,7 @@ class SqlAlchemyExperimentStatusDbManager:
                 },
             )
         )
-        with self.engine.connect() as conn:
+        with self.status_engine.connect() as conn:
             with conn.begin():
                 result = conn.execute(query)
                 # NOTE: SQLite == rowcount(), PG == rowcount. Intriguing.
@@ -214,33 +121,6 @@ class SqlAlchemyExperimentStatusDbManager:
                 modified=HUtils.get_current_datetime()
             )
         )
-        with self.engine.connect() as conn, conn.begin():
+        with self.status_engine.connect() as conn, conn.begin():
             conn.execute(query)
 
-
-def create_experiment_status_db_manager(
-    db_engine: str, **options
-) -> SqlAlchemyExperimentStatusDbManager | ExperimentStatusDbManager:
-    """Creates a Postgres or SQLite database manager based on the Autosubmit configuration.
-
-    Note that you must provide the options even if they are optional, in which case
-    you must provide ``options=None``, or you will get a ``KeyError``.
-
-    TODO: better example and/or link to DbManager.
-
-    :param db_engine: The database engine type.
-    :return: The database manager.
-    :raises ValueError: If the database engine type is not valid.
-    :raises KeyError: If the ``options`` dictionary is missing a required parameter for an engine.
-    """
-    if db_engine == "postgres":
-        return SqlAlchemyExperimentStatusDbManager()
-    elif db_engine == "sqlite":
-        return ExperimentStatusDbManager(
-            expid=options['expid'],
-            db_dir_path=options['db_dir_path'],
-            main_db_name=options['main_db_name'],
-            local_root_dir_path=options['local_root_dir_path'],
-        )
-    else:
-        raise ValueError(f"Invalid database engine: {db_engine}")

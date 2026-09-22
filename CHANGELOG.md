@@ -16,6 +16,8 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
 - Add per-target `schema_migrations` tracking and create the `job_data(job_name)` index in the SQLAlchemy history database manager #3114
 - Align the SQLAlchemy history manager lookups and bulk updates, and remove the temporary table from `select_jobs_data` #3114
+- Use SQLAlchemy for all history and experiment status database managers, dropping the legacy SQLite-only managers #3114
+- Fix log recovery skipping historical stats when the scheduler reuses job ids across chunks #3114
 
 **New Features:**
 

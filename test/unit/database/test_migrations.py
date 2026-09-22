@@ -30,6 +30,8 @@ from autosubmit.database.migrations import (
     schema_migrations_table,
 )
 
+TABLE_NAME = "schema_migrations"
+
 
 def _make_engine(tmp_path: Path, name: str):
     return create_engine(f"sqlite:///{tmp_path / name}")
@@ -37,9 +39,9 @@ def _make_engine(tmp_path: Path, name: str):
 
 def test_schema_migrations_table_shape() -> None:
     """The helper builds the expected schema_migrations table."""
-    table = schema_migrations_table(MetaData())
+    table = schema_migrations_table(MetaData(), TABLE_NAME)
 
-    assert table.name == "schema_migrations"
+    assert table.name == TABLE_NAME
     assert {column.name for column in table.columns} == {"version", "applied_at"}
     assert table.c.version.primary_key is True
 
@@ -47,7 +49,7 @@ def test_schema_migrations_table_shape() -> None:
 def test_get_schema_version_returns_zero_without_table(tmp_path: Path) -> None:
     """A target without the migrations table reports version 0."""
     engine = _make_engine(tmp_path, "a.db")
-    table = schema_migrations_table(MetaData())
+    table = schema_migrations_table(MetaData(), TABLE_NAME)
 
     assert get_schema_version(engine, table) == 0
 
@@ -55,7 +57,7 @@ def test_get_schema_version_returns_zero_without_table(tmp_path: Path) -> None:
 def test_record_migration_is_idempotent(tmp_path: Path) -> None:
     """Recording the same version twice keeps a single row."""
     engine = _make_engine(tmp_path, "a.db")
-    table = schema_migrations_table(MetaData())
+    table = schema_migrations_table(MetaData(), TABLE_NAME)
     ensure_schema_migrations_table(engine, table)
 
     with engine.begin() as conn:
@@ -71,7 +73,7 @@ def test_record_migration_is_idempotent(tmp_path: Path) -> None:
 def test_apply_ordered_migrations_applies_pending_in_order(tmp_path: Path) -> None:
     """Pending migrations run in ascending order and are recorded."""
     engine = _make_engine(tmp_path, "a.db")
-    table = schema_migrations_table(MetaData())
+    table = schema_migrations_table(MetaData(), TABLE_NAME)
     ensure_schema_migrations_table(engine, table)
     executed: list[int] = []
 
@@ -91,10 +93,10 @@ def test_apply_ordered_migrations_applies_pending_in_order(tmp_path: Path) -> No
     assert get_schema_version(engine, table) == 3
 
 
-@pytest.mark.parametrize("recorded, expected", [(5, 5), (0, 0)])
+@pytest.mark.parametrize("recorded, expected", [(5, 5), (21, 21)])
 def test_schema_version_is_isolated_per_tenant(tmp_path: Path, recorded: int, expected: int) -> None:
     """Each tenant keeps its own schema version."""
-    table = schema_migrations_table(MetaData())
+    table = schema_migrations_table(MetaData(), TABLE_NAME)
     first = _make_engine(tmp_path, "first.db")
     second = _make_engine(tmp_path, "second.db")
     ensure_schema_migrations_table(first, table)

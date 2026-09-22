@@ -3113,14 +3113,16 @@ class Job:
         return exp_history.get_finish_data_dc(self.name, attempt)
 
     def stat_registered(self, attempt: int) -> bool:
-        """Check if submit/start/finish are registered in the historical DB for this job_id and attempt.
+        """Check if the stats are already registered in the historical DB for this job and attempt.
+
+        The lookup uses the job name (unique per job and chunk) instead of the
+        scheduler job id, which is not guaranteed to be unique.
 
         :param attempt: The fail_count (attempt) to look up.
-        :return: True if submit, start, and finish are all non-zero in the historical record.
+        :return: True if a historical record exists for this job and attempt.
         """
         exp_history = ExperimentHistory(self.expid)
-        job_data = exp_history.get_job_data_by_job_id_and_fail_count(self.id, attempt)
-        return job_data is not None
+        return exp_history.get_submit_data_dc(self.name, attempt) is not None
 
     def check_started_after(self, date_limit) -> bool:
         """Checks if the job started after the given date

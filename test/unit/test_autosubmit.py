@@ -402,11 +402,11 @@ def test_check_non_wrapped_jobs_notifies_on_change(
 
 
 def test_finish_current_experiment_run(mocker):
-    """finish_current_experiment_run: delegates to ExperimentHistory."""
+    """finish_current_experiment_run: delegates to the provided ExperimentHistory."""
     mocker.patch("autosubmit.workflow.manage._save_historical_edges")
-    mock_exp_hist = mocker.patch("autosubmit.workflow.manage.ExperimentHistory")
-    _finish_current_experiment_run("a000")
-    mock_exp_hist.return_value.finish_current_experiment_run.assert_called_once()
+    exp_history = mocker.MagicMock()
+    _finish_current_experiment_run("a000", exp_history)
+    exp_history.finish_current_experiment_run.assert_called_once()
 
 
 def test_submit_ready_jobs_inspect_skips_check(mocker):

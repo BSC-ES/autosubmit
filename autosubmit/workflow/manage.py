@@ -561,27 +561,26 @@ def _save_historical_edges(expid):
     exp_history.save_historical_edges()
 
 
-def _finish_current_experiment_run(expid):
+def _finish_current_experiment_run(expid, exp_history):
     """Update the finish time of the current experiment run in the database.
 
-    :param expid: a string with the experiment id
+    :param expid: a string with the experiment id.
+    :param exp_history: The ``ExperimentHistory`` instance to use.
     :return: None
     """
     _save_historical_edges(expid)
-    # TODO: Add all methods and functions to the new historical db manager
-    old_exp_history = ExperimentHistory(expid)
-    old_exp_history.finish_current_experiment_run()
+    exp_history.finish_current_experiment_run()
 
 
-def _process_historical_data_iteration(job_list, job_changes_tracker, expid):
+def _process_historical_data_iteration(job_list, job_changes_tracker, expid, exp_history):
     """Process the historical data for the current iteration.
 
     :param job_list: a JobList object.
     :param job_changes_tracker: a dictionary with the changes in the job status.
     :param expid: a string with the experiment id.
+    :param exp_history: The ``ExperimentHistory`` instance to use.
     :return: an ExperimentHistory object.
     """
-    exp_history = ExperimentHistory(expid)
     if len(job_changes_tracker) > 0:
         exp_history.process_job_list_changes_to_experiment_totals(
             job_list.get_job_list()
@@ -692,6 +691,7 @@ def run(
         job_list.recover_logs(from_db=True)
         job_list.reset_updated_logs()
         job_list.load_wrappers()
+        exp_history = ExperimentHistory(expid)
         while job_list.continue_run():
             try:
                 if profiler is not None:
@@ -735,7 +735,7 @@ def run(
                             Status.VALUE_TO_KEY[job.status],
                         )
                     _process_historical_data_iteration(
-                        job_list, job_changes_tracker, expid
+                        job_list, job_changes_tracker, expid, exp_history
                     )
                 except Exception:
                     Log.printlog(
@@ -869,7 +869,7 @@ def run(
         Log.info("Waiting for all logs to be updated")
         for p in platforms_to_test:
             p.clean_log_recovery_process()
-        _process_historical_data_iteration(job_list, job_changes_tracker, expid)
+        _process_historical_data_iteration(job_list, job_changes_tracker, expid, exp_history)
 
         for p in platforms_to_test:
             p.close_connection()
@@ -883,7 +883,7 @@ def run(
                 )
             # Updating finish time for job data header
             try:
-                _finish_current_experiment_run(expid)
+                _finish_current_experiment_run(expid, exp_history)
             except Exception as e:
                 Log.warning(f"Database is locked: {str(e)}")
         rocrate_data = as_conf.experiment_data.get("ROCRATE", None)

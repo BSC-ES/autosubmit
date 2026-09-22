@@ -17,9 +17,6 @@
 
 """Integration tests for the experiment status DB managers."""
 
-from pathlib import Path
-from typing import TYPE_CHECKING, cast
-
 import pytest
 from sqlalchemy import inspect
 
@@ -29,95 +26,45 @@ from autosubmit.history.database_managers.database_models import (
     ExperimentStatusRow,
 )
 from autosubmit.history.database_managers.experiment_status_db_manager import (
-    ExperimentStatusDbManager,
     SqlAlchemyExperimentStatusDbManager,
-    create_experiment_status_db_manager,
 )
 from autosubmit.job.job_common import Status
-
-if TYPE_CHECKING:
-    # noinspection PyProtectedMember
-    from _pytest._py.path import LocalPath
-
-
-def test_create_experiment_status_db_manager_invalid_value():
-    with pytest.raises(ValueError):
-        create_experiment_status_db_manager(None)  # type: ignore
 
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_experiment_status_db_manager(tmp_path: 'LocalPath', as_db: str, use_sqlalchemy: bool, get_next_expid):
-    if as_db == "postgres" and not use_sqlalchemy:
-        pytest.skip("Postgres only supports SQLAlchemy")
-
+def test_experiment_status_db_manager(as_db: str, get_next_expid):
+    """The SQLAlchemy status manager creates and updates the experiment status."""
     expid = get_next_expid()
-    options = {"expid": expid}
-    tmp_test_dir = tmp_path / "test_status"
-    tmp_test_dir.mkdir()
+    database_manager = SqlAlchemyExperimentStatusDbManager()
 
-    if as_db == "sqlite":
-        options["db_dir_path"] = tmp_test_dir
-        options["local_root_dir_path"] = tmp_test_dir
-        options["main_db_name"] = "tests.db"
+    inspector = inspect(database_manager.status_engine)
+    schema = None if as_db == "sqlite" else "public"
+    assert inspector.has_table(ExperimentStatusTable.name, schema=schema)
 
-    if as_db == "sqlite" and use_sqlalchemy:
-        database_manager = SqlAlchemyExperimentStatusDbManager()
-        clazz = SqlAlchemyExperimentStatusDbManager
-    else:
-        database_manager = create_experiment_status_db_manager(as_db, **options)
-        clazz = (
-            ExperimentStatusDbManager
-            if as_db == "sqlite"
-            else SqlAlchemyExperimentStatusDbManager
-        )
-
-    # Assert type of database manager
-    assert isinstance(database_manager, clazz)
-
-    if as_db == "sqlite" and not use_sqlalchemy:
-        assert Path(
-            cast(ExperimentStatusDbManager, database_manager)._as_times_file_path
-        ).exists()
-    elif as_db == "sqlite" and use_sqlalchemy:
-        inspector = inspect(database_manager.engine)
-        assert inspector.has_table(ExperimentStatusTable.name)
-    else:
-        inspector = inspect(database_manager.engine)
-        assert inspector.has_table(ExperimentStatusTable.name, schema="public")
-
-    # Test methods
     # Create as RUNNING
-    experiment = ExperimentRow(id=1, name=options["expid"], autosubmit_version="4.1.10", description="test")
+    experiment = ExperimentRow(id=1, name=expid, autosubmit_version="4.1.10", description="test")
     database_manager.create_experiment_status_as_running(experiment)
 
-    exp_status: ExperimentStatusRow = (database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id))
+    exp_status: ExperimentStatusRow = database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id)
     assert exp_status.status == "RUNNING"
 
     # Update status
     database_manager.update_exp_status(experiment.name, "READY")
-    exp_status: ExperimentStatusRow = (database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id))
+    exp_status = database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id)
     assert exp_status.status == "READY"
 
     # Set back to RUNNING
     database_manager.set_existing_experiment_status_as_running(exp_status.name)
-    exp_status: ExperimentStatusRow = (database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id))
+    exp_status = database_manager.get_experiment_status_row_by_exp_id(exp_id=experiment.id)
     assert exp_status.status == "RUNNING"
 
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_get_experiment_status_row_by_expid(tmp_path: 'LocalPath', as_db: str, autosubmit_exp, get_next_expid):
+def test_get_experiment_status_row_by_expid(as_db: str, autosubmit_exp, get_next_expid):
     expid = get_next_expid()
-    options = {"expid": expid}
-
-    is_sqlalchemy = as_db == "sqlite"
-    if is_sqlalchemy:
-        options["db_dir_path"] = tmp_path
-        options["local_root_dir_path"] = tmp_path
-        options["main_db_name"] = "tests.db"
-
-    database_manager = create_experiment_status_db_manager(as_db, **options)
+    database_manager = SqlAlchemyExperimentStatusDbManager()
 
     # An error as there is no such experiment ID in the database
     with pytest.raises(ValueError):

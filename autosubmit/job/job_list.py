@@ -4336,7 +4336,7 @@ class JobList:
                 status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
         if not finished_jobs:
             return
-        exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
+        exp_history = ExperimentHistory(self.expid)
         jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in finished_jobs])
         for job in finished_jobs:
             if job.id and job.updated_log <= job.fail_count and job.has_valid_submit_time():
@@ -4378,7 +4378,7 @@ class JobList:
 
         job_names: list[str] | list[Job] = self._get_jobs_by_name(platform=platform, return_only_names=True)
         if job_names:
-            exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
+            exp_history = ExperimentHistory(self.expid)
             jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
             return {name for name, data in jobs_data.items() if data["status"] == "COMPLETED"}
 

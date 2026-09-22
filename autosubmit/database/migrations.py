@@ -51,15 +51,11 @@ __all__ = [
     "schema_migrations_table",
 ]
 
-SCHEMA_MIGRATIONS_TABLE_NAME = "schema_migrations"
-
 # A migration step is a version and the callable that applies it.
 Migration = tuple[int, Callable[["Connection"], None]]
 
 
-def schema_migrations_table(
-    metadata: MetaData, name: str = SCHEMA_MIGRATIONS_TABLE_NAME
-) -> Table:
+def schema_migrations_table(metadata: MetaData, name: str) -> Table:
     """Build the table that records which migrations were applied.
 
     :param metadata: The metadata the table belongs to.
