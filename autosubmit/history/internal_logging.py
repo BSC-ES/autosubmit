@@ -18,9 +18,7 @@
 import os
 
 from autosubmit.history import utils as HUtils
-from autosubmit.history.database_managers.database_manager import (
-  DEFAULT_HISTORICAL_LOGS_DIR,
-)
+from autosubmit.history.utils import DEFAULT_HISTORICAL_LOGS_DIR
 
 
 class Logging:

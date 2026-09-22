@@ -12,7 +12,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import os
 import traceback
 from time import time
 from typing import TYPE_CHECKING
@@ -23,9 +22,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers.experiment_history_db_manager import (
-    ExperimentHistoryDbManager,
     SqlAlchemyExperimentHistoryDbManager,
-    create_experiment_history_db_manager,
 )
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.history.internal_logging import Logging
@@ -42,28 +39,20 @@ from autosubmit.log.log import Log
 if TYPE_CHECKING:
     from autosubmit.job.job import Job
 
-SECONDS_WAIT_PLATFORM = 60
-
 
 class ExperimentHistory:
-    def __init__(self, expid, force_sql_alchemy: bool = False):
-        # Unused arguments, but I didn't want to change every call to this class in this PR
+    def __init__(self, expid):
         self.expid = expid
         BasicConfig.read()
         self._log = Logging(expid, BasicConfig.HISTORICAL_LOG_DIR)
         self._job_data_dir_path = BasicConfig.JOBDATA_DIR
         self._job_data_file = f"job_data_{expid}.db" if BasicConfig.DATABASE_BACKEND == "sqlite" else ""
         self._historiclog_dir_path = BasicConfig.HISTORICAL_LOG_DIR
-        self.force_sql_alchemy = force_sql_alchemy
-        self._manager: SqlAlchemyExperimentHistoryDbManager | ExperimentHistoryDbManager | None = None
+        self._manager: SqlAlchemyExperimentHistoryDbManager | None = None
         try:
-            options = {
-                'expid': self.expid,
-                'jobdata_path': self._job_data_dir_path,
-                'jobdata_file': self._job_data_file,
-                'force_sql_alchemy': self.force_sql_alchemy  # tmp, the idea is to move everything to sqlalchemy
-            }
-            self._manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
+            self._manager = SqlAlchemyExperimentHistoryDbManager(
+                self.expid, self._job_data_dir_path, self._job_data_file
+            )
             self.initialize_database()
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
@@ -71,7 +60,7 @@ class ExperimentHistory:
             self._manager = None
 
     @property
-    def manager(self) -> SqlAlchemyExperimentHistoryDbManager | ExperimentHistoryDbManager:
+    def manager(self) -> SqlAlchemyExperimentHistoryDbManager:
         """Return the history database manager.
 
         :raises RuntimeError: If the manager could not be initialized.
@@ -142,17 +131,74 @@ class ExperimentHistory:
         except Exception:
             return None
 
-    def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> JobData | None:
-        """Retrieve JobData by job_id and fail_count.
+    def get_finish_data_dc(self, job_name: str, fail_count: int = 0) -> JobData | None:
+        """Retrieve the full JobData for a job's finish record by job name and fail count.
 
-        :param job_id: The scheduler job ID.
-        :param fail_count: The attempt (fail_count) to look up.
-        :return: The JobData instance, or None if not found.
+        :param job_name: The name of the job.
+        :param fail_count: The number of times the job has failed. Defaults to 0.
+        :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
         """
         try:
-            return self.manager.get_job_data_by_job_id_and_fail_count(job_id, fail_count)
+            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
         except Exception:
             return None
+
+    def update_submit_time(self, job_name: str, submit: int = 0, status: str = "UNKNOWN", ncpus: int = 0,
+                           wallclock: str = "00:00", qos: str = "debug", date: str = "", member: str = "",
+                           section: str = "", chunk: int = 0, platform: str = "NA", job_id: int = 0,
+                           wrapper_queue: str | None = None, wrapper_code: str | None = None,
+                           children: str = "", workflow_commit: str = "", split=None, splits=None,
+                           fail_count: int = 0) -> JobData | None:
+        """Updates an existing job submission entry in the database, identified by job name and fail count.
+
+        :param job_name: The name of the job.
+        :param submit: The submission time of the job. Defaults to 0.
+        :param status: The status of the job. Defaults to "UNKNOWN".
+        :param ncpus: The number of CPUs allocated for the job. Defaults to 0.
+        :param wallclock: The wallclock time allocated for the job. Defaults to "00:00".
+        :param qos: The quality of service. Defaults to "debug".
+        :param date: The date associated with the job. Defaults to an empty string.
+        :param member: The member associated with the job. Defaults to an empty string.
+        :param section: The section associated with the job. Defaults to an empty string.
+        :param chunk: The chunk number associated with the job. Defaults to 0.
+        :param platform: The platform on which the job is run. Defaults to "NA".
+        :param job_id: The job ID. Defaults to 0.
+        :param wrapper_queue: The wrapper queue. Defaults to None.
+        :param wrapper_code: The wrapper code. Defaults to None.
+        :param children: The children. Defaults to an empty string.
+        :param workflow_commit: The workflow commit identifier. Defaults to an empty string.
+        :param split: The split identifier. Defaults to None.
+        :param splits: The splits information. Defaults to None.
+        :param fail_count: The number of times the job has failed. Defaults to 0.
+        :return: The updated JobData instance, or None if the record is not found or an exception occurs.
+        """
+
+        try:
+            job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+        except Exception:
+            return None
+        try:
+            job_data_dc.submit = submit
+            job_data_dc.status = status
+            job_data_dc.ncpus = ncpus
+            job_data_dc.wallclock = wallclock
+            job_data_dc.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
+            job_data_dc.date = date
+            job_data_dc.member = member
+            job_data_dc.section = section
+            job_data_dc.chunk = chunk
+            job_data_dc.platform = platform
+            job_data_dc.job_id = job_id
+            job_data_dc.children = children
+            job_data_dc.rowtype = self._get_defined_rowtype(wrapper_code)
+            job_data_dc.workflow_commit = workflow_commit
+            job_data_dc.split = split
+            job_data_dc.splits = splits
+            job_data_dc.fail_count = fail_count
+            return self.manager.update_job_data_dc_by_job_id_name(job_data_dc)
+        except Exception as exp:
+            self._log.log(str(exp), traceback.format_exc())
+            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
                          job_id: int = 0, wrapper_queue: str | None = None, wrapper_code: str | None = None,
@@ -516,5 +562,5 @@ def get_historical_database(expid, job_list, as_conf):
         # Connection to status database ec_earth.db can fail.
         # API worker will fix the status.
         Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
-                  f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
+                  f"{BasicConfig.AS_TIMES_DB_PATH}. Exception: {str(e)}", 7003)
     return exp_history
