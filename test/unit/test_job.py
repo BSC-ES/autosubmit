@@ -3188,3 +3188,17 @@ def test_recover_log_disabled_threads(mocker):
     mock_notify.assert_called_once_with(as_conf)
     assert job.log_recovery_call_count == 1
 
+
+
+def test_stat_registered_uses_job_name(mocker):
+    """stat_registered looks up by job name, not by the non-unique scheduler job id."""
+    job = Job("t001_20000101_fc0_1_JOB", 1, Status.COMPLETED, 0)
+    mocked_history = mocker.patch("autosubmit.job.job.ExperimentHistory")
+    manager = mocked_history.return_value
+
+    manager.get_submit_data_dc.return_value = None
+    assert job.stat_registered(0) is False
+    manager.get_submit_data_dc.assert_called_once_with(job.name, 0)
+
+    manager.get_submit_data_dc.return_value = object()
+    assert job.stat_registered(0) is True

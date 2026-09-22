@@ -21,13 +21,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from autosubmit.config.basicconfig import BasicConfig
+
 LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S%z'
 
-
-def get_fields_as_comma_str(model):
-    """Get the fields of a namedtuple as a comma separated string."""
-    return ",".join(model._fields)
+DEFAULT_HISTORICAL_LOGS_DIR = BasicConfig.HISTORICAL_LOG_DIR
 
 
 def calculate_queue_time_in_seconds(submit_time: float, start_time: float) -> int:
@@ -85,6 +84,3 @@ class SupportedStatus:
     SUBMITTED = "SUBMITTED"
     RUNNING = "RUNNING"
     SUSPENDED = "SUSPENDED"
-
-# if __name__ == "__main__":
-#   print(get_fields_as_comma_str())

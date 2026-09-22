@@ -25,9 +25,7 @@ from autosubmit.database.tables import JobDataTable, get_table_with_schema
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     CURRENT_DB_VERSION,
     DB_EXPERIMENT_HEADER_SCHEMA_CHANGES,
-    ExperimentHistoryDbManager,
     SqlAlchemyExperimentHistoryDbManager,
-    create_experiment_history_db_manager,
 )
 from autosubmit.history.utils import get_current_datetime
 from test._oldschema import old_experiment_run_table, old_job_data_table
@@ -127,11 +125,6 @@ def test_sqlalchemy_initialize_migration_preserves_data(tmp_path, mocker):
     assert row.last == 1
     assert row.split is None
     assert row.fail_count == 0
-
-
-def test_create_experiment_history_db_manager_invalid():
-    with pytest.raises(ValueError):
-        create_experiment_history_db_manager('banana')
 
 
 def _set_only_version(db_manager, version: int) -> None:
@@ -368,80 +361,6 @@ def test_sqlalchemy_get_last_job_data_dc_only_matching_counter_is_returned(sqlal
     assert result.counter == counter
 
 
-@pytest.fixture()
-def sqlite_db_manager(tmp_path):
-    """Return an initialised ExperimentHistoryDbManager backed by a temp SQLite file."""
-    db_manager = ExperimentHistoryDbManager(
-        expid="t002",
-        jobdata_dir_path=str(tmp_path),
-    )
-    db_manager.create_historical_database()
-    return db_manager
-
-
-def _insert_sqlite_row(db_manager: ExperimentHistoryDbManager, row: dict) -> None:
-    """Insert a single row dict into job_data via raw SQLite for test setup."""
-    import sqlite3 as _sqlite3
-    conn = _sqlite3.connect(db_manager.historicaldb_file_path)
-    cols = ", ".join(row.keys())
-    placeholders = ", ".join(["?"] * len(row))
-    conn.execute(
-        f"INSERT INTO job_data ({cols}) VALUES ({placeholders})",
-        list(row.values()),
-    )
-    conn.commit()
-    conn.close()
-
-
-def test_sqlite_get_last_job_data_dc_returns_single_row(sqlite_db_manager):
-    """Return exactly one JobData when exactly one row matches."""
-    row = _base_row("t002_20200101_fc0_1_SIM", counter=1, job_id=10)
-    _insert_sqlite_row(sqlite_db_manager, row)
-
-    result = sqlite_db_manager.get_last_job_data_dc_by_job_name_and_counter(
-        "t002_20200101_fc0_1_SIM", 1
-    )
-
-    assert result.job_name == "t002_20200101_fc0_1_SIM"
-    assert result.counter == 1
-
-
-def test_sqlite_get_last_job_data_dc_returns_correct_row_among_multiple_counters(sqlite_db_manager):
-    """Return the row matching the requested counter when the job has multiple counter entries."""
-    job_name = "t002_20200101_fc0_3_SIM"
-    _insert_sqlite_row(sqlite_db_manager, {**_base_row(job_name, counter=1, job_id=20), "status": "FAILED"})
-    _insert_sqlite_row(sqlite_db_manager, {**_base_row(job_name, counter=2, job_id=22), "status": "COMPLETED"})
-    _insert_sqlite_row(sqlite_db_manager, {**_base_row(job_name, counter=3, job_id=23), "status": "RUNNING"})
-
-    result = sqlite_db_manager.get_last_job_data_dc_by_job_name_and_counter(job_name, 2)
-
-    assert result.counter == 2
-    assert result.status == "COMPLETED"
-    assert result.job_id == 22
-
-
-def test_sqlite_get_last_job_data_dc_raises_when_not_found(sqlite_db_manager):
-    """Raise an exception when no row matches job_name and counter."""
-    with pytest.raises(Exception, match="No job_data found"):
-        sqlite_db_manager.get_last_job_data_dc_by_job_name_and_counter(
-            "nonexistent_job", 99
-        )
-
-
-@pytest.mark.parametrize("counter", [1, 2, 3])
-def test_sqlite_get_last_job_data_dc_only_matching_counter_is_returned(sqlite_db_manager, counter):
-    """Return only the row matching the requested counter value."""
-    job_name = f"t002_20200101_fc0_{counter}_SIM_counter_test"
-    for c in range(1, 4):
-        _insert_sqlite_row(sqlite_db_manager, _base_row(job_name, counter=c, job_id=100 + c))
-
-    result = sqlite_db_manager.get_last_job_data_dc_by_job_name_and_counter(
-        job_name, counter
-    )
-
-    assert result.counter == counter
-
-
 def test_sqlalchemy_get_last_job_data_dc_by_job_name_returns_highest_id(sqlalchemy_db_manager):
     """Return the row with the highest id when the job has multiple counter entries."""
     job_data_table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
@@ -479,36 +398,6 @@ def test_sqlalchemy_get_last_job_data_dc_by_job_name_raises_when_not_found(sqlal
     """Raise an exception when no row exists for the given job_name."""
     with pytest.raises(Exception, match="No job_data found"):
         sqlalchemy_db_manager.get_last_job_data_dc_by_job_name("nonexistent_job_name")
-
-
-def test_sqlite_get_last_job_data_dc_by_job_name_returns_highest_id(sqlite_db_manager):
-    """Return the row with the highest id when the job has multiple counter entries."""
-    job_name = "t002_20200101_fc0_10_SIM"
-    _insert_sqlite_row(sqlite_db_manager, {**_base_row(job_name, counter=1, job_id=50), "status": "FAILED"})
-    _insert_sqlite_row(sqlite_db_manager, {**_base_row(job_name, counter=2, job_id=51), "status": "COMPLETED"})
-
-    result = sqlite_db_manager.get_last_job_data_dc_by_job_name(job_name)
-
-    assert result.job_name == job_name
-    assert result.counter == 2
-    assert result.job_id == 51
-
-
-def test_sqlite_get_last_job_data_dc_by_job_name_single_row(sqlite_db_manager):
-    """Return the only row when exactly one row exists for the job_name."""
-    job_name = "t002_20200101_fc0_11_SIM"
-    _insert_sqlite_row(sqlite_db_manager, _base_row(job_name, counter=1, job_id=60))
-
-    result = sqlite_db_manager.get_last_job_data_dc_by_job_name(job_name)
-
-    assert result.job_name == job_name
-    assert result.counter == 1
-
-
-def test_sqlite_get_last_job_data_dc_by_job_name_raises_when_not_found(sqlite_db_manager):
-    """Raise an exception when no row exists for the given job_name."""
-    with pytest.raises(Exception, match="No job_data found"):
-        sqlite_db_manager.get_last_job_data_dc_by_job_name("nonexistent_job_name")
 
 
 def test_sqlalchemy_get_job_data_by_job_id_name_raises_when_not_found(sqlalchemy_db_manager) -> None:
