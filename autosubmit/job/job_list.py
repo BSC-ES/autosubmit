@@ -3367,11 +3367,11 @@ class JobList:
                 if len(tmp) == len(job.parents):
                     aux_job_delay = 0
                     if job.delay_retrials:
-                        if ("+" == str(job.delay_retrials)[0] or "*" == str(job.delay_retrials)[0]):
+                        if "+" == str(job.delay_retrials)[0] or "*" == str(job.delay_retrials)[0]:
                             aux_job_delay = int(job.delay_retrials[1:])
                         else:
                             aux_job_delay = int(job.delay_retrials)
-                    if (as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or aux_job_delay <= 0):
+                    if as_conf.jobs_data[job.section].get("DELAY_RETRY_TIME", None) or aux_job_delay <= 0:
                         delay_retry_time = str(as_conf.get_delay_retry_time())
                     else:
                         delay_retry_time = str(job.retry_delay)
@@ -3996,7 +3996,7 @@ class JobList:
                                 t_start = min(t_start, c_start)
                                 job_data.start = t_start
 
-                        if seconds is False:
+                        if not seconds:
                             queue_time = math.ceil(
                                 job_data.queuing_time() / 60)
                             running_time = math.ceil(
