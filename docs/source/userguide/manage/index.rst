@@ -1,10 +1,10 @@
 Manage Experiments
-===================
+==================
 
 .. _clean:
 
-How to clean the experiment
----------------------------
+Cleaning the experiment
+-----------------------
 
 This procedure allows you to save space after finalising an experiment.
 You must execute:
@@ -42,8 +42,8 @@ A bare copy (which occupies less space on disk) will be automatically made.
 
 .. _archive:
 
-How to archive an experiment
-----------------------------
+Archiving an experiment
+-----------------------
 
 When you archive an experiment in Autosubmit, it automatically :ref:`cleans <clean>`
 the experiment as well. This means the experiment will not be available for
@@ -63,8 +63,8 @@ date or, if no ``_COMPLETED`` job is present, it will use the year of
 the date the ``autosubmit archive`` was run (e.g. for the selected
 year ``2023``, the location will be ``$HOME/autosubmit/2023/<EXPID>.tar.gz``).
 
-How to unarchive an experiment
-------------------------------
+Unarchiving an experiment
+-------------------------
 
 To unarchive an experiment, use the command:
 
@@ -76,8 +76,8 @@ Options:
 
 .. runcmd:: autosubmit unarchive -h
 
-How to delete the experiment
-----------------------------
+Deleting the experiment
+-----------------------
 
 To delete the experiment, use the command:
 ::
@@ -88,7 +88,7 @@ To delete the experiment, use the command:
 identifier, or a comma-separated list of identifiers.
 
 .. warning:: DO NOT USE THIS COMMAND IF YOU ARE NOT SURE !
-    It deletes the experiment from database and experiment’s folder.
+    It deletes the experiment from database and experiment's folder.
 
 Options:
 
@@ -101,8 +101,8 @@ Example:
 
 .. warning:: Be careful ! force option does not ask for your confirmation.
 
-How to synchronize with the project's latest changes
-----------------------------------------------------
+Synchronizing with the project's latest changes
+-----------------------------------------------
 
 Autosubmit supports directly fetching files from the repository, which could be local or remote.
 
@@ -131,8 +131,8 @@ Example:
 
 .. _updateDescrip:
 
-How to update the description of your experiment
-------------------------------------------------
+Updating the experiment description
+-----------------------------------
 
 Use the command:
 ::
@@ -156,8 +156,8 @@ Example:
 
 .. _setstatus:
 
-How to change the job status
-----------------------------
+Changing the job status
+-----------------------
 
 This procedure allows you to modify the status of your jobs.
 
@@ -292,7 +292,7 @@ Multiple filters combined (AND logic, selects jobs matching ALL filters):
 This selects jobs that are in both the chunk filter AND have type "SIM".
 
 Chunk/Section/Split Filter Details
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Format:
 ::
@@ -315,7 +315,7 @@ Date (day) range example:
 ::
 
     autosubmit setstatus <EXPID> -fc "[ 1960(1101-1105) [ fc1 [1] ] ]" -ft "SIM" -t SUSPENDED -s
-    
+
 Result:
 ::
 
@@ -326,7 +326,7 @@ Result:
     <EXPID>_19601105_fc1_1_SIM
 
 Using the "Any" Keyword
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 The keyword ``Any`` (case-insensitive) means "no restriction" in that filter:
 
@@ -342,7 +342,7 @@ Example:
 This changes all jobs in the chunk filter to ``READY``, regardless of their current status.
 
 Deprecated Filters
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 .. warning:: The ``-ftc`` and ``-ftcs`` filters are deprecated and will be removed in future versions. Use ``-fc`` instead.
 
@@ -359,8 +359,8 @@ Use ``-fc`` with ``-ft`` instead:
 .. hint:: When satisfied with your filter selections, use the parameter ``-s`` to save changes to the pkl file. In order to understand more the grouping options, which are used for visualization purposes, please check :ref:`grouping`.
 .. _setstatusno:
 
-How to change the job status without stopping autosubmit
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Changing the job status without stopping Autosubmit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     This procedure allows you to modify the status of your jobs without having to stop Autosubmit.
 

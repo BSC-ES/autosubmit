@@ -10,14 +10,14 @@ For Autosubmit, user mapping means associating selected personal user accounts w
 The personal user account is used to access each remote platform, while the shared account is used to run the experiments on the machine where Autosubmit is deployed.
 
 When to use
--------------
+-----------
 
 When to use: When you want to run a set of shared experiments using different HPC users.
 
 More specifically, this can be useful for launching something like an experiment testing suite on a shared machine without having to create redundant experiments for each user who wants to run the tests.
 
 Prerequisites
---------------
+-------------
 
 * The sysadmin of the machine where Autosubmit is deployed must have created a shared user account that will be used to run the experiments.
 
@@ -30,7 +30,7 @@ Prerequisites
 * Someone has to create the ``ssh_config_${SUDO_USER}`` file for each user with access to the shared account.
 
 How it works
---------------
+------------
 
 The idea is to map two different things depending on the user logged in to the shared account to ensure the correct Autosubmit behavior.
 
@@ -61,8 +61,8 @@ Defaults to: None
 Defaults to: "~/.ssh/config" or "~/.ssh/config_${SUDO_USER}" if the env variable: "AS_ENV_SSH_CONFIG_PATH" is set.
 
 
-How to activate it with examples
-----------------------------------
+Activating user mapping
+-----------------------
 
 * (once) Generate the platform_${SUDO_USER}.yml
 

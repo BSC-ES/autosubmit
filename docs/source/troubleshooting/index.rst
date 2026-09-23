@@ -9,13 +9,13 @@
 Troubleshooting
 ###############
 
-How to change the job status stopping autosubmit
-================================================
+Changing the job status with Autosubmit stopped
+===============================================
 
 Review :ref:`setstatus`.
 
-How to change the job status without stopping autosubmit
-========================================================
+Changing the job status while Autosubmit runs
+=============================================
 
 Review :ref:`setstatusno`.
 
@@ -26,11 +26,11 @@ My project parameters are not being substituted in the templates
 
 *Solution*: Don't repeat section names and parameters names until Autosubmit 4.0 release.
 
-Unable to recover remote logs files.
-========================================================
+Unable to recover remote logs files
+===================================
 
 *Explanation*: If there are limitations on the remote platform regarding multiple connections.
-*Solution*: You can try DISABLE_RECOVERY_THREADS: TRUE under the platform_name: section in the platform_<EXPID>.yml.
+*Solution*: You can try DISABLE_RECOVERY_THREADS: TRUE under the platform_name: section in the platforms_<EXPID>.yml.
 
 Error on create caused by a configuration parsing error
 =======================================================
@@ -74,15 +74,15 @@ Example output of the command:
 Other possible errors
 =====================
 
-**I see the `database malformed` error on my experiment log.**
+**I see the ``database malformed`` error on my experiment log.**
 
 *Explanation*: The latest version of autosubmit uses a database to efficiently track changes in the jobs of your experiment. It could have happened that this small database got corrupted.
 
-*Solution*: run `autosubmit dbfix <EXPID>` where `<EXPID>` is the identifier of your experiment. This function will rebuild the database saving as much information as possible (usually all of it).
+*Solution*: run ``autosubmit dbfix <EXPID>`` where ``<EXPID>`` is the identifier of your experiment. This function will rebuild the database saving as much information as possible (usually all of it).
 
 **The pkl file of my experiment is empty but there is a job_list_%<EXPID>%_backup.pkl file that seems to be the real one.**
 
-*Solution*: run `autosubmit pklfix <EXPID>`, it will restore the `backup` file if possible.
+*Solution*: run ``autosubmit pklfix <EXPID>``, it will restore the ``backup`` file if possible.
 
 Error codes
 ===========

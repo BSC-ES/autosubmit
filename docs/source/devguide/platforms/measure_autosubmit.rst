@@ -82,7 +82,7 @@ Step 3 - Read the summary
     ====================================================================
     Autosubmit platform I/O measurement
     ====================================================================
-    Experiment : a004
+    Experiment: a004
     Timestamp  : 20260902_135720
     Trace file : /home/user/autosubmit/a004/tmp/measure_20260902_135720/strace.log (20M)
 

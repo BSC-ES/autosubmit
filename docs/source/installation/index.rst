@@ -16,7 +16,7 @@ Installation
 Install Autosubmit
 ==================
 
-Autosubmit is distributed via PyPI and as source on GitHub. Choose one of the methods below. 
+Autosubmit is distributed via PyPI and as source on GitHub. Choose one of the methods below.
 The commands use ``apt`` and assume Ubuntu 20.04 LTS; adjust for other distributions.
 
 .. _install-with-pip:

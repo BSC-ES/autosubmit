@@ -1,10 +1,10 @@
 .. _workflow_recovery:
 
-How to restart the experiment
-=============================
+Restarting the experiment
+=========================
 
-How to recover an experiment
-----------------------------
+Recovering an experiment
+------------------------
 
 We use the ``recovery`` command when an experiment was interrupted in an ungraceful way and Autosubmit job states are no longer consistent with the actual state of the jobs on the platform.
 
@@ -28,22 +28,22 @@ The ``recovery`` command checks which jobs have already finished, and it updates
 
 - If a platform is unreachable, we can use the ``--offline`` flag to force the recovery without checking completion files remotely. In this case, Autosubmit reads ``job_data_<EXPID>.db``, gets the last ``run_id``, and checks only the jobs that were run in that run.
 
-.. warning:: Without the -s flag, Autosubmit will only perform a dry-run (i.e. it will not take effect) of the command.  
+.. warning:: Without the -s flag, Autosubmit will only perform a dry-run (i.e. it will not take effect) of the command.
 
 
 Typical workflow of recovery
 ----------------------------
 
-1. Run a dry-run first and inspect the generated report. 
+1. Run a dry-run first and inspect the generated report.
 We will check for the completion files of all jobs in the experiment, so we will use the ``--all`` flag.
 ::
 
     autosubmit recovery <EXPID> --all
 
-2. If needed, apply filters to limit which jobs are checked for completion files. 
+2. If needed, apply filters to limit which jobs are checked for completion files.
 For example, we can filter by job names, chunk/section/split, job statuses, or job types.
 ::
-    
+
     # check for completion files of all jobs filtered by a space-separated list of job names
     autosubmit recovery <EXPID> --all -fl "<EXPID>_20101101_fc3_21_SIM <EXPID>_20111101_fc4_26_SIM"
 
@@ -66,7 +66,7 @@ For example, we can filter by job names, chunk/section/split, job statuses, or j
 
 4. Resume the workflow with the ``run`` command.
 ::
-    
+
     autosubmit run <EXPID>
 
 
@@ -107,7 +107,7 @@ Important options for recovery
    (i.e. jobs in SUBMITTED, QUEUING, RUNNING, UNKNOWN, HELD, READY or DELAYED status).
 
 Examples:
-----------------------------
+---------
 
 ::
 
@@ -138,8 +138,8 @@ Options:
 
 .. runcmd:: autosubmit recovery -h
 
-How to rerun a part of the experiment
--------------------------------------
+Rerunning part of the experiment
+--------------------------------
 
 This procedure allows you to create automatically a new pickle with a list of jobs of the experiment to rerun.
 
@@ -208,6 +208,6 @@ Run the command:
 
 .. code-block:: bash
 
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     nohup autosubmit run <EXPID> &

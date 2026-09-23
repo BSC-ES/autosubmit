@@ -8,14 +8,14 @@ Monitor and Check Experiments
    Runtime validation during ``autosubmit run`` is still controlled by the
    ``CHECK:`` job attribute (see below).
 
-How to use check in running time:
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using check at run time
+~~~~~~~~~~~~~~~~~~~~~~~
 
 In ``jobs_<EXPID>.yml``, you can set check (default true) to check the scripts during autosubmit run.
 
 There are two parameters related to check:
 
-* CHECK: Controls the mechanism that allows replacing an unused variable with an empty string ( %_% substitution). It is TRUE by default.
+* CHECK: Controls the mechanism that allows replacing an unused variable with an empty string (%_% substitution). It is TRUE by default.
 
 * SHOW_CHECK_WARNINGS: For debugging purposes. It will print a lot of information regarding variables and substitution if it is set to TRUE.
 
@@ -62,10 +62,10 @@ For example:
 
 .. _inspect_cmd:
 
-How to generate cmd files
--------------------------
+Generating cmd files
+--------------------
 
-The `inspect` command generates the ``.cmd`` files for jobs in an experiment without
+The ``inspect`` command generates the ``.cmd`` files for jobs in an experiment without
 submitting them. This allows you to preview the rendered scripts and verify that all
 parameters are correctly substituted prior to submission.
 
@@ -139,10 +139,10 @@ To generate cmd only for one job per section:
     autosubmit inspect <EXPID> -q
 
 
-How to monitor an experiment
-----------------------------
+Monitoring an experiment
+------------------------
 
-The `monitor` command allows you to visualize the experiment workflow and shows each job's status (color coded)
+The ``monitor`` command allows you to visualize the experiment workflow and shows each job's status (color coded)
 or stores a text file with the status of each job. You can select which jobs to monitor by using optional filters
 and grouping options.
 
@@ -439,8 +439,8 @@ Especially in the case of monitoring an experiment with a very large number of c
 
 .. _monitor_profiling:
 
-How to profile Autosubmit while monitoring an experiment
---------------------------------------------------------
+Profiling Autosubmit while monitoring
+-------------------------------------
 
 Autosubmit offers the possibility to profile the execution of the monitoring process. To enable the
 profiler, just add the ``--profile`` flag to your ``autosubmit monitor`` command, as in
@@ -452,8 +452,8 @@ the following example:
 
 .. include:: ../../_include/profiler_common.rst
 
-How to get details about the experiment
----------------------------------------
+Getting experiment details
+--------------------------
 
 To get details about the experiment, use the command:
 ::
@@ -482,8 +482,8 @@ Examples:
 
 .. _autoStatistics:
 
-How to monitor job statistics
------------------------------
+Monitoring job statistics
+-------------------------
 
 The following command could be adopted to generate the plots for visualizing the jobs statistics of the experiment at any instance:
 ::
@@ -549,12 +549,12 @@ Where:
 - Expected consumption CPU time (h): Sum of the products of wallclock value and number of requested processors for each job, in hours.
 - Consumption real (h): Sum of the time spent running by all attempts of jobs, in hours.
 - Consumption CPU time (h): Sum of the products of the time spent running and number of requested processors for each job, in hours.
-- Consumption (%): Percentage of `Consumption CPU time` relative to `Expected consumption CPU time`.
+- Consumption (%): Percentage of ``Consumption CPU time`` relative to ``Expected consumption CPU time``.
 
 Diagram output description
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The main `stats` output is a bar diagram. On this diagram, each job presents these values:
+The main ``stats`` output is a bar diagram. On this diagram, each job presents these values:
 
 - Queued (h): Sum of time spent queuing for COMPLETED attempts, in hours.
 - Run (h): Sum of time spent running for COMPLETED attempts, in hours.
@@ -593,7 +593,7 @@ Custom statistics
 ~~~~~~~~~~~~~~~~~
 
 Although Autosubmit saves several statistics about your experiment, such as the queueing time for each job, how many failures per job, etc.,
-The user also might be interested in adding his particular statistics to the Autosubmit stats report (```autosubmit stats EXPID```).
+The user also might be interested in adding his particular statistics to the Autosubmit stats report (````autosubmit stats EXPID````).
 The allowed format for this feature is the same as the Autosubmit configuration files: INI style. For example:
 ::
 
@@ -611,8 +611,8 @@ The location where user can put this stats is in the file:
 
 .. _report:
 
-How to extract information about the experiment parameters
-------------------------------------------------------------
+Extracting experiment parameters
+--------------------------------
 
 The ``autosubmit report`` command extracts the parameters and resolved values
 of an experiment. It has two modes, each generating their own file, and they can be used together:
@@ -646,7 +646,7 @@ Options:
 .. runcmd:: autosubmit report -h
 
 What goes into the parameter list
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The flat ``-all`` output contains, in order:
 
@@ -666,7 +666,7 @@ For the full catalogue of variables, see the
 :doc:`Variables reference <../variables>`.
 
 Template syntax
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 Autosubmit parameters are encapsulated by ``%KEY%``, where ``KEY`` is any
 parameter name from the ``-all`` output. Keys are case-insensitive, so
@@ -741,7 +741,7 @@ If the parameter does not exist, it will be returned as ``-``, while if the
 parameter is declared but empty, it will remain empty.
 
 Starter template
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
 
 The template below covers the most common parameters from ``CONFIG``,
 ``EXPERIMENT``, ``PLATFORMS``, and the top-level namespace. It is a starting
@@ -791,7 +791,7 @@ point: add, remove, or reorder lines freely.
     === TOP_LEVEL ===
     HPCARCH        : %HPCARCH%
     HPCROOTDIR     : %HPCROOTDIR%
-    HPCSCRATCH_DIR : %HPCSCRATCH_DIR%
+    HPCSCRATCH_DIR: %HPCSCRATCH_DIR%
     ROOTDIR        : %ROOTDIR%
     PROJDIR        : %PROJDIR%
 
@@ -825,7 +825,7 @@ Example output of ``-all``:
     ...
 
 Tips
-~~~~~
+~~~~
 
 * If a row in the rendered output contains ``-`` where you expected a value,
   re-run with ``--placeholders`` to see exactly which key the renderer could

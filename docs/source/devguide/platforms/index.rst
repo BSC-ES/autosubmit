@@ -182,8 +182,8 @@ creation where the platform type
             asconf.expid, section, exp_data, auth_password = auth_password)
 
 
-How to Configure a Platform
----------------------------
+Configuring a platform
+----------------------
 
 To set up your platform, you first have to create a new experiment by running the following command:
 |br| *Change the platform from MARENOSTRUM5 to whichever you will use*
@@ -289,7 +289,7 @@ to be re-established mid-run.
 The write-permission check
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Before relying on a remote platform, Autosubmit verifies that entries can be created and deleted, under the configured 
+Before relying on a remote platform, Autosubmit verifies that entries can be created and deleted, under the configured
 ``SCRATCH_DIR``. This is done by creating a small probe directory under
 ``<scratch_dir>/<project>/<user>/`` and immediately removing it. The probe is
 a directory, not a file; the name it uses depends on the platform type:
@@ -501,7 +501,7 @@ dummy workflow is deliberately small (7-8 jobs), so
 these numbers are an illustrative baseline, not a benchmark of what
 Autosubmit does in an operational context.
 
-.. list-table:: 
+.. list-table::
    :header-rows: 1
    :widths: 55 45
 
@@ -532,8 +532,8 @@ different workflow or platform, see the runbook at
 (``scripts/measure_platform_io.sh``) is included in the repository and
 uses ``bpftrace`` when available, falling back to ``strace`` otherwise.
 
-How to generate a new experiment
---------------------------------
+Generating a new experiment
+---------------------------
 
 Now you can add jobs at the end of the file to see the execution
 Each job will point to one of the ``Bash`` files that will be created in the next step, meaning that Autosubmit will
@@ -644,8 +644,8 @@ So add the following the instruction below to one or more ``Bash`` files created
 
     sleep 5
 
-How to run the experiment
--------------------------
+Running the experiment
+----------------------
 
 ``autosubmit create -f -v <EXPID>``
 

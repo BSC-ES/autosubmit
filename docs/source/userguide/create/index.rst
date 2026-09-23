@@ -34,7 +34,7 @@ Examples:
     autosubmit expid -dm -d "dummy test"
 
 Configuring default platforms
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If you have an ``autosubmitrc`` or ``.autosubmitrc`` file in your home directory, you can configure a default platforms file that will be used as a template for new experiments.
 
@@ -112,7 +112,7 @@ Example:
     autosubmit expid -H ithaca -dm -d "Testing Autosubmit configuration"
 
 Create a test case experiment
-------------------------------
+-----------------------------
 
 Test case experiments use a reserved "t" prefix in their experiment ID to distinguish testing suites from production runs. They allow you to create experiments with specific configurations for testing purposes.
 
@@ -136,7 +136,7 @@ Example:
 .. _create_profiling:
 
 Profiling experiment creation
-------------------------------
+-----------------------------
 
 You can profile the experiment creation process to analyze performance.
 To enable profiling, add the ``--profile`` flag to your ``autosubmit create`` command:

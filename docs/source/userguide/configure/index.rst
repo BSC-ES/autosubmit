@@ -225,7 +225,7 @@ Example:
             - rlewis@example.com
 
 
-**2.** Define for which jobs you want to be notified. Edit ``jobs_<EXPID>.yml``.  You will be notified every time the job changes its status to one of the statuses defined on the parameter ``NOTIFY_ON``. You can define more than one job status separated by a whitespace, a comma (`,`), or using a list.
+**2.** Define for which jobs you want to be notified. Edit ``jobs_<EXPID>.yml``. You will be notified every time the job changes its status to one of the statuses defined on the parameter ``NOTIFY_ON``. You can define more than one job status separated by a whitespace, a comma (``,``), or using a list.
 
 Example:
 
@@ -252,8 +252,8 @@ Example:
 Configuring CPMIP threshold notifications
 -----------------------------------------
 
-Autosubmit can send email alerts when one or more :doc:`CPMIP performance metrics </userguide/performance/index>` 
-fall outside the configured target range. This feature uses the same ``MAIL.NOTIFICATIONS`` and ``MAIL.TO`` 
+Autosubmit can send email alerts when one or more :doc:`CPMIP performance metrics </userguide/performance/index>`
+fall outside the configured target range. This feature uses the same ``MAIL.NOTIFICATIONS`` and ``MAIL.TO``
 settings as job-status notifications, so make sure those are enabled first (see the previous section).
 
 .. code-block:: yaml
@@ -296,9 +296,9 @@ threshold, effective bound, and observed value.
 Example notification
 ~~~~~~~~~~~~~~~~~~~~
 
-With the configuration above, suppose the simulation completes with ``SYPD = 3.9``, ``CHSY = 55000``, and ``CORE_HOURS = 1280``. 
+With the configuration above, suppose the simulation completes with ``SYPD = 3.9``, ``CHSY = 55000``, and ``CORE_HOURS = 1280``.
 All three values fall outside their effective bounds (SYPD ``≥ 4.5`` after the 10% slack;
-CHSY ``≤ 52500`` after the 5% slack; CORE_HOURS ``≤ 1050`` 
+CHSY ``≤ 52500`` after the 5% slack; CORE_HOURS ``≤ 1050``
 after the 5% slack), so Autosubmit sends a single email notification similar to the following:
 
 .. code-block:: text

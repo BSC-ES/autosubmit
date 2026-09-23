@@ -4,7 +4,7 @@ Performance
 
 Autosubmit includes built-in support for **CPMIP** (Computational Performance Model Intercomparison Project)
 metrics, a set of metrics that can be used for the study of computational performance of climate (and Earth system) models.
-These metrics provide a quick and comparable view of how efficiently a simulation runs on a given platform, making them a useful first indicator 
+These metrics provide a quick and comparable view of how efficiently a simulation runs on a given platform, making them a useful first indicator
 when investigating for inefficiencies — undersized partitions, oversubscribed nodes, I/O bottlenecks, or regressions after a code change.
 
 CPMIP metrics target the **simulation job** of an experiment — the job that
@@ -14,8 +14,8 @@ defined in terms of simulated years, so they rely on the chunk calendar
 jobs carry; CORE_HOURS can still be computed on any job.
 
 CPMIP metrics are not computed automatically: today they are evaluated only
-as part of the notification workflow. 
-A job’s CPMIP metrics are computed only when both of the following conditions are met:
+as part of the notification workflow.
+A job's CPMIP metrics are computed only when both of the following conditions are met:
 
 * ``MAIL.NOTIFICATIONS: True`` is set in the experiment configuration, and
 * the job declares a ``CPMIP_THRESHOLDS`` block in ``jobs_<EXPID>.yml``.

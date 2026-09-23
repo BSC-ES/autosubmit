@@ -9,11 +9,11 @@ Major changes:
 - Python version has changed to 3.7.3 instead of 2.7.
 - Configuration language has changed to YAML.
 
- - All parameters are now unified into a single dictionary.
- - All sections are now uppercase.
- - All parameters, except for job related ones, have now an hierarchy.
- - An special key, FOR:, has been added. This key allows to create multiple jobs with almost the same configuration.
- - The configuration of autosubmit is now more flexible.
+- All parameters are now unified into a single dictionary.
+- All sections are now uppercase.
+- All parameters, except for job related ones, have now an hierarchy.
+- An special key, FOR:, has been added. This key allows to create multiple jobs with almost the same configuration.
+- The configuration of autosubmit is now more flexible.
 
 - New command added, upgrade. This command will update all the scripts and autosubmit configuration.
 - Wrapper definition has changed.
@@ -44,13 +44,13 @@ These custom ones can be anywhere and have any name. By default, they're inside 
 
 Additionally, you must be aware of the following changes:
 
- - All section **keys** are normalized to **UPPERCASE**, while values remain as the user put them. Beware of scripts that rely on %CURRENT_HPCARCH% and variables that refer to a platform because they will always be in UPPERCASE. Normalize the script.
- - To define a job, you must put it under the key ``jobs`` in any custom configuration file.
- - To define a platform, you must put it under the key ``platforms`` in any custom configuration file.
- - To define a loop, you must put the key ``FOR`` as the first key of the section.
- - You can put any %placeholder% in the proj_<EXPID>.yml and custom files, and also you can put %ROOTDIR% in the expdef_<EXPID>.yml.
- - All configuration is now based in an hierarchical structure, so to export a var, you must use the following syntax: `%KEY.SUBKEY.SUBSUBKEY%`. The same goes for override them.
- - YAML has into account the type.
+- All section **keys** are normalized to **UPPERCASE**, while values remain as the user put them. Beware of scripts that rely on %CURRENT_HPCARCH% and variables that refer to a platform because they will always be in UPPERCASE. Normalize the script.
+- To define a job, you must put it under the key ``jobs`` in any custom configuration file.
+- To define a platform, you must put it under the key ``platforms`` in any custom configuration file.
+- To define a loop, you must put the key ``FOR`` as the first key of the section.
+- You can put any %placeholder% in the proj_<EXPID>.yml and custom files, and also you can put %ROOTDIR% in the expdef_<EXPID>.yml.
+- All configuration is now based in an hierarchical structure, so to export a var, you must use the following syntax: ``%KEY.SUBKEY.SUBSUBKEY%``. The same goes for override them.
+- YAML has into account the type.
 
 Examples
 ========

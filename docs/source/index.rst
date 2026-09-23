@@ -3,11 +3,11 @@
 .. autosubmit documentation master file, created by
    sphinx-quickstart on Wed Mar 18 16:55:44 2015.
    You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+   contain the root ``toctree`` directive.
 
-############################
+###########################
 Autosubmit Workflow Manager
-############################
+###########################
 
 .. toctree::
    :caption: Getting Started
@@ -197,7 +197,7 @@ Both are open source and documented separately.
       :class-img-top: dark-light
       :link: https://autosubmit-gui.readthedocs.io/
       :class-card: as-card
-      
+
       A graphical interface that presents workflow execution in the browser, with
       job trees, run history and log inspection for experiments managed by
       Autosubmit.

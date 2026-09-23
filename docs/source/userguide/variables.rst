@@ -82,7 +82,7 @@ files. Each ``JOBS`` entry can reference any of these platforms via its
 ``PLATFORM`` key. If no platform is specified, the job uses the experiment's
 default platform (``DEFAULT.HPCARCH``).
 
-There are three ways platform variables reach your job templates: raw keys, 
+There are three ways platform variables reach your job templates: raw keys,
 ``HPC``-prefixed keys, and ``CURRENT_``-prefixed keys.
 
 Example configuration
@@ -147,7 +147,7 @@ In this example:
 Every key under a platform is available globally as ``PLATFORMS.<PLATFORM_ID>.<KEY>``.
 You can reference them in templates as ``%PLATFORMS.MARENOSTRUM5.HOST%`` for example.
 
-In the output of :ref:`report <report>` you will find them with the pattern 
+In the output of :ref:`report <report>` you will find them with the pattern
 ``PLATFORMS.<PLATFORM_ID>.<KEY>=<VALUE>``.
 
 .. code-block:: text
@@ -269,8 +269,8 @@ Continuing with the example above:
     JOBS.SIM.CURRENT_HOST=glogin1.bsc.es, glogin2.bsc.es
     JOBS.SIM.CURRENT_PROJECT=bsc32
 
-The ``CURRENT_`` prefix is also populated from the job's section keys 
-(``JOBS.<section>``). This allows you to inject job-specific information 
+The ``CURRENT_`` prefix is also populated from the job's section keys
+(``JOBS.<section>``). This allows you to inject job-specific information
 into your templates.
 
 **Auto-generated CURRENT_ variables**
@@ -282,7 +282,7 @@ These are always available regardless of the raw YAML keys defined.
 
 
 .. note::
-    The table above lists the ``CURRENT_`` variables that Autosubmit 
+    The table above lists the ``CURRENT_`` variables that Autosubmit
     exposes from the platform section. Not all of them are always
     populated. Some are filled automatically by Autosubmit, others
     come from the YAML configuration, and a few are only used by certain
@@ -292,7 +292,7 @@ These are always available regardless of the raw YAML keys defined.
       ``CURRENT_SCRATCH_DIR``, ``CURRENT_ROOTDIR``,
       ``CURRENT_LOGDIR`` and ``CURRENT_HYPERTHREADING`` are
       **automatically** filled by Autosubmit.
-    
+
     * ``CURRENT_USER``, ``CURRENT_PROJ``, ``CURRENT_QUEUE``,
       ``CURRENT_PARTITION`` and ``CURRENT_TEMP_DIR`` are only
       filled if the corresponding YAML key (``USER``,
@@ -304,13 +304,13 @@ These are always available regardless of the raw YAML keys defined.
       ``CURRENT_EXCLUSIVITY`` are only populated if the
       corresponding YAML keys (``BUDGET``, ``RESERVATION``,
       ``EXCLUSIVITY``) are defined in the platform configuration.
-      They are only used by certain schedulers: ``CURRENT_BUDG`` 
-      is used by the ECMWF header, ``CURRENT_RESERVATION`` by 
+      They are only used by certain schedulers: ``CURRENT_BUDG``
+      is used by the ECMWF header, ``CURRENT_RESERVATION`` by
       SLURM and PBS, and ``CURRENT_EXCLUSIVITY`` by SLURM.
 
 
 Other variables
-=================
+===============
 
 .. autosubmit-variables:: config
 

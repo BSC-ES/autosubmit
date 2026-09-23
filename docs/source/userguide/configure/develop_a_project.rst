@@ -116,7 +116,7 @@ Autosubmit configuration
         # Default: 3
         MAXWAITINGJOBS: 3
         # Default maximum number of jobs to be running at the same time at any platform
-        # Can be set at platform level on the platform_<EXPID>.yml file
+        # Can be set at platform level on the platforms_<EXPID>.yml file
         # Default: 6
         TOTALJOBS: 6
         # Time (seconds) between connections to the HPC queue scheduler to poll already submitted jobs status
@@ -130,7 +130,7 @@ Autosubmit configuration
         RETRIALS: 0
         ##  Allows to put a delay between retries, of retries if a job fails. If not specified, it will be static
         # DELAY_RETRY_TIME:11 # static: always N seconds
-        # DELAY_RETRY_TIME:+11 # will wait 11,22,33,44... # linear: N * retry   
+        # DELAY_RETRY_TIME:+11 # will wait 11,22,33,44... # linear: N * retry
         # DELAY_RETRY_TIME:*11 # will wait 11,110,1100,11000... # exponential: N * 10^(retry-1)
         # Default output type for CREATE, MONITOR, SET STATUS, RECOVERY. Available options: pdf, svg, png, ps, txt
         # Default: pdf
@@ -251,7 +251,7 @@ Proj configuration
 
 After completing the experiment configuration, run ``autosubmit create <EXPID>``. Then navigate to ``proj``, where a copy of the model is stored.
 
-The experiment project contains the scripts specified in ``jobs_<EXPID>.yml`` and a copy of model source code and data specified in ``expdef_xxxx.yml``.
+The experiment project contains the scripts specified in ``jobs_<EXPID>.yml`` and a copy of model source code and data specified in ``expdef_<EXPID>.yml``.
 
 To configure experiment project parameters for the experiment, edit ``proj_<EXPID>.yml``.
 
@@ -520,7 +520,7 @@ Detailed platform configuration
 
 In this section, we describe the platform configuration using ``-QOS`` and also ``PARTITION``
 
-    vi <expid>/conf/platform_<EXPID>.yml
+    vi <expid>/conf/platforms_<EXPID>.yml
 
 .. code-block:: yaml
 
@@ -618,13 +618,13 @@ In this section, we describe the platform configuration using ``-QOS`` and also 
 
 The custom directives can be used for multiple parameters at the same time using the following syntax.
 
-    vi <expid>/conf/platform_<EXPID>.yml
+    vi <expid>/conf/platforms_<EXPID>.yml
 
 .. code-block:: yaml
 
     PLATFORMS:
         puhti:
-            #Check your partition ( test/small/large])
+            #Check your partition (test/small/large])
             CUSTOM_DIRECTIVES: ["#SBATCH -p test", "#SBATCH --no-requeue", "#SBATCH --usage"]
             ### Batch job system / queue at HPC
             TYPE: slurm
@@ -639,7 +639,7 @@ The custom directives can be used for multiple parameters at the same time using
             # Should've false already, just in case it is not
             ADD_PROJECT_TO_HOST: False
 
-            #Check your partition ( test[00:15]/small[72:00]/large[72:00]) max_wallclock
+            #Check your partition (test[00:15]/small[72:00]/large[72:00]) max_wallclock
             MAX_WALLCLOCK: 00:15
             # [test [80] // small [40] // large [1040]
             MAX_PROCESSORS: 80
@@ -689,4 +689,3 @@ Note that a wrapped job is counted as a single job regardless of the number of t
     - If ``POLICY`` is mixed and there are failed jobs inside a wrapper, these jobs will be submitted as individual jobs.
     - If ``POLICY`` is strict and it is not possible to wrap ``MIN_WRAPPED`` or more tasks, these tasks will not be submitted until there are enough tasks to build a package.
     - strict and mixed policies can cause **deadlocks**.
-    
