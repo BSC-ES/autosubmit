@@ -8,6 +8,11 @@ number of times, optionally with a delay between attempts. This page covers
 job-level retries; for SSH-connection and remote-command retries, see
 :ref:`ssh_retries` below.
 
+.. note::
+   The ``RETRIALS`` setting will be renamed to ``RETRIES`` in a future release
+   (see `#2088 <https://github.com/BSC-ES/autosubmit/issues/2088>`_).
+   ``RETRIALS`` will continue to work during the transition.
+
 Configuration
 -------------
 
@@ -51,6 +56,12 @@ tells Autosubmit which formula to use for computing the delay before each retry.
     * - ``*N``
       - ``N × 10^(fail_count - 1)``
       - Exponential growth. Wait ``N``, ``10N``, ``100N``, ... seconds.
+
+The ``*N`` format is a form of `exponential backoff
+<https://en.wikipedia.org/wiki/Exponential_backoff>`_, a common retry pattern
+in distributed systems and workflow managers. See also
+`Kestra's overview <https://kestra.io/resources/infrastructure/exponential-backoff>`_
+and `OpenWorkflow's retries docs <https://openworkflow.dev/docs/retries>`_.
 
 Worked example with ``N = 11``:
 

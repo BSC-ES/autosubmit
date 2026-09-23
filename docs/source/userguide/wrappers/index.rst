@@ -200,9 +200,13 @@ The extend_wallclock parameter allows users to provide extra headroom for the wr
 Retrials
 ^^^^^^^^
 
-This parameter sets the number of retries for inner jobs of the wrapper, and overrides ``RETRIALS`` defined on the inner jobs themselves.
+This parameter sets the number of retries for inner jobs of the wrapper, and 
+overrides ``RETRIALS`` defined on the inner jobs themselves.
 
-Vertical wrappers retry the inner jobs **inside the same wrapper submission**, without resubmitting the wrapper. Once the wrapper finishes, its inner jobs are not retried again externally by Autosubmit. See :ref:`job_retries` for the standalone job retry mechanism.
+Vertical wrappers retry the inner jobs **inside the same wrapper submission**, 
+without resubmitting the wrapper. Once the wrapper finishes, its inner jobs 
+are not retried again externally by Autosubmit. 
+See :ref:`job_retries` for the standalone job retry mechanism.
 
 .. code-block:: YAML
 
