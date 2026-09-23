@@ -264,17 +264,19 @@ min_confidence = 70
 [external]
 dependencies = [
     "dep:generic/bash",
-    "dep:generic/curl",
-    "dep:generic/dialog",
     "dep:generic/git@>=2.32",
     "dep:generic/graphviz@>=2.38",
     "dep:generic/rsync",
     "dep:generic/sqlite3",
     "dep:generic/subversion",
-    "dep:generic/tk",
+]
+
+[external.optional-dependencies]
+plot = [
+    "dep:generic/xdg-utils",
 ]
 
 [tool.autosubmit.docs.system-dependencies]
 git = { check = "git --version" }
 graphviz = { note = "2.40 is known not to work", check = "dot -v" }
-tk = { note = "python-tk on Debian and Ubuntu, tkinter on CentOS" }
+xdg-utils = { note = "provides xdg-open, used by autosubmit create --plot" }

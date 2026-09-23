@@ -38,17 +38,20 @@ __version__ = "0.1.0"
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOTDIR: Path = Path(__file__).parents[3]
+"""Repository root, from which ``pyproject.toml`` is read."""
 
-# Fixed table headers and column widths for typing
 TableHeader = Literal["Package", "Version Spec", "License"]
+"""Fixed table headers, for typing."""
+
 ColumnWidth = Literal[30, 20, 50]
+"""Fixed column widths, for typing."""
 
-# A ``License`` metadata field longer than this, or spanning several lines, is
-# the full licence text rather than a name, and is not usable as a table cell.
 _MAX_LICENSE_NAME_LENGTH = 128
+"""A ``License`` metadata field longer than this, or spanning several lines, is
+the full licence text rather than a name, and is not usable as a table cell."""
 
-# Carries no information beyond what the other classifiers already say.
 _UNSPECIFIC_CLASSIFIERS = frozenset({"License :: OSI Approved"})
+"""Classifiers carrying no information beyond what the others already say."""
 
 _PYTHON_SUBSTITUTIONS = """
 
@@ -57,6 +60,7 @@ _PYTHON_SUBSTITUTIONS = """
 .. |python_requires| replace:: {requires}
 .. |license| replace:: {license}
 """
+"""Substitutions defined for every page, filled from ``pyproject.toml``."""
 
 
 @lru_cache(maxsize=1)
@@ -107,7 +111,8 @@ def _python_bounds(requires_python: str) -> tuple[str, str]:
     """Return the (minimum, maximum) supported ``MAJOR.MINOR`` Python versions.
 
     An exclusive upper bound such as ``<3.13`` is reported as the last version
-    it admits, ``3.12``.
+    it admits, ``3.12``. An upper bound with a zero minor, such as ``<4``, is
+    not handled and yields an empty maximum.
     """
     minimum: str = ""
     maximum: str = ""
@@ -152,11 +157,42 @@ def _system_dependencies() -> tuple[list[str], dict[str, dict[str, str]]]:
     )
 
 
-def inject_python_substitutions(app, config) -> None:
-    """Define ``|python_min|``, ``|python_max|`` and ``|python_requires|``.
+def _optional_system_dependencies() -> dict[str, list[str]]:
+    """Read PEP 725 ``[external.optional-dependencies]`` groups."""
+    return _load_pyproject().get("external", {}).get("optional-dependencies", {})
 
-    The values come from ``project.requires-python`` in ``pyproject.toml``, so
-    the docs cannot drift from the packaging metadata.
+
+def _dependency_item(
+    name: str,
+    version: str,
+    annotations: dict[str, dict[str, str]],
+) -> nodes.list_item:
+    """Build one bullet for a system dependency, with its docs annotation."""
+    paragraph: nodes.paragraph = nodes.paragraph()
+    paragraph += nodes.literal(text=name)
+    if version:
+        paragraph += nodes.Text(f" {version}")
+
+    annotation: dict[str, str] = annotations.get(name, {})
+    note: str = annotation.get("note", "")
+    check: str = annotation.get("check", "")
+
+    if note:
+        paragraph += nodes.Text(f" — {note}")
+    if check:
+        paragraph += nodes.Text("; check with " if note else " — check with ")
+        paragraph += nodes.literal(text=check)
+
+    item: nodes.list_item = nodes.list_item()
+    item += paragraph
+    return item
+
+
+def inject_python_substitutions(app, config) -> None:
+    """Define ``|python_min|``, ``|python_max|``, ``|python_requires|`` and ``|license|``.
+
+    The values come from ``project.requires-python`` and ``project.license`` in
+    ``pyproject.toml``, so the docs cannot drift from the packaging metadata.
     """
     project: dict = _load_pyproject().get("project", {})
     requires_python: str = project.get("requires-python", "")
@@ -279,40 +315,44 @@ class AutosubmitSystemDependenciesDirective(SphinxDirective):
 
     def run(self) -> list[Node]:
         dependencies, annotations = _system_dependencies()
+        optional_groups: dict[str, list[str]] = _optional_system_dependencies()
+
         parsed: list[tuple[str, str]] = [
             (name, version)
             for name, version in map(_parse_depurl, dependencies)
             if name
         ]
-        if not parsed:
+        if not parsed and not optional_groups:
             logger.warning("No system dependencies could be parsed")
             return []
 
-        bullets: nodes.bullet_list = nodes.bullet_list()
+        result: list[Node] = []
 
-        for name, version in sorted(parsed):
-            paragraph: nodes.paragraph = nodes.paragraph()
-            paragraph += nodes.literal(text=name)
-            if version:
-                paragraph += nodes.Text(f" {version}")
+        if parsed:
+            bullets: nodes.bullet_list = nodes.bullet_list()
+            for name, version in sorted(parsed):
+                bullets += _dependency_item(name, version, annotations)
+            result.append(bullets)
 
-            annotation: dict[str, str] = annotations.get(name, {})
-            note: str = annotation.get("note", "")
-            check: str = annotation.get("check", "")
+        for group, specifiers in sorted(optional_groups.items()):
+            optional_bullets: nodes.bullet_list = nodes.bullet_list()
+            for specifier in sorted(specifiers):
+                name, version = _parse_depurl(specifier)
+                if name:
+                    optional_bullets += _dependency_item(name, version, annotations)
 
-            if note:
-                paragraph += nodes.Text(f" — {note}")
-            if check:
-                paragraph += nodes.Text("; check with " if note else " — check with ")
-                paragraph += nodes.literal(text=check)
+            # An empty or wholly unparseable group would leave a stray heading.
+            if not len(optional_bullets):
+                continue
 
-            item: nodes.list_item = nodes.list_item()
-            item += paragraph
-            bullets += item
+            heading: nodes.paragraph = nodes.paragraph()
+            heading += nodes.Text(f"Optional, for {group}:")
+            result.append(heading)
+            result.append(optional_bullets)
 
-        return [bullets]
+        return result
 
-    
+
 def setup(app) -> dict[str, object]:
     app.add_directive(
         "dependencies_licenses",

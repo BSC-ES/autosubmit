@@ -39,7 +39,16 @@ Install system packages and the Autosubmit Python package:
     export DEBIAN_FRONTEND=noninteractive
 
     # System dependencies
-    apt install curl git graphviz python3 python3-pip python3-tk rsync sqlite3 subversion dialog -y -q
+    # This example is for Debian-based distributions. On Suse, RHEL, Alpine,
+    # Rocky and others, install the equivalent packages for your package manager.
+    apt install --yes --quiet \
+        git \
+        graphviz \
+        python3 \
+        python3-pip \
+        rsync \
+        sqlite3 \
+        subversion
 
     # Install Autosubmit from PyPI
     pip3 install autosubmit
@@ -166,7 +175,8 @@ Set the ``AUTOSUBMIT_CONFIGURATION`` environment variable to the path of an ``au
 ``autosubmit configure``
 ------------------------
 
-Create ``/etc/autosubmitrc`` (or move ``$HOME/.autosubmitrc`` to ``/etc/autosubmitrc``) with the sections below.
+Create ``/etc/autosubmitrc`` with the sections below, or move an existing ``$HOME/.autosubmitrc`` there.
+Any of the locations listed above will do — ``/etc/autosubmitrc`` is the usual choice for a shared installation because every user on the machine picks it up.
 
 Mandatory parameters
 ~~~~~~~~~~~~~~~~~~~~
