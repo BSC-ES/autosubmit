@@ -1,4 +1,4 @@
-###################
+chunk_start_year###################
 Variables reference
 ###################
 
@@ -59,6 +59,30 @@ The following variables are present only in jobs that contain a date
 
 
 .. autosubmit-variables:: chunk
+
+
+Something Something config.
+
+
+.. autosubmit-variables:: config
+
+
+Something Something experiment.
+
+
+.. autosubmit-variables:: experiment
+
+
+Something Something default.
+
+
+.. autosubmit-variables:: default
+
+
+Something Something project.
+
+
+.. autosubmit-variables:: project
 
 Custom directives
 -----------------

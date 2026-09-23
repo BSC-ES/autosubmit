@@ -654,7 +654,7 @@ class Job:
             self._retrials = int(value)
 
     @property  # type: ignore
-    @autosubmit_parameter(name='checkpoint')
+    @autosubmit_parameter(name='checkpoint', group='job')
     def checkpoint(self):
         """Generates a checkpoint step for this job based on job.type."""
         return self.type.checkpoint
@@ -680,7 +680,7 @@ class Job:
         self._member = value
 
     @property  # type: ignore
-    @autosubmit_parameter(name='chunk')
+    @autosubmit_parameter(name='chunk', group='job')
     def chunk(self):
         """Current chunk."""
         return self._chunk
@@ -746,7 +746,7 @@ class Job:
         self._nodes = value
 
     @property  # type: ignore
-    @autosubmit_parameter(name=['numthreads', 'threads', 'cpus_per_task'])
+    @autosubmit_parameter(name=['numthreads', 'threads', 'cpus_per_task'], group='job')
     def threads(self):
         """Number of threads that the job will use."""
         return self._threads
@@ -756,7 +756,7 @@ class Job:
         self._threads = value
 
     @property  # type: ignore
-    @autosubmit_parameter(name=['numtask', 'tasks', 'tasks_per_node'])
+    @autosubmit_parameter(name=['numtask', 'tasks', 'tasks_per_node'], group='job')
     def tasks(self):
         """Number of tasks that the job will use."""
         return self._tasks
@@ -876,7 +876,7 @@ class Job:
         self._splits = value
 
     @property  # type: ignore
-    @autosubmit_parameter(name='notify_on')
+    @autosubmit_parameter(name='notify_on', group='chunk')
     def notify_on(self):
         """Send mail notification on job status change."""
         return self._notify_on
@@ -886,7 +886,7 @@ class Job:
         self._notify_on = value
 
     @property
-    @autosubmit_parameter(name='cpmip_thresholds')
+    @autosubmit_parameter(name='cpmip_thresholds', group='job')
     def cpmip_thresholds(self):
         """Thresholds for CPMIP metrics."""
         return self._cpmip_thresholds
@@ -896,7 +896,7 @@ class Job:
         self._cpmip_thresholds = value
 
     @property
-    @autosubmit_parameter(name='chunk_size')
+    @autosubmit_parameter(name='chunk_size', group='job')
     def chunk_size(self):
         """Chunk size used to compute CPMIP metrics."""
         return self._chunk_size
@@ -906,7 +906,7 @@ class Job:
         self._chunk_size = value
 
     @property
-    @autosubmit_parameter(name='chunk_size_unit')
+    @autosubmit_parameter(name='chunk_size_unit', group='job')
     def chunk_size_unit(self):
         """Chunk size unit used to compute CPMIP metrics."""
         return self._chunk_size_unit
@@ -1005,7 +1005,7 @@ class Job:
         self._parents = parents
 
     @property  # type: ignore
-    @autosubmit_parameter(name='status')
+    @autosubmit_parameter(name='status', group='chunk')
     def status(self):
         return self._status
 
@@ -1048,7 +1048,7 @@ class Job:
         self._platform = value
 
     @property  # type: ignore
-    @autosubmit_parameter(name="current_queue")
+    @autosubmit_parameter(name="current_queue", group='job')
     def queue(self) -> "Platform | str":
         """Returns the queue to be used by the job. Chooses between serial and parallel platforms.
 

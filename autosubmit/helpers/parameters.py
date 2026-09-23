@@ -39,12 +39,11 @@ to populate the comments in the Autosubmit YAML configuration files.
 """
 
 
-def autosubmit_parameter(func=None, *, name, group: str | None = None):
+def autosubmit_parameter(*, name: str | list, group: str | None = None):
     """Decorator for Autosubmit configuration parameters.
 
     Used to annotate properties of classes
 
-    :param func: wrapped function. Always ``None`` due to how we call the decorator.
     :param name: parameter name.
     :param group: group name. Default to caller module name.
     """

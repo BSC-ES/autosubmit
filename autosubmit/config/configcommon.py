@@ -39,6 +39,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.helpers.enums import ChunkUnit
+from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.platform_type import PlatformType
@@ -1632,6 +1633,7 @@ class AutosubmitConfig:
 
         return parameters
 
+    @autosubmit_parameter(name='custom_config', group='default')
     def load_custom_config(self, current_data, filenames_to_load):
         """Loads custom config files
         :param current_data: dict with current data
@@ -2075,6 +2077,7 @@ class AutosubmitConfig:
         self.deep_update(self.experiment_data, db_parameters)
         return self.deep_parameters_export(self.experiment_data)
 
+    @autosubmit_parameter(name='project_type', group='project')
     def get_project_type(self) -> str:
         """Returns project type from experiment config file.
 
@@ -2176,6 +2179,7 @@ class AutosubmitConfig:
         """
         return str(self.get_section(['GIT', 'FETCH_SINGLE_BRANCH'], "true")).lower()
 
+    @autosubmit_parameter(name='project_destination', group='project')
     def get_project_destination(self):
         """Returns git commit from experiment's config file
 
@@ -2266,7 +2270,7 @@ class AutosubmitConfig:
             for str_date in date_value:
                 date_list.append(parse_date(str_date))
         return date_list
-
+    @autosubmit_parameter(name='numchunks', group='experiment')
     def get_num_chunks(self):
         """Returns number of chunks to run for each member
 
@@ -2287,6 +2291,7 @@ class AutosubmitConfig:
             return default
         return int(chunk_ini)
 
+    @autosubmit_parameter(name='chunksizeunit', group='experiment')
     def get_chunk_size_unit(self):
         """Unit for the chunk length
 
@@ -2295,6 +2300,7 @@ class AutosubmitConfig:
         """
         return self.get_section(['EXPERIMENT', 'CHUNKSIZEUNIT'])
 
+    @autosubmit_parameter(name='chunksize', group='experiment')
     def get_chunk_size(self, default=1):
         """Chunk Size as defined in the expdef file.
 
@@ -2306,6 +2312,7 @@ class AutosubmitConfig:
             return default
         return int(chunk_size)
 
+    @autosubmit_parameter(name='members', group='experiment')
     def get_member_list(self, run_only=False):
         """Returns members list from experiment's config file
 
@@ -2349,6 +2356,7 @@ class AutosubmitConfig:
 
         return str(self.get_section(['RERUN', 'RERUN'])).lower()
 
+    @autosubmit_parameter(name='hpcarch', group='default')
     def get_platform(self) -> str:
         """
         Returns main platforms from experiment's config file
@@ -2408,6 +2416,7 @@ class AutosubmitConfig:
         open(version_file, 'w').write(content)
         os.chmod(version_file, 0o755)
 
+    @autosubmit_parameter(name='autosubmit_version', group='config')
     def get_version(self):
         """Returns version number of the current experiment from autosubmit's config file
 
@@ -2416,6 +2425,7 @@ class AutosubmitConfig:
         """
         return str(self.get_section(['CONFIG', 'AUTOSUBMIT_VERSION'], ""))
 
+    @autosubmit_parameter(name='totaljobs', group='config')
     def get_total_jobs(self) -> int | None:
         """Returns max number of running jobs from autosubmit's config file.
 
@@ -2446,6 +2456,7 @@ class AutosubmitConfig:
         """
         return self.get_section(['CONFIG', 'MAX_PROCESSORS'], -1)
 
+    @autosubmit_parameter(name='maxwaitingjobs', group='config')
     def get_max_waiting_jobs(self) -> int | None:
         """Returns max number of waiting jobs from autosubmit's config file.
 

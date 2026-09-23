@@ -385,7 +385,7 @@ class Platform(ABC):
         self._scratch = value
 
     @property
-    @autosubmit_parameter(name='current_proj_dir')
+    @autosubmit_parameter(name='projdir', group='job')
     def project_dir(self):
         """Platform's project folder path. """
         return self._project_dir
@@ -395,7 +395,7 @@ class Platform(ABC):
         self._project_dir = value
 
     @property
-    @autosubmit_parameter(name='current_rootdir')
+    @autosubmit_parameter(name='rootdir', group='job')
     def root_dir(self):
         """Platform's experiment folder path. """
         return self._root_dir
