@@ -1,0 +1,4 @@
+# Users allowed to trigger the benchmark /metrics commands on PRs.
+# One @username per line, read from the default branch by the metrics
+# workflow (members of the BSC-ES/autosubmit team are always allowed).
+@dbeltrankyl
