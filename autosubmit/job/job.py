@@ -39,9 +39,9 @@ from bscearth.utils.date import (
 )
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
+from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
 )
@@ -51,7 +51,6 @@ from autosubmit.job.job_common import (
     increase_wallclock_by_chunk,
     wallclock_to_seconds,
 )
-from autosubmit.job.job_utils import get_split_size, get_split_size_unit
 from autosubmit.job.metrics_processor import UserMetricProcessor
 from autosubmit.job.template import Language, get_template_snippet
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -61,6 +60,7 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.platform_type import PlatformType
 
 if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.template import TemplateSnippet
     from autosubmit.platforms.platform import Platform
 
@@ -340,7 +340,8 @@ class Job:
         else:
             self.date = None
 
-    def internal_slot_name(self, slot) -> str:
+    @staticmethod
+    def internal_slot_name(slot) -> str:
         """Normalize the slot name to match the expected format.
 
         This is useful for ensuring that the slot names are consistent
@@ -443,7 +444,7 @@ class Job:
         self.check = 'true'
         self.check_warnings = False
         self.packed = False
-        self.hold = False  # type: bool
+        self.hold: bool = False
         self.distance_weight = 0
         self.level = 0
         self._export = "none"
@@ -568,7 +569,7 @@ class Job:
         self.validate_template = False
         self.finished_time = None
 
-    def init_runtime_parameters(self, as_conf: AutosubmitConfig, reset_logs: bool,
+    def init_runtime_parameters(self, as_conf: 'AutosubmitConfig', reset_logs: bool,
                                 called_from_log_recovery: bool) -> None:
         """Initialize runtime parameters for the job.
 
@@ -577,11 +578,8 @@ class Job:
         resets log-related attributes if requested.
 
         :param as_conf: Autosubmit configuration object containing job settings.
-        :type as_conf: AutosubmitConfig
         :param reset_logs: Whether to reset log-related attributes.
-        :type reset_logs: bool
         :param called_from_log_recovery: Whether this initialization is called during log recovery.
-        :type called_from_log_recovery: bool
         """
         self.het = {'HETSIZE': 0}
         self._tasks = '0'
@@ -984,7 +982,7 @@ class Job:
     def validate_template(self, value):
         self._validate_template = value
 
-    def read_header_tailer_script(self, script_path: str, as_conf: AutosubmitConfig, is_header: bool):
+    def read_header_tailer_script(self, script_path: str, as_conf: 'AutosubmitConfig', is_header: bool):
         """Opens and reads a script. If it is not a BASH script it will fail :(
 
         Will strip away the line with the hash bang (#!)
@@ -1103,13 +1101,12 @@ class Job:
         """Sets the HPC platforms to be used by the job.
 
         :param value: platforms to set
-        :type value: HPCPlatform
         """
         self._platform = value
 
     @property  # type: ignore
     @autosubmit_parameter(name="current_queue")
-    def queue(self) -> "Platform":
+    def queue(self) -> "Platform | str":
         """Returns the queue to be used by the job. Chooses between serial and parallel platforms.
 
         :return HPCPlatform object for the job to use
@@ -1126,12 +1123,11 @@ class Job:
         """Sets the queue to be used by the job.
 
         :param value: queue to set
-        :type value: HPCPlatform
         """
         self._queue = value
 
     @property  # type: ignore
-    def partition(self) -> "Platform":
+    def partition(self) -> "Platform | str":
         """Returns the queue to be used by the job. Chooses between serial and parallel platforms
 
         :return HPCPlatform object for the job to use
@@ -1145,10 +1141,9 @@ class Job:
 
     @partition.setter
     def partition(self, value):
-        """Sets the partion to be used by the job.
+        """Sets the partition to be used by the job.
 
-        :param value: partion to set
-        :type value: HPCPlatform
+        :param value: partition to set
         """
         self._partition = value
 
@@ -1165,7 +1160,6 @@ class Job:
         """Sets the shape to be used by the job.
 
         :param value: shape to set
-        :type value: HPCPlatform
         """
         self._shape = value
 
@@ -1277,11 +1271,10 @@ class Job:
         return self.status == Status.FAILED and self.fail_count < self.retrials
 
     # Maybe should be renamed to the plural?
-    def add_parent(self, *parents):
+    def add_parent(self, *parents) -> None:
         """Add parents for the job. It also adds current job as a child for all the new parents
 
         :param parents: job's parents to add
-        :type parents: Job
         """
         for parent in parents:
             num_parents = 1
@@ -1292,29 +1285,26 @@ class Job:
                 self._parents.add(new_parent)
                 new_parent.__add_child(self)
 
-    def add_children(self, children):
+    def add_children(self, children) -> None:
         """Add children for the job. It also adds current job as a parent for all the new children
 
         :param children: job's children to add
-        :type children: list of Job objects
         """
         for child in (child for child in children if child.name != self.name):
             self.__add_child(child)
             child._parents.add(self)
 
-    def __add_child(self, new_child):
+    def __add_child(self, new_child) -> None:
         """Adds a new child to the job
 
         :param new_child: new child to add
-        :type new_child: Job
         """
         self.children.add(new_child)
 
-    def delete_parent(self, parent):
+    def delete_parent(self, parent) -> None:
         """Remove a parent from the job
 
         :param parent: parent to remove
-        :type parent: Job
         """
         self.parents.remove(parent)
 
@@ -1343,9 +1333,7 @@ class Job:
         """Returns value from given row index position in STAT file associated to job.
 
         :param index: Row position to retrieve.
-        :type index: int
-        :param fail_count: Fail count to determine the STAT file name. Default to self.stat_file for non-wrapped jobs.
-        :type fail_count: int
+        :param attempt: Fail count to determine the STAT file name. Default to self.stat_file for non-wrapped jobs.
         """
         logname = os.path.join(self._tmp_path, f"{self.stat_file}{attempt}")
         if os.path.exists(logname):
@@ -1363,7 +1351,6 @@ class Job:
         """Returns list of values from given column index position in TOTAL_STATS file associated to job
 
         :param index: column position to retrieve
-        :type index: int
         :return: list of values in column index position
         """
         log_name = Path(f"{self._tmp_path}/{self.name}_TOTAL_STATS")
@@ -1443,9 +1430,7 @@ class Job:
         return retrials_list
 
     def get_new_remotelog_name(self, attempt: int):
-        """
-        Checks if remote log file exists on remote host
-        if it exists, remote_log variable is updated
+        """Checks if remote log file exists on remote host if it exists, remote_log variable is updated
         :param
         """
         try:
@@ -1459,7 +1444,6 @@ class Job:
         """Checks if remote log file exists on remote host
 
         :param show_logs: Whether to show logs during the check
-        :type show_logs: bool
         :return: True if remote log file exists, False otherwise
         """
         try:
@@ -1655,7 +1639,6 @@ class Job:
         wallclock time in seconds and the wallclock time with the margin as a timedelta.
 
         :param wallclock: The original wallclock time.
-        :type wallclock: datetime.timedelta
 
         :return: The total wallclock time in seconds.
         """
@@ -1671,8 +1654,7 @@ class Job:
         wallclock_delta = datetime.timedelta(seconds=total)
         return int(wallclock_delta.total_seconds())
 
-    @staticmethod
-    def parse_time(wallclock) -> datetime.timedelta | None:
+    def parse_time(self, wallclock) -> datetime.timedelta | None:
         """Convert a ``HH:MM[:SS]`` wallclock to a :class:`datetime.timedelta`.
 
         :param wallclock: Wallclock to convert, e.g. ``'07:30'`` or ``'07:30:00'``.
@@ -1700,7 +1682,7 @@ class Job:
             return True
         return False
 
-    def update_status(self, as_conf: AutosubmitConfig) -> Status:
+    def update_status(self, as_conf: 'AutosubmitConfig') -> Status:
         """Updates job status, checking COMPLETED file if needed.
 
         :param as_conf: Autosubmit configuration.
@@ -1735,7 +1717,7 @@ class Job:
 
         return self.status
 
-    def check_completion(self, default_status=Status.FAILED):
+    def check_completion(self, default_status=Status.FAILED) -> None:
         """Check whether a COMPLETED file exists on the platform.
 
         This method sets ``self.new_status`` (the *proposed* status), not
@@ -1744,14 +1726,13 @@ class Job:
 
         :param default_status: Status to propose when the COMPLETED file is
             absent. Defaults to ``Status.FAILED``.
-        :type default_status: Status
         """
         if self.platform.get_completed_job_names([self.name]):
             self.new_status = Status.COMPLETED
         else:
             self.new_status = default_status
 
-    def get_metric_folder(self, as_conf: AutosubmitConfig) -> str:
+    def get_metric_folder(self, as_conf: 'AutosubmitConfig') -> str:
         """Returns the default metric folder for the job.
 
         :return: The metric folder path.
@@ -1776,15 +1757,13 @@ class Job:
 
         return str(metric_folder)
 
-    def update_current_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
+    def update_current_parameters(self, as_conf: 'AutosubmitConfig', parameters: dict) -> dict:
         """
         Populate and update `CURRENT_XXX` parameters and placeholders in the given parameters dictionary.
 
         :param as_conf: Autosubmit configuration object containing `platforms_data`,
             `jobs_data` and other experiment-level settings.
-        :type as_conf: AutosubmitConfig
         :param parameters: Parameters dictionary to be updated. This dict is modified
-        :type parameters: dict
         :return: The same `parameters` dictionary updated.
         """
 
@@ -2052,7 +2031,7 @@ class Job:
         # Increasing according to chunk
         self.wallclock = increase_wallclock_by_chunk(self.wallclock, self.wchunkinc, chunk)
 
-    def update_platform_associated_parameters(self, as_conf: AutosubmitConfig, parameters: dict, chunk,
+    def update_platform_associated_parameters(self, as_conf: 'AutosubmitConfig', parameters: dict, chunk,
                                               set_attributes) -> dict:
         if set_attributes:
             self.x11_options = str(parameters.get("CURRENT_X11_OPTIONS", ""))
@@ -2130,7 +2109,8 @@ class Job:
 
         return parameters
 
-    def update_wrapper_parameters(self, as_conf: AutosubmitConfig, parameters: dict) -> dict:
+    @staticmethod
+    def update_wrapper_parameters(as_conf: 'AutosubmitConfig', parameters: dict) -> dict:
         wrappers = as_conf.experiment_data.get("WRAPPERS", {})
         if len(wrappers) > 0:
             parameters['WRAPPER'] = as_conf.get_wrapper_type()
@@ -2154,7 +2134,7 @@ class Job:
                 as_conf.get_extensible_wallclock(as_conf.experiment_data["WRAPPERS"].get(wrapper_section)))
         return parameters
 
-    def update_dict_parameters(self, as_conf: AutosubmitConfig) -> None:
+    def update_dict_parameters(self, as_conf: 'AutosubmitConfig') -> None:
         self.retrials = as_conf.jobs_data.get(self.section, {}).get("RETRIALS",
                                                                     as_conf.experiment_data.get("CONFIG", {}).get(
                                                                         "RETRIALS", 0))
@@ -2191,7 +2171,7 @@ class Job:
         self._chunk_size = as_conf.get_chunk_size()
         self._chunk_size_unit = as_conf.get_chunk_size_unit().lower()
 
-    def update_check_variables(self, as_conf: AutosubmitConfig) -> None:
+    def update_check_variables(self, as_conf: 'AutosubmitConfig') -> None:
         """Update job check variables from Autosubmit configuration.
         :param as_conf: The Autosubmit configuration object."""
 
@@ -2209,19 +2189,17 @@ class Job:
                                                                                                  "MAX_WAITING_JOBS",
                                                                                                  -1))))
 
-    def calendar_split(self, as_conf: AutosubmitConfig, parameters: dict, set_attributes: bool) -> dict:
+    def calendar_split(self, as_conf: 'AutosubmitConfig', parameters: dict, set_attributes: bool) -> dict:
         """Calculate the calendar splits for the job.
 
         This method processes the calendar splits based on the provided parameters and the Autosubmit configuration.
 
         :param as_conf: The Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         :param parameters: The dictionary containing job parameters.
-        :type parameters: dict
         :param set_attributes: Flag indicating whether to set attributes directly.
-        :type set_attributes: bool
         :return: The updated parameters dictionary containing calendar split information.
         """
+        from autosubmit.job.job_utils import get_split_size, get_split_size_unit
         # Calendar struct type numbered ( year, month, day, hour )
         if str(self.splits).isdigit() and int(self.splits) > 0 and self.running != "once":  # once jobs has no date
             if int(self.split) == 1:
@@ -2365,11 +2343,8 @@ class Job:
         """Update job parameters and optionally set job attributes.
 
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: Any
         :param parameters: Dictionary of parameters to update.
-        :type parameters: Dict[str, Any]
         :param set_attributes: Whether to set job attributes from parameters.
-        :type set_attributes: bool
         :return: Updated parameters dictionary.
         """
         if set_attributes:
@@ -2468,16 +2443,14 @@ class Job:
             self.wrapper_type = None
             self.id = None
 
-    def update_placeholders(self, as_conf: AutosubmitConfig, parameters: dict, replace_by_empty=False) -> dict:
+    @staticmethod
+    def update_placeholders(as_conf: 'AutosubmitConfig', parameters: dict, replace_by_empty=False) -> dict:
         """Find and substitute dynamic placeholders in `parameters` using the provided
         Autosubmit configuration helpers.
 
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         :param parameters: Parameters dictionary potentially containing placeholders.
-        :type parameters: dict
         :param replace_by_empty: Flag indicating whether to replace dynamic variables with empty strings.
-        :type replace_by_empty: bool
         :return: Parameters with placeholders substituted.
         """
 
@@ -2522,22 +2495,16 @@ class Job:
 
         return parameters
 
-    def update_parameters(self, as_conf: AutosubmitConfig, set_attributes: bool = False,
-                          reset_logs: bool = False, called_from_log_recovery: bool = False) -> dict:
+    def update_parameters(self, as_conf: 'AutosubmitConfig', set_attributes: bool = False,
+                          reset_logs: bool = False) -> dict:
         """Refresh the job's parameters value.
 
         This method reloads the Autosubmit configuration and updates the job's parameters
         based on the configuration and the current state of the job.
 
         :param as_conf: The Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         :param set_attributes: Flag indicating whether to set attributes, defaults to False.
-        :type set_attributes: bool
         :param reset_logs: Flag indicating whether to reset logs, defaults to False.
-        :type reset_logs: bool
-        :param called_from_log_recovery: Flag indicating if called from log recovery, defaults to False.
-        :type called_from_log_recovery: bool
-        :return: None
         """
         if not set_attributes and as_conf.needs_reload():
             set_attributes = True
@@ -2570,7 +2537,7 @@ class Job:
         self.updated = True
         return parameters
 
-    def init_platform(self, as_conf: AutosubmitConfig) -> None:
+    def init_platform(self, as_conf: 'AutosubmitConfig') -> None:
         """Initialize the job's platform.
 
         The submitter comes from the job_list.submitter during an autosubmit run/inspect, but if not, it is created here.
@@ -2585,7 +2552,8 @@ class Job:
                 self.platform_name = as_conf.experiment_data.get("DEFAULT", {}).get("HPCARCH", "LOCAL")
             self.platform = self.submitter.platforms.get(self.platform_name)
 
-    def update_content_extra(self, as_conf: AutosubmitConfig, files: list[str]) -> list[str]:
+    @staticmethod
+    def update_content_extra(as_conf: 'AutosubmitConfig', files: list[str]) -> list[str]:
         additional_templates = []
         for file in files:
             if as_conf.get_project_type().lower() == "none":
@@ -2599,7 +2567,7 @@ class Job:
             additional_templates += [template]
         return additional_templates
 
-    def update_content(self, as_conf: AutosubmitConfig, parameters: dict) -> tuple[str, list[str]]:
+    def update_content(self, as_conf: 'AutosubmitConfig', parameters: dict) -> tuple[str, list[str]]:
         """Create the script content to be run for the job.
 
         :param as_conf: Autosubmit configuration.
@@ -2636,7 +2604,7 @@ class Job:
         additional_content = self.update_content_extra(as_conf, self.additional_files)
         return template_content, additional_content
 
-    def get_wrapped_content(self, as_conf: AutosubmitConfig, parameters: dict):
+    def get_wrapped_content(self, as_conf: 'AutosubmitConfig', parameters: dict):
         snippet: TemplateSnippet = get_template_snippet(Language.EMPTY)
         template = f'python $SCRATCH/{self.expid}/LOG_{self.expid}/{self.name}.cmd'
         return self._get_paramiko_template(snippet, template, parameters)
@@ -2681,11 +2649,10 @@ class Job:
                 return True
         return False
 
-    def create_script(self, as_conf: AutosubmitConfig) -> str:
+    def create_script(self, as_conf: 'AutosubmitConfig') -> str:
         """Create the script file to be run for the job.
 
         :param as_conf: Configuration object.
-        :type as_conf: AutosubmitConfig
         :return: Script's filename.
         """
         lang = locale.getlocale()[1] or locale.getdefaultlocale()[1] or 'UTF-8'
@@ -2717,7 +2684,6 @@ class Job:
         """Check if the given content is valid Python code.
 
         :param content: The script content to check.
-        :type content: str
         :return: True if the content is valid Python code, False otherwise.
         """
         try:
@@ -2730,7 +2696,6 @@ class Job:
         """Check if the given content is valid R code.
 
         :param content: The script content to check.
-        :type content: str
         :return: True if the content is valid R code, False otherwise.
         """
 
@@ -2751,7 +2716,6 @@ class Job:
         """Check if the given content is valid Bash code.
 
         :param content: The script content to check.
-        :type content: str
         :return: True if the content is valid Bash code, False otherwise.
         """
         import subprocess
@@ -2771,9 +2735,7 @@ class Job:
         """Check if the script content is syntactically correct depending on the language specified.
 
         :param content: The script content to check.
-        :type content: str
         :param script_path: The path to the generated script file.
-        :type script_path: Path
         :raises ValueError: If there are unsubstituted placeholders in the content.
         """
         try:
@@ -2788,24 +2750,19 @@ class Job:
                 e.message += f". Generated scripts are located in file://{script_path.parent} the current file is {script_path.name}"
             raise e
 
+    @staticmethod
     def _substitute_placeholders(
-            self,
             content: str,
             parameters: dict,
-            as_conf: AutosubmitConfig,
+            as_conf: 'AutosubmitConfig',
             undefined_variables: list[str] | None = None
     ) -> str:
-        """
-        Replace placeholders in the template content.
+        """Replace placeholders in the template content.
 
         :param content: Template content with placeholders.
-        :type content: str
         :param parameters: Dictionary of parameters for substitution.
-        :type parameters: dict
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         :param undefined_variables: List of undefined variable names to remove.
-        :type undefined_variables: list[str], optional
         :return: Content with placeholders substituted.
         """
         if undefined_variables is None:
@@ -2829,15 +2786,11 @@ class Job:
         return content.replace("%%", "%")
 
     def _write_additional_file(self, additional_file: str, content: str, lang: str) -> None:
-        """
-        Write additional file with processed content.
+        """Write additional file with processed content.
 
         :param additional_file: Path to the additional file.
-        :type additional_file: str
         :param content: Content to write.
-        :type content: str
         :param lang: Encoding language.
-        :type lang: str
         :return: None
         """
         tmp_path = Path(self._tmp_path)
@@ -2846,18 +2799,16 @@ class Job:
             f.write(content.encode(lang))
 
     def construct_real_additional_file_name(self, file_name: str) -> str:
-        """
-        Constructs the real name of the file to be sent to the platform.
+        """Constructs the real name of the file to be sent to the platform.
 
         :param file_name: The name of the file to be sent.
-        :type file_name: str
         :return: The full path of the file to be sent.
         """
         real_name = str(f"{Path(file_name).stem}_{self.name}")
         real_name = real_name.replace(f"{self.expid}_", "")
         return real_name
 
-    def create_wrapped_script(self, as_conf: AutosubmitConfig, wrapper_tag='wrapped') -> str:
+    def create_wrapped_script(self, as_conf: 'AutosubmitConfig', wrapper_tag='wrapped') -> str:
         parameters = self.update_parameters(as_conf, set_attributes=False)
         template_content = self.get_wrapped_content(as_conf, parameters)
         for key, value in parameters.items():
@@ -2873,7 +2824,7 @@ class Job:
         os.chmod(os.path.join(self._tmp_path, script_name), 0o755)
         return script_name
 
-    def check_script(self, as_conf: AutosubmitConfig, show_logs="false") -> bool:
+    def check_script(self, as_conf: 'AutosubmitConfig', show_logs="false") -> bool:
         """Checks if the script is well-formed.
 
         :param as_conf: Autosubmit configuration.
@@ -2907,8 +2858,8 @@ class Job:
 
     def update_local_logs(self, attempt: int = 0) -> None:
         """Updates the local log filenames based on the fail count.
+
         :param attempt: The current attempt number.
-        :type attempt: int
         """
 
         if attempt > 0:
@@ -2985,8 +2936,8 @@ class Job:
 
     def update_start_time(self, attempt=-1):
         """Updates the job's start time based on the count of retries.
+
         :param attempt: The retry count.
-        :type attempt: int
         """
         start_time_ = self.check_start_time(attempt)  # last known start time from the .cmd file
         if start_time_:
@@ -2997,8 +2948,7 @@ class Job:
                 datetime.datetime.now(), 'S')
 
     def fix_local_logs_timestamps(self, current_timestamp: str, new_timestamp: str) -> None:
-        """Renames local log files to update the timestamp in their names without
-        changing the prefix and extension.
+        """Renames local log files to update the timestamp in their names without changing the prefix and extension.
 
         It assumes that self.local_logs contains the new timestamp in their names.
 
@@ -3024,7 +2974,6 @@ class Job:
         """Writes start date and time to TOTAL_STATS file and the history database.
 
         :param attempt: The fail count to identify the correct database row.
-        :type attempt: int
         :return: True if successful, False otherwise
         """
         self._write_time("start")
@@ -3057,12 +3006,11 @@ class Job:
             return False
         return True
 
-    def write_end_time(self, completed, attempt):
+    def write_end_time(self, completed, attempt) -> None:
         """Writes end timestamp to TOTAL_STATS file and jobs_data.db
+
         :param completed: True if the job has been completed, False otherwise
-        :type completed: bool
         :param attempt: number of retrials
-        :type attempt: int
         """
         self.status = Status.COMPLETED if completed else Status.FAILED
         end_time = self.check_end_time(attempt)
@@ -3092,21 +3040,19 @@ class Job:
             thread_write_finish.name = f"JOB_data_{self.name}"
             thread_write_finish.start()
 
-    def _get_submit_data_dc_from_db(self, attempt: int):
+    def _get_submit_data_dc_from_db(self, attempt: int) -> "JobData | None":
         """Retrieve submit data from the experiment history database for a given attempt.
 
         :param attempt: The attempt (fail_count) to look up.
-        :type attempt: int
         :return: The JobData for the submit record, or None if not found.
         """
         exp_history = ExperimentHistory(self.expid)
         return exp_history.get_submit_data_dc(self.name, attempt)
 
-    def _get_finish_time_from_db(self, attempt: int):
+    def _get_finish_time_from_db(self, attempt: int) -> "JobData | None":
         """Retrieve finish data from the experiment history database for a given attempt.
 
         :param attempt: The attempt (fail_count) to look up.
-        :type attempt: int
         :return: The JobData for the finish record, or None if not found.
         """
         exp_history = ExperimentHistory(self.expid)
@@ -3124,8 +3070,8 @@ class Job:
 
     def check_started_after(self, date_limit) -> bool:
         """Checks if the job started after the given date
+
         :param date_limit: reference date
-        :type date_limit: datetime.datetime
         :return: True if job started after the given date, false otherwise
         """
         if any(parse_date(str(date_retrial)) > date_limit for date_retrial in self.check_retrials_start_time()):
@@ -3135,8 +3081,8 @@ class Job:
 
     def check_running_after(self, date_limit) -> bool:
         """Checks if the job was running after the given date
+
         :param date_limit: reference date
-        :type date_limit: datetime.datetime
         :return: True if job was running after the given date, false otherwise
         """
         if any(parse_date(str(date_end)) > date_limit for date_end in self.check_retrials_end_time()):
@@ -3146,9 +3092,9 @@ class Job:
 
     def is_parent(self, job):
         """Check if the given job is a parent
+
         :param job: job to be checked if is a parent
         :return: True if job is a parent, false otherwise
-        :rtype bool
         """
         return job in self.parents
 
@@ -3272,7 +3218,7 @@ class WrapperJob(Job):
             total_wallclock: str,
             num_processors: int,
             platform: 'ParamikoPlatform',
-            as_config: AutosubmitConfig,
+            as_config: 'AutosubmitConfig',
             hold: bool = False,
             sections=None,
             method=None,
@@ -3357,16 +3303,13 @@ class WrapperJob(Job):
         )
 
     def _apply_io_safe_wait(self, inner_job: Job, current_stat: Status, timeout_to: Status,
-                            keep_alive: Status = None) -> Status:
+                            keep_alive: Status | None = None) -> Status:
         """Track elapsed time since wrapper finished; timeout transitions to timeout_to.
+
         :param inner_job: The inner job to check.
-        :type inner_job: Job
         :param current_stat: The current status of the inner job.
-        :type current_stat: Status
         :param timeout_to: The status to transition to if the IO_SAFE_WAIT time has elapsed.
-        :type timeout_to: Status
         :param keep_alive: Optional status to return if still within IO_SAFE_WAIT time.
-        :type keep_alive: Status, optional
         :return: The new status for the inner job based on the IO_SAFE_WAIT logic.
         """
         if not inner_job.finished_time:
@@ -3377,15 +3320,12 @@ class WrapperJob(Job):
             return timeout_to
         return keep_alive if keep_alive is not None else current_stat
 
-    def _compute_inner_job_status(self, inner_job: Job, stat_statuses: dict,
-                                  wrapper_is_done: bool) -> int:
+    def _compute_inner_job_status(self, inner_job: Job, stat_statuses: dict, wrapper_is_done: bool) -> int:
         """Determine the new status for a single inner job.
+
         :param inner_job: The inner job to compute the status for.
-        :type inner_job: Job
         :param stat_statuses: A dictionary mapping job names to their statuses as determined by platform stat checks.
-        :type stat_statuses: dict
         :param wrapper_is_done: Whether the wrapper job is in a done state (COMPLETED or FAILED).
-        :type wrapper_is_done: bool
         :return: The new status for the inner job.
         """
         fallback = Status.WAITING if wrapper_is_done else Status.SUBMITTED
@@ -3426,10 +3366,10 @@ class WrapperJob(Job):
                 inner_job.new_status = Status.WAITING
         return True
 
-    def _sync_inner_job_statuses(self, as_conf: AutosubmitConfig) -> None:
+    def _sync_inner_job_statuses(self, as_conf: 'AutosubmitConfig') -> None:
         """Persist status changes for inner jobs that have transitioned.
+
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         """
         for inner_job in [inner_job for inner_job in self.job_list if inner_job.status != inner_job.new_status]:
             inner_job.update_status(as_conf)
@@ -3446,10 +3386,10 @@ class WrapperJob(Job):
 
         return True
 
-    def check_and_update_status(self, as_conf: AutosubmitConfig) -> bool:
+    def check_and_update_status(self, as_conf: 'AutosubmitConfig') -> bool:
         """Check the status of the wrapper job and its inner jobs.
+
         :param as_conf: Autosubmit configuration object.
-        :type as_conf: AutosubmitConfig
         :return: True if the status of the wrapper job has changed, otherwise False.
         """
         save = False
@@ -3494,7 +3434,6 @@ class WrapperJob(Job):
         """This will check if the job is running longer than the wallclock was set to be run.
 
         :param job: The inner job of a job.
-        :type job: Job
         :return: True if the job is running longer then wallclock, otherwise False.
         """
         effective_wallclock = job.wallclock_in_seconds

@@ -148,11 +148,9 @@ class JobPackageBase:
 
     def check_job_files_exists(self, configuration: 'AutosubmitConfig', only_generate: bool) -> None:
         """ Check that all job files exist in the project directory.
+
         :param configuration: Autosubmit basic configuration.
-        :type configuration: AutosubmitConfig
         :param only_generate: True to only generate scripts without submitting.
-        :type only_generate: bool
-        :return: None.
         """
         if not configuration.get_project_type() or (
                 configuration.get_project_type() and str(configuration.get_project_type()).lower() == "none"):
@@ -180,7 +178,6 @@ class JobPackageBase:
         """Submit jobs one by one without using threads.
 
         :param configuration: Autosubmit basic configuration.
-        :type configuration: AutosubmitConfig
         :return: None.
         """
         Log.debug("Checking Scripts")
@@ -194,7 +191,7 @@ class JobPackageBase:
         Log.debug("Building scripts")
         self._create_scripts(configuration)
 
-    def generate_scripts(self, configuration: 'AutosubmitConfig', only_generate: bool = False) -> None:
+    def generate_scripts(self, configuration:'AutosubmitConfig', only_generate: bool = False) -> None:
         if not only_generate:
             self._clean_previous_run()
         self.check_job_files_exists(configuration, only_generate)
@@ -278,22 +275,17 @@ class JobPackageThread(JobPackageBase):
     Class to manage a thread-based package of jobs to be submitted by autosubmit
 
     :param dependency: Name of potential dependency
-    :type dependency: String
     """
     FILE_PREFIX = 'ASThread'
 
-    def __init__(self, jobs: list[Job], dependency=None, jobs_resources: dict | None = None,
+    def __init__(self, jobs: list[Job], dependency: str | None=None, jobs_resources: dict | None = None,
                  method: str = 'ASThread', configuration: 'AutosubmitConfig | None' = None,
                  wrapper_section: str = "WRAPPERS", wrapper_info: list | None = None):
         """
         :param dependency: Dependency
-        :type dependency: String
         :param jobs_resources: Resources to be used by the jobs, if any
-        :type jobs_resources: Dictionary
         :param method: Method to be used to submit the jobs, ASThread by default
-        :type method: String
         :param configuration: Autosubmit configuration
-        :type configuration: Autosubmitconfigparser instance
         """
         # This function is called from the JobPackageThread constructor
         # and from the JobPackageThread.create_scripts function
@@ -572,7 +564,6 @@ class JobPackageVertical(JobPackageThread):
     """
     Class to manage a vertical thread-based package of jobs to be submitted by autosubmit
     :param jobs:
-    :type jobs:
     :param: dependency:
     """
 
