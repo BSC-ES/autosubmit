@@ -171,6 +171,7 @@ class JobList:
     def expid(self):
         """Returns the experiment identifier
 
+        :autosubmit-group: DEFAULT
         :return: experiment's identifier
         """
         return self._expid
@@ -2143,9 +2144,9 @@ class JobList:
         The purpose is that all jobs share the same name structure.
 
         :param filtered_jobs_list: A list of jobs of only those that comply with certain criteria,
-        e.g. those belonging to a user defined job type for wrapping. \n
-        :return filtered_jobs_fake_date_member: List of fake jobs. \n
-        :return fake_original_job_map: Dictionary that maps fake job to original one. \n
+        e.g. those belonging to a user defined job type for wrapping.
+        :return filtered_jobs_fake_date_member: List of fake jobs.
+        :return fake_original_job_map: Dictionary that maps fake job to original one.
         """
         filtered_jobs_fake_date_member = []
         fake_original_job_map = {}
@@ -3141,7 +3142,7 @@ class JobList:
         :param job: The job whose parent statuses are to be checked.
         :param parents_edge_info: Dictionary or list containing information about the edges from parent jobs.
         :param parents_nodes: Dictionary mapping parent job names to Job objects.
-        :return A tuple containing two lists: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
+        :return: the first list contains non-completed parent jobs, and the second list contains completed parent jobs.
         """
         non_completed = []
         completed = []

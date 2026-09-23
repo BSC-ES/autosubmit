@@ -50,17 +50,19 @@ Job variables
 
 These variables are relatives to the current job. These variables
 appear in the output of the :ref:`report <report>` command with the
-pattern ``JOBS.${JOB_ID}.${JOB_VARIABLE}=${VALUE}``. They can be used in
-templates with ``%JOB_VARIABLE%``.
-
-.. autosubmit-variables:: job
+pattern ``JOBS.${JOB_NAME}.${JOB_VARIABLE}=${VALUE}``. They can be used in
+templates with ``%PATH_TO_JOB_VARIABLE%``.
 
 
-The following variables are present only in jobs that contain a date
+The variables are present only in jobs that contain a date
 (e.g. ``RUNNING=date``).
 
 
-.. autosubmit-variables:: chunk
+.. autosubmit-variables:: JOB
+
+
+.. autosubmit-variables:: CHUNK
+
 
 Custom directives
 -----------------
@@ -318,7 +320,7 @@ into your templates.
 Below is a list of the auto-generated ``CURRENT_`` variables that are available in each job.
 These are always available regardless of the raw YAML keys defined.
 
-.. autosubmit-variables:: platform
+.. autosubmit-variables:: PLATFORM
 
 
 .. note::
@@ -352,16 +354,16 @@ These are always available regardless of the raw YAML keys defined.
 Other variables
 ===============
 
-.. autosubmit-variables:: config
+#.. autosubmit-variables:: CONFIG
 
 
-.. autosubmit-variables:: default
+.. autosubmit-variables:: DEFAULT
 
 
-.. autosubmit-variables:: experiment
+#.. autosubmit-variables:: EXPERIMENT
 
 
-.. autosubmit-variables:: project
+#.. autosubmit-variables:: PROJECT
 
 
 .. note::

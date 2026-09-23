@@ -15,74 +15,60 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import functools
 import inspect
 from collections import defaultdict
-from typing import Any
 
-PARAMETERS: dict[str, Any] = defaultdict(defaultdict)
-"""Global default dictionary holding a multi-level dictionary with the Autosubmit
-parameters. At the first level we have the parameter groups.
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.job.job import Job
+from autosubmit.job.job_list import JobList
+from autosubmit.platforms.platform import Platform
 
-  - ``JOB``
-
-  - ``PLATFORM``
-  
-  - ``PROJECT``
-  
-Each entry in the ``PARAMETERS`` dictionary holds another default dictionary. Finally,
-the lower level in the dictionary has a ``key=value`` where ``key`` is the parameter
-name, and ``value`` the parameter documentation.
-
-These values are used to create the Sphinx documentation for variables, as well as
-to populate the comments in the Autosubmit YAML configuration files.
-"""
+CLASSES = {
+    Job,
+    JobList,
+    Platform,
+    AutosubmitConfig,
+}
 
 
-def autosubmit_parameter(func=None, *, name, group: str | None = None):
-    """Decorator for Autosubmit configuration parameters.
+def get_parameters() -> dict[str, dict[str, str]]:
+    parameters: dict[str, dict[str, str]] = defaultdict(dict)
 
-    Used to annotate properties of classes
+    for cls in CLASSES:
+        for name, attribute in vars(cls).items():
+            if not isinstance(attribute, property):
+                continue
 
-    :param func: wrapped function. Always ``None`` due to how we call the decorator.
-    :param name: parameter name.
-    :param group: group name. Default to caller module name.
-    """
-    if group is None:
-        stack = inspect.stack()
-        group = stack[1][0].f_locals['__qualname__'].rsplit('.', 1)[-1]
+            doc = inspect.getdoc(attribute.fget)
 
-    group = group.upper()
+            if not doc:
+                continue
 
-    if group not in PARAMETERS:
-        PARAMETERS[group] = defaultdict(defaultdict)
+            group = extract_group(doc)
 
-    names = name
-    if type(name) is not list:
-        names = [name]
+            if group is None:
+                continue
 
-    for parameter_name in names:
-        if parameter_name not in PARAMETERS[group]:
-            PARAMETERS[group][parameter_name] = None
+            description = remove_group(doc)
 
-    def parameter_decorator(wrapped_func):
-        parameter_group = getattr(parameter_decorator, "__group")
-        parameter_names = getattr(parameter_decorator, "__names")
-        for p_name in parameter_names:
-            if wrapped_func.__doc__:
-                PARAMETERS[parameter_group][p_name] = wrapped_func.__doc__.strip().split('\n')[0]
+            parameters[group][name] = description.splitlines()[0].strip()
 
-        # Delete the members created as we are not using them hereafter
-        delattr(parameter_decorator, "__group")
-        delattr(parameter_decorator, "__names")
+    return dict(parameters)
 
-        @functools.wraps(wrapped_func)
-        def wrapper(*args, **kwargs):
-            return wrapped_func(*args, **kwargs)
 
-        return wrapper
+def extract_group(doc: str) -> str | None:
+    for line in doc.splitlines():
+        if line.strip().startswith(":autosubmit-group:"):
+            return line.split(":", 2)[2].strip().upper()
 
-    setattr(parameter_decorator, "__group", group)
-    setattr(parameter_decorator, "__names", names)
+    return None
 
-    return parameter_decorator
+
+def remove_group(doc: str) -> str:
+    lines = [
+        line
+        for line in doc.splitlines()
+        if not line.strip().startswith(":autosubmit-group:")
+    ]
+
+    return "\n".join(lines).strip()
