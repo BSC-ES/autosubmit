@@ -15,6 +15,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
+- Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295
 
 **New Features:**
 
