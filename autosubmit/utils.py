@@ -89,7 +89,7 @@ def as_conf_default_values(autosubmit_version: str, exp_id: str, hpc: str = "", 
             yaml.dump(yaml_data, as_conf_file)
 
 
-def expand_values(raw_value: str, known_values: list[str]) -> set[str]:
+def expand_values(raw_value: str | None, known_values: list[str]) -> set[str]:
     """Expand ranges, colon, dash, space-separated values.
 
     'ANY' expands to known_values if given.

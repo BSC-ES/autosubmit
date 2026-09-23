@@ -1182,7 +1182,7 @@ class AutosubmitConfig:
                 return result
         except AutosubmitCritical as e:
             # In case that there are critical errors in the configuration, Autosubmit won't continue.
-            if running_time is True:
+            if running_time:
                 raise
             else:
                 if not no_log:

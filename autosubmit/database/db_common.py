@@ -23,7 +23,7 @@ import sqlite3
 import subprocess
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.schema import CreateTable
@@ -881,7 +881,7 @@ def _delete_experiment_sqlalchemy(experiment_id: str) -> bool:
             except Exception as e:
                 Log.debug(f"The experiment {experiment_id} has no status: {str(e)}")
 
-        if cast(int, result.rowcount) > 0:
+        if result.rowcount > 0:
             Log.debug(f"The experiment {experiment_id} has been deleted!!!")
         return True
 
