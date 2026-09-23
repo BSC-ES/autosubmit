@@ -114,26 +114,13 @@ For jobs running in HPC platforms, usually you have to provide information about
     * - ``QUEUE``
       - If given, Autosubmit will add jobs to the given queue instead of platform's default queue
     * - ``RETRIALS``
-      - Number of retries if a job fails. Defaults to the value given on experiment's autosubmit_<EXPID>.yml
+      - Number of retries if a job fails. Default: ``0``. See :ref:`job_retries` for details, including per-job overrides.
     * - ``DELAY_RETRY_TIME``
-      - Allows to put a delay between retries. Autosubmit will retry the job as soon as possible.
-        Accepted formats are:
-
-        #. plain number (specify a constant delay between retries),
-
-        #. plus (+) sign followed by a number (the delay will steadily increase by the addition of these number of seconds)
-
-        #. multiplication (*) sign follows by a number (the delay after n retries will be the number multiplied by 10*n).
-
-        Having this in mind, the ideal scenario is to use +(number) or plain(number) in case that the HPC has little
-        issues or the experiment will run for a little time. Otherwise, is better to use the \*(number) approach.
-
-
-.. code-block:: yaml
-
-    #DELAY_RETRY_TIME: 11
-    #DELAY_RETRY_TIME: +11 # will wait 11 + number specified
-    #DELAY_RETRY_TIME:*11 # will wait 11,110,1100,11000...* by 10 to prevent a too big number
+      - Delay in seconds between retries. Accepts three formats:
+        plain ``N`` (constant), 
+        ``+N`` (linear: ``N × retry``),or 
+        ``*N`` (exponential: ``N × 10^(retry-1)``). 
+        Default: ``-1`` (no delay). See :ref:`job_retries` for worked examples.
 
 
 There are also other, less used features that you can use:
