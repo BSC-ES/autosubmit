@@ -17,49 +17,66 @@
 
 import traceback
 from abc import ABCMeta, abstractmethod
+from typing import TYPE_CHECKING
 
 import autosubmit.history.database_managers.database_models as Models
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.utils import DEFAULT_HISTORICAL_LOGS_DIR
 
+if TYPE_CHECKING:
+    from autosubmit.history.data_classes.job_data import JobData
+    from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
+
 
 class PlatformInformationHandler:
-    def __init__(self, strategy):
+    def __init__(self, strategy: "Strategy"):
         self._strategy = strategy
 
     @property
-    def strategy(self):
+    def strategy(self) -> "Strategy":
         return self._strategy
 
     @strategy.setter
-    def strategy(self, strategy):
+    def strategy(self, strategy: "Strategy"):
         self._strategy = strategy
 
-    def execute_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
+    def execute_distribution(
+        self,
+        job_data_dc: "JobData",
+        job_data_dcs_in_wrapper: list["JobData"],
+        slurm_monitor: "SlurmMonitor",
+    ) -> list["JobData"]:
         return self._strategy.apply_distribution(job_data_dc, job_data_dcs_in_wrapper, slurm_monitor)
 
 
 class Strategy(metaclass=ABCMeta):
     """Strategy Interface"""
 
-    def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
+    def __init__(self, historiclog_dir_path: str = DEFAULT_HISTORICAL_LOGS_DIR):
         self.historiclog_dir_path = historiclog_dir_path
 
     @abstractmethod
-    def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
+    def apply_distribution(
+        self,
+        job_data_dc: "JobData",
+        job_data_dcs_in_wrapper: list["JobData"],
+        slurm_monitor: "SlurmMonitor",
+    ) -> list["JobData"]:
         pass  # pragma: no cover
 
-    def set_job_data_dc_as_processed(self, job_data_dc, original_ssh_output):
+    def set_job_data_dc_as_processed(self, job_data_dc: "JobData", original_ssh_output: str) -> "JobData":
         job_data_dc.platform_output = original_ssh_output
         job_data_dc.rowstatus = Models.RowStatus.PROCESSED
         return job_data_dc
 
-    def set_job_data_dc_as_process_failed(self, job_data_dc, original_ssh_output):
+    def set_job_data_dc_as_process_failed(self, job_data_dc: "JobData", original_ssh_output: str) -> "JobData":
         job_data_dc.platform_output = original_ssh_output
         job_data_dc.rowstatus = Models.RowStatus.FAULTY
         return job_data_dc
 
-    def get_calculated_weights_of_jobs_in_wrapper(self, job_data_dcs_in_wrapper):
+    def get_calculated_weights_of_jobs_in_wrapper(
+        self, job_data_dcs_in_wrapper: list["JobData"]
+    ) -> dict[str, float]:
         """ Based on computational weight: running time in seconds * number of cpus. """
         total_weight = sum(job.computational_weight for job in job_data_dcs_in_wrapper)
         if total_weight == 0:
@@ -69,10 +86,15 @@ class Strategy(metaclass=ABCMeta):
 
 class SingleAssociationStrategy(Strategy):
 
-    def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
+    def __init__(self, historiclog_dir_path: str = DEFAULT_HISTORICAL_LOGS_DIR):
         super().__init__(historiclog_dir_path=historiclog_dir_path)
 
-    def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
+    def apply_distribution(
+        self,
+        job_data_dc: "JobData",
+        job_data_dcs_in_wrapper: list["JobData"],
+        slurm_monitor: "SlurmMonitor",
+    ) -> list["JobData"]:
         try:
             if len(job_data_dcs_in_wrapper) > 0:
                 return []
@@ -100,10 +122,15 @@ class SingleAssociationStrategy(Strategy):
 
 class StraightWrapperAssociationStrategy(Strategy):
 
-    def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
+    def __init__(self, historiclog_dir_path: str = DEFAULT_HISTORICAL_LOGS_DIR):
         super().__init__(historiclog_dir_path=historiclog_dir_path)
 
-    def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
+    def apply_distribution(
+        self,
+        job_data_dc: "JobData",
+        job_data_dcs_in_wrapper: list["JobData"],
+        slurm_monitor: "SlurmMonitor",
+    ) -> list["JobData"]:
         """ """
         try:
             if len(job_data_dcs_in_wrapper) != slurm_monitor.step_count:
@@ -134,10 +161,15 @@ class StraightWrapperAssociationStrategy(Strategy):
 
 class GeneralizedWrapperDistributionStrategy(Strategy):
 
-    def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
+    def __init__(self, historiclog_dir_path: str = DEFAULT_HISTORICAL_LOGS_DIR):
         super().__init__(historiclog_dir_path=historiclog_dir_path)
 
-    def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
+    def apply_distribution(
+        self,
+        job_data_dc: "JobData",
+        job_data_dcs_in_wrapper: list["JobData"],
+        slurm_monitor: "SlurmMonitor",
+    ) -> list["JobData"]:
         try:
             result = []
             computational_weights = self.get_calculated_weights_of_jobs_in_wrapper(job_data_dcs_in_wrapper)
@@ -160,21 +192,27 @@ class GeneralizedWrapperDistributionStrategy(Strategy):
 
 class TwoDimWrapperDistributionStrategy(Strategy):
 
-    def __init__(self, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
+    def __init__(self, historiclog_dir_path: str = DEFAULT_HISTORICAL_LOGS_DIR):
         super().__init__(historiclog_dir_path=historiclog_dir_path)
-        self.jobs_per_level = None
+        self.jobs_per_level: list[list["JobData"]] | None = None
 
-    def apply_distribution(self, job_data_dc, job_data_dcs_in_wrapper, slurm_monitor):
+    def apply_distribution(
+        self,
+        job_data_dc: "JobData",
+        job_data_dcs_in_wrapper: list["JobData"],
+        slurm_monitor: "SlurmMonitor",
+    ) -> list["JobData"]:
         try:
             result = []
-            self.jobs_per_level = self.get_jobs_per_level(job_data_dcs_in_wrapper)
-            if len(self.jobs_per_level) != slurm_monitor.step_count:
+            jobs_per_level = self.get_jobs_per_level(job_data_dcs_in_wrapper)
+            self.jobs_per_level = jobs_per_level
+            if len(jobs_per_level) != slurm_monitor.step_count:
                 return []
-            comp_weight_per_level = self.get_comp_weight_per_level(self.jobs_per_level)
+            comp_weight_per_level = self.get_comp_weight_per_level(jobs_per_level)
             level_energy = []
             for i, step in enumerate(slurm_monitor.steps):
                 level_energy.append(step.energy + comp_weight_per_level[i] * slurm_monitor.extern.energy)
-            for i, jobs in enumerate(self.jobs_per_level):
+            for i, jobs in enumerate(jobs_per_level):
                 weights = self.get_comp_weight_per_group_of_job_dcs(jobs)
                 for j, job_dc in enumerate(jobs):
                     job_dc.energy = round(level_energy[i] * weights[j], 2)
@@ -191,7 +229,7 @@ class TwoDimWrapperDistributionStrategy(Strategy):
             job_data_dc = self.set_job_data_dc_as_process_failed(job_data_dc, slurm_monitor.original_input)
             return [job_data_dc]
 
-    def get_jobs_per_level(self, job_data_dcs_in_wrapper):
+    def get_jobs_per_level(self, job_data_dcs_in_wrapper: list["JobData"]) -> list[list["JobData"]]:
         """ List of Lists, index of list is the level. """
         job_name_to_object = {job.job_name: job for job in job_data_dcs_in_wrapper}
         levels = []
@@ -203,21 +241,21 @@ class TwoDimWrapperDistributionStrategy(Strategy):
             next_level = self.get_level(next_level, job_name_to_object)
         return levels
 
-    def _get_roots(self, job_data_dcs_in_wrapper):
+    def _get_roots(self, job_data_dcs_in_wrapper: list["JobData"]) -> list["JobData"]:
         children_names = self._get_all_children(job_data_dcs_in_wrapper)
         return [job for job in job_data_dcs_in_wrapper if job.job_name not in children_names]
 
-    def _get_all_children(self, job_data_dcs_in_wrapper):
+    def _get_all_children(self, job_data_dcs_in_wrapper: list["JobData"]) -> list[str]:
         result = []
         for job_dc in job_data_dcs_in_wrapper:
             result.extend(job_dc.children_list)
         return result
 
-    def get_comp_weight_per_group_of_job_dcs(self, jobs):
+    def get_comp_weight_per_group_of_job_dcs(self, jobs: list["JobData"]) -> list[float]:
         total = sum(job.computational_weight for job in jobs)
         return [round(job.computational_weight / total, 4) for job in jobs]
 
-    def get_comp_weight_per_level(self, jobs_per_level):
+    def get_comp_weight_per_level(self, jobs_per_level: list[list["JobData"]]) -> list[float]:
         level_weight = []
         total_weight = 0
         for jobs in jobs_per_level:
@@ -226,7 +264,9 @@ class TwoDimWrapperDistributionStrategy(Strategy):
             level_weight.append(computational_weight)
         return [round(weight / total_weight, 4) for weight in level_weight]
 
-    def get_level(self, previous_level_dcs, job_name_to_object):
+    def get_level(
+        self, previous_level_dcs: list["JobData"], job_name_to_object: dict[str, "JobData"]
+    ) -> list["JobData"]:
         children_names = []
         for job_dc in previous_level_dcs:
             children_names.extend(job_dc.children_list)

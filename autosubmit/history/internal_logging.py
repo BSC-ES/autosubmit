@@ -22,12 +22,12 @@ from autosubmit.history.utils import DEFAULT_HISTORICAL_LOGS_DIR
 
 
 class Logging:
-  def __init__(self, expid, historiclog_dir_path=DEFAULT_HISTORICAL_LOGS_DIR):
+  def __init__(self, expid: str, historiclog_dir_path: str = DEFAULT_HISTORICAL_LOGS_DIR):
     self.expid = expid
     self.historiclog_dir_path = historiclog_dir_path
     self._make_log_directory_if_not_exists()  
 
-  def log(self, main_msg, traceback_msg=""):
+  def log(self, main_msg: str, traceback_msg: str = ""):
     try:
       log_path = self.get_log_file_path()
       HUtils.get_current_datetime()
@@ -39,12 +39,12 @@ class Logging:
       print(exp)
       print("Logging failed. Please report it to the developers.")  
     
-  def build_message(self, main_msg, traceback_msg):
+  def build_message(self, main_msg: str, traceback_msg: str) -> str:
     return f"{HUtils.get_current_datetime()} :: {main_msg} :: {traceback_msg}\n"
 
   def _make_log_directory_if_not_exists(self):
     if not os.path.exists(self.historiclog_dir_path):
       os.makedirs(self.historiclog_dir_path)
 
-  def get_log_file_path(self):     
+  def get_log_file_path(self) -> str:
     return os.path.join(self.historiclog_dir_path,f"{self.expid}_log.txt")

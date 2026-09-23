@@ -27,7 +27,7 @@ from autosubmit.history.internal_logging import Logging
 class ExperimentStatus:
     """Represents the Experiment Status Mechanism that keeps track of currently active experiments."""
 
-    def __init__(self, expid):
+    def __init__(self, expid: str):
         self.expid = expid
         BasicConfig.read()
         self.manager: SqlAlchemyExperimentStatusDbManager | None = None

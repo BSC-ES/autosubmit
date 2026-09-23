@@ -192,7 +192,7 @@ def test_get_all_tables_by_name_returns_dict():
 def test_get_all_tables_by_name_contains_expected_tables():
     result = get_all_tables_by_name()
     expected_names = {
-        'experiment', 'db_version', 'experiment_status',
+        'experiment', 'experiment_status',
         'experiment_run', 'job_data', 'jobs', 'details',
         'user_metrics', 'experiment_structure', 'structure_data',
         'sections', 'wrappers_info', 'wrappers_jobs',
