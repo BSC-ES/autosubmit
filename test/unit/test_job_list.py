@@ -1050,3 +1050,21 @@ def test_vertical_wrapper_inner_job_is_not_retried(failed_job):
     assert JobList._update_failed_jobs(job_list, as_conf) is True
     assert job.status == Status.FAILED
 
+
+@pytest.mark.parametrize("two_step_start,attr", [
+    (True, "jobs_to_run_first"),
+    (False, "rerun_job_list"),
+], ids=["two-step-start", "rerun"])
+@pytest.mark.parametrize("unparsed_jobs,expected", [
+    ("job1 job3&", {"job1", "job3"}),
+    ("SIM;", {"job1", "job2"}),
+], ids=["by-name", "by-section"])
+def test_parse_jobs_by_filter(setup_job_list, two_step_start, attr, unparsed_jobs, expected):
+    """``parse_jobs_by_filter`` must work for both two-step start and rerun (issue #3295)."""
+    jobs, _edges, job_list = setup_job_list
+    for job in jobs:
+        job.section = "SIM" if job.name in ("job1", "job2") else "POST"
+
+    job_list.parse_jobs_by_filter(unparsed_jobs, two_step_start=two_step_start)
+
+    assert {job.name for job in getattr(job_list, attr)} == expected
