@@ -74,7 +74,7 @@ master_doc = 'index'
 project = 'autosubmit'
 # noinspection PyShadowingBuiltins
 copyright = '2013-2026, Barcelona Supercomputing Center, BSC'
-author = 'Earth Sciences Department, Barcelona Supercomputing Center, BSC'
+author = 'Barcelona Supercomputing Center (BSC-CNS) - Earth Sciences Department'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
