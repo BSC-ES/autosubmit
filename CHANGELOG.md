@@ -24,6 +24,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - [enhancement] Allow recovery to update current running/ready jobs #1251
 - `autosubmit` Bash autocomplete #1227 #3171
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
+- Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
 
 **Migration from `job_list.pkl` to Database**
 

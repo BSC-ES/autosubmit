@@ -23,7 +23,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from autosubmit.job.template import r
 from autosubmit.job.template.r import _DEFAULT_EXECUTABLE, as_body, as_header, as_tailer
+
+from ._helpers import build_script
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,22 +40,10 @@ pytestmark = pytest.mark.skipif(_RSCRIPT is None, reason='Rscript not found on P
 
 def _build_script(tmp_path: 'Path', body: str, executable: str | None = None) -> 'Path':
     """Assemble and write a runnable R script, returning its path."""
-    executable = executable or _RSCRIPT
-    h = as_header(platform_header='', executable=executable)
-    b = as_body(dedent(body))
-    t = as_tailer()
-
-    script = '\n'.join([h, b, t])
-    script = script.replace('%EXTENDED_HEADER%', '')
-    script = script.replace('%EXTENDED_TAILER%', '')
-    script = script.replace('%CURRENT_LOGDIR%', str(tmp_path))
-    script = script.replace('%JOBNAME%', _JOBNAME)
-    script = script.replace('%FAIL_COUNT%', _FAIL_COUNT)
-
-    script_path = tmp_path / 'the_script.R'
-    script_path.write_text(script)
-    script_path.chmod(0o755)
-    return script_path
+    return build_script(
+        tmp_path, r, body, 'the_script.R',
+        executable=executable or _RSCRIPT, job_name=_JOBNAME, fail_count=_FAIL_COUNT,
+    )
 
 
 def test_header_default_executable_used_when_empty():
