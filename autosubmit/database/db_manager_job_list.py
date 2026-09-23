@@ -118,9 +118,7 @@ class JobsDbManager(DbManager):
         :meth:`save_job_log`.
 
         :param job_list: List of Job objects to save to the database.
-        :type job_list: List[Job]
         :param reset_log_counters: Whether to reset log counters.
-        :type reset_log_counters: bool
 
         :return: None
         :raises: May raise database-related exceptions during upsert operations.
@@ -145,7 +143,6 @@ class JobsDbManager(DbManager):
         only update log-related fields (name, log, updated_log, local_logs_out, local_logs_err, remote_logs_out, remote_logs_err).
 
         :param job: Job object whose log information is to be saved.
-        :type job: Job
         :return: None
         """
         table: Table = self.table_registry.get(JobsTable.name)
@@ -187,7 +184,6 @@ class JobsDbManager(DbManager):
         """
         Load a job by its name from the database.
         :param job_name: Name of the job to load.
-        :type job_name: str
         :return: Dictionary containing the job information.
         """
         table: Table = self.table_registry.get(JobsTable.name)
@@ -639,7 +635,6 @@ class JobsDbManager(DbManager):
         """
         Select a job by its name from the database.
         :param job_name: Name of the job to select.
-        :type job_name: str
         :return: List of dictionaries containing the job information.
         """
         table: Table = self.table_registry.get(JobsTable.name)
@@ -749,9 +744,7 @@ class JobsDbManager(DbManager):
         Save the section data to the database.
 
         :param sections_data: List of dictionaries containing section information.
-        :type sections_data: List[Dict[str, Any]]
         :return: None
-        :rtype: None
         """
         section_structure_table: Table = self.table_registry.get(SectionsStructureTable.name)
         self.drop_table(section_structure_table.name)
@@ -771,7 +764,6 @@ class JobsDbManager(DbManager):
         Remove jobs from the database that are no longer needed based on section differences.
 
         :param differences: Dictionary describing changes in sections.
-        :type differences: Dict[str, Dict[str, Any]]
         """
         jobs_table: Table = self.table_registry.get(JobsTable.name)
         jobs_to_delete: set[str] = set()
@@ -795,11 +787,8 @@ class JobsDbManager(DbManager):
         Determine if a job should be deleted based on section differences.
 
         :param job: Job dictionary.
-        :type job: Dict[str, Any]
         :param section_diff: Section difference dictionary.
-        :type section_diff: Dict[str, Any]
         :return: True if the job should be deleted, False otherwise.
-        :rtype: bool
         """
         if 'numchunks' in section_diff and job.get('chunk') is not None:
             if (job.get('chunk') is None and section_diff['numchunks'] is not None) or \
@@ -868,7 +857,6 @@ class JobsDbManager(DbManager):
         Clear all wrapper jobs and their associated information from the database.
 
         :param preview: If True, use preview tables; otherwise, use production tables.
-        :type preview: bool
         """
         if preview:
             innerjobs_table: Table = self.table_registry.get(PreviewWrapperJobsTable.name)
@@ -882,12 +870,11 @@ class JobsDbManager(DbManager):
         self.delete_all(innerjobs_table.name)
         self.delete_all(wrapper_info_table.name)
 
-    def update_wrapper_status(self, packages) -> None:
+    def update_wrapper_status(self, packages: list[dict[str, Any]]) -> None:
         """
         Update the status of wrapper jobs in the database.
 
-        :param packages: WrapperJob object containing package information.
-        :type packages: WrapperJob
+        :param packages: List of wrapper job dictionaries.
         """
         wrapper_info_table: Table = self.table_registry.get(WrapperInfoTable.name)
         self.create_table(wrapper_info_table.name)
@@ -902,7 +889,6 @@ class JobsDbManager(DbManager):
         Get the IDs of all wrapper jobs in the database.
 
         :return: List of wrapper job IDs.
-        :rtype: List[int]
         """
         wrapper_info_table: Table = self.table_registry.get(WrapperInfoTable.name)
         self.create_table(wrapper_info_table.name)
@@ -924,7 +910,6 @@ class JobsDbManager(DbManager):
         """Get the names of jobs that have failed.
 
         :return: List of job names that have failed.
-        :rtype: List[str]
         """
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)

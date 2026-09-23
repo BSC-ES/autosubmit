@@ -19,6 +19,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Use SQLAlchemy for all history and experiment status database managers, dropping the legacy SQLite-only managers #3114
 - Fix log recovery skipping historical stats when the scheduler reuses job ids across chunks #3114
 - Record `schema_migrations` with a dialect upsert to avoid races when databases are written concurrently #3114
+- Make the general database and experiment details use only SQLAlchemy, dropping the last raw-sqlite3 code paths and the legacy `db_version` table #3114
 
 **New Features:**
 

@@ -125,7 +125,6 @@ autosubmit = "autosubmit.scripts.autosubmit:main"
 [tool.setuptools]
 package-data = { "autosubmit" = [
     "config/files/*.yml",
-    "database/data/*.sql",
     "scripts/autosubmit-completion.bash",
 ] }
 include-package-data = true

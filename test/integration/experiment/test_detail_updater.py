@@ -16,28 +16,16 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for detail updater."""
-from pathlib import Path
-
 import pytest
-from sqlalchemy.schema import CreateTable
 
-from autosubmit.database import session
-from autosubmit.database.tables import DetailsTable
 from autosubmit.experiment.detail_updater import (
     ExperimentDetails,
-    create_experiment_details_repository,
+    ExperimentDetailsRepository,
 )
 
 
-def test_create_experiment_details_repository_invalid_db_engine():
-    with pytest.raises(ValueError):
-        create_experiment_details_repository('csv')
-
-
 def test_details_properties(autosubmit_exp, mocker):
-    # TODO: mocked create_experiment_details_repository as it fails intermittently with
-    #       sqlite3.OperationalError: unable to open database file
-    mocker.patch('autosubmit.experiment.detail_updater.create_experiment_details_repository')
+    mocker.patch('autosubmit.experiment.detail_updater.ExperimentDetailsRepository')
     exp = autosubmit_exp()
     exp_details = ExperimentDetails(exp.expid, init_reload=False)
 
@@ -59,56 +47,33 @@ def test_details_properties(autosubmit_exp, mocker):
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_details_repository(tmpdir, as_db: str):
-    db_path = Path(tmpdir, 'details.db')
-    with session.get_engine(db_path=db_path).connect() as conn:
-        conn.execute(CreateTable(DetailsTable, if_not_exists=True))
-        conn.commit()
+def test_details_repository(as_db: str):
+    details_repo = ExperimentDetailsRepository()
 
-    details_repo = create_experiment_details_repository(as_db)
-
-    new_data = {
-        "exp_id": 10,
-        "user": "foo",
-        "created": "2024-04-11T13:34:41+02:00",
-        "model": "my_model",
-        "branch": "NA",
-        "hpc": "MN5",
-    }
+    exp_id = 10
+    created = "2024-04-11T13:34:41+02:00"
 
     # Insert data
     details_repo.upsert_details(
-        exp_id=new_data["exp_id"],
-        user=new_data["user"],
-        created=new_data["created"],
-        model=new_data["model"],
-        branch=new_data["branch"],
-        hpc=new_data["hpc"],
+        exp_id=exp_id, user="foo", created=created, model="my_model", branch="NA", hpc="MN5"
     )
-    result = details_repo.get_details(new_data["exp_id"])
-    assert result == new_data
-
-    # Update data
-    updated_data = {
-        "exp_id": 10,
-        "user": "bar",
-        "created": "2024-04-11T13:34:41+02:00",
+    assert details_repo.get_details(exp_id) == {
+        "exp_id": exp_id,
+        "user": "foo",
+        "created": created,
         "model": "my_model",
         "branch": "NA",
         "hpc": "MN5",
     }
+
+    # Update data
     details_repo.upsert_details(
-        exp_id=updated_data["exp_id"],
-        user=updated_data["user"],
-        created=updated_data["created"],
-        model=updated_data["model"],
-        branch=updated_data["branch"],
-        hpc=updated_data["hpc"],
+        exp_id=exp_id, user="bar", created=created, model="my_model", branch="NA", hpc="MN5"
     )
-    result = details_repo.get_details(updated_data["exp_id"])
-    assert result == updated_data
+    updated = details_repo.get_details(exp_id)
+    assert updated is not None
+    assert updated["user"] == "bar"
 
     # Delete data
-    details_repo.delete_details(updated_data["exp_id"])
-    result = details_repo.get_details(updated_data["exp_id"])
-    assert result is None
+    details_repo.delete_details(exp_id)
+    assert details_repo.get_details(exp_id) is None

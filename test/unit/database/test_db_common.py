@@ -17,14 +17,13 @@
 
 """Unit tests for ``autosubmit.database.db_common``.
 
-We cover mainly error and validation scenarios here. See
-the ``test/integration/test_db_common.py`` for more tests.
+We cover mainly error and validation scenarios here.
 """
 
-import inspect
 import sqlite3
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import db_common
@@ -45,77 +44,44 @@ def test_install_creates_schema_migrations(autosubmit_config) -> None:
 
 
 @pytest.mark.parametrize(
-    "fn",
+    "fn,args",
     [
-        "check_experiment_exists",
-        "delete_experiment",
-        "get_autosubmit_version",
-        "get_experiment_description",
-        "get_experiment_id",
-        "last_name_used",
-        "save_experiment",
-        "update_experiment_description_version",
+        ("check_db", ()),
+        ("check_experiment_exists", ("a000",)),
+        ("delete_experiment", ("a000",)),
+        ("get_autosubmit_version", ("a000",)),
+        ("get_experiment_description", ("a000",)),
+        ("get_experiment_expids", ()),
+        ("get_experiment_id", ("a000",)),
+        ("last_name_used", ()),
+        ("save_experiment", ("a000", "desc", "4.0.0")),
+        ("update_experiment_description_version", ("a000",)),
     ],
 )
-def test_db_common_sqlite_multiprocessing_queue_error(mocker, fn: str, tmp_path) -> None:
-    """Test the queue timeout error path for ``db_common`` functions.
+def test_db_common_raises_without_database(monkeypatch, tmp_path, fn: str, args: tuple) -> None:
+    """Every database operation raises when the general database is missing."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(tmp_path / "missing.db"))
 
-    ``db_common`` uses multiprocessing and a ``Queue`` to launch database operations (SQLite).
-    This test simply iterates all the functions and confirms that upon an error in the
-    ``Queue`` reading (like a timeout) the function will raise an ``AutosubmitCritical``
-    error.
-
-    TODO: In the future we should possibly drop that multiprocessing approach, and use
-          simpler timeouts directly in SQLAlchemy or sqlite3.
-    """
-    mocked_queue = mocker.patch('multiprocessing.Queue')
-    mocker.patch('multiprocessing.Queue', return_value=mocked_queue)
-    mocker.patch('multiprocessing.Process')
-    mocked_queue.get.side_effect = [Exception]
-
-    db_common_fn = getattr(db_common, fn)
-    sig = inspect.signature(db_common_fn)
-    params = ['' for _ in range(len(sig.parameters))]
     with pytest.raises(AutosubmitCritical):
-        db_common_fn(*params)
+        getattr(db_common, fn)(*args)
 
-def test_save_experiment_sqlite_open_conn_error(monkeypatch, tmp_path, mocker):
-    """Test the ``open_conn`` error path for ``db_common`` functions.
 
-    Several functions in ``db_common`` (SQLite) follow the pattern of
-    calling ``check_db`` and then try/catch the ``open_conn`` call.
+@pytest.mark.parametrize(
+    "exception",
+    [
+        IntegrityError("stmt", {}, Exception("boom")),
+        Exception("boom"),
+    ],
+    ids=["integrity-error", "generic-exception"],
+)
+def test_save_experiment_wraps_insert_errors(mocker, monkeypatch, tmp_path, exception) -> None:
+    """``save_experiment`` wraps insert errors in an ``AutosubmitCritical``."""
+    db_file = tmp_path / "autosubmit.db"
+    db_file.touch()
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(db_file))
+    mocker.patch("autosubmit.database.db_common._get_engine", side_effect=exception)
 
-    Here, we verify that ``open_conn`` failing results in the expected
-    outcome."""
-    monkeypatch.setattr(db_common, 'TIMEOUT', 1)
-    monkeypatch.setattr(BasicConfig, 'DB_PATH', str(tmp_path))
-
-    mocker.patch('autosubmit.database.db_common.open_conn', side_effect=db_common.DbException('bla'))
-
-    for fn in [
-        'get_experiment_id',
-        'update_experiment_description_version',
-        'last_name_used',
-        'delete_experiment',
-        'save_experiment',
-        'get_experiment_description',
-        'get_autosubmit_version'
-    ]:
-        with pytest.raises(AutosubmitCritical):
-            db_common_fn = getattr(db_common, fn)
-            sig = inspect.signature(db_common_fn)
-            params = ['' for _ in range(len(sig.parameters))]
-            db_common_fn(*params)
-
-def test_save_experiment_integrity_error(monkeypatch, tmp_path, mocker):
-    """Test the ``IntegrityError`` error path for ``db_common.save_experiment``.."""
-    monkeypatch.setattr(db_common, 'TIMEOUT', 1)
-    monkeypatch.setattr(BasicConfig, 'DB_PATH', str(tmp_path))
-
-    from sqlalchemy.exc import IntegrityError
-
-    mocker.patch('autosubmit.database.db_common.open_conn', side_effect=IntegrityError('bla', 'bla', 'bla'))
-
-    with pytest.raises(AutosubmitCritical) as e:
-        db_common.save_experiment('', '', '')
-        assert "could not register experiment" in str(e.value)
+    with pytest.raises(AutosubmitCritical):
+        db_common.save_experiment("a000", "desc", "4.0.0")

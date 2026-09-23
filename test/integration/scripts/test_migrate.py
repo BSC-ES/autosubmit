@@ -33,3 +33,13 @@ def test_migrate_offer(autosubmit_exp):
         _autosubmit(["migrate", exp.expid, "-o"])
 
     assert cm.value.code == 1
+
+
+def test_dbmigrate_is_not_implemented(autosubmit_exp):
+    """The ``dbmigrate`` command is a placeholder for #1286 and exits with an error."""
+    exp = autosubmit_exp(experiment_data={})
+
+    with pytest.raises(SystemExit) as cm:
+        _autosubmit(["dbmigrate", exp.expid])
+
+    assert cm.value.code == 1

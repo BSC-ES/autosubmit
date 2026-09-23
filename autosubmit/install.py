@@ -19,7 +19,6 @@
 
 import os
 from configparser import ConfigParser
-from importlib.resources import files
 from pathlib import Path
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -94,10 +93,7 @@ def _create_sqlite_database() -> bool:
 
     Log.info("Creating autosubmit database...")
 
-    query_file = files("autosubmit.database") / "data/autosubmit.sql"
-    query = query_file.read_text()
-
-    if not create_db(query):
+    if not create_db():
         Log.error("Can not write database file")
         return False
 
@@ -113,7 +109,7 @@ def _create_postgres_database() -> bool:
     """
     Log.info("Creating autosubmit Postgres database...")
 
-    if not create_db(""):
+    if not create_db():
         Log.error("Failed to create Postgres database")
         return False
 

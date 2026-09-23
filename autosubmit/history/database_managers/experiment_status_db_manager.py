@@ -47,10 +47,10 @@ class SqlAlchemyExperimentStatusDbManager:
         with self.status_engine.begin() as conn:
             conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
 
-    def set_existing_experiment_status_as_running(self, expid):
+    def set_existing_experiment_status_as_running(self, expid: str):
         self.update_exp_status(expid, Models.RunningStatus.RUNNING)
 
-    def create_experiment_status_as_running(self, experiment):
+    def create_experiment_status_as_running(self, experiment: Models.ExperimentRow):
         self.create_exp_status(experiment.id, experiment.name, Models.RunningStatus.RUNNING)
 
     def get_experiment_status_row_by_expid(self, expid: str) -> Models.ExperimentStatusRow | None:
@@ -111,7 +111,7 @@ class SqlAlchemyExperimentStatusDbManager:
                 row_count = result.rowcount() if callable(result.rowcount) else result.rowcount
         return row_count
 
-    def update_exp_status(self, expid: str, status="RUNNING") -> None:
+    def update_exp_status(self, expid: str, status: str = "RUNNING") -> None:
         query = (
             update(ExperimentStatusTable).
             where(ExperimentStatusTable.c.name == expid).  # type: ignore
