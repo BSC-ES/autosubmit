@@ -15,74 +15,126 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import functools
 import inspect
-from collections import defaultdict
-from typing import Any
 
-PARAMETERS: dict[str, Any] = defaultdict(defaultdict)
-"""Global default dictionary holding a multi-level dictionary with the Autosubmit
-parameters. At the first level we have the parameter groups.
+from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.job.job import Job
+from autosubmit.job.job_list import JobList
+from autosubmit.platforms.platform import Platform
 
-  - ``JOB``
+CLASSES = (
+    Job,
+    JobList,
+    Platform,
+    AutosubmitConfig,
+)
 
-  - ``PLATFORM``
-  
-  - ``PROJECT``
-  
-Each entry in the ``PARAMETERS`` dictionary holds another default dictionary. Finally,
-the lower level in the dictionary has a ``key=value`` where ``key`` is the parameter
-name, and ``value`` the parameter documentation.
+extra_parameters = {
+    "EDGE": {
+        "CHUNK_END_DATE": "Chunk end date",
+        "CHUNK_END_DATE_LAST": "End date of the last chunk, i.e. the experiment end boundary. Available to any date-aware job (notably RUNNING: date jobs).",
+        "CHUNK_END_DAY": "Chunk end day.",
+        "CHUNK_END_HOUR": "Chunk end hour.",
+        "CHUNK_END_IN_DAYS": "Days passed from the start of the simulation until the end of the chunk.",
+        "CHUNK_END_MONTH": "Chunk end month.",
+        "CHUNK_END_YEAR": "Chunk end year.",
+        "CHUNK_FIRST": "True if the current chunk is the first, false otherwise.",
+        "CHUNK_LAST": "True if the current chunk is the last, false otherwise.",
+        "CHUNK_SECOND_TO_LAST_DATE": "Chunk second to last date.",
+        "CHUNK_SECOND_TO_LAST_DAY": "Chunk second to last day.",
+        "CHUNK_SECOND_TO_LAST_HOUR": "Chunk second to last hour.",
+        "CHUNK_SECOND_TO_LAST_MONTH": "Chunk second to last month.",
+        "CHUNK_SECOND_TO_LAST_YEAR": "Chunk second to last year.",
+        "CHUNK_START_DATE": "Chunk start date.",
+        "CHUNK_START_DAY": "Chunk start day.",
+        "CHUNK_START_HOUR": "Chunk start hour.",
+        "CHUNK_START_MONTH": "Chunk start month.",
+        "CHUNK_START_YEAR": "Chunk start year.",
+        "DAY_BEFORE": "Day before the start date.",
+        "LDATE": "Last date of the experiment (the run's final day, parallel to SDATE).",
+        "NOTIFY_ON": "Determine the job statuses you want to be notified.",
+        "PREV": "Days since start date at the chunk's start.",
+        "RUN_DAYS": "Chunk length in days",
+    },
+    "CONFIG": {
+        "AUTOSUBMIT_VERSION": "Current version of Autosubmit.",
+        "MAXWAITINGJOBS": "Maximum number of jobs permitted in the waiting status.",
+        "TOTALJOBS": "Total number of jobs in the workflow.",
+        "STATUS": "Sets the status of the job",
+    },
+    "DEFAULT":{
+        "CUSTOM_CONFIG": "Custom configuration location.",
+        "HPCARCH": "Default HPC platform name.",
+    },
+    "EXPERIMENT": {
+        "CALENDAR": "Calendar used for the experiment. Can be standard or noleap.",
+        "CHUNKSIZE": "Size of each chunk.",
+        "CHUNKSIZEUNIT": "Unit of the chunk size. Can be hour, day, month, or year.",
+        "DATELIST": "List of start dates",
+        "MEMBERS": "List of members.",
+        "NUMCHUNKS": "Number of chunks of the experiment.",
+    },
+    "PROJECT": {
+        "PROJECT_DESTINATION" : "Folder to hold the project sources.",
+        "PROJECT_TYPE" : "Type of the project.",
+    },
+}
+def get_parameters() -> dict[str, dict[str, str]]:
+    """Collect documented properties, grouped by their Autosubmit group."""
+    parameters: dict[str, dict[str, str]] = {}
 
-These values are used to create the Sphinx documentation for variables, as well as
-to populate the comments in the Autosubmit YAML configuration files.
-"""
+    for cls in CLASSES:
+        for name, attribute in vars(cls).items():
+            if not isinstance(attribute, property) or attribute.fget is None:
+                continue
+
+            doc = inspect.getdoc(attribute.fget)
+            if not doc:
+                continue
+
+            group, variable_name, description = parse_property_docstring(doc)
+
+            if group is None:
+                continue
+
+            if variable_name != "":
+                parameters.setdefault(group, {})[variable_name.upper()] = description
+            else:
+                parameters.setdefault(group, {})[name.upper()] = description
+
+    for key in extra_parameters:
+        if key in parameters:
+            parameters[key].update(extra_parameters[key])
+        else:
+            parameters[key] = extra_parameters[key]
+
+    return parameters
 
 
-def autosubmit_parameter(func=None, *, name, group: str | None = None):
-    """Decorator for Autosubmit configuration parameters.
+def parse_property_docstring(doc: str) -> tuple[str, str , str]:
+    """Extract the Autosubmit group and description from a property docstring."""
+    group: str = ""
+    variable_name: str = ""
+    description_lines: list[str] = []
 
-    Used to annotate properties of classes
+    for line in doc.splitlines():
+        stripped = line.strip()
 
-    :param func: wrapped function. Always ``None`` due to how we call the decorator.
-    :param name: parameter name.
-    :param group: group name. Default to caller module name.
-    """
-    if group is None:
-        stack = inspect.stack()
-        group = stack[1][0].f_locals['__qualname__'].rsplit('.', 1)[-1]
+        if stripped.startswith(":autosubmit-group:"):
+            if group == "":
+                group = stripped.partition(":autosubmit-group:")[2].strip().upper()
+            continue
 
-    group = group.upper()
+        if stripped.startswith(":autosubmit-name:"):
+            if variable_name == "":
+                variable_name = stripped.partition(":autosubmit-name:")[2].strip().upper()
+            continue
 
-    if group not in PARAMETERS:
-        PARAMETERS[group] = defaultdict(defaultdict)
+        description_lines.append(line)
 
-    names = name
-    if type(name) is not list:
-        names = [name]
+    description = next(
+        (line.strip() for line in description_lines if line.strip()),
+        "",
+    )
 
-    for parameter_name in names:
-        if parameter_name not in PARAMETERS[group]:
-            PARAMETERS[group][parameter_name] = None
-
-    def parameter_decorator(wrapped_func):
-        parameter_group = getattr(parameter_decorator, "__group")
-        parameter_names = getattr(parameter_decorator, "__names")
-        for p_name in parameter_names:
-            if wrapped_func.__doc__:
-                PARAMETERS[parameter_group][p_name] = wrapped_func.__doc__.strip().split('\n')[0]
-
-        # Delete the members created as we are not using them hereafter
-        delattr(parameter_decorator, "__group")
-        delattr(parameter_decorator, "__names")
-
-        @functools.wraps(wrapped_func)
-        def wrapper(*args, **kwargs):
-            return wrapped_func(*args, **kwargs)
-
-        return wrapper
-
-    setattr(parameter_decorator, "__group", group)
-    setattr(parameter_decorator, "__names", names)
-
-    return parameter_decorator
+    return group, variable_name, description
