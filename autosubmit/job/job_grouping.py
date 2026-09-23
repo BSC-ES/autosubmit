@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -77,9 +77,7 @@ class JobGrouping:
 
         jobs_group_dict = final_jobs_group
 
-        groups_dict = {}
-        groups_dict['jobs'] = jobs_group_dict
-        groups_dict['status'] = self.group_status_dict
+        groups_dict = {'jobs': jobs_group_dict, 'status': self.group_status_dict}
 
         return groups_dict
 
@@ -151,7 +149,8 @@ class JobGrouping:
                 raise ValueError(
                     "Please check the syntax of the expand parameter including dates and the corresponding members and chunks")
 
-    def _set_group_status(self, statuses):
+    @staticmethod
+    def _set_group_status(statuses) -> int | str | None:
         if isinstance(statuses, int):
             return statuses
         if len(statuses) == 1:
@@ -173,8 +172,9 @@ class JobGrouping:
                 return Status.SUSPENDED
             elif Status.UNKNOWN in statuses:
                 return Status.UNKNOWN
+            return None
 
-    def _create_groups(self, jobs_group_dict, blacklist=[]):
+    def _create_groups(self, jobs_group_dict: dict[str, list[str]], blacklist: list | None = None) -> None:
         for i in reversed(range(len(self.jobs))):
             job = self.jobs[i]
 
@@ -214,7 +214,7 @@ class JobGrouping:
                         jobs_group_dict[job.name] = []
                     jobs_group_dict[job.name].append(group)
 
-    def _check_synchronized_job(self, job, groups):
+    def _check_synchronized_job(self, job: 'Job', groups: list) -> bool:
         synchronized = False
         if job.chunk is not None and len(str(job.chunk)) > 0:
             if job.date is None and len(str(job.date)) > 0 and job.member is None and len(str(job.member)) > 0:
@@ -275,7 +275,7 @@ class JobGrouping:
 
         return jobs_group_dict
 
-    def _create_splits_groups(self):
+    def _create_splits_groups(self) -> tuple[dict[Any, Any], dict[Any, Any]]:
         jobs_group_dict = {}
 
         self.group_by = 'split'

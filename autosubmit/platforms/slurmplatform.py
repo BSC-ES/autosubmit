@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -68,14 +68,9 @@ class SlurmPlatform(ParamikoPlatform):
         """Initialization of the Class SlurmPlatform.
 
         :param expid: ID of the experiment which will instantiate the SlurmPlatform.
-        :type expid: str
         :param name: Name of the platform to be instantiated.
-        :type name: str
         :param config: Configuration of the platform, PATHS to Files and DB.
-        :type config: dict
         :param auth_password: Authenticator's password.
-        :type auth_password: str
-        :rtype: None
         """
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.mkdir_cmd = None
@@ -108,11 +103,9 @@ class SlurmPlatform(ParamikoPlatform):
             tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
 
     def create_a_new_copy(self):
-        """Return a copy of a SlurmPlatform object with the same
-        expid, name and config as the original.
+        """Return a copy of a SlurmPlatform object with the same expid, name and config as the original.
 
         :return: A new platform type slurm
-        :rtype: SlurmPlatform
         """
         return SlurmPlatform(self.expid, self.name, self.config)
 
@@ -164,7 +157,6 @@ class SlurmPlatform(ParamikoPlatform):
         """Get the variable mkdir_cmd that stores the mkdir command.
 
         :return: Mkdir command
-        :rtype: str
         """
         return self.mkdir_cmd
 
@@ -172,7 +164,6 @@ class SlurmPlatform(ParamikoPlatform):
         """Get the variable remote_log_dir that stores the directory of the Log of the experiment.
 
         :return: The remote_log_dir variable.
-        :rtype: str
         """
         return self.remote_log_dir
 
@@ -188,7 +179,7 @@ class SlurmPlatform(ParamikoPlatform):
             return status
         return status[0]
 
-    def get_submitted_job_id(self, output: str, x11: bool = False) -> list[str]:
+    def get_submitted_job_id(self, output: str, x11: bool = False) -> int | list[Any]:
         """Parses the output of the submit command to get the job ID.
 
         :param output: output of the submit command.
@@ -214,9 +205,7 @@ class SlurmPlatform(ParamikoPlatform):
         one recoverable job identifier per submitted script.
 
         :param script_names: Submitted script filenames.
-        :type script_names: list[str]
         :return: Matching Slurm job IDs in submission order.
-        :rtype: list[int]
         """
         submitted_job_ids: list[int] = []
 
@@ -237,17 +226,15 @@ class SlurmPlatform(ParamikoPlatform):
 
         :param jobs_id: ID of one or more jobs.
         :return: sacct command to all jobs.
-        :rtype: str
         """
         return f"sacct -n -X --jobs {jobs_id} -o jobid,State"
 
-    def get_estimated_queue_time_cmd(self, job_id: str):
+    @staticmethod
+    def get_estimated_queue_time_cmd(job_id: str):
         """Gets an estimated queue time to the job selected.
 
         :param job_id: ID of a job.
-        :param job_id: str
         :return: Gets estimated queue time.
-        :rtype: str
         """
         return f"scontrol -o show JobId {job_id} | grep -Po '(?<=EligibleTime=)[0-9-:T]*'"
 
@@ -257,9 +244,7 @@ class SlurmPlatform(ParamikoPlatform):
         """Looks for a job based on its name.
 
         :param job_name: Name given to a job
-        :param job_name: str
         :return: Command to look for a job in the queue.
-        :rtype: str
         """
         return f'squeue -o %A,%.50j -n {job_name}'
 
@@ -268,9 +253,7 @@ class SlurmPlatform(ParamikoPlatform):
         JobId, State, NCPUS, NNodes, Submit, Start, End, ConsumedEnergy, MaxRSS, AveRSS%25.
 
         :param job_id: ID of a job.
-        :param job_id: str
         :return: Command to get job energy.
-        :rtype: str
         """
         return (f'sacct -n --jobs {job_id} -o JobId%25,State,NCPUS,NNodes,Submit,'
                 f'Start,End,ConsumedEnergy,MaxRSS%25,AveRSS%25')
@@ -279,7 +262,6 @@ class SlurmPlatform(ParamikoPlatform):
         """Parses the queue reason from the output of the command.
 
         :param output: output of the command.
-        :param job_id: job id
         :return: queue reason.
         """
         return ''.join([
@@ -294,9 +276,7 @@ class SlurmPlatform(ParamikoPlatform):
         """It generates the header of the wrapper configuring it to execute the Experiment.
 
         :param kwargs: Key arguments associated to the Job/Experiment to configure the wrapper.
-        :type kwargs: Any
         :return: a sequence of slurm commands.
-        :rtype: str
         """
         return self._header.wrapper_header(**kwargs)
 
@@ -305,7 +285,6 @@ class SlurmPlatform(ParamikoPlatform):
         """It sets the allocated nodes of the wrapper
 
         :return: A command that changes the num of Node per job
-        :rtype: str
         """
         return """os.system("scontrol show hostnames $SLURM_JOB_NODELIST > node_list_{0}".format(node_id))"""
 
@@ -316,9 +295,7 @@ class SlurmPlatform(ParamikoPlatform):
         ``JobName:id,id2,id3``.
 
         :param job_names: Job names to query.
-        :type job_names: list[str]
         :return: Shell command that groups matching job IDs by job name.
-        :rtype: str
         """
         return (
             f"squeue -h -o '%j:%A' -n {','.join(job_names)} "
@@ -330,7 +307,6 @@ class SlurmPlatform(ParamikoPlatform):
         """Cancel jobs by their IDs.
 
         :param job_ids: List of job IDs to cancel.
-        :type job_ids: list[str]
         """
         if job_ids:
             cancel_by_comma = ",".join(str(job_id) for job_id in job_ids)

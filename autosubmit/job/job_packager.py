@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -48,15 +48,12 @@ class JobPackager:
     """
     Main class that manages Job wrapping.
 
-    :param as_config: Autosubmit basic configuration.\n
-    :type as_config: AutosubmitConfig object.\n
-    :param platform: A particular platform we are dealing with, e.g. Slurm Platform.\n
-    :type platform: Specific Platform Object, e.g. SlurmPlatform(), EcPlatform(), ...\n
-    :param jobs_list: Contains the list of the jobs, along other properties.\n
-    :type jobs_list: JobList object.
+    :param as_config: Autosubmit basic configuration.
+    :param platform: A particular platform we are dealing with, e.g. Slurm Platform.
+    :param jobs_list: Contains the list of the jobs, along other properties.
     """
 
-    def __init__(self, as_config: 'AutosubmitConfig', platform: 'ParamikoPlatform', jobs_list: 'JobList', hold=False):
+    def __init__(self, as_config: 'AutosubmitConfig', platform: 'ParamikoPlatform', jobs_list: 'JobList', hold: bool=False):
         self.current_wrapper_section = "WRAPPERS"
         self._as_config = as_config
         self._platform = platform
@@ -141,14 +138,12 @@ class JobPackager:
             for job in highest_completed:
                 job.distance_weight = job.distance_weight - 1
 
-    def calculate_wrapper_bounds(self, section_list):
+    def calculate_wrapper_bounds(self, section_list: list[str]) -> dict:
         """
         Returns the minimum and maximum number of jobs that can be wrapped
 
         :param section_list: List of sections to be wrapped
-        :type section_list: List of strings
         :return: Minimum and Maximum number of jobs that can be wrapped
-        :rtype: Dictionary with keys: min, max, min_v, max_v, min_h, max_h, max_by_section
         """
         wrapper_limits = {'min': 1, 'max': 9999999, 'min_v': 1, 'max_v': 9999999, 'min_h': 1, 'max_h': 9999999,
                           'max_by_section': {}}
@@ -892,15 +887,12 @@ class JobPackager:
 
         return packages
 
-    def _build_vertical_packages(self, section_list, wrapper_limits, wrapper_info={}):
+    def _build_vertical_packages(self, section_list: list, wrapper_limits: dict, wrapper_info: dict={}) -> list[JobPackageVertical]:
         """Builds Vertical-Mixed or Vertical
 
-        :param section_list: Jobs defined as wrappable belonging to a common section.\n
-        :type section_list: List() of Job Objects. \n
-        :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical). \n
-        :type wrapper_limits: Dict. \n
-        :return: List of Wrapper Packages, Dictionary that details dependencies. \n
-        :rtype: List() of JobPackageVertical(), Dictionary Key: String, Value: (Dictionary Key: Variable Name, Value: String/Int)
+        :param section_list: Jobs defined as wrappable belonging to a common section.
+        :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical).
+        :return: List of Wrapper Packages, Dictionary that details dependencies.
         """
         packages = []
         dict_jobs = self._jobs_list.get_ordered_jobs_by_date_member(self.current_wrapper_section)
@@ -940,7 +932,7 @@ class JobPackager:
         total_wallclock = '00:00'
         horizontal_package = horizontal_packager.build_horizontal_package(wrapper_info=wrapper_info)
         horizontal_packager.create_sections_order(job_sections)
-        horizontal_packager.add_sectioncombo_processors(
+        horizontal_packager.add_section_combo_processors(
             horizontal_packager.total_processors)
         horizontal_package.sort(
             key=lambda job: horizontal_packager.sort_by_expression(job.section))
@@ -1010,20 +1002,15 @@ class JobPackagerVertical:
     """
     Vertical Packager Parent Class
 
-    :param jobs_list: Usually there is only 1 job in this list. \n
-    :type jobs_list: List() of Job Objects \n
-    :param total_wallclock: Wallclock per object. \n
-    :type total_wallclock: String  \n
-    :param max_jobs: Maximum number of jobs per platform. \n
-    :type max_jobs: Integer \n
-    :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical). \n
-    :type wrapper_limits: Dict. \n
-    :param max_wallclock: Value from Platform. \n
-    :type max_wallclock: Integer
-
+    :param jobs_list: Usually there is only 1 job in this list.
+    :param total_wallclock: wallclock per object.
+    :param max_jobs: Maximum number of jobs per platform.
+    :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical).
+    :param max_wallclock: Value from Platform
     """
 
-    def __init__(self, jobs_list, total_wallclock, max_jobs, wrapper_limits, max_wallclock, wrapper_info):
+    def __init__(self, jobs_list: list[Job], total_wallclock: dict, max_jobs: int, wrapper_limits: dict,
+                 max_wallclock: int, wrapper_info: dict):
         self.jobs_list = jobs_list
         self.total_wallclock = total_wallclock
         self.max_jobs = max_jobs
@@ -1111,24 +1098,26 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
     """
     Vertical Mixed Class. First statement of the constructor builds JobPackagerVertical.
 
-    :param dict_jobs: Jobs sorted by date, member, RUNNING, and chunk number. Only those relevant to the wrapper. \n
-    :type dict_jobs: Dictionary Key: date, Value: (Dictionary Key: Member, Value: List of jobs sorted) \n
-    :param ready_job: Job to be wrapped. \n
-    :type ready_job: Job Object \n
-    :param jobs_list: ready_job as a list. \n
-    :type jobs_list: List() of Job Object \n
-    :param total_wallclock: wallclock time per job. \n
-    :type total_wallclock: String \n
-    :param max_jobs: Maximum number of jobs per platform. \n
-    :type max_jobs: Integer \n
-    :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical). \n
-    :type wrapper_limits: Dict. \n
-    :param max_wallclock: Value from Platform. \n
-    :type max_wallclock: String \n
+    :param dict_jobs: Jobs sorted by date, member, RUNNING, and chunk number. Only those relevant to the wrapper.
+    :param ready_job: Job to be wrapped.
+    :param jobs_list: ready_job as a list.
+    :param total_wallclock: wallclock time per job.
+    :param max_jobs: Maximum number of jobs per platform.
+    :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical).
+    :param max_wallclock: Value from Platform.
     """
 
-    def __init__(self, dict_jobs, ready_job, jobs_list, total_wallclock, max_jobs, wrapper_limits, max_wallclock,
-                 wrapper_info={}):
+    def __init__(
+        self,
+        dict_jobs: dict,
+        ready_job: Job,
+        jobs_list: list[Job],
+        total_wallclock: str,
+        max_jobs: int,
+        wrapper_limits: dict,
+        max_wallclock: str,
+        wrapper_info: dict | None = {},
+    ):
         super().__init__(
             jobs_list, total_wallclock, max_jobs, wrapper_limits, max_wallclock, wrapper_info)
         self.ready_job = ready_job
@@ -1165,7 +1154,7 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
                     break
         return child, index + 1
 
-    def _is_wrappable(self, job):
+    def _is_wrappable(self, job: "Job") -> bool:
         """Check if a job can be added to the current mixed wrapper chain.
 
         Unlike the parent class version, this does not enforce chunk boundaries
@@ -1187,7 +1176,8 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
 
 
 class JobPackagerHorizontal:
-    def __init__(self, job_list, max_processors, wrapper_limits, max_jobs, processors_node, method="ASThread"):
+    def __init__(self, job_list: 'JobList', max_processors: int, wrapper_limits: dict, max_jobs: int,
+                 processors_node: int, method: str="ASThread"):
         self.processors_node = processors_node
         self.max_processors = max_processors
         self.wrapper_limits = wrapper_limits
@@ -1204,7 +1194,7 @@ class JobPackagerHorizontal:
         self._package_sections = {}
         self.wrapper_info = []
 
-    def build_horizontal_package(self, horizontal_vertical=False, wrapper_info=[]):
+    def build_horizontal_package(self, horizontal_vertical: bool = False, wrapper_info: list | None = None):
         self.wrapper_info = wrapper_info
         current_package = []
         current_package_by_section = {}
@@ -1264,17 +1254,17 @@ class JobPackagerHorizontal:
             self._sort_order_dict[section] = i
 
     # EXIT FALSE IF A SECTION EXIST AND HAVE LESS PROCESSORS
-    def add_sectioncombo_processors(self, total_processors_section):
-        keySection = ""
+    def add_section_combo_processors(self, total_processors_section: int) -> bool:
+        key_section = ""
 
         self._sectionList.sort()
         for section in self._sectionList:
-            keySection += str(section)
-        if keySection in self._package_sections:
-            if self._package_sections[keySection] < total_processors_section:
+            key_section += str(section)
+        if key_section in self._package_sections:
+            if self._package_sections[key_section] < total_processors_section:
                 return False
         else:
-            self._package_sections[keySection] = total_processors_section
+            self._package_sections[key_section] = total_processors_section
         self._maxTotalProcessors = max(
             max(self._package_sections.values()), self._maxTotalProcessors)
         return True
@@ -1282,7 +1272,7 @@ class JobPackagerHorizontal:
     def sort_by_expression(self, section):
         return self._sort_order_dict[section]
 
-    def get_next_packages(self, jobs_sections, max_wallclock=None, horizontal_vertical=False, max_procs=0):
+    def get_next_packages(self, jobs_sections: dict[str], max_wallclock: dict | None = None, horizontal_vertical: bool=False, max_procs: int=0):
         packages = []
         job = max(self.job_list, key=attrgetter('total_wallclock'))
         wallclock = job.wallclock

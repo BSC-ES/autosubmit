@@ -63,7 +63,7 @@ def _validate_section(as_conf: AutosubmitConfig, filter_section: str) -> None:
         )
 
 
-def _validate_list(as_conf, job_list, filter_list):
+def _validate_list(as_conf: AutosubmitConfig, job_list: 'JobList', filter_list: str):
     """
     Validate the ``-fl`` job filter.
 
@@ -72,17 +72,16 @@ def _validate_list(as_conf, job_list, filter_list):
     :param as_conf: Autosubmit configuration object
     :param job_list: JobList object containing the jobs to validate against
     :param filter_list: string with the jobs separated by space
-    :return None if the filter is valid
     :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
     """
     job_validation_error = False
     job_error = False
-    job_not_foundList = []
+    job_not_found_list = []
     job_validation_message = "\n## Job Validation Message ##"
     jobs = []
-    countStart = filter_list.count("[")
-    countEnd = filter_list.count("]")
-    if countStart > 1 or countEnd > 1:
+    count_start = filter_list.count("[")
+    count_end = filter_list.count("]")
+    if count_start > 1 or count_end > 1:
         job_validation_error = True
         job_validation_message += "\n\tList of jobs has a format error. Perhaps you were trying to use -fc instead."
 
@@ -95,7 +94,7 @@ def _validate_list(as_conf, job_list, filter_list):
                     # Provided job does not exist, or it is not the keyword 'Any'
                     if sentJob not in jobs and (sentJob.upper() != "ANY"):
                         job_error = True
-                        job_not_foundList.append(sentJob)
+                        job_not_found_list.append(sentJob)
         else:
             job_validation_error = True
             job_validation_message += "\n\tEmpty input. No changes performed."
@@ -104,7 +103,7 @@ def _validate_list(as_conf, job_list, filter_list):
         if job_error is True:
             job_validation_message += (
                 "\n\tSpecified job(s) : ["
-                + str(job_not_foundList)
+                + str(job_not_found_list)
                 + "] not found in the experiment "
                 + str(as_conf.expid)
                 + ". \n\tProcess stopped. Review the format of the provided input. Comparison is case sensitive."
@@ -115,7 +114,7 @@ def _validate_list(as_conf, job_list, filter_list):
         )
 
 
-def _validate_status(job_list, filter_status):
+def _validate_status(job_list: 'JobList', filter_status: str):
     """
     Validate the ``-fs`` status filter.
 
@@ -129,9 +128,9 @@ def _validate_status(job_list, filter_status):
     status_validation_error = False
     status_validation_message = "\n## Status Validation Message ##"
     # Trying to identify chunk formula
-    countStart = filter_status.count("[")
-    countEnd = filter_status.count("]")
-    if countStart > 1 or countEnd > 1:
+    count_start = filter_status.count("[")
+    count_end = filter_status.count("]")
+    if count_start > 1 or count_end > 1:
         status_validation_error = True
         status_validation_message += "\n\tList of status provided has a format error. Perhaps you were trying to use -fc instead."
     # If everything is fine until this point
@@ -349,7 +348,7 @@ def _validate_chunk_section_split(
 
 def validate_job_filters(
     as_conf: AutosubmitConfig,
-    job_list: "JobList",
+    job_list: 'JobList',
     filter_list: str | None,
     filter_chunk_section_split: str | None,
     filter_status: str | None,
