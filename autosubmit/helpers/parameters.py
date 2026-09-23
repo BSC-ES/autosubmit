@@ -18,9 +18,7 @@
 import functools
 import inspect
 from collections import defaultdict
-from typing import Any, TypeVar
-
-_C = TypeVar("_C")
+from typing import Any
 
 PARAMETERS: dict[str, Any] = defaultdict(defaultdict)
 """Global default dictionary holding a multi-level dictionary with the Autosubmit
@@ -39,36 +37,6 @@ name, and ``value`` the parameter documentation.
 These values are used to create the Sphinx documentation for variables, as well as
 to populate the comments in the Autosubmit YAML configuration files.
 """
-
-
-def autosubmit_parameters(cls=None, *, parameters: dict):
-    """Decorator for Autosubmit configuration parameters defined in a class.
-
-    This is useful for parameters that are not defined in a single function or
-    class (e.g. parameters that are created on-the-fly in functions)."""
-
-    def wrap(cls: _C) -> _C:
-        parameters = wrap.parameters  # type: ignore
-
-        for group, group_parameters in parameters.items():
-            group = group.upper()
-
-            if group not in PARAMETERS:
-                PARAMETERS[group] = defaultdict(defaultdict)
-
-            for parameter_name, parameter_value in group_parameters.items():
-                if parameter_name not in PARAMETERS[group]:
-                    PARAMETERS[group][parameter_name] = parameter_value.strip()
-
-        return cls
-
-    wrap.parameters = parameters  # type: ignore
-
-    # NOTE: This is not reachable code, as the parameters must be defined!
-    # if cls is not None:
-    #     raise ValueError(f'You must provide a list of parameters')
-
-    return wrap
 
 
 def autosubmit_parameter(func=None, *, name, group: str | None = None):
