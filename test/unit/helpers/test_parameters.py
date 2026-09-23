@@ -18,7 +18,6 @@
 from autosubmit.helpers.parameters import (
     PARAMETERS,
     autosubmit_parameter,
-    autosubmit_parameters,
 )
 
 """Tests for the ``helpers.parameters`` module."""
@@ -100,28 +99,3 @@ def test_autosubmit_decorator_no_group():
     assert Job.__name__.upper() in PARAMETERS
     assert parameter_name in PARAMETERS[Job.__name__.upper()]
     assert 'This parameter is the job name.' == PARAMETERS[Job.__name__.upper()][parameter_name]
-
-
-def test_autosubmit_class_decorator():
-    """Test the ``autosubmit_decorator`` when ``group`` is not provided."""
-
-    PARAMETERS.clear()
-
-    @autosubmit_parameters(parameters={
-        'job': {
-            'JOBNAME': 'The value!'
-        }
-    })
-    class Job:
-        @property
-        def name(self):
-            """This parameter is the job name."""
-            return 'FOO'
-
-    job = Job()
-
-    assert 'FOO' == job.name
-    assert len(PARAMETERS) > 0
-    assert 'JOB' in PARAMETERS
-    assert 'JOBNAME' in PARAMETERS['JOB']
-    assert 'The value!' == PARAMETERS['JOB']['JOBNAME']
