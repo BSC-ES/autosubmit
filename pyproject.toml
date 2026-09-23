@@ -260,3 +260,23 @@ ignore = [
 [tool.vulture]
 exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
 min_confidence = 70
+
+[external]
+dependencies = [
+    "dep:generic/bash",
+    "dep:generic/git@>=2.32",
+    "dep:generic/graphviz@>=2.38",
+    "dep:generic/rsync",
+    "dep:generic/sqlite3",
+    "dep:generic/subversion",
+]
+
+[external.optional-dependencies]
+plot = [
+    "dep:generic/xdg-utils",
+]
+
+[tool.autosubmit.docs.system-dependencies]
+git = { check = "git --version" }
+graphviz = { note = "2.40 is known not to work", check = "dot -v" }
+xdg-utils = { note = "provides xdg-open, used by autosubmit create --plot" }
