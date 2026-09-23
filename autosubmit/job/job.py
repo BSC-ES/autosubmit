@@ -40,7 +40,7 @@ from bscearth.utils.date import (
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.enums import ChunkUnit
-from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
+from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
@@ -131,63 +131,6 @@ PERSISTENT_ATTRIBUTES = (
 # are cumulative, so you can add to ``job``, for instance,
 # in multiple files as long as the variable names are
 # unique per group.
-@autosubmit_parameters(
-    parameters={
-        'chunk': {
-            'day_before': 'Day before the start date.',
-            'chunk_end_in_days': 'Days passed from the start of the simulation until the end of the chunk.',
-            'chunk_start_date': 'Chunk start date.',
-            'chunk_start_year': 'Chunk start year.',
-            'chunk_start_month': 'Chunk start month.',
-            'chunk_start_day': 'Chunk start day.',
-            'chunk_start_hour': 'Chunk start hour.',
-            'chunk_end_date': 'Chunk end date.',
-            'chunk_end_year': 'Chunk end year.',
-            'chunk_end_month': 'Chunk end month.',
-            'chunk_end_day': 'Chunk end day.',
-            'chunk_end_hour': 'Chunk end hour.',
-            'chunk_second_to_last_date': 'Chunk second to last date.',
-            'chunk_second_to_last_year': 'Chunk second to last year.',
-            'chunk_second_to_last_month': 'Chunk second to last month.',
-            'chunk_second_to_last_day': 'Chunk second to last day.',
-            'chunk_second_to_last_hour': 'Chunk second to last hour.',
-            'prev': 'Days since start date at the chunk\'s start.',
-            'chunk_first': 'True if the current chunk is the first, false otherwise.',
-            'chunk_last': 'True if the current chunk is the last, false otherwise.',
-            'chunk_end_date_last': 'End date of the last chunk, i.e. the experiment end boundary. Available to any date-aware job (notably RUNNING: date jobs).',
-            'ldate': 'Last date of the experiment (the run\'s final day, parallel to SDATE).',
-            'run_days': 'Chunk length in days.',
-            'notify_on': 'Determine the job statuses you want to be notified.'
-        },
-        'config': {
-            'config.autosubmit_version': 'Current version of Autosubmit.',
-            'config.totaljobs': 'Total number of jobs in the workflow.',
-            'config.maxwaitingjobs': 'Maximum number of jobs permitted in the waiting status.'
-        },
-        'experiment': {
-            'experiment.datelist': 'List of start dates',
-            'experiment.calendar': 'Calendar used for the experiment. Can be standard or noleap.',
-            'experiment.chunksize': 'Size of each chunk.',
-            'experiment.numchunks': 'Number of chunks of the experiment.',
-            'experiment.chunksizeunit': 'Unit of the chunk size. Can be hour, day, month, or year.',
-            'experiment.members': 'List of members.'
-        },
-        'default': {
-            'default.expid': 'Job experiment ID.',
-            'default.hpcarch': 'Default HPC platform name.',
-            'default.custom_config': 'Custom configuration location.',
-        },
-        'job': {
-            'rootdir': 'Experiment folder path.',
-            'projdir': 'Project folder path.',
-            'nummembers': 'Number of members of the experiment.'
-        },
-        'project': {
-            'project.project_type': 'Type of the project.',
-            'project.project_destination': 'Folder to hold the project sources.'
-        }
-    }
-)
 class Job:
     """
     Class to handle all the tasks with Jobs at HPC.
