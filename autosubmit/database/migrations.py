@@ -18,12 +18,10 @@
 """Per-tenant schema migration tracking.
 
 This module is intentionally small and tool-agnostic. It keeps track of a schema
-version per tenant (each experiment has its own SQLite file or PostgreSQL schema)
-and exposes a hook for ordered migrations, so that a dedicated migration tool can
-later replace what happens inside without callers noticing.
+version per tenant (each experiment has its own SQLite file or PostgreSQL schema).
 
-TODO(#1286): a migration tool should eventually take over this layer. The tool
-is TBD. Alternatives to evaluate:
+TODO(#1286): a dedicated migration tool should eventually apply the ordered
+migration steps, taking over this layer. The tool is TBD. Alternatives to evaluate:
 - Alembic: SQLAlchemy-native; autogenerates migration scripts by diffing the
   models against the DB, orders them, and handles SQLite ALTER via batch mode.
   Would need customization to fit the per-experiment files/schemas.
@@ -34,13 +32,12 @@ is TBD. Alternatives to evaluate:
 
 import datetime
 from collections.abc import Callable, Iterable
-from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, Integer, MetaData, Table, Text, func, inspect, select
+from sqlalchemy import Column, DateTime, Integer, MetaData, Table, func, inspect, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.schema import CreateTable
-
-if TYPE_CHECKING:
-    from sqlalchemy.engine import Connection, Engine
 
 __all__ = [
     "Migration",
@@ -66,26 +63,29 @@ def schema_migrations_table(metadata: MetaData, name: str) -> Table:
         name,
         metadata,
         Column("version", Integer, primary_key=True, nullable=False),
-        Column("applied_at", Text, nullable=False),
+        Column("applied_at", DateTime(timezone=True), nullable=False),
     )
 
 
-def _now() -> str:
+def _now() -> datetime.datetime:
     """Return the current UTC timestamp used for ``applied_at``."""
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
-def ensure_schema_migrations_table(engine: "Engine", table: Table) -> None:
+def ensure_schema_migrations_table(target: Engine | Connection, table: Table) -> None:
     """Create the ``schema_migrations`` table if it does not exist.
 
-    :param engine: The engine that owns the target database.
+    :param target: The engine that owns the target database, or an open connection.
     :param table: The ``schema_migrations`` table.
     """
-    with engine.begin() as conn:
-        conn.execute(CreateTable(table, if_not_exists=True))
+    if isinstance(target, Engine):
+        with target.begin() as conn:
+            conn.execute(CreateTable(table, if_not_exists=True))
+    else:
+        target.execute(CreateTable(table, if_not_exists=True))
 
 
-def get_schema_version(engine: "Engine", table: Table, schema: str | None = None) -> int:
+def get_schema_version(engine: Engine, table: Table, schema: str | None = None) -> int:
     """Return the highest migration version recorded for the target.
 
     :param engine: The engine that owns the target database.
@@ -100,23 +100,36 @@ def get_schema_version(engine: "Engine", table: Table, schema: str | None = None
     return int(version) if version is not None else 0
 
 
-def record_migration(conn: "Connection", table: Table, version: int) -> None:
+def record_migration(conn: Connection, table: Table, version: int) -> None:
     """Record a migration as applied. Safe to call more than once.
+
+    Uses a dialect upsert (``ON CONFLICT DO NOTHING``) so concurrent writers do
+    not race on the check-then-insert.
 
     :param conn: An open connection.
     :param table: The ``schema_migrations`` table.
     :param version: The migration version to record.
     """
-    exists = conn.execute(select(table.c.version).where(table.c.version == version)).first()
-    if exists:
-        return
-    conn.execute(table.insert().values(version=version, applied_at=_now()))
-    # TODO(#3114): make this atomic with a dialect upsert (on_conflict_do_nothing)
-    #             before the databases are written concurrently (engine/session step).
+    values = {"version": version, "applied_at": _now()}
+    if conn.dialect.name == "postgresql":
+        stmt = pg_insert(table).values(**values).on_conflict_do_nothing(
+            index_elements=[table.c.version]
+        )
+    elif conn.dialect.name == "sqlite":
+        stmt = sqlite_insert(table).values(**values).on_conflict_do_nothing(
+            index_elements=[table.c.version]
+        )
+    else:
+        # Unknown dialect: fall back to a non-atomic check-then-insert.
+        exists = conn.execute(select(table.c.version).where(table.c.version == version)).first()
+        if exists:
+            return
+        stmt = table.insert().values(**values)
+    conn.execute(stmt)
 
 
 def apply_ordered_migrations(
-    engine: "Engine",
+    engine: Engine,
     table: Table,
     schema: str | None,
     migrations: Iterable[Migration],
@@ -124,16 +137,13 @@ def apply_ordered_migrations(
 ) -> None:
     """Apply the pending migration steps in order, up to ``to_version``.
 
+    Placeholder for the migration tool tracked in #1286.
+
     :param engine: The engine that owns the target database.
     :param table: The ``schema_migrations`` table.
     :param schema: Optional schema name (PostgreSQL).
     :param migrations: The ordered migration steps.
     :param to_version: The version to migrate to.
+    :raises NotImplementedError: Always, until #1286 is implemented.
     """
-    current = get_schema_version(engine, table, schema)
-    for version, migrate in sorted(migrations):
-        if version <= current or version > to_version:
-            continue
-        with engine.begin() as conn:
-            migrate(conn)
-            record_migration(conn, table, version)
+    raise NotImplementedError("Ordered migrations are not implemented yet (see #1286).")
