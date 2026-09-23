@@ -54,6 +54,8 @@ class DeleteOptions(AutosubmitOptions):
     """Whether or not the sub-command accepts multiple expids. Default is no."""
     accepts_other_users = False
     """Whether or not the sub-command accepts other users. Default is no."""
+    acquires_lock = True
+    """Whether or not the sub-command holds the experiment lock while it runs. Default is no."""
 
     expid: str
     """Experiment identifiers separated by commas."""

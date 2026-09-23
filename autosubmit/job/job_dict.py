@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -17,6 +17,7 @@
 
 import datetime
 import re
+from typing import TYPE_CHECKING
 
 from bscearth.utils.date import date2str
 
@@ -24,26 +25,24 @@ from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
 
+if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+
 
 class DicJobs: # Not accurate name, to rename to JobBuilder or something in these lines
     """
     Class to create and build jobs from conf file and to find jobs by start date, member and chunk
 
     :param date_list: start dates
-    :type date_list: list
     :param member_list: members
-    :type member_list: list
     :param chunk_list chunks
-    :type chunk_list: list
     :param date_format: H/M/D (hour, month, day)
-    :type date_format: str
     :param default_retrials: 0 by default
-    :type default_retrials: int
     :param as_conf: Comes from config parser, contains all experiment yml info
-    :type as_conf: as_conf
     """
 
-    def __init__(self, date_list, member_list, chunk_list, date_format, default_retrials, as_conf):
+    def __init__(self, date_list: list, member_list: list, chunk_list: list, date_format: str, default_retrials: int,
+                 as_conf: 'AutosubmitConfig'):
         self._date_list = date_list
         self._member_list = member_list
         self._chunk_list = chunk_list
@@ -90,17 +89,14 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
             delay = int(parameters[section].get("DELAY", -1))
             self._create_jobs_chunk(section, priority, frequency, default_job_type, synchronize, delay, splits)
 
-    def _create_jobs_startdate(self, section, priority, frequency, default_job_type, splits=-1):
+    def _create_jobs_startdate(self, section: str, priority: int, frequency: int, default_job_type: str, splits: int=-1):
         """
         Create jobs to be run once per start date
 
         :param section: section to read
-        :type section: str
         :param priority: priority for the jobs
-        :type priority: int
         :param frequency: if greater than 1, only creates one job each frequency startdates. Always creates one job
                           for the last
-        :type frequency: int
         """
         self._dic[section] = {}
         count = 0
@@ -111,20 +107,14 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
                 self._create_jobs_split(splits, section, date, None, None, priority, default_job_type,
                                         self._dic[section][date])
 
-    def _create_jobs_member(self, section, priority, frequency, default_job_type, splits=-1):
+    def _create_jobs_member(self, section: str, priority: int, frequency: int, default_job_type: str, splits: int=-1):
         """
         Create jobs to be run once per member
 
         :param section: section to read
-        :type section: str
         :param priority: priority for the jobs
-        :type priority: int
         :param frequency: if greater than 1, only creates one job each frequency members. Always creates one job
                           for the last
-        :type frequency: int
-        :type excluded_members: list
-        :param excluded_members: if member index is listed there, the job won't run for this member.
-
         """
         self._dic[section] = {}
         for date in self._date_list:
@@ -137,32 +127,27 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
                     self._create_jobs_split(splits, section, date, member, None, priority, default_job_type,
                                             self._dic[section][date][member])
 
-    def _create_jobs_once(self, section, priority, default_job_type, splits=0):
+    def _create_jobs_once(self, section: str, priority: int, default_job_type: str, splits: int=0):
         """
         Create jobs to be run once
 
         :param section: section to read
-        :type section: str
         :param priority: priority for the jobs
-        :type priority: int
         """
         self._dic[section] = []
         self._create_jobs_split(splits, section, None, None, None, priority, default_job_type, self._dic[section])
 
-    def _create_jobs_chunk(self, section, priority, frequency, default_job_type, synchronize=None, delay=0, splits=0):
+    def _create_jobs_chunk(self, section: str, priority: int, frequency: int, default_job_type: str,
+                           synchronize: str | None =None, delay: int=0, splits: int=0):
         """
         Create jobs to be run once per chunk
 
         :param synchronize:
         :param section: section to read
-        :type section: str
         :param priority: priority for the jobs
-        :type priority: int
         :param frequency: if greater than 1, only creates one job each frequency chunks. Always creates one job
                           for the last
-        :type frequency: int
         :param delay: if this parameter is set, the job is only created for the chunks greater than the delay
-        :type delay: int
         """
         self._dic[section] = {}
         # Temporally creation for unified jobs in case of synchronize
@@ -515,22 +500,19 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
 
         return list(set(final_jobs_list))
 
-    def get_jobs(self, section, date=None, member=None, chunk=None, sort_string=False):
+    def get_jobs(self, section: str, date: str | None=None, member: str | None=None, chunk: int | None=None,
+                 sort_string: bool=False) -> list:
         """
         Return all the jobs matching section, date, member and chunk provided. If any parameter is none, returns all
         the jobs without checking that parameter value. If a job has one parameter to None, is returned if all the
         others match parameters passed
 
         :param section: section to return
-        :type section: str
         :param date: stardate to return
-        :type date: str
         :param member: member to return
-        :type member: str
         :param chunk: chunk to return
-        :type chunk: int
+        :param sort_string:
         :return: jobs matching parameters passed
-        :rtype: list
         """
         jobs = []
 
@@ -567,7 +549,7 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
 
         return jobs
 
-    def _get_date(self, jobs, dic, date, member, chunk):
+    def _get_date(self, jobs: list["Job"], dic: dict, date: datetime.datetime | None, member: str | None, chunk: int | None):
         if date not in dic:
             return jobs
         dic = dic[date]
@@ -585,7 +567,7 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
 
         return jobs
 
-    def _get_member(self, jobs, dic, member, chunk):
+    def _get_member(self, jobs: list["Job"], dic: dict, member: str | None, chunk: int | None) -> list["Job"]:
         if member not in dic:
             return jobs
         dic = dic[member]
@@ -602,12 +584,13 @@ class DicJobs: # Not accurate name, to rename to JobBuilder or something in thes
                     jobs.append(dic[c])
         return jobs
 
-    def build_job(self, section, priority, date, member, chunk, default_job_type, section_data, splits=1, split=-1):
+    def build_job(self, section: str, priority: int, date: datetime.datetime | None, member: str | None, chunk: int | None,
+                  default_job_type: str | None, section_data: list["Job"], splits: int=1, split: int=-1):
         name = self.experiment_data.get("DEFAULT", {}).get("EXPID", "")
         if date:
-            name += "_" + date2str(date, self._date_format)
+            name += f"_{date2str(date, self._date_format)}"
         if member:
-            name += "_" + member
+            name += f"_{member}"
         if chunk:
             name += f"_{chunk}"
         if split > 0:

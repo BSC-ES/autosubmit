@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -147,14 +147,12 @@ class Type:
 
 # TODO: Statistics classes refactor proposal: replace tailer by footer
 
-def parse_output_number(string_number):
+def parse_output_number(string_number: str) -> float:
     """
     Parses number in format 1.0K 1.0M 1.0G
 
     :param string_number: String representation of number
-    :type string_number: str
-    :return: number in float format
-    :rtype: float
+    :return: convertion to float format
     """
     number = 0.0
     if string_number:
@@ -177,20 +175,16 @@ def parse_output_number(string_number):
             number = 0.0
     return number
 
-def increase_wallclock_by_chunk(current, increase, chunk):
+def increase_wallclock_by_chunk(current: str, increase: str, chunk: int) -> str:
     """
     Receives the wallclock times an increases it according to a quantity times the number of the current chunk.
     The result cannot be larger than the platform max_wallclock.
     If Chunk = 0 then no increment.
 
     :param current: WALLCLOCK HH:MM
-    :type current: str
     :param increase: WCHUNKINC HH:MM
-    :type increase: str
     :param chunk: chunk number
-    :type chunk: int
     :return: HH:MM wallclock
-    :rtype: str
     """
     # Pipeline is not testing this since mock is not well-made
     try:

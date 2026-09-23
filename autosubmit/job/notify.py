@@ -18,13 +18,17 @@
 """Job notification."""
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
 
 
-def job_notify(as_conf, expid, job):
-    if as_conf.get_notifications() == "true" and Status.VALUE_TO_KEY[job.status] in job.notify_on:
+def job_notify(as_conf, expid: str, job: Job):
+    if (
+        as_conf.get_notifications() == "true"
+        and Status.VALUE_TO_KEY[job.status] in job.notify_on
+    ):
         Notifier.notify_status_change(
             MailNotifier(BasicConfig),
             expid,
@@ -36,7 +40,7 @@ def job_notify(as_conf, expid, job):
 
 
 # TODO: It would probably make sense to have an autosubmit.wrappers package.
-def wrapper_notify(as_conf, expid, wrapper_job):
+def wrapper_notify(as_conf, expid: str, wrapper_job: WrapperJob):
     if as_conf.get_notifications() == "true":
         for inner_job in wrapper_job.job_list:
             job_notify(as_conf, expid, inner_job)

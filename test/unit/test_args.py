@@ -19,20 +19,7 @@ import pytest
 from portalocker.exceptions import BaseLockException
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError
-from autosubmit.scripts._args import _delete_lock_file, exit_from_error
-
-
-def test_delete_lockfile(tmp_path):
-    fake_lock = tmp_path / "autosubmit.lock"
-    fake_lock.touch()
-
-    _delete_lock_file(str(tmp_path), "not-found")
-
-    assert fake_lock.exists()
-
-    _delete_lock_file(str(tmp_path), fake_lock.name)
-
-    assert not fake_lock.exists()
+from autosubmit.scripts._args import exit_from_error
 
 
 def test_log_critical_raises_error(mocker):
@@ -60,13 +47,13 @@ _TEST_EXCEPTION.trace = "a trace"
 
 
 @pytest.mark.parametrize(
-    "exception,expected_code,critical_calls,delete_called",
+    "exception,expected_code,critical_calls",
     [
-        (ValueError(), 7000, 2, True),
-        (BaseLockException(), 1, 1, False),
-        (AutosubmitCritical(), 7000, 2, True),
-        (_TEST_EXCEPTION, 7000, 3, True),
-        (AutosubmitError(), 6000, 2, True),
+        (ValueError(), 7000, 2),
+        (BaseLockException(), 1, 1),
+        (AutosubmitCritical(), 7000, 2),
+        (_TEST_EXCEPTION, 7000, 3),
+        (AutosubmitError(), 6000, 2),
     ],
     ids=[
         "normal_exception",
@@ -81,13 +68,10 @@ def test_exit_from_error(
     exception: Exception,
     expected_code: int,
     critical_calls: int,
-    delete_called: bool,
 ):
     mocked_log = mocker.patch("autosubmit.scripts._args.Log")
-    mocked_delete = mocker.patch("autosubmit.scripts._args._delete_lock_file")
 
     result = exit_from_error(exception)
 
     assert result == expected_code
     assert mocked_log.critical.call_count == critical_calls
-    assert mocked_delete.called == delete_called

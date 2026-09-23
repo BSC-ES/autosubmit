@@ -25,10 +25,11 @@ dynamic = ["version", "readme"]
 description = "Autosubmit is a Python-based workflow manager to create, manage and monitor complex tasks involving different substeps, such as scientific computational experiments. These workflows may involve multiple computing systems for their completion, from HPCs to post-processing clusters or workstations. Autosubmit can orchestrate all the tasks integrating the workflow by managing their dependencies, interfacing with all the platforms involved, and handling eventual errors."
 requires-python = ">=3.10,<3.13"
 authors = [
-    { name = "The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email = "support-autosubmit@bsc.es" },
+    { name = "Barcelona Supercomputing Center (BSC-CNS) - Earth Sciences Department", email = "support-autosubmit@bsc.es" },
 ]
+
 maintainers = [
-    { name = "The Autosubmit Team - Models and Workflows Team (MWT) - Barcelona Supercomputing Center (BSC)", email = "support-autosubmit@bsc.es" },
+    { name = "Barcelona Supercomputing Center (BSC-CNS) - Earth Sciences Department", email = "support-autosubmit@bsc.es" },
 ]
 
 keywords = ["climate", "weather", "workflow", "HPC"]
@@ -47,7 +48,7 @@ dependencies = [
     "bscearth.utils<=0.5.2",
     "requests<=2.34.2",
     "networkx<=3.6.1",
-    "portalocker<=4.3.2",
+    "portalocker<=4.4.0",
     "paramiko>=3.5.0",
     "pyparsing==3.3.2",
     "matplotlib<=3.10.9",
@@ -71,7 +72,7 @@ Documentation = "https://autosubmit.readthedocs.io/"
 [project.optional-dependencies]
 postgres = ["psycopg", "psycopg2"]
 lint = [
-    "ruff==0.16.7",
+    "ruff==0.16.8",
 ]
 tests = [
     # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
@@ -260,3 +261,23 @@ ignore = [
 [tool.vulture]
 exclude = ["*/build/*", "*/.venv/*", "*/docs/*"]
 min_confidence = 70
+
+[external]
+dependencies = [
+    "dep:generic/bash",
+    "dep:generic/git@>=2.32",
+    "dep:generic/graphviz@>=2.38",
+    "dep:generic/rsync",
+    "dep:generic/sqlite3",
+    "dep:generic/subversion",
+]
+
+[external.optional-dependencies]
+plot = [
+    "dep:generic/xdg-utils",
+]
+
+[tool.autosubmit.docs.system-dependencies]
+git = { check = "git --version" }
+graphviz = { note = "2.40 is known not to work", check = "dot -v" }
+xdg-utils = { note = "provides xdg-open, used by autosubmit create --plot" }
