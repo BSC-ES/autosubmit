@@ -44,7 +44,7 @@ These custom ones can be anywhere and have any name. By default, they're inside 
 
 Additionally, you must be aware of the following changes:
 
- - All section **keys** are normalized to **UPPERCASE**, while values remain as the user put them. Beware of scripts that rely on %CURRENT_HPCARCH% and variables that refer to a platform because they will always be in UPPERCASE. Normalize the script.
+ - All section **keys** are normalised to **UPPERCASE**, while values remain as the user put them. Beware of scripts that rely on %CURRENT_HPCARCH% and variables that refer to a platform because they will always be in UPPERCASE. normalise the script.
  - To define a job, you must put it under the key ``jobs`` in any custom configuration file.
  - To define a platform, you must put it under the key ``platforms`` in any custom configuration file.
  - To define a loop, you must put the key ``FOR`` as the first key of the section.

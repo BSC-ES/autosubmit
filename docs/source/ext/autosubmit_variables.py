@@ -23,19 +23,13 @@ from docutils.parsers.rst import Directive
 from docutils.statemachine import StringList
 from sphinx import addnodes
 
-from autosubmit.helpers.parameters import PARAMETERS
+from autosubmit.helpers.parameters import get_parameters
 
 __version__ = 0.1
 logger = logging.getLogger(__name__)
 
 
 class AutosubmitVariablesDirective(Directive):
-    """A custom Sphinx directive that prints Autosubmit variables.
-
-    It is able to recognize variables and separate them in groups,
-    producing valid Sphinx documentation directly from the Python
-    docstrings.
-    """
 
     has_content = True
     required_arguments = 1
@@ -48,30 +42,39 @@ class AutosubmitVariablesDirective(Directive):
             '.. list-table::',
             '   :widths: 25 75',
             '   :header-rows: 1',
-            '   ',
+            '',
             '   * - Variable',
-            '     - Description'
+            '     - Description',
         ]
 
         parameters_group = self.arguments[0].upper()
-        if parameters_group not in PARAMETERS:
-            logger.error(f'Parameter group {parameters_group} not set')
+
+        parameters = get_parameters()
+
+        if parameters_group not in parameters:
+            logger.error(
+                f'Parameter group {parameters_group} not set'
+            )
             return []
 
-        parameters = sorted(PARAMETERS[parameters_group].items())
-
-        for parameter_name, parameter_doc in parameters:
-            # rst.append(f'- **{parameter_name.upper()}**: {parameter_doc}')
-            rst.extend([f'   * - **{parameter_name.upper()}**', f'     - {parameter_doc}'])
+        for parameter_name, parameter_doc in sorted(
+            parameters[parameters_group].items()
+        ):
+            rst.extend([
+                f'   * - **{parameter_name.upper()}**',
+                f'     - {parameter_doc}',
+            ])
 
         rst.extend(['', ''])
 
         node = addnodes.desc()
+
         self.state.nested_parse(
             StringList(rst),
             self.content_offset,
-            node
+            node,
         )
+
         return [node]
 
 
