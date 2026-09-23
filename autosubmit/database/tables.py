@@ -45,14 +45,6 @@ ExperimentTable = Table(
 )
 """The main table, populated by Autosubmit. Should be read-only by the API."""
 
-# NOTE: In the original SQLite DB, db_version.version was the only field,
-#       and not a PK.
-DBVersionTable = Table(
-    "db_version",
-    metadata_obj,
-    Column("version", Integer, nullable=False, primary_key=True),
-)
-
 ExperimentStatusTable = Table(
     "experiment_status",
     metadata_obj,
@@ -238,7 +230,7 @@ SectionsStructureTable = Table(
 )
 
 
-def create_wrapper_tables(name, metadata_obj_):
+def create_wrapper_tables(name: str, metadata_obj_: MetaData) -> tuple[Table, Table]:
     """Create a wrapper table for the given name."""
     table_package_info = Table(
         f"{name}_info",
@@ -294,7 +286,6 @@ GENERALTABLES = {
     ExperimentTable.name: ExperimentTable,
     ExperimentStatusTable.name: ExperimentStatusTable,
     ExperimentRunTable.name: ExperimentRunTable,
-    DBVersionTable.name: DBVersionTable,
     JobDataTable.name: JobDataTable,
     StructureDataTable.name: StructureDataTable,
     DetailsTable.name: DetailsTable,

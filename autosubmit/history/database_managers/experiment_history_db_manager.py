@@ -203,7 +203,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         self.create_historical_database()
         self._migrate_schema()
 
-    def get_experiment_run_dc_with_max_id(self):
+    def get_experiment_run_dc_with_max_id(self) -> ExperimentRun:
         run = self._get_experiment_run_with_max_id()
         return ExperimentRun.from_model(run)
 
@@ -214,7 +214,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         except Exception:
             return None
 
-    def register_experiment_run_dc(self, experiment_run_dc):
+    def register_experiment_run_dc(self, experiment_run_dc: ExperimentRun) -> ExperimentRun:
         query = (
             insert(self.table_registry.get(ExperimentRunTable.name)).
             values(
@@ -238,7 +238,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
-    def update_experiment_run_dc_by_id(self, experiment_run_dc):
+    def update_experiment_run_dc_by_id(self, experiment_run_dc: ExperimentRun) -> ExperimentRun:
         experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
             update(experiment_run_table).
@@ -261,7 +261,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             conn.execute(query)
         return ExperimentRun.from_model(self._get_experiment_run_with_max_id())
 
-    def _get_experiment_run_with_max_id(self):
+    def _get_experiment_run_with_max_id(self) -> Models.ExperimentRunRow:
         """ Get Models.ExperimentRunRow for the maximum id run. """
         experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
@@ -283,7 +283,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             result = conn.execute(query).first()
         return result[0] if result and result[0] is not None else 0
 
-    def is_there_a_last_experiment_run(self):
+    def is_there_a_last_experiment_run(self) -> bool:
         """Return ``True`` if there is at least one experiment run in the database. ``False`` otherwise."""
         experiment_run_table = self.table_registry.get(ExperimentRunTable.name)
         query = (
@@ -295,18 +295,18 @@ class SqlAlchemyExperimentHistoryDbManager:
             result = conn.execute(query).first()
         return result is not None
 
-    def get_job_data_all(self):
+    def get_job_data_all(self) -> list[Models.JobDataRow]:
         job_data_table = self.table_registry.get(JobDataTable.name)
         with self.engine.connect() as conn:
             job_data_rows = conn.execute(select(job_data_table)).all()
         return [Models.JobDataRow(*row) for row in job_data_rows]
 
-    def register_submitted_job_data_dc(self, job_data_dc):
+    def register_submitted_job_data_dc(self, job_data_dc: JobData) -> JobData | None:
         self._set_current_job_data_rows_last_to_zero_by_job_name(job_data_dc.job_name)
         self._insert_job_data(job_data_dc)
         return self.get_job_data_dc_unique_latest_by_job_name(job_data_dc.job_name)
 
-    def _set_current_job_data_rows_last_to_zero_by_job_name(self, job_name):
+    def _set_current_job_data_rows_last_to_zero_by_job_name(self, job_name: str):
         """ Sets the column last = 0 for all job_rows by job_name and last = 1. """
         job_data_row_last = self._get_job_data_last_by_name(job_name)
         job_data_dc_list = [JobData.from_model(row) for row in job_data_row_last]
@@ -319,28 +319,26 @@ class SqlAlchemyExperimentHistoryDbManager:
         Update JobData data class. Returns the latest row from job_data by job_name.
 
         :param job_data_dc: The JobData data class instance containing job_id and job_name.
-        :type job_data_dc: JobData
         :return: The latest row from job_data corresponding to the given job_id and job_name.
-        :rtype: Any
         """
         self._update_job_data_by_id(job_data_dc)
         # Return the latest row from job_data by job_id and job_name
         return self.get_job_data_by_job_id_name(job_data_dc.job_id, job_data_dc.job_name)
 
-    def update_list_job_data_dc_by_each_id(self, job_data_dcs):
+    def update_list_job_data_dc_by_each_id(self, job_data_dcs: list[JobData]) -> int:
         """ Return length of updated list. """
         for job_data_dc in job_data_dcs:
             self._update_job_data_by_id(job_data_dc)
         return len(job_data_dcs)
 
-    def get_job_data_dc_unique_latest_by_job_name(self, job_name: str | None):
+    def get_job_data_dc_unique_latest_by_job_name(self, job_name: str | None) -> JobData | None:
         """ Returns JobData data class for the latest job_data_row with last=1 by job_name. """
         job_data_row_last = self._get_job_data_last_by_name(job_name)
         if len(job_data_row_last) > 0:
             return JobData.from_model(job_data_row_last[0])
         return None
 
-    def _get_job_data_last_by_name(self, job_name):
+    def _get_job_data_last_by_name(self, job_name: str | None) -> list[Models.JobDataRow]:
         job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
             select(job_data_table).
@@ -364,13 +362,13 @@ class SqlAlchemyExperimentHistoryDbManager:
                 job_data_rows_last = conn.execute(new_query).all()
         return [Models.JobDataRow(*row) for row in job_data_rows_last]
 
-    def get_job_data_dcs_last_by_wrapper_code(self, wrapper_code):
+    def get_job_data_dcs_last_by_wrapper_code(self, wrapper_code: int) -> list[JobData]:
         if wrapper_code and wrapper_code > 2:
             return [JobData.from_model(row) for row in self._get_job_data_last_by_wrapper_code(wrapper_code)]
         else:
             return []
 
-    def _get_job_data_last_by_wrapper_code(self, wrapper_code):
+    def _get_job_data_last_by_wrapper_code(self, wrapper_code: int) -> list[Models.JobDataRow]:
         """ Get List of Models.JobDataRow for last=1 and rowtype=wrapper_code """
         job_data_table = self.table_registry.get(JobDataTable.name)
         query = (
@@ -387,12 +385,12 @@ class SqlAlchemyExperimentHistoryDbManager:
             job_data_rows = conn.execute(query).all()
         return [Models.JobDataRow(*row) for row in job_data_rows]
 
-    def get_all_last_job_data_dcs(self):
+    def get_all_last_job_data_dcs(self) -> list[JobData]:
         """ Gets JobData data classes in job_data for last=1. """
         job_data_rows = self._get_all_last_job_data_rows()
         return [JobData.from_model(row) for row in job_data_rows]
 
-    def _get_all_last_job_data_rows(self):
+    def _get_all_last_job_data_rows(self) -> list[Models.JobDataRow]:
         """ Get List of Models.JobDataRow for last=1. """
         job_data_table = self.table_registry.get(JobDataTable.name)
         # TODO(#3114): select only the needed columns once callers no longer
@@ -405,7 +403,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             job_data_rows = conn.execute(query).all()
         return [Models.JobDataRow(*row) for row in job_data_rows]
 
-    def _insert_job_data(self, job_data):
+    def _insert_job_data(self, job_data: JobData) -> int:
         job_data_table = self.table_registry.get(JobDataTable.name)
         insert_query = (
             insert(job_data_table).
@@ -448,9 +446,9 @@ class SqlAlchemyExperimentHistoryDbManager:
         )
         with self.engine.connect() as conn, conn.begin():
             result = conn.execute(insert_query)
-        return result.lastrowid
+        return result.inserted_primary_key[0]
 
-    def update_many_job_data_change_status(self, changes) -> None:
+    def update_many_job_data_change_status(self, changes: list[tuple]) -> None:
         """Update many job_data rows in bulk.
 
         Requires a changes list of tuples ``(modified, status, rowstatus, id)``.
@@ -482,7 +480,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             for batch in chunked(params, batch_size):
                 conn.execute(query, batch)
 
-    def _update_job_data_by_id(self, job_data_dc):
+    def _update_job_data_by_id(self, job_data_dc: JobData):
         job_data_table = self.table_registry.get(JobDataTable.name)
         # noinspection PyProtectedMember
         query = (
@@ -539,11 +537,8 @@ class SqlAlchemyExperimentHistoryDbManager:
         """Get the last job data by job name and fail_count.
 
         :param job_name: The job name.
-        :type job_name: str
         :param fail_count: The counter value.
-        :type fail_count: int
         :return: The most recent JobData instance for the given job_name and counter.
-        :rtype: JobData
         :raises Exception: If no job_data is found for the given job_name and counter.
         """
         job_data_table = self.table_registry.get(JobDataTable.name)
@@ -563,11 +558,8 @@ class SqlAlchemyExperimentHistoryDbManager:
         """Get the last JobData for a given job_name and counter.
 
         :param job_name: The job name.
-        :type job_name: str
         :param counter: The counter value.
-        :type counter: int
         :return: The most recent JobData instance for the given job_name and counter.
-        :rtype: JobData
         :raises Exception: If no job_data is found for the given job_name and counter.
         """
         job_data_table = self.table_registry.get(JobDataTable.name)
@@ -587,9 +579,7 @@ class SqlAlchemyExperimentHistoryDbManager:
         """Get the most recent JobData for a given job_name regardless of counter.
 
         :param job_name: The job name.
-        :type job_name: str
         :return: The JobData instance with the highest id for the given job_name.
-        :rtype: JobData
         :raises Exception: If no job_data is found for the given job_name.
         """
         job_data_table = self.table_registry.get(JobDataTable.name)
@@ -669,7 +659,6 @@ class SqlAlchemyExperimentHistoryDbManager:
         """Return all job_data rows with submit>0 and (start=0 or finish=0).
 
         :return: List of Row objects with job_name, fail_count, platform.
-        :rtype: list
         """
         job_data_table = self.table_registry.get(JobDataTable.name)
         query = select(
@@ -691,7 +680,6 @@ class SqlAlchemyExperimentHistoryDbManager:
         :param start: Start epoch timestamp.
         :param finish: Finish epoch timestamp.
         :return: Number of rows updated.
-        :rtype: int
         """
         job_data_table = self.table_registry.get(JobDataTable.name)
         stmt = update(job_data_table).where(

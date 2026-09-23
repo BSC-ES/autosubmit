@@ -171,11 +171,8 @@ class DbManager:
         """Select rows from a table with specific columns. Return a list of hashable tuples.
 
         :param table: Table object or table name to select from.
-        :type table: Table
         :param where: Dictionary of column:value pairs to filter by, or a SQLAlchemy clause.
-        :type where: Dict[str, Any] | ClauseElement
         :return: List of tuples containing column-value pairs.
-        :rtype: List[tuple[str, Any]]
         """
         self.create_table(table.name)  # Ensure the table exists
 
@@ -215,11 +212,8 @@ class DbManager:
         Supports both equality and 'IN' queries for list values.
 
         :param table_name: Name of the table to delete from.
-        :type table_name: str
         :param where: Dictionary of column names and values (single value or list for IN).
-        :type where: Dict[str, Any]
         :return: Number of rows deleted.
-        :rtype: int
         :raises ValueError: If 'where' is empty.
         """
         table = self.table_registry.get(table_name)
