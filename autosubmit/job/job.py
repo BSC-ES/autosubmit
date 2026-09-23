@@ -1809,7 +1809,7 @@ class Job:
         return parameters
 
     def process_scheduler_parameters(self, job_platform: 'Platform', chunk: int) -> None:
-        """Parsers yaml data stored in the dictionary and calculates the components of the heterogeneous job if any."""
+        """Parsers YAML data stored in the dictionary and calculates the components of the heterogeneous job if any."""
         if type(self.processors) is list:
             hetsize = (len(self.processors))
         else:
