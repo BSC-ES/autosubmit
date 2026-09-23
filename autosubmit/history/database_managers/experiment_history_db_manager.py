@@ -38,6 +38,7 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.db_utils import batch_size_for, chunked, max_params
 from autosubmit.database.migrations import (
+    ensure_schema_migrations_table,
     get_schema_version,
     record_migration,
     schema_migrations_table,
@@ -192,7 +193,7 @@ class SqlAlchemyExperimentHistoryDbManager:
                 conn.execute(CreateSchema(self.schema, if_not_exists=True))
             conn.execute(CreateTable(self.table_registry.get(ExperimentRunTable.name), if_not_exists=True))
             conn.execute(CreateTable(self.table_registry.get(JobDataTable.name), if_not_exists=True))
-            conn.execute(CreateTable(self._version_table, if_not_exists=True))
+            ensure_schema_migrations_table(conn, self._version_table)
             self._create_indexes(conn)
             self._set_db_version(conn, CURRENT_DB_VERSION)
             # TODO(#1286): implement the SQLite -> PostgreSQL data migration.

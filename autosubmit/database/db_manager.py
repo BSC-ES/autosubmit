@@ -37,6 +37,7 @@ from sqlalchemy.schema import CreateSchema, CreateTable, DropTable
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.migrations import (
+    ensure_schema_migrations_table,
     record_migration,
     schema_migrations_table,
 )
@@ -93,9 +94,7 @@ class DbManager:
         with engine.begin() as conn:
             if self.schema:
                 conn.execute(CreateSchema(self.schema, if_not_exists=True))
-            # TODO(#3114): centralize the table creation through
-            #             migrations.ensure_schema_migrations_table.
-            conn.execute(CreateTable(self._schema_migrations_table, if_not_exists=True))
+            ensure_schema_migrations_table(conn, self._schema_migrations_table)
             record_migration(conn, self._schema_migrations_table, self.SCHEMA_VERSION)
         self._schema_version_ensured = True
 
