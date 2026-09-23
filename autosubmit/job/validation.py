@@ -41,7 +41,7 @@ def _validate_section(as_conf: AutosubmitConfig, filter_section: str) -> None:
 
     :param as_conf: Autosubmit configuration object
     :param filter_section: string with the sections separated by comma
-    :return None if the filter is valid
+    :return: None if the filter is valid
     :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
     """
     section_validation_message = "\n## Section Validation Message ##"
@@ -122,7 +122,7 @@ def _validate_status(job_list: 'JobList', filter_status: str):
 
     :param job_list: JobList object containing the jobs to validate against
     :param filter_status: string with the statuses separated by space
-    :return None if the filter is valid
+    :return: None if the filter is valid
     :raises AutosubmitCritical: if the filter is invalid, with a message describing the errors found
     """
     status_validation_error = False
