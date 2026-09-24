@@ -18,6 +18,7 @@ several bug fixes and enhancements to improve the overall user experience.
 
 **New Features:**
 
+- Allow local project paths to use `~` for the user's home directory #3296.
 - Introduced SQLAlchemy as the main database backend for joblist management, replacing the previous pickle-based system. This change allows for better scalability and flexibility in handling large workflows.
 - Added support for PostgreSQL as a database backend, in addition to the default SQLite. This provides users with more options for database management.
 - Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
