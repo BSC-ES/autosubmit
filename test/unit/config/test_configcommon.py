@@ -52,6 +52,38 @@ def submitter(mocker):
     )
 
 
+@pytest.mark.parametrize('project_path', ['~', '~/autosubmit-src/project'])
+def test_local_project_path_expands_home(autosubmit_config, tmp_path, monkeypatch, project_path):
+    """Local projects under the user's home can be addressed with a tilde."""
+    monkeypatch.setenv('HOME', str(tmp_path))
+    project_dir = tmp_path / project_path.removeprefix('~').lstrip('/')
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / 'project.yml').write_text('PROJECT: {}\n')
+    as_conf = autosubmit_config(
+        expid=_EXPID, experiment_data={'LOCAL': {'PROJECT_PATH': project_path}})
+
+    actual = as_conf.get_local_project_path()
+
+    assert actual == project_dir
+    assert (actual / 'project.yml').read_text() == 'PROJECT: {}\n'
+
+
+@pytest.mark.parametrize('project_path', ['/opt/projects/demo', 'relative/project'])
+def test_local_project_path_preserves_other_paths(autosubmit_config, project_path):
+    """Paths without a home prefix retain their existing interpretation."""
+    as_conf = autosubmit_config(
+        expid=_EXPID, experiment_data={'LOCAL': {'PROJECT_PATH': project_path}})
+    assert as_conf.get_local_project_path() == Path(project_path)
+
+
+@pytest.mark.parametrize('local', [{}, {'PROJECT_PATH': ''}])
+def test_local_project_path_rejects_empty_path(autosubmit_config, local):
+    """An absent path must not become the current directory."""
+    as_conf = autosubmit_config(expid=_EXPID, experiment_data={'LOCAL': local})
+    with pytest.raises(AutosubmitCritical, match='Empty project path'):
+        as_conf.get_local_project_path()
+
+
 def test_get_submodules_list_default_empty_list(autosubmit_config: 'AutosubmitConfigFactory'):
     """If nothing is provided, we get a list with an empty string."""
     as_conf: AutosubmitConfig = autosubmit_config(expid='a000', experiment_data={})

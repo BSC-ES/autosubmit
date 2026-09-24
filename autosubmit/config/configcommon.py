@@ -2218,7 +2218,7 @@ class AutosubmitConfig:
         return self.get_section(['SVN', 'PROJECT_REVISION'])
 
     def get_local_project_path(self) -> Path:
-        """Gets path to origin for local project
+        """Gets path to origin for local project, expanding a user-home prefix.
 
         :return: path to local project
         :rtype: Path
@@ -2227,7 +2227,7 @@ class AutosubmitConfig:
         if not path:
             raise AutosubmitCritical(
                 "Empty project path! Please change this parameter to a valid one.", 7014)
-        return Path(path)
+        return Path(path).expanduser()
 
     def get_date_list(self):
         """
