@@ -595,14 +595,6 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter: list[str] | None = None
             else:
                 job_ids.append(str(job.id))
 
-    for platform, jobs in jobs_by_platform.items():
-        job_ids = []
-        for job in jobs:
-            if not job.id:
-                Log.warning(f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
-            else:
-                job_ids.append(str(job.id))
-
         if job_ids:
             Log.info(f'Cancelling jobs {", ".join(job_ids)} on platform {platform.name}')
             try:
