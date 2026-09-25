@@ -426,7 +426,7 @@ The reconnection behaviour described above applies after the workflow has
 started running. If the very first connection attempt at the start of
 ``autosubmit run`` fails, Autosubmit makes two internal retries within a
 single connection attempt and then aborts if both fail — see
-:ref:`userguide/run/index:retries` for the retry configuration Autosubmit
+:ref:`ssh_retries` for the retry configuration Autosubmit
 exposes at the workflow level.
 
 Filesystem operations during a run
