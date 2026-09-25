@@ -99,7 +99,7 @@ def handle_start_after(start_after: str, expid: str) -> None:
             sleep(60)
 
 
-def get_allowed_members(run_members: str, as_conf: AutosubmitConfig) -> list[str] | list[Any]:
+def get_allowed_members(run_members: str | None, as_conf: AutosubmitConfig) -> list[str] | list[Any]:
     """Check if the members sent are allowed
 
    :param run_members: str

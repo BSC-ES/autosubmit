@@ -695,13 +695,11 @@ class ParamikoPlatform(Platform):
 
         :param script_names: Script filenames to submit on the remote
             platform.
-        :type script_names: list[str]
         :raises AutosubmitError: If the submission command fails or no submit
             output can be parsed.
         :raises AutosubmitCritical: If Slurm reports a critical submission
             failure.
         :return: Submitted Slurm job identifiers in submission order.
-        :rtype: list[int]
         """
 
         if not script_names:
@@ -714,7 +712,7 @@ class ParamikoPlatform(Platform):
         self.send_command(cmd)
         jobs_ids = None
 
-        # If it is is a critical, no jobs will be submitted at all, stop autosubmit
+        # If it is a critical, no jobs will be submitted at all, stop autosubmit
         with suppress(AutosubmitError):
             jobs_ids = self.get_submitted_job_id(self.get_ssh_output())
 
