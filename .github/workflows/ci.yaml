@@ -13,6 +13,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Disable the ryuk sidekick container used in TestContainers to monitor
+  # the test containers launched (and kill them -- what a sidekick...).
+  TESTCONTAINERS_RYUK_DISABLED: true
+
 jobs:
   test-unit:
     env:
