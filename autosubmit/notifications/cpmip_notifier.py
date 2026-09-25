@@ -122,7 +122,7 @@ def _estimate_cpus(job) -> int | None:
 
 
 def _simulated_years(job, as_conf) -> float | None:
-    """Return chunk duration in simulated years, honouring the experiment calendar.
+    """Return chunk duration in simulated years, honoring the experiment calendar.
 
     Uses the same calendar primitives the Job class relies on so the result
     matches what the workflow would compute for ``RUN_DAYS``.

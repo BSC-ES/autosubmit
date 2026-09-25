@@ -35,6 +35,7 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.helpers.enums import ChunkUnit
+from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
@@ -169,6 +170,7 @@ class JobList:
         raise AttributeError("job_list is a dynamic view and cannot be directly modified.")
 
     @property
+    @autosubmit_parameter(name='expid', group='default')
     def expid(self):
         """Returns the experiment identifier
 
