@@ -24,6 +24,7 @@ from getpass import getuser
 from pathlib import Path
 from shutil import copy
 from textwrap import dedent
+from threading import Event
 from typing import TYPE_CHECKING
 
 import pytest
@@ -32,6 +33,7 @@ from ruamel.yaml import YAML
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.experiment.manage import create
 from autosubmit.helpers.utils import build_and_connect_platform
+from autosubmit.job.job_list import JobList
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.workflow.manage import inspect, monitor, run
 from test.integration.commands.run.conftest import (
@@ -156,6 +158,7 @@ def test_run_interrupted(
         slurm_server: 'Container',
         prepare_scratch,
         general_data,
+        mocker,
 ):
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
@@ -166,19 +169,43 @@ def test_run_interrupted(
     log_dir = tmp_path / f"LOG_{as_exp.expid}"
     as_conf.set_last_as_command('run')
 
-    for _ in range(3):
-        as_thread, _, stop_event = run_in_thread(
-            run,
-            expid=as_exp.expid
-        )
+    # NOTE: Before, we had a for-loop, iterating three times, launching
+    #       the experiment THREE times in a thread, and then setting the
+    #       stop event. We never noticed the three calls. And the test
+    #       was one of the slowest. The ``time.sleep`` is an antipattern
+    #       that we must avoid at all costs in tests.
 
-        time.sleep(4)
+    # Here we are creating an event, and using it as a "Spy". We replace the
+    # ``JobList.get_ready`` function. That function is now the trigger for our
+    # spy to tell it was called.
+    ready_checked = Event()
 
-        if as_thread.is_alive():
-            stop_event.set()
-            as_thread.join(timeout=60)
+    original_get_ready = JobList.get_ready
 
-        assert not as_thread.is_alive(), "Autosubmit thread did not stop as expected."
+    def get_ready_spy(self, *args, **kwargs):
+        ready_checked.set()
+        return original_get_ready(self, *args, **kwargs)
+
+    mocker.patch.object(
+        JobList,
+        "get_ready",
+        get_ready_spy,
+    )
+
+    # Launch Autosubmit in a thread, so we can terminate it later...
+    as_thread, result, stop_event = run_in_thread(run, expid=as_exp.expid)
+
+    # Our spy has 30 seconds to be called, or... explode?
+    assert ready_checked.wait(timeout=30), (
+        "Autosubmit did not reach the main loop within 30 seconds"
+    )
+
+    stop_event.set()
+    as_thread.join(timeout=60)
+
+    assert not as_thread.is_alive(), "Autosubmit thread did not stop as expected."
+    if result["exception"] is not None:
+        raise result["exception"]
 
     exit_code = run(expid=as_exp.expid)
 
