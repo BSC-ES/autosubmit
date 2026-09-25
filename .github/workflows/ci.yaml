@@ -148,7 +148,7 @@ jobs:
           export DISPLAY=:99
 
           pytest \
-            -n $(nproc) \
+            -n 2 \
             test/integration \
             -m "${{ matrix.pytest-markers }}"
 
