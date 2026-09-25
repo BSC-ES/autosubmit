@@ -405,19 +405,22 @@ def ssh_x11_mfa_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") 
         copy_content_from_containers(request, 'ssh_server', 'app/')
 
 
-@pytest.fixture(scope="function")
-def slurm_server(request, tmp_path, mocker) -> Generator["Container", Any, None]:
-    """Function-scoped fixture that creates a Slurm server container per test."""
-    # TODO: Needed? If so, explain why.
-    mocker.patch(
+@pytest.fixture(scope="module")
+def slurm_server(request, tmp_path_factory) -> Generator["Container", Any, None]:
+    """Module-scoped fixture that creates a Slurm server container per test module, reusing it across tests."""
+    from unittest.mock import patch
+    mp_patcher = patch(
         'autosubmit.platforms.platform.Platform.get_mp_context',
         return_value=multiprocessing.get_context('fork')
     )
+    mp_patcher.start()
+    ssh_dir = tmp_path_factory.mktemp("slurm_ssh")
     container, ssh_port = get_slurm_container()
     with container:
-        prepare_and_test_slurm_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
+        prepare_and_test_slurm_container(container, ssh_port, ssh_dir, mocker=None)
         yield container.get_wrapped_container()
         copy_content_from_containers(request, 'slurm_server', '/tmp/scratch/group/root/')
+    mp_patcher.stop()
 
 
 @pytest.fixture(autouse=True)
@@ -427,6 +430,17 @@ def clear_platform_worker_events() -> Generator[None, None, None]:
     with suppress(Exception):
         from autosubmit.platforms.platform import Platform
         Platform.worker_events.clear()
+
+
+@pytest.fixture(autouse=True)
+def cleanup_slurm_queue(request) -> Generator[None, None, None]:
+    """Clean up running or pending Slurm jobs after each test when slurm_server is active."""
+    yield
+    if 'slurm_server' in request.fixturenames:
+        with suppress(Exception):
+            server = request.getfixturevalue('slurm_server')
+            server.exec_run(["bash", "-c", "scancel -u root -f 2>/dev/null || true"])
+
 
 
 @pytest.fixture
