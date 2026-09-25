@@ -4,6 +4,7 @@ Developers Guide
 
 .. toctree::
    /devguide/platforms/index
+   /devguide/database/index
 
 Command list
 ============

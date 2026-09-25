@@ -24,7 +24,7 @@ RO-Crate
 RO-Crate is a community standard adopted by other workflow managers
 to package research data with their metadata. It is extensible, and contains
 profiles to package computational workflows. From the `RO-Crate`_ website,
-“What is RO-Crate?”:
+"What is RO-Crate?":
 
 .. pull-quote::
   RO-Crate is a community effort to establish a lightweight approach to

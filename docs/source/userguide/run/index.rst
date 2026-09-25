@@ -2,13 +2,13 @@ Running Experiments
 ===================
 
 Run an experiment
--------------------
+-----------------
 
 Launch Autosubmit with the command:
 
 .. code-block:: bash
 
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID>
 
@@ -28,14 +28,14 @@ Example:
 
 .. code-block:: bash
 
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     nohup autosubmit run <EXPID> &
 
 .. important:: Before launching Autosubmit, check that password-less ssh is feasible (*HPCName* is the hostname).
 .. important:: Add encryption key to ssh agent for each session (if your ssh key is encrypted).
 
-.. important:: The host machine has to be able to access HPC's/Clusters via password-less ssh. Make sure that the ssh key is in PEM format `ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM`.
+.. important:: The host machine has to be able to access HPC's/Clusters via password-less ssh. Make sure that the ssh key is in PEM format ``ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM``.
 
     ``ssh HPCName``
 
@@ -54,8 +54,8 @@ This can be disabled by setting the property ``CONFIG.GIT_OPERATIONAL_CHECK_ENAB
 to ``False`` (it is ``True`` by default). Note, however, that this is discouraged as
 it would affect the traceability of operational experiments.
 
-How to run an experiment that was created with another version
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Running an experiment created with another version
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. important:: First of all you have to stop your Autosubmit instance related with the experiment
 
@@ -65,12 +65,12 @@ Once you've already loaded / installed the Autosubmit version do you want:
 
     autosubmit create <EXPID>
     autosubmit recovery <EXPID> -s --all -f
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID> -v
     or
     autosubmit updateversion <EXPID>
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID> -v
 
@@ -79,8 +79,8 @@ The most common problem when you change your Autosubmit version is the apparitio
 This is due to how Autosubmit saves internally the data, which can be incompatible between versions.
 The steps above represent the process to re-create (1) these internal data structures and to recover (2) the previous status of your experiment.
 
-How to run an experiment that was created with version <= 4.0.0
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Running an experiment created with version 4.0.0 or earlier
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. important:: First of all you have to stop your Autosubmit instance related with the experiment.
 
@@ -91,12 +91,12 @@ Once you've already loaded / installed the Autosubmit version do you want:
     autosubmit upgrade <EXPID>
     autosubmit create <EXPID>
     autosubmit recovery <EXPID> -s --all -f
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID> -v
     or
     autosubmit updateversion <EXPID>
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID> -v
 
@@ -105,28 +105,28 @@ The most common problem when you upgrade an experiment with INI configuration to
 Ensure that all your <EXPID>/conf/\*.yml files are correct and also revise the templates in <EXPID>/proj/$proj_name.
 
 
-How to run only selected members
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Running only selected members
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To run only a subset of selected members you can execute the command:
 
     .. code-block:: bash
 
-        # Add your key to ssh agent ( if encrypted )
+        # Add your key to ssh agent (if encrypted)
         ssh-add ~/.ssh/id_rsa
         autosubmit run <EXPID> -rom MEMBERS
 
 *<EXPID>* is the experiment identifier, the experiment you want to run.
 
-*MEMBERS* is the selected subset of members. Format `"member1 member2 member2"`, example: `"fc0 fc1 fc2"`.
+*MEMBERS* is the selected subset of members. Format ``"member1 member2 member2"``, example: ``"fc0 fc1 fc2"``.
 
 Then, your experiment will start running jobs belonging to those members only. If the experiment was previously running and autosubmit was stopped when some jobs belonging to other members (not the ones from your input) where running, those jobs will be tracked and finished in the new exclusive run.
 
-Furthermore, if you wish to run a sequence of only members execution, then instead of running `autosubmit run -rom "member_1"` ... `autosubmit run -rom "member_n"`, you can make a bash file with that sequence and run the bash file. Example:
+Furthermore, if you wish to run a sequence of only members execution, then instead of running ``autosubmit run -rom "member_1"`` ... ``autosubmit run -rom "member_n"``, you can make a bash file with that sequence and run the bash file. Example:
 
 .. code-block:: bash
 
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID> -rom MEMBER_1
     autosubmit run <EXPID> -rom MEMBER_2
@@ -134,14 +134,14 @@ Furthermore, if you wish to run a sequence of only members execution, then inste
     ...
     autosubmit run <EXPID> -rom MEMBER_N
 
-How to start an experiment at a given time
-------------------------------------------
+Starting an experiment at a given time
+--------------------------------------
 
 To start an experiment at a given time, use the command:
 
 .. code-block:: bash
 
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID> -st INPUT
 
@@ -153,19 +153,19 @@ To start an experiment at a given time, use the command:
 
 Then, your terminal will show a countdown for your experiment start.
 
-This functionality can be used together with other options supplied by the `run` command.
+This functionality can be used together with other options supplied by the ``run`` command.
 
-The `-st` command has a long version `--start_time`.
+The ``-st`` command has a long version ``--start_time``.
 
 
-How to start an experiment after another experiment is finished
----------------------------------------------------------------
+Starting an experiment after another finishes
+---------------------------------------------
 
 To start an experiment after another experiment is finished, use the command:
 
 .. code-block:: bash
 
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     autosubmit run <EXPID> -sa <EXPIDB>
 
@@ -173,18 +173,18 @@ To start an experiment after another experiment is finished, use the command:
 
 *<EXPIDB>* is the experiment identifier of the experiment you are waiting for before your experiment starts.
 
-.. warning:: Both experiments must be using Autosubmit version `3.13.0` or later.
+.. warning:: Both experiments must be using Autosubmit version ``3.13.0`` or later.
 
 Then, your terminal will show the current status of the experiment you are waiting for. The status format is ``COMPLETED/QUEUING/RUNNING/SUSPENDED/FAILED``.
 
-This functionality can be used together with other options supplied by the `run` command.
+This functionality can be used together with other options supplied by the ``run`` command.
 
-The `-sa` command has a long version `--start_after`.
+The ``-sa`` command has a long version ``--start_after``.
 
 .. _run_profiling:
 
-How to profile Autosubmit while running an experiment
------------------------------------------------------
+Profiling Autosubmit while running
+----------------------------------
 
 Autosubmit offers the possibility to profile an experiment execution. To enable the profiler, just
 add the ``--profile`` flag to your ``autosubmit run`` command, as in the following example:
@@ -197,8 +197,8 @@ add the ``--profile`` flag to your ``autosubmit run`` command, as in the followi
 
 .. _run_modes:
 
-How to prepare an experiment to run in two independent job_list. (Priority jobs, Two-step-run) (OLD METHOD)
------------------------------------------------------------------------------------------------------------
+Two-step run: old method
+------------------------
 
 This feature allows to run an experiment in two separated steps without the need of do anything manually.
 
@@ -214,12 +214,12 @@ It can be activated through TWO_STEP_START and it is set on expdef_<EXPID>.yml, 
         CHUNKSIZEUNIT: day
         CHUNKSIZE: 1
         NUMCHUNKS: 10
-        CHUNKINI :
+        CHUNKINI:
         CALENDAR: standard
         # To run before the rest of experiment:
         TWO_STEP_START: <job_names&section,dates,member_or_chunk(M/C),chunk_or_member(C/M)>
 
-In order to be easier to use, there are Three  modes for use this feature: job_names and section,dates,member_or_chunk(M/C),chunk_or_member(C/M).
+In order to be easier to use, there are Three modes for use this feature: job_names and section,dates,member_or_chunk(M/C),chunk_or_member(C/M).
 
 * By using job_names alone, you will need to put all jobs names one by one divided by the char , .
 * By using section,dates,member_or_chunk(M/C),chunk_or_member(C/M). You will be able to select multiple jobs at once combining these filters.
@@ -248,16 +248,16 @@ Guess the expdef configuration as follow:
         NUMCHUNKS: 2
         TWO_STEP_START: a02n_20120101_000_1_REDUCE&COMPILE_DA,SIM;20120101;c[1]
 
-Given this job_list ( jobs_conf has REMOTE_COMPILE(once),DA,SIM,REDUCE)
+Given this job_list (jobs_conf has REMOTE_COMPILE(once),DA,SIM,REDUCE)
 
 ['a02n_REMOTE_COMPILE', 'a02n_20120101_000_1_SIM', 'a02n_20120101_000_2_SIM', 'a02n_20120101_001_1_SIM', 'a02n_20120101_001_2_SIM', 'a02n_COMPILE_DA', 'a02n_20120101_1_DA', 'a02n_20120101_2_DA', 'a02n_20120101_000_1_REDUCE', 'a02n_20120101_000_2_REDUCE', 'a02n_20120101_001_1_REDUCE', 'a02n_20120101_001_2_REDUCE']
 
-The priority jobs will be ( check TWO_STEP_START from expdef conf):
+The priority jobs will be (check TWO_STEP_START from expdef conf):
 
 ['a02n_20120101_000_1_SIM', 'a02n_20120101_001_1_SIM', 'a02n_COMPILE_DA', 'a02n_20120101_000_1_REDUCE']
 
-How to prepare an experiment to run in two independent job_list. (New method)
------------------------------------------------------------------------------
+Two-step run: new method
+------------------------
 
 From AS4, TWO_STEP_START is not longer needed since the users can now specify exactly which tasks of a job are needed to run the current task in the DEPENDENCIES parameter.
 
@@ -403,14 +403,14 @@ Finally, you can launch Autosubmit *run* in background and with ``nohup`` (conti
 
 .. code-block:: bash
 
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to ssh agent (if encrypted)
     ssh-add ~/.ssh/id_rsa
     nohup autosubmit run <EXPID> &
 
-How to stop the experiment
---------------------------
+Stopping the experiment
+-----------------------
 
-From Autosubmit 4.1.6, you can stop an experiment using the command `autosubmit stop`
+From Autosubmit 4.1.6, you can stop an experiment using the command ``autosubmit stop``
 
 Options:
 

@@ -149,8 +149,8 @@ The resulting workflow can be seen in :numref:`fig-dependencies-previous` for an
 .. warning::
 
    Autosubmit simplifies the dependencies, so the final graph usually does not show all the lines that you may expect to
-   see. In this example you can see that there are no lines between the `ini` and the `sim` jobs for chunks 2 to 5 because
-   that dependency is redundant with the one on the previous `sim`
+   see. In this example you can see that there are no lines between the ``ini`` and the ``sim`` jobs for chunks 2 to 5 because
+   that dependency is redundant with the one on the previous ``sim``
 
 
 .. autosubmitfigure::
@@ -269,7 +269,7 @@ This can be achieved using the ``START_CONDITIONS`` feature based on the depende
 
 Start conditions are achieved by adding the keyword ``STATUS`` and optionally ``FROM_STEP`` keywords into any dependency that you want.
 
-The ``STATUS`` keyword can be used to select the status of the dependency that you want to check. The possible values ( case-insensitive ) are:
+The ``STATUS`` keyword can be used to select the status of the dependency that you want to check. The possible values (case-insensitive) are:
 See :ref:`job_status_reference` for a complete reference and meanings.
 
 
@@ -328,7 +328,7 @@ The status are ordered, so if you select ``RUNNING`` status, the task will be ru
         RUNNING: chunk
 
 
-The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. The possible value is an integer. Additionally, the target dependency, must call to `%AS_CHECKPOINT%` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.
+The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. The possible value is an integer. Additionally, the target dependency, must call to ``%AS_CHECKPOINT%`` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.
 
 .. code-block:: yaml
 
@@ -1269,7 +1269,7 @@ Workflow examples:
 ------------------
 
 Example 1: How to select a specific chunk
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. WARNING::
    This example illustrates the old select_chunk.

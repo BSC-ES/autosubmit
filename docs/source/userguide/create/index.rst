@@ -33,8 +33,8 @@ Examples:
     # Create dummy experiment for testing
     autosubmit expid -dm -d "dummy test"
 
-Configuring Default Platforms
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Configuring default platforms
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If you have an ``autosubmitrc`` or ``.autosubmitrc`` file in your home directory, you can configure a default platforms file that will be used as a template for new experiments.
 
@@ -76,7 +76,7 @@ Examples:
     autosubmit expid -y a0b1 -H ithaca -d "Copy of experiment a0b1"
 
     # Copy with custom configuration path
-    autosubmit expid -y a0b1 -p "/esarchive/autosubmit/genericFiles/conf" \
+    autosubmit expid -y a0b1 -c "/esarchive/autosubmit/genericFiles/conf" \
                      -H marenostrum4 -d "Modified copy of a0b1"
 
 .. warning:: You can only copy experiments created with Autosubmit 3.11 or above.
@@ -112,7 +112,7 @@ Example:
     autosubmit expid -H ithaca -dm -d "Testing Autosubmit configuration"
 
 Create a test case experiment
-------------------------------
+-----------------------------
 
 Test case experiments use a reserved "t" prefix in their experiment ID to distinguish testing suites from production runs. They allow you to create experiments with specific configurations for testing purposes.
 
@@ -136,7 +136,7 @@ Example:
 .. _create_profiling:
 
 Profiling experiment creation
-------------------------------
+-----------------------------
 
 You can profile the experiment creation process to analyze performance.
 To enable profiling, add the ``--profile`` flag to your ``autosubmit create`` command:

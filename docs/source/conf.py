@@ -205,7 +205,7 @@ html_logo = '_static/Logo.svg'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ['_static', 'media/fig']
 
 # These paths are either relative to html_static_path
 # or fully qualified paths (eg. https://...)
@@ -228,11 +228,12 @@ html_css_files = [
 # html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
-html_sidebars: dict[str, list[str]] = {
-    "qstartguide/index": [],
+html_sidebars = {
+    "**": ["sidebar-nav-bs"],
+    "qstartguide/index": [], 
     "installation/index": [],
-    "database/index": [], 
-    "devguide/platforms/index": [],             
+    "database/index": [],
+    "media/index": []              
 }
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
