@@ -52,10 +52,6 @@ if TYPE_CHECKING:
 
 _PLATFORM_NAME = 'TEST_SLURM'
 
-pytestmark = [
-    pytest.mark.xdist_group("slurm"),
-]
-
 
 def _create_slurm_platform(expid: str, as_conf: AutosubmitConfig):
     return SlurmPlatform(expid, _PLATFORM_NAME, config=as_conf.experiment_data, auth_password=None)
@@ -1102,6 +1098,7 @@ def test_check_if_packages_are_ready_to_build(autosubmit_exp):
 
 
 @pytest.mark.timeout(120)
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.docker
 @pytest.mark.slurm
 @pytest.mark.ssh

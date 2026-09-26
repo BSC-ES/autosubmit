@@ -26,7 +26,7 @@ an extra and not very well-tested)."""
 import os
 import pwd
 import sqlite3
-from contextlib import suppress
+from collections.abc import Callable
 from pathlib import Path
 from threading import Event, Thread
 from typing import Any
@@ -35,7 +35,6 @@ import pytest
 
 # TODO expand the tests (Ecplatform, PJM) whenever possible
 # TODO The db check could be improved to check everything not only the job_data table
-
 
 @pytest.fixture
 def prepare_scratch(tmp_path: Path) -> Any:

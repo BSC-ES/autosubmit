@@ -743,33 +743,6 @@ def copy_code(
                 7062,
             )
         Log.debug(f"{output}")
-        Log.debug(f"The project folder {local_proj_dir} has been created.")
-        Log.info(
-            f"Checking out revision {svn_project_revision + ' ' + svn_project_url} into {local_proj_dir}"
-        )
-        try:
-            output = subprocess.check_output(
-                "cd "
-                + local_proj_dir
-                + "; svn --force-interactive checkout -r "
-                + svn_project_revision
-                + " "
-                + svn_project_url
-                + " "
-                + project_destination,
-                shell=True,
-            )
-        except subprocess.CalledProcessError:
-            try:
-                rmtree(local_proj_dir, ignore_errors=True)
-            except Exception:
-                pass
-            raise AutosubmitCritical(
-                f"Can not check out revision {svn_project_revision} {svn_project_url} "
-                f"into {local_proj_dir}",
-                7062,
-            )
-        Log.debug(f"{output}")
     elif project_type == "local":
         local_project: Path = as_conf.get_local_project_path()
         if not local_project:

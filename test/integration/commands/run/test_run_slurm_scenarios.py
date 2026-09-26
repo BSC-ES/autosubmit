@@ -50,12 +50,8 @@ from test.integration.conftest import AutosubmitExperimentFixture
 if TYPE_CHECKING:
     from docker.models.containers import Container
 
-pytestmark = [
-    pytest.mark.xdist_group("slurm"),
-]
-
-
 @pytest.mark.docker
+@pytest.mark.xdist_group("slurm")
 @pytest.mark.slurm
 @pytest.mark.ssh
 @pytest.mark.parametrize("jobs_data,expected_db_entries,final_status,wrapper_type", [

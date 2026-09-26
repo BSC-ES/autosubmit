@@ -104,22 +104,14 @@ def make_ssh_client(ssh_port: int, password: str | None, key: Union['Path', str]
     return ssh_client
 
 
-def mock_ssh_config_and_client(ssh_config_path: Path, ssh_port: int, password: str | None, mocker: Any = None) -> Any:
+def mock_ssh_config_and_client(ssh_config_path: Path, ssh_port: int, password: str | None, mocker: 'MockerFixture') -> Any:
     ssh_config = paramiko.SSHConfig()
     with open(ssh_config_path, 'r') as f:
         ssh_config.parse(f)
     if password:
         ssh_client = make_ssh_client(ssh_port, password, None)
-        if mocker is not None and hasattr(mocker, 'patch'):
-            mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
-        else:
-            from unittest.mock import patch
-            patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client).start()
-    if mocker is not None and hasattr(mocker, 'patch'):
-        return mocker.patch('autosubmit.platforms.paramiko_platform._load_ssh_config', return_value=ssh_config)
-    else:
-        from unittest.mock import patch
-        return patch('autosubmit.platforms.paramiko_platform._load_ssh_config', return_value=ssh_config).start()
+        mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+    return mocker.patch('autosubmit.platforms.paramiko_platform._load_ssh_config', return_value=ssh_config)
 
 
 def _generate_ssh_keypair(path: Path):

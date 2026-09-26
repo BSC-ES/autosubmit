@@ -406,21 +406,20 @@ def ssh_x11_mfa_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") 
 
 
 @pytest.fixture(scope="module")
-def slurm_server(request, tmp_path_factory) -> Generator["Container", Any, None]:
+def slurm_server(request, tmp_path_factory, module_mocker: "MockerFixture") -> Generator["Container", Any, None]:
     """Module-scoped fixture that creates a Slurm server container per test module, reusing it across tests."""
-    from unittest.mock import patch
-    mp_patcher = patch(
+    # Patch multiprocessing start method to 'fork' in test environment so child worker processes
+    # inherit active pytest fixtures, monkeypatches, and in-memory mock dispatchers (Platform defaults to 'spawn').
+    module_mocker.patch(
         'autosubmit.platforms.platform.Platform.get_mp_context',
         return_value=multiprocessing.get_context('fork')
     )
-    mp_patcher.start()
     ssh_dir = tmp_path_factory.mktemp("slurm_ssh")
     container, ssh_port = get_slurm_container()
     with container:
-        prepare_and_test_slurm_container(container, ssh_port, ssh_dir, mocker=None)
+        prepare_and_test_slurm_container(container, ssh_port, ssh_dir, module_mocker)
         yield container.get_wrapped_container()
         copy_content_from_containers(request, 'slurm_server', '/tmp/scratch/group/root/')
-    mp_patcher.stop()
 
 
 @pytest.fixture(autouse=True)
@@ -440,7 +439,6 @@ def cleanup_slurm_queue(request) -> Generator[None, None, None]:
         with suppress(Exception):
             server = request.getfixturevalue('slurm_server')
             server.exec_run(["bash", "-c", "scancel -u root -f 2>/dev/null || true"])
-
 
 
 @pytest.fixture

@@ -26,9 +26,6 @@ if TYPE_CHECKING:
     from docker.models.containers import Container
 
 
-import subprocess
-
-
 # svn operational check
 
 def _get_experiment_data() -> dict:
@@ -44,8 +41,6 @@ def _get_experiment_data() -> dict:
             'PROJECT_DESTINATION': 'svn-project',
         },
         'SVN': {
-            'PROJECT_URL': 'http://localhost/svn/svn-project',
-            'PROJECT_REVISION': '1',
         },
         'CUSTOM_CONFIG': {
             'USER': 'svnadmin',
@@ -54,41 +49,33 @@ def _get_experiment_data() -> dict:
     }
 
 
-@pytest.fixture
-def mock_svn(mocker):
-    """Mocks external SVN CLI subprocess calls to eliminate network latency and Docker container overhead."""
-    original_check_output = subprocess.check_output
-
-    def _mock_check_output(cmd, *args, **kwargs):
-        if isinstance(cmd, str) and 'svn' in cmd:
-            # Match svn checkout command: "cd <local_proj_dir>; svn ... checkout -r <rev> <url> <dest>"
-            if 'checkout' in cmd:
-                parts = cmd.split(';')
-                cd_part = parts[0].strip()
-                local_proj_dir_str = cd_part.replace('cd ', '').strip()
-                local_proj_dir = Path(local_proj_dir_str)
-                proj_dest = local_proj_dir / 'svn-project'
-                (proj_dest / 'branches').mkdir(parents=True, exist_ok=True)
-                (proj_dest / 'tags').mkdir(parents=True, exist_ok=True)
-                (proj_dest / 'trunk').mkdir(parents=True, exist_ok=True)
-                return b"Checked out revision 1.\n"
-            return b""
-        return original_check_output(cmd, *args, **kwargs)
-
-    mocker.patch('subprocess.check_output', side_effect=_mock_check_output)
-
-
 @pytest.mark.svn
+@pytest.mark.docker
 def test_svn_submodules_dirty(
         autosubmit_exp: Callable,
-        mock_svn,
+        svn_server: tuple['Container', Path, str],
         tmp_path
 ) -> None:
-    """Tests that Autosubmit detects dirty local svn submodules with mocked SVN calls.
+    """Tests that Autosubmit detects dirty local svn submodules, especially with operational experiments.
 
-    Mocking external SVN calls eliminates the ~2 minute network and Docker container latency.
+    This test has a svn repository with a svn submodule. The parameters in this test control whether the
+    svn repository and the svn submodule contents will be committed and pushed.
+
+    If the user has non-committed or non-pushed changes in the repository or submodule, the code is
+    expected to fail, raising an error when the experiment is operational.
     """
+
+    _container, svn_repos_path, svn_url = svn_server  # type: Container, Path, str # type: ignore
+
+    svn_repo = svn_repos_path / 'svn-project'
+
     experiment_data = _get_experiment_data()
+    experiment_data['PROJECT']['PROJECT_TYPE'] = 'svn'
+    experiment_data['SVN']['PROJECT_URL'] = f'{svn_url}/{svn_repo.name}'
+    experiment_data['SVN']['PROJECT_REVISION'] = '1'
+    experiment_data['CUSTOM_CONFIG']['USER'] = 'svnadmin'
+    experiment_data['CUSTOM_CONFIG']['PASSWORD'] = 'test'
+
     as_exp = autosubmit_exp('t001', experiment_data=experiment_data)
     proj_dir = Path(as_exp.as_conf.get_project_dir())
 
@@ -96,4 +83,3 @@ def test_svn_submodules_dirty(
     assert (proj_dir / 'branches').exists()
     assert (proj_dir / 'tags').exists()
     assert (proj_dir / 'trunk').exists()
-
