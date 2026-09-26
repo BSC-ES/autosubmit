@@ -49,7 +49,6 @@ def _get_experiment_data() -> dict:
     }
 
 
-@pytest.mark.xfail(reason="Not working yet, needs to be fixed")
 @pytest.mark.svn
 @pytest.mark.docker
 def test_svn_submodules_dirty(
