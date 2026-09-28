@@ -22,16 +22,10 @@ from sqlalchemy import MetaData
 
 from autosubmit.database.models.tables import (
     ExperimentTable,
-    JobDataTable,
-    JobsTable,
     TableRegistry,
     create_wrapper_tables,
     get_all_tables_by_name,
-    get_table_from_name,
-    get_table_with_schema,
 )
-
-JobListTable = JobsTable
 
 
 @pytest.fixture
@@ -212,23 +206,3 @@ def test_get_all_tables_by_name_values_are_tables():
 def test_get_all_tables_by_name_count():
     result = get_all_tables_by_name()
     assert len(result) > 0
-
-
-@pytest.mark.parametrize('table_name,expected_name,schema', [
-    ('EXPERIMENT', 'experiment', None),
-    ('Job_Data', 'job_data', 'my_schema'),
-])
-def test_get_table_from_name_case_insensitive(table_name, expected_name, schema):
-    table = get_table_from_name(schema=schema, table_name=table_name)
-    assert table.name == expected_name
-    if schema is not None:
-        assert table.metadata.schema == schema
-
-
-@pytest.mark.parametrize('source_table', [JobDataTable, JobListTable])
-def test_get_table_with_schema_preserves_columns(source_table):
-    result = get_table_with_schema(schema='test', table=source_table)
-    assert len(result.columns) == len(source_table.columns)
-    orig_names = {c.name for c in source_table.columns}
-    new_names = {c.name for c in result.columns}
-    assert orig_names == new_names

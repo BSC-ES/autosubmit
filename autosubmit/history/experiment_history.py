@@ -70,7 +70,7 @@ class ExperimentHistory:
         return self._manager
 
     def initialize_database(self):
-        """Initialize the database manager, creating tables and running schema migrations."""
+        """Initialize the database manager, creating tables and applying missing-column migrations."""
         try:
             self.manager.initialize()
         except Exception as exp:
@@ -202,7 +202,7 @@ class ExperimentHistory:
 
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
                          job_id: int = 0, wrapper_queue: str | None = None, wrapper_code: str | None = None,
-                         children: str = "", fail_count: int = 0) -> JobData:
+                         children: str = "", fail_count: int = 0) -> JobData | None:
         """
         Updates the start time and other details of a job in the database.
 
@@ -234,7 +234,7 @@ class ExperimentHistory:
 
     def write_finish_time(self, job_name: str, finish: int = 0, status: str = "UNKNOWN", job_id: int = 0,
                           out_file: str | None = None, err_file: str | None = None,
-                          fail_count: int = 0) -> JobData:
+                          fail_count: int = 0) -> JobData | None:
         """Updates the finish time and other details of a job in the database.
 
         :param job_name: The name of the job.
@@ -539,7 +539,7 @@ def get_historical_database(expid, job_list, as_conf):
     :param expid: a string with the experiment id
     :param job_list: a JobList object
     :param as_conf: a AutosubmitConfig object
-    :return: an experiment history object
+    :return: The ``ExperimentHistory`` instance, or ``None`` if it could not be created.
     """
     exp_history = None
     try:
@@ -552,14 +552,14 @@ def get_historical_database(expid, job_list, as_conf):
                                                     status_counts=job_list.get_status_counts())
         job_list.run_id = run_dc.run_id if run_dc else None
         # TODO: Restore database backup after 4.2.0 joblist? https://github.com/BSC-ES/autosubmit/issues/3179
-        # Autosubmit.database_backup(expid)
+        # db_common.database_backup(expid)
     except Exception:
         Log.warning(f"Couldn't access the historical database for experiment {expid}")
 
     try:
         ExperimentStatus(expid).set_as_running()
     except Exception as e:
-        # Connection to status database ec_earth.db can fail.
+        # Connection to the experiment-status database (as_times) can fail.
         # API worker will fix the status.
         Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
                   f"{BasicConfig.AS_TIMES_DB_PATH}. Exception: {str(e)}", 7003)

@@ -80,8 +80,8 @@ def _insert_run(manager: HistoricalDbManager) -> int:
         "metadata": None,
     }
     manager.insert(ExperimentRunTable.name, run_data)
-    result = manager.select_first_where(ExperimentRunTable.name, where=None)
-    return result[0]  # run_id is the first column (primary key, auto-incremented)
+    rows = manager.select_all_with_columns(ExperimentRunTable.name)
+    return rows[0][0][1]  # run_id is the first column (primary key, auto-incremented)
 
 
 def test_historical_db_manager_uses_sqlite_engine(autosubmit_exp) -> None:
@@ -218,11 +218,11 @@ def test_save_historical_edges_stores_correct_values(autosubmit_exp) -> None:
 
     manager._save_historical_edges(_SAMPLE_EDGES, run_id)
 
-    row = manager.select_first_where(
-        StructureDataTable.name,
-        where={"e_from": "a001_LOCAL_SETUP", "e_to": "a001_REMOTE_SETUP"},
+    rows = manager.select_where_with_columns(
+        StructureDataTable,
+        {"e_from": "a001_LOCAL_SETUP", "e_to": "a001_REMOTE_SETUP"},
     )
-    assert row is not None
+    assert rows
 
 
 def test_save_historical_edges_upserts_on_conflict(autosubmit_exp) -> None:

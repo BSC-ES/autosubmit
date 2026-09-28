@@ -254,7 +254,6 @@ class JobData:
         Calculates and returns the running time of the job, in seconds.
 
         :return: Running time in seconds.   
-        :rtype: int
         """
         if self.status in ["RUNNING", "COMPLETED", "FAILED"]:
             return HUtils.calculate_run_time_in_seconds(self.start, self.finish)
@@ -266,7 +265,6 @@ class JobData:
         Calculates and returns the queuing time of the job, in seconds.
 
         :return: Queueing time in seconds.   
-        :rtype: int
         """
         if self.status in ["SUBMITTED", "QUEUING", "RUNNING", "COMPLETED", "HELD", "PREPARED", "FAILED", "SKIPPED"]:
             return HUtils.calculate_queue_time_in_seconds(self.submit, self.start)

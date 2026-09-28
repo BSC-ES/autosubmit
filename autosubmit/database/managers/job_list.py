@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Contains code to manage a database via SQLAlchemy."""
+"""SQLAlchemy manager for the per-experiment ``job_list`` database."""
 import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -91,8 +91,7 @@ if TYPE_CHECKING:
 class JobsDbManager(DbManager):
     """A database manager for the job_list that extends DbManager using SQLAlchemy.
 
-    It can be used with any engine supported by SQLAlchemy, such
-    as Postgres, Mongo, MySQL, etc.
+    It supports the SQLite and PostgreSQL backends used by Autosubmit.
     """
 
     # Schema version of the job_list database, recorded in ``schema_migrations``.
@@ -109,7 +108,6 @@ class JobsDbManager(DbManager):
         super().__init__(persistence_full_path, schema)
         self._ACTIVE_STATUSES = ['READY', 'SUBMITTED', 'QUEUING', 'HELD', 'RUNNING']
         self._FINAL_STATUSES = ['COMPLETED', 'FAILED']
-        self.restore_path = Path(BasicConfig.LOCAL_ROOT_DIR) / 'db' / 'job_list.sql'
 
     def save_jobs(self, job_list: list["Job"], reset_log_counters: bool = False) -> None:
         """Save the job list to the database.
@@ -119,8 +117,6 @@ class JobsDbManager(DbManager):
 
         :param job_list: List of Job objects to save to the database.
         :param reset_log_counters: Whether to reset log counters.
-
-        :return: None
         :raises: May raise database-related exceptions during upsert operations.
         """
         table: Table = self.table_registry.get(JobsTable.name)
@@ -140,10 +136,9 @@ class JobsDbManager(DbManager):
     def save_job_log(self, job: "Job") -> None:
         """Save only the log information of a single job to the database.
 
-        only update log-related fields (name, log, updated_log, local_logs_out, local_logs_err, remote_logs_out, remote_logs_err).
+        only update log-related fields (name, log, updated_log, updated_stats, local_logs_out, local_logs_err, remote_logs_out, remote_logs_err).
 
         :param job: Job object whose log information is to be saved.
-        :return: None
         """
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)
@@ -160,7 +155,7 @@ class JobsDbManager(DbManager):
             load_failed_jobs: bool = False,
             members: list[Any] | None = None
     ) -> list[dict[str, Any]]:
-        """Return a  list of jobs loaded from the database.
+        """Return a list of jobs loaded from the database.
 
         Load jobs according to the requested mode.
 
@@ -180,11 +175,11 @@ class JobsDbManager(DbManager):
 
         return [dict(job) for job in job_list]
 
-    def load_job_by_name(self, job_name: str) -> dict[str, Any]:
+    def load_job_by_name(self, job_name: str) -> dict[str, Any] | None:
         """
         Load a job by its name from the database.
         :param job_name: Name of the job to load.
-        :return: Dictionary containing the job information.
+        :return: Dictionary containing the job information, or ``None`` if not found.
         """
         table: Table = self.table_registry.get(JobsTable.name)
         self.create_table(table.name)
@@ -192,9 +187,7 @@ class JobsDbManager(DbManager):
         return dict(job) if job else None
 
     def get_job_list_size(self) -> tuple[int, int, int]:
-        """
-        Return the number of jobs in the database.
-        """
+        """Return the total, completed and failed job counts."""
         table: Table = self.table_registry.get(JobsTable.name)
 
         self.create_table(table.name)
@@ -321,7 +314,7 @@ class JobsDbManager(DbManager):
             self,
             sections: list[str],
             already_loaded_names: set[str],
-    ) -> list[tuple[tuple[str, Any]]]:
+    ) -> list[tuple[tuple[str, Any], ...]]:
         """Return non-completed jobs in sections whose cross-section parents are all COMPLETED.
 
         Uses a single SQL query with NOT EXISTS to find jobs whose
@@ -604,20 +597,18 @@ class JobsDbManager(DbManager):
         return [dict(edge) for edge in graph]
 
     def delete_unused_edges(self, graph: list[dict[str, Any]]) -> None:
-        """
-        Delete unused edges from the database.
-        """
+        """Replace all stored edges with the given graph."""
         table: Table = self.table_registry.get(ExperimentStructureTable.name)
 
         self.create_table(table.name)
         self.delete_all(table.name)
         self.save_edges(graph)
 
-    def select_job_by_name(self, job_name: str) -> dict[str, Any]:
-        """
-        Select a job by its name from the database.
+    def select_job_by_name(self, job_name: str) -> tuple[tuple[str, Any], ...] | None:
+        """Select a job by its name from the database.
+
         :param job_name: Name of the job to select.
-        :return: List of dictionaries containing the job information.
+        :return: The job row as a tuple of column-value pairs, or ``None`` if not found.
         """
         table: Table = self.table_registry.get(JobsTable.name)
 
@@ -736,11 +727,9 @@ class JobsDbManager(DbManager):
         self.drop_table(experiment_structure_table.name)
 
     def save_sections_data(self, sections_data: list[dict[str, Any]]) -> None:
-        """
-        Save the section data to the database.
+        """Save the section data to the database.
 
         :param sections_data: List of dictionaries containing section information.
-        :return: None
         """
         section_structure_table: Table = self.table_registry.get(SectionsStructureTable.name)
         self.drop_table(section_structure_table.name)
@@ -748,7 +737,7 @@ class JobsDbManager(DbManager):
         self.upsert_many(section_structure_table.name, sections_data, ['name'])
 
     def load_sections_data(self) -> list[tuple[str, Any]]:
-        """Load the section data to the database."""
+        """Load the section data from the database."""
         section_structure_table: Table = self.table_registry.get(SectionsStructureTable.name)
 
         self.create_table(section_structure_table.name)
@@ -756,8 +745,7 @@ class JobsDbManager(DbManager):
         return section_data
 
     def clear_unused_nodes(self, differences: dict[str, dict[str, Any]]) -> None:
-        """
-        Remove jobs from the database that are no longer needed based on section differences.
+        """Remove jobs from the database that are no longer needed based on section differences.
 
         :param differences: Dictionary describing changes in sections.
         """

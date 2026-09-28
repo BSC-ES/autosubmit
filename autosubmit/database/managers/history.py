@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -37,17 +37,12 @@ import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.db_utils import batch_size_for, chunked, max_params
+from autosubmit.database.managers.base import SchemaVersionedManager
 from autosubmit.database.models import records as Models
 from autosubmit.database.models.tables import (
     ExperimentRunTable,
     JobDataTable,
     TableRegistry,
-)
-from autosubmit.database.schema_version import (
-    ensure_schema_migrations_table,
-    get_schema_version,
-    record_schema_migration,
-    schema_migrations_table,
 )
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
@@ -55,18 +50,17 @@ from autosubmit.log.log import Log
 
 CURRENT_DB_VERSION = 21  # Update this if you change the database schema
 DB_EXPERIMENT_HEADER_SCHEMA_CHANGES = 14
-DB_VERSION_SCHEMA_CHANGES = 12
-DEFAULT_DB_VERSION = 10
 DEFAULT_MAX_COUNTER = 0
 
-class SqlAlchemyExperimentHistoryDbManager:
+class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
     """A SQLAlchemy experiment history database manager.
-    Its interface was designed based on the SQLite database manager,
-    with the following differences:
-    - We do not have the DB migration system that they used, as that
-      used SQLite pragmas, which are not portable across DB engines
-      (i.e. no ``_set_schema_changes()`` nor ``_set_table_queries()``).
+
+    Schema versions are tracked through ``autosubmit.database.schema_version``
+    (a portable ``schema_migrations`` table) instead of SQLite pragmas.
     """
+
+    SCHEMA_VERSION = CURRENT_DB_VERSION
+    SCHEMA_MIGRATIONS_TABLE_NAME = "history_schema_migrations"
 
     def __init__(
             self,
@@ -93,9 +87,7 @@ class SqlAlchemyExperimentHistoryDbManager:
 
         self.table_registry = TableRegistry(schema=self.schema)
         self.engine = session.get_engine(db_path=db_path)
-        self._schema_migrations_table = schema_migrations_table(
-            self.table_registry.metadata, name="history_schema_migrations"
-        )
+        self._init_schema_version(self.table_registry.metadata)
 
     def initialize(self) -> None:
         """Create the historical database tables if they do not exist, then migrate any missing columns."""
@@ -114,21 +106,6 @@ class SqlAlchemyExperimentHistoryDbManager:
         table = self.table_registry.get(JobDataTable.name)
         for index in table.indexes:
             conn.execute(CreateIndex(index, if_not_exists=True))
-
-    def _set_db_version(self, conn: Connection, version: int) -> None:
-        """Record the schema version as applied in the historical database.
-
-        :param conn: An open SQLAlchemy connection.
-        :param version: The schema version to record.
-        """
-        record_schema_migration(conn, self._schema_migrations_table, version)
-
-    def _get_db_version(self) -> int:
-        """Read the schema version recorded in the historical database.
-
-        :return: The recorded version, or 0 if it is unknown.
-        """
-        return get_schema_version(self.engine, self._schema_migrations_table, self.schema)
 
     def _migrate_schema(self) -> None:
         """Add missing columns, ensure indexes and update the stored schema version."""
@@ -165,26 +142,12 @@ class SqlAlchemyExperimentHistoryDbManager:
         if inspector.has_table(JobDataTable.name, schema=self.schema):
             with self.engine.begin() as conn:
                 self._create_indexes(conn)
-                self._set_db_version(conn, CURRENT_DB_VERSION)
+                self._set_schema_version(conn)
 
-
-    def my_database_exists(self) -> bool:
-        """Return ``True`` if the schema and tables exist in the database. ``False`` otherwise."""
-        inspector = inspect(self.engine)
-        if self.schema is not None and self.schema not in inspector.get_schema_names():
-            return False
-        return (
-                inspector.has_table(ExperimentRunTable.name, schema=self.schema)
-                and inspector.has_table(JobDataTable.name, schema=self.schema)
-        )
 
     def is_header_ready_db_version(self) -> bool:
         """Return ``True`` if the stored schema version is new enough for the completion trigger."""
-        return self._get_db_version() >= DB_EXPERIMENT_HEADER_SCHEMA_CHANGES
-
-    def is_current_version(self) -> bool:
-        """Return ``True`` if the stored schema version matches the current one."""
-        return self._get_db_version() == CURRENT_DB_VERSION
+        return self._get_schema_version(self.engine, self.schema) >= DB_EXPERIMENT_HEADER_SCHEMA_CHANGES
 
     def create_historical_database(self) -> None:
         """Create the historical tables, the version table and the indexes if they do not exist."""
@@ -193,15 +156,9 @@ class SqlAlchemyExperimentHistoryDbManager:
                 conn.execute(CreateSchema(self.schema, if_not_exists=True))
             conn.execute(CreateTable(self.table_registry.get(ExperimentRunTable.name), if_not_exists=True))
             conn.execute(CreateTable(self.table_registry.get(JobDataTable.name), if_not_exists=True))
-            ensure_schema_migrations_table(conn, self._schema_migrations_table)
             self._create_indexes(conn)
-            self._set_db_version(conn, CURRENT_DB_VERSION)
+            self._set_schema_version(conn)
             # TODO(#2647,#1286): implement the SQLite -> PostgreSQL data migration.
-
-    def update_historical_database(self) -> None:
-        """Bring an existing historical database up to date (missing columns, indexes and version)."""
-        self.create_historical_database()
-        self._migrate_schema()
 
     def get_experiment_run_dc_with_max_id(self) -> ExperimentRun:
         run = self._get_experiment_run_with_max_id()
@@ -295,12 +252,6 @@ class SqlAlchemyExperimentHistoryDbManager:
             result = conn.execute(query).first()
         return result is not None
 
-    def get_job_data_all(self) -> list[Models.JobDataRow]:
-        job_data_table = self.table_registry.get(JobDataTable.name)
-        with self.engine.connect() as conn:
-            job_data_rows = conn.execute(select(job_data_table)).all()
-        return [Models.JobDataRow(*row) for row in job_data_rows]
-
     def register_submitted_job_data_dc(self, job_data_dc: JobData) -> JobData | None:
         self._set_current_job_data_rows_last_to_zero_by_job_name(job_data_dc.job_name)
         self._insert_job_data(job_data_dc)
@@ -314,7 +265,7 @@ class SqlAlchemyExperimentHistoryDbManager:
             job_data_dc.last = 0
             self._update_job_data_by_id(job_data_dc)
 
-    def update_job_data_dc_by_job_id_name(self, job_data_dc: Any) -> Any:
+    def update_job_data_dc_by_job_id_name(self, job_data_dc: JobData) -> JobData:
         """
         Update JobData data class. Returns the latest row from job_data by job_name.
 
@@ -552,46 +503,6 @@ class SqlAlchemyExperimentHistoryDbManager:
             result = conn.execute(query).first()
         if result is None:
             raise Exception(f"No job_data found for job_name='{job_name}' and fail_count={fail_count}.")
-        return JobData.from_model(result)
-
-    def get_last_job_data_dc_by_job_name_and_counter(self, job_name: str, counter: int) -> JobData:
-        """Get the last JobData for a given job_name and counter.
-
-        :param job_name: The job name.
-        :param counter: The counter value.
-        :return: The most recent JobData instance for the given job_name and counter.
-        :raises Exception: If no job_data is found for the given job_name and counter.
-        """
-        job_data_table = self.table_registry.get(JobDataTable.name)
-        query = (
-            select(job_data_table)
-            .where(job_data_table.c.job_name == job_name)  # type: ignore
-            .where(job_data_table.c.counter == counter)  # type: ignore
-            .order_by(desc(job_data_table.c.id))
-        )
-        with self.engine.connect() as conn:
-            result = conn.execute(query).first()
-        if result is None:
-            raise Exception(f"No job_data found for job_name='{job_name}' and counter={counter}.")
-        return JobData.from_model(result)
-
-    def get_last_job_data_dc_by_job_name(self, job_name: str) -> JobData:
-        """Get the most recent JobData for a given job_name regardless of counter.
-
-        :param job_name: The job name.
-        :return: The JobData instance with the highest id for the given job_name.
-        :raises Exception: If no job_data is found for the given job_name.
-        """
-        job_data_table = self.table_registry.get(JobDataTable.name)
-        query = (
-            select(job_data_table)
-            .where(job_data_table.c.job_name == job_name)  # type: ignore
-            .order_by(desc(job_data_table.c.id))
-        )
-        with self.engine.connect() as conn:
-            result = conn.execute(query).first()
-        if result is None:
-            raise Exception(f"No job_data found for job_name='{job_name}'.")
         return JobData.from_model(result)
 
     def get_job_data_max_counter(self, job_name: str | None = None) -> int:

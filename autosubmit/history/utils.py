@@ -48,7 +48,6 @@ def get_current_datetime() -> str:
 
 
 def get_current_datetime_if_none(argument: Any) -> str | None:
-    # type : (Any) -> Union[Any, str]
     """ Returns the current time in format '%Y-%m-%dT%H:%M:%S%z' if the supplied argument is None, else return argument. """
     if argument is None:
         return get_current_datetime()
@@ -57,7 +56,7 @@ def get_current_datetime_if_none(argument: Any) -> str | None:
 
 
 def create_file_with_full_permissions(path: str) -> None:
-    """ creates a database files with full permissions """
+    """Create a file with full permissions."""
     os.umask(0)
     os.open(path, os.O_WRONLY | os.O_CREAT, 0o777)
 

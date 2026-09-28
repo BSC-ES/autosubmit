@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-from sqlalchemy import MetaData, select, update
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable
@@ -25,11 +25,6 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.models import records as Models
 from autosubmit.database.models.tables import ExperimentStatusTable, ExperimentTable
-from autosubmit.database.schema_version import (
-    ensure_schema_migrations_table,
-    record_schema_migration,
-    schema_migrations_table,
-)
 
 
 class SqlAlchemyExperimentStatusDbManager:
@@ -39,23 +34,13 @@ class SqlAlchemyExperimentStatusDbManager:
     and SQLite.
     """
 
-    # Schema version of the as_times database, recorded in its own
-    # ``schema_migrations`` table.
-    SCHEMA_VERSION = 1
-    SCHEMA_MIGRATIONS_TABLE_NAME = "as_times_schema_migrations"
-
     def __init__(self) -> None:
         # ``experiment_status`` lives in the as_times database, while ``experiment``
         # lives in the general database. On PostgreSQL both paths resolve to the
         # same engine.
         self.status_engine = session.get_engine(db_path=BasicConfig.AS_TIMES_DB_PATH)
         self.general_engine = session.get_engine(db_path=BasicConfig.DB_PATH)
-        self._schema_migrations_table = schema_migrations_table(
-            MetaData(), name=self.SCHEMA_MIGRATIONS_TABLE_NAME
-        )
         with self.status_engine.begin() as conn:
-            ensure_schema_migrations_table(conn, self._schema_migrations_table)
-            record_schema_migration(conn, self._schema_migrations_table, self.SCHEMA_VERSION)
             conn.execute(CreateTable(ExperimentStatusTable, if_not_exists=True))
 
     def set_existing_experiment_status_as_running(self, expid: str):
@@ -118,7 +103,7 @@ class SqlAlchemyExperimentStatusDbManager:
         with self.status_engine.connect() as conn:
             with conn.begin():
                 result = conn.execute(query)
-                # NOTE: SQLite == rowcount(), PG == rowcount. Intriguing.
+                # SQLAlchemy may expose ``rowcount`` as an int or a callable depending on the driver.
                 row_count = result.rowcount() if callable(result.rowcount) else result.rowcount
         return row_count
 

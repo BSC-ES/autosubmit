@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
 CURRENT_DATABASE_VERSION = 1
 
-# The general database records its schema version in ``schema_migrations``.
+# The general database records its schema version in ``general_schema_migrations``.
 _SCHEMA_MIGRATIONS_TABLE = schema_migrations_table(
     tables.metadata_obj, name="general_schema_migrations"
 )

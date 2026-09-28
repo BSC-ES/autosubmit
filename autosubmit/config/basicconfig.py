@@ -103,7 +103,6 @@ class BasicConfig:
         no error is raised. Configuration options also are not required to exist
 
         :param file_path: configuration file to read
-        :type file_path: str
         """
         if not os.path.isfile(file_path):
             return

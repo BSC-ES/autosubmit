@@ -93,6 +93,7 @@ def _create_sqlite_database() -> bool:
 
     Log.info("Creating autosubmit database...")
 
+    # The schema comes from the SQLAlchemy definitions, not from a ``.sql`` file.
     if not create_db():
         Log.error("Can not write database file")
         return False
