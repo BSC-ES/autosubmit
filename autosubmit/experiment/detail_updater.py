@@ -32,7 +32,6 @@ from autosubmit.database.db_common import get_experiment_id
 from autosubmit.database.managers.details import ExperimentDetailsManager
 
 __all__ = [
-    "LOCAL_TZ",
     "ExperimentDetails",
     "ExperimentDetailsRepository",
     "ExperimentDetailsSQLAlchemyRepository",
