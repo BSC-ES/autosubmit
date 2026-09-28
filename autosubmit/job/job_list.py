@@ -34,8 +34,8 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
-from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.datetime_utils import utc_now_iso
+from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors

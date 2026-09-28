@@ -34,7 +34,6 @@ from autosubmit.database.session import get_engine
 from autosubmit.database.tables import TableRegistry
 
 __all__ = [
-    "LOCAL_TZ",
     "ExperimentDetails",
     "ExperimentDetailsRepository",
     "ExperimentDetailsSQLAlchemyRepository",
