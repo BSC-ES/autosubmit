@@ -72,6 +72,10 @@ several bug fixes and enhancements to improve the overall user experience.
 - Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly
   (with edge-completion reconciliation), never loaded into the graph. #3231
 - Remove two-step start code, tests, and docs #3313 (thanks @CodeByPeace)
+- Optimized RO-Crate construction and ZIP generation.
+  Combined, these improvements reduced total generation time from over 36 hours to approximately
+  5 minutes in tests with an operational experiment containing over 500,000 files.
+  ZIP archives are now written without compression. #3307
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 
