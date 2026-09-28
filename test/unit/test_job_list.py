@@ -24,7 +24,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_manager_job_list import _edge_satisfied
+from autosubmit.database.managers.job_list import _edge_satisfied
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_dict import DicJobs

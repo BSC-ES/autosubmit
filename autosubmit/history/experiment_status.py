@@ -18,7 +18,7 @@
 import traceback
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.database_managers.experiment_status_db_manager import (
+from autosubmit.database.managers.status import (
     SqlAlchemyExperimentStatusDbManager,
 )
 from autosubmit.history.internal_logging import Logging

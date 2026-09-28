@@ -21,12 +21,12 @@ import pytest
 from sqlalchemy import and_, create_engine, delete, insert, inspect, select
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.tables import JobDataTable, get_table_with_schema
-from autosubmit.history.database_managers.experiment_history_db_manager import (
+from autosubmit.database.managers.history import (
     CURRENT_DB_VERSION,
     DB_EXPERIMENT_HEADER_SCHEMA_CHANGES,
     SqlAlchemyExperimentHistoryDbManager,
 )
+from autosubmit.database.models.tables import JobDataTable, get_table_with_schema
 from autosubmit.history.utils import get_current_datetime
 from test._oldschema import old_experiment_run_table, old_job_data_table
 
@@ -130,7 +130,7 @@ def test_sqlalchemy_initialize_migration_preserves_data(tmp_path, mocker):
 def _set_only_version(db_manager, version: int) -> None:
     """Reset the recorded migrations and leave only ``version`` (test helper)."""
     with db_manager.engine.begin() as conn:
-        conn.execute(delete(db_manager._version_table))
+        conn.execute(delete(db_manager._schema_migrations_table))
         db_manager._set_db_version(conn, version)
 
 

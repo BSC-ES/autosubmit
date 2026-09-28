@@ -39,11 +39,12 @@ from bscearth.utils.date import (
 )
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.helpers.enums import ChunkUnit
-from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
-from autosubmit.history.database_managers.experiment_history_db_manager import (
+from autosubmit.database.managers.history import (
     get_last_run_id,
 )
+from autosubmit.helpers.enums import ChunkUnit
+from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
+from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job_common import (
     Status,

@@ -36,16 +36,16 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import database_backup
-from autosubmit.database.db_manager_historical import HistoricalDbManager
-from autosubmit.database.db_manager_job_list import JobsDbManager
+from autosubmit.database.managers.history import (
+    get_last_run_id,
+)
+from autosubmit.database.managers.history_edges import HistoricalDbManager
+from autosubmit.database.managers.job_list import JobsDbManager
 from autosubmit.experiment.manage import (
     provenance,
 )
 from autosubmit.experiment.utils import print_job_details
 from autosubmit.git.autosubmit_git import check_unpushed_changes
-from autosubmit.history.database_managers.experiment_history_db_manager import (
-    get_last_run_id,
-)
 from autosubmit.history.experiment_history import (
     ExperimentHistory,
     get_historical_database,

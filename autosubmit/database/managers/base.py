@@ -36,12 +36,12 @@ from sqlalchemy.schema import CreateSchema, CreateTable, DropTable
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
-from autosubmit.database.migrations import (
+from autosubmit.database.models.tables import GENERALTABLES, Table, TableRegistry
+from autosubmit.database.schema_version import (
     ensure_schema_migrations_table,
-    record_migration,
+    record_schema_migration,
     schema_migrations_table,
 )
-from autosubmit.database.tables import GENERALTABLES, Table, TableRegistry
 
 
 class DbManager:
@@ -95,7 +95,7 @@ class DbManager:
             if self.schema:
                 conn.execute(CreateSchema(self.schema, if_not_exists=True))
             ensure_schema_migrations_table(conn, self._schema_migrations_table)
-            record_migration(conn, self._schema_migrations_table, self.SCHEMA_VERSION)
+            record_schema_migration(conn, self._schema_migrations_table, self.SCHEMA_VERSION)
         self._schema_version_ensured = True
 
     def _get_engine(self, table_name: str | None = None) -> Engine:

@@ -16,14 +16,14 @@ import traceback
 from time import time
 from typing import TYPE_CHECKING
 
-import autosubmit.history.database_managers.database_models as Models
+import autosubmit.database.models.records as Models
 import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.data_classes.experiment_run import ExperimentRun
-from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.database_managers.experiment_history_db_manager import (
+from autosubmit.database.managers.history import (
     SqlAlchemyExperimentHistoryDbManager,
 )
+from autosubmit.history.data_classes.experiment_run import ExperimentRun
+from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor

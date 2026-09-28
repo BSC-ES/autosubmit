@@ -23,8 +23,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_manager_historical import HistoricalDbManager
-from autosubmit.database.tables import ExperimentRunTable, StructureDataTable
+from autosubmit.database.managers.history_edges import HistoricalDbManager
+from autosubmit.database.models.tables import ExperimentRunTable, StructureDataTable
 
 # Minimal graph edges shared across tests.
 _SAMPLE_EDGES: list[dict[str, Any]] = [

@@ -21,6 +21,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix log recovery skipping historical stats when the scheduler reuses job ids across chunks #3114
 - Record `schema_migrations` with a dialect upsert to avoid races when databases are written concurrently #3114
 - Make the general database and experiment details use only SQLAlchemy, dropping the last raw-sqlite3 code paths and the legacy `db_version` table #3114
+- Move every database manager into `autosubmit/database` (`models/` and `managers/` subpackages) #3114
 - Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295
 - Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
 - Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
