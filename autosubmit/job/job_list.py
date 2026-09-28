@@ -2421,8 +2421,7 @@ class JobList:
             try:
                 self.rerun_job_list = self.get_job_related(select_jobs_by_name=select_jobs_by_name,
                                                            select_all_jobs_by_section=select_all_jobs_by_section,
-                                                           filter_jobs_by_section=filter_jobs_by_section,
-                                                           two_step_start=two_step_start)
+                                                           filter_jobs_by_section=filter_jobs_by_section)
             except Exception:
                 raise AutosubmitCritical(f"Check the {unparsed_jobs} format."
                                          "\nFirst filter is optional ends with '&'."
