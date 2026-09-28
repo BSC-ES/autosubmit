@@ -26,9 +26,9 @@ from autosubmit.database.managers.history import (
     DB_EXPERIMENT_HEADER_SCHEMA_CHANGES,
     SqlAlchemyExperimentHistoryDbManager,
 )
-from autosubmit.database.models.tables import JobDataTable, get_table_with_schema
+from autosubmit.database.models.tables import JobDataTable
 from autosubmit.history.utils import get_current_datetime
-from test._oldschema import old_experiment_run_table, old_job_data_table
+from test._oldschema import old_experiment_run_table, old_job_data_table, with_schema
 
 
 def _create_old_schema(engine):
@@ -114,7 +114,7 @@ def test_sqlalchemy_initialize_migration_preserves_data(tmp_path, mocker):
     db_manager = SqlAlchemyExperimentHistoryDbManager("test", str(tmp_path), "job_data.db")
     db_manager.initialize()
 
-    job_data_table = get_table_with_schema(None, JobDataTable)
+    job_data_table = with_schema(None, JobDataTable)
     with db_manager.engine.connect() as conn:
         result = conn.execute(
             select(job_data_table).where(job_data_table.c.job_name == "test_job")
@@ -131,14 +131,14 @@ def _set_only_version(db_manager, version: int) -> None:
     """Reset the recorded migrations and leave only ``version`` (test helper)."""
     with db_manager.engine.begin() as conn:
         conn.execute(delete(db_manager._schema_migrations_table))
-        db_manager._set_db_version(conn, version)
+        db_manager._set_schema_version(conn, version)
 
 
-def test_sqlalchemy_create_creates_index_and_current_version(sqlalchemy_db_manager) -> None:
-    """A freshly initialized SQLAlchemy database is current and has the job_data index."""
-    assert sqlalchemy_db_manager.my_database_exists() is True
-    assert sqlalchemy_db_manager._get_db_version() == CURRENT_DB_VERSION
-    assert sqlalchemy_db_manager.is_current_version() is True
+def test_sqlalchemy_create_creates_index_and_records_version(sqlalchemy_db_manager) -> None:
+    """A freshly initialized SQLAlchemy database records the current version and has the job_data index."""
+    assert sqlalchemy_db_manager._get_schema_version(
+        sqlalchemy_db_manager.engine, sqlalchemy_db_manager.schema
+    ) == CURRENT_DB_VERSION
     assert sqlalchemy_db_manager.is_header_ready_db_version() is True
 
     inspector = inspect(sqlalchemy_db_manager.engine)
@@ -147,32 +147,21 @@ def test_sqlalchemy_create_creates_index_and_current_version(sqlalchemy_db_manag
 
 
 @pytest.mark.parametrize(
-    "stored_version, expected_current, expected_header_ready",
+    "stored_version, expected_header_ready",
     [
-        (0, False, False),
-        (DB_EXPERIMENT_HEADER_SCHEMA_CHANGES - 1, False, False),
-        (DB_EXPERIMENT_HEADER_SCHEMA_CHANGES, False, True),
-        (CURRENT_DB_VERSION, True, True),
+        (0, False),
+        (DB_EXPERIMENT_HEADER_SCHEMA_CHANGES - 1, False),
+        (DB_EXPERIMENT_HEADER_SCHEMA_CHANGES, True),
+        (CURRENT_DB_VERSION, True),
     ],
 )
 def test_sqlalchemy_version_checks(
-    sqlalchemy_db_manager, stored_version: int, expected_current: bool, expected_header_ready: bool
+    sqlalchemy_db_manager, stored_version: int, expected_header_ready: bool
 ) -> None:
-    """Report the current/header-ready flags based on the recorded schema version."""
+    """Report whether the recorded schema version is new enough for the completion trigger."""
     _set_only_version(sqlalchemy_db_manager, stored_version)
 
-    assert sqlalchemy_db_manager.is_current_version() is expected_current
     assert sqlalchemy_db_manager.is_header_ready_db_version() is expected_header_ready
-
-
-def test_sqlalchemy_update_historical_database_restamps_version(sqlalchemy_db_manager) -> None:
-    """update_historical_database() brings an outdated schema version back to the current one."""
-    _set_only_version(sqlalchemy_db_manager, 0)
-
-    sqlalchemy_db_manager.update_historical_database()
-
-    assert sqlalchemy_db_manager.is_current_version() is True
-    assert sqlalchemy_db_manager.is_header_ready_db_version() is True
 
 
 def test_sqlalchemy_no_database_reports_version_zero(tmp_path, monkeypatch) -> None:
@@ -184,9 +173,7 @@ def test_sqlalchemy_no_database_reports_version_zero(tmp_path, monkeypatch) -> N
         jobdata_file="job_data_t000.db",
     )
 
-    assert db_manager.my_database_exists() is False
-    assert db_manager._get_db_version() == 0
-    assert db_manager.is_current_version() is False
+    assert db_manager._get_schema_version(db_manager.engine, db_manager.schema) == 0
     assert db_manager.is_header_ready_db_version() is False
 
 
@@ -251,7 +238,7 @@ def test_select_jobs_data_regression_sqlite_variable_limit(tmp_path, monkeypatch
 
 
 def _base_row(job_name: str, counter: int, job_id: int, status: str = "COMPLETED") -> dict:
-    """Return a minimal job_data row dict for use in both SQLite and SQLAlchemy tests."""
+    """Return a minimal job_data row dict for job-data tests."""
     now = get_current_datetime()
     return {
         "counter": counter,
@@ -298,106 +285,6 @@ def sqlalchemy_db_manager(tmp_path, monkeypatch):
     )
     db_manager.initialize()
     return db_manager
-
-
-def test_sqlalchemy_get_last_job_data_dc_returns_single_row(sqlalchemy_db_manager):
-    """Return exactly one JobData when exactly one row matches."""
-    job_data_table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
-    row = _base_row("t001_20200101_fc0_1_SIM", counter=1, job_id=10)
-    with sqlalchemy_db_manager.engine.connect() as conn:
-        conn.execute(insert(job_data_table), [row])
-        conn.commit()
-
-    result = sqlalchemy_db_manager.get_last_job_data_dc_by_job_name_and_counter(
-        "t001_20200101_fc0_1_SIM", 1
-    )
-
-    assert result.job_name == "t001_20200101_fc0_1_SIM"
-    assert result.counter == 1
-
-
-def test_sqlalchemy_get_last_job_data_dc_returns_correct_row_among_multiple_counters(sqlalchemy_db_manager):
-    """Return the row matching the requested counter when the job has multiple counter entries."""
-    job_data_table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
-    job_name = "t001_20200101_fc0_3_SIM"
-    rows = [
-        {**_base_row(job_name, counter=1, job_id=20), "status": "FAILED"},
-        {**_base_row(job_name, counter=2, job_id=22), "status": "COMPLETED"},
-        {**_base_row(job_name, counter=3, job_id=23), "status": "RUNNING"},
-    ]
-    with sqlalchemy_db_manager.engine.connect() as conn:
-        conn.execute(insert(job_data_table), rows)
-        conn.commit()
-
-    result = sqlalchemy_db_manager.get_last_job_data_dc_by_job_name_and_counter(job_name, 2)
-
-    assert result.counter == 2
-    assert result.status == "COMPLETED"
-    assert result.job_id == 22
-
-
-def test_sqlalchemy_get_last_job_data_dc_raises_when_not_found(sqlalchemy_db_manager):
-    """Raise an exception when no row matches job_name and counter."""
-    with pytest.raises(Exception, match="No job_data found"):
-        sqlalchemy_db_manager.get_last_job_data_dc_by_job_name_and_counter(
-            "nonexistent_job", 99
-        )
-
-
-@pytest.mark.parametrize("counter", [1, 2, 3])
-def test_sqlalchemy_get_last_job_data_dc_only_matching_counter_is_returned(sqlalchemy_db_manager, counter):
-    """Return only the row matching the requested counter value."""
-    job_data_table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
-    job_name = f"t001_20200101_fc0_{counter}_SIM_counter_test"
-    rows = [_base_row(job_name, counter=c, job_id=100 + c) for c in range(1, 4)]
-    with sqlalchemy_db_manager.engine.connect() as conn:
-        conn.execute(insert(job_data_table), rows)
-        conn.commit()
-
-    result = sqlalchemy_db_manager.get_last_job_data_dc_by_job_name_and_counter(
-        job_name, counter
-    )
-
-    assert result.counter == counter
-
-
-def test_sqlalchemy_get_last_job_data_dc_by_job_name_returns_highest_id(sqlalchemy_db_manager):
-    """Return the row with the highest id when the job has multiple counter entries."""
-    job_data_table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
-    job_name = "t001_20200101_fc0_10_SIM"
-    rows = [
-        {**_base_row(job_name, counter=1, job_id=50), "status": "FAILED"},
-        {**_base_row(job_name, counter=2, job_id=51), "status": "COMPLETED"},
-    ]
-    with sqlalchemy_db_manager.engine.connect() as conn:
-        conn.execute(insert(job_data_table), rows)
-        conn.commit()
-
-    result = sqlalchemy_db_manager.get_last_job_data_dc_by_job_name(job_name)
-
-    assert result.job_name == job_name
-    assert result.counter == 2
-    assert result.job_id == 51
-
-
-def test_sqlalchemy_get_last_job_data_dc_by_job_name_single_row(sqlalchemy_db_manager):
-    """Return the only row when exactly one row exists for the job_name."""
-    job_data_table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
-    job_name = "t001_20200101_fc0_11_SIM"
-    with sqlalchemy_db_manager.engine.connect() as conn:
-        conn.execute(insert(job_data_table), [_base_row(job_name, counter=1, job_id=60)])
-        conn.commit()
-
-    result = sqlalchemy_db_manager.get_last_job_data_dc_by_job_name(job_name)
-
-    assert result.job_name == job_name
-    assert result.counter == 1
-
-
-def test_sqlalchemy_get_last_job_data_dc_by_job_name_raises_when_not_found(sqlalchemy_db_manager):
-    """Raise an exception when no row exists for the given job_name."""
-    with pytest.raises(Exception, match="No job_data found"):
-        sqlalchemy_db_manager.get_last_job_data_dc_by_job_name("nonexistent_job_name")
 
 
 def test_sqlalchemy_get_job_data_by_job_id_name_raises_when_not_found(sqlalchemy_db_manager) -> None:

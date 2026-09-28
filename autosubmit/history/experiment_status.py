@@ -39,7 +39,7 @@ class ExperimentStatus:
             self.manager = None
 
     def set_as_running(self):
-        """ Set the status of the experiment in experiment_status of as_times.db as RUNNING. Creates the database, table and row if necessary."""
+        """ Set the status of the experiment in the as_times database as RUNNING. Creates the database, table and row if necessary."""
         if self.manager:
             exp_status_row = self.manager.get_experiment_status_row_by_expid(self.expid)
             if exp_status_row:

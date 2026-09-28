@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Tests for the straight wrapper association strategy."""
+"""Tests for the single association strategy."""
 
 from datetime import datetime
 from time import time

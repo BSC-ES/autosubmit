@@ -3007,7 +3007,7 @@ class Job:
         return True
 
     def write_end_time(self, completed, attempt) -> None:
-        """Writes end timestamp to TOTAL_STATS file and jobs_data.db
+        """Writes end timestamp to the TOTAL_STATS file and the experiment history database.
 
         :param completed: True if the job has been completed, False otherwise
         :param attempt: number of retrials

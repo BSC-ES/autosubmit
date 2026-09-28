@@ -117,7 +117,7 @@ def _prepare_run(
     :param recover: a boolean to indicate if the experiment is recovering from a failure.
     :param check_scripts: Whether to check the scripts before submitting.
     :param submitter: the actual loaded platforms if any
-    :return: a Union
+    :return: A tuple with the job list, submitter, experiment history, host, config, platforms to test and the recovery flag.
     """
     host = platform.node()
     # Init the AutosubmitConfig and check that every file exists, and it is a valid configuration.
@@ -560,25 +560,28 @@ def _save_historical_edges(expid):
     exp_history.save_historical_edges()
 
 
-def _finish_current_experiment_run(expid, exp_history):
+def _finish_current_experiment_run(expid: str, exp_history: ExperimentHistory):
     """Update the finish time of the current experiment run in the database.
 
     :param expid: a string with the experiment id.
     :param exp_history: The ``ExperimentHistory`` instance to use.
-    :return: None
     """
     _save_historical_edges(expid)
     exp_history.finish_current_experiment_run()
 
 
-def _process_historical_data_iteration(job_list, job_changes_tracker, expid, exp_history):
+def _process_historical_data_iteration(
+    job_list: JobList,
+    job_changes_tracker: dict[str, tuple[str, str]],
+    expid: str,
+    exp_history: ExperimentHistory,
+):
     """Process the historical data for the current iteration.
 
     :param job_list: a JobList object.
     :param job_changes_tracker: a dictionary with the changes in the job status.
     :param expid: a string with the experiment id.
     :param exp_history: The ``ExperimentHistory`` instance to use.
-    :return: an ExperimentHistory object.
     """
     if len(job_changes_tracker) > 0:
         exp_history.process_job_list_changes_to_experiment_totals(

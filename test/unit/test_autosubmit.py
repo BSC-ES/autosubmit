@@ -204,10 +204,6 @@ def test_signal_handler_sets_exit_flag(monkeypatch):
 
     :raises AssertionError: If ``Scheduler.exit`` is not ``True`` after the handler runs.
     """
-    """signal_handler must set ``Scheduler.exit`` to ``True`` on SIGINT."""
-
-    """signal_handler must set ``Scheduler.exit`` to ``True`` on SIGINT."""
-
     monkeypatch.setattr(Scheduler, "exit", False)
 
     _signal_handler(signal.SIGINT, None)

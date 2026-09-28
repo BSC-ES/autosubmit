@@ -22,17 +22,18 @@ import time
 from pathlib import Path
 
 import pytest
-from sqlalchemy import delete, inspect, select, text
+from sqlalchemy import inspect, select, text
 from sqlalchemy.schema import CreateSchema
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.managers.history import (
     SqlAlchemyExperimentHistoryDbManager,
 )
-from autosubmit.database.models.tables import JobDataTable, get_table_with_schema
+from autosubmit.database.models import records as Models
+from autosubmit.database.models.tables import JobDataTable
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
-from test._oldschema import old_experiment_run_table, old_job_data_table
+from test._oldschema import old_experiment_run_table, old_job_data_table, with_schema
 
 
 def _create_db_manager(as_db: str, **options) -> SqlAlchemyExperimentHistoryDbManager:
@@ -40,6 +41,14 @@ def _create_db_manager(as_db: str, **options) -> SqlAlchemyExperimentHistoryDbMa
     jobdata_dir_path = options.get("jobdata_dir_path", BasicConfig.JOBDATA_DIR)
     job_data_file = options.get("jobdata_file", None)
     return SqlAlchemyExperimentHistoryDbManager(options["expid"], jobdata_dir_path, job_data_file)
+
+
+def _read_job_data(db_manager) -> list:
+    """Read all ``job_data`` rows (the removed ``get_job_data_all`` equivalent)."""
+    table = db_manager.table_registry.get(JobDataTable.name)
+    with db_manager.engine.connect() as conn:
+        rows = conn.execute(select(table)).all()
+    return [Models.JobDataRow(*row) for row in rows]
 
 
 @pytest.mark.docker
@@ -54,9 +63,7 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
 
     # Test initialization of the table
     database_manager.initialize()
-    assert database_manager.my_database_exists()
     # The manager tracks a portable schema version and creates the job_data index.
-    assert database_manager.is_current_version() is True
     assert database_manager.is_header_ready_db_version() is True
     inspector = inspect(database_manager.engine)
     index_names = {
@@ -120,7 +127,7 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
         assert submitted_job.rowtype == new_job.rowtype
         assert submitted_job.last == 1
 
-        all_jobs = database_manager.get_job_data_all()
+        all_jobs = _read_job_data(database_manager)
         assert len(all_jobs) == i + 1
         count_lasts = 0
         for curr_job in all_jobs:
@@ -128,36 +135,18 @@ def test_experiment_history_db_manager(tmp_path: Path, as_db: str):
         assert count_lasts == 1
 
     # Test many job update
-    all_jobs = database_manager.get_job_data_all()
+    all_jobs = _read_job_data(database_manager)
     changes = []
     for i, curr_job in enumerate(all_jobs):
         changes.append(["2024-01-01-00:00:00", "COMPLETED", i, curr_job.id])
 
     database_manager.update_many_job_data_change_status(changes)
 
-    all_jobs = database_manager.get_job_data_all()
+    all_jobs = _read_job_data(database_manager)
     for i, curr_job in enumerate(all_jobs):
         assert curr_job.modified == "2024-01-01-00:00:00"
         assert curr_job.status == "COMPLETED"
         assert curr_job.rowstatus == i
-
-
-@pytest.mark.docker
-@pytest.mark.postgres
-def test_sqlalchemy_schema_version_is_isolated_per_tenant(as_db: str):
-    """Each experiment records its own schema version."""
-    first = _create_db_manager(as_db, expid="test_iso_first")
-    second = _create_db_manager(as_db, expid="test_iso_second")
-    assert isinstance(first, SqlAlchemyExperimentHistoryDbManager)
-    assert isinstance(second, SqlAlchemyExperimentHistoryDbManager)
-    first.initialize()
-    second.initialize()
-
-    with first.engine.begin() as conn:
-        conn.execute(delete(first._schema_migrations_table))
-
-    assert first.is_current_version() is False
-    assert second.is_current_version() is True
 
 
 @pytest.mark.docker
@@ -381,7 +370,7 @@ def test_update_list_job_data_dc_by_each_id(as_db: str, autosubmit_exp):
         db_manager.register_submitted_job_data_dc(job)
 
     jobs_row_statuses = [j.status for j in jobs]
-    retrieved_jobs = db_manager.get_job_data_all()
+    retrieved_jobs = _read_job_data(db_manager)
     retrieved_jobs_statuses = [j.status for j in retrieved_jobs]
 
     assert retrieved_jobs_statuses == jobs_row_statuses
@@ -393,7 +382,7 @@ def test_update_list_job_data_dc_by_each_id(as_db: str, autosubmit_exp):
 
     db_manager.update_list_job_data_dc_by_each_id(jobs)
 
-    retrieved_jobs = db_manager.get_job_data_all()
+    retrieved_jobs = _read_job_data(db_manager)
     retrieved_jobs_statuses = [j.status for j in retrieved_jobs]
 
     assert retrieved_jobs_statuses == [new_status, new_status, new_status]
@@ -418,8 +407,8 @@ def test_sqlalchemy_initialize_migration_postgres(as_db):
         conn.execute(CreateSchema(schema, if_not_exists=True))
         conn.commit()
 
-    old_job = get_table_with_schema(schema, old_job_data_table)
-    old_exp = get_table_with_schema(schema, old_experiment_run_table)
+    old_job = with_schema(schema, old_job_data_table)
+    old_exp = with_schema(schema, old_experiment_run_table)
     old_job.create(db_manager.engine)
     old_exp.create(db_manager.engine)
 
@@ -463,8 +452,8 @@ def test_sqlalchemy_initialize_migration_twice_postgres(as_db):
         conn.execute(CreateSchema(schema, if_not_exists=True))
         conn.commit()
 
-    old_job = get_table_with_schema(schema, old_job_data_table)
-    old_exp = get_table_with_schema(schema, old_experiment_run_table)
+    old_job = with_schema(schema, old_job_data_table)
+    old_exp = with_schema(schema, old_experiment_run_table)
     old_job.create(db_manager.engine)
     old_exp.create(db_manager.engine)
 
@@ -498,8 +487,8 @@ def test_sqlalchemy_initialize_migration_preserves_data_postgres(as_db):
         conn.execute(CreateSchema(schema, if_not_exists=True))
         conn.commit()
 
-    old_job = get_table_with_schema(schema, old_job_data_table)
-    old_exp = get_table_with_schema(schema, old_experiment_run_table)
+    old_job = with_schema(schema, old_job_data_table)
+    old_exp = with_schema(schema, old_experiment_run_table)
     old_job.create(db_manager.engine)
     old_exp.create(db_manager.engine)
 
@@ -524,7 +513,7 @@ def test_sqlalchemy_initialize_migration_preserves_data_postgres(as_db):
 
     db_manager.initialize()
 
-    job_data_table = get_table_with_schema(schema, old_job_data_table)
+    job_data_table = with_schema(schema, old_job_data_table)
     with db_manager.engine.connect() as conn:
         result = conn.execute(
             select(job_data_table).where(job_data_table.c.job_name == "test_job")

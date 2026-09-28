@@ -60,26 +60,6 @@ def test_after_3_inserts_into_a_table_then_it_has_3_rows(tmp_path: "LocalPath", 
     assert 3 == db_manager.count(ExperimentTable.name)
 
 
-@pytest.mark.docker
-@pytest.mark.postgres
-def test_select_first_where(tmp_path: "LocalPath", as_db: str) -> None:
-    db_manager = _create_db_manager(Path(tmp_path, 'tests.db'))
-    db_manager.create_table(ExperimentTable.name)
-    for i in range(1, 5):
-        db_manager.insert(
-            ExperimentTable.name,
-            {'name': f'exp{i}', 'description': f'description {i}', 'autosubmit_version': '4.0.0'},
-        )
-
-    first_value = db_manager.select_first_where(ExperimentTable.name, where=None)
-    assert first_value is not None
-    assert first_value[1] == 'exp1'
-
-    last_value = db_manager.select_first_where(ExperimentTable.name, where={'name': 'exp4'})
-    assert last_value is not None
-    assert last_value[1] == 'exp4'
-
-
 def test_delete_experiment_db(monkeypatch, tmp_path) -> None:
     """Deleting an experiment removes the row from the database."""
     db_path = tmp_path / "tests.db"
@@ -145,6 +125,6 @@ def test_update_where(monkeypatch, tmp_path, where_type: str) -> None:
             {'name': ['test_experiment']},
         )
 
-    result = db_manager.select_first_where(ExperimentTable.name, where={'name': 'test_experiment'})
-    assert result is not None
-    assert result[2] == 'Updated description'
+    rows = db_manager.select_where_with_columns(ExperimentTable, {'name': 'test_experiment'})
+    assert rows
+    assert dict(rows[0])['description'] == 'Updated description'

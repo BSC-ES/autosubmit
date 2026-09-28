@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Contains code to manage a database via SQLAlchemy."""
+"""SQLAlchemy manager for the per-experiment historical job-data database."""
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 

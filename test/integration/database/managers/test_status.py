@@ -28,7 +28,6 @@ from autosubmit.database.models.records import (
     ExperimentStatusRow,
 )
 from autosubmit.database.models.tables import ExperimentStatusTable
-from autosubmit.database.schema_version import get_schema_version
 from autosubmit.job.job_common import Status
 
 
@@ -87,18 +86,3 @@ def test_get_experiment_status_row_by_expid(as_db: str, autosubmit_exp, get_next
 
     experiment_status_row = database_manager.get_experiment_status_row_by_expid(exp.expid)
     assert experiment_status_row
-
-
-@pytest.mark.docker
-@pytest.mark.postgres
-def test_experiment_status_db_manager_records_schema_version(as_db: str):
-    """The status manager records its schema version in the as_times database."""
-    database_manager = SqlAlchemyExperimentStatusDbManager()
-    schema = None if as_db == "sqlite" else "public"
-
-    assert inspect(database_manager.status_engine).has_table(
-        database_manager.SCHEMA_MIGRATIONS_TABLE_NAME, schema=schema
-    )
-    assert get_schema_version(
-        database_manager.status_engine, database_manager._schema_migrations_table, schema
-    ) == database_manager.SCHEMA_VERSION

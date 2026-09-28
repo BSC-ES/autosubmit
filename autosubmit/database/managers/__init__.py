@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -15,4 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""SQLAlchemy database managers for every Autosubmit target database."""
+"""SQLAlchemy database managers for every Autosubmit target database.
+
+``DbManager`` (``base.py``) is the generic CRUD toolkit shared by the
+job-list and historical-edge managers. Managers with a different shape (SQL
+written by hand, or more than one engine) do not inherit from it:
+``SqlAlchemyExperimentHistoryDbManager`` and
+``SqlAlchemyExperimentStatusDbManager`` only share ``SchemaVersionedManager``
+for schema-version tracking. ``ExperimentDetailsRepository`` and
+``UserMetricRepository`` are single-table repositories.
+"""

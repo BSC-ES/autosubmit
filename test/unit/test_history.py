@@ -94,13 +94,6 @@ class TestExperimentHistory:
         os.remove(self.target_path_tt00)
         os.remove(self.target_path_tt01)
 
-    def test_db_exists(self):
-        exp_history = ExperimentHistory("tt00")
-        exp_history.initialize_database()
-        assert exp_history.manager.my_database_exists() is True
-        exp_history = ExperimentHistory("tt99")
-        assert exp_history.manager.my_database_exists() is False
-
     def test_is_header_ready(self):
         exp_history = ExperimentHistory("tt00")
         assert exp_history.is_header_ready() is True
@@ -386,9 +379,7 @@ def test_get_finish_data_dc(tmp_path, monkeypatch):
     """Test that get_finish_data_dc retrieves the correct JobData after a full submit/start/finish cycle.
 
     :param tmp_path: Pytest fixture providing a temporary directory unique to the test invocation.
-    :type tmp_path: pathlib.Path
     :param monkeypatch: Pytest fixture for monkeypatching attributes and environment variables.
-    :type monkeypatch: pytest.MonkeyPatch
     :raises AssertionError: If the retrieved job data does not match the inserted job data.
     """
     monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
@@ -438,9 +429,7 @@ def test_update_submit_time(tmp_path, monkeypatch):
     """Test that update_submit_time correctly updates the submit time of an existing job record.
 
     :param tmp_path: Pytest fixture providing a temporary directory unique to the test invocation.
-    :type tmp_path: pathlib.Path
     :param monkeypatch: Pytest fixture for monkeypatching attributes and environment variables.
-    :type monkeypatch: pytest.MonkeyPatch
     :raises AssertionError: If the submit time is not updated correctly.
     """
     monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
