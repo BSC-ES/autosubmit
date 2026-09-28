@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -298,9 +299,33 @@ def test_run_command(command: list[str], test_experiment: "AutosubmitExperiment"
     ],
 )
 def test_run_command_plot_behavior(
-    command: list[str], test_experiment: "AutosubmitExperiment"
+    command: list[str],
+    test_experiment: "AutosubmitExperiment",
+    mocker: "MockerFixture",
 ):
     """Test the plot behaviour of the setstatus, create and recovery commands."""
+    real_check_output = subprocess.check_output
+
+    def mock_check_output(c, *args, **kwargs):
+        """This function mocks the call to subprocess.check_output.
+
+        It is used when the user asks for Autosubmit to open the PDF.
+        We ignore it as otherwise it would fail on CICD environment
+        without an X server or someone to close the PDF. And also because
+        closing the PDF when running locally is annoying.
+
+        This was added as this test was taking ~2 minutes on CICD
+        environment (the exact timeout configured for pytest).
+        """
+        if c[0] in {"xdg-open", "open"}:
+            return b""
+        return real_check_output(c, *args, **kwargs)
+
+    mocker.patch(
+        "autosubmit.monitor.monitor.subprocess.check_output",
+        side_effect=mock_check_output,
+    )
+    
     has_both_plot_flags = "-np" in command and "-plt" in command
 
     command = _parse_command(command, test_experiment.expid)
