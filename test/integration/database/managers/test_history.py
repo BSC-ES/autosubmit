@@ -26,12 +26,12 @@ from sqlalchemy import delete, inspect, select, text
 from sqlalchemy.schema import CreateSchema
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.tables import JobDataTable, get_table_with_schema
-from autosubmit.history.data_classes.experiment_run import ExperimentRun
-from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.database_managers.experiment_history_db_manager import (
+from autosubmit.database.managers.history import (
     SqlAlchemyExperimentHistoryDbManager,
 )
+from autosubmit.database.models.tables import JobDataTable, get_table_with_schema
+from autosubmit.history.data_classes.experiment_run import ExperimentRun
+from autosubmit.history.data_classes.job_data import JobData
 from test._oldschema import old_experiment_run_table, old_job_data_table
 
 
@@ -154,7 +154,7 @@ def test_sqlalchemy_schema_version_is_isolated_per_tenant(as_db: str):
     second.initialize()
 
     with first.engine.begin() as conn:
-        conn.execute(delete(first._version_table))
+        conn.execute(delete(first._schema_migrations_table))
 
     assert first.is_current_version() is False
     assert second.is_current_version() is True

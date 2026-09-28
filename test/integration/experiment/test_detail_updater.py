@@ -16,12 +16,8 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Integration tests for detail updater."""
-import pytest
 
-from autosubmit.experiment.detail_updater import (
-    ExperimentDetails,
-    ExperimentDetailsRepository,
-)
+from autosubmit.experiment.detail_updater import ExperimentDetails
 
 
 def test_details_properties(autosubmit_exp, mocker):
@@ -43,37 +39,3 @@ def test_details_properties(autosubmit_exp, mocker):
 
     assert exp_details.model == "my_git_origin"
     assert exp_details.branch == "my_git_branch"
-
-
-@pytest.mark.docker
-@pytest.mark.postgres
-def test_details_repository(as_db: str):
-    details_repo = ExperimentDetailsRepository()
-
-    exp_id = 10
-    created = "2024-04-11T13:34:41+02:00"
-
-    # Insert data
-    details_repo.upsert_details(
-        exp_id=exp_id, user="foo", created=created, model="my_model", branch="NA", hpc="MN5"
-    )
-    assert details_repo.get_details(exp_id) == {
-        "exp_id": exp_id,
-        "user": "foo",
-        "created": created,
-        "model": "my_model",
-        "branch": "NA",
-        "hpc": "MN5",
-    }
-
-    # Update data
-    details_repo.upsert_details(
-        exp_id=exp_id, user="bar", created=created, model="my_model", branch="NA", hpc="MN5"
-    )
-    updated = details_repo.get_details(exp_id)
-    assert updated is not None
-    assert updated["user"] == "bar"
-
-    # Delete data
-    details_repo.delete_details(exp_id)
-    assert details_repo.get_details(exp_id) is None

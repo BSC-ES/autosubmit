@@ -15,13 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Integration tests for ``autosubmit.job.user_metrics``."""
+"""Integration tests for the user-metrics repository."""
 from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import select
 
-from autosubmit.job.metrics_processor import UserMetricRepository
+from autosubmit.database.managers.metrics import UserMetricRepository
 
 if TYPE_CHECKING:
     # noinspection PyProtectedMember

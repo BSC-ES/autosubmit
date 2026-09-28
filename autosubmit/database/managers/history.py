@@ -37,20 +37,20 @@ import autosubmit.history.utils as HUtils
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database import session
 from autosubmit.database.db_utils import batch_size_for, chunked, max_params
-from autosubmit.database.migrations import (
-    ensure_schema_migrations_table,
-    get_schema_version,
-    record_migration,
-    schema_migrations_table,
-)
-from autosubmit.database.tables import (
+from autosubmit.database.models import records as Models
+from autosubmit.database.models.tables import (
     ExperimentRunTable,
     JobDataTable,
     TableRegistry,
 )
+from autosubmit.database.schema_version import (
+    ensure_schema_migrations_table,
+    get_schema_version,
+    record_schema_migration,
+    schema_migrations_table,
+)
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.database_managers import database_models as Models
 from autosubmit.log.log import Log
 
 CURRENT_DB_VERSION = 21  # Update this if you change the database schema
@@ -93,7 +93,7 @@ class SqlAlchemyExperimentHistoryDbManager:
 
         self.table_registry = TableRegistry(schema=self.schema)
         self.engine = session.get_engine(db_path=db_path)
-        self._version_table = schema_migrations_table(
+        self._schema_migrations_table = schema_migrations_table(
             self.table_registry.metadata, name="history_schema_migrations"
         )
 
@@ -121,14 +121,14 @@ class SqlAlchemyExperimentHistoryDbManager:
         :param conn: An open SQLAlchemy connection.
         :param version: The schema version to record.
         """
-        record_migration(conn, self._version_table, version)
+        record_schema_migration(conn, self._schema_migrations_table, version)
 
     def _get_db_version(self) -> int:
         """Read the schema version recorded in the historical database.
 
         :return: The recorded version, or 0 if it is unknown.
         """
-        return get_schema_version(self.engine, self._version_table, self.schema)
+        return get_schema_version(self.engine, self._schema_migrations_table, self.schema)
 
     def _migrate_schema(self) -> None:
         """Add missing columns, ensure indexes and update the stored schema version."""
@@ -193,10 +193,10 @@ class SqlAlchemyExperimentHistoryDbManager:
                 conn.execute(CreateSchema(self.schema, if_not_exists=True))
             conn.execute(CreateTable(self.table_registry.get(ExperimentRunTable.name), if_not_exists=True))
             conn.execute(CreateTable(self.table_registry.get(JobDataTable.name), if_not_exists=True))
-            ensure_schema_migrations_table(conn, self._version_table)
+            ensure_schema_migrations_table(conn, self._schema_migrations_table)
             self._create_indexes(conn)
             self._set_db_version(conn, CURRENT_DB_VERSION)
-            # TODO(#1286): implement the SQLite -> PostgreSQL data migration.
+            # TODO(#2647,#1286): implement the SQLite -> PostgreSQL data migration.
 
     def update_historical_database(self) -> None:
         """Bring an existing historical database up to date (missing columns, indexes and version)."""
@@ -393,8 +393,8 @@ class SqlAlchemyExperimentHistoryDbManager:
     def _get_all_last_job_data_rows(self) -> list[Models.JobDataRow]:
         """ Get List of Models.JobDataRow for last=1. """
         job_data_table = self.table_registry.get(JobDataTable.name)
-        # TODO(#3114): select only the needed columns once callers no longer
-        #             require a full Models.JobDataRow.
+        # TODO(#2645?): read only the needed columns instead of the full ``job_data``
+        #             row.
         query = (
             select(job_data_table).
             where(job_data_table.c.last == 1)  # type: ignore

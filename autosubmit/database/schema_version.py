@@ -15,13 +15,25 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Per-tenant schema migration tracking.
+"""Per-target schema version tracking.
 
-This module is intentionally small and tool-agnostic. It keeps track of a schema
-version per tenant (each experiment has its own SQLite file or PostgreSQL schema).
+This module keeps track of a schema version per target. Targets are the general
+database (which also holds ``experiment`` and ``details``), ``as_times``
+(``experiment_status``), and the per-experiment job_list and history databases
+(each experiment has its own SQLite file or PostgreSQL schema).
 
-TODO(#1286): a dedicated migration tool should eventually apply the ordered
-migration steps, taking over this layer. The tool is TBD. Alternatives to evaluate:
+The version table lives in the target database and is created and recorded
+lazily: on a fresh install for the general database, or the first time a target
+database is opened. A pre-existing database that is never opened again therefore
+has no version row, which is fine: the version is schema metadata, not a registry
+of experiments, and nothing depends on it until the database is used. The legacy
+versioning (SQLite pragmas / the ``db_version`` table) is not read here, so a
+pre-existing database is stamped with the current version the first time it is
+opened.
+
+TODO(#1286): a dedicated migration tool should eventually read the legacy version
+and apply the ordered migration steps, taking over this layer. The tool is TBD.
+Alternatives to evaluate:
 - Alembic: SQLAlchemy-native; autogenerates migration scripts by diffing the
   models against the DB, orders them, and handles SQLite ALTER via batch mode.
   Would need customization to fit the per-experiment files/schemas.
@@ -31,7 +43,6 @@ migration steps, taking over this layer. The tool is TBD. Alternatives to evalua
 """
 
 import datetime
-from collections.abc import Callable, Iterable
 
 from sqlalchemy import Column, DateTime, Integer, MetaData, Table, func, inspect, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -40,16 +51,11 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.schema import CreateTable
 
 __all__ = [
-    "Migration",
-    "apply_ordered_migrations",
     "ensure_schema_migrations_table",
     "get_schema_version",
-    "record_migration",
+    "record_schema_migration",
     "schema_migrations_table",
 ]
-
-# A migration step is a version and the callable that applies it.
-Migration = tuple[int, Callable[["Connection"], None]]
 
 
 def schema_migrations_table(metadata: MetaData, name: str) -> Table:
@@ -100,7 +106,7 @@ def get_schema_version(engine: Engine, table: Table, schema: str | None = None) 
     return int(version) if version is not None else 0
 
 
-def record_migration(conn: Connection, table: Table, version: int) -> None:
+def record_schema_migration(conn: Connection, table: Table, version: int) -> None:
     """Record a migration as applied. Safe to call more than once.
 
     Uses a dialect upsert (``ON CONFLICT DO NOTHING``) so concurrent writers do
@@ -126,24 +132,3 @@ def record_migration(conn: Connection, table: Table, version: int) -> None:
             return
         stmt = table.insert().values(**values)
     conn.execute(stmt)
-
-
-def apply_ordered_migrations(
-    engine: Engine,
-    table: Table,
-    schema: str | None,
-    migrations: Iterable[Migration],
-    to_version: int,
-) -> None:
-    """Apply the pending migration steps in order, up to ``to_version``.
-
-    Placeholder for the migration tool tracked in #1286.
-
-    :param engine: The engine that owns the target database.
-    :param table: The ``schema_migrations`` table.
-    :param schema: Optional schema name (PostgreSQL).
-    :param migrations: The ordered migration steps.
-    :param to_version: The version to migrate to.
-    :raises NotImplementedError: Always, until #1286 is implemented.
-    """
-    raise NotImplementedError("Ordered migrations are not implemented yet (see #1286).")

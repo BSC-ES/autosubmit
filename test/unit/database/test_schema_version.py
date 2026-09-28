@@ -15,18 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Unit tests for ``autosubmit.database.migrations``."""
+"""Unit tests for ``autosubmit.database.schema_version``."""
 
 from pathlib import Path
 
 import pytest
 from sqlalchemy import DateTime, MetaData, create_engine, select
 
-from autosubmit.database.migrations import (
-    apply_ordered_migrations,
+from autosubmit.database.schema_version import (
     ensure_schema_migrations_table,
     get_schema_version,
-    record_migration,
+    record_schema_migration,
     schema_migrations_table,
 )
 
@@ -55,15 +54,15 @@ def test_get_schema_version_returns_zero_without_table(tmp_path: Path) -> None:
     assert get_schema_version(engine, table) == 0
 
 
-def test_record_migration_is_idempotent(tmp_path: Path) -> None:
+def test_record_schema_migration_is_idempotent(tmp_path: Path) -> None:
     """Recording the same version twice keeps a single row."""
     engine = _make_engine(tmp_path, "a.db")
     table = schema_migrations_table(MetaData(), TABLE_NAME)
     ensure_schema_migrations_table(engine, table)
 
     with engine.begin() as conn:
-        record_migration(conn, table, 1)
-        record_migration(conn, table, 1)
+        record_schema_migration(conn, table, 1)
+        record_schema_migration(conn, table, 1)
 
     assert get_schema_version(engine, table) == 1
     with engine.connect() as conn:
@@ -71,7 +70,7 @@ def test_record_migration_is_idempotent(tmp_path: Path) -> None:
     assert rows == [(1,)]
 
 
-def test_record_migration_is_idempotent_across_transactions(tmp_path: Path) -> None:
+def test_record_schema_migration_is_idempotent_across_transactions(tmp_path: Path) -> None:
     """The dialect upsert keeps a single row even when recorded in separate transactions."""
     engine = _make_engine(tmp_path, "a.db")
     table = schema_migrations_table(MetaData(), TABLE_NAME)
@@ -79,7 +78,7 @@ def test_record_migration_is_idempotent_across_transactions(tmp_path: Path) -> N
 
     for _ in range(3):
         with engine.begin() as conn:
-            record_migration(conn, table, 7)
+            record_schema_migration(conn, table, 7)
 
     with engine.connect() as conn:
         rows = conn.execute(select(table.c.version)).fetchall()
@@ -93,7 +92,7 @@ def test_ensure_schema_migrations_table_accepts_connection(tmp_path: Path) -> No
 
     with engine.begin() as conn:
         ensure_schema_migrations_table(conn, table)
-        record_migration(conn, table, 1)
+        record_schema_migration(conn, table, 1)
 
     assert get_schema_version(engine, table) == 1
 
@@ -108,17 +107,7 @@ def test_schema_version_is_isolated_per_tenant(tmp_path: Path, recorded: int, ex
     ensure_schema_migrations_table(second, table)
 
     with first.begin() as conn:
-        record_migration(conn, table, recorded)
+        record_schema_migration(conn, table, recorded)
 
     assert get_schema_version(first, table) == expected
     assert get_schema_version(second, table) == 0
-
-
-def test_apply_ordered_migrations_is_a_placeholder(tmp_path: Path) -> None:
-    """The ordered migrations runner is a placeholder for #1286."""
-    engine = _make_engine(tmp_path, "a.db")
-    table = schema_migrations_table(MetaData(), TABLE_NAME)
-    ensure_schema_migrations_table(engine, table)
-
-    with pytest.raises(NotImplementedError):
-        apply_ordered_migrations(engine, table, None, [], 1)

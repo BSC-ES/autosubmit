@@ -24,10 +24,10 @@ import pytest
 from bscearth.utils.date import date2str
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.database_managers.experiment_history_db_manager import (
+from autosubmit.database.managers.history import (
     SqlAlchemyExperimentHistoryDbManager,
 )
+from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.job.job_common import Status
 from autosubmit.job.job_list import load_job_list
 from autosubmit.job.manage import set_status

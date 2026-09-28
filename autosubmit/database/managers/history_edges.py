@@ -20,10 +20,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_manager import DbManager
+from autosubmit.database.managers.base import DbManager
 
 if TYPE_CHECKING:
-    from autosubmit.database.db_manager_job_list import JobsDbManager
+    from autosubmit.database.managers.job_list import JobsDbManager
 
 
 class HistoricalDbManager(DbManager):

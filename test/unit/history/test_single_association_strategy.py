@@ -20,8 +20,8 @@
 from datetime import datetime
 from time import time
 
+from autosubmit.database.models.records import RowStatus, RowType
 from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.database_managers.database_models import RowStatus, RowType
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
 from autosubmit.history.strategies import SingleAssociationStrategy
 from autosubmit.job.job_common import Status

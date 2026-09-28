@@ -24,8 +24,8 @@ from sqlalchemy import and_, exists, func, not_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database.db_manager import DbManager
-from autosubmit.database.tables import (
+from autosubmit.database.managers.base import DbManager
+from autosubmit.database.models.tables import (
     ExperimentStructureTable,
     JobsTable,
     PreviewWrapperInfoTable,
@@ -231,24 +231,6 @@ class JobsDbManager(DbManager):
         with self._get_engine(table.name).connect() as conn:
             rows = conn.execute(select(table.c.name).select_from(table).where(condition))
             return {row[0] for row in rows.fetchall()}
-
-    def count_remaining_jobs_in_sections(self, sections: list[str], exclude_names: list[str]) -> int:
-        """Count non-completed jobs in sections, excluding given names.
-
-        :param sections: List of section names.
-        :param exclude_names: List of job names to exclude.
-        :return: Count of remaining non-completed jobs.
-        """
-        table: Table = self.table_registry.get(JobsTable.name)
-        self.create_table(table.name)
-        condition = and_(
-            table.c.section.in_(sections),
-            table.c.status != 'COMPLETED',
-            not_(table.c.name.in_(exclude_names))
-        )
-        with self._get_engine(table.name).connect() as conn:
-            row = conn.execute(select(func.count()).select_from(table).where(condition))
-            return row.scalar()
 
     def count_non_completed_parents_not_in_memory(
             self, remaining_names: set[str], loaded_names: set[str]) -> int:
@@ -643,6 +625,20 @@ class JobsDbManager(DbManager):
         job = self.select_where_with_columns(table, {'name': job_name})
         if job:
             return job[0]
+
+    def select_parent_names(self, job_name: str) -> set[str]:
+        """Return the names of the jobs that the given job depends on.
+
+        :param job_name: The job name.
+        :return: A set of parent job names.
+        """
+        structure_table: Table = self.table_registry.get(ExperimentStructureTable.name)
+        self.create_table(structure_table.name)
+        with self._get_engine(structure_table.name).connect() as conn:
+            rows = conn.execute(
+                select(structure_table.c.e_from).where(structure_table.c.e_to == job_name)
+            )
+            return {row[0] for row in rows}
 
     # WRAPPERS
     # At this point, we already built the wrappers, so we can save them in the database.

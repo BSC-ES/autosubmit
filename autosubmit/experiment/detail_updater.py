@@ -22,86 +22,18 @@ import pwd
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Table, delete, insert, select
-
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import get_experiment_id
-from autosubmit.database.session import get_engine
-from autosubmit.database.tables import TableRegistry
+from autosubmit.database.managers.details import ExperimentDetailsRepository
 
 __all__ = [
     "LOCAL_TZ",
     "ExperimentDetails",
-    "ExperimentDetailsRepository",
 ]
 
 LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
-
-
-class ExperimentDetailsRepository:
-    """Manage the experiment details in the general database."""
-
-    def __init__(self) -> None:
-        table_registry = TableRegistry(None)
-        self.table: Table = table_registry.get("details")
-        self.engine = get_engine(db_path=BasicConfig.DB_PATH)
-
-    def get_details(self, exp_id: int) -> dict[str, Any] | None:
-        """Get the details of an experiment by its id.
-
-        :param exp_id: The id of the experiment.
-        :return: A dictionary with the details, or ``None`` if not found.
-        """
-        with self.engine.connect() as conn:
-            result = conn.execute(
-                select(self.table).where(self.table.c.exp_id == exp_id)
-            ).one_or_none()
-
-        if result is None:
-            return None
-        return {
-            "exp_id": result.exp_id,
-            "user": result.user,
-            "created": result.created,
-            "model": result.model,
-            "branch": result.branch,
-            "hpc": result.hpc,
-        }
-
-    def upsert_details(
-        self, exp_id: int, user: str, created: str, model: str, branch: str, hpc: str
-    ) -> None:
-        """Upsert the details of an experiment.
-
-        :param exp_id: The id of the experiment.
-        :param user: The user that created the experiment.
-        :param created: The creation date of the experiment.
-        :param model: The model of the experiment.
-        :param branch: The branch of the experiment.
-        :param hpc: The HPC of the experiment.
-        """
-        with self.engine.connect() as conn, conn.begin():
-            conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
-            conn.execute(
-                insert(self.table).values(
-                    exp_id=exp_id,
-                    user=user,
-                    created=created,
-                    model=model,
-                    branch=branch,
-                    hpc=hpc,
-                )
-            )
-
-    def delete_details(self, exp_id: int) -> None:
-        """Delete the details of an experiment by its id.
-
-        :param exp_id: The id of the experiment.
-        """
-        with self.engine.connect() as conn, conn.begin():
-            conn.execute(delete(self.table).where(self.table.c.exp_id == exp_id))
 
 
 class ExperimentDetails:

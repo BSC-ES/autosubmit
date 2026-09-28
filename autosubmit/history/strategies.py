@@ -19,7 +19,7 @@ import traceback
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
-import autosubmit.history.database_managers.database_models as Models
+import autosubmit.database.models.records as Models
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.utils import DEFAULT_HISTORICAL_LOGS_DIR
 

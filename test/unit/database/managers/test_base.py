@@ -15,14 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Unit tests for ``autosubmit.database.db_manager``."""
-
+"""Unit tests for ``autosubmit.database.managers.base``."""
 from contextlib import nullcontext as does_not_raise
 
 import pytest
 
-from autosubmit.database.db_manager import DbManager
-from autosubmit.database.tables import ExperimentTable
+from autosubmit.database.managers.base import DbManager
+from autosubmit.database.models.tables import ExperimentTable
 
 
 def test_insert_rejects_empty_data():

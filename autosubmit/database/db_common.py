@@ -31,9 +31,13 @@ from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.schema import CreateTable
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.database import session, tables
+from autosubmit.database import session
 from autosubmit.database.db_utils import batch_size_for, chunked
-from autosubmit.database.migrations import record_migration, schema_migrations_table
+from autosubmit.database.models import tables
+from autosubmit.database.schema_version import (
+    record_schema_migration,
+    schema_migrations_table,
+)
 from autosubmit.log.log import AutosubmitCritical, Log
 
 if TYPE_CHECKING:
@@ -89,7 +93,7 @@ def create_db() -> bool:
         with _get_engine(create=True).begin() as conn:
             for table in tables_to_create:
                 conn.execute(CreateTable(table, if_not_exists=True))
-            record_migration(conn, _SCHEMA_MIGRATIONS_TABLE, CURRENT_DATABASE_VERSION)
+            record_schema_migration(conn, _SCHEMA_MIGRATIONS_TABLE, CURRENT_DATABASE_VERSION)
     except Exception as exc:
         raise AutosubmitCritical(f"Database can not be created: {exc}", 7004, str(exc))
     return True
