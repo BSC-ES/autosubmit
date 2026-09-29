@@ -50,7 +50,7 @@ dependencies = [
     "networkx<=3.6.1",
     "portalocker<=4.4.0",
     "paramiko>=3.5.0",
-    "pyparsing==3.3.2",
+    "pyparsing==3.3.3",
     "matplotlib<=3.10.9",
     "psutil<=7.2.2",
     "py3dotplus==1.1.0",
@@ -72,7 +72,7 @@ Documentation = "https://autosubmit.readthedocs.io/"
 [project.optional-dependencies]
 postgres = ["psycopg", "psycopg2"]
 lint = [
-    "ruff==0.16.8",
+    "ruff==0.16.9",
 ]
 tests = [
     # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!

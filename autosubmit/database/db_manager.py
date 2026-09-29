@@ -107,7 +107,7 @@ class DbManager:
         table = self.table_registry.get(table_name)
         with self._get_engine(table_name).begin() as conn:
             result = conn.execute(insert(table), data)
-            return cast(int, result.rowcount)
+            return result.rowcount
 
     def select_first_where(self, table_name: str, where: dict[str, str] | None) -> Any | None:
         table = self.table_registry.get(table_name)

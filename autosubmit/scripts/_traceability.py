@@ -84,7 +84,7 @@ def log_command_context(argv: Sequence[str]) -> None:
 
     The command line is logged with sensitive option values redacted.
 
-    :param args: The command-line arguments.
+    :param argv: The command-line arguments.
     """
     timezone = datetime.now().astimezone().tzname()
     timezone_offset = datetime.now().astimezone().strftime("%z")

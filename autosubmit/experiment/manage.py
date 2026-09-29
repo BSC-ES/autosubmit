@@ -127,8 +127,8 @@ def _generate_as_config(
                     parameter_key = ".".join([*keys, key]).upper()
                     if parameter_key in parameters:
                         comment = parameters[parameter_key]
-                        yaml_data.yaml_set_comment_before_after_key(
-                            key, before=comment, indent=yaml_data.lc.col
+                        yaml_data.yaml_set_comment_before_after_key(  # type: ignore[attr-defined]
+                            key, before=comment, indent=yaml_data.lc.col  # type: ignore[attr-defined]
                         )
 
     def _recurse_into_parameters(
@@ -742,34 +742,7 @@ def copy_code(
                 f"into {local_proj_dir}",
                 7062,
             )
-        Log.debug(f"{output}")
-        Log.debug(f"The project folder {local_proj_dir} has been created.")
-        Log.info(
-            f"Checking out revision {svn_project_revision + ' ' + svn_project_url} into {local_proj_dir}"
-        )
-        try:
-            output = subprocess.check_output(
-                "cd "
-                + local_proj_dir
-                + "; svn --force-interactive checkout -r "
-                + svn_project_revision
-                + " "
-                + svn_project_url
-                + " "
-                + project_destination,
-                shell=True,
-            )
-        except subprocess.CalledProcessError:
-            try:
-                rmtree(local_proj_dir, ignore_errors=True)
-            except Exception:
-                pass
-            raise AutosubmitCritical(
-                f"Can not check out revision {svn_project_revision} {svn_project_url} "
-                f"into {local_proj_dir}",
-                7062,
-            )
-        Log.debug(f"{output}")
+        Log.debug(f"{output.decode('utf-8', errors='replace')}")
     elif project_type == "local":
         local_project: Path = as_conf.get_local_project_path()
         if not local_project:
@@ -1021,7 +994,8 @@ def create(
             if group_by:
                 status = []
                 if expand_status:
-                    for s in expand_status.split():
+                    status_list = expand_status.split() if isinstance(expand_status, str) else expand_status
+                    for s in status_list:
                         status.append(get_job_status(s.upper()))
 
                 job_grouping = JobGrouping(
@@ -1122,7 +1096,7 @@ def archive(expid: str, noclean=True, uncompress=True, create_rocrate=False) -> 
                 compress_type = "w"
                 output_filepath = f"{expid}.tar"
             year_path_file = year_path.joinpath(output_filepath)
-            with tarfile.open(year_path_file, compress_type) as tar:
+            with tarfile.open(year_path_file, compress_type) as tar:  # type: ignore[call-overload]
                 tar.add(exp_folder, arcname="")
                 tar.close()
                 year_path_file.chmod(mode=0o775)
@@ -1137,8 +1111,8 @@ def archive(expid: str, noclean=True, uncompress=True, create_rocrate=False) -> 
         Log.warning(f"Can not fully remove experiments folder: {str(e)}")
         if os.stat(exp_folder):
             try:
-                tmp_folder = os.path.join(BasicConfig.LOCAL_ROOT_DIR, "tmp")
-                tmp_expid = os.path.join(tmp_folder, expid + "_to_delete")
+                tmp_folder_delete = os.path.join(BasicConfig.LOCAL_ROOT_DIR, "tmp")
+                tmp_expid = os.path.join(tmp_folder_delete, expid + "_to_delete")
                 os.rename(exp_folder, tmp_expid)
                 Log.warning(f"Experiment folder renamed to: {exp_folder}_to_delete")
             except Exception as e:
@@ -1198,7 +1172,7 @@ def unarchive(experiment_id: str, uncompressed=True, create_rocrate=False) -> bo
             with zipfile.ZipFile(str(archive_path), "r") as zip_file:
                 zip_file.extractall(exp_folder)
         else:
-            with tarfile.open(archive_path, compress_type) as tar:
+            with tarfile.open(archive_path, compress_type) as tar:  # type: ignore[call-overload]
                 tar.extractall(exp_folder)
                 tar.close()
     except Exception as e:

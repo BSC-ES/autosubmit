@@ -168,7 +168,7 @@ def cli_function(
                         trace_enabled=trace,
                         max_checkpoints=max_iterations,
                     )
-                    profiler.start()
+                    profiler.start()  # type: ignore
 
                     opts._profiler = profiler
 
@@ -188,7 +188,7 @@ def cli_function(
                 return exit_from_error(e)
             finally:
                 if profiler is not None:
-                    profiler.stop()
+                    profiler.stop()  # type: ignore
 
         _cli_function.command_group = group
         _cli_function.options_type = options_type
