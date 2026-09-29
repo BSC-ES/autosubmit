@@ -19,6 +19,8 @@
 
 from datetime import datetime, timedelta
 
+import pytest
+
 from autosubmit.helpers.datetime_utils import (
     to_utc_iso,
     utc_now_iso,
@@ -41,7 +43,8 @@ def test_to_utc_iso_converts_aware_local_to_utc():
     assert to_utc_iso(aware) == "2026-09-03T14:00:00+00:00"
 
 
-def test_to_utc_iso_assumes_naive_is_utc():
-    """Test that to_utc_iso assumes a naive datetime is UTC."""
+def test_to_utc_iso_rejects_naive_datetime():
+    """Test that to_utc_iso raises for a timezone-less datetime."""
     naive = datetime(2026, 9, 3, 16, 0, 0)
-    assert to_utc_iso(naive) == "2026-09-03T16:00:00+00:00"
+    with pytest.raises(ValueError):
+        to_utc_iso(naive)
