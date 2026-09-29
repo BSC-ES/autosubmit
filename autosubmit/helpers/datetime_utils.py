@@ -34,5 +34,7 @@ def utc_now_iso() -> str:
 def to_utc_iso(value: datetime) -> str:
     """Serialize any datetime to the canonical UTC ISO format."""
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
+        raise ValueError(
+            "Naive datetime is not allowed; must be timezone-aware (e.g. datetime.now(timezone.utc)"
+        )
     return value.astimezone(timezone.utc).isoformat(timespec="seconds")
