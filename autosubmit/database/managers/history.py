@@ -484,11 +484,13 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
             raise Exception(f"No job_data found for job_id='{job_id}' and job_name='{job_name}'.")
         return JobData.from_model(result)
 
-    def get_last_job_data_dc_by_job_name_and_fail_counter(self, job_name: str, fail_count: int) -> JobData:
+    def get_last_job_data_dc_by_job_name_and_fail_counter(
+            self, job_name: str, fail_count: int, run_id: int | None = None) -> JobData:
         """Get the last job data by job name and fail_count.
 
         :param job_name: The job name.
         :param fail_count: The counter value.
+        :param run_id: Optional run id to restrict the lookup to a single run.
         :return: The most recent JobData instance for the given job_name and counter.
         :raises Exception: If no job_data is found for the given job_name and counter.
         """
@@ -499,6 +501,8 @@ class SqlAlchemyExperimentHistoryDbManager(SchemaVersionedManager):
             .where(job_data_table.c.fail_count == fail_count)  # type: ignore
             .order_by(desc(job_data_table.c.id))
         )
+        if run_id is not None:
+            query = query.where(job_data_table.c.run_id == run_id)  # type: ignore
         with self.engine.connect() as conn:
             result = conn.execute(query).first()
         if result is None:

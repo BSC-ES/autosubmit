@@ -307,3 +307,26 @@ def test_sqlalchemy_get_jobs_data_last_row_projects_columns(sqlalchemy_db_manage
         sqlalchemy_db_manager._JOB_DATA_LAST_ROW_COLUMNS
     )
     assert result[job_name]["job_id"] == 70
+
+
+def test_get_last_job_data_dc_by_job_name_and_fail_counter_is_run_scoped(sqlalchemy_db_manager) -> None:
+    """The job-name lookup can be restricted to a single run.
+
+    A rerun writes rows for a new run; without the run filter the lookup would
+    match the previous run and the historical stats would be skipped.
+    """
+    table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
+    with sqlalchemy_db_manager.engine.connect() as conn:
+        conn.execute(insert(table), [
+            {**_base_row("job", counter=0, job_id=1), "run_id": 1, "fail_count": 0},
+            {**_base_row("job", counter=1, job_id=2), "run_id": 2, "fail_count": 0},
+        ])
+        conn.commit()
+
+    assert sqlalchemy_db_manager.get_last_job_data_dc_by_job_name_and_fail_counter(
+        "job", 0, run_id=1).run_id == 1
+    assert sqlalchemy_db_manager.get_last_job_data_dc_by_job_name_and_fail_counter(
+        "job", 0, run_id=2).run_id == 2
+
+    with pytest.raises(Exception, match="No job_data found"):
+        sqlalchemy_db_manager.get_last_job_data_dc_by_job_name_and_fail_counter("job", 0, run_id=3)
