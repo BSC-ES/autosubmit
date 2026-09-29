@@ -136,7 +136,7 @@ reference:
     * - Variable
       - Value
     * - ``%FAIL_COUNT%``
-      - Current retry number (0 on first attempt, incremented on each failure).
+      - Current retry number (``0`` on first attempt, incremented on each failure).
     * - ``%RETRIALS%``
       - Configured maximum retry count for the job.
 
@@ -177,14 +177,13 @@ host name, or a list of host names using commas (``,``) as separators.
 
 Right now Autosubmit has a hard-coded number of retries for connecting
 to remote platforms. It will try to connect to the platform, without
-interval, **retrying connecting twice (``2``)**. It will write to logs in
+interval, **retrying connecting twice** (``2``). It will write to logs in
 ``INFO`` and ``WARNING`` levels information about the retries, like
 whether it is retrying to connect, and what is the current retry number.
 
-When Autosubmit retries connecting to a platform with multiple hosts
-separated by comma, the first connection uses the first host name. If it
-retries the connection, the next executions will exclude the first host,
-and then randomly select one of the remaining host names.
+When multiple hosts are given as a comma-separated list, the first connection
+attempt uses the first host in the list. If it fails, the single retry picks
+at random from the remaining hosts, excluding the one that just failed.
 
 For **executing** commands on remote platforms, Autosubmit uses another
 hard-coded value of ``3`` retries, without interval between each retry.
@@ -193,11 +192,13 @@ fails on the remote platform, **Autosubmit will not retry** the command.
 
 As an example, if you try to run an executable such as ``Rscript``, but this
 executable does not exist on the remote platform, Autosubmit will log the error,
-and mark the job as ``FAILED``.
+and mark the job as ``FAILED``. If the job has ``RETRIALS`` configured (see
+:ref:`job_retries`), Autosubmit may then retry it according to that policy —
+though a missing executable will fail identically on every retry.
 
 However, if you have a networking issue between Autosubmit and your remote
-platform, then Autosubmit will log in ``INFO`` and ``WARNING`` and **will
-retry executing the command up to hard-coded ``3`` retries**.
+platform, then Autosubmit will log in ``INFO`` and ``WARNING`` and will
+retry executing the command up to hard-coded ``3`` retries.
 
 .. note::
    These SSH-layer retry counts are not user-configurable. An issue is open
