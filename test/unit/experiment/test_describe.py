@@ -197,7 +197,7 @@ def test_describe_experiment_from_configuration(mocker, tmp_path: Path) -> None:
     conf_path = tmp_path / "autosubmit.yml"
     conf_path.touch()
 
-    created = datetime(2026, 8, 31, 10, 52, 39)
+    created = "2026-08-31T10:52:39+00:00"
 
     mock_config = mocker.patch("autosubmit.experiment.describe.AutosubmitConfig")
     mock_config_instance = mock_config.return_value
@@ -224,7 +224,8 @@ def test_describe_experiment_from_configuration(mocker, tmp_path: Path) -> None:
 
     import os
 
-    os.utime(conf_path, (created.timestamp(), created.timestamp()))
+    created_at = datetime.fromisoformat(created)
+    os.utime(conf_path, (created_at.timestamp(), created_at.timestamp()))
 
     result = describe_experiment("a001")
 
@@ -400,7 +401,7 @@ def test_describe_experiment_uses_database_snapshot_when_configuration_fails(
             get_details=mocker.Mock(
                 return_value={
                     "user": "kinow",
-                    "created": datetime(2026, 8, 31, 10, 52, 39),
+                    "created": "2026-08-31T10:52:39+00:00",
                     "model": "model",
                     "branch": "main",
                     "hpc": "HPC",
@@ -417,7 +418,7 @@ def test_describe_experiment_uses_database_snapshot_when_configuration_fails(
 
     assert result == ExperimentDescription(
         user="kinow",
-        created=datetime(2026, 8, 31, 10, 52, 39),
+        created="2026-08-31T10:52:39+00:00",
         model="model",
         branch="main",
         hpc="HPC",
@@ -491,7 +492,7 @@ def test_log_experiment_description(mocker, tmp_path: Path) -> None:
 
     experiment = ExperimentDescription(
         user="kinow",
-        created=datetime(2026, 8, 31, 10, 52, 39),
+        created="2026-08-31T10:52:39+00:00",
         model="model",
         branch="main",
         hpc="LOCAL",
@@ -505,7 +506,7 @@ def test_log_experiment_description(mocker, tmp_path: Path) -> None:
         mocker.call("Experiment a001"),
         mocker.call("  Owner:       kinow"),
         mocker.call(f"  Location:    {tmp_path / 'a001'}"),
-        mocker.call("  Created:     2026-08-31 10:52:39"),
+        mocker.call("  Created:     2026-08-31T10:52:39+00:00"),
         mocker.call("  Model:       model"),
         mocker.call("  Branch:      main"),
         mocker.call("  HPC:         LOCAL"),
