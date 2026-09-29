@@ -3062,13 +3062,15 @@ class Job:
         """Check if the stats are already registered in the historical DB for this job and attempt.
 
         The lookup uses the job name (unique per job and chunk) instead of the
-        scheduler job id, which is not guaranteed to be unique.
+        scheduler job id, which is not guaranteed to be unique, and restricts the
+        search to the current run so a rerun does not match the previous run's rows.
 
         :param attempt: The fail_count (attempt) to look up.
-        :return: True if a historical record exists for this job and attempt.
+        :return: True if a historical record exists for this job and attempt in the current run.
         """
         exp_history = ExperimentHistory(self.expid)
-        return exp_history.get_submit_data_dc(self.name, attempt) is not None
+        run_id = get_last_run_id(self.expid)
+        return exp_history.get_submit_data_dc(self.name, attempt, run_id=run_id) is not None
 
     def check_started_after(self, date_limit) -> bool:
         """Checks if the job started after the given date

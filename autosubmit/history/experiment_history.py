@@ -118,15 +118,16 @@ class ExperimentHistory:
 
             return None
 
-    def get_submit_data_dc(self, job_name: str, fail_count: int = 0) -> JobData | None:
+    def get_submit_data_dc(self, job_name: str, fail_count: int = 0, run_id: int | None = None) -> JobData | None:
         """Retrieve the full JobData for a job's submission by job name and fail count.
 
         :param job_name: The name of the job.
         :param fail_count: The number of times the job has failed. Defaults to 0.
+        :param run_id: Optional run id to restrict the lookup to a single run.
         :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
         """
         try:
-            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
+            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count, run_id)
         except Exception:
             return None
 
