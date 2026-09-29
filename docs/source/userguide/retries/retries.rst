@@ -204,9 +204,30 @@ However, if you have a networking issue between Autosubmit and your remote
 platform, then Autosubmit will log in ``INFO`` and ``WARNING`` and will
 retry executing the command up to hard-coded ``3`` retries.
 
+Autosubmit treats network problems with a remote platform as recoverable
+events. If the session drops, if the SSH transport breaks, or if a connection
+or a timeout fails, Autosubmit rebuilds the connection and tries the command
+again. This includes the case where the remote host closes the socket and
+Paramiko raises an ``EOFError``, which used to abort the run.
+
+To avoid idle disconnections, Autosubmit can send keepalive packets to the
+remote platform. You configure this per platform with
+``PLATFORMS.<name>.SSH_KEEPALIVE``, in seconds, and the default is ``30``.
+Setting it to ``0`` disables keepalives. The value is how often a keepalive
+packet is sent while the connection is idle. It is not a connection timeout.
+
+If a platform keeps dropping the connection after every reconnection,
+Autosubmit stops the run instead of retrying the recovery forever. You control
+how many consecutive transport failures are tolerated with
+``PLATFORMS.<name>.MAX_TRANSPORT_RETRIALS``, and the default is ``3``. Setting
+it to ``0`` disables the limit. This protects the run when a platform stays
+unreachable after several attempts.
+
 .. note::
-   These SSH-layer retry counts are not user-configurable. An issue is open
-   to make them configurable by users and site admins.
+   The number of attempts Autosubmit makes before giving up is fixed in the
+   code: ``2`` for connecting and ``3`` for executing a command. Issue
+   `#986 <https://github.com/BSC-ES/autosubmit/issues/986>`_ tracks making
+   those counts configurable.
 
 For ``ecaccess`` platforms specifically, the ``-retry`` flag count on the
 ``ecaccess`` binary is user-configurable via ``PLATFORMS.<name>.ECACCESS_RETRIES``
