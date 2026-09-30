@@ -82,11 +82,6 @@ def generate_scripts_andor_wrappers(
     job_list.update_list(as_conf, False)
     # Loading parameters again
     as_conf.set_platform_parameters(job_list, submitter.platforms)
-    # Related to TWO_STEP_START new variable defined in expdef
-    # TODO: For another day, this was a workaround in AS 3 to fake dependencies for crossdate, this should not be longer neccesary
-    unparsed_two_step_start = as_conf.get_parse_two_step_start()
-    if unparsed_two_step_start != "":
-        job_list.parse_jobs_by_filter(unparsed_two_step_start)
 
     for job in job_list.get_job_list():
         if job.status != Status.WAITING and job.status != Status.READY:
