@@ -27,7 +27,7 @@
     min-width: 0;
 }
 
-.bd-header {
+:root {
     --pst-header-height: var(--as-header-height);
 }
 
@@ -92,18 +92,6 @@ html[data-theme="dark"] .bd-header {
     padding: 0;
 }
 
-#pst-primary-sidebar a.reference.internal {
-    display: block;
-
-    padding: 0.30rem 0;
-
-    line-height: 1.3;
-
-    border-radius: 4px;
-
-    transition: background-color .15s ease;
-}
-
 #pst-primary-sidebar a.reference.internal:hover {
     background: rgba(127,127,127,.08);
 }
@@ -137,8 +125,33 @@ html[data-theme="dark"] .bd-header {
 #pst-primary-sidebar ul,
 #pst-primary-sidebar li {
     margin: 0;
-    padding: 0;
     list-style: none;
+}
+
+#pst-primary-sidebar li.has-children > details > summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+}
+
+#pst-primary-sidebar li.has-children > details > summary > a.reference.internal {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#pst-primary-sidebar li.has-children > details > summary > .toctree-toggle {
+    position: static;
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+#pst-primary-sidebar a.reference.internal {
+    padding: 0.30rem 0;
+    line-height: 1.3;
+    border-radius: 4px;
+    transition: background-color .15s ease;
 }
 
 #pst-primary-sidebar ul.bd-sidenav > li {
@@ -181,9 +194,14 @@ html[data-theme="dark"] {
 
 .bd-article section > h1,
 .bd-article section > h2 {
-display: table;
+    display: table;
+    position: relative;
 }
 
+.bd-article section > h1 > a.headerlink,
+.bd-article section > h2 > a.headerlink {
+    position: absolute;
+}
 .bd-article section > h1::after,
 .bd-article section > h2::after {
 content: "";
@@ -227,7 +245,6 @@ margin: 6rem 0 1.15rem;
 max-width: 68rem;
 margin-bottom: 2.75rem;
 line-height: 1.75;
-opacity: .7;
 }
 
 #autosubmit-workflow-manager > section#media-and-press-kit > h2 {
@@ -235,7 +252,6 @@ font-size: 1.02rem;
 font-weight: 600;
 letter-spacing: 0;
 margin-top: 5rem;
-opacity: .6;
 }
 
 #autosubmit-workflow-manager > section#media-and-press-kit > h2::after {
@@ -381,7 +397,6 @@ margin: 0 0 3rem;
 margin: 0;
 font-size: .92rem;
 line-height: 1.7;
-opacity: .55;
 }
 
 .as-media a.reference.internal {
