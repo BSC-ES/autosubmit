@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import pytest
 from ruamel.yaml import YAML
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from testcontainers.community.postgres import PostgresContainer  # type: ignore
 from testcontainers.core.container import DockerContainer  # type: ignore
 
@@ -473,11 +473,6 @@ def postgres_server(request: "FixtureRequest") -> Generator[PostgresContainer | 
             yield container
 
 
-@pytest.fixture(params=[False, True])
-def use_sqlalchemy(request):
-    return request.param
-
-
 @pytest.fixture(params=['postgres', 'sqlite'])
 def as_db(request: "FixtureRequest", tmp_path: "LocalPath", postgres_server: "DockerContainer",
           autosubmit_exp, monkeypatch):
@@ -515,7 +510,6 @@ def as_db(request: "FixtureRequest", tmp_path: "LocalPath", postgres_server: "Do
         # Create a new DB to run the current test completely isolated from others.
         # We use the test name, minus the [params], appending the current nanoseconds
         # instead to distinguish parametrised tests too -- really isolated.
-        from sqlalchemy import create_engine, text
         engine = create_engine(f'postgresql://{user}:{password}@localhost:{port}/postgres')
         with engine.connect() as conn:
             conn.execution_options(isolation_level="AUTOCOMMIT").execute(

@@ -1,0 +1,377 @@
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
+#
+# This file is part of Autosubmit.
+#
+# Autosubmit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Autosubmit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Base SQLAlchemy database manager shared by all Autosubmit target databases."""
+from typing import Any, cast
+
+from sqlalchemy import (
+    ClauseElement,
+    Connection,
+    Engine,
+    MetaData,
+    delete,
+    desc,
+    func,
+    insert,
+    inspect,
+    select,
+    text,
+)
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.schema import CreateSchema, CreateTable, DropTable
+
+from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database import session
+from autosubmit.database.models.tables import GENERALTABLES, Table, TableRegistry
+from autosubmit.database.schema_version import (
+    ensure_schema_migrations_table,
+    get_schema_version,
+    record_schema_migration,
+    schema_migrations_table,
+)
+
+
+class SchemaVersionedManager:
+    """Tracks the schema version of a single target database.
+
+    Subclasses that own a target set ``SCHEMA_VERSION`` to the version they
+    expect and give the target a unique ``SCHEMA_MIGRATIONS_TABLE_NAME``
+    (targets that share a schema must not reuse the same table name).
+    """
+
+    # Schema version expected for the target database. When set, the manager
+    # records it in a ``schema_migrations`` table inside the target database.
+    SCHEMA_VERSION: int | None = None
+    SCHEMA_MIGRATIONS_TABLE_NAME = "schema_migrations"
+
+    def _init_schema_version(self, metadata: MetaData) -> None:
+        """Build the per-target ``schema_migrations`` table on ``metadata``."""
+        self._schema_migrations_table = schema_migrations_table(
+            metadata, name=self.SCHEMA_MIGRATIONS_TABLE_NAME
+        )
+
+    def _set_schema_version(self, target: Engine | Connection, version: int | None = None) -> None:
+        """Create the ``schema_migrations`` table and record ``version``.
+
+        :param target: An open connection, or an engine (a transaction is opened).
+        :param version: Version to record; defaults to ``SCHEMA_VERSION``.
+        """
+        version = self.SCHEMA_VERSION if version is None else version
+        if version is None:
+            return
+        ensure_schema_migrations_table(target, self._schema_migrations_table)
+        record_schema_migration(target, self._schema_migrations_table, version)
+
+    def _get_schema_version(self, target: Engine, schema: str | None = None) -> int:
+        """Read the recorded schema version, or 0 if it is unknown.
+
+        :param target: An engine to read from.
+        :param schema: Optional schema name.
+        :return: The recorded version, or 0 if it is unknown.
+        """
+        return get_schema_version(target, self._schema_migrations_table, schema)
+
+
+class DbManager(SchemaVersionedManager):
+    """A database manager using SQLAlchemy.
+
+    It supports the SQLite and PostgreSQL backends used by Autosubmit.
+    """
+
+    def __init__(self, db_path: str, schema: str | None = None, historical: bool = False) -> None:
+        self.engine = None
+        self.engine_historical = None
+        if BasicConfig.DATABASE_BACKEND == "sqlite":
+            if historical:
+                self.engine_historical = session.get_engine(db_path)
+            else:
+                self.engine = session.get_engine(db_path)
+        else:
+            # Postgres is unified
+            self.engine: Engine = session.get_engine(db_path)
+            self.engine_historical = self.engine
+
+        self.schema = schema if BasicConfig.DATABASE_BACKEND != "sqlite" else None
+        self.table_registry = TableRegistry(self.schema)
+        self._init_schema_version(self.table_registry.metadata)
+        self._schema_version_ensured = False
+
+    def _target_engine(self) -> Engine:
+        """Return the engine that owns the tables managed by this instance."""
+        return cast(Engine, self.engine_historical or self.engine)
+
+    def _ensure_schema_version(self) -> None:
+        """Ensure the ``schema_migrations`` table exists and records the current version."""
+        if self.SCHEMA_VERSION is None or self._schema_version_ensured:
+            return
+        engine = self._target_engine()
+        with engine.begin() as conn:
+            if self.schema:
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            self._set_schema_version(conn)
+        self._schema_version_ensured = True
+
+    def _get_engine(self, table_name: str | None = None) -> Engine:
+        """Return the appropriate engine based on context.
+
+        :param table_name: Optional table name; general tables are routed to the historical engine when available.
+        :return: The selected SQLAlchemy engine.
+        """
+        if table_name and table_name in GENERALTABLES and self.engine_historical:
+            return self.engine_historical
+        return self.engine
+
+    def create_table(self, table_name: str) -> None:
+        self._ensure_schema_version()
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).begin() as conn:
+            if self.schema:
+                conn.execute(CreateSchema(self.schema, if_not_exists=True))
+            conn.execute(CreateTable(table, if_not_exists=True))
+            # Auto-add missing columns for schema evolution
+            schema_arg = {"schema": self.schema} if self.schema else {}
+            existing = {col['name'] for col in inspect(conn).get_columns(table_name, **schema_arg)}
+            for column in table.columns:
+                if column.name not in existing:
+                    qualified_name = f"{self.schema}.{table_name}" if self.schema else table_name
+                    conn.execute(
+                        text(f"ALTER TABLE {qualified_name} ADD COLUMN {column.name} {column.type}")
+                    )
+
+    def drop_table(self, table_name: str) -> None:
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).begin() as conn:
+            conn.execute(DropTable(table, if_exists=True))
+
+    def insert(self, table_name: str, data: dict[str, Any]) -> None:
+        if not data:
+            return
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).begin() as conn:
+            conn.execute(insert(table), data)
+
+    def insert_many(self, table_name: str, data: list[dict[str, Any]]) -> int:
+        if not data:
+            return 0
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).begin() as conn:
+            result = conn.execute(insert(table), data)
+            return result.rowcount
+
+    def select_all_with_columns(self, table_name: str) -> list[tuple[tuple[str, Any], ...]]:
+        """Select rows from a table. Return a list of hashable tuples."""
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).connect() as conn:
+            rows = conn.execute(select(table)).fetchall()
+            columns = table.c.keys()
+            return [tuple(zip(columns, row)) for row in rows]
+
+    def select_where_with_columns(
+            self,
+            table: "Table",
+            where: dict[str, Any] | ClauseElement | None = None
+    ) -> list[tuple[tuple[str, Any], ...]]:
+        """Select rows from a table with specific columns. Return a list of hashable tuples.
+
+        :param table: SQLAlchemy ``Table`` to select from.
+        :param where: Dictionary of column:value pairs to filter by, or a SQLAlchemy clause.
+        :return: List of tuples containing column-value pairs.
+        """
+        self.create_table(table.name)  # Ensure the table exists
+
+        query = select(table)
+        columns = table.c.keys()
+
+        if isinstance(where, dict):
+            for key, value in where.items():
+                if key in columns:
+                    column = getattr(table.c, key)
+                    if isinstance(value, list):
+                        query = query.where(column.in_(value))
+                    else:
+                        query = query.where(column == value)
+        else:
+            query = query.where(where)
+
+        with self._get_engine(table.name).begin() as conn:
+            rows = conn.execute(query).fetchall()
+
+        return [tuple(zip(columns, row)) for row in rows]
+
+    def count(self, table_name: str) -> int:
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).connect() as conn:
+            row = conn.execute(select(func.count()).select_from(table))
+            return cast(int, row.scalar())
+
+    def delete_all(self, table_name: str) -> int:
+        table = self.table_registry.get(table_name)
+        with self._get_engine(table_name).begin() as conn:
+            result = conn.execute(delete(table))
+            return result.rowcount
+
+    def delete_where(self, table_name: str, where: dict[str, Any] | ClauseElement | None) -> int:
+        """Delete rows from a table where the specified conditions are met.
+        Supports both equality and 'IN' queries for list values.
+
+        :param table_name: Name of the table to delete from.
+        :param where: Dictionary of column names and values (single value or list for IN).
+        :return: Number of rows deleted.
+        :raises ValueError: If 'where' is empty.
+        """
+        table = self.table_registry.get(table_name)
+        query = delete(table)
+
+        if where:
+            for key, value in where.items():
+                column = getattr(table.c, key)
+                if isinstance(value, list):
+                    query = query.where(column.in_(value))
+                else:
+                    query = query.where(column == value)
+        else:
+            raise ValueError(
+                "The 'where' parameter must be a non-empty dictionary. Multiple-table criteria within Delete are not supported.")
+
+        with self._get_engine(table_name).begin() as conn:
+            result = conn.execute(query)
+        return result.rowcount
+
+    def upsert_many(self, table_name: str, data: list[dict[str, Any]], conflict_cols: list[str],
+                     exclude_cols: list[str] | None = None, batch_size: int = 1000) -> int:
+        """Perform an upsert (insert, or update the conflicting row) operation.
+
+        :param table_name: Name of the table.
+        :param data: List of dictionaries containing the data to upsert.
+        :param conflict_cols: List of columns to check for conflicts. ( unique keys and primary keys )
+        :param exclude_cols: Optional list of columns to exclude from the UPDATE SET clause,
+            preserving their existing values on conflict.
+        :return: Number of rows affected.
+        :raises ValueError: If data is empty or unsupported dialect.
+        """
+        if not data:
+            return 0
+
+        table: Table = self.table_registry.get(table_name)
+        update_cols = [col for col in data[0].keys()
+                       if col not in conflict_cols and col not in (exclude_cols or [])]
+
+        # NOTE general insert doesn't have on_conflict
+        if self._get_engine(table_name).dialect.name == "postgresql":
+            insert_stmt = pg_insert(table)
+        elif self._get_engine(table_name).dialect.name == "sqlite":
+            insert_stmt = sqlite_insert(table)
+        else:
+            raise ValueError(f"Unsupported dialect: {self._get_engine(table_name).dialect.name}")
+
+        # add on_conflict clause
+        update_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=conflict_cols,
+            set_={col: getattr(insert_stmt.excluded, col) for col in update_cols}
+        )
+
+        total_rows = 0
+        with self._get_engine(table_name).begin() as conn:
+            for i in range(0, len(data), batch_size):
+                batch = data[i:i + batch_size]
+                result = conn.execute(update_stmt, batch)
+                total_rows += result.rowcount
+
+        return total_rows
+
+    def count_where(self, table_name: str, where: dict[str, Any]) -> int:
+        """Count the number of rows in a table that match a given condition."""
+        table = self.table_registry.get(table_name)
+        query = select(func.count()).select_from(table)
+        for key, value in where.items():
+            query = query.where(getattr(table.c, key) == value)
+        with self._get_engine(table_name).connect() as conn:
+            row = conn.execute(query).scalar()
+        return cast(int, row) if row is not None else 0
+
+
+    def update_where(self, table_name: str, values: dict[str, Any], where: dict[str, Any]) -> int:
+        """Update rows in a table where conditions are met.
+
+        Supports both equality and IN queries for list values.
+
+        :param table_name: Name of the table to update.
+        :param values: Dictionary of column names and new values to set.
+        :param where: Dictionary of column names and values (single value or list for IN).
+        :return: Number of rows updated.
+        """
+        table = self.table_registry.get(table_name)
+        query = table.update().values(**values)
+
+        for key, value in where.items():
+            column = getattr(table.c, key)
+            if isinstance(value, list):
+                query = query.where(column.in_(value))
+            else:
+                query = query.where(column == value)
+
+        with self._get_engine(table_name).begin() as conn:
+            result = conn.execute(query)
+
+        return result.rowcount
+
+    def select_latest_inner_jobs(
+            self,
+            innerjobs_table: Table,
+            job_names: list[str] | None = None
+    ) -> list[dict[str, object]]:
+        """
+        Select the row with the latest timestamp for each job_name from the inner jobs table.
+        If job_names is provided, filter only those job_names.
+
+        :param innerjobs_table: SQLAlchemy Table object for the inner jobs.
+        :param job_names: Optional list of job_name values to filter by.
+        :return: List of dictionaries with the latest row per job_name.
+        """
+        row_number = func.row_number().over(
+            partition_by=innerjobs_table.c.job_name,
+            order_by=desc(innerjobs_table.c.timestamp)
+        ).label('row_number')
+
+        stmt = select(*innerjobs_table.c, row_number)
+        if job_names:
+            stmt = stmt.where(innerjobs_table.c.job_name.in_(job_names))
+        subquery = stmt.alias('subq')
+        query = select(*(col for col in subquery.c if col.name != 'row_number')).where(subquery.c.row_number == 1)
+        with self._get_engine(innerjobs_table.name).connect() as conn:
+            result = conn.execute(query)
+            return [dict(row) for row in result.mappings().all()]
+
+    def select_last_with_columns(self, table_name: str, columns: list[str] | None = None) -> dict[str, Any] | None:
+        """Return the latest row from a table ordered by descending update time.
+
+        :param table_name: Name of the table to select from.
+        :param columns: Optional list of column names to include. If None, all columns are included.
+        :return: Dictionary representing the latest row, or None if the table is empty.
+        """
+        table: Table = self.table_registry.get(table_name)
+        self.create_table(table.name)
+
+        col_keys = columns if columns is not None else list(table.c.keys())
+        selected_cols = [table.c[col] for col in col_keys]
+
+        stmt = select(*selected_cols).order_by(desc(table.c.modified)).limit(1)
+        with self._get_engine(table_name).connect() as conn:
+            row = conn.execute(stmt).fetchone()
+
+        return dict(zip(col_keys, row)) if row else None

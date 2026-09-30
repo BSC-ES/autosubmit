@@ -32,7 +32,7 @@ from networkx import DiGraph
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_manager_job_list import JobsDbManager
+from autosubmit.database.managers.job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.history.experiment_history import ExperimentHistory
@@ -718,17 +718,7 @@ class JobList:
         """
         if job.parents or not self.dbmanager:
             return
-        from sqlalchemy import select
-
-        from autosubmit.database.tables import ExperimentStructureTable
-        structure_table = self.dbmanager.table_registry.get(ExperimentStructureTable.name)
-        self.dbmanager.create_table(structure_table.name)
-        with self.dbmanager._get_engine(structure_table.name).connect() as conn:
-            rows = conn.execute(
-                select(structure_table.c.e_from)
-                .where(structure_table.c.e_to == job.name)
-            )
-            parent_names = {row[0] for row in rows}
+        parent_names = self.dbmanager.select_parent_names(job.name)
         for parent_name in parent_names:
             parent_obj = next((j for j in self.job_list if j.name == parent_name), None)
             if not parent_obj:
@@ -4180,7 +4170,7 @@ class JobList:
                 status=[Status.COMPLETED, Status.FAILED, Status.SKIPPED], return_only_names=False)
         if not finished_jobs:
             return
-        exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
+        exp_history = ExperimentHistory(self.expid)
         jobs_data = exp_history.manager.get_jobs_data_last_row([job.name for job in finished_jobs])
         for job in finished_jobs:
             if job.id and job.updated_log <= job.fail_count and job.has_valid_submit_time():
@@ -4222,7 +4212,7 @@ class JobList:
 
         job_names: list[str] | list[Job] = self._get_jobs_by_name(platform=platform, return_only_names=True)
         if job_names:
-            exp_history = ExperimentHistory(self.expid, force_sql_alchemy=True)
+            exp_history = ExperimentHistory(self.expid)
             jobs_data = exp_history.manager.get_jobs_data_last_row(job_names)  # This gets only the last row
             return {name for name, data in jobs_data.items() if data["status"] == "COMPLETED"}
 

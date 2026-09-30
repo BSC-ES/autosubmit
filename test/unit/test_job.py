@@ -3187,4 +3187,3 @@ def test_recover_log_disabled_threads(mocker):
     mock_retrieve.assert_called_once()
     mock_notify.assert_called_once_with(as_conf)
     assert job.log_recovery_call_count == 1
-

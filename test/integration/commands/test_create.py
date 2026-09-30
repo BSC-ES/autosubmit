@@ -18,10 +18,10 @@
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.experiment.manage import create
-from autosubmit.history.database_managers.experiment_history_db_manager import (
+from autosubmit.database.managers.history import (
     SqlAlchemyExperimentHistoryDbManager,
 )
+from autosubmit.experiment.manage import create
 from autosubmit.log.log import Log
 
 

@@ -39,12 +39,12 @@ from bscearth.utils.date import (
 )
 
 from autosubmit.config.basicconfig import BasicConfig
+from autosubmit.database.managers.history import (
+    get_last_run_id,
+)
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
 from autosubmit.history.data_classes.job_data import JobData
-from autosubmit.history.database_managers.experiment_history_db_manager import (
-    get_last_run_id,
-)
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job_common import (
     Status,
@@ -3007,7 +3007,7 @@ class Job:
         return True
 
     def write_end_time(self, completed, attempt) -> None:
-        """Writes end timestamp to TOTAL_STATS file and jobs_data.db
+        """Writes end timestamp to the TOTAL_STATS file and the experiment history database.
 
         :param completed: True if the job has been completed, False otherwise
         :param attempt: number of retrials
@@ -3059,14 +3059,18 @@ class Job:
         return exp_history.get_finish_data_dc(self.name, attempt)
 
     def stat_registered(self, attempt: int) -> bool:
-        """Check if submit/start/finish are registered in the historical DB for this job_id and attempt.
+        """Check if the stats are already registered in the historical DB for this job and attempt.
+
+        The lookup uses the job name (unique per job and chunk) instead of the
+        scheduler job id, which is not guaranteed to be unique, and restricts the
+        search to the current run so a rerun does not match the previous run's rows.
 
         :param attempt: The fail_count (attempt) to look up.
-        :return: True if submit, start, and finish are all non-zero in the historical record.
+        :return: True if a historical record exists for this job and attempt in the current run.
         """
         exp_history = ExperimentHistory(self.expid)
-        job_data = exp_history.get_job_data_by_job_id_and_fail_count(self.id, attempt)
-        return job_data is not None
+        run_id = get_last_run_id(self.expid)
+        return exp_history.get_submit_data_dc(self.name, attempt, run_id=run_id) is not None
 
     def check_started_after(self, date_limit) -> bool:
         """Checks if the job started after the given date
