@@ -9,8 +9,8 @@ several bug fixes and enhancements to improve the overall user experience.
 **Bug fixes:**
 
 - Fix `autosubmit.lock` not being deleted after `create` and `run`; `archive` and `delete` now acquire it too #3033 #3055
-- Fix multi-member PJM job lookup output parsing #3255
-- Remove the unrelated `--filter_status` option from `autosubmit expid` #3241
+- Fix multi-member PJM job lookup output parsing #3255 (thanks @1cbyc)
+- Remove the unrelated `--filter_status` option from `autosubmit expid` #3241 (thanks @1cbyc)
 - Fixed `DELAY_RETRY_TIME` not matching the documented `+N` and `*N` delay sequences #3138
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
@@ -22,36 +22,49 @@ several bug fixes and enhancements to improve the overall user experience.
 - Record `schema_migrations` with a dialect upsert to avoid races when databases are written concurrently #3114
 - Make the general database and experiment details use only SQLAlchemy, dropping the last raw-sqlite3 code paths and the legacy `db_version` table #3114
 - Move every database manager into `autosubmit/database` (`models/` and `managers/` subpackages) #3114
-- Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295
+- Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295 (thanks @elliot1377)
+- Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
+
 
 **New Features:**
 
-- Allow local project paths to use `~` for the user's home directory #3296.
-- Introduced SQLAlchemy as the main database backend for joblist management, replacing the previous pickle-based system. This change allows for better scalability and flexibility in handling large workflows.
-- Added support for PostgreSQL as a database backend, in addition to the default SQLite. This provides users with more options for database management.
+- Allow local project paths to use `~` for the user's home directory #3296 (thanks @fatihcvs)
+- Introduced SQLAlchemy as the main database backend for joblist management, replacing the
+  previous pickle-based system. This change allows for better scalability and flexibility in
+  handling large workflows.
+- Added support for PostgreSQL as a database backend, in addition to the default SQLite.
+  This provides users with more options for database management.
 - Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
-- [enhancement] Allow recovery to update current running/ready jobs #1251
+- Allow recovery to update current running/ready jobs #1251
 - `autosubmit` Bash autocomplete #1227 #3171
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
 
 **Migration from `job_list.pkl` to Database**
 
-- All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted in significant changes to the code.
+- All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted
+  in significant changes to the code.
 
 **Memory and Performance Improvements**:
 
 - Significant reduction in memory usage by loading only necessary jobs and dependencies for active employment.
-- Enhanced performance during autosubmit runs and ongoing improvements to the log process management through direct database interactions to reduce the communication with the main process.
-- Overall job management features have been improved to ensure better tracking and status updates, removing redundant code to enhance the efficiency of a loop 
-- The recovery and set status commands have been improved for version 4.2.0 and later 4.1.16, resulting in faster operations.
+- Enhanced performance during autosubmit runs and ongoing improvements to the log process management
+  through direct database interactions to reduce the communication with the main process.
+- Overall job management features have been improved to ensure better tracking and status updates,
+  removing redundant code to enhance the efficiency of a loop 
+- The recovery and set status commands have been improved for version 4.2.0 and later 4.1.16,
+  resulting in faster operations.
 - Removal of _COMPLETED files to reduce the amount of inodes generated
-- A significant rework of the wrapper building process has been implemented to address ongoing issues and prevent regressions, particularly with 2D wrappers.
-- Various functions have been optimized to minimize calls to save/load operations, enhancing the software's overall efficiency and responsiveness.
+- A significant rework of the wrapper building process has been implemented to address ongoing issues
+  and prevent regressions, particularly with 2D wrappers.
+- Various functions have been optimized to minimize calls to save/load operations, enhancing the
+  software's overall efficiency and responsiveness.
 
 **Enhancements**
 
-- **Database Method Enhancements**: Support for both PostgreSQL and SQLite with optimized save/load mechanisms. Improved wrapper data storage and load.
-- **Testing Efforts**: Tests have been added for every rework to enhance reliability, with a particular effort on integration tests.
+- **Database Method Enhancements**: Support for both PostgreSQL and SQLite with optimised save/load mechanisms.
+  Improved wrapper data storage and load.
+- **Testing Efforts**: Tests have been added for every rework to enhance reliability, with a particular effort
+  on integration tests.
 - Enforce connection pool usage when using PostgreSQL as database backend #2973
 - Auto-detect git default branch when `-b` flag not specified #3101
 - Removed `files` arguments from autosubmit sub-commands, and moved code to upgrade scripts out of `autosubmit.py` #2711
@@ -62,8 +75,10 @@ several bug fixes and enhancements to improve the overall user experience.
 - Every command now prints traceability information (AS/Python version, Linux, user name, ...) #2795 #3171
 - set_status now rejects active targets (SUBMITTED/QUEUING/RUNNING → AutosubmitCritical 7011). #3231
 - Centralized Job.apply_status / Status.ACTIVE/RE_RUNNABLE #3231
-- stale-data recovery on set-status runs only for final targets (_FINAL_STATUSES) in job/manage.py instead of the autosubmit.py monolith. #3231
-- Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly (with edge-completion reconciliation), never loaded into the graph. #3231
+- Stale-data recovery on set-status runs only for final targets (_FINAL_STATUSES) in job/manage.py
+  instead of the autosubmit.py monolith. #3231
+- Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly
+  (with edge-completion reconciliation), never loaded into the graph. #3231
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 

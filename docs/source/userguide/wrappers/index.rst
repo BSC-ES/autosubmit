@@ -193,13 +193,20 @@ The extend_wallclock parameter allows users to provide extra headroom for the wr
       JOBS_IN_WRAPPER: "SIM"
       extend_wallclock: 1
 
+
+.. _wrapper_retrials:
+
+
 Retrials
 ^^^^^^^^
 
-This parameter allows the users to enable or disable the wrapper's retrying mechanism.
-This value overrides the general tasks defined.
+This parameter sets the number of retries for inner jobs of the wrapper, and 
+overrides ``RETRIALS`` defined on the inner jobs themselves.
 
-Vertical wrappers will retry the jobs without resubmitting the wrapper. 
+Vertical wrappers retry the inner jobs **inside the same wrapper submission**, 
+without resubmitting the wrapper. Once the wrapper finishes, its inner jobs 
+are not retried again externally by Autosubmit. 
+See :ref:`job_retries` for the standalone job retry mechanism.
 
 .. code-block:: YAML
 

@@ -406,9 +406,10 @@ def ssh_x11_mfa_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") 
 
 
 @pytest.fixture(scope="function")
-def slurm_server(request, tmp_path, mocker) -> Generator["Container", Any, None]:
+def slurm_server(request, tmp_path, mocker: "MockerFixture") -> Generator["Container", Any, None]:
     """Function-scoped fixture that creates a Slurm server container per test."""
-    # TODO: Needed? If so, explain why.
+    # Patch multiprocessing start method to 'fork' in test environment so child worker processes
+    # inherit active pytest fixtures, monkeypatches, and in-memory mock dispatchers (Platform defaults to 'spawn').
     mocker.patch(
         'autosubmit.platforms.platform.Platform.get_mp_context',
         return_value=multiprocessing.get_context('fork')
