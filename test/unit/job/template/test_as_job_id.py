@@ -23,10 +23,22 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from autosubmit.job.template import Language, get_template_snippet
+
 from ._helpers import TEMPLATE_LANGUAGES, TemplateLanguage, build_script
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+_SCHEDULER_JOB_ID_ENV_VARS = (
+    'SLURM_JOBID',
+    'PBS_JOBID',
+    'JOB_ID',
+    'LSB_JOBID',
+    'LOADL_STEP_ID',
+    'PJM_JOBID',
+)
+"""Scheduler variables every template must resolve ``AS_JOB_ID`` from, in priority order."""
 
 LANGUAGE_PARAMS = [
     pytest.param(
@@ -92,3 +104,20 @@ def test_as_job_id_falls_back_to_pid(
     )
     assert result.returncode == 0, result.stderr
     assert (tmp_path / 'as_job_id.txt').read_text().strip().isdigit()
+
+
+@pytest.mark.parametrize(
+    'language',
+    [Language.BASH, Language.PYTHON2, Language.PYTHON3, Language.R],
+    ids=['bash', 'python2', 'python3', 'r'],
+)
+def test_template_header_references_all_scheduler_job_id_vars(language: Language) -> None:
+    """Every template header must resolve ``AS_JOB_ID`` from all scheduler variables.
+
+    Guards against adding or removing a scheduler variable in only some templates.
+
+    :param language: Template language under test.
+    """
+    header = get_template_snippet(language).as_header(platform_header='', executable='')
+    for var in _SCHEDULER_JOB_ID_ENV_VARS:
+        assert var in header

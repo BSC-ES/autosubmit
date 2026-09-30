@@ -534,10 +534,7 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
         failed_wrapper = os.path.join(os.getcwd(),wrapper_id)
         retrials = {self.retrials}
         total_steps = 0
-        try:
-            print("JOB.ID:"+ os.getenv('SLURM_JOBID'))
-        except:
-            print("JOB.ID")
+        print("JOB.ID:" + AS_JOB_ID)
         for i in range(len({jobs_list})):
             job_retrials = retrials
             completed = False

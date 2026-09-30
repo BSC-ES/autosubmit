@@ -2584,6 +2584,17 @@ def test_vertical_job_thread_uses_fail_count(wrapper_builder: PythonVerticalWrap
     assert 'self.fail_count' in thread
 
 
+_SCHEDULER_JOB_ID_ENV_VARS = (
+    'SLURM_JOBID',
+    'PBS_JOBID',
+    'JOB_ID',
+    'LSB_JOBID',
+    'LOADL_STEP_ID',
+    'PJM_JOBID',
+)
+"""Scheduler variables every wrapper must resolve ``AS_JOB_ID`` from, in priority order."""
+
+
 def test_python_wrapper_stat_exposes_as_job_id(wrapper_builder: PythonVerticalWrapperBuilder) -> None:
     """The Python wrapper must expose the scheduler job id as ``AS_JOB_ID``.
 
@@ -2592,6 +2603,20 @@ def test_python_wrapper_stat_exposes_as_job_id(wrapper_builder: PythonVerticalWr
     stat = wrapper_builder.build_wrapper_stat()
     assert 'AS_JOB_ID' in stat
     assert '_as_job_id' not in stat
+    for var in _SCHEDULER_JOB_ID_ENV_VARS:
+        assert var in stat
+
+
+def test_vertical_launcher_uses_as_job_id(wrapper_builder: PythonVerticalWrapperBuilder) -> None:
+    """The vertical launcher must report the job id through ``AS_JOB_ID``.
+
+    :param wrapper_builder: Builder fixture.
+    """
+    launcher = wrapper_builder.build_sequential_threads_launcher(
+        'scripts', 'JobThread(scripts[i], i, retrials, fail_count)', footer=True
+    )
+    assert 'AS_JOB_ID' in launcher
+    assert 'SLURM_JOBID' not in launcher
 
 
 def test_bash_wrapper_stat_exposes_as_job_id() -> None:
@@ -2609,6 +2634,8 @@ def test_bash_wrapper_stat_exposes_as_job_id() -> None:
     stat = builder.build_wrapper_stat()
     assert 'AS_JOB_ID' in stat
     assert '_as_jobid_set' not in stat
+    for var in _SCHEDULER_JOB_ID_ENV_VARS:
+        assert var in stat
 
 
 @pytest.mark.parametrize("policy", ["strict", "flexible", "mixed"],

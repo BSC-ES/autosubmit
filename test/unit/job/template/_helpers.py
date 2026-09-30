@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 
-from autosubmit.job.template import bash, python3, r
+from autosubmit.job.template import Language, get_template_snippet
 from autosubmit.job.template.common import TemplateSnippet
 
 _RSCRIPT = shutil.which('Rscript')
@@ -70,46 +70,51 @@ def build_script(
 class TemplateLanguage:
     """A job template language and the pieces needed to run a script for it.
 
-    :param name: Language name used in test IDs.
-    :param module: Template module exposing the ``as_*`` functions.
+    :param language: Autosubmit template language under test.
     :param filename: Name of the generated script file.
-    :param executable: Interpreter used in the shebang.
     :param runner: Callable that builds the command to run the generated script.
     :param body: Script body that writes ``AS_JOB_ID`` to ``as_job_id.txt``.
     :param skip_reason: If set, tests for this language are skipped with this reason.
     """
 
-    name: str
-    module: TemplateSnippet
+    language: Language
     filename: str
-    executable: str | None
     runner: Callable[[Path], list[str]]
     body: str
     skip_reason: str | None = None
 
+    @property
+    def name(self) -> str:
+        """Language name used in test IDs."""
+        return self.language.value
+
+    @property
+    def module(self) -> TemplateSnippet:
+        """Template module exposing the ``as_*`` functions."""
+        return get_template_snippet(self.language)
+
+    @property
+    def executable(self) -> str:
+        """Interpreter used in the shebang."""
+        return Language.get_executable(self.language)
+
 
 TEMPLATE_LANGUAGES: list[TemplateLanguage] = [
     TemplateLanguage(
-        name='bash',
-        module=bash,
+        language=Language.BASH,
         filename='the_script.sh',
-        executable='/bin/bash',
         runner=lambda script_path: [str(script_path)],
         body='echo "$AS_JOB_ID" > as_job_id.txt',
     ),
     TemplateLanguage(
-        name='python3',
-        module=python3,
+        language=Language.PYTHON3,
         filename='the_script.py',
-        executable=sys.executable,
         runner=lambda script_path: [sys.executable, str(script_path)],
         body="open('as_job_id.txt', 'w').write(AS_JOB_ID)",
     ),
     TemplateLanguage(
-        name='r',
-        module=r,
+        language=Language.R,
         filename='the_script.R',
-        executable=_RSCRIPT,
         runner=lambda script_path: [_RSCRIPT or 'Rscript', str(script_path)],
         body="writeLines(AS_JOB_ID, 'as_job_id.txt')",
         skip_reason=None if _RSCRIPT else 'Rscript not found on PATH',
