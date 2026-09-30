@@ -112,7 +112,7 @@ def test_get_allowed_members(
 )
 def test_handle_start_after(mocker, autosubmit_config: Callable, time: str,
                              header_skip: bool, experiment_exists: bool):
-    """Test the function handle_start_time inside autosubmit_helper"""
+    """Test the function handle_start_after inside autosubmit_helper"""
     autosubmit_helper = mocker.patch('autosubmit.helpers.autosubmit_helper.check_experiment_exists')
     mock_experiment_history = mocker.patch('autosubmit.helpers.autosubmit_helper.ExperimentHistory')
     mocked_sleep = mocker.patch('autosubmit.helpers.autosubmit_helper.sleep')
@@ -141,7 +141,15 @@ def test_handle_start_after(mocker, autosubmit_config: Callable, time: str,
     autosubmit_helper.return_value = experiment_exists
     mocked_sleep.return_value = 0
 
-    helper.handle_start_after(time, _EXPID)
-    if header_skip is True and experiment_exists is True:
+    result = helper.handle_start_after(time, _EXPID)
+
+    if not experiment_exists:
+        assert result == time
+        mocked_sleep.assert_not_called()
+    elif not header_skip:
+        assert result is None
+        mocked_sleep.assert_not_called()
+    else:
+        assert result is None
         assert mocked_exp_history.manager.get_experiment_run_dc_with_max_id_or_none.called
-    assert mocked_sleep.has_been_called()
+        mocked_sleep.assert_called()

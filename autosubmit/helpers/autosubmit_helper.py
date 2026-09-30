@@ -63,8 +63,14 @@ def handle_start_time(start_time: str) -> None:
             sleep(1)
 
 
-def handle_start_after(start_after: str, expid: str) -> None:
-    """Wait until the start_after experiment has finished."""
+def handle_start_after(start_after: str, expid: str) -> str | None:
+    """Wait until the start_after experiment has finished.
+
+    :param start_after: The expid whose completion triggers this experiment.
+    :param expid: The expid being run.
+    :return: The ``start_after`` expid when it does not exist, so the caller can
+        report it after the console is cleared; ``None`` otherwise.
+    """
     if start_after:
         Log.info("User provided expid completion trigger has been detected.")
         # The user tries to be tricky
@@ -76,10 +82,7 @@ def handle_start_after(start_after: str, expid: str) -> None:
         # error_on_inexistence is disabled because a missing experiment must not
         # block the run: it is reported and ignored.
         if not check_experiment_exists(start_after, error_on_inexistence=False):
-            Log.warning(f"Experiment {start_after} does not exist. Ignoring the start_after trigger.")
-            # Keep the warning readable before the console is cleared.
-            sleep(3)
-            return
+            return start_after
         # Historical Database: We use the historical database to retrieve the current progress
         # data of the supplied expid (start_after)
         exp_history = ExperimentHistory(start_after)
@@ -110,6 +113,7 @@ def handle_start_after(start_after: str, expid: str) -> None:
             sleep(60)
             current_run = exp_history.manager.get_experiment_run_dc_with_max_id_or_none()
         Log.info(f"Experiment {start_after} finished. Starting experiment {expid}.")
+    return None
 
 
 def _run_is_completed(current_run) -> bool:

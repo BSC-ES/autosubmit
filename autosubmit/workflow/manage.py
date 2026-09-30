@@ -129,7 +129,7 @@ def _prepare_run(
             # Handling starting time
             AutosubmitHelper.handle_start_time(start_time)
             # Start after completion trigger block
-            AutosubmitHelper.handle_start_after(start_after, expid)
+            ignored_start_after: str | None = AutosubmitHelper.handle_start_after(start_after, expid)
             # Handling run_only_members
         except AutosubmitCritical:
             raise
@@ -140,6 +140,12 @@ def _prepare_run(
                 str(e),
             )
         os.system("clear")
+        # Report the ignored trigger now that the console has been cleared, so the
+        # warning is not wiped by ``clear`` above.
+        if ignored_start_after:
+            Log.warning(
+                f"Experiment {ignored_start_after} does not exist. Ignoring the start_after trigger."
+            )
         if threading.current_thread().name == threading.main_thread():
             signal.signal(signal.SIGINT, _signal_handler)
         else:
