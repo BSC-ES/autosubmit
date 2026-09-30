@@ -25,6 +25,7 @@ from autosubmit.database.managers.history import (
     CURRENT_DB_VERSION,
     DB_EXPERIMENT_HEADER_SCHEMA_CHANGES,
     SqlAlchemyExperimentHistoryDbManager,
+    get_last_run_id,
 )
 from autosubmit.database.models.tables import JobDataTable
 from autosubmit.history.utils import get_current_datetime
@@ -330,3 +331,62 @@ def test_get_last_job_data_dc_by_job_name_and_fail_counter_is_run_scoped(sqlalch
 
     with pytest.raises(Exception, match="No job_data found"):
         sqlalchemy_db_manager.get_last_job_data_dc_by_job_name_and_fail_counter("job", 0, run_id=3)
+
+
+def test_sqlalchemy_get_max_experiment_run_id_is_zero_without_runs(sqlalchemy_db_manager) -> None:
+    """No experiment_run rows means the max id is 0."""
+    assert sqlalchemy_db_manager._get_max_experiment_run_id() == 0
+
+
+def test_sqlalchemy_get_stale_rows(sqlalchemy_db_manager) -> None:
+    """Rows with submit set but start/finish missing are reported as stale."""
+    table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
+    with sqlalchemy_db_manager.engine.connect() as conn:
+        conn.execute(insert(table), [
+            {**_base_row("stale", counter=0, job_id=1), "submit": 100, "start": 0, "finish": 0, "fail_count": 0},
+            {**_base_row("done", counter=0, job_id=2), "submit": 100, "start": 100, "finish": 200, "fail_count": 0},
+        ])
+        conn.commit()
+
+    stale = {row.job_name for row in sqlalchemy_db_manager.get_stale_rows()}
+    assert stale == {"stale"}
+
+
+def test_sqlalchemy_update_job_data_values(sqlalchemy_db_manager) -> None:
+    """The start/finish of the matching job_data row are updated."""
+    table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
+    with sqlalchemy_db_manager.engine.connect() as conn:
+        conn.execute(insert(table), {**_base_row("job", counter=0, job_id=1), "fail_count": 0})
+        conn.commit()
+
+    assert sqlalchemy_db_manager.update_job_data_values("job", 0, start=11, finish=22) == 1
+    row = sqlalchemy_db_manager.get_last_job_data_dc_by_job_name_and_fail_counter("job", 0)
+    assert (row.start, row.finish) == (11, 22)
+
+
+def test_sqlalchemy_get_jobs_data_last_row_keeps_highest_counter(sqlalchemy_db_manager) -> None:
+    """For several rows with the same name, the highest counter wins."""
+    table = sqlalchemy_db_manager.table_registry.get(JobDataTable.name)
+    with sqlalchemy_db_manager.engine.connect() as conn:
+        conn.execute(insert(table), [
+            {**_base_row("job", counter=0, job_id=1), "fail_count": 0},
+            {**_base_row("job", counter=1, job_id=2), "fail_count": 0},
+        ])
+        conn.commit()
+
+    result = sqlalchemy_db_manager.get_jobs_data_last_row(["job"])
+    assert result["job"]["counter"] == 1
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_get_last_run_id_returns_none(mocker, monkeypatch, tmp_path, fail) -> None:
+    """No runs or a read failure both yield ``None`` instead of raising."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+    if fail:
+        mocker.patch(
+            "autosubmit.database.managers.history.SqlAlchemyExperimentHistoryDbManager",
+            side_effect=Exception("boom"),
+        )
+
+    assert get_last_run_id("t999") is None

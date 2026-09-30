@@ -21,6 +21,7 @@ We cover mainly error and validation scenarios here.
 """
 
 import sqlite3
+from pathlib import Path
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -85,3 +86,31 @@ def test_save_experiment_wraps_insert_errors(mocker, monkeypatch, tmp_path, exce
 
     with pytest.raises(AutosubmitCritical):
         db_common.save_experiment("a000", "desc", "4.0.0")
+
+
+def test_create_db_wraps_errors(mocker, monkeypatch, tmp_path) -> None:
+    """``create_db`` wraps creation errors in an ``AutosubmitCritical``."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(tmp_path / "autosubmit.db"))
+    mocker.patch("autosubmit.database.db_common._get_engine", side_effect=Exception("boom"))
+
+    with pytest.raises(AutosubmitCritical):
+        db_common.create_db()
+
+
+@pytest.mark.parametrize("error_on_inexistence, create_folder, expect_raises", [
+    (True, False, True),
+    (False, True, False),
+])
+def test_check_experiment_exists_missing(autosubmit_config, error_on_inexistence, create_folder, expect_raises) -> None:
+    """A missing experiment either raises or is registered from the local filesystem."""
+    autosubmit_config("a000", {})
+    name = "a999"
+    if create_folder:
+        Path(BasicConfig.LOCAL_ROOT_DIR, name).mkdir(parents=True, exist_ok=True)
+
+    if expect_raises:
+        with pytest.raises(AutosubmitCritical):
+            db_common.check_experiment_exists(name, error_on_inexistence=error_on_inexistence)
+    else:
+        assert db_common.check_experiment_exists(name, error_on_inexistence=error_on_inexistence) is True

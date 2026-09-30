@@ -111,3 +111,19 @@ def test_schema_version_is_isolated_per_tenant(tmp_path: Path, recorded: int, ex
 
     assert get_schema_version(first, table) == expected
     assert get_schema_version(second, table) == 0
+
+
+def test_record_schema_migration_unknown_dialect_falls_back(tmp_path: Path, mocker) -> None:
+    """An unknown dialect falls back to a non-atomic check-then-insert."""
+    engine = _make_engine(tmp_path, "a.db")
+    table = schema_migrations_table(MetaData(), TABLE_NAME)
+    ensure_schema_migrations_table(engine, table)
+
+    with engine.begin() as conn:
+        mocker.patch.object(conn.dialect, "name", "other")
+        record_schema_migration(conn, table, 1)
+        record_schema_migration(conn, table, 1)
+
+    with engine.connect() as conn:
+        rows = conn.execute(select(table.c.version)).fetchall()
+    assert rows == [(1,)]
