@@ -151,34 +151,33 @@ class JobPackager:
         # Calculate the min and max based in the wrapper_section wrappers: min_wrapped:2, max_wrapped: 2 { wrapper_section: {min_wrapped: 6, max_wrapped: 6} }
         wrapper_data = self._as_config.experiment_data.get("WRAPPERS", {})
         current_wrapper_data = wrapper_data.get(self.current_wrapper_section, {})
-        if len(self._jobs_list.jobs_to_run_first) == 0:
-            wrapper_limits['min'] = int(current_wrapper_data.get("MIN_WRAPPED", wrapper_data.get("MIN_WRAPPED", 1)))
-            wrapper_limits['max'] = int(
-                current_wrapper_data.get("MAX_WRAPPED", wrapper_data.get("MAX_WRAPPED", 9999999)))
-            wrapper_limits['min_v'] = int(
-                current_wrapper_data.get("MIN_WRAPPED_V", wrapper_data.get("MIN_WRAPPED_V", 1)))
-            wrapper_limits['max_v'] = int(
-                current_wrapper_data.get("MAX_WRAPPED_V", wrapper_data.get("MAX_WRAPPED_V", 1)))
-            wrapper_limits['min_h'] = int(
-                current_wrapper_data.get("MIN_WRAPPED_H", wrapper_data.get("MIN_WRAPPED_H", 1)))
-            wrapper_limits['max_h'] = int(
-                current_wrapper_data.get("MAX_WRAPPED_H", wrapper_data.get("MAX_WRAPPED_H", 1)))
-            # Max and min calculations
-            wrapper_limits['max'] = max(wrapper_limits['max'], wrapper_limits['max_v'] * wrapper_limits['max_h'])
-            if wrapper_limits['min'] < wrapper_limits['min_v'] * wrapper_limits['min_h']:
-                wrapper_limits['min'] = max(wrapper_limits['min_v'], wrapper_limits['min_h'])
-            # if one dimensional wrapper or value is the default
-            if wrapper_limits['max_v'] == 1 or current_wrapper_data.get("TYPE", "") == "vertical":
-                wrapper_limits['max_v'] = wrapper_limits['max']
+        wrapper_limits['min'] = int(current_wrapper_data.get("MIN_WRAPPED", wrapper_data.get("MIN_WRAPPED", 1)))
+        wrapper_limits['max'] = int(
+            current_wrapper_data.get("MAX_WRAPPED", wrapper_data.get("MAX_WRAPPED", 9999999)))
+        wrapper_limits['min_v'] = int(
+            current_wrapper_data.get("MIN_WRAPPED_V", wrapper_data.get("MIN_WRAPPED_V", 1)))
+        wrapper_limits['max_v'] = int(
+            current_wrapper_data.get("MAX_WRAPPED_V", wrapper_data.get("MAX_WRAPPED_V", 1)))
+        wrapper_limits['min_h'] = int(
+            current_wrapper_data.get("MIN_WRAPPED_H", wrapper_data.get("MIN_WRAPPED_H", 1)))
+        wrapper_limits['max_h'] = int(
+            current_wrapper_data.get("MAX_WRAPPED_H", wrapper_data.get("MAX_WRAPPED_H", 1)))
+        # Max and min calculations
+        wrapper_limits['max'] = max(wrapper_limits['max'], wrapper_limits['max_v'] * wrapper_limits['max_h'])
+        if wrapper_limits['min'] < wrapper_limits['min_v'] * wrapper_limits['min_h']:
+            wrapper_limits['min'] = max(wrapper_limits['min_v'], wrapper_limits['min_h'])
+        # if one dimensional wrapper or value is the default
+        if wrapper_limits['max_v'] == 1 or current_wrapper_data.get("TYPE", "") == "vertical":
+            wrapper_limits['max_v'] = wrapper_limits['max']
 
-            if wrapper_limits['max_h'] == 1 or current_wrapper_data.get("TYPE", "") == "horizontal":
-                wrapper_limits['max_h'] = wrapper_limits['max']
+        if wrapper_limits['max_h'] == 1 or current_wrapper_data.get("TYPE", "") == "horizontal":
+            wrapper_limits['max_h'] = wrapper_limits['max']
 
-            if wrapper_limits['min_v'] == 1 and current_wrapper_data.get("TYPE", "") == "vertical":
-                wrapper_limits['min_v'] = wrapper_limits['min']
+        if wrapper_limits['min_v'] == 1 and current_wrapper_data.get("TYPE", "") == "vertical":
+            wrapper_limits['min_v'] = wrapper_limits['min']
 
-            if wrapper_limits['min_h'] == 1 and current_wrapper_data.get("TYPE", "") == "horizontal":
-                wrapper_limits['min_h'] = wrapper_limits['min']
+        if wrapper_limits['min_h'] == 1 and current_wrapper_data.get("TYPE", "") == "horizontal":
+            wrapper_limits['min_h'] = wrapper_limits['min']
 
         # Calculate the max by section by looking at jobs_data[section].max_wrapped
         for section in section_list:
@@ -188,27 +187,6 @@ class JobPackager:
 
         wrapper_limits['real_min'] = max(2, wrapper_limits['min'])
         return wrapper_limits
-
-    def check_jobs_to_run_first(self, package):
-        """
-        Check if the jobs to run first are in the package
-        :param package:
-        :return:
-        """
-        run_first = False
-        if len(self._jobs_list.jobs_to_run_first) > 0:
-            for job in package.jobs[:]:
-                job.wrapper_type = package.wrapper_type
-                if job in self._jobs_list.jobs_to_run_first:
-                    run_first = True
-                else:
-                    package.jobs.remove(job)
-                    if self.wrapper_type[self.current_wrapper_section] not in ["horizontal", "vertical",
-                                                                               "vertical-mixed"]:
-                        for seq in range(len(package.jobs_lists)):
-                            with suppress(ValueError):
-                                package.jobs_lists[seq].remove(job)
-        return package, run_first
 
     def check_real_package_wrapper_limits(self, package):
         balanced = True
@@ -260,22 +238,6 @@ class JobPackager:
             if max_jobs_to_submit == 0:
                 break
             failed_innerjobs = False
-            # Check if the user is using the option to run first some jobs. if so, remove non-first jobs from the package and submit them sequentially following a flexible policy
-            if len(self._jobs_list.jobs_to_run_first) > 0:
-                p, run_first = self.check_jobs_to_run_first(p)
-                if run_first:
-                    for job in p.jobs:
-                        if max_jobs_to_submit == 0:
-                            break
-                        if job.status == Status.READY:
-                            if job.type in [Language.PYTHON3, Language.PYTHON,
-                                            Language.PYTHON2] and not self._platform.allow_python_jobs:
-                                package = JobPackageSimpleWrapped([job])
-                            else:
-                                package = JobPackageSimple([job])
-                            packages_to_submit.append(package)
-                            max_jobs_to_submit = max_jobs_to_submit - 1
-                continue
             # The only policy where it matters if an innerjob has failed or not is the "strict" one
             if p.wrapper_policy == "strict":
                 for job in p.jobs:
@@ -580,19 +542,10 @@ class JobPackager:
         :return: list of jobs ready to be built, boolean indicating if there are underlying blocking errors.
         """
         Log.info(f"Calculating possible ready jobs for {self._platform.name}")
-        jobs_ready = []
-        if len(self._jobs_list.jobs_to_run_first) > 0:
-            jobs_ready = [
-                job
-                for job in self._jobs_list.jobs_to_run_first
-                if (self._platform is None or job.platform.name.upper() == self._platform.name.upper())
-                   and job.status == Status.READY
-            ]
-        if not jobs_ready:
-            if self.hold:
-                jobs_ready = self._jobs_list.get_prepared(self._platform)
-            else:
-                jobs_ready = self._jobs_list.get_ready(self._platform)
+        if self.hold:
+            jobs_ready = self._jobs_list.get_prepared(self._platform)
+        else:
+            jobs_ready = self._jobs_list.get_ready(self._platform)
 
         jobs_ready = [
             job for job in jobs_ready
@@ -798,9 +751,6 @@ class JobPackager:
                     continue
             elif max_jobs_to_submit <= 0:
                 break
-            if len(self._jobs_list.jobs_to_run_first) > 0:  # if user wants to run first some jobs, submit them first
-                if job not in self._jobs_list.jobs_to_run_first:
-                    continue
             if job.type in [Language.PYTHON3, Language.PYTHON,
                             Language.PYTHON2] and not self._platform.allow_python_jobs:
                 package = JobPackageSimpleWrapped([job])

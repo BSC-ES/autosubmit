@@ -71,6 +71,7 @@ several bug fixes and enhancements to improve the overall user experience.
   instead of the autosubmit.py monolith. #3231
 - Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly
   (with edge-completion reconciliation), never loaded into the graph. #3231
+- Remove two-step start code, tests, and docs #3313 (thanks @CodeByPeace)
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 

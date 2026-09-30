@@ -232,14 +232,6 @@ def _prepare_run(
             f" will be tracked."
         )
     if not recover:
-        # This function, looks at the "TWO_STEP_START" variable in the experiment configuration file.
-        # This may not be necessary any more as the same can be achieved by using the new DEPENDENCIES dict.
-        # I replicated the same functionality in the new DEPENDENCIES dict using crossdate wrappers of
-        # auto-monarch da ( documented in rst .)
-        # We can look at it when auto-monarch starts to use AS 4.0, now it is maintained for compatibility.
-        unparsed_two_step_start = as_conf.get_parse_two_step_start()
-        if unparsed_two_step_start != "":
-            job_list.parse_jobs_by_filter(unparsed_two_step_start)
         Log.debug("Running job data structure")
         exp_history = get_historical_database(expid, job_list, as_conf)
         # establish the connection to all platforms

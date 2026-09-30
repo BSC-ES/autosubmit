@@ -264,10 +264,10 @@ Two-step run: new method
 From AS4, TWO_STEP_START is not longer needed since the users can now specify exactly which tasks of a job are needed to run the current task in the DEPENDENCIES parameter.
 
 
-Simplified example using the new method
+Simplified example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This example is based on the previous one, but using the new method and without the reduce job.
+The following example uses the DEPENDENCIES parameter.
 
 .. code-block:: yaml
 
