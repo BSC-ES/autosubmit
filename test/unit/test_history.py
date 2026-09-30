@@ -22,12 +22,16 @@ import traceback
 from collections import namedtuple
 from pathlib import Path
 from shutil import copy2
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import create_engine
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.history.experiment_history import ExperimentHistory
+from autosubmit.history.experiment_history import (
+    ExperimentHistory,
+    get_historical_database,
+)
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
 from autosubmit.history.strategies import (
@@ -483,3 +487,75 @@ def test_update_submit_time_returns_none_when_not_found(tmp_path, monkeypatch):
 
     loaded = exp_history.get_finish_data_dc(JOB_NAME, fail_count=1)
     assert loaded is None, "No record should exist for fail_count=1"
+
+
+def _bare_history(manager=None) -> ExperimentHistory:
+    """Build an ``ExperimentHistory``"""
+    exp = ExperimentHistory.__new__(ExperimentHistory)
+    exp.expid = "t000"
+    exp._log = MagicMock()
+    exp._manager = manager
+    return exp
+
+
+@pytest.mark.parametrize("method, args", [
+    ("get_submit_data_dc", ("job", 0)),
+    ("update_submit_time", ("job",)),
+    ("process_status_changes", ([],)),
+    ("process_job_list_changes_to_experiment_totals", ([],)),
+])
+def test_history_manager_errors_return_none(method, args) -> None:
+    """A manager failure makes the wrapped calls return ``None`` instead of raising."""
+    manager = MagicMock()
+    manager.get_last_job_data_dc_by_job_name_and_fail_counter.side_effect = Exception("boom")
+    manager.get_experiment_run_dc_with_max_id.side_effect = Exception("boom")
+    exp = _bare_history(manager)
+    exp.detect_changes_in_job_list = MagicMock(side_effect=Exception("boom"))
+
+    assert getattr(exp, method)(*args) is None
+
+
+def test_history_availability() -> None:
+    """The history reports availability based on its manager."""
+    exp = _bare_history()
+    with pytest.raises(RuntimeError):
+        _ = exp.manager
+    assert exp.is_header_ready() is False
+
+    manager = MagicMock()
+    manager.is_header_ready_db_version.return_value = True
+    assert _bare_history(manager).is_header_ready() is True
+
+
+def test_history_disables_manager_on_error(mocker, tmp_path, monkeypatch) -> None:
+    """A failure while initialising or creating the manager disables it."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
+    mocker.patch("autosubmit.history.experiment_history.Logging")
+
+    manager = MagicMock()
+    manager.initialize.side_effect = Exception("boom")
+    exp = _bare_history(manager)
+    exp.initialize_database()
+    assert exp._manager is None
+
+    mocker.patch(
+        "autosubmit.history.experiment_history.SqlAlchemyExperimentHistoryDbManager",
+        side_effect=Exception("boom"),
+    )
+    assert ExperimentHistory("t000")._manager is None
+
+
+def test_get_historical_database_swallows_status_error(mocker) -> None:
+    """A failure while setting the experiment status is swallowed."""
+    exp = _bare_history(MagicMock())
+    exp.initialize_database = MagicMock()
+    exp.process_status_changes = MagicMock(return_value=MagicMock())
+    mocker.patch("autosubmit.history.experiment_history.ExperimentHistory", return_value=exp)
+    mocker.patch("autosubmit.history.experiment_history.ExperimentStatus", side_effect=Exception("boom"))
+    as_conf = MagicMock()
+    as_conf.get_chunk_size_unit.return_value = "month"
+    as_conf.get_chunk_size.return_value = 1
+    as_conf.get_full_config_as_json.return_value = {}
+
+    assert get_historical_database("t000", MagicMock(), as_conf) is exp
