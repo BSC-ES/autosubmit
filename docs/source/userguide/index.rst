@@ -8,6 +8,7 @@ User Guide
    /userguide/defining_workflows/index
    /userguide/wrappers/index
    /userguide/run/index
+   /userguide/retries/retries.rst
    /userguide/modifying_workflow/index
    /userguide/manage/index
    /userguide/monitor_and_check/index

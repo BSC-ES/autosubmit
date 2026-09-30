@@ -452,8 +452,3 @@ To stop immediately experiment <EXPID>:
 
 See :ref:`job_retries` for how Autosubmit retries failed jobs, and
 :ref:`ssh_retries` for SSH-connection and remote-command retries.
-
-.. toctree::
-   :hidden:
-
-   retries
