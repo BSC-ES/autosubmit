@@ -90,7 +90,7 @@ def handle_start_after(start_after: str, expid: str) -> str | None:
             Log.critical(
                 f"Experiment {start_after} is running a database version which is not supported by the completion "
                 f"trigger function. An updated DB version is needed.")
-            return
+            return None
         Log.info(f"Autosubmit will start monitoring experiment {start_after}. When the number of completed jobs plus "
                  f"suspended jobs becomes equal to the total number of jobs of experiment {start_after}, experiment "
                  f"{expid} will start. Querying every 60 seconds. Status format "
