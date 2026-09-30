@@ -19,7 +19,8 @@ Job packages, or "wrappers", are jobs created as bundles of different tasks (sub
 Basic configuration
 -------------------
 
-To configure a new wrapper, the user has to define a ``WRAPPERS`` section in any configuration file. When using the standard configuration, this one is autosubmit_<EXPID>.yml.
+To configure a new wrapper, the user has to define a ``WRAPPERS`` section in any configuration file. 
+When using the standard configuration, this one is ``autosubmit_<EXPID>.yml``.
 
 .. code-block:: yaml
 
@@ -260,11 +261,13 @@ The CHECK_TIME_WRAPPER parameter defines the frequency, in seconds, on which Aut
       TYPE: "vertical"
       JOBS_IN_WRAPPER: "SIM1"
 
-Number of jobs in a wrapper({MIN/MAX}_WRAPPED{_H/_V}
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Number of jobs in a wrapper ``{MIN/MAX}_WRAPPED_{H/V}``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-Users can configure the maximum and the minimum number of jobs in each wrapper by configuring MAX_WRAPPED and MIN_WRAPPED inside the wrapper section. If the user doesn't set them, Autosubmit will default to MAX_WRAPPED: "infinite" and MIN_WRAPPED: 2.
+Users can configure the maximum and the minimum number of jobs in each wrapper by configuring 
+``MAX_WRAPPED`` and ``MIN_WRAPPED`` inside the wrapper section. 
+If the user doesn't set them, Autosubmit will default to ``MAX_WRAPPED``: "infinite" and ``MIN_WRAPPED``: 2.
 
 .. code-block:: yaml
 
@@ -279,7 +282,7 @@ Users can configure the maximum and the minimum number of jobs in each wrapper b
       TYPE: "vertical"
       JOBS_IN_WRAPPER: "SIM1"
 
-For 2-dim wrappers, {MAX_MIN}_WRAPPED_{V/H} must be used instead of the general one.
+For 2-dim wrappers, ``{MAX_MIN}_WRAPPED_{H/V}`` must be used instead of the general one.
 
 .. code-block:: yaml
 
@@ -298,7 +301,10 @@ Policy
 ^^^^^^
 
 
-Autosubmit will wrap as many tasks as possible while respecting the limits set in the configuration(MAX_WRAPPED, MAX_WRAPPED_H, MAX_WRAPPED_V, MIN_WRAPPED, MIN_WRAPPED_V, and MIN_WRAPPED_H parameters). However, users have three different policies available to tune the behavior in situations where there aren't enough tasks in general, or there are uncompleted tasks remaining from a failed wrapper job:
+Autosubmit will wrap as many tasks as possible while respecting the limits set in the configuration(``MAX_WRAPPED``, 
+``MAX_WRAPPED_H``, ``MAX_WRAPPED_V``, ``MIN_WRAPPED``, ``MIN_WRAPPED_V``, and ``MIN_WRAPPED_H`` parameters). However,
+users have three different policies available to tune the behavior in situations where there aren't enough tasks in
+general, or there are uncompleted tasks remaining from a failed wrapper job:
 
 * Flexible: if there aren't at least MIN_WRAPPED tasks to be grouped, Autosubmit will submit them as individual jobs.
 * Mixed: will wait for MIN_WRAPPED jobs to be available to create a wrapper, except if one of the wrapped tasks had failed beforehand. In this case, Autosubmit will submit them individually.

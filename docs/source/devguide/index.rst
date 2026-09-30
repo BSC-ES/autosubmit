@@ -31,7 +31,6 @@ Command list
 * ``report``  extract experiment parameters
 * ``updateversion``  Updates the Autosubmit version of your experiment with the current version of the module you are using
 * ``dbfix``  Fixes the database malformed error in the historical database of your experiment
-* ``pklfix``  Fixes the blank pkl error of your experiment
 * ``updatedescrip``  Updates the description of your experiment (See: :ref:`updateDescrip`)
 
 

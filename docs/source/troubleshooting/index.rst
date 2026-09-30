@@ -3,7 +3,6 @@
    :maxdepth: 1
 
    /troubleshooting/error-codes
-   /troubleshooting/changelog
 
 ###############
 Troubleshooting
@@ -80,10 +79,6 @@ Other possible errors
 
 *Solution*: run ``autosubmit dbfix <EXPID>`` where ``<EXPID>`` is the identifier of your experiment. This function will rebuild the database saving as much information as possible (usually all of it).
 
-**The pkl file of my experiment is empty but there is a job_list_%<EXPID>%_backup.pkl file that seems to be the real one.**
-
-*Solution*: run ``autosubmit pklfix <EXPID>``, it will restore the ``backup`` file if possible.
-
 Error codes
 ===========
 
@@ -92,4 +87,10 @@ The latest version of **Autosubmit** implements a code system that guides you th
 Changelog
 =========
 
-review :doc:`changelog`.
+For the changes in each release, see the `CHANGELOG on GitHub`_, which is
+always up to date.
+
+The :doc:`changelog page <changelog>` in these docs also covers migrating
+configuration from Autosubmit 3 to 4.
+
+.. _CHANGELOG on GitHub: https://github.com/BSC-ES/autosubmit/blob/master/CHANGELOG.md

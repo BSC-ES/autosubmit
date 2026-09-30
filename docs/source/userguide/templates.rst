@@ -211,7 +211,7 @@ If the user script fails mid-way, and the tailer never produces a ``_COMPLETED``
 not cause any issues as a ``_COMPLETED`` file is not expected upon failures. However, the missing
 ``_STAT`` file may result in incorrect values reported in Autosubmit commands and API/GUI.
 
-For that reason, Autosubmit 4.1.16+ adopted ``Bash shell trap functions``_. The script
+For that reason, Autosubmit 4.1.16+ adopted `Bash shell trap functions`_. The script
 watches for ``EXIT``, and for the following signals:
 
 * ``SIGHUP``

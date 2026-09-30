@@ -269,8 +269,8 @@ Example: BSC ``/etc/autosubmitrc``
    mail_from = automail@bsc.es
 
    [hosts]
-   authorized = [run bscearth000,bscesautosubmit01,bscesautosubmit02] [stats, clean, describe, check, report,dbfix,pklfix, upgrade,updateversion all]
-   forbidden = [expid, create, recovery, delete, inspect, monitor, recovery, configure,setstatus,testcase, test, refresh, archive, unarchive bscearth000,bscesautosubmit01,bscesautosubmit02]
+   authorized = [run bscearth000,bscesautosubmit01,bscesautosubmit02] [stats, clean, describe, check, report, dbfix, upgrade, updateversion all]
+   forbidden = [expid, create, recovery, delete, inspect, monitor, recovery, configure, setstatus, testcase, test, refresh, archive, unarchive bscearth000, bscesautosubmit01, bscesautosubmit02]
 
 ``autosubmit install``
 ----------------------

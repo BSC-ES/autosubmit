@@ -212,7 +212,7 @@ Citing Autosubmit
 Contact Us
 ==========
 
-.. grid:: 1 3 3 3
+.. grid:: 1 2 2 2
    :gutter: 3
    :class-container: as-contact
 
@@ -232,7 +232,16 @@ Contact Us
       Found a bug or want to request a feature? Open an issue on the tracker.
 
       +++
-      Issue tracker
+      BSC-ES/autosubmit/issues
+
+   .. grid-item-card:: :octicon:`comment-discussion;1.5em` Discussions
+      :link: https://github.com/BSC-ES/autosubmit/discussions
+      :class-card: as-card
+
+      Ask questions, share workflows, and see how other centres use Autosubmit.
+
+      +++
+      BSC-ES/autosubmit/discussions
 
    .. grid-item-card:: :octicon:`mail;1.1em` Ask the team
       :link: mailto:support-autosubmit@bsc.es

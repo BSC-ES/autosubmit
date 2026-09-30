@@ -38,10 +38,14 @@ For more information on adding a new platform to the experiment configuration, s
     - Time (seconds) between connections to the HPC queue scheduler to poll already submitted jobs status.
     - Number of retries if a job fails.
 
-Once all file parameters have been tuned, an experiment can be created. Refer to the method page :meth:`autosubmit.autosubmit.Autosubmit.create` for syntax details.
-``autosubmit create`` will make use of the ``expdef_<EXPID>.yml`` file to generate the experiment and related workflow.
-The experiment workflow, which contains all the jobs and its dependencies, will be saved as a ``pkl`` file.
-More info on pickle can be found at http://docs.python.org/library/pickle.html.
+Once all file parameters have been tuned, an experiment can be created.
+``autosubmit create`` will make use of the ``expdef_<EXPID>.yml`` file to
+generate the experiment and related workflow.
+
+The experiment workflow, which contains all the jobs and their dependencies, is
+stored in the Autosubmit database. From Autosubmit ``4.2.0+`` onwards this is a
+SQLAlchemy-backed database — SQLite by default, with PostgreSQL also supported —
+replacing the ``job_list.pkl`` file used by earlier versions.
 
 In order to understand more the grouping options, which are used for visualization purposes, please check :ref:`grouping`.
 
@@ -162,9 +166,12 @@ Adding a heterogeneous job
 --------------------------
 
 .. important::
-    This feature is only available for SLURM platforms. It is automatically enabled when the processors or nodes parameter is a yaml list
+    This feature is only available for SLURM platforms. It is automatically enabled when the processors or nodes 
+    parameter is a yaml list
 
-An heterogeneous job or hetjob is a job for which each component has virtually all job options available including partition, account and QOS (Quality Of Service). For example, part of a job might require four cores and 4 GB for each of 128 tasks while another part of the job would require 16 GB of memory and one CPU.
+An heterogeneous job or hetjob is a job for which each component has virtually all job options available 
+including partition, account and QOS (Quality Of Service). For example, part of a job might require 
+four cores and 4 GB for each of 128 tasks while another part of the job would require 16 GB of memory and one CPU.
 
 
 

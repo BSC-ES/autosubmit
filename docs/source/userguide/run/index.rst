@@ -256,6 +256,8 @@ The priority jobs will be (check TWO_STEP_START from expdef conf):
 
 ['a02n_20120101_000_1_SIM', 'a02n_20120101_001_1_SIM', 'a02n_COMPILE_DA', 'a02n_20120101_000_1_REDUCE']
 
+.. TODO: to be removed in the future 
+
 Two-step run: new method
 ------------------------
 
@@ -410,7 +412,7 @@ Finally, you can launch Autosubmit *run* in background and with ``nohup`` (conti
 Stopping the experiment
 -----------------------
 
-From Autosubmit 4.1.6, you can stop an experiment using the command ``autosubmit stop``
+From Autosubmit ``4.1.6+``, you can stop an experiment using the command ``autosubmit stop``
 
 Options:
 
