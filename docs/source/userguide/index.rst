@@ -2,7 +2,18 @@
 User Guide
 ##########
 
+This guide explains how to use Autosubmit to create, configure, run and manage
+experiments. It is intended for users who want to set up their own workflows,
+whether on a local machine or on remote HPC platforms.
+
+The sections follow the typical life cycle of an experiment, from creating and
+configuring it, through defining and running its workflow, to monitoring and
+managing it. Advanced topics such as provenance, metrics and debugging are
+covered at the end.
+
 .. toctree::
+   :maxdepth: 2
+
    /userguide/create/index
    /userguide/configure/index
    /userguide/defining_workflows/index
@@ -27,6 +38,8 @@ User Guide
 Tutorials (How to)
 ------------------
 
+Step-by-step guides for common tasks:
+
 * :doc:`create/index`
 
 * :doc:`configure/index`
@@ -40,3 +53,4 @@ Tutorials (How to)
 * :ref:`archive`
 
 * :ref:`advanced_features`
+
