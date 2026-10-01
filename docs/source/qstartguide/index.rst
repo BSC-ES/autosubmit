@@ -251,7 +251,7 @@ If you want to visualize the workflow when creating it, use the command ``autosu
 
 .. seealso::
     For the full set of platform keys, see
-    :doc:`Configure experiments </userguide//configure/index>`.
+    :doc:`Configure experiments </userguide/configure/index>`.
     If your site maps local users to different remote users, see
     :doc:`User mapping </userguide/user_mapping>`.
 

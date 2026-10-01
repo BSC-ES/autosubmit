@@ -611,7 +611,7 @@ Custom statistics
 Although Autosubmit saves several statistics about your experiment, such as the queueing time for each job, how many
 failures per job, etc.,
 The user also might be interested in adding his particular statistics to the Autosubmit stats report
-(````autosubmit stats EXPID````).
+(``autosubmit stats EXPID``).
 The allowed format for this feature is the same as the Autosubmit configuration files: INI style. For example:
 ::
 
