@@ -121,7 +121,8 @@ The following filters can be combined to select jobs to inspect.
 | -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
 +--------+----------------------------------------------+----------------------------------------------+
 
-If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will be selected for inspection.
+If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs
+matching ALL specified filters will be selected for inspection.
 
 To combine multiple filters:
 ::
@@ -169,7 +170,8 @@ The location where the user can find the generated plots with date and timestamp
 
     <experiments_directory>/<EXPID>/plot/<EXPID>_<DATE>_<TIME>.pdf
 
-The location where the user can find the txt output containing the status of each job and the path to out and err log files.
+The location where the user can find the txt output containing the status of each job and the path to out and err log
+files.
 
 ::
 
@@ -190,7 +192,8 @@ The following filters can be combined to select jobs to monitor.
 | -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
 +--------+----------------------------------------------+----------------------------------------------+
 
-If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will be selected for monitoring.
+If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs
+matching ALL specified filters will be selected for monitoring.
 
 Example of combined filters:
 
@@ -234,11 +237,14 @@ In order to understand more the grouping options, please check :ref:`grouping`.
 Grouping jobs
 -------------
 
-Other than the filters, another option for large workflows is to group jobs. This option is available with the ``group_by`` keyword, which can receive the values ``{date,member,chunk,split,automatic}``.
+Other than the filters, another option for large workflows is to group jobs. This option is available with the
+``group_by`` keyword, which can receive the values ``{date,member,chunk,split,automatic}``.
 
 For the first 4 options, the grouping criteria is explicitly defined ``{date,member,chunk,split}``.
-In addition to that, it is possible to expand some dates/members/chunks that would be grouped either/both by status or/and by specifying the date/member/chunk not to group.
-The syntax used in this option is almost the same as for the filters, in the format of ``[ date1 [ member1 [ chunk1 chunk2 ] member2 [ chunk3 ... ] ... ] date2 [ member3 [ chunk1 ] ] ... ]``
+In addition to that, it is possible to expand some dates/members/chunks that would be grouped either/both by status
+or/and by specifying the date/member/chunk not to group.
+The syntax used in this option is almost the same as for the filters, in the format of
+``[ date1 [ member1 [ chunk1 chunk2 ] member2 [ chunk3 ... ] ... ] date2 [ member3 [ chunk1 ] ] ... ]``
 
 .. important:: The grouping option is also in autosubmit monitor, create, setstatus and recovery
 
@@ -415,13 +421,18 @@ If there are chunk jobs that are split, the splits can also be grouped.
 **Understanding the group status**
 
 If there are jobs with different status grouped together, the status of the group is determined as follows:
-If there is at least one job that failed, the status of the group will be FAILED. If there are no failures but there is at least one job running, the status will be RUNNING.
-The same idea applies following the hierarchy: SUBMITTED, QUEUING, READY, WAITING, SUSPENDED, UNKNOWN. If the group status is COMPLETED, it means that all jobs in the group were completed.
+If there is at least one job that failed, the status of the group will be FAILED. If there are no failures but there is
+at least one job running, the status will be RUNNING.
+The same idea applies following the hierarchy: SUBMITTED, QUEUING, READY, WAITING, SUSPENDED, UNKNOWN. If the group
+status is COMPLETED, it means that all jobs in the group were completed.
 
 **Automatic grouping**
 
-For the automatic grouping, the groups are created by collapsing the split->chunk->member->date that share the same status (following this hierarchy).
-The following workflow automatic created the groups 20000101_fc0, since all the jobs for this date and member were completed, 20000101_fc1_3, 20000202_fc0_2, 20000202_fc0_3 and 20000202_fc1, as all the jobs up to the respective group granularity share the same - waiting - status.
+For the automatic grouping, the groups are created by collapsing the split->chunk->member->date that share the same
+status (following this hierarchy).
+The following workflow automatic created the groups 20000101_fc0, since all the jobs for this date and member were
+completed, 20000101_fc1_3, 20000202_fc0_2, 20000202_fc0_3 and 20000202_fc1, as all the jobs up to the respective group
+granularity share the same - waiting - status.
 
 For example:
 
@@ -431,7 +442,10 @@ For example:
    :align: center
    :alt: group automatic
 
-Especially in the case of monitoring an experiment with a very large number of chunks, it might be useful to hide the groups created automatically. This allows to better visualize the chunks in which there are jobs with different status, which can be a good indication that there is something currently happening within such chunks (jobs ready, submitted, running, queueing or failed).
+Especially in the case of monitoring an experiment with a very large number of chunks, it might be useful to hide the
+groups created automatically. This allows to better visualize the chunks in which there are jobs with different status,
+which can be a good indication that there is something currently happening within such chunks (jobs ready, submitted,
+running, queueing or failed).
 
 ::
 
@@ -485,7 +499,8 @@ Examples:
 Monitoring job statistics
 -------------------------
 
-The following command could be adopted to generate the plots for visualizing the jobs statistics of the experiment at any instance:
+The following command could be adopted to generate the plots for visualizing the jobs statistics of the experiment at
+any instance:
 ::
 
     autosubmit stats EXPID
@@ -563,7 +578,8 @@ The main ``stats`` output is a bar diagram. On this diagram, each job presents t
 - Fail Run (h): Sum of time spent running for FAILED attempts, in hours.
 - Max wallclock (h): Maximum wallclock value for all jobs in the plot.
 
-Notice that the left scale of the diagram measures the time in hours, and the right scale measures the number of attempts.
+Notice that the left scale of the diagram measures the time in hours, and the right scale measures the number of
+attempts.
 
 Summaries output description
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -592,8 +608,10 @@ CSV files are also generated with the same information, in the same directory as
 Custom statistics
 ~~~~~~~~~~~~~~~~~
 
-Although Autosubmit saves several statistics about your experiment, such as the queueing time for each job, how many failures per job, etc.,
-The user also might be interested in adding his particular statistics to the Autosubmit stats report (````autosubmit stats EXPID````).
+Although Autosubmit saves several statistics about your experiment, such as the queueing time for each job, how many
+failures per job, etc.,
+The user also might be interested in adding his particular statistics to the Autosubmit stats report
+(````autosubmit stats EXPID````).
 The allowed format for this feature is the same as the Autosubmit configuration files: INI style. For example:
 ::
 

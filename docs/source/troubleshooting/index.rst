@@ -21,7 +21,8 @@ Review :ref:`setstatusno`.
 My project parameters are not being substituted in the templates
 ================================================================
 
-*Explanation*: If there is a duplicated section or option in any other side of autosubmit, including proj files, it won't be able to recognize which option pertains to what section in which file.
+*Explanation*: If there is a duplicated section or option in any other side of autosubmit, including proj files, it
+won't be able to recognize which option pertains to what section in which file.
 
 *Solution*: Don't repeat section names and parameters names until Autosubmit 4.0 release.
 
@@ -39,15 +40,18 @@ When running create, you can come across an error similar to:
 
     [ERROR] Trace: '%' must be followed by '%' or '(', found: u'%HPCROOTDIR%/remoteconfig/%CURRENT_ARCH%_launcher.sh'
 
-The important part of this error is the message ``'%' must be followed by '%'``. It indicates that the source of the error is the ``configparser`` library.
-This library is included in the python common libraries, so you shouldn't have any other version of it installed in your environment. Execute ``pip list``, if you see
+The important part of this error is the message ``'%' must be followed by '%'``. It indicates that the source of the
+error is the ``configparser`` library.
+This library is included in the python common libraries, so you shouldn't have any other version of it installed in your
+environment. Execute ``pip list``, if you see
 ``configparser`` in the list, then run ``pip uninstall configparser``. Then, try to create your experiment again.
 
 Error when using jobs.<job>.VALIDATE: True
 ==========================================
 
 
-When using the ``VALIDATE: True`` option in your job configuration, you might encounter errors related to syntax issues in the generated Python script for that job.
+When using the ``VALIDATE: True`` option in your job configuration, you might encounter errors related to syntax issues
+in the generated Python script for that job.
 This validation checks if your script is compatible with autosubmit and will print any errors it finds.
 To get rid of this error, you need to fix the syntax issues in your job script.
 The error message will indicate the specific line and type of syntax error that needs to be addressed.
@@ -75,14 +79,18 @@ Other possible errors
 
 **I see the ``database malformed`` error on my experiment log.**
 
-*Explanation*: The latest version of autosubmit uses a database to efficiently track changes in the jobs of your experiment. It could have happened that this small database got corrupted.
+*Explanation*: The latest version of autosubmit uses a database to efficiently track changes in the jobs of your
+experiment. It could have happened that this small database got corrupted.
 
-*Solution*: run ``autosubmit dbfix <EXPID>`` where ``<EXPID>`` is the identifier of your experiment. This function will rebuild the database saving as much information as possible (usually all of it).
+*Solution*: run ``autosubmit dbfix <EXPID>`` where ``<EXPID>`` is the identifier of your experiment. This function will
+rebuild the database saving as much information as possible (usually all of it).
 
 Error codes
 ===========
 
-The latest version of **Autosubmit** implements a code system that guides you through the process of fixing some of the common problems you might find. Check :doc:`error-codes`, where you will find the list of error codes, their descriptions, and solutions.
+The latest version of **Autosubmit** implements a code system that guides you through the process of fixing some of the
+common problems you might find. Check :doc:`error-codes`, where you will find the list of error codes, their
+descriptions, and solutions.
 
 Changelog
 =========

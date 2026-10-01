@@ -39,7 +39,10 @@ Composing the Extended Platform Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this page we will be extending the SLURM
-platform - source file ``autosubmit/platforms/slurmplatform.py``, see in GitHub `slurmplatform.py <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/slurmplatform.py#L35>`_ -, but any platform can be extended by following the same steps.
+platform - source file ``autosubmit/platforms/slurmplatform.py``, see in GitHub
+`slurmplatform.py <https://github.com/BSC-ES/autosubmit/blob/
+53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/slurmplatform.py#L35>`_
+-, but any platform can be extended by following the same steps.
 
 The platform will be transcribing the files and configurations you set manually to allow operations,
 and connection to SLURM and its commands, preparing your experiments to be executed transforming configuration
@@ -92,7 +95,8 @@ new parameters and/or behaviours, making it possible to add flexibility and rest
 
 The class ``submit_job`` is a existing class in ``SlurmPlatform`` that was overwritten to have a new behaviour.
 
-After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` class could look similar to the following example code.
+After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` class could look similar to the following
+example code.
 
 .. code-block:: python
     :linenos:
@@ -135,7 +139,9 @@ to determine the scheduler.
     seen more as a reference
 
 
-``autosubmit/autosubmit.py`` in `line 2538 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py#L2537>`_  add a new ``string`` making sure the new platform type is considered
+``autosubmit/autosubmit.py`` in
+`line 2538 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py#L2537>`_  add a new ``string``
+making sure the new platform type is considered
 the same as SLURM platform, as we expect a similar behaviour.
 
 .. code-block:: python
@@ -147,7 +153,8 @@ the same as SLURM platform, as we expect a similar behaviour.
                                                                                          failed_packages,
                                                                                          error_message="", hold=hold)
 
-``autosubmit/job/job.py`` in `line 2575 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2575>`_ ensure each job Job writes
+``autosubmit/job/job.py`` in
+`line 2575 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2575>`_ ensure each job Job writes
 the timestamp to TOTAL_STATS file and jobs_data.db properly.
 
 .. code-block:: python
@@ -158,7 +165,9 @@ the timestamp to TOTAL_STATS file and jobs_data.db properly.
         thread_write_finish.name = f"JOB_data_{self.name}"
         thread_write_finish.start()
 
-``autosubmit/job/job.py`` in `line 2817 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2817>`_ add a new validation for the validation of the queue
+``autosubmit/job/job.py`` in
+`line 2817 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2817>`_ add a new validation for
+the validation of the queue
 creation with the platform type
 
 .. code-block:: python
@@ -171,7 +180,9 @@ creation with the platform type
             self._platform._ssh_output, self.id)
 
 
-``autosubmit/platforms/paramiko_submitter.py`` in `line 143 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a new validation for the header command
+``autosubmit/platforms/paramiko_submitter.py`` in
+`line 143 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a
+new validation for the header command
 creation where the platform type
 
 .. code-block:: python
@@ -194,7 +205,8 @@ To set up your platform, you first have to create a new experiment by running th
 
 This will generate a minimal version of an experiment.
 
-To change the configuration of your experiment to ensure it works properly, you can create a project and customize its parameters. The following instructions are
+To change the configuration of your experiment to ensure it works properly, you can create a project and customize its
+parameters. The following instructions are
 designed to execute a small job through Autosubmit, explaining how to configure a new platform.
 
 Open the file ``~/autosubmit/<expid>/config/minimal.yml`` and you'll find a file as shown below.
@@ -432,7 +444,11 @@ exposes at the workflow level.
 Filesystem operations during a run
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Beyond handling write-permission probes and SSH sessions, Autosubmit performs several file operations against the remote ``<SCRATCH_DIR>`` during each run. The exact number of these operations can vary based on the workflow's complexity, including factors such as the number of jobs, retries, wrapper usage, and recovery events. The table below outlines the types of operations performed at different stages, with descriptions provided in qualitative terms to reflect this variability.
+Beyond handling write-permission probes and SSH sessions, Autosubmit performs several file operations against the remote
+``<SCRATCH_DIR>`` during each run. The exact number of these operations can vary based on the workflow's complexity,
+including factors such as the number of jobs, retries, wrapper usage, and recovery events. The table below outlines the
+types of operations performed at different stages, with descriptions provided in qualitative terms to reflect this
+variability.
 
 .. list-table::
    :header-rows: 1

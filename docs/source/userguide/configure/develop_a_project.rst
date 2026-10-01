@@ -10,9 +10,11 @@ This section contains some examples on how to develop a new project.
 
 All files, with the exception of user-defined scripts, are located in the ``<expid>/conf`` directory.
 
-Configuration files are written in ``yaml`` format. On the other hand, the user-defined scripts are written in ``bash/python or R`` format.
+Configuration files are written in ``yaml`` format. On the other hand, the user-defined scripts are written in
+``bash/python or R`` format.
 
-To configure the experiment, edit ``autosubmit_<EXPID>.yml``, ``expdef_<EXPID>.yml``, ``jobs_<EXPID>.yml`` , ``platforms_<EXPID>.yml`` and ``proj_<EXPID>.yml`` in the ``conf`` folder of the experiment.
+To configure the experiment, edit ``autosubmit_<EXPID>.yml``, ``expdef_<EXPID>.yml``, ``jobs_<EXPID>.yml`` ,
+``platforms_<EXPID>.yml`` and ``proj_<EXPID>.yml`` in the ``conf`` folder of the experiment.
 
 Expdef configuration
 ====================
@@ -254,9 +256,11 @@ Platform configuration
 Proj configuration
 ==================
 
-After completing the experiment configuration, run ``autosubmit create <EXPID>``. Then navigate to ``proj``, where a copy of the model is stored.
+After completing the experiment configuration, run ``autosubmit create <EXPID>``. Then navigate to ``proj``, where a
+copy of the model is stored.
 
-The experiment project contains the scripts specified in ``jobs_<EXPID>.yml`` and a copy of model source code and data specified in ``expdef_<EXPID>.yml``.
+The experiment project contains the scripts specified in ``jobs_<EXPID>.yml`` and a copy of model source code and data
+specified in ``expdef_<EXPID>.yml``.
 
 To configure experiment project parameters for the experiment, edit ``proj_<EXPID>.yml``.
 
@@ -656,7 +660,8 @@ Controlling the number of active concurrent tasks in an experiment
 
 In some cases, you may want to control the number of concurrent tasks/jobs that can be active in an experiment.
 
-To set the maximum number of concurrent tasks/jobs, you can use the ``TOTAL_JOBS`` and ``MAX_WAITING_JOBS`` variable in the ``conf/autosubmit_<EXPID>.yml`` file.
+To set the maximum number of concurrent tasks/jobs, you can use the ``TOTAL_JOBS`` and ``MAX_WAITING_JOBS`` variable in
+the ``conf/autosubmit_<EXPID>.yml`` file.
 
     vi <EXPID>/conf/autosubmit_<EXPID>.yml
 
@@ -667,9 +672,11 @@ To set the maximum number of concurrent tasks/jobs, you can use the ``TOTAL_JOBS
     # Controls the maximum number of submitted and waiting tasks
     MAX_WAITING_JOBS: 10
 
-To control the number of jobs included in a wrapper, you can use the ``MAX_WRAPPED_JOBS`` and ``MIN_WRAPPED_JOBS`` variables in the ``conf/autosubmit_<EXPID>.yml`` file.
+To control the number of jobs included in a wrapper, you can use the ``MAX_WRAPPED_JOBS`` and ``MIN_WRAPPED_JOBS``
+variables in the ``conf/autosubmit_<EXPID>.yml`` file.
 
-Note that a wrapped job is counted as a single job regardless of the number of tasks it contains. Therefore, ``TOTAL_JOBS`` and ``MAX_WAITING_JOBS`` won't have an impact inside a wrapper.
+Note that a wrapped job is counted as a single job regardless of the number of tasks it contains. Therefore,
+``TOTAL_JOBS`` and ``MAX_WAITING_JOBS`` won't have an impact inside a wrapper.
 
     vi <expid>/conf/autosubmit_<EXPID>.yml
 

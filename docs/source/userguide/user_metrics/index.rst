@@ -40,7 +40,8 @@ Example:
 Prepare your script template
 ----------------------------
 
-Autosubmit will look for the metric files in a specific location. This location will be available to the template by using
+Autosubmit will look for the metric files in a specific location. This location will be available to the template by
+using
 the ``%CURRENT_METRIC_FOLDER%`` variable. This variable will be replaced by the path to the metrics folder of the job.
 
 For example, a valid script template for the specification above will look like this:
@@ -61,8 +62,10 @@ For example, a valid script template for the specification above will look like 
     EOF
 
 
-The ``%CURRENT_METRIC_FOLDER%`` variable is by default set to the ``%CURRENT_ROOTDIR%/%JOBNAME%`` location. However, you can
-change this location by setting the ``CONFIG.METRIC_FOLDER`` variable in your experiment configuration file, and then the job name
+The ``%CURRENT_METRIC_FOLDER%`` variable is by default set to the ``%CURRENT_ROOTDIR%/%JOBNAME%`` location. However, you
+can
+change this location by setting the ``CONFIG.METRIC_FOLDER`` variable in your experiment configuration file, and then
+the job name
 will be appended to it. This is useful if you want to store the metrics in a different location.
 
 .. code-block:: yaml

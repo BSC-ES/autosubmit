@@ -6,9 +6,11 @@ Restarting the experiment
 Recovering an experiment
 ------------------------
 
-We use the ``recovery`` command when an experiment was interrupted in an ungraceful way and Autosubmit job states are no longer consistent with the actual state of the jobs on the platform.
+We use the ``recovery`` command when an experiment was interrupted in an ungraceful way and Autosubmit job states are no
+longer consistent with the actual state of the jobs on the platform.
 
-In practice, this command is used as a last resort when resuming an experiment is not working as expected. Example of such case:
+In practice, this command is used as a last resort when resuming an experiment is not working as expected. Example of
+such case:
 
 ::
 
@@ -20,7 +22,8 @@ In practice, this command is used as a last resort when resuming an experiment i
 
 And after this modifications executing again ``autosubmit run <EXPID>`` does not work as expected.
 
-The ``recovery`` command checks which jobs have already finished, and it updates their status to ``COMPLETED``. It also tries to recover missing logs and missing ``job_data`` information when possible.
+The ``recovery`` command checks which jobs have already finished, and it updates their status to ``COMPLETED``. It also
+tries to recover missing logs and missing ``job_data`` information when possible.
 
 - By default, it checks for the completion files for active jobs (i.e. jobs in ``SUBMITTED``, ``RUNNING``, ``QUEUING``, ``UNKNOWN``, ``HELD``, ``READY`` or ``DELAYED`` status).
 
@@ -143,11 +146,14 @@ Rerunning part of the experiment
 
 This procedure allows you to create automatically a new pickle with a list of jobs of the experiment to rerun.
 
-The ``create`` command will use the ``expdef_<EXPID>.yml`` file to generate the rerun if the variable RERUN is set to TRUE and a RERUN_JOBLIST is provided.
+The ``create`` command will use the ``expdef_<EXPID>.yml`` file to generate the rerun if the variable RERUN is set to
+TRUE and a RERUN_JOBLIST is provided.
 
-Additionally, you can have re-run only jobs that won't be included in the default job_list. In order to do that, you have to set RERUN_ONLY in the jobs conf of the corresponding job.
+Additionally, you can have re-run only jobs that won't be included in the default job_list. In order to do that, you
+have to set RERUN_ONLY in the jobs conf of the corresponding job.
 
-By default, ``create`` does **not** generate plots. To generate plots of the new job list, use the ``-plt`` or ``--plot`` option.
+By default, ``create`` does **not** generate plots. To generate plots of the new job list, use the ``-plt`` or
+``--plot`` option.
 
 The only exception is ``-txt`` flag that does not require ``-plt`` or ``--plot`` option.
 

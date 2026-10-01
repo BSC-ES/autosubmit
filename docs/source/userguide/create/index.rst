@@ -36,7 +36,8 @@ Examples:
 Configuring default platforms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you have an ``autosubmitrc`` or ``.autosubmitrc`` file in your home directory, you can configure a default platforms file that will be used as a template for new experiments.
+If you have an ``autosubmitrc`` or ``.autosubmitrc`` file in your home directory, you can configure a default platforms
+file that will be used as a template for new experiments.
 
 Add the following to your autosubmitrc file:
 
@@ -92,7 +93,8 @@ Examples:
 Create a dummy experiment
 -------------------------
 
-Dummy experiments are useful for testing your Autosubmit configuration without expensive computations. They behave like regular experiments but only submit sleep jobs to the HPC platform.
+Dummy experiments are useful for testing your Autosubmit configuration without expensive computations. They behave like
+regular experiments but only submit sleep jobs to the HPC platform.
 
 To create a dummy experiment:
 
@@ -114,7 +116,8 @@ Example:
 Create a test case experiment
 -----------------------------
 
-Test case experiments use a reserved "t" prefix in their experiment ID to distinguish testing suites from production runs. They allow you to create experiments with specific configurations for testing purposes.
+Test case experiments use a reserved "t" prefix in their experiment ID to distinguish testing suites from production
+runs. They allow you to create experiments with specific configurations for testing purposes.
 
 To create a test case experiment:
 

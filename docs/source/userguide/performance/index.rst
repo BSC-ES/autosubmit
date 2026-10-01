@@ -3,9 +3,12 @@ Performance
 ###########
 
 Autosubmit includes built-in support for **CPMIP** (Computational Performance Model Intercomparison Project)
-metrics, a set of metrics that can be used for the study of computational performance of climate (and Earth system) models.
-These metrics provide a quick and comparable view of how efficiently a simulation runs on a given platform, making them a useful first indicator
-when investigating for inefficiencies — undersized partitions, oversubscribed nodes, I/O bottlenecks, or regressions after a code change.
+metrics, a set of metrics that can be used for the study of computational performance of climate (and Earth system)
+models.
+These metrics provide a quick and comparable view of how efficiently a simulation runs on a given platform, making them
+a useful first indicator
+when investigating for inefficiencies — undersized partitions, oversubscribed nodes, I/O bottlenecks, or regressions
+after a code change.
 
 CPMIP metrics target the **simulation job** of an experiment — the job that
 advances model time chunk by chunk (commonly named ``SIM``). SYPD and CHSY are

@@ -7,14 +7,16 @@ About
 
 For Autosubmit, user mapping means associating selected personal user accounts with a shared account.
 
-The personal user account is used to access each remote platform, while the shared account is used to run the experiments on the machine where Autosubmit is deployed.
+The personal user account is used to access each remote platform, while the shared account is used to run the
+experiments on the machine where Autosubmit is deployed.
 
 When to use
 -----------
 
 When to use: When you want to run a set of shared experiments using different HPC users.
 
-More specifically, this can be useful for launching something like an experiment testing suite on a shared machine without having to create redundant experiments for each user who wants to run the tests.
+More specifically, this can be useful for launching something like an experiment testing suite on a shared machine
+without having to create redundant experiments for each user who wants to run the tests.
 
 Prerequisites
 -------------
@@ -32,11 +34,13 @@ Prerequisites
 How it works
 ------------
 
-The idea is to map two different things depending on the user logged in to the shared account to ensure the correct Autosubmit behavior.
+The idea is to map two different things depending on the user logged in to the shared account to ensure the correct
+Autosubmit behavior.
 
 * Platform_<EXPID>.yml file that contains the personal user for each platform.
 
-(Personal user action): The user must set the environment variable "AS_ENV_PLATFORMS_PATH" to point to the file that contains the personal platforms_<EXPID>.yml file.
+(Personal user action): The user must set the environment variable "AS_ENV_PLATFORMS_PATH" to point to the file that
+contains the personal platforms_<EXPID>.yml file.
 
 Defaults to: None
 
@@ -56,7 +60,8 @@ Defaults to: None
 
 * (OPTIONAL) ssh_config file that contains the ssh config for each platform
 
-(Personal user action): The user must set the environment variable "AS_ENV_SSH_CONFIG_PATH" to point to a file that contains the personal ~/.ssh/config file.
+(Personal user action): The user must set the environment variable "AS_ENV_SSH_CONFIG_PATH" to point to a file that
+contains the personal ~/.ssh/config file.
 
 Defaults to: "~/.ssh/config" or "~/.ssh/config_${SUDO_USER}" if the env variable: "AS_ENV_SSH_CONFIG_PATH" is set.
 

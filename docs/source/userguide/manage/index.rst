@@ -169,7 +169,8 @@ You must execute:
 
     autosubmit setstatus <EXPID> <FILTER> <VALUE_TO_FILTER> -t <STATUS_FINAL> -s
 
-By default, plots are **not** generated when changing status. To generate plots showing the updated job statuses, use the ``-plt`` or ``--plot`` option.
+By default, plots are **not** generated when changing status. To generate plots showing the updated job statuses, use
+the ``-plt`` or ``--plot`` option.
 
 ::
 
@@ -189,7 +190,8 @@ Where:
 | -fc    | filter by chunk/section/split                | ``-fc "[ 19601101 [ fc1 [1] ] ]"``           |
 +--------+----------------------------------------------+----------------------------------------------+
 
-If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs matching ALL specified filters will have their status changed.
+If multiple filters are provided (``-fl, -fs, -ft, -fc``), they will be combined as logical AND, meaning that only jobs
+matching ALL specified filters will have their status changed.
 
 Mandatory arguments:
 
@@ -254,7 +256,8 @@ Options:
 
 Filter precedence (when multiple chunk filters are specified):
 
-When ``-fc``, ``-ftc``, and ``-ftcs`` are combined, precedence is: ``-fc`` → ``-ftc`` → ``-ftcs``. A warning will be logged if multiple chunk filters are detected.
+When ``-fc``, ``-ftc``, and ``-ftcs`` are combined, precedence is: ``-fc`` → ``-ftc`` → ``-ftcs``. A warning will be
+logged if multiple chunk filters are detected.
 
 Filter Examples
 ~~~~~~~~~~~~~~~
@@ -388,7 +391,8 @@ Example:
     <EXPID>_20101101_fc3_21_SIM    READY
     <EXPID>_20111101_fc4_26_SIM    READY
 
-If Autosubmit finds the above file, it will process it. You can check that the processing was OK at a given date and time,
+If Autosubmit finds the above file, it will process it. You can check that the processing was OK at a given date and
+time,
 if you see that the file name has changed to:
 ::
 

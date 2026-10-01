@@ -77,7 +77,8 @@ Once you've already loaded / installed the Autosubmit version do you want:
 *EXPID* is the experiment identifier.
 The most common problem when you change your Autosubmit version is the apparition of several Python errors.
 This is due to how Autosubmit saves internally the data, which can be incompatible between versions.
-The steps above represent the process to re-create (1) these internal data structures and to recover (2) the previous status of your experiment.
+The steps above represent the process to re-create (1) these internal data structures and to recover (2) the previous
+status of your experiment.
 
 Running an experiment created with version 4.0.0 or earlier
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -101,7 +102,8 @@ Once you've already loaded / installed the Autosubmit version do you want:
     autosubmit run <EXPID> -v
 
 *<EXPID>* is the experiment identifier.
-The most common problem when you upgrade an experiment with INI configuration to YAML is that some variables may be not automatically translated.
+The most common problem when you upgrade an experiment with INI configuration to YAML is that some variables may be not
+automatically translated.
 Ensure that all your <EXPID>/conf/\*.yml files are correct and also revise the templates in <EXPID>/proj/$proj_name.
 
 
@@ -120,9 +122,13 @@ To run only a subset of selected members you can execute the command:
 
 *MEMBERS* is the selected subset of members. Format ``"member1 member2 member2"``, example: ``"fc0 fc1 fc2"``.
 
-Then, your experiment will start running jobs belonging to those members only. If the experiment was previously running and autosubmit was stopped when some jobs belonging to other members (not the ones from your input) where running, those jobs will be tracked and finished in the new exclusive run.
+Then, your experiment will start running jobs belonging to those members only. If the experiment was previously running
+and autosubmit was stopped when some jobs belonging to other members (not the ones from your input) where running, those
+jobs will be tracked and finished in the new exclusive run.
 
-Furthermore, if you wish to run a sequence of only members execution, then instead of running ``autosubmit run -rom "member_1"`` ... ``autosubmit run -rom "member_n"``, you can make a bash file with that sequence and run the bash file. Example:
+Furthermore, if you wish to run a sequence of only members execution, then instead of running
+``autosubmit run -rom "member_1"`` ... ``autosubmit run -rom "member_n"``, you can make a bash file with that sequence
+and run the bash file. Example:
 
 .. code-block:: bash
 
@@ -175,7 +181,8 @@ To start an experiment after another experiment is finished, use the command:
 
 .. warning:: Both experiments must be using Autosubmit version ``3.13.0`` or later.
 
-Then, your terminal will show the current status of the experiment you are waiting for. The status format is ``COMPLETED/QUEUING/RUNNING/SUSPENDED/FAILED``.
+Then, your terminal will show the current status of the experiment you are waiting for. The status format is
+``COMPLETED/QUEUING/RUNNING/SUSPENDED/FAILED``.
 
 This functionality can be used together with other options supplied by the ``run`` command.
 

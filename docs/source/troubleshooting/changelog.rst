@@ -39,10 +39,13 @@ Major changes:
 Configuration changes
 =====================
 
-Now autosubmit is composed of two kinds of YAML configurations: the default ones, which are the same as always, and the custom ones.
+Now autosubmit is composed of two kinds of YAML configurations: the default ones, which are the same as always, and the
+custom ones.
 
-The custom ones allow defining custom configurations that will override the default ones. In order to do this, you only have to put the key in the custom configuration file.
-These custom ones can be anywhere and have any name. By default, they're inside ``<EXPID>/conf``, but you can change this path in the expdef_<EXPID>.yml file using ``DEFAULT.CUSTOM_CONFIG``.
+The custom ones allow defining custom configurations that will override the default ones. In order to do this, you only
+have to put the key in the custom configuration file.
+These custom ones can be anywhere and have any name. By default, they're inside ``<EXPID>/conf``, but you can change
+this path in the expdef_<EXPID>.yml file using ``DEFAULT.CUSTOM_CONFIG``.
 
 Additionally, you must be aware of the following changes:
 
@@ -426,7 +429,8 @@ The DEPENDENCIES key is used to define the dependencies of a job. It can be used
         - "all": Will link all selected tasks of the dependency with the current selected tasks. Example: SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1, DA_FC00_CHUNK_2, DA_FC00_CHUNK_3...
         - "none": Will unlink selected tasks of the dependency from the current selected tasks.
 
-For the new format, consider that the priority is hierarchy and goes like this DATES_FROM -(includes)-> MEMBERS_FROM -(includes)-> CHUNKS_FROM.
+For the new format, consider that the priority is hierarchy and goes like this DATES_FROM -(includes)-> MEMBERS_FROM
+-(includes)-> CHUNKS_FROM.
 
 - You can define a DATES_FROM inside the DEPENDENCY.
 - You can define a MEMBERS_FROM inside the DEPENDENCY and DEPENDENCY.DATES_FROM.
@@ -542,7 +546,8 @@ Example 1: New format with specific dependencies
 ------------------------------------------------
 
 
-In the following example, we want to launch the next member SIM after the last SIM chunk of the previous member is finished.
+In the following example, we want to launch the next member SIM after the last SIM chunk of the previous member is
+finished.
 
 .. code-block:: yaml
 
