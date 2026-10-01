@@ -127,18 +127,6 @@ class ExperimentHistory:
         except Exception:
             return None
 
-    def get_finish_data_dc(self, job_name: str, fail_count: int = 0) -> JobData | None:
-        """Retrieve the full JobData for a job's finish record by job name and fail count.
-
-        :param job_name: The name of the job.
-        :param fail_count: The number of times the job has failed. Defaults to 0.
-        :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
-        """
-        try:
-            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except Exception:
-            return None
-
     def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> JobData | None:
         """Retrieve JobData by job_id and fail_count.
 
@@ -150,63 +138,6 @@ class ExperimentHistory:
             return self.manager.get_job_data_by_job_id_and_fail_count(job_id, fail_count)
         except Exception:
             return None
-
-    def update_submit_time(self, job_name: str, submit: int = 0, status: str = "UNKNOWN", ncpus: int = 0,
-                           wallclock: str = "00:00", qos: str = "debug", date: str = "", member: str = "",
-                           section: str = "", chunk: int = 0, platform: str = "NA", job_id: int = 0,
-                           wrapper_queue: str | None = None, wrapper_code: str | None = None,
-                           children: str = "", workflow_commit: str = "", split=None, splits=None,
-                           fail_count: int = 0) -> JobData | None:
-        """Updates an existing job submission entry in the database, identified by job name and fail count.
-
-        :param job_name: The name of the job.
-        :param submit: The submission time of the job. Defaults to 0.
-        :param status: The status of the job. Defaults to "UNKNOWN".
-        :param ncpus: The number of CPUs allocated for the job. Defaults to 0.
-        :param wallclock: The wallclock time allocated for the job. Defaults to "00:00".
-        :param qos: The quality of service. Defaults to "debug".
-        :param date: The date associated with the job. Defaults to an empty string.
-        :param member: The member associated with the job. Defaults to an empty string.
-        :param section: The section associated with the job. Defaults to an empty string.
-        :param chunk: The chunk number associated with the job. Defaults to 0.
-        :param platform: The platform on which the job is run. Defaults to "NA".
-        :param job_id: The job ID. Defaults to 0.
-        :param wrapper_queue: The wrapper queue. Defaults to None.
-        :param wrapper_code: The wrapper code. Defaults to None.
-        :param children: The children. Defaults to an empty string.
-        :param workflow_commit: The workflow commit identifier. Defaults to an empty string.
-        :param split: The split identifier. Defaults to None.
-        :param splits: The splits information. Defaults to None.
-        :param fail_count: The number of times the job has failed. Defaults to 0.
-        :return: The updated JobData instance, or None if the record is not found or an exception occurs.
-        """
-
-        try:
-            job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except Exception:
-            return None
-        try:
-            job_data_dc.submit = submit
-            job_data_dc.status = status
-            job_data_dc.ncpus = ncpus
-            job_data_dc.wallclock = wallclock
-            job_data_dc.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
-            job_data_dc.date = date
-            job_data_dc.member = member
-            job_data_dc.section = section
-            job_data_dc.chunk = chunk
-            job_data_dc.platform = platform
-            job_data_dc.job_id = job_id
-            job_data_dc.children = children
-            job_data_dc.rowtype = self._get_defined_rowtype(wrapper_code)
-            job_data_dc.workflow_commit = workflow_commit
-            job_data_dc.split = split
-            job_data_dc.splits = splits
-            job_data_dc.fail_count = fail_count
-            return self.manager.update_job_data_dc_by_job_id_name(job_data_dc)
-        except Exception as exp:
-            self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
                          job_id: int = 0, wrapper_queue: str | None = None, wrapper_code: str | None = None,
