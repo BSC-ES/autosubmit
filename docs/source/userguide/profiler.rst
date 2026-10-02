@@ -14,9 +14,9 @@ autosubmit.profiler
    user-oriented guides are available for :ref:`run<run_profiling>`,
    :ref:`create<create_profiling>`, and :ref:`monitor<monitor_profiling>`.
 
-######################################
+#########################
 The Autosubmit's profiler
-######################################
+#########################
 
 Autosubmit integrates a profiler that allows developers to measure the execution time and resource
 usage of Autosubmit commands.

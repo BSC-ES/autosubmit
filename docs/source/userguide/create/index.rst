@@ -33,10 +33,11 @@ Examples:
     # Create dummy experiment for testing
     autosubmit expid -dm -d "dummy test"
 
-Configuring Default Platforms
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Configuring default platforms
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you have an ``autosubmitrc`` or ``.autosubmitrc`` file in your home directory, you can configure a default platforms file that will be used as a template for new experiments.
+If you have an ``autosubmitrc`` or ``.autosubmitrc`` file in your home directory, you can configure a default platforms
+file that will be used as a template for new experiments.
 
 Add the following to your autosubmitrc file:
 
@@ -58,28 +59,12 @@ To copy an existing experiment with a new unique identifier:
     # Copy experiment with default configuration
     autosubmit expid -y <EXPID> -H <HPCname> -d "<Description>"
 
-    # Copy experiment with custom configuration path
-    autosubmit expid -y <EXPID> -c <PATH> -H <HPCname> -d "<Description>"
-
 Where:
 
 * ``EXPID`` - The experiment identifier to copy from
 * ``HPCname`` - The name of the main HPC platform for the new experiment
 * ``Description`` - A brief description of the new experiment
 * ``PATH`` - (Optional) Path to custom configuration directory
-
-Examples:
-
-.. code-block:: bash
-
-    # Copy experiment to Ithaca platform
-    autosubmit expid -y a0b1 -H ithaca -d "Copy of experiment a0b1"
-
-    # Copy with custom configuration path
-    autosubmit expid -y a0b1 -p "/esarchive/autosubmit/genericFiles/conf" \
-                     -H marenostrum4 -d "Modified copy of a0b1"
-
-.. warning:: You can only copy experiments created with Autosubmit 3.11 or above.
 
 .. tip::
    You can configure default platforms in your ``autosubmitrc`` file:
@@ -92,7 +77,8 @@ Examples:
 Create a dummy experiment
 -------------------------
 
-Dummy experiments are useful for testing your Autosubmit configuration without expensive computations. They behave like regular experiments but only submit sleep jobs to the HPC platform.
+Dummy experiments are useful for testing your Autosubmit configuration without expensive computations. They behave like
+regular experiments but only submit sleep jobs to the HPC platform.
 
 To create a dummy experiment:
 
@@ -112,9 +98,10 @@ Example:
     autosubmit expid -H ithaca -dm -d "Testing Autosubmit configuration"
 
 Create a test case experiment
-------------------------------
+-----------------------------
 
-Test case experiments use a reserved "t" prefix in their experiment ID to distinguish testing suites from production runs. They allow you to create experiments with specific configurations for testing purposes.
+Test case experiments use a reserved "t" prefix in their experiment ID to distinguish testing suites from production
+runs. They allow you to create experiments with specific configurations for testing purposes.
 
 To create a test case experiment:
 
@@ -136,7 +123,7 @@ Example:
 .. _create_profiling:
 
 Profiling experiment creation
-------------------------------
+-----------------------------
 
 You can profile the experiment creation process to analyze performance.
 To enable profiling, add the ``--profile`` flag to your ``autosubmit create`` command:

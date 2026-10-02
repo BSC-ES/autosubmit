@@ -1,14 +1,17 @@
 Wrappers
 ========
 
-Job packages, or "wrappers", are jobs created as bundles of different tasks (submitted at once in a single script to the platform) assembled by Autosubmit to maximize the usage of platforms managed by a scheduler (by minimizing the queuing time between consecutive or concurrent tasks). Autosubmit supports four wrapper types that can be used depending on the experiment’s workflow.
+Job packages, or "wrappers", are jobs created as bundles of different tasks (submitted at once in a single script to the
+platform) assembled by Autosubmit to maximize the usage of platforms managed by a scheduler (by minimizing the queuing
+time between consecutive or concurrent tasks). Autosubmit supports four wrapper types that can be used depending on the
+experiment's workflow.
 
 * Horizontal_
 * Vertical_
 * Horizontal-vertical_
 * Vertical-horizontal_
 
-.. note:: To have a preview of wrappers, you must use the parameter `-cw` available on inspect, monitor, and create.
+.. note:: To have a preview of wrappers, you must use the parameter ``-cw`` available on inspect, monitor, and create.
 
 .. code-block:: bash
 
@@ -19,19 +22,21 @@ Job packages, or "wrappers", are jobs created as bundles of different tasks (sub
 Basic configuration
 -------------------
 
-To configure a new wrapper, the user has to define a `WRAPPERS` section in any configuration file. When using the standard configuration, this one is autosubmit_<EXPID>.yml.
+To configure a new wrapper, the user has to define a ``WRAPPERS`` section in any configuration file. 
+When using the standard configuration, this one is ``autosubmit_<EXPID>.yml``.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
     WRAPPERS:
         WRAPPER_0:
             TYPE: "horizontal"
 
-By default, Autosubmit will try to bundle jobs of the same type. The user can alter this behavior by setting the `JOBS_IN_WRAPPER` parameter directive in the wrapper section.
+By default, Autosubmit will try to bundle jobs of the same type. The user can alter this behavior by setting the
+``JOBS_IN_WRAPPER`` parameter directive in the wrapper section.
 
-When using multiple wrappers or 2-dim wrappers is essential to define the `JOBS_IN_WRAPPER` parameter.
+When using multiple wrappers or 2-dim wrappers is essential to define the ``JOBS_IN_WRAPPER`` parameter.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
     EXPERIMENT:
       DATELIST: 20220101
@@ -122,11 +127,11 @@ Wrapper parameters description
 Type
 ^^^^
 
-The type parameter allows the user to determine the wrapper algorithm. 
+The type parameter allows the user to determine the wrapper algorithm.
 
-It affects task execution order in wrappers, and in hybrid cases, it adds some internal logic. 
+It affects task execution order in wrappers, and in hybrid cases, it adds some internal logic.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_0:
@@ -135,24 +140,25 @@ It affects task execution order in wrappers, and in hybrid cases, it adds some i
 Jobs_in_wrapper
 ^^^^^^^^^^^^^^^
 
-The jobs_in_wrapper parameter allows the user to determine the tasks inside a wrapper by specifying the job_section name. It can group multiple tasks by providing more than one job_section name. 
+The jobs_in_wrapper parameter allows the user to determine the tasks inside a wrapper by specifying the job_section
+name. It can group multiple tasks by providing more than one job_section name.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_0:
       TYPE: "horizontal"
       JOBS_IN_WRAPPER: "SIM"
-      
+
 
 Method
 ^^^^^^
 
-The method parameter allows the user to determine if the wrapper will use machine files or threads. 
+The method parameter allows the user to determine if the wrapper will use machine files or threads.
 
 This allows forming a wrapper that relies on machinefiles to work.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_0:
@@ -160,9 +166,9 @@ This allows forming a wrapper that relies on machinefiles to work.
       JOBS_IN_WRAPPER: "SIM"
       METHOD: ASTHREAD
 
-or 
+or
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_0:
@@ -172,7 +178,7 @@ or
 This allows forming a wrapper with shared-memory paradigm instead of relying on machinefiles to work in parallel.
 
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_0:
@@ -183,9 +189,11 @@ This allows forming a wrapper with shared-memory paradigm instead of relying on 
 Extend_wallclock
 ^^^^^^^^^^^^^^^^
 
-The extend_wallclock parameter allows users to provide extra headroom for the wrapper. The accepted value is an integer. Autosubmit will translate this value automatically to the max_wallclock of the sum of wrapper inner-task wallclocks at the horizontal level. 
+The extend_wallclock parameter allows users to provide extra headroom for the wrapper. The accepted value is an integer.
+Autosubmit will translate this value automatically to the max_wallclock of the sum of wrapper inner-task wallclocks at
+the horizontal level.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_0:
@@ -208,7 +216,7 @@ without resubmitting the wrapper. Once the wrapper finishes, its inner jobs
 are not retried again externally by Autosubmit. 
 See :ref:`job_retries` for the standalone job retry mechanism.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_0:
@@ -219,9 +227,10 @@ See :ref:`job_retries` for the standalone job retry mechanism.
 Queue
 ^^^^^
 
-The queue parameter allows the users to define a different queue for the wrapper. This value overrides the platform queue and job queue.
+The queue parameter allows the users to define a different queue for the wrapper. This value overrides the platform
+queue and job queue.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_0:
@@ -232,9 +241,10 @@ The queue parameter allows the users to define a different queue for the wrapper
 Export
 ^^^^^^
 
-The export parameter allows users to define a path to a script that will load environment scripts before running the wrapper tasks. This value overrides the job export setting.
+The export parameter allows users to define a path to a script that will load environment scripts before running the
+wrapper tasks. This value overrides the job export setting.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_0:
@@ -247,9 +257,10 @@ The export parameter allows users to define a path to a script that will load en
 Check_time_wrapper
 ^^^^^^^^^^^^^^^^^^
 
-The CHECK_TIME_WRAPPER parameter defines the frequency, in seconds, on which Autosubmit will check the remote platform status of all the wrapper tasks. This affects all wrappers.
+The CHECK_TIME_WRAPPER parameter defines the frequency, in seconds, on which Autosubmit will check the remote platform
+status of all the wrapper tasks. This affects all wrappers.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     CHECK_TIME_WRAPPER: 10
@@ -260,13 +271,15 @@ The CHECK_TIME_WRAPPER parameter defines the frequency, in seconds, on which Aut
       TYPE: "vertical"
       JOBS_IN_WRAPPER: "SIM1"
 
-Number of jobs in a wrapper({MIN/MAX}_WRAPPED{_H/_V}
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Number of jobs in a wrapper ``{MIN/MAX}_WRAPPED_{H/V}``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-Users can configure the maximum and the minimum number of jobs in each wrapper by configuring MAX_WRAPPED and MIN_WRAPPED inside the wrapper section. If the user doesn't set them, Autosubmit will default to MAX_WRAPPED: “infinite” and MIN_WRAPPED: 2.
+Users can configure the maximum and the minimum number of jobs in each wrapper by configuring 
+``MAX_WRAPPED`` and ``MIN_WRAPPED`` inside the wrapper section. 
+If the user doesn't set them, Autosubmit will default to ``MAX_WRAPPED``: "infinite" and ``MIN_WRAPPED``: 2.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     MIN_WRAPPED: 2
@@ -279,9 +292,9 @@ Users can configure the maximum and the minimum number of jobs in each wrapper b
       TYPE: "vertical"
       JOBS_IN_WRAPPER: "SIM1"
 
-For 2-dim wrappers, {MAX_MIN}_WRAPPED_{V/H} must be used instead of the general one.
+For 2-dim wrappers, ``{MAX_MIN}_WRAPPED_{H/V}`` must be used instead of the general one.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
    MIN_WRAPPED: 2
@@ -298,16 +311,19 @@ Policy
 ^^^^^^
 
 
-Autosubmit will wrap as many tasks as possible while respecting the limits set in the configuration(MAX_WRAPPED, MAX_WRAPPED_H, MAX_WRAPPED_V, MIN_WRAPPED, MIN_WRAPPED_V, and MIN_WRAPPED_H parameters). However, users have three different policies available to tune the behavior in situations where there aren’t enough tasks in general, or there are uncompleted tasks remaining from a failed wrapper job:
+Autosubmit will wrap as many tasks as possible while respecting the limits set in the configuration(``MAX_WRAPPED``, 
+``MAX_WRAPPED_H``, ``MAX_WRAPPED_V``, ``MIN_WRAPPED``, ``MIN_WRAPPED_V``, and ``MIN_WRAPPED_H`` parameters). However,
+users have three different policies available to tune the behavior in situations where there aren't enough tasks in
+general, or there are uncompleted tasks remaining from a failed wrapper job:
 
-* Flexible: if there aren’t at least MIN_WRAPPED tasks to be grouped, Autosubmit will submit them as individual jobs.
+* Flexible: if there aren't at least MIN_WRAPPED tasks to be grouped, Autosubmit will submit them as individual jobs.
 * Mixed: will wait for MIN_WRAPPED jobs to be available to create a wrapper, except if one of the wrapped tasks had failed beforehand. In this case, Autosubmit will submit them individually.
 * Strict: will always wait for MIN_WRAPPED tasks to be ready to create a wrapper.
 
 
 .. warning:: Mixed and strict policies can cause deadlocks.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     POLICY: "flexible"
@@ -320,11 +336,14 @@ Autosubmit will wrap as many tasks as possible while respecting the limits set i
 Vertical wrapper
 ----------------
 
-Vertical wrappers are suited for sequential dependent jobs (e.x. chunks of SIM tasks that depend on the previous chunk). Defining the platform’s  `MAX_WALLCLOCK` is essential since the wrapper's total wallclock time will be the sum of each job and will be a limiting factor for the creation of the wrapper, which will not bundle more jobs than the ones fitting in the wallclock time.
+Vertical wrappers are suited for sequential dependent jobs (e.x. chunks of SIM tasks that depend on the previous chunk).
+Defining the platform's  ``MAX_WALLCLOCK`` is essential since the wrapper's total wallclock time will be the sum of each
+job and will be a limiting factor for the creation of the wrapper, which will not bundle more jobs than the ones fitting
+in the wallclock time.
 
 Autosubmit supports wrapping together vertically jobs of different types.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   JOBS:
     SIM:
@@ -357,9 +376,12 @@ Autosubmit supports wrapping together vertically jobs of different types.
 Horizontal wrapper
 ------------------
 
-Horizontal wrappers are suited for jobs that must run parallel (e.x. members of SIM tasks). Defining the platform’s  `MAX_PROCESSORS` is essential since the wrapper processor amount will be the sum of each job and will be a limiting factor for the creation of the wrapper, which will not bundle more jobs than the ones fitting in the `MAX_PROCESSORS` of the platform.
+Horizontal wrappers are suited for jobs that must run parallel (e.x. members of SIM tasks). Defining the platform's 
+``MAX_PROCESSORS`` is essential since the wrapper processor amount will be the sum of each job and will be a limiting
+factor for the creation of the wrapper, which will not bundle more jobs than the ones fitting in the ``MAX_PROCESSORS``
+of the platform.
 
-.. code-block:: YAML
+.. code-block:: yaml
 
   WRAPPERS:
     WRAPPER_H:
@@ -384,7 +406,8 @@ Horizontal wrappers are suited for jobs that must run parallel (e.x. members of 
 Vertical-horizontal wrapper
 ---------------------------
 
-The vertical-horizontal wrapper allows bundling together a vertical sequence of tasks independent of the horizontal ones. Therefore, all horizontal tasks do not need to finish to progress to the next horizontal level.
+The vertical-horizontal wrapper allows bundling together a vertical sequence of tasks independent of the horizontal
+ones. Therefore, all horizontal tasks do not need to finish to progress to the next horizontal level.
 
 .. autosubmitfigure::
     :command: create
@@ -402,7 +425,8 @@ The vertical-horizontal wrapper allows bundling together a vertical sequence of 
 Horizontal-vertical wrapper
 ---------------------------
 
-The horizontal-vertical wrapper allows bundling together tasks that could run simultaneously but need to communicate before progressing to the next horizontal level.
+The horizontal-vertical wrapper allows bundling together tasks that could run simultaneously but need to communicate
+before progressing to the next horizontal level.
 
 .. autosubmitfigure::
     :command: create

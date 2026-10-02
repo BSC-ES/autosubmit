@@ -1,16 +1,18 @@
 Configure Experiments
 =====================
 
-This page covers some of the basics for defining experiment parameters, as well as some references to the files where such information is stored. Locally, you can find them under ``autosubmit/expid/conf`` where ``expid`` is the experiment ID. See :doc:`../expids` for more information regarding experiment IDs.
+This page covers some of the basics for defining experiment parameters, as well as some references to the files where
+such information is stored. Locally, you can find them under ``autosubmit/expid/conf`` where ``expid`` is the experiment
+ID. See :doc:`../expids` for more information regarding experiment IDs.
 
 
 Configuration files
 -------------------
 
 Experiment configuration files are stored under each experiment's configuration directory.
-You should adjust all parameters to your needs in this files before creating the experiment.
+You should adjust all parameters to your needs in these files before creating the experiment.
 The files follow the naming schema ``type_expid.yml`` where ``type`` is either
-``**expdef**``, ``**jobs**``, ``**platforms**`` or ``**autosubmit**``.
+``expdef``, ``jobs``, ``platforms`` or ``autosubmit``.
 
 ``expdef_<EXPID>.yml`` contains:
     - Start dates, members and chunks (number and length).
@@ -25,7 +27,7 @@ The files follow the naming schema ``type_expid.yml`` where ``type`` is either
 
 For more information on adding jobs see :ref:`add-new-job` and :ref:`add-het-job`.
 
-*platforms_<EXPID>.yml* contains:
+``platforms_<EXPID>.yml`` contains:
     - HPC, fat-nodes and supporting computers configuration.
 
 For more information on adding a new platform to the experiment configuration, see :ref:`add-new-plat-exp`.
@@ -33,17 +35,22 @@ For more information on adding a new platform to the experiment configuration, s
 .. note:: ``platforms_<EXPID>.yml`` is usually provided by workflow developers or site administrators.
           Users only have to change their login and accounting options for the selected HPCs.
 
-*autosubmit_<EXPID>.yml* contains:
+``autosubmit_<EXPID>.yml`` contains:
     - Maximum number of jobs to be running at the same time at the HPC.
     - Time (seconds) between connections to the HPC queue scheduler to poll already submitted jobs status.
     - Number of retries if a job fails.
 
-Once all file parameters have been tuned, an experiment can be created. Refer to the method page :meth:`autosubmit.autosubmit.Autosubmit.create` for syntax details.
-``autosubmit create`` will make use of the ``expdef_<EXPID>.yml`` file to generate the experiment and related workflow.
-The experiment workflow, which contains all the jobs and its dependencies, will be saved as a *pkl* file.
-More info on pickle can be found at http://docs.python.org/library/pickle.html.
+Once all file parameters have been tuned, an experiment can be created.
+``autosubmit create`` will make use of the ``expdef_<EXPID>.yml`` file to
+generate the experiment and related workflow.
 
-In order to understand more the grouping options, which are used for visualization purposes, please check :ref:`grouping`.
+The experiment workflow, which contains all the jobs and their dependencies, is
+stored in the Autosubmit database. From Autosubmit ``4.2.0+`` onwards this is a
+SQLAlchemy-backed database — SQLite by default, with PostgreSQL also supported —
+replacing the ``job_list.pkl`` file used by earlier versions.
+
+In order to understand more the grouping options, which are used for visualization purposes, please check
+:ref:`grouping`.
 
 The output of ``autosubmit create`` includes details about the YAML files used to build the final Autosubmit
 configuration model. This information is useful for developing workflows and troubleshooting configuration issues.
@@ -53,8 +60,8 @@ are shown each time a YAML file is loaded from disk.
 
 .. _add-new-job:
 
-How to add a new job
---------------------
+Adding a new job
+----------------
 
 To add a new job from a template file, open the ``jobs_<EXPID>.yml`` file and add this text:
 
@@ -63,9 +70,11 @@ To add a new job from a template file, open the ``jobs_<EXPID>.yml`` file and ad
     new_job:
         FILE: <new_job_template>
 
-This will create a new job named *new_job* that will be executed once at the default platform. This job will use the template located at ``<new_job_template>``. Note that path is relative to project folder.
+This will create a new job named ``new_job`` that will be executed once at the default platform. This job will use the
+template located at ``<new_job_template>``. Note that path is relative to project folder.
 
-This is the minimum job definition and usually is not enough. Typically, you usually will need to add some others parameters:
+This is the minimum job definition and usually is not enough. Typically, you usually will need to add some others
+parameters:
 
 
 .. list-table::
@@ -84,13 +93,16 @@ This is the minimum job definition and usually is not enough. Typically, you usu
         Options are: ``once``, ``date``, ``member``, ``chunk``
     * - ``DEPENDENCIES``
       - Defines dependencies from job as a list of parents jobs separated by spaces.
-        If *new_job* has to wait for *old_job* to finish, you must add the line ``DEPENDENCIES: old_job``.
+        If ``new_job`` has to wait for ``old_job`` to finish, you must add the line ``DEPENDENCIES: old_job``.
 
-For dependencies to jobs running in previous chunks, members or start-dates, use ``-(DISTANCE)``. For example, for a job *SIM* waiting for the previous *SIM* job to finish, you have to add ``DEPENDENCIES: SIM-1``.
+For dependencies to jobs running in previous chunks, members or start-dates, use ``-(DISTANCE)``. For example, for a job
+``SIM`` waiting for the previous ``SIM`` job to finish, you have to add ``DEPENDENCIES: SIM-1``.
 
-For dependencies that are not mandatory for the normal workflow behaviour, you must add the char ``?`` at the end of the dependency.
+For dependencies that are not mandatory for the normal workflow behaviour, you must add the char ``?`` at the end of the
+dependency.
 
-For jobs running in HPC platforms, usually you have to provide information about processors, wallclock times and more. To do this, use:
+For jobs running in HPC platforms, usually you have to provide information about processors, wallclock times and more.
+To do this, use:
 
 .. list-table::
     :widths: 25 75
@@ -158,13 +170,16 @@ There are also other, less used features that you can use:
 
 .. _add-het-job:
 
-How to add a new heterogeneous job
-----------------------------------
+Adding a heterogeneous job
+--------------------------
 
 .. important::
-    This feature is only available for SLURM platforms. It is automatically enabled when the processors or nodes parameter is a yaml list
+    This feature is only available for SLURM platforms. It is automatically enabled when the processors or nodes 
+    parameter is a yaml list
 
-An heterogeneous job or hetjob is a job for whcih each component has virtually all job options available including partition, account and QOS (Quality Of Service). For example, part of a job might require four cores and 4 GB for each of 128 tasks while another part of the job would require 16 GB of memory and one CPU.
+An heterogeneous job or hetjob is a job for which each component has virtually all job options available 
+including partition, account and Quality Of Service. For example, part of a job might require 
+four cores and 4 GB for each of 128 tasks while another part of the job would require 16 GB of memory and one CPU.
 
 
 
@@ -188,12 +203,13 @@ To add a new hetjob, open the ``jobs_<EXPID>.yml``.
                 - <partition_name>
             TASKS: 128 # Determines the amount of tasks that will be used by each component
 
-This will create a new job named *new_hetjob* with two components that will be executed once.
+This will create a new job named ``new_hetjob`` with two components that will be executed once.
 
-How to configure email notifications
-------------------------------------
+Configuring email notifications
+-------------------------------
 
-**1.** Enable email notifications and set the accounts where you will receive it. For this, edit ``autosubmit_<EXPID>.yml``. More than one address can be defined.
+**1.** Enable email notifications and set the accounts where you will receive it. For this, edit
+``autosubmit_<EXPID>.yml``. More than one address can be defined.
 
 Example:
 
@@ -212,7 +228,9 @@ Example:
             - rlewis@example.com
 
 
-**2.** Define for which jobs you want to be notified. Edit ``jobs_<EXPID>.yml``.  You will be notified every time the job changes its status to one of the statuses defined on the parameter ``NOTIFY_ON``. You can define more than one job status separated by a whitespace, a comma (`,`), or using a list.
+**2.** Define for which jobs you want to be notified. Edit ``jobs_<EXPID>.yml``. You will be notified every time the job
+changes its status to one of the statuses defined on the parameter ``NOTIFY_ON``. You can define more than one job
+status separated by a whitespace, a comma (``,``), or using a list.
 
 Example:
 
@@ -236,11 +254,11 @@ Example:
 
 .. _cpmip-notifications-config:
 
-How to configure CPMIP threshold notifications
-----------------------------------------------
+Configuring CPMIP threshold notifications
+-----------------------------------------
 
-Autosubmit can send email alerts when one or more :doc:`CPMIP performance metrics </userguide/performance/index>` 
-fall outside the configured target range. This feature uses the same ``MAIL.NOTIFICATIONS`` and ``MAIL.TO`` 
+Autosubmit can send email alerts when one or more :doc:`CPMIP performance metrics </userguide/performance/index>`
+fall outside the configured target range. This feature uses the same ``MAIL.NOTIFICATIONS`` and ``MAIL.TO``
 settings as job-status notifications, so make sure those are enabled first (see the previous section).
 
 .. code-block:: yaml
@@ -283,9 +301,10 @@ threshold, effective bound, and observed value.
 Example notification
 ~~~~~~~~~~~~~~~~~~~~
 
-With the configuration above, suppose the simulation completes with ``SYPD = 3.9``, ``CHSY = 55000``, and ``CORE_HOURS = 1280``. 
+With the configuration above, suppose the simulation completes with ``SYPD = 3.9``, ``CHSY = 55000``, and
+``CORE_HOURS = 1280``.
 All three values fall outside their effective bounds (SYPD ``≥ 4.5`` after the 10% slack;
-CHSY ``≤ 52500`` after the 5% slack; CORE_HOURS ``≤ 1050`` 
+CHSY ``≤ 52500`` after the 5% slack; CORE_HOURS ``≤ 1050``
 after the 5% slack), so Autosubmit sends a single email notification similar to the following:
 
 .. code-block:: text
@@ -339,8 +358,8 @@ If all configured metrics satisfy their thresholds, no notification email is sen
 
 .. _add-new-plat-exp:
 
-How to add a new platform to the experiment configuration
----------------------------------------------------------
+Adding a new platform
+---------------------
 
 .. hint::
     If you are interested in changing the communications library, go to :ref:`request-exclusivity-reservation`.
@@ -362,8 +381,8 @@ To add a new platform, open the ``platforms_<EXPID>.yml`` file and add:
             # OPTIONAL
             ADD_PROJECT_TO_HOST: False
             MAX_PROCESSORS: <N>
-            EC_QUEUE : <ec_queue> # only when type == ecaccess
-            ECACCESS_RETRIES : 100 # optional, only when type == ecaccess
+            EC_QUEUE: <ec_queue> # only when type == ecaccess
+            ECACCESS_RETRIES: 100 # optional, only when type == ecaccess
             VERSION: <version>
             2FA: False
             2FA_TIMEOUT: <timeout> # default 300
@@ -377,7 +396,7 @@ To add a new platform, open the ``platforms_<EXPID>.yml`` file and add:
             CUSTOM_DIRECTIVES: "[ 'my_directive' ]"
 
 
-This will create a platform named *new_platform*. The options specified are all required:
+This will create a platform named ``new_platform``. The options specified are all required:
 
 .. list-table::
     :widths: 25 75
@@ -414,7 +433,7 @@ This will create a platform named *new_platform*. The options specified are all 
     * - Parameter
       - Description
     * - ``VERSION``
-      - Determines de version of the platform type.
+      - Determines the version of the platform type.
 
 .. warning:: With some platforms, 2FA authentication is required. If this is the case, you have to add the parameter
     2FA. These platforms are ecaccess (options: True, False). There may be some autosubmit functions that are not available when using an interactive auth method.
@@ -467,13 +486,14 @@ There are some other parameters that you may need to specify:
 
 .. _request-exclusivity-reservation:
 
-How to request exclusivity or reservation
------------------------------------------
+Requesting exclusivity or reservation
+-------------------------------------
 
 .. important::
     Until now, it is only available for Marenostrum.
 
-To request exclusivity or reservation for your jobs, you can configure two platform variables. Edit ``platforms_<EXPID>.yml``.
+To request exclusivity or reservation for your jobs, you can configure two platform variables. Edit
+``platforms_<EXPID>.yml``.
 
 
 .. hint::
@@ -497,7 +517,7 @@ Of course, you can configure only one or both. For example, for reservation it w
 
 Example:
 
-.. code-block:: YAML
+.. code-block:: yaml
 
     PLATFORMS:
         marenostrum5:
@@ -506,12 +526,13 @@ Example:
             RESERVATION: your-reservation-id
 
 
-How to set a custom interpreter for your job
---------------------------------------------
+Setting a custom interpreter
+----------------------------
 
-If the remote platform does not implement the interpreter you need, you can customize the ``shebang`` of your job script so it points to the relative path of the interpreter you want.
+If the remote platform does not implement the interpreter you need, you can customize the ``shebang`` of your job script
+so it points to the relative path of the interpreter you want.
 
-In the file ``jos_<EXPID>.yml``:
+In the file ``jobs_<EXPID>.yml``:
 
 
 .. list-table:: Parameters Description
@@ -520,7 +541,7 @@ In the file ``jos_<EXPID>.yml``:
 
    * - Parameters
      - Description
-     - Exemple
+     - Example
    * - ``JOBNAME``
      - Job Name
      -
@@ -567,7 +588,8 @@ In the file ``jos_<EXPID>.yml``:
      - 1
 
 
-You can give a path to the ``EXECUTABLE`` setting of your job. Autosubmit will replace the ``shebang`` with the path you provided.
+You can give a path to the ``EXECUTABLE`` setting of your job. Autosubmit will replace the ``shebang`` with the path you
+provided.
 
 Example:
 
@@ -599,10 +621,12 @@ Example:
 
 The result is a ``shebang`` line ``#!/esarchive/autosubmit/my_python_env/python3``.
 
-How to create and run only selected members
--------------------------------------------
+Running only selected members
+-----------------------------
 
-Your experiment is defined and correctly configured, but you want to create it only considering some selected members, and also to avoid creating the whole experiment to run only the members you want. Then, you can do it by configuring the setting ``RUN_ONLY_MEMBERS`` in the ``expdef_<EXPID>.yml`` file:
+Your experiment is defined and correctly configured, but you want to create it only considering some selected members,
+and also to avoid creating the whole experiment to run only the members you want. Then, you can do it by configuring the
+setting ``RUN_ONLY_MEMBERS`` in the ``expdef_<EXPID>.yml`` file:
 
 .. code-block:: yaml
 
@@ -637,9 +661,13 @@ Your experiment is defined and correctly configured, but you want to create it o
         RUN_ONLY_MEMBERS:
 
 
-You can set the ``RUN_ONLY_MEMBERS`` value as shown in the format examples above it. Then, ``Job List`` generation is performed as usual. However, an extra step is performed that will filter the jobs according to ``RUN_ONLY_MEMBERS``. It discards jobs belonging to members not considered in the value provided, and also we discard these jobs from the dependency tree (parents and children). The filtered ``Job List`` is returned.
+You can set the ``RUN_ONLY_MEMBERS`` value as shown in the format examples above it. Then, ``Job List`` generation is
+performed as usual. However, an extra step is performed that will filter the jobs according to ``RUN_ONLY_MEMBERS``. It
+discards jobs belonging to members not considered in the value provided, and also we discard these jobs from the
+dependency tree (parents and children). The filtered ``Job List`` is returned.
 
-The necessary changes have been implemented in the API so you can correctly visualize experiments implementing this new setting in **Autosubmit GUI**.
+The necessary changes have been implemented in the API so you can correctly visualize experiments implementing this new
+setting in **Autosubmit GUI**.
 
 .. important::
     Wrappers are correctly formed considering the resulting jobs.

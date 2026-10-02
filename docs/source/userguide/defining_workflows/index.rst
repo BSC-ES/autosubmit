@@ -2,7 +2,8 @@ Defining the workflow
 =====================
 
 One of the most important steps that you have to do when planning to use autosubmit for an experiment is the definition
-of the workflow the experiment will use. In this section, you will learn about the workflow definition syntax so you will
+of the workflow the experiment will use. In this section, you will learn about the workflow definition syntax so you
+will
 be able to exploit autosubmit's full potential.
 
 .. warning::
@@ -14,7 +15,8 @@ Simple workflow
 ---------------
 
 The simplest workflow that can be defined is a sequence of two jobs, with the second one triggering at the end of
-the first. To define it, we define the two jobs and then add a ``DEPENDENCIES`` attribute to the second job referring to the
+the first. To define it, we define the two jobs and then add a ``DEPENDENCIES`` attribute to the second job referring to
+the
 first one.
 
 It is important to remember when defining workflows that ``DEPENDENCIES`` on autosubmit always refer to jobs that should
@@ -53,8 +55,10 @@ Running jobs once per startdate, member or chunk
 Autosubmit is capable of running ensembles made of various startdates and members. It also has the capability to
 divide member execution on different chunks.
 
-To set at what level a job has to run you have to use the ``RUNNING`` attribute. It has four possible values: ``once``, ``date``,
-``member`` and ``chunk`` corresponding to running once, once per startdate, once per member or once per chunk respectively.
+To set at what level a job has to run you have to use the ``RUNNING`` attribute. It has four possible values: ``once``,
+``date``,
+``member`` and ``chunk`` corresponding to running once, once per startdate, once per member or once per chunk
+respectively.
 
 
 .. code-block:: yaml
@@ -115,7 +119,8 @@ Dependencies with previous jobs
 
 Autosubmit can manage dependencies between jobs that are part of different chunks, members or startdates. The next
 example will show how to make a simulation job wait for the previous chunk of the simulation. To do that, we add
-``sim-1`` on the ``DEPENDENCIES`` attribute. As you can see, you can add as much dependencies as you like separated by spaces
+``sim-1`` on the ``DEPENDENCIES`` attribute. As you can see, you can add as much dependencies as you like separated by
+spaces
 
 .. code-block:: yaml
 
@@ -144,13 +149,14 @@ example will show how to make a simulation job wait for the previous chunk of th
         RUNNING: chunk
 
 
-The resulting workflow can be seen in :numref:`fig-dependencies-previous` for an experiment with 2 startdates, 2 members per startdate and 2 chunks per member.
+The resulting workflow can be seen in :numref:`fig-dependencies-previous` for an experiment with 2 startdates, 2 members
+per startdate and 2 chunks per member.
 
 .. warning::
 
    Autosubmit simplifies the dependencies, so the final graph usually does not show all the lines that you may expect to
-   see. In this example you can see that there are no lines between the `ini` and the `sim` jobs for chunks 2 to 5 because
-   that dependency is redundant with the one on the previous `sim`
+   see. In this example you can see that there are no lines between the ``ini`` and the ``sim`` jobs for chunks 2 to 5 because
+   that dependency is redundant with the one on the previous ``sim``
 
 
 .. autosubmitfigure::
@@ -255,7 +261,8 @@ The ``DEPENDENCIES`` key is used to define the dependencies of a job. It can be 
     * 'all': Will link all selected tasks of the dependency with current selected tasks. Example, ``SIM_FC00_CHUNK_1`` -> ``DA_FC00_CHUNK_1``, ``DA_FC00_CHUNK_2``, ``DA_FC00_CHUNK_3``...
     * 'none': Will unlink selected tasks of the dependency with current selected tasks.
 
-For the new format, consider that the priority is hierarchy and goes like this ``DATES_FROM`` -(includes)-> ``MEMBERS_FROM`` -(includes)-> ``CHUNKS_FROM``.
+For the new format, consider that the priority is hierarchy and goes like this ``DATES_FROM`` -(includes)->
+``MEMBERS_FROM`` -(includes)-> ``CHUNKS_FROM``.
 
 * You can define a ``DATES_FROM`` inside the ``DEPENDENCY``.
 * You can define a ``MEMBERS_FROM`` inside the ``DEPENDENCY`` and ``DEPENDENCY.DATES_FROM``.
@@ -264,12 +271,15 @@ For the new format, consider that the priority is hierarchy and goes like this `
 Start conditions
 ~~~~~~~~~~~~~~~~
 
-Sometimes you want to run a job only when a certain condition is met. For example, you may want to run a job only when a certain task is running.
+Sometimes you want to run a job only when a certain condition is met. For example, you may want to run a job only when a
+certain task is running.
 This can be achieved using the ``START_CONDITIONS`` feature based on the dependencies rework.
 
-Start conditions are achieved by adding the keyword ``STATUS`` and optionally ``FROM_STEP`` keywords into any dependency that you want.
+Start conditions are achieved by adding the keyword ``STATUS`` and optionally ``FROM_STEP`` keywords into any dependency
+that you want.
 
-The ``STATUS`` keyword can be used to select the status of the dependency that you want to check. The possible values ( case-insensitive ) are:
+The ``STATUS`` keyword can be used to select the status of the dependency that you want to check. The possible values
+(case-insensitive) are:
 See :ref:`job_status_reference` for a complete reference and meanings.
 
 
@@ -306,7 +316,9 @@ See :ref:`job_status_reference` for a complete reference and meanings.
     * - ``SUSPENDED``
       - The task is suspended.
 
-The status are ordered, so if you select ``RUNNING`` status, the task will be run if the parent is in any of the following statuses: ``RUNNING``, ``QUEUING``, ``HELD``, ``SUBMITTED``, ``READY``, ``PREPARED``, ``DELAYED``, ``WAITING``.
+The status are ordered, so if you select ``RUNNING`` status, the task will be run if the parent is in any of the
+following statuses: ``RUNNING``, ``QUEUING``, ``HELD``, ``SUBMITTED``, ``READY``, ``PREPARED``, ``DELAYED``,
+``WAITING``.
 
 .. code-block:: yaml
 
@@ -328,7 +340,9 @@ The status are ordered, so if you select ``RUNNING`` status, the task will be ru
         RUNNING: chunk
 
 
-The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. The possible value is an integer. Additionally, the target dependency, must call to `%AS_CHECKPOINT%` inside their scripts. This will create a checkpoint that will be used to check the amount of steps processed.
+The ``FROM_STEP`` keyword can be used to select the **internal** step of the dependency that you want to check. The
+possible value is an integer. Additionally, the target dependency, must call to ``%AS_CHECKPOINT%`` inside their
+scripts. This will create a checkpoint that will be used to check the amount of steps processed.
 
 .. code-block:: yaml
 
@@ -346,7 +360,8 @@ The ``FROM_STEP`` keyword can be used to select the **internal** step of the dep
           STATUS: 'RUNNING'
           FROM_STEP: 2
 
-There is now a new function that is automatically added in your scripts which is called ``as_checkpoint``. This is the function that is generating the checkpoint file. You can see the function below:
+There is now a new function that is automatically added in your scripts which is called ``as_checkpoint``. This is the
+function that is generating the checkpoint file. You can see the function below:
 
 .. code-block:: bash
 
@@ -361,7 +376,8 @@ There is now a new function that is automatically added in your scripts which is
         touch ${job_name_ptrn}_CHECKPOINT_${AS_CHECKPOINT_CALLS}
     }
 
-And what you would have to include in your target dependency or dependencies is the call to this function which in this example is a.sh.
+And what you would have to include in your target dependency or dependencies is the call to this function which in this
+example is a.sh.
 
 The amount of calls is strongly related to the ``FROM_STEP`` value.
 
@@ -375,7 +391,8 @@ The amount of calls is strongly related to the ``FROM_STEP`` value.
   as_checkpoint
 
 
-To select an specific task, you have to combine the ``STATUS`` and ``CHUNKS_TO`` , ``MEMBERS_TO`` and ``DATES_TO``, ``SPLITS_TO`` keywords.
+To select an specific task, you have to combine the ``STATUS`` and ``CHUNKS_TO`` , ``MEMBERS_TO`` and ``DATES_TO``,
+``SPLITS_TO`` keywords.
 
 .. code-block:: yaml
 
@@ -405,8 +422,10 @@ To select an specific task, you have to combine the ``STATUS`` and ``CHUNKS_TO``
 Job frequency
 ~~~~~~~~~~~~~
 
-Some times you just don't need a job to be run on every chunk or member. For example, you may want to launch the postprocessing
-job after various chunks have completed. This behaviour can be achieved using the ``FREQUENCY`` attribute. You can specify
+Some times you just don't need a job to be run on every chunk or member. For example, you may want to launch the
+postprocessing
+job after various chunks have completed. This behaviour can be achieved using the ``FREQUENCY`` attribute. You can
+specify
 an integer I for this attribute and the job will run only once for each I iterations on the running level.
 
 .. hint::
@@ -567,7 +586,8 @@ Job split
 For jobs running at any level (``once``, ``date``, ``member``, ``chunk``), you can split each logical task into
 multiple sub-tasks with the ``SPLITS`` attribute.
 
-This is useful when you want multiple tasks to be run in parallel (e.g. multiple independent ``APP`` instances for the same chunk).
+This is useful when you want multiple tasks to be run in parallel (e.g. multiple independent ``APP`` instances for the
+same chunk).
 
 Basic behavior
 ^^^^^^^^^^^^^^
@@ -905,7 +925,8 @@ Job Splits with calendar
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``SPLITS: auto`` lets Autosubmit compute the split count from calendar configuration.
-This mode requires ``RUNNING: chunk``. This is useful for instance when you want to split a monthly chunk into daily splits, but you don't want to compute the exact amount of days for each month.
+This mode requires ``RUNNING: chunk``. This is useful for instance when you want to split a monthly chunk into daily
+splits, but you don't want to compute the exact amount of days for each month.
 
 Autosubmit computes split count from:
 
@@ -1269,7 +1290,7 @@ Workflow examples:
 ------------------
 
 Example 1: How to select a specific chunk
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. WARNING::
    This example illustrates the old select_chunk.
@@ -1447,7 +1468,8 @@ Weak dependencies, work like this way:
 Example 4: Select a member
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In this workflow you can see an illustrated example of select member. Using 4 members 1 datelist and 4 different job sections.
+In this workflow you can see an illustrated example of select member. Using 4 members 1 datelist and 4 different job
+sections.
 
 .. code-block:: yaml
 
