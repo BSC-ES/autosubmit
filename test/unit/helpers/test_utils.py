@@ -106,4 +106,3 @@ def test_user_yes_no_query(answer: str, expected_or_error: bool | Exception, moc
     else:
         mocker.patch('autosubmit.helpers.utils.input', return_value=answer)
         assert expected_or_error == user_yes_no_query('Sure?')
-

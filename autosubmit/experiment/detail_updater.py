@@ -34,14 +34,12 @@ from autosubmit.database.session import get_engine
 from autosubmit.database.tables import TableRegistry
 
 __all__ = [
-    "LOCAL_TZ",
     "ExperimentDetails",
     "ExperimentDetailsRepository",
     "ExperimentDetailsSQLAlchemyRepository",
     "ExperimentDetailsSQLiteRepository",
 ]
-
-LOCAL_TZ = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
+from autosubmit.helpers.datetime_utils import to_utc_iso
 
 
 class ExperimentDetailsRepository(ABC):
@@ -272,7 +270,7 @@ class ExperimentDetails:
         self._details_repo.upsert_details(
             self.exp_id, self.user, self.created, self.model, self.branch, self.hpc
         )
-    
+
     def get_details(self) -> dict[str, Any] | None:
         """
         Retrieve the last stored snapshot of the experiment's details
@@ -303,9 +301,11 @@ class ExperimentDetails:
         Get the creation date of the experiment. This is obtained from the
         experiment directory stat information.
         """
-        return datetime.datetime.fromtimestamp(
-            int(self.exp_dir_stat.st_ctime), tz=LOCAL_TZ
-        ).isoformat()
+        return to_utc_iso(
+            datetime.datetime.fromtimestamp(
+                int(self.exp_dir_stat.st_ctime), tz=datetime.timezone.utc
+            )
+        )
 
     @property
     def model(self) -> str:

@@ -51,7 +51,7 @@ job = namedtuple("Job", ["name", "date", "member", "status_str", "children"])
 def test_get_current_datetime():
     current_datetime = get_current_datetime()
     assert isinstance(current_datetime, str)
-    pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$"
+    pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$"
     assert re.match(pattern, current_datetime) is not None
 
 
