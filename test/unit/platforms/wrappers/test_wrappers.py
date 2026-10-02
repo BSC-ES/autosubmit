@@ -44,10 +44,12 @@ from autosubmit.job.job_utils import Dependency
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 from autosubmit.platforms.wrappers.wrapper_builder import (
+    BashWrapperBuilder,
     PythonVerticalWrapperBuilder,
     PythonWrapperBuilder,
     SrunVerticalHorizontalWrapperBuilder,
 )
+from autosubmit.scheduler import check_deadlock
 
 """Tests for wrappers."""
 
@@ -420,6 +422,50 @@ class TestWrappers:
 
             for i in range(len(returned_packages)):
                 assert returned_packages[i]._jobs == packages[i]._jobs
+
+    def test_vertical_packager_does_not_leak_scan_index_into_job_level(self):
+        """Vertical packaging must not write the sorted_jobs scan index into job.level."""
+        date_list = ["d1"]
+        member_list = ["m1"]
+        chunk_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        for section, s_value in self.workflows['basic']['sections'].items():
+            self.as_conf.jobs_data[section] = s_value
+        self._createDummyJobs(self.workflows['basic'], date_list, member_list, chunk_list)
+
+        s2_jobs = [self.job_list.get_job_by_name(f'expid_d1_m1_{chunk}_s2') for chunk in chunk_list]
+        for job in s2_jobs[:8]:
+            job.status = Status.COMPLETED
+        for job in s2_jobs[8:]:
+            job.status = Status.READY
+
+        self.job_list._ordered_jobs_by_date_member["WRAPPERS"] = {}
+        self.job_list._ordered_jobs_by_date_member["WRAPPERS"]["d1"] = {}
+        self.job_list._ordered_jobs_by_date_member["WRAPPERS"]["d1"]["m1"] = s2_jobs
+
+        self.job_packager.current_wrapper_section = "WRAPPERS"
+        self.job_packager.retrials = 0
+        self.job_packager._platform.max_wallclock = '10:00'
+        self.job_packager.wrapper_type = 'vertical'
+
+        max_wrapped_job_by_section = dict.fromkeys(["s1", "s2", "s3", "s4"], 10)
+        wrapper_limits = {
+            "max": 10,
+            "max_v": 10,
+            "max_h": 10,
+            "min": 2,
+            "min_v": 2,
+            "min_h": 2,
+            "max_by_section": max_wrapped_job_by_section,
+        }
+
+        with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
+            returned_packages = self.job_packager._build_vertical_packages(
+                [s2_jobs[8]], wrapper_limits, self.wrapper_info)
+
+        assert len(returned_packages) == 1
+        package = returned_packages[0]
+        assert [job.name for job in package.jobs] == ["expid_d1_m1_9_s2", "expid_d1_m1_10_s2"]
+        assert all(job.level == 0 for job in package.jobs)
 
     def test_returned_packages_max_wrapped_jobs(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
@@ -1730,80 +1776,6 @@ class TestWrappers:
                 assert min_v == 3
                 assert min_h == 3
 
-    def test_check_jobs_to_run_first(self):
-        with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
-
-            # want to test self.job_packager.check_jobs_to_run_first(package)
-            date_list = ["d1"]
-            member_list = ["m1", "m2"]
-            chunk_list = [1, 2, 3, 4]
-            for section, s_value in self.workflows['basic']['sections'].items():
-                self.as_conf.jobs_data[section] = s_value
-            self._createDummyJobs(
-                self.workflows['basic'], date_list, member_list, chunk_list)
-
-            self.job_list.get_job_by_name(
-                'expid_d1_m1_s1').status = Status.COMPLETED
-            self.job_list.get_job_by_name(
-                'expid_d1_m2_s1').status = Status.COMPLETED
-
-            self.job_list.get_job_by_name('expid_d1_m1_1_s2').status = Status.READY
-            self.job_list.get_job_by_name('expid_d1_m2_1_s2').status = Status.READY
-
-            wrapper_expression = "s2 s3"
-            d1_m1_1_s2 = self.job_list.get_job_by_name('expid_d1_m1_1_s2')
-            d1_m1_2_s2 = self.job_list.get_job_by_name('expid_d1_m1_2_s2')
-            d1_m1_3_s2 = self.job_list.get_job_by_name('expid_d1_m1_3_s2')
-            d1_m1_4_s2 = self.job_list.get_job_by_name('expid_d1_m1_4_s2')
-            d1_m2_1_s2 = self.job_list.get_job_by_name('expid_d1_m2_1_s2')
-            d1_m2_2_s2 = self.job_list.get_job_by_name('expid_d1_m2_2_s2')
-            d1_m2_3_s2 = self.job_list.get_job_by_name('expid_d1_m2_3_s2')
-            d1_m2_4_s2 = self.job_list.get_job_by_name('expid_d1_m2_4_s2')
-
-            d1_m1_1_s3 = self.job_list.get_job_by_name('expid_d1_m1_1_s3')
-            d1_m1_2_s3 = self.job_list.get_job_by_name('expid_d1_m1_2_s3')
-            d1_m1_3_s3 = self.job_list.get_job_by_name('expid_d1_m1_3_s3')
-            d1_m1_4_s3 = self.job_list.get_job_by_name('expid_d1_m1_4_s3')
-            d1_m2_1_s3 = self.job_list.get_job_by_name('expid_d1_m2_1_s3')
-            d1_m2_2_s3 = self.job_list.get_job_by_name('expid_d1_m2_2_s3')
-            d1_m2_3_s3 = self.job_list.get_job_by_name('expid_d1_m2_3_s3')
-            d1_m2_4_s3 = self.job_list.get_job_by_name('expid_d1_m2_4_s3')
-
-            self.job_list._ordered_jobs_by_date_member["WRAPPERS"]["d1"] = {}
-            self.job_list._ordered_jobs_by_date_member["WRAPPERS"]["d1"]["m1"] = [d1_m1_1_s2, d1_m1_1_s3, d1_m1_2_s2,
-                                                                                  d1_m1_2_s3,
-                                                                                  d1_m1_3_s2, d1_m1_3_s3, d1_m1_4_s2,
-                                                                                  d1_m1_4_s3]
-
-            self.job_list._ordered_jobs_by_date_member["WRAPPERS"]["d1"]["m2"] = [d1_m2_1_s2, d1_m2_1_s3, d1_m2_2_s2,
-                                                                                  d1_m2_2_s3,
-                                                                                  d1_m2_3_s2, d1_m2_3_s3, d1_m2_4_s2,
-                                                                                  d1_m2_4_s3]
-
-            self.job_packager.jobs_in_wrapper = wrapper_expression
-
-            self.job_packager.retrials = 0
-            # test vertical-wrapper
-            self.job_packager.wrapper_type["WRAPPER_V"] = 'vertical'
-            self.job_packager.current_wrapper_section = "WRAPPER_V"
-            self.as_conf.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section] = {}
-            self.as_conf.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section]["TYPE"] = "vertical"
-            self.as_conf.experiment_data["WRAPPERS"][self.job_packager.current_wrapper_section][
-                "JOBS_IN_WRAPPER"] = "S2 S3"
-            package_m1_s2_s3 = [d1_m1_1_s2, d1_m1_1_s3, d1_m1_2_s2, d1_m1_2_s3]
-
-            packages_v = [JobPackageVertical(package_m1_s2_s3, configuration=self.as_conf)]
-            self.job_packager._jobs_list.jobs_to_run_first = []
-            for p in packages_v:
-                p2, run_first = self.job_packager.check_jobs_to_run_first(p)
-                assert p2.jobs == p.jobs
-                assert not run_first
-            self.job_packager._jobs_list.jobs_to_run_first = [d1_m1_1_s2, d1_m1_1_s3]
-            for p in packages_v:
-                p2, run_first = self.job_packager.check_jobs_to_run_first(p)
-                assert p2.jobs == [d1_m1_1_s2, d1_m1_1_s3]
-                assert run_first
-
     def test_calculate_wrapper_bounds(self):
         with mock.patch("autosubmit.job.job.Job.update_parameters", return_value={}):
             # want to test self.job_packager.calculate_wrapper_bounds(section_list)
@@ -2299,7 +2271,7 @@ def test_process_not_wrappeable_packages_no_more_remaining_jobs(setup, not_wrapp
             "strict_one_job", "mixed_one_job", "flexible_one_job"])
 def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wrappeable_package_info,
                                                                    packages_to_submit, max_jobs_to_submit, expected,
-                                                                   unparsed_policy, autosubmit, autosubmit_config):
+                                                                   unparsed_policy, autosubmit_config):
     job_packager, vertical_package = setup
     job_list = JobList("t000", job_packager._as_config, YAMLParserFactory())
     if unparsed_policy == "mixed_failed":
@@ -2336,9 +2308,9 @@ def test_process_not_wrappeable_packages_more_jobs_of_that_section(setup, not_wr
             not_wrappeable_package_info, packages_to_submit, max_jobs_to_submit, wrapper_limits)
     if unparsed_policy in ["strict", "mixed", "strict_one_job", "mixed_one_job"]:
         with pytest.raises(AutosubmitCritical):
-            autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
+            check_deadlock(job_packager.wrappers_with_error, False, job_list)
     else:
-        autosubmit.check_deadlock(job_packager.wrappers_with_error, False, job_list)
+        check_deadlock(job_packager.wrappers_with_error, False, job_list)
     assert result == expected
 
 
@@ -2536,6 +2508,60 @@ def test_vertical_job_thread_uses_fail_count(wrapper_builder: PythonVerticalWrap
     thread = wrapper_builder.build_job_thread()
     assert 'fail_count' in thread
     assert 'self.fail_count' in thread
+
+
+_SCHEDULER_JOB_ID_ENV_VARS = (
+    'SLURM_JOBID',
+    'PBS_JOBID',
+    'JOB_ID',
+    'LSB_JOBID',
+    'LOADL_STEP_ID',
+    'PJM_JOBID',
+)
+"""Scheduler variables every wrapper must resolve ``AS_JOB_ID`` from, in priority order."""
+
+
+def test_python_wrapper_stat_exposes_as_job_id(wrapper_builder: PythonVerticalWrapperBuilder) -> None:
+    """The Python wrapper must expose the scheduler job id as ``AS_JOB_ID``.
+
+    :param wrapper_builder: Builder fixture.
+    """
+    stat = wrapper_builder.build_wrapper_stat()
+    assert 'AS_JOB_ID' in stat
+    assert '_as_job_id' not in stat
+    for var in _SCHEDULER_JOB_ID_ENV_VARS:
+        assert var in stat
+
+
+def test_vertical_launcher_uses_as_job_id(wrapper_builder: PythonVerticalWrapperBuilder) -> None:
+    """The vertical launcher must report the job id through ``AS_JOB_ID``.
+
+    :param wrapper_builder: Builder fixture.
+    """
+    launcher = wrapper_builder.build_sequential_threads_launcher(
+        'scripts', 'JobThread(scripts[i], i, retrials, fail_count)', footer=True
+    )
+    assert 'AS_JOB_ID' in launcher
+    assert 'SLURM_JOBID' not in launcher
+
+
+def test_bash_wrapper_stat_exposes_as_job_id() -> None:
+    """The Bash wrapper must expose the scheduler job id as ``AS_JOB_ID``."""
+    builder = BashWrapperBuilder(
+        header_directive='',
+        jobs_scripts=['job1.cmd'],
+        threads=1,
+        num_processors=1,
+        num_processors_value=1,
+        expid='a000',
+        name='test_wrapper',
+        working_dir='/tmp',
+    )
+    stat = builder.build_wrapper_stat()
+    assert 'AS_JOB_ID' in stat
+    assert '_as_jobid_set' not in stat
+    for var in _SCHEDULER_JOB_ID_ENV_VARS:
+        assert var in stat
 
 
 @pytest.mark.parametrize("policy", ["strict", "flexible", "mixed"],

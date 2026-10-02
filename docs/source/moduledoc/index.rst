@@ -5,7 +5,6 @@ API Reference
 .. toctree::
    :titlesonly:
 
-   autosubmit
    database
    git
    job

@@ -23,7 +23,7 @@ from collections.abc import Iterable
 from contextlib import suppress
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -63,7 +63,7 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: st
         else:
             jobs_data = as_conf.jobs_data.values()
 
-        # List of files that doesn't exist.
+        # List of files that does not exist.
         missing_files: list[str] = []
 
         for data in jobs_data:
@@ -80,7 +80,7 @@ def check_jobs_file_exists(as_conf: 'AutosubmitConfig', current_section_name: st
 
 
 def check_experiment_ownership(
-        expid: str, basic_config: BasicConfig, raise_error=False, logger: Log | None = None
+        expid: str, basic_config: type[BasicConfig], raise_error=False, logger: Log | None = None
 ) -> tuple[bool, bool, str]:
     # [A-Za-z09]+ variable is not needed, LOG is global thus it will be read if available
     my_user_id = os.getuid()

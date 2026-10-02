@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
+from autosubmit.experiment.manage import provenance
 from autosubmit.log.log import AutosubmitCritical
 
 
@@ -39,7 +39,7 @@ def test_provenance_rocrate_success(mock_paths, mocker):
     """
     Test the provenance function when rocrate=True and the process is successful.
     """
-    mock_rocrate = mocker.patch('autosubmit.autosubmit.Autosubmit.rocrate')
+    mock_rocrate = mocker.patch('autosubmit.experiment.manage.rocrate')
     mock_log_info = mocker.patch('autosubmit.log.log.Log.info')
 
     expid = "expid123"
@@ -48,7 +48,7 @@ def test_provenance_rocrate_success(mock_paths, mocker):
     aslogs_folder = os.path.join(tmp_folder, 'ASLOGS')
     expected_aslogs_path = aslogs_folder
 
-    Autosubmit.provenance(expid, rocrate=True)
+    provenance(expid, create_rocrate=True)
 
     mock_rocrate.assert_called_once_with(expid, Path(expected_aslogs_path))
     mock_log_info.assert_called_once_with('RO-Crate ZIP file created!')
@@ -58,10 +58,10 @@ def test_provenance_rocrate_failure(mocker):
     """
     Test the provenance function when Autosubmit.rocrate fails
     """
-    mock_rocrate = mocker.patch('autosubmit.autosubmit.Autosubmit.rocrate', side_effect=Exception("Mocked exception"))
+    mock_rocrate = mocker.patch('autosubmit.experiment.manage.rocrate', side_effect=Exception("Mocked exception"))
 
     with pytest.raises(AutosubmitCritical) as excinfo:
-        Autosubmit.provenance("expid123", rocrate=True)
+        provenance("expid123", create_rocrate=True)
 
     assert "Error creating RO-Crate ZIP file: Mocked exception" in str(excinfo)
 
@@ -72,9 +72,9 @@ def test_provenance_no_rocrate(mocker):
     """
     Test the provenance function when rocrate=False 
     """
-    mock_rocrate = mocker.patch('autosubmit.autosubmit.Autosubmit.rocrate')
+    mock_rocrate = mocker.patch('autosubmit.experiment.manage.rocrate')
     with pytest.raises(AutosubmitCritical) as excinfo:
-        Autosubmit.provenance("expid123", rocrate=False)
+        provenance("expid123", create_rocrate=False)
 
     assert "Can not create RO-Crate ZIP file. Argument '--rocrate' required" in str(excinfo)
     mock_rocrate.assert_not_called()

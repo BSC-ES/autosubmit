@@ -98,6 +98,11 @@ Expdef configuration
         # Where is JOBS CONFIGURATION file location relative to project root path
         FILE_JOBS_CONF: templates/common/jobs.yml
 
+For local projects, ``LOCAL.PROJECT_PATH`` accepts a home-directory prefix, for
+example ``~/autosubmit-src/project``. The ``~`` expands to the home directory of
+the user running Autosubmit. Absolute paths and relative paths without this
+prefix retain their existing meaning.
+
 Autosubmit configuration
 ========================
 
@@ -129,9 +134,9 @@ Autosubmit configuration
         # Default:0
         RETRIALS:0
         ##  Allows to put a delay between retries, of retries if a job fails. If not specified, it will be static
-        # DELAY_RETRY_TIME:11
-        # DELAY_RETRY_TIME:+11 # will wait 11,22,33,44...
-        # DELAY_RETRY_TIME:*11 # will wait 11,110,1110,11110...
+        # DELAY_RETRY_TIME:11 # static: always N seconds
+        # DELAY_RETRY_TIME:+11 # will wait 11,22,33,44... # linear: N * retry   
+        # DELAY_RETRY_TIME:*11 # will wait 11,110,1100,11000... # exponential: N * 10^(retry-1)
         # Default output type for CREATE, MONITOR, SET STATUS, RECOVERY. Available options: pdf, svg, png, ps, txt
         # Default:pdf
         OUTPUT:pdf

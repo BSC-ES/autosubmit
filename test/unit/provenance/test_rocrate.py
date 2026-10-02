@@ -19,12 +19,13 @@
 
 from pathlib import Path
 from subprocess import CalledProcessError
+from zipfile import ZipFile
 
 import pytest
 from rocrate.rocrate import ROCrate  # type: ignore
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.experiment.manage import rocrate
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
@@ -37,6 +38,7 @@ from autosubmit.provenance.rocrate import (
     _get_action_status,
     _get_git_branch_and_commit,
     _get_project_entity,
+    _write_zip_uncompressed,
 )
 
 _EXPID = 'zzzz'
@@ -117,6 +119,40 @@ def test_add_files_set_encoding(empty_rocrate: ROCrate, tmp_path):
             break
     else:
         pytest.fail('Failed to locate the entity for files/file.txt')
+
+
+def test_write_zip_uncompressed(empty_rocrate: ROCrate, tmp_path):
+    """Test that a file larger than one chunk retains its path and contents in the ZIP."""
+    content = b'a' * (1024 * 1024) + b'b'
+    source = tmp_path / 'file.bin'
+    source.write_bytes(content)
+    empty_rocrate.add_file(source, dest_path='folder/file.bin')
+
+    zip_path = tmp_path / 'crate.zip'
+    _write_zip_uncompressed(empty_rocrate, zip_path)
+
+    with ZipFile(zip_path, 'r') as archive:
+        assert archive.read('folder/file.bin') == content
+
+
+def test_write_zip_uncompressed_path_change(mocker, tmp_path):
+    """Test that a path change within the same entity creates a new ZIP entry."""
+    entity = mocker.Mock()
+    entity.stream.return_value = [
+        ('first.bin', b'first'),
+        ('second.bin', b'second'),
+    ]
+
+    crate = mocker.Mock(spec=ROCrate)
+    crate.data_entities = [entity]
+    crate.default_entities = []
+
+    zip_path = tmp_path / 'crate.zip'
+    _write_zip_uncompressed(crate, zip_path)
+
+    with ZipFile(zip_path, 'r') as archive:
+        assert archive.read('first.bin') == b'first'
+        assert archive.read('second.bin') == b'second'
 
 
 def test_get_action_status():
@@ -254,13 +290,12 @@ def test_get_git_branch_and_commit(mocker):
 def test_rocrate_main_fail_missing_rocrate(mocker, tmp_path):
     mocked_as_conf = mocker.Mock(autospec=AutosubmitConfig)
     mocked_as_conf.experiment_data = {}
-    mocked_log = mocker.patch('autosubmit.autosubmit.Log')
-    mocked_autosubmit_config = mocker.patch('autosubmit.autosubmit.AutosubmitConfig')
+    mocked_log = mocker.patch('autosubmit.experiment.manage.Log')
+    mocked_autosubmit_config = mocker.patch('autosubmit.experiment.manage.AutosubmitConfig')
     mocked_autosubmit_config.return_value = mocked_as_conf
 
-    autosubmit = Autosubmit()
     with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.rocrate(_EXPID, path=tmp_path)
+        rocrate(_EXPID, path=tmp_path)
 
     assert cm.value.message == 'You must provide an ROCRATE configuration key when using RO-Crate...'
     assert mocked_log.error.call_count == 1

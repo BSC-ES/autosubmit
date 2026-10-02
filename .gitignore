@@ -15,6 +15,9 @@ dist/
 build/
 .cache
 
+# Benchmark files
+.benchmarks/artifacts
+
 # Coverage files
 coverage/
 .coverage
@@ -26,6 +29,9 @@ test/htmlcov
 # Docker
 dockerfiles/id_rsa*
 dockerfiles/authorized_keys
+
+# Manual pages
+man/
 
 venv/
 .ipynb_checkpoints

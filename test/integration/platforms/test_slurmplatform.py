@@ -42,6 +42,7 @@ from autosubmit.job.job_list import JobList
 from autosubmit.job.job_packager import JobPackager
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
+from autosubmit.workflow.manage import run
 from test.integration.conftest import AutosubmitExperimentFixture
 from test.unit.test_utils import is_gzip_file, is_xz_file
 
@@ -166,8 +167,8 @@ def test_run_simple_workflow_slurm(
     exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
-    assert 0 == exp.autosubmit.run_experiment(exp.expid)
+    exp.as_conf.set_last_as_command('run')
+    assert 0 == run(exp.expid)
 
 # TODO: 4.2 - readd hybrid wrappers
 @pytest.mark.timeout(60)
@@ -329,8 +330,8 @@ def test_run_all_wrappers_workflow_slurm(experiment_data: dict, autosubmit_exp: 
         }
     }
 
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
-    assert 0 == exp.autosubmit.run_experiment(exp.expid)
+    exp.as_conf.set_last_as_command('run')
+    assert 0 == run(exp.expid)
 
 
 @pytest.mark.timeout(60)
@@ -595,8 +596,8 @@ def test_run_all_wrappers_workflow_slurm_complex(experiment_data: dict, autosubm
         }
     }
 
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, 'run')
-    assert 0 == exp.autosubmit.run_experiment(exp.expid)
+    exp.as_conf.set_last_as_command('run')
+    assert 0 == run(exp.expid)
 
 
 @pytest.mark.timeout(60)
@@ -783,8 +784,8 @@ def test_simple_workflow_compress_logs_slurm(
     exp = autosubmit_exp(experiment_data=experiment_data, wrapper=with_wrapper, include_jobs=False)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
-    exp.autosubmit.run_experiment(exp.expid)
+    exp.as_conf.set_last_as_command('run')
+    run(exp.expid)
 
     # Check if the log files are compressed
     logs_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(
@@ -877,14 +878,14 @@ def test_compress_log_missing_tool(
     exp = autosubmit_exp(experiment_data=experiment_data, include_jobs=False)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
+    exp.as_conf.set_last_as_command("run")
 
     # Mock the compress_file method to simulate missing compression tool
     mocker.patch(
         "autosubmit.platforms.paramiko_platform.ParamikoPlatform.compress_file",
         return_value=None,
     )
-    exp.autosubmit.run_experiment(exp.expid)
+    run(exp.expid)
 
     # Check if the log files are compressed
     logs_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(
@@ -1040,8 +1041,8 @@ def test_remove_files_on_transfer_slurm(
     exp = autosubmit_exp(experiment_data=experiment_data)
     _create_slurm_platform(exp.expid, exp.as_conf)
 
-    exp.autosubmit._check_ownership_and_set_last_command(exp.as_conf, exp.expid, "run")
-    exp.autosubmit.run_experiment(exp.expid)
+    exp.as_conf.set_last_as_command("run")
+    run(exp.expid)
 
     remote_logs_dir = Path(
         experiment_data["PLATFORMS"][_PLATFORM_NAME]["SCRATCH_DIR"],
@@ -1172,19 +1173,16 @@ def test_run_bug_save_wrapper_crashes(
     real_save_wrappers = JobList.save_wrappers
     mocker.patch.object(JobList, 'save_wrappers', side_effect=[ValueError, real_save_wrappers])
 
-    exp.autosubmit._check_ownership_and_set_last_command(
-        exp.as_conf,
-        exp.expid,
-        'run')
+    exp.as_conf.set_last_as_command("run")
 
     # Here we just confirm that the exception is raised for whatever mysterious
     # reason (I/O error, out of memory, etc.).
     with pytest.raises(ValueError):
-        exp.autosubmit.run_experiment(expid=exp.expid)
+        run(exp.expid)
 
     # NOTE: On ``master`` before the fix (commit d635461f4ecac42985ba584e2cbfa65223ea2151),
     #       this fails showing the same exception reported by users,
     #       ``AttributeError: 'list' object has no attribute 'status'``. But only after it
     #       failed to save the wrappers (which is why we are mocking it above).
     JobList.save_wrappers = real_save_wrappers  # restore original
-    assert exp.autosubmit.run_experiment(expid=exp.expid) == 0
+    assert run(expid=exp.expid) == 0

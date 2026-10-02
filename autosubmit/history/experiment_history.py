@@ -12,8 +12,10 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
+import os
 import traceback
 from time import time
+from typing import TYPE_CHECKING
 
 import autosubmit.history.database_managers.database_models as Models
 import autosubmit.history.utils as HUtils
@@ -24,6 +26,7 @@ from autosubmit.history.database_managers.experiment_history_db_manager import (
     ExperimentHistoryDatabaseManager,
     create_experiment_history_db_manager,
 )
+from autosubmit.history.experiment_status import ExperimentStatus
 from autosubmit.history.internal_logging import Logging
 from autosubmit.history.platform_monitor.slurm_monitor import SlurmMonitor
 from autosubmit.history.strategies import (
@@ -34,6 +37,9 @@ from autosubmit.history.strategies import (
     TwoDimWrapperDistributionStrategy,
 )
 from autosubmit.log.log import Log
+
+if TYPE_CHECKING:
+    from autosubmit.job.job import Job
 
 SECONDS_WAIT_PLATFORM = 60
 
@@ -125,18 +131,6 @@ class ExperimentHistory:
         except Exception:
             return None
 
-    def get_finish_data_dc(self, job_name: str, fail_count: int = 0) -> JobData | None:
-        """Retrieve the full JobData for a job's finish record by job name and fail count.
-
-        :param job_name: The name of the job.
-        :param fail_count: The number of times the job has failed. Defaults to 0.
-        :return: The JobData instance for the given job_name and fail_count, or None if an exception occurs.
-        """
-        try:
-            return self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except Exception:
-            return None
-
     def get_job_data_by_job_id_and_fail_count(self, job_id: int, fail_count: int) -> JobData | None:
         """Retrieve JobData by job_id and fail_count.
 
@@ -148,63 +142,6 @@ class ExperimentHistory:
             return self.manager.get_job_data_by_job_id_and_fail_count(job_id, fail_count)
         except Exception:
             return None
-
-    def update_submit_time(self, job_name: str, submit: int = 0, status: str = "UNKNOWN", ncpus: int = 0,
-                           wallclock: str = "00:00", qos: str = "debug", date: str = "", member: str = "",
-                           section: str = "", chunk: int = 0, platform: str = "NA", job_id: int = 0,
-                           wrapper_queue: str | None = None, wrapper_code: str | None = None,
-                           children: str = "", workflow_commit: str = "", split=None, splits=None,
-                           fail_count: int = 0) -> JobData | None:
-        """Updates an existing job submission entry in the database, identified by job name and fail count.
-
-        :param job_name: The name of the job.
-        :param submit: The submission time of the job. Defaults to 0.
-        :param status: The status of the job. Defaults to "UNKNOWN".
-        :param ncpus: The number of CPUs allocated for the job. Defaults to 0.
-        :param wallclock: The wallclock time allocated for the job. Defaults to "00:00".
-        :param qos: The quality of service. Defaults to "debug".
-        :param date: The date associated with the job. Defaults to an empty string.
-        :param member: The member associated with the job. Defaults to an empty string.
-        :param section: The section associated with the job. Defaults to an empty string.
-        :param chunk: The chunk number associated with the job. Defaults to 0.
-        :param platform: The platform on which the job is run. Defaults to "NA".
-        :param job_id: The job ID. Defaults to 0.
-        :param wrapper_queue: The wrapper queue. Defaults to None.
-        :param wrapper_code: The wrapper code. Defaults to None.
-        :param children: The children. Defaults to an empty string.
-        :param workflow_commit: The workflow commit identifier. Defaults to an empty string.
-        :param split: The split identifier. Defaults to None.
-        :param splits: The splits information. Defaults to None.
-        :param fail_count: The number of times the job has failed. Defaults to 0.
-        :return: The updated JobData instance, or None if the record is not found or an exception occurs.
-        """
-
-        try:
-            job_data_dc = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
-        except Exception:
-            return None
-        try:
-            job_data_dc.submit = submit
-            job_data_dc.status = status
-            job_data_dc.ncpus = ncpus
-            job_data_dc.wallclock = wallclock
-            job_data_dc.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
-            job_data_dc.date = date
-            job_data_dc.member = member
-            job_data_dc.section = section
-            job_data_dc.chunk = chunk
-            job_data_dc.platform = platform
-            job_data_dc.job_id = job_id
-            job_data_dc.children = children
-            job_data_dc.rowtype = self._get_defined_rowtype(wrapper_code)
-            job_data_dc.workflow_commit = workflow_commit
-            job_data_dc.split = split
-            job_data_dc.splits = splits
-            job_data_dc.fail_count = fail_count
-            return self.manager.update_job_data_dc_by_job_id_name(job_data_dc)
-        except Exception as exp:
-            self._log.log(str(exp), traceback.format_exc())
-            Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
     def write_start_time(self, job_name: str, start: int = 0, status: str = "UNKNOWN", qos: str = "debug",
                          job_id: int = 0, wrapper_queue: str | None = None, wrapper_code: str | None = None,
@@ -315,8 +252,23 @@ class ExperimentHistory:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
-    def process_status_changes(self, job_list=None, chunk_unit="NA", chunk_size=0, current_config="", create=False):
-        """ Detect status differences between job_list and current job_data rows, and update. Creates a new run if necessary. """
+    def process_status_changes(self, job_list: "list[Job] | None" = None, chunk_unit: str = "NA", chunk_size: int = 0,
+                               current_config: str = "", create: bool = False,
+                               status_counts: "dict[str, int] | None" = None) -> ExperimentRun | None:
+        """Detect status differences between the job list and the ``job_data`` rows and update them.
+
+        Creates a new run if necessary.
+
+        :param job_list: the jobs of the experiment as a plain list.
+        :param chunk_unit: the chunk unit (e.g. month) of the current run.
+        :param chunk_size: the chunk size of the current run.
+        :param current_config: the experiment configuration as a JSON string.
+        :param create: whether a new run must be created regardless of changes.
+        :param status_counts: optional pre-computed status counts (e.g. from the
+            complete jobs database, which includes jobs unloaded from memory).
+            When omitted they are computed from ``job_list``.
+        :return: the current ``ExperimentRun`` or None if the database failed.
+        """
         try:
             try:
                 current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
@@ -332,28 +284,38 @@ class ExperimentHistory:
             if len(update_these_changes) > 0 and not should_create_new_run:
                 self.manager.update_many_job_data_change_status(update_these_changes)
             if should_create_new_run:
-                return self.create_new_experiment_run(chunk_unit, chunk_size, current_config, job_list)
-            return self.update_counts_on_experiment_run_dc(current_experiment_run_dc, job_list)
+                return self.create_new_experiment_run(chunk_unit, chunk_size, current_config, job_list,
+                                                      status_counts=status_counts)
+            return self.update_counts_on_experiment_run_dc(current_experiment_run_dc, job_list,
+                                                           status_counts=status_counts)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
-    def _get_built_list_of_changes(self, job_list):
+    def _get_built_list_of_changes(self, job_list: "list[Job]"):
         """ Return: List of (current timestamp, current datetime str, status, rowstatus, id in job_data). One tuple per change. """
         job_data_dcs = self.detect_changes_in_job_list(job_list)
         return [(HUtils.get_current_datetime(), job.status, Models.RowStatus.CHANGED, job._id) for job in job_data_dcs]
 
-    def process_job_list_changes_to_experiment_totals(self, job_list=None):
-        """ Updates current experiment_run row with totals calculated from job_list. """
+    def process_job_list_changes_to_experiment_totals(self, job_list: "list[Job] | None" = None,
+                                                      status_counts: "dict[str, int] | None" = None) -> ExperimentRun | None:
+        """Updates the current ``experiment_run`` row with totals computed from the given ``status_counts``.
+
+        :param job_list: the jobs of the experiment as a plain list.
+        :param status_counts: optional pre-computed status counts (e.g. from the
+            complete jobs database, which includes jobs unloaded from memory).
+            When omitted they are computed from ``job_list``.
+        """
         try:
             current_experiment_run_dc = self.manager.get_experiment_run_dc_with_max_id()
-            return self.update_counts_on_experiment_run_dc(current_experiment_run_dc, job_list)
+            return self.update_counts_on_experiment_run_dc(current_experiment_run_dc, job_list,
+                                                           status_counts=status_counts)
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')
 
-    def should_we_create_a_new_run(self, job_list, changes_count, current_experiment_run_dc, new_chunk_unit,
-                                   new_chunk_size, create=False):
+    def should_we_create_a_new_run(self, job_list: "list[Job]", changes_count: int, current_experiment_run_dc: ExperimentRun,
+                                   new_chunk_unit: str, new_chunk_size: int, create: bool = False) -> bool:
         if create:
             return True
         elif not create and self.expid[0].lower() != "t":
@@ -370,17 +332,27 @@ class ExperimentHistory:
             return True
         return False
 
-    def update_counts_on_experiment_run_dc(self, experiment_run_dc, job_list=None):
-        """ Return updated row as Models.ExperimentRun. """
-        status_counts = self.get_status_counts_from_job_list(job_list)
-        experiment_run_dc.completed = status_counts[HUtils.SupportedStatus.COMPLETED]
-        experiment_run_dc.failed = status_counts[HUtils.SupportedStatus.FAILED]
-        experiment_run_dc.queuing = status_counts[HUtils.SupportedStatus.QUEUING]
-        experiment_run_dc.submitted = status_counts[HUtils.SupportedStatus.SUBMITTED]
-        experiment_run_dc.running = status_counts[HUtils.SupportedStatus.RUNNING]
-        experiment_run_dc.suspended = status_counts[HUtils.SupportedStatus.SUSPENDED]
-        experiment_run_dc.total = status_counts["TOTAL"]
-        return self.manager.update_experiment_run_dc_by_id(experiment_run_dc)
+    def update_counts_on_experiment_run_dc(self, current_experiment_run_dc: ExperimentRun, job_list: "list[Job] | None" = None,
+                                           status_counts: "dict[str, int] | None" = None) -> ExperimentRun:
+        """Updates the counts of the run from the given ``status_counts`` and returns the updated row.
+
+        :param current_experiment_run_dc: the run to update.
+        :param job_list: the jobs of the experiment as a plain list. Used to
+            compute the counts when ``status_counts`` is not provided.
+        :param status_counts: optional pre-computed status counts (e.g. from the
+            complete jobs database, which includes jobs unloaded from memory).
+            When omitted they are computed from ``job_list``.
+        """
+        if status_counts is None:
+            status_counts = self.get_status_counts_from_job_list(job_list)
+        current_experiment_run_dc.completed = status_counts[HUtils.SupportedStatus.COMPLETED]
+        current_experiment_run_dc.failed = status_counts[HUtils.SupportedStatus.FAILED]
+        current_experiment_run_dc.queuing = status_counts[HUtils.SupportedStatus.QUEUING]
+        current_experiment_run_dc.submitted = status_counts[HUtils.SupportedStatus.SUBMITTED]
+        current_experiment_run_dc.running = status_counts[HUtils.SupportedStatus.RUNNING]
+        current_experiment_run_dc.suspended = status_counts[HUtils.SupportedStatus.SUSPENDED]
+        current_experiment_run_dc.total = status_counts["TOTAL"]
+        return self.manager.update_experiment_run_dc_by_id(current_experiment_run_dc)
 
     def finish_current_experiment_run(self):
         if self.manager.is_there_a_last_experiment_run():
@@ -389,15 +361,26 @@ class ExperimentHistory:
             return self.manager.update_experiment_run_dc_by_id(current_experiment_run_dc)
         return None
 
-    def create_new_experiment_run(self, chunk_unit="NA", chunk_size=0, current_config="", job_list=None):
-        """ Also writes the finish timestamp of the previous run.  """
+    def create_new_experiment_run(self, chunk_unit: str = "NA", chunk_size: int = 0, current_config: str = "",
+                                  job_list: "list[Job] | None" = None,
+                                  status_counts: "dict[str, int] | None" = None) -> ExperimentRun:
+        """Create a new ``experiment_run`` row, also writing the finish timestamp of the previous run.
+
+        :param job_list: the jobs of the experiment as a plain list.
+        :param status_counts: optional pre-computed status counts (e.g. from the
+            complete jobs database). When omitted they are computed from ``job_list``.
+        """
         self.finish_current_experiment_run()
         return self._create_new_experiment_run_dc_with_counts(chunk_unit=chunk_unit, chunk_size=chunk_size,
-                                                              current_config=current_config, job_list=job_list)
+                                                              current_config=current_config, job_list=job_list,
+                                                              status_counts=status_counts)
 
-    def _create_new_experiment_run_dc_with_counts(self, chunk_unit, chunk_size, current_config="", job_list=None):
+    def _create_new_experiment_run_dc_with_counts(self, chunk_unit: str, chunk_size: int, current_config: str = "",
+                                                  job_list: "list[Job] | None" = None,
+                                                  status_counts: "dict[str, int] | None" = None) -> ExperimentRun:
         """ Create new experiment_run row and return the new Models.ExperimentRun data class from database. """
-        status_counts = self.get_status_counts_from_job_list(job_list)
+        if status_counts is None:
+            status_counts = self.get_status_counts_from_job_list(job_list)
         experiment_run_dc = ExperimentRun(0,
                                           chunk_unit=chunk_unit,
                                           chunk_size=chunk_size,
@@ -412,7 +395,7 @@ class ExperimentHistory:
                                           suspended=status_counts[HUtils.SupportedStatus.SUSPENDED])
         return self.manager.register_experiment_run_dc(experiment_run_dc)
 
-    def detect_changes_in_job_list(self, job_list):
+    def detect_changes_in_job_list(self, job_list: "list[Job]"):
         """ Detect changes in job_list compared to the current contents of job_data table. Returns a list of JobData data classes where the status of each item is the new status."""
         job_name_to_job = {str(job.name): job for job in job_list}
         current_job_data_dcs = self.manager.get_all_last_job_data_dcs()
@@ -448,16 +431,15 @@ class ExperimentHistory:
         else:
             return max_counter
 
-    def _get_date_member_completed_count(self, job_list):
+    def _get_date_member_completed_count(self, job_list: "list[Job] | None" = None) -> int:
         """ Each item in the job_list must have attributes: date, member, status_str. """
         job_list = job_list if job_list else []
         return sum(1 for job in job_list if
                    job.date is not None and job.member is not None and job.status_str == HUtils.SupportedStatus.COMPLETED)
 
-    def get_status_counts_from_job_list(self, job_list):
-        """
-        Return dict with keys COMPLETED, FAILED, QUEUING, SUBMITTED, RUNNING, SUSPENDED, TOTAL.
-        """
+    def get_status_counts_from_job_list(self, job_list: "list[Job] | None" = None) -> dict[str, int]:
+        """Return dict with keys COMPLETED, FAILED, QUEUING, SUBMITTED, RUNNING, SUSPENDED, TOTAL."""
+        job_list = job_list or []
         result = {
             HUtils.SupportedStatus.COMPLETED: 0,
             HUtils.SupportedStatus.FAILED: 0,
@@ -465,11 +447,7 @@ class ExperimentHistory:
             HUtils.SupportedStatus.SUBMITTED: 0,
             HUtils.SupportedStatus.RUNNING: 0,
             HUtils.SupportedStatus.SUSPENDED: 0,
-            "TOTAL": 0
         }
-
-        if not job_list:
-            job_list = []
 
         for job in job_list:
             if job.status_str in result:
@@ -496,3 +474,36 @@ class ExperimentHistory:
         :rtype: int
         """
         return self.manager.update_job_data_values(job_name, fail_count, start, finish)
+
+
+def get_historical_database(expid, job_list, as_conf):
+    """Get the historical database for the experiment.
+
+    :param expid: a string with the experiment id
+    :param job_list: a JobList object
+    :param as_conf: a AutosubmitConfig object
+    :return: an experiment history object
+    """
+    exp_history = None
+    try:
+        # Historical Database: Can create a new run if there is a difference in the number of jobs or if the current run does not exist.
+        exp_history = ExperimentHistory(expid)
+        exp_history.initialize_database()
+        run_dc = exp_history.process_status_changes(job_list.get_job_list(), as_conf.get_chunk_size_unit(),
+                                                    as_conf.get_chunk_size(),
+                                                    current_config=as_conf.get_full_config_as_json(),
+                                                    status_counts=job_list.get_status_counts())
+        job_list.run_id = run_dc.run_id if run_dc else None
+        # TODO: Restore database backup after 4.2.0 joblist? https://github.com/BSC-ES/autosubmit/issues/3179
+        # Autosubmit.database_backup(expid)
+    except Exception:
+        Log.warning(f"Couldn't access the historical database for experiment {expid}")
+
+    try:
+        ExperimentStatus(expid).set_as_running()
+    except Exception as e:
+        # Connection to status database ec_earth.db can fail.
+        # API worker will fix the status.
+        Log.debug(f"Autosubmit couldn't set your experiment as running on the autosubmit times database: "
+                  f"{os.path.join(BasicConfig.DB_DIR, BasicConfig.AS_TIMES_DB)}. Exception: {str(e)}", 7003)
+    return exp_history

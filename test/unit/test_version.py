@@ -20,18 +20,20 @@ import subprocess
 import sys
 from pathlib import Path
 
-from autosubmit.autosubmit import Autosubmit
+from autosubmit.helpers.version import get_version
 
 
 def test_autosubmit_version():
     # Use the autosubmit from the same venv as the test runner
-    venv_bin = shutil.which("autosubmit") or str(Path(sys.executable).parent / "autosubmit")
+    venv_bin = shutil.which("autosubmit") or str(
+        Path(sys.executable).parent / "autosubmit"
+    )
 
-    exit_code, out = subprocess.getstatusoutput(f'{venv_bin} -v')
+    exit_code, out = subprocess.getstatusoutput(f"{venv_bin} -v")
     assert exit_code == 0
-    assert out.strip().endswith(Autosubmit.autosubmit_version)
+    assert out.strip().endswith(get_version())
 
 
 def test_autosubmit_version_broken():
-    exit_code, _ = subprocess.getstatusoutput('autosubmit -abcdefg')
-    assert exit_code == 1
+    exit_code, _ = subprocess.getstatusoutput("autosubmit -abcdefg")
+    assert exit_code == 2

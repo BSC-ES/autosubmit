@@ -22,83 +22,83 @@ from getpass import getuser
 
 import pytest
 
-from autosubmit.experiment.experiment_common import check_ownership
+from autosubmit.experiment.utils import check_ownership, get_experiment_owner
 from autosubmit.log.log import AutosubmitCritical
 
 
-def test_check_ownership(autosubmit_config):
-    as_conf = autosubmit_config(expid='t000', experiment_data={})
-    owner, eadmin, current_owner = check_ownership(as_conf.expid, raise_error=False)
+def test_get_experiment_owner(autosubmit_config):
+    as_conf = autosubmit_config(expid="t000", experiment_data={})
+    owner_username, owner_uid, is_owner, is_eadmin = get_experiment_owner(as_conf.expid)
 
-    assert owner
-    assert eadmin is False
-    assert current_owner
+    assert owner_username
+    assert owner_uid
+    assert is_eadmin is False
+    assert is_owner is True
 
 
 def test_check_ownership_different_owner(autosubmit_config, mocker):
-    as_conf = autosubmit_config(expid='t000', experiment_data={})
+    as_conf = autosubmit_config(expid="t000", experiment_data={})
 
     user = getuser()
     current_user_id = os.getuid()
-    not_owner = f'not_{user}'
+    not_owner = f"not_{user}"
 
-    mocker.patch('os.getuid', return_value=current_user_id + 42)
+    mocker.patch("os.getuid", return_value=current_user_id + 42)
 
     r = mocker.MagicMock()
     r.pw_name = not_owner
-    mocker.patch('pwd.getpwuid', return_value=r)
+    mocker.patch("pwd.getpwuid", return_value=r)
 
-    owner, eadmin, current_owner = check_ownership(as_conf.expid, raise_error=False)
+    owner_username, owner_uid, is_owner, is_eadmin = get_experiment_owner(as_conf.expid)
 
-    assert not owner
-    assert eadmin is False
-    assert current_owner != owner
+    assert owner_username
+    assert owner_uid
+    assert is_eadmin is False
+    assert is_owner is False
 
 
 def test_check_ownership_different_owner_exception(autosubmit_config, mocker):
-    as_conf = autosubmit_config(expid='t000', experiment_data={})
+    as_conf = autosubmit_config(expid="t000", experiment_data={})
 
     user = getuser()
     current_user_id = os.getuid()
-    not_owner = f'not_{user}'
+    not_owner = f"not_{user}"
 
-    mocker.patch('os.getuid', return_value=current_user_id + 42)
+    mocker.patch("os.getuid", return_value=current_user_id + 42)
 
     r = mocker.MagicMock()
     r.pw_name = not_owner
-    mocker.patch('pwd.getpwuid', return_value=r)
+    mocker.patch("pwd.getpwuid", return_value=r)
 
     with pytest.raises(AutosubmitCritical):
-        check_ownership(as_conf.expid, raise_error=True)
+        check_ownership(as_conf.expid)
 
 
 def test_check_ownership_with_eadmin(autosubmit_config, mocker):
-    as_conf = autosubmit_config(expid='t000', experiment_data={})
+    as_conf = autosubmit_config(expid="t000", experiment_data={})
 
     current_user_id = os.getuid()
 
     fake_uid = current_user_id + 42
-    mocker.patch('os.getuid', return_value=fake_uid)
+    mocker.patch("os.getuid", return_value=fake_uid)
 
     # eadmin
     r = mocker.MagicMock
     r.pw_uid = fake_uid
-    mocker.patch('pwd.getpwnam', return_value=r)
+    mocker.patch("pwd.getpwnam", return_value=r)
 
-    owner, eadmin, current_owner = check_ownership(as_conf.expid, raise_error=False)
+    _, _, is_owner, is_eadmin = get_experiment_owner(as_conf.expid)
 
-    assert not owner
-    assert eadmin is True
-    assert current_owner != owner
+    assert not is_owner
+    assert is_eadmin is True
 
 
 def test_check_ownership_missing_user(autosubmit_config, mocker):
-    as_conf = autosubmit_config(expid='t000', experiment_data={})
+    as_conf = autosubmit_config(expid="t000", experiment_data={})
 
-    mocker.patch('pwd.getpwuid', side_effect=KeyError)
+    mocker.patch("pwd.getpwuid", side_effect=KeyError)
 
-    owner, eadmin, current_owner = check_ownership(as_conf.expid, raise_error=False)
+    _, _, is_owner, is_eadmin = get_experiment_owner(as_conf.expid)
 
-    assert owner is True
-    assert eadmin is False
-    assert current_owner is None
+    assert is_owner is True
+    assert is_eadmin is False

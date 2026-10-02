@@ -23,7 +23,6 @@ import subprocess
 from pathlib import Path
 from shutil import rmtree
 from time import time
-from typing import Union
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig

@@ -17,7 +17,7 @@
 
 """Integration tests for ``experiment_common.py``."""
 
-from autosubmit.experiment.experiment_common import delete_experiment
+from autosubmit.experiment.manage import delete_experiment
 
 
 def test_delete_experiment_cancelled(autosubmit_exp, mocker):
@@ -25,8 +25,8 @@ def test_delete_experiment_cancelled(autosubmit_exp, mocker):
     exp1 = autosubmit_exp(experiment_data={})
     exp2 = autosubmit_exp(experiment_data={})
 
-    mocker.patch('autosubmit.experiment.experiment_common.user_yes_no_query', side_effect=[False, True])
-    mocked_log = mocker.patch('autosubmit.experiment.experiment_common.Log')
+    mocker.patch('autosubmit.experiment.manage.user_yes_no_query', side_effect=[False, True])
+    mocked_log = mocker.patch('autosubmit.experiment.manage.Log')
     delete_experiment(f'{exp1.expid},{exp2.expid}', force=False)
 
     assert exp1.exp_path.exists()
@@ -38,20 +38,20 @@ def test_delete_experiment_cancelled(autosubmit_exp, mocker):
 
 def test_delete_experiment_failed(autosubmit_exp, mocker):
     exp = autosubmit_exp(experiment_data={})
-    mocker.patch('autosubmit.experiment.experiment_common._delete_experiment', side_effect=ValueError)
+    mocker.patch('autosubmit.experiment.manage._delete_experiment', side_effect=ValueError)
 
     assert not delete_experiment(exp.expid, force=True)
 
 
 def test_delete_experiment_that_is_running(autosubmit_exp, mocker):
     exp = autosubmit_exp(experiment_data={})
-    mocker.patch('autosubmit.experiment.experiment_common.process_id', return_value=True)
+    mocker.patch('autosubmit.experiment.manage.process_id', return_value=True)
 
     assert not delete_experiment(exp.expid, force=True)
 
 
 def test_delete_experiment_fails_db_details(autosubmit_exp, mocker):
     exp = autosubmit_exp(experiment_data={})
-    mocker.patch('autosubmit.experiment.experiment_common.ExperimentDetails', side_effect=ValueError)
+    mocker.patch('autosubmit.experiment.manage.ExperimentDetails', side_effect=ValueError)
 
     assert not delete_experiment(exp.expid, force=True)

@@ -77,6 +77,10 @@ class BasicConfig:
         return BasicConfig.expid_dir(exp_id).joinpath(BasicConfig.LOCAL_TMP_DIR)
 
     @staticmethod
+    def expid_lock_file(exp_id):
+        return BasicConfig.expid_tmp_dir(exp_id).joinpath('autosubmit.lock')
+
+    @staticmethod
     def expid_log_dir(exp_id):
         return BasicConfig.expid_tmp_dir(exp_id).joinpath(f'LOG_{exp_id}')
 
@@ -226,22 +230,3 @@ class BasicConfig:
                     BasicConfig.__read_file_config(etc_rc_path)
 
         BasicConfig._update_config()
-
-
-def generate_dirs() -> None:
-    """Generates the directory structure needed for Autosubmit operation."""
-    Path(BasicConfig.DB_DIR).mkdir(parents=True, exist_ok=True)
-    Path(BasicConfig.LOCAL_ROOT_DIR).mkdir(parents=True, exist_ok=True)
-    Path(BasicConfig.STRUCTURES_DIR).mkdir(parents=True, exist_ok=True)
-    Path(BasicConfig.GLOBAL_LOG_DIR).mkdir(parents=True, exist_ok=True)
-    Path(BasicConfig.DEFAULT_OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
-    Path(BasicConfig.JOBDATA_DIR).mkdir(parents=True, exist_ok=True)
-    Path(BasicConfig.HISTORICAL_LOG_DIR).mkdir(parents=True, exist_ok=True)
-
-    os.chmod(BasicConfig.DB_DIR, 0o770)
-    os.chmod(BasicConfig.LOCAL_ROOT_DIR, 0o770)
-    os.chmod(BasicConfig.STRUCTURES_DIR, 0o770)
-    os.chmod(BasicConfig.GLOBAL_LOG_DIR, 0o770)
-    os.chmod(BasicConfig.DEFAULT_OUTPUT_DIR, 0o770)
-    os.chmod(BasicConfig.JOBDATA_DIR, 0o770)
-    os.chmod(BasicConfig.HISTORICAL_LOG_DIR, 0o770)

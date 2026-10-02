@@ -1,43 +1,105 @@
 ### 4.2.0: Minor release
 
-This is a minor release of Autosubmit that introduces significant changes in the management of jobs and dependencies. 
-The main highlight of this release is the introduction of a new database backend for the joblist using SQLAlchemy, which allows for better scalability in handling large workflows.
-This release also includes several bug fixes and enhancements to improve the overall user experience.
+This is a minor release of Autosubmit that introduces significant changes in the
+management of jobs and dependencies. The main highlight of this release is the
+introduction of a new database backend for the joblist using SQLAlchemy, which
+allows for better scalability in handling large workflows. This release also includes
+several bug fixes and enhancements to improve the overall user experience.
 
 **Bug fixes:**
 
+- Fix `autosubmit.lock` not being deleted after `create` and `run`; `archive` and `delete` now acquire it too #3033 #3055
+- Fix multi-member PJM job lookup output parsing #3255 (thanks @1cbyc)
+- Remove the unrelated `--filter_status` option from `autosubmit expid` #3241 (thanks @1cbyc)
+- Fixed `DELAY_RETRY_TIME` not matching the documented `+N` and `*N` delay sequences #3138
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
+- Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
+- Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295 (thanks @elliot1377)
+- Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
+- Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
+- Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
+- Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
 
 **New Features:**
 
-- Introduced SQLAlchemy as the main database backend for joblist management, replacing the previous pickle-based system. This change allows for better scalability and flexibility in handling large workflows.
-- Added support for PostgreSQL as a database backend, in addition to the default SQLite. This provides users with more options for database management.
+- Allow local project paths to use `~` for the user's home directory #3296 (thanks @fatihcvs)
+- Introduced SQLAlchemy as the main database backend for joblist management, replacing the
+  previous pickle-based system. This change allows for better scalability and flexibility in
+  handling large workflows.
+- Added support for PostgreSQL as a database backend, in addition to the default SQLite.
+  This provides users with more options for database management.
 - Improved the performance of job and dependency management, especially for large workflows with thousands of jobs.
-- [enhancement] Allow recovery to update current running/ready jobs #1251
+- Allow recovery to update current running/ready jobs #1251
+- `autosubmit` Bash autocomplete #1227 #3171
+- Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
+- Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
 
 **Migration from `job_list.pkl` to Database**
 
-- All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted in significant changes to the code.
+- All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted
+  in significant changes to the code.
 
 **Memory and Performance Improvements**:
 
 - Significant reduction in memory usage by loading only necessary jobs and dependencies for active employment.
-- Enhanced performance during autosubmit runs and ongoing improvements to the log process management through direct database interactions to reduce the communication with the main process.
-- Overall job management features have been improved to ensure better tracking and status updates, removing redundant code to enhance the efficiency of a loop 
-- The recovery and set status commands have been improved for version 4.2.0 and later 4.1.16, resulting in faster operations.
+- Enhanced performance during autosubmit runs and ongoing improvements to the log process management
+  through direct database interactions to reduce the communication with the main process.
+- Overall job management features have been improved to ensure better tracking and status updates,
+  removing redundant code to enhance the efficiency of a loop 
+- The recovery and set status commands have been improved for version 4.2.0 and later 4.1.16,
+  resulting in faster operations.
 - Removal of _COMPLETED files to reduce the amount of inodes generated
-- A significant rework of the wrapper building process has been implemented to address ongoing issues and prevent regressions, particularly with 2D wrappers.
-- Various functions have been optimized to minimize calls to save/load operations, enhancing the software's overall efficiency and responsiveness.
+- A significant rework of the wrapper building process has been implemented to address ongoing issues
+  and prevent regressions, particularly with 2D wrappers.
+- Various functions have been optimized to minimize calls to save/load operations, enhancing the
+  software's overall efficiency and responsiveness.
 
 **Enhancements**
 
-- **Database Method Enhancements**: Support for both PostgreSQL and SQLite with optimized save/load mechanisms. Improved wrapper data storage and load.
-- **Testing Efforts**: Tests have been added for every rework to enhance reliability, with a particular effort on integration tests.
-- `autosubmit refresh` no longer creates a `proj_{timestamp}` backup by default and aborts on uncommitted or unpushed changes. #2633
+- **Database Method Enhancements**: Support for both PostgreSQL and SQLite with optimised save/load mechanisms.
+  Improved wrapper data storage and load.
+- **Testing Efforts**: Tests have been added for every rework to enhance reliability, with a particular effort
+  on integration tests.
 - Enforce connection pool usage when using PostgreSQL as database backend #2973
 - Auto-detect git default branch when `-b` flag not specified #3101
 - Removed `files` arguments from autosubmit sub-commands, and moved code to upgrade scripts out of `autosubmit.py` #2711
+- `autosubmit.py` file was deleted and its 5K lines of code were moved into separated files #973 #1046 #3171 #3172
+- `autosubmit --help` now shows better description, and lists available subcommands #3171
+- The documentation of CLI commands are synced automatically with the Sphinx docs #3171 #1344
+- Most `autosubmit` sub-commands now support the `--profiler`` to run with cProfile #1094 #3171
+- Every command now prints traceability information (AS/Python version, Linux, user name, ...) #2795 #3171
+- set_status now rejects active targets (SUBMITTED/QUEUING/RUNNING → AutosubmitCritical 7011). #3231
+- Centralized Job.apply_status / Status.ACTIVE/RE_RUNNABLE #3231
+- Stale-data recovery on set-status runs only for final targets (_FINAL_STATUSES) in job/manage.py
+  instead of the autosubmit.py monolith. #3231
+- Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly
+  (with edge-completion reconciliation), never loaded into the graph. #3231
+- Remove two-step start code, tests, and docs #3313 (thanks @CodeByPeace)
+- Optimized RO-Crate construction and ZIP generation.
+  Combined, these improvements reduced total generation time from over 36 hours to approximately
+  5 minutes in tests with an operational experiment containing over 500,000 files.
+  ZIP archives are now written without compression. #3307
+- Removed `PRESUBMISSION` from documentation, removed in 4.x #3320 (thanks @vansh-nagar)
+
+### 4.1.17.1: Bug fixes and enhancements (#3181)
+
+**Bug fixes:**
+
+- Fewer "key-exchange timed out" errors on busy cluster login servers. Autosubmit now waits longer and recovers by itself.
+- `recovery` no longer stops when a platform can't say which jobs finished; offline it falls back to its own records.
+- The `updated_list_<EXPID>.txt` status file is now friendlier: bad lines are skipped with a warning, job names and statuses are case-insensitive, and it can't break your run.
+- Autosubmit no longer gets stuck on logs of jobs whose info was lost after an interrupted run.
+- Relaunching a finished job from the `updated_list` file now correctly resets some variables used to download the logs
+- The default for IO_SAFE_WAIT is set back to 60 seconds
+
+**Enhancements:**
+
+- New `CLEAR_TO_SEND_TIMEOUT` platform setting: how long to wait for a busy login server. Default: 180 seconds.
+- When you change the status of a job that is still running, Autosubmit stops it on the cluster first and then applies the change. No more accidental duplicate runs.
+- `setstatus` and `updated_list` no longer let you put a job into an in-progress state like submitted, queuing, or running. Autosubmit manages those states on its own.
+- QOL: `updated_list` and `setstatus` now call the same functions to manage status.
+- Improved provenance documentation, describing the inputs, outputs, how options are merged, etc. #3232
 
 ### 4.1.17: Bug fixes and enhancements
 
@@ -81,10 +143,11 @@ This release also includes several bug fixes and enhancements to improve the ove
 - Fixed infinite loop when STAT file stays on RUNNING, now falls back to scheduler status after IO_SAFE_WAIT #3059
 - Fixed `HETSIZE` whenever it had values bigger than 0 without a `CURRENT_QUEUE` or skipping the order of info #2660
 - Fixed `CPU per task` for new version of autosubmit #2897
-- Fixed issue overwritting expid config variables with the ones from the github repo #2877
+- Fixed issue overwriting expid config variables with the ones from the github repo #2877
 - Fixed inspect infinite loop when PLATFORMS.TOTALJOBS or PLATFORMS.MAX_WAITING_JOBS is set to 0 #2749
 - Fixed wrappers on Lumi platform #3059 
 - Fixed HPC2020 platform #3059
+- Fixed submission of jobs for PJM platform #2977
 
 **Enhancements:**
 

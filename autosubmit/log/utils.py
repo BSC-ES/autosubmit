@@ -18,7 +18,6 @@
 import gzip
 import lzma
 from pathlib import Path
-from typing import Union
 
 
 def compress_xz(

@@ -17,7 +17,6 @@
 
 """Unit tests for the wrapper_factory module."""
 
-from typing import Union
 
 import pytest
 

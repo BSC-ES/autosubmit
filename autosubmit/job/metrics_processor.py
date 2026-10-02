@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -28,13 +28,13 @@ from sqlalchemy import delete, insert
 from sqlalchemy.schema import CreateSchema, CreateTable
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.database import session
 from autosubmit.database.tables import TableRegistry
 from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
     # Avoid circular imports
+    from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.job.job import Job
 
 # Default 16MB max file size
@@ -172,7 +172,7 @@ class UserMetricRepository:
 
 class UserMetricProcessor:
     def __init__(
-        self, as_conf: AutosubmitConfig, job: "Job", run_id: int | None = None
+        self, as_conf: "AutosubmitConfig", job: "Job", run_id: int | None = None
     ):
         self.as_conf = as_conf
         self.job = job

@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -24,16 +24,30 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_common import get_experiment_description
+from autosubmit.database.db_common import (
+    get_experiment_description,
+    update_experiment_description_version,
+)
+from autosubmit.experiment.manage import create
+from autosubmit.helpers.version import get_version
+from autosubmit.install import install
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.job.job_list import JobList
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.job.job_list import JobList, load_job_list
+from autosubmit.job.job_utils import check_wrappers
+from autosubmit.job.manage import set_status
+from autosubmit.log.log import Log
 from autosubmit.platforms.platform import Platform
+from autosubmit.scheduler import Scheduler
+
+# noinspection PyProtectedMember
+from autosubmit.scripts.autosubmit import _autosubmit
+
+# noinspection PyProtectedMember
+from autosubmit.workflow.manage import _prepare_run, monitor, stop
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
@@ -41,387 +55,502 @@ if TYPE_CHECKING:
     from test.integration.conftest import AutosubmitExperimentFixture
 
 
-def test__init_logs_config_file_not_found(autosubmit, autosubmit_exp, mocker, monkeypatch):
-    """Test that an error is raised when the ``BasicConfig.CONFIG_FILE_FOUND`` returns ``False``."""
+def _assert_log_contains(mock_error, message: str) -> None:
+    """Assert that an error log contains the expected message.
+
+    :param mock_error: Mocked ``Log.error`` method.
+    :param message: Text expected to be present in one of the logged errors.
+    """
+    logged_messages = [
+        str(call.args[0]) for call in mock_error.call_args_list if call.args
+    ]
+
+    assert any(message in logged_message for logged_message in logged_messages), (
+        f"Expected {message!r} in logged errors: {logged_messages!r}"
+    )
+
+
+def test__init_logs_config_file_not_found(autosubmit_exp, mocker):
+    """Test that an error is logged when the configuration file is missing."""
+    mocked_basic_config = mocker.patch("autosubmit.scripts._validation.BasicConfig")
+    mocked_basic_config.CONFIG_FILE_FOUND = False
+    mocked_log = mocker.patch("autosubmit.scripts._validation.Log")
+
     autosubmit_exp()
 
-    args = mocker.MagicMock()
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'describe'
+    with pytest.raises(SystemExit):
+        _autosubmit(["-lc", "DEBUG", "-lf", "DEBUG", "describe"])
 
-    monkeypatch.setattr(BasicConfig, 'CONFIG_FILE_FOUND', False)
-
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.run_command(args)
-
-    assert 'No configuration file' in str(cm.value.message)
+    _assert_log_contains(
+        mocked_log.error, 'Autosubmit configuration file "autosubmitrc" not found'
+    )
 
 
-def test__init_logs_sqlite_db_path_not_found(autosubmit, autosubmit_exp, mocker, monkeypatch, tmp_path):
-    """Test that an error is raised when the SQLite file cannot be located."""
+def test__init_logs_sqlite_db_path_not_found(
+    autosubmit_exp,
+    mocker,
+    tmp_path,
+):
+    """Test that an error is logged when the SQLite database cannot be found."""
+    mocked_basic_config = mocker.patch("autosubmit.scripts._validation.BasicConfig")
+    mocked_basic_config.DATABASE_BACKEND = "sqlite"
+    mocked_basic_config.DB_PATH = str(tmp_path / "you-cannot-find-me.xz")
+
+    mocked_log = mocker.patch("autosubmit.scripts._validation.Log")
+
     exp = autosubmit_exp()
+    args = ["-lc", "DEBUG", "-lf", "DEBUG", "describe", exp.expid]
 
-    args = mocker.MagicMock()
-    args.expid = exp.expid
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'describe'
+    with pytest.raises(SystemExit):
+        _autosubmit(args)
 
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
-    monkeypatch.setattr(BasicConfig, 'DB_PATH', str(tmp_path / 'you-cannot-find-me.xz'))
-
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.run_command(args)
-
-    assert 'Experiments database not found in this filesystem' in str(cm.value.message)
+    _assert_log_contains(
+        mocked_log.error,
+        "Experiments database not found",
+    )
 
 
-def test__init_logs_sqlite_db_not_readable(autosubmit, autosubmit_exp, mocker, monkeypatch):
-    """Test that an error is raised when the SQLite file is not readable."""
-    exp = autosubmit_exp()
-
-    args = mocker.MagicMock()
-    args.expid = exp.expid
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'describe'
-
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
+def test__init_logs_sqlite_db_not_readable(autosubmit_exp, mocker, tmp_path):
+    """Test that an error is logged when the SQLite database is not readable."""
+    mocked_basic_config = mocker.patch("autosubmit.scripts._validation.BasicConfig")
+    mocked_basic_config.DATABASE_BACKEND = "sqlite"
+    mocked_basic_config.DB_PATH = tmp_path / "database.db"
+    mocked_basic_config.DB_PATH.touch()
 
     def path_exists(_, perm):
         return perm != R_OK
 
-    mocker.patch('os.access', side_effect=path_exists)
+    mocker.patch("os.access", side_effect=path_exists)
+    mocked_log = mocker.patch("autosubmit.scripts._validation.Log")
 
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.run_command(args)
-
-    assert 'not readable' in str(cm.value.message)
-
-
-def test__init_logs_sqlite_db_not_writable(autosubmit, autosubmit_exp, mocker, monkeypatch):
-    """Test that an error is raised when the SQLite file is not writable."""
     exp = autosubmit_exp()
+    args = ["-lc", "DEBUG", "-lf", "DEBUG", "describe", exp.expid]
 
-    args = mocker.MagicMock()
-    args.expid = exp.expid
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'describe'
+    with pytest.raises(SystemExit):
+        _autosubmit(args)
 
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
+    _assert_log_contains(mocked_log.error, "not readable")
+
+
+def test__init_logs_sqlite_db_not_writable(autosubmit_exp, mocker, tmp_path):
+    """Test that an error is logged when the SQLite database is not writable."""
+    mocked_basic_config = mocker.patch("autosubmit.scripts._validation.BasicConfig")
+    mocked_basic_config.DATABASE_BACKEND = "sqlite"
+    mocked_basic_config.DB_PATH = tmp_path / "database.db"
+    mocked_basic_config.DB_PATH.touch()
 
     def path_exists(_, perm):
         return perm != W_OK
 
-    mocker.patch('os.access', side_effect=path_exists)
+    mocker.patch("os.access", side_effect=path_exists)
+    mocked_log = mocker.patch("autosubmit.scripts._validation.Log")
 
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.run_command(args)
+    exp = autosubmit_exp()
+    args = ["-lc", "DEBUG", "-lf", "DEBUG", "describe", exp.expid]
 
-    assert 'not writable' in str(cm.value.message)
+    with pytest.raises(SystemExit):
+        _autosubmit(args)
+
+    _assert_log_contains(mocked_log.error, "not writable")
 
 
-def test__init_logs_sqlite_exp_path_does_not_exist(autosubmit, autosubmit_exp, mocker, monkeypatch):
-    """Test that an error is raised when the experiment path does not exist and SQLite is used."""
+def test__init_logs_sqlite_exp_path_does_not_exist(
+    autosubmit_exp,
+    mocker,
+    tmp_path,
+):
+    """Test that an error is logged when a SQLite experiment does not exist."""
+    mocked_basic_config = mocker.patch("autosubmit.scripts._validation.BasicConfig")
+    mocked_basic_config.DATABASE_BACKEND = "sqlite"
+    mocked_basic_config.DB_PATH = tmp_path / "database.db"
+    mocked_basic_config.DB_PATH.touch()
+
+    mocked_log = mocker.patch("autosubmit.scripts._validation.Log")
+
     autosubmit_exp()
+    args = ["-lc", "DEBUG", "-lf", "DEBUG", "setstatus", "yyyy", "-t", "WAITING"]
 
-    args = mocker.MagicMock()
-    args.expid = '0000'
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'setstatus'
+    with pytest.raises(SystemExit):
+        _autosubmit(args)
 
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
-
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.run_command(args)
-
-    assert 'Experiment does not exist' == str(cm.value.message)
+    _assert_log_contains(mocked_log.error, "Experiment 'yyyy' was not found")
 
 
-def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(autosubmit, autosubmit_exp, mocker, monkeypatch):
-    """Test that a new experiment is created for Postgres when the directory is empty,
-    but an error is raised when the experiment data is empty."""
-    autosubmit_exp()
+def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(
+    autosubmit_exp, mocker, tmp_path
+):
+    """Test that a PostgreSQL experiment without YAML data logs an error."""
+    mocked_basic_config = mocker.patch("autosubmit.scripts._validation.BasicConfig")
+    mocked_basic_config.DATABASE_BACKEND = "postgres"
+    mocked_basic_config.DB_PATH = tmp_path / "database.db"
+    mocked_basic_config.DB_PATH.touch()
 
-    args = mocker.MagicMock()
-    args.expid = '0000'
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'setstatus'
+    mocker.patch("autosubmit.scripts._validation.validate_required_files")
+    mocked_log = mocker.patch("autosubmit.scripts._initialise.Log")
 
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
-    mocker.patch('autosubmit.config.configcommon.AutosubmitConfig.reload')
+    as_exp = autosubmit_exp()
+    args = ["-lc", "DEBUG", "-lf", "DEBUG", "clean", as_exp.expid]
 
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.run_command(args)
+    mocked_autosubmit_config = mocker.patch(
+        "autosubmit.config.configcommon.AutosubmitConfig"
+    )
+    as_conf = mocker.MagicMock()
+    mocked_autosubmit_config.return_value = as_conf
+    as_conf.experiment_data = {}
 
-    assert 'has no yml data' in str(cm.value.message)
+    with pytest.raises(SystemExit):
+        _autosubmit(args)
+
+    _assert_log_contains(
+        mocked_log.error, f"Experiment '{as_exp.expid}' contains no YAML configuration"
+    )
 
 
-def test__init_logs_sqlite_mismatch_as_version_upgrade_it(autosubmit, autosubmit_exp, mocker):
-    """Test that setting an invalid AS version but passing the arg to update version results in the command
-    being called correctly."""
-    exp = autosubmit_exp(experiment_data={
-        'CONFIG': {
-            'AUTOSUBMIT_VERSION': 'bright-opera'
+def test__init_logs_sqlite_mismatch_as_version_upgrade_it(
+    autosubmit_exp, mocker, tmp_path
+):
+    """Test that an invalid Autosubmit version can be explicitly updated."""
+    mocked_basic_config = mocker.patch("autosubmit.scripts._validation.BasicConfig")
+    mocked_basic_config.DATABASE_BACKEND = "sqlite"
+    mocked_basic_config.DB_PATH = tmp_path / "database.db"
+    mocked_basic_config.DB_PATH.touch()
+
+    mocker.patch("autosubmit.job.manage.set_status", True)
+
+    exp = autosubmit_exp(
+        experiment_data={
+            "CONFIG": {
+                "AUTOSUBMIT_VERSION": "bright-opera",
+            }
         }
-    })
+    )
+    args = [
+        "-lc",
+        "DEBUG",
+        "-lf",
+        "DEBUG",
+        "setstatus",
+        exp.expid,
+        "-t",
+        "WAITING",
+        "-v",
+    ]
 
-    args = mocker.MagicMock()
-    args.expid = exp.expid
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'setstatus'
-    args.update_version = True
-    args.__contains__ = lambda x, y: True
-
-    mocked_set_status = mocker.patch('autosubmit.autosubmit.Autosubmit.set_status')
-
-    autosubmit.run_command(args)
-
-    assert mocked_set_status.called
+    assert _autosubmit(args)
 
 
-def test__init_logs_sqlite_mismatch_as_version(autosubmit, autosubmit_exp, mocker):
-    """Test that an Autosubmit command ran with the wrong AS version results in an error."""
-    exp = autosubmit_exp(experiment_data={
-        'CONFIG': {
-            'AUTOSUBMIT_VERSION': 'bright-opera'
+def test__init_logs_sqlite_mismatch_as_version(autosubmit_exp, mocker, tmp_path):
+    """Test that an Autosubmit version mismatch is logged as an error."""
+    mocked_basic_config = mocker.patch("autosubmit.scripts._validation.BasicConfig")
+    mocked_basic_config.DATABASE_BACKEND = "sqlite"
+    mocked_basic_config.DB_PATH = tmp_path / "database.db"
+    mocked_basic_config.DB_PATH.touch()
+
+    mocked_log = mocker.patch("autosubmit.scripts._initialise.Log")
+
+    exp = autosubmit_exp(
+        experiment_data={
+            "CONFIG": {
+                "AUTOSUBMIT_VERSION": "bright-opera",
+            }
         }
-    })
+    )
+    args = ["-lc", "DEBUG", "-lf", "DEBUG", "setstatus", exp.expid, "-t", "WAITING"]
 
-    args = mocker.MagicMock()
-    args.expid = exp.expid
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'setstatus'
+    with pytest.raises(SystemExit):
+        _autosubmit(args)
 
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.run_command(args)
-
-    assert 'update the experiment version' in str(cm.value.message)
+    _assert_log_contains(
+        mocked_log.error, "update the experiment version if you wish to continue"
+    )
 
 
-def test_install_sqlite_already_exists(monkeypatch, tmp_path, autosubmit):
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
-    db_file = tmp_path / 'test.db'
+def test_install_sqlite_already_exists(monkeypatch, tmp_path, mocker):
+    """Test that an existing SQLite database is reported as an error."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+
+    db_file = tmp_path / "test.db"
     db_file.touch()
-    monkeypatch.setattr(BasicConfig, 'DB_PATH', str(db_file))
 
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.install()
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(db_file))
 
-    assert 'Database already exists.' == str(cm.value.message)
+    mock_error = mocker.patch.object(Log, "error")
 
+    install()
 
-def test_install_sqlite_create_db_fails(monkeypatch, tmp_path, autosubmit, mocker):
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
-    db_file = tmp_path / 'test.db'
-    monkeypatch.setattr(BasicConfig, 'DB_PATH', str(db_file))
-    mocker.patch('autosubmit.autosubmit.create_db', return_value=False)
-
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.install()
-
-    assert 'Can not write database file' == str(cm.value.message)
+    mock_error.assert_called_once_with("Database already exists.")
 
 
-def test_install_sqlite_create_new_db(monkeypatch, tmp_path, autosubmit):
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'sqlite')
-    db_file = tmp_path / 'test.db'
-    monkeypatch.setattr(BasicConfig, 'DB_PATH', str(db_file))
+def test_install_sqlite_create_db_fails(monkeypatch, tmp_path, mocker):
+    """Test that failure to create the SQLite database is logged."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
 
-    autosubmit.install()
+    db_file = tmp_path / "test.db"
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(db_file))
+
+    mocker.patch("autosubmit.install.create_db", return_value=False)
+    mock_error = mocker.patch.object(Log, "error")
+
+    install()
+
+    _assert_log_contains(mock_error, "Can not write database file")
+
+
+def test_install_sqlite_create_new_db(monkeypatch, tmp_path):
+    """Test that a new SQLite database is created successfully."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "sqlite")
+
+    db_file = tmp_path / "test.db"
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(db_file))
+
+    install()
 
     assert db_file.exists()
 
 
-def test_install_postgres_create_db_fails(monkeypatch, autosubmit, mocker):
-    monkeypatch.setattr(BasicConfig, 'DATABASE_BACKEND', 'postgres')
-    mocker.patch('autosubmit.autosubmit.create_db', return_value=False)
+def test_install_postgres_create_db_fails(monkeypatch, mocker):
+    """Test that failure to create the PostgreSQL database is logged."""
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "postgres")
+    mocker.patch("autosubmit.install.create_db", return_value=False)
 
-    with pytest.raises(AutosubmitCritical) as cm:
-        autosubmit.install()
+    mock_error = mocker.patch.object(Log, "error")
 
-    assert 'Failed to create Postgres database' == str(cm.value.message)
+    install()
+
+    _assert_log_contains(mock_error, "Failed to create Postgres database")
 
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_update_version(as_db: str, autosubmit, autosubmit_exp, mocker):
-    wrong_version = 'bright-opera'
-    exp = autosubmit_exp(experiment_data={
-        'CONFIG': {
-            'AUTOSUBMIT_VERSION': wrong_version
+def test_update_version(as_db: str, autosubmit_exp):
+    """Test that an experiment with an outdated version can be updated."""
+    wrong_version = "bright-opera"
+
+    exp = autosubmit_exp(
+        experiment_data={
+            "CONFIG": {
+                "AUTOSUBMIT_VERSION": wrong_version,
+            }
         }
-    })
+    )
+    create(exp.expid, True, True)
 
-    args = mocker.MagicMock()
-    args.expid = exp.expid
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'setstatus'
+    new_version = get_version()
+    assert update_experiment_description_version(exp.expid, version=new_version)
+    exp.as_conf.set_version(new_version)
 
-    assert autosubmit.update_version(exp.expid)
-
-    as_conf = AutosubmitConfig(exp.expid, BasicConfig, YAMLParserFactory())
+    as_conf = AutosubmitConfig(
+        exp.expid,
+        BasicConfig,
+        YAMLParserFactory(),
+    )
     as_conf.reload(force_load=True)
 
+    # TODO: We probably should test that the DB value is correct as well?
     assert as_conf.get_version() != wrong_version
 
 
 @pytest.mark.docker
 @pytest.mark.postgres
-def test_update_description(as_db: str, autosubmit, autosubmit_exp, mocker):
-    wrong_version = 'bright-opera'
-    exp = autosubmit_exp(experiment_data={
-        'CONFIG': {
-            'AUTOSUBMIT_VERSION': wrong_version
+def test_update_description(as_db: str, autosubmit_exp):
+    """Test that an experiment description can be updated."""
+    wrong_version = "bright-opera"
+
+    exp = autosubmit_exp(
+        experiment_data={
+            "CONFIG": {
+                "AUTOSUBMIT_VERSION": wrong_version,
+            }
         }
-    })
+    )
 
-    args = mocker.MagicMock()
-    args.expid = exp.expid
-    args.logconsole = 'DEBUG'
-    args.logfile = 'DEBUG'
-    args.command = 'setstatus'
+    new_description = "a new description arrived"
 
-    new_description = 'a new description arrived'
-    assert autosubmit.update_description(exp.expid, new_description)
+    assert update_experiment_description_version(
+        exp.expid,
+        new_description,
+    )
 
     assert new_description == get_experiment_description(exp.expid)[0][0]
 
 
-@pytest.mark.parametrize('experiment_data,context_mgr', [
-    ({
-         'JOBS': {
-             'DQC': {
-                 'FOR': {
-                     'NAME': [
-                         'BASIC',
-                         'FULL',
-                     ],
-                     'WALLCLOCK': "00:40",
-                 },
-             },
-         },
-     }, pytest.raises(IndexError)),
-    ({
-         'JOBS': {
-             'DQC': {
-                 'FOR': {
-                     'NAME': [
-                         'BASIC',
-                         'FULL',
-                     ],
-                 },
-                 'WALLCLOCK': "00:40",
-             },
-         },
-     }, does_not_raise()),
-], ids=[
-    'Missing WALLCLOCK in FOR',
-    'Correct FOR',
-])
-def test_parse_data_loops(autosubmit_exp: 'AutosubmitExperimentFixture', experiment_data: dict,
-                          context_mgr: 'AbstractContextManager'):
+@pytest.mark.parametrize(
+    "experiment_data,context_mgr",
+    [
+        (
+            {
+                "JOBS": {
+                    "DQC": {
+                        "FOR": {
+                            "NAME": [
+                                "BASIC",
+                                "FULL",
+                            ],
+                            "WALLCLOCK": "00:40",
+                        },
+                    },
+                },
+            },
+            pytest.raises(IndexError),
+        ),
+        (
+            {
+                "JOBS": {
+                    "DQC": {
+                        "FOR": {
+                            "NAME": [
+                                "BASIC",
+                                "FULL",
+                            ],
+                        },
+                        "WALLCLOCK": "00:40",
+                    },
+                },
+            },
+            does_not_raise(),
+        ),
+    ],
+    ids=[
+        "Missing WALLCLOCK in FOR",
+        "Correct FOR",
+    ],
+)
+def test_parse_data_loops(
+    autosubmit_exp: "AutosubmitExperimentFixture",
+    experiment_data: dict,
+    context_mgr: "AbstractContextManager",
+):
+    """Test parsing of job loop configuration data."""
     with context_mgr:
-        autosubmit_exp(experiment_data=experiment_data, create=False, include_jobs=False)
-
+        autosubmit_exp(
+            experiment_data=experiment_data,
+            create=False,
+            include_jobs=False,
+        )
 
 
 @pytest.mark.parametrize(
-    '_exit,job_previous_status,expected_jobs_to_check',
+    "_exit,job_previous_status,expected_jobs_to_check",
     [
         (
-                True,
-                Status.FAILED,
-                0
+            True,
+            Status.FAILED,
+            0,
         ),
         (
-                True,
-                Status.RUNNING,
-                0
+            True,
+            Status.RUNNING,
+            0,
         ),
         (
-                False,
-                Status.FAILED,
-                0
+            False,
+            Status.FAILED,
+            0,
         ),
         (
-                False,
-                Status.RUNNING,
-                1
+            False,
+            Status.RUNNING,
+            1,
         ),
     ],
     ids=[
         "If exiting, no jobs are checked",
         "If exiting, no jobs are checked",
         "If not exiting, ignore failed jobs",
-        "If not exiting, do NOT ignore running jobs"
-    ]
+        "If not exiting, do NOT ignore running jobs",
+    ],
 )
 def test_check_wrappers_and_as_exit(
-        _exit, job_previous_status, expected_jobs_to_check, autosubmit_exp, autosubmit, mocker):
-    """Test the function ``check_wrappers`` in ``Autosubmit``.
+    _exit,
+    job_previous_status,
+    expected_jobs_to_check,
+    autosubmit_exp,
+    mocker,
+):
+    """Test wrapper handling when the scheduler exit flag changes.
 
-    We almost had a regression in 4.1.16, due to https://github.com/BSC-ES/autosubmit/pull/2474.
-
-    The logic changed had a bug, and was only identified upon manual testing.
-
-    This unit test is intended to cover only the parts related to where ``Autosubmit.exit``
-    is used.
-
-    This function ``check_wrappers`` should probably be moved to another place in the future,
-    to simplify the 6K+ lines ``autosubmit.py``.
+    :param _exit: Value assigned to ``Scheduler.exit``.
+    :param job_previous_status: Previous status of the test job.
     """
     exp = autosubmit_exp(experiment_data={})
     as_conf: AutosubmitConfig = exp.as_conf
 
-    job = Job('1', '1', job_previous_status)
+    job = Job("1", "1", job_previous_status)
+
     job_list: JobList = mocker.MagicMock(spec=JobList)
     job_list.get_job_list.return_value = [job]
     job_list.job_package_map = {}
 
     platform = mocker.MagicMock(spec=Platform)
-    platform.name = 'test_platform'
+    platform.name = "test_platform"
 
-    Autosubmit.exit = _exit
+    Scheduler.exit = _exit
 
-    autosubmit.check_wrappers(as_conf, job_list, exp.expid)
+    check_wrappers(as_conf, job_list, exp.expid)
 
 
 def test_create_txt_output_writes_status_file(autosubmit_exp):
-    """Test that -o txt and -d both write a txt file to the status folder."""
+    """Test that text output creates status files.
+
+    Both ``-o txt`` and ``-d`` should create a text file in the status directory.
+    """
     exp = autosubmit_exp(include_jobs=True)
 
-    # status/ should be empty before test
-    assert not list(exp.status_dir.glob('*.txt')), "status/ should be empty before test"
+    assert not list(exp.status_dir.glob("*.txt")), "status/ should be empty before test"
 
-    # test -o txt creates a file in status/
-    exp.autosubmit.create(exp.expid, noplot=False, hide=True, output='txt', force=True)
-    txt_files_after_txt = list(exp.status_dir.glob('*.txt'))
-    assert len(txt_files_after_txt) == 1, "Expected exactly one txt file in status/ for -o txt"
+    create(
+        exp.expid,
+        noplot=False,
+        hide=True,
+        output="txt",
+        force=True,
+    )
 
-    # wait to ensure a different timestamp for the second file
+    txt_files_after_txt = list(exp.status_dir.glob("*.txt"))
+
+    assert len(txt_files_after_txt) == 1, (
+        "Expected exactly one txt file in status/ for -o txt"
+    )
+
     time.sleep(1)
 
-    # test -d creates another file in status/
-    exp.autosubmit.create(exp.expid, noplot=True, hide=True, output=None, detail=True, force=True)
-    txt_files_after_detail = list(exp.status_dir.glob('*.txt'))
-    assert len(txt_files_after_detail) == 2, "Expected a second txt file in status/ for -d"
+    create(
+        exp.expid,
+        noplot=True,
+        hide=True,
+        output=None,
+        detail=True,
+        force=True,
+    )
 
+    txt_files_after_detail = list(exp.status_dir.glob("*.txt"))
+
+    assert len(txt_files_after_detail) == 2, (
+        "Expected a second txt file in status/ for -d"
+    )
 
 
 def test_prepare_run_returns_tuple(autosubmit_exp):
-    """prepare_run: returns the expected 7-tuple with recover=False."""
+    """Test that ``prepare_run`` returns the expected tuple."""
     exp = autosubmit_exp(include_jobs=True)
-    result = Autosubmit.prepare_run(exp.expid, check_scripts=False)
+
+    result = _prepare_run(
+        exp.expid,
+        check_scripts=False,
+    )
+
     assert len(result) == 7
-    job_list, submitter, exp_history, _host, _as_conf, _platforms_to_test, recover = result
+
+    (
+        job_list,
+        submitter,
+        exp_history,
+        _host,
+        _as_conf,
+        _platforms_to_test,
+        recover,
+    ) = result
+
     assert job_list is not None
     assert submitter is not None
     assert exp_history is not None
@@ -429,11 +558,27 @@ def test_prepare_run_returns_tuple(autosubmit_exp):
 
 
 def test_prepare_run_returns_tuple_with_recover(autosubmit_exp):
-    """prepare_run: returns the expected 7-tuple with recover=True."""
+    """Test that ``prepare_run`` returns the expected tuple in recovery mode."""
     exp = autosubmit_exp(include_jobs=True)
-    result = Autosubmit.prepare_run(exp.expid, check_scripts=False, recover=True)
+
+    result = _prepare_run(
+        exp.expid,
+        check_scripts=False,
+        recover=True,
+    )
+
     assert len(result) == 7
-    job_list, submitter, exp_history, _host, _as_conf, _platforms_to_test, recover = result
+
+    (
+        job_list,
+        submitter,
+        exp_history,
+        _host,
+        _as_conf,
+        _platforms_to_test,
+        recover,
+    ) = result
+
     assert job_list is not None
     assert submitter is not None
     assert exp_history is None
@@ -441,48 +586,97 @@ def test_prepare_run_returns_tuple_with_recover(autosubmit_exp):
 
 
 def test_stop_sets_exit_flag(autosubmit_exp, mocker):
-    """stop: sets Autosubmit.exit to True for the given experiment."""
+    """Test that ``stop`` sets the scheduler exit flag."""
     exp = autosubmit_exp()
-    mocker.patch('builtins.input', return_value='y')
-    mocker.patch('autosubmit.helpers.processes.process_id', return_value=0)
-    original = Autosubmit.exit
+
+    mocker.patch("builtins.input", return_value="y")
+    mocker.patch(
+        "autosubmit.helpers.processes.process_id",
+        return_value=0,
+    )
+
+    original = Scheduler.exit
+
     try:
-        Autosubmit.exit = False
-        result = Autosubmit.stop(exp.expid, force_yes=True)
+        Scheduler.exit = False
+
+        result = stop(
+            exp.expid,
+            force_yes=True,
+        )
+
         assert result is True
     finally:
-        Autosubmit.exit = original
+        Scheduler.exit = original
 
 
 def test_monitor_with_check_wrapper(autosubmit_exp):
-    """monitor: check_wrapper=True loads wrapper packages."""
+    """Test that ``monitor`` loads wrapper packages when requested."""
     exp = autosubmit_exp(include_jobs=True)
-    # Create a minimal job_list pickle so load_job_list works
-    as_conf = AutosubmitConfig(exp.expid, BasicConfig, YAMLParserFactory())
+
+    as_conf = AutosubmitConfig(
+        exp.expid,
+        BasicConfig,
+        YAMLParserFactory(),
+    )
     as_conf.check_conf_files(True)
-    job_list = Autosubmit.load_job_list(exp.expid, as_conf, monitor=True, new=False)
+
+    job_list = load_job_list(
+        exp.expid,
+        as_conf,
+        monitor=True,
+        new=False,
+    )
     job_list.save_jobs()
 
-    result = Autosubmit.monitor(exp.expid, file_format='pdf', lst='', filter_chunks='',
-                                filter_status='', filter_section='', hide=True,
-                                check_wrapper=True)
+    result = monitor(
+        exp.expid,
+        file_format="pdf",
+        lst="",
+        filter_chunks="",
+        filter_status="",
+        filter_section="",
+        hide=True,
+        check_wrapper=True,
+    )
+
     assert result is True
 
 
 def test_set_status_with_detail(autosubmit_exp):
-    """set_status: detail=True prints job list after status change."""
+    """Test that ``set_status`` prints the job list when detail is requested."""
     exp = autosubmit_exp(include_jobs=True)
-    # Create a job list with a job
-    as_conf = AutosubmitConfig(exp.expid, BasicConfig, YAMLParserFactory())
+
+    as_conf = AutosubmitConfig(
+        exp.expid,
+        BasicConfig,
+        YAMLParserFactory(),
+    )
     as_conf.check_conf_files(True)
-    job_list = Autosubmit.load_job_list(exp.expid, as_conf, monitor=True, new=False)
+
+    job_list = load_job_list(
+        exp.expid,
+        as_conf,
+        monitor=True,
+        new=False,
+    )
+
     job_name = job_list.get_job_list()[0].name
     job_list.save_jobs()
 
-    result = Autosubmit.set_status(
-        exp.expid, noplot=True, save=True, final='WAITING',
-        filter_list=job_name, filter_chunks='', filter_status='',
-        filter_section='', filter_type_chunk='', filter_type_chunk_split='',
-        hide=True, detail=True
+    result = set_status(
+        exp.expid,
+        noplot=True,
+        save=True,
+        final="WAITING",
+        filter_list=job_name,
+        filter_chunks="",
+        filter_status="",
+        filter_section="",
+        filter_type_chunk="",
+        filter_type_chunk_split="",
+        hide=True,
+        detail=True,
     )
+
     assert result is True

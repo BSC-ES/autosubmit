@@ -443,7 +443,7 @@ How to profile Autosubmit while monitoring an experiment
 --------------------------------------------------------
 
 Autosubmit offers the possibility to profile the execution of the monitoring process. To enable the
-profiler, just add the ``--profile`` (or ``-p``) flag to your ``autosubmit monitor`` command, as in
+profiler, just add the ``--profile`` flag to your ``autosubmit monitor`` command, as in
 the following example:
 
 .. code-block:: bash
@@ -737,7 +737,7 @@ This will be understood by Autosubmit and the result would be similar to:
 
 Although it depends on the experiment.
 
-If the parameter doesn't exist, it will be returned as ``-``, while if the
+If the parameter does not exist, it will be returned as ``-``, while if the
 parameter is declared but empty, it will remain empty.
 
 Starter template

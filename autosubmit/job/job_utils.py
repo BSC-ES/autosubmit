@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -16,17 +16,22 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import math
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from bscearth.utils.date import chunk_end_date, chunk_start_date, date2str
 
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_common import Status
+from autosubmit.job.notify import job_notify, wrapper_notify
 from autosubmit.log.log import AutosubmitCritical, Log
 
 if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
+    from autosubmit.job.job import Job, WrapperJob
     from autosubmit.job.job_list import JobList
+    from autosubmit.platforms.platform import Platform
 
 CALENDAR_UNITSIZE_ENUM = {
     "hour": 0,
@@ -47,11 +52,8 @@ def is_leap_year(year: int, cal: str = "standard") -> bool:
     rules apply.
 
     :param year: Year to check
-    :type year: int
     :param cal: Calendar type (standard, noleap)
-    :type cal: str
     :return: True if the year is a leap year
-    :rtype: bool
     """
     if cal == "noleap":
         return False
@@ -62,11 +64,8 @@ def calendar_unitsize_isgreater(split_unit: str, chunk_unit: str) -> bool:
     """Check if the split unit is greater than the chunk unit.
 
     :param split_unit: Unit of the split
-    :type split_unit: str
     :param chunk_unit: Unit of the chunk
-    :type chunk_unit: str
     :return: True if the split unit is greater than the chunk unit
-    :rtype: bool
     :raises: AutosubmitCritical if any of the units are invalid
     """
     split_unit = split_unit.lower()
@@ -83,9 +82,7 @@ def calendar_unitsize_getlowersize(unitsize: str) -> str:
     For example, if the input is "month", the output will be "day".
 
     :param unitsize: Unit size to get the lower unit size for
-    :type unitsize: str
     :return: The lower unit size
-    :rtype: str
     :raises: AutosubmitCritical if the unit size is invalid
     """
     unit_size = unitsize.lower()
@@ -103,11 +100,8 @@ def calendar_get_month_days(date_str: str, cal: str = "standard") -> int:
     """Get the number of days in a month, respecting the calendar type (leap year or not).
 
     :param date_str: Date in string format (YYYYMMDD)
-    :type date_str: str
     :param cal: Calendar type (standard, noleap)
-    :type cal: str
     :return: Number of days in the month
-    :rtype: int
     """
     year = int(date_str[0:4])
     month = int(date_str[4:6])
@@ -121,19 +115,14 @@ def calendar_get_month_days(date_str: str, cal: str = "standard") -> int:
         return 31
 
 
-def get_chunksize_in_hours(date_str: str, chunk_unit: str, chunk_length: int, cal: str = "standard") -> int:
+def get_chunk_size_in_hours(date_str: str, chunk_unit: str, chunk_length: int, cal: str = "standard") -> int:
     """Get the chunk size in hours.
 
     :param date_str: Date in string format (YYYYMMDD)
-    :type date_str: str
     :param chunk_unit: Unit of the chunk
-    :type chunk_unit: str
     :param chunk_length: Length of the chunk
-    :type chunk_length: int
     :param cal: Calendar type (standard, noleap)
-    :type cal: str
     :return: The chunk size in hours
-    :rtype: int
     """
     if is_leap_year(int(date_str[0:4]), cal):
         num_days_in_a_year = 366
@@ -155,17 +144,11 @@ def calendar_split_size_isvalid(date_str: str, split_size: int, split_unit: str,
     """Check if the split size is valid for the calendar.
 
     :param date_str: Date in string format (YYYYMMDD)
-    :type date_str: str
     :param split_size: Size of the split
-    :type split_size: int
     :param split_unit: Unit of the split
-    :type split_unit: str
     :param chunk_size_in_hours: chunk size in hours
-    :type chunk_size_in_hours: int
     :param cal: Calendar type (standard, noleap)
-    :type cal: str
     :return: True if the split size is valid for the calendar
-    :rtype: bool
     """
     if is_leap_year(int(date_str[0:4]), cal):
         num_days_in_a_year = 366
@@ -195,14 +178,9 @@ def _validate_calendar_inputs(
     """Validate the calendar inputs.
 
     :param cal: Calendar type
-    :type cal: str
     :param chunk_unit: Unit of the chunk
-    :type chunk_unit: str
     :param split_unit: Unit of the split
-    :type split_unit: str
     :param split_policy: Policy for handling split sizes
-    :type split_policy: str
-    :return: None
     :raises: AutosubmitCritical if any of the inputs are invalid
     """
     if chunk_unit == ChunkUnit.HOUR:
@@ -235,15 +213,10 @@ def _count_units_between_dates(start_date: datetime, end_date: datetime, unit: s
     """Count the number of units between two dates.
 
     :param start_date: Start date
-    :type start_date: datetime
     :param end_date: End date
-    :type end_date: datetime
     :param unit: Unit to count (hour, day, month, year)
-    :type unit: str
     :param cal: Calendar type (standard, noleap)
-    :type cal: str
     :return: Number of units between the two dates
-    :rtype: float
     :raises: AutosubmitCritical if the unit is invalid
     """
     if unit == ChunkUnit.HOUR:
@@ -296,15 +269,10 @@ def calendar_chunk_section(exp_data: dict[str, Any], section: str, date: datetim
     """Calculate the number of splits for a chunk based on the calendar configuration.
 
     :param exp_data: Experiment configuration dictionary
-    :type exp_data: dict[str, Any]
     :param section: Job section name
-    :type section: str
     :param date: Start date of the experiment
-    :type date: datetime
     :param chunk: Chunk number
-    :type chunk: int
     :return: Number of splits for the chunk
-    :rtype: int
     :raises AutosubmitCritical: If the calendar configuration is invalid or if the split size doesn't fit in the chunk size.
     """
     jobs_data = exp_data.get("JOBS", {})
@@ -339,7 +307,7 @@ def calendar_chunk_section(exp_data: dict[str, Any], section: str, date: datetim
     chunk_end = chunk_end_date(chunk_start, chunk_length, chunk_unit, cal)
 
     num_max_splits = _count_units_between_dates(chunk_start, chunk_end, split_unit, cal)
-    chunk_size_in_hours = get_chunksize_in_hours(
+    chunk_size_in_hours = get_chunk_size_in_hours(
         date2str(chunk_start), chunk_unit, chunk_length, cal
     )
 
@@ -378,11 +346,8 @@ def get_split_size_unit(data: dict[str, Any], section: str) -> str:
     it defaults to "day".
 
     :param data: Experiment configuration dictionary.
-    :type data: dict[str, Any]
     :param section: Job section name.
-    :type section: str
     :return: The resolved split size unit as a string.
-    :rtype: str
     """
     split_unit = str(data.get('JOBS', {}).get(section, {}).get('SPLITSIZEUNIT', "none")).lower()
     if split_unit == "none":
@@ -405,11 +370,8 @@ def get_split_size(as_conf: dict[str, Any], section: str) -> int:
     ``EXPERIMENT.SPLITSIZE``, and finally defaults to ``1``.
 
     :param as_conf: Experiment configuration dictionary.
-    :type as_conf: dict[str, Any]
     :param section: Job section name.
-    :type section: str
     :return: The resolved split size as an integer.
-    :rtype: int
     """
     job_split_size = as_conf.get('JOBS', {}).get(section, {}).get('SPLITSIZE')
     experiment_split_size = as_conf.get('EXPERIMENT', {}).get('SPLITSIZE')
@@ -420,10 +382,7 @@ def get_split_size(as_conf: dict[str, Any], section: str) -> int:
 
 
 class Dependency:
-    """
-    Class to manage the metadata related with a dependency
-
-    """
+    """Class to manage the metadata related with a dependency"""
 
     def __init__(self, section, distance=None, running=None, sign=None, delay=-1, splits=None,
                  relationships=None) -> None:
@@ -543,7 +502,49 @@ class SubJobManager:
         return self.subjobfixes
 
 
-def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status= str | None) -> None:
+def change_jobs_status(job_status_pairs: list[tuple["Job", int]], cancel_active: bool = True) -> dict[str, str]:
+    """Apply new statuses to a set of jobs, cancelling active ones (batched per platform) first.
+
+    Used by both the ``updated_list_<EXPID>.txt`` mechanism (``JobList.update_from_file``) and the
+    ``set_status`` command (``Autosubmit.change_status``).
+
+    Jobs whose current status is ACTIVE (QUEUING/RUNNING/SUBMITTED) are cancelled on their
+    platform first, avoiding a double submission. Active statuses can never be set as a target:
+    those pairs are rejected with a warning. Re-running jobs start from a clean per-attempt state.
+
+    :param job_status_pairs: Iterable of ``(job, new_status)`` pairs to change.
+    :param cancel_active: Whether to cancel jobs whose current status is ACTIVE.
+    :return: Mapping of ``job.name -> "OLD -> NEW"`` for every applied change.
+    """
+    performed_changes: dict[str, str] = {}
+    jobs_to_cancel: dict[str, list[str]] = defaultdict(list)
+    platforms_by_name: dict[str, Any] = {}
+    for job, new_status in job_status_pairs:
+        if new_status in Status.ACTIVE:
+            Log.warning(f"Job [{job.name}] cannot be set to active status "
+                        f"{Status.VALUE_TO_KEY.get(new_status, 'UNKNOWN')}, skipping it")
+            continue
+        old_status = Status.VALUE_TO_KEY.get(job.status, "UNKNOWN")
+        if cancel_active and job.status in Status.ACTIVE:
+            if job.id:
+                # The id is captured before apply_status resets it.
+                platform = job.platform
+                jobs_to_cancel[platform.name].append(str(job.id))
+                platforms_by_name[platform.name] = platform
+            else:
+                Log.warning(f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+        job.apply_status(new_status)
+        performed_changes[job.name] = f"{old_status} -> {Status.VALUE_TO_KEY.get(new_status, 'UNKNOWN')}"
+    for platform_name, job_ids in jobs_to_cancel.items():
+        try:
+            platforms_by_name[platform_name].cancel_jobs(job_ids)
+        except Exception as e:
+            Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform_name}: {e}")
+    return performed_changes
+
+
+def cancel_jobs(job_list: "JobList", active_jobs_filter: list[str] | None = None,
+                target_status: str | None = None) -> None:
     """Cancel jobs on platforms.
 
     It receives a list ``active_jobs_filter`` of statuses to filter jobs for their statuses,
@@ -556,19 +557,17 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status= str
     filter does not find any "ACTIVE" jobs.
 
     It will iterate the list of active jobs, sending commands to cancel them (varies per platform).
+    Jobs without a valid id are skipped for cancellation but their status is still changed.
     After the command was issued, regardless whether successful or not, it finishes by changing
     the status of the jobs.
 
     It finishes saving the job list, to persist the jobs with their updated target statuses.
 
-    NOTE: For consistency, an experiment must be stopped before its jobs are cancelled.
+    NOTE: For consistency, an experiment must be stopped before its jobs are canceled.
 
     :param job_list: Autosubmit job list object.
-    :type job_list: JobList
     :param active_jobs_filter: Filter used to identify jobs considered active.
-    :type active_jobs_filter: List[str]
-    :param target_status: Final status of the jobs cancelled.
-    :type target_status: str|None
+    :param target_status: Final status of the jobs canceled.
     """
     if not target_status or target_status not in Status.VALUE_TO_KEY.values():
         raise AutosubmitCritical(f'Cancellation target status of jobs is not valid: {target_status}')
@@ -589,16 +588,123 @@ def cancel_jobs(job_list: "JobList", active_jobs_filter=None, target_status= str
         jobs_by_platform.setdefault(job.platform, []).append(job)
 
     for platform, jobs in jobs_by_platform.items():
-        job_ids = [str(job.id) for job in jobs]
-        Log.info(f'Cancelling jobs {", ".join(job_ids)} on platform {platform.name}')
+        job_ids = []
+        for job in jobs:
+            if not job.id:
+                Log.warning(f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+            else:
+                job_ids.append(str(job.id))
 
-        try:
-            platform.cancel_jobs(job_ids)
-        except Exception as e:
-            Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform.name}: {str(e)}")
+    for platform, jobs in jobs_by_platform.items():
+        job_ids = []
+        for job in jobs:
+            if not job.id:
+                Log.warning(f"Skipping cancellation of job [{job.name}] with invalid ID: {job.id}")
+            else:
+                job_ids.append(str(job.id))
+
+        if job_ids:
+            Log.info(f'Cancelling jobs {", ".join(job_ids)} on platform {platform.name}')
+            try:
+                platform.cancel_jobs(job_ids)
+            except Exception as e:
+                Log.warning(f"Failed to cancel jobs {', '.join(job_ids)} on platform {platform.name}: {str(e)}")
 
         for job in jobs:
             Log.info(f"Changing status of job {job.name} to {target_status}")
             job.status = Status.KEY_TO_VALUE[target_status]
 
     job_list.save_jobs()
+
+
+def check_non_wrapped_jobs(
+    platforms_to_test: list["Platform"],
+    job_list: "JobList",
+    as_conf: "AutosubmitConfig",
+    expid: str,
+) -> None:
+    """Check the status of non-wrapped jobs and notify if there are changes.
+
+    :param platforms_to_test: list of platforms to check.
+    :param job_list: JobList object containing the jobs to check.
+    :param as_conf: AutosubmitConfig object containing the configuration of the experiment.
+    :param expid: Experiment identifier.
+    """
+    for p in platforms_to_test:
+        platform_jobs = [
+            job
+            for job in job_list.get_in_queue(p)
+            if job.id not in job_list.get_wrappers_id_from_db()
+        ]
+        if len(platform_jobs) == 0:
+            continue
+        Log.info(f"Checking {len(platform_jobs)} jobs for platform {p.name}")
+
+        p.check_all_jobs(platform_jobs, as_conf)
+        save = False
+        for job in platform_jobs:
+            if job.new_status != job.status:
+                job.update_status(as_conf)
+                save = True
+        if save:
+            job_list.save_jobs()
+
+        for job in platform_jobs:
+            if job.prev_status != job.status:
+                job_notify(as_conf, expid, job)
+
+
+def _manage_wrapper_job(as_conf: "AutosubmitConfig", job_list: "JobList", wrapper_job: "WrapperJob") -> "WrapperJob":
+    """ Function that checks the wrapper job status and updates it if necessary, and returns the wrapper job with the updated status.
+    :param as_conf: Autosubmit configuration
+    :param job_list: job_list object
+    :param wrapper_job: wrapper object
+    :return:  wrapper job with the updated status
+    """
+    save = False
+    check_wrapper_jobs_sleeptime = as_conf.get_wrapper_check_time()
+    Log.debug(f'WRAPPER CHECK TIME = {check_wrapper_jobs_sleeptime}')
+    # Setting prev_status as an easy way to check status change for inner jobs
+    if as_conf.get_notifications() == "true":
+        for inner_job in wrapper_job.job_list:
+            inner_job.prev_status = inner_job.status
+    check_wrapper = True
+    if wrapper_job.status == Status.RUNNING:
+        check_wrapper = timedelta.total_seconds(datetime.now(
+        ) - wrapper_job.checked_time) >= check_wrapper_jobs_sleeptime
+    if check_wrapper:
+        Log.debug(f'Checking Wrapper {str(wrapper_job.id)}')
+        wrapper_job.checked_time = datetime.now()
+        save |= wrapper_job.check_and_update_status(as_conf)
+        if save:
+            job_list.update_db_wrappers()
+            job_list.save_jobs()
+    return wrapper_job
+
+
+def check_wrappers(
+        as_conf: "AutosubmitConfig",
+        job_list: "JobList",
+        expid: str,
+) -> tuple[dict[str, list[list["Job"]]], dict[str, tuple[Status, Status]]]:
+    """Check wrappers and inner jobs status, and collect non-wrapped jobs to check.
+
+    :param as_conf: a AutosubmitConfig object
+    :param job_list: a JobList object
+    :param expid: a string with the experiment id
+    """
+    jobs_to_check: dict[str, list[list["Job"]]] = defaultdict(list)
+    job_changes_tracker: dict[str, tuple[Status, Status]] = {}
+
+    for active_wrapper in list(job_list.job_package_map.values()):
+        wrapper_job = _manage_wrapper_job(as_conf, job_list, active_wrapper)
+        wrapper_notify(as_conf, expid, wrapper_job)
+        if active_wrapper.status in [Status.FAILED, Status.COMPLETED]:
+            job_list.job_package_map.pop(active_wrapper.id, None)
+            job_list.packages_dict.pop(active_wrapper.name, None)
+
+    for job in job_list.get_job_list():
+        if job.id not in job_list.job_package_map and job.status != Status.FAILED:
+            jobs_to_check[job.platform_name].append([job, job.status])
+
+    return jobs_to_check, job_changes_tracker

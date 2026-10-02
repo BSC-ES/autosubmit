@@ -251,7 +251,7 @@ Model configuration is distributed at `git. <https://earth.bsc.es/gitlab/ces/aut
 .. code-block:: yaml
 
    # Create and run the experiment, since it contains all the info!
-   autosubmit create a04b  # if $expid/proj doesn't exists
+   autosubmit create a04b  # if $expid/proj does not exist
    autosubmit refresh a04b
    autosubmit run a04b
 

@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -48,15 +48,12 @@ class JobPackager:
     """
     Main class that manages Job wrapping.
 
-    :param as_config: Autosubmit basic configuration.\n
-    :type as_config: AutosubmitConfig object.\n
-    :param platform: A particular platform we are dealing with, e.g. Slurm Platform.\n
-    :type platform: Specific Platform Object, e.g. SlurmPlatform(), EcPlatform(), ...\n
-    :param jobs_list: Contains the list of the jobs, along other properties.\n
-    :type jobs_list: JobList object.
+    :param as_config: Autosubmit basic configuration.
+    :param platform: A particular platform we are dealing with, e.g. Slurm Platform.
+    :param jobs_list: Contains the list of the jobs, along other properties.
     """
 
-    def __init__(self, as_config: 'AutosubmitConfig', platform: 'ParamikoPlatform', jobs_list: 'JobList', hold=False):
+    def __init__(self, as_config: 'AutosubmitConfig', platform: 'ParamikoPlatform', jobs_list: 'JobList', hold: bool=False):
         self.current_wrapper_section = "WRAPPERS"
         self._as_config = as_config
         self._platform = platform
@@ -141,14 +138,12 @@ class JobPackager:
             for job in highest_completed:
                 job.distance_weight = job.distance_weight - 1
 
-    def calculate_wrapper_bounds(self, section_list):
+    def calculate_wrapper_bounds(self, section_list: list[str]) -> dict:
         """
         Returns the minimum and maximum number of jobs that can be wrapped
 
         :param section_list: List of sections to be wrapped
-        :type section_list: List of strings
         :return: Minimum and Maximum number of jobs that can be wrapped
-        :rtype: Dictionary with keys: min, max, min_v, max_v, min_h, max_h, max_by_section
         """
         wrapper_limits = {'min': 1, 'max': 9999999, 'min_v': 1, 'max_v': 9999999, 'min_h': 1, 'max_h': 9999999,
                           'max_by_section': {}}
@@ -156,34 +151,33 @@ class JobPackager:
         # Calculate the min and max based in the wrapper_section wrappers: min_wrapped:2, max_wrapped: 2 { wrapper_section: {min_wrapped: 6, max_wrapped: 6} }
         wrapper_data = self._as_config.experiment_data.get("WRAPPERS", {})
         current_wrapper_data = wrapper_data.get(self.current_wrapper_section, {})
-        if len(self._jobs_list.jobs_to_run_first) == 0:
-            wrapper_limits['min'] = int(current_wrapper_data.get("MIN_WRAPPED", wrapper_data.get("MIN_WRAPPED", 1)))
-            wrapper_limits['max'] = int(
-                current_wrapper_data.get("MAX_WRAPPED", wrapper_data.get("MAX_WRAPPED", 9999999)))
-            wrapper_limits['min_v'] = int(
-                current_wrapper_data.get("MIN_WRAPPED_V", wrapper_data.get("MIN_WRAPPED_V", 1)))
-            wrapper_limits['max_v'] = int(
-                current_wrapper_data.get("MAX_WRAPPED_V", wrapper_data.get("MAX_WRAPPED_V", 1)))
-            wrapper_limits['min_h'] = int(
-                current_wrapper_data.get("MIN_WRAPPED_H", wrapper_data.get("MIN_WRAPPED_H", 1)))
-            wrapper_limits['max_h'] = int(
-                current_wrapper_data.get("MAX_WRAPPED_H", wrapper_data.get("MAX_WRAPPED_H", 1)))
-            # Max and min calculations
-            wrapper_limits['max'] = max(wrapper_limits['max'], wrapper_limits['max_v'] * wrapper_limits['max_h'])
-            if wrapper_limits['min'] < wrapper_limits['min_v'] * wrapper_limits['min_h']:
-                wrapper_limits['min'] = max(wrapper_limits['min_v'], wrapper_limits['min_h'])
-            # if one dimensional wrapper or value is the default
-            if wrapper_limits['max_v'] == 1 or current_wrapper_data.get("TYPE", "") == "vertical":
-                wrapper_limits['max_v'] = wrapper_limits['max']
+        wrapper_limits['min'] = int(current_wrapper_data.get("MIN_WRAPPED", wrapper_data.get("MIN_WRAPPED", 1)))
+        wrapper_limits['max'] = int(
+            current_wrapper_data.get("MAX_WRAPPED", wrapper_data.get("MAX_WRAPPED", 9999999)))
+        wrapper_limits['min_v'] = int(
+            current_wrapper_data.get("MIN_WRAPPED_V", wrapper_data.get("MIN_WRAPPED_V", 1)))
+        wrapper_limits['max_v'] = int(
+            current_wrapper_data.get("MAX_WRAPPED_V", wrapper_data.get("MAX_WRAPPED_V", 1)))
+        wrapper_limits['min_h'] = int(
+            current_wrapper_data.get("MIN_WRAPPED_H", wrapper_data.get("MIN_WRAPPED_H", 1)))
+        wrapper_limits['max_h'] = int(
+            current_wrapper_data.get("MAX_WRAPPED_H", wrapper_data.get("MAX_WRAPPED_H", 1)))
+        # Max and min calculations
+        wrapper_limits['max'] = max(wrapper_limits['max'], wrapper_limits['max_v'] * wrapper_limits['max_h'])
+        if wrapper_limits['min'] < wrapper_limits['min_v'] * wrapper_limits['min_h']:
+            wrapper_limits['min'] = max(wrapper_limits['min_v'], wrapper_limits['min_h'])
+        # if one dimensional wrapper or value is the default
+        if wrapper_limits['max_v'] == 1 or current_wrapper_data.get("TYPE", "") == "vertical":
+            wrapper_limits['max_v'] = wrapper_limits['max']
 
-            if wrapper_limits['max_h'] == 1 or current_wrapper_data.get("TYPE", "") == "horizontal":
-                wrapper_limits['max_h'] = wrapper_limits['max']
+        if wrapper_limits['max_h'] == 1 or current_wrapper_data.get("TYPE", "") == "horizontal":
+            wrapper_limits['max_h'] = wrapper_limits['max']
 
-            if wrapper_limits['min_v'] == 1 and current_wrapper_data.get("TYPE", "") == "vertical":
-                wrapper_limits['min_v'] = wrapper_limits['min']
+        if wrapper_limits['min_v'] == 1 and current_wrapper_data.get("TYPE", "") == "vertical":
+            wrapper_limits['min_v'] = wrapper_limits['min']
 
-            if wrapper_limits['min_h'] == 1 and current_wrapper_data.get("TYPE", "") == "horizontal":
-                wrapper_limits['min_h'] = wrapper_limits['min']
+        if wrapper_limits['min_h'] == 1 and current_wrapper_data.get("TYPE", "") == "horizontal":
+            wrapper_limits['min_h'] = wrapper_limits['min']
 
         # Calculate the max by section by looking at jobs_data[section].max_wrapped
         for section in section_list:
@@ -193,27 +187,6 @@ class JobPackager:
 
         wrapper_limits['real_min'] = max(2, wrapper_limits['min'])
         return wrapper_limits
-
-    def check_jobs_to_run_first(self, package):
-        """
-        Check if the jobs to run first are in the package
-        :param package:
-        :return:
-        """
-        run_first = False
-        if len(self._jobs_list.jobs_to_run_first) > 0:
-            for job in package.jobs[:]:
-                job.wrapper_type = package.wrapper_type
-                if job in self._jobs_list.jobs_to_run_first:
-                    run_first = True
-                else:
-                    package.jobs.remove(job)
-                    if self.wrapper_type[self.current_wrapper_section] not in ["horizontal", "vertical",
-                                                                               "vertical-mixed"]:
-                        for seq in range(len(package.jobs_lists)):
-                            with suppress(ValueError):
-                                package.jobs_lists[seq].remove(job)
-        return package, run_first
 
     def check_real_package_wrapper_limits(self, package):
         balanced = True
@@ -265,22 +238,6 @@ class JobPackager:
             if max_jobs_to_submit == 0:
                 break
             failed_innerjobs = False
-            # Check if the user is using the option to run first some jobs. if so, remove non-first jobs from the package and submit them sequentially following a flexible policy
-            if len(self._jobs_list.jobs_to_run_first) > 0:
-                p, run_first = self.check_jobs_to_run_first(p)
-                if run_first:
-                    for job in p.jobs:
-                        if max_jobs_to_submit == 0:
-                            break
-                        if job.status == Status.READY:
-                            if job.type in [Language.PYTHON3, Language.PYTHON,
-                                            Language.PYTHON2] and not self._platform.allow_python_jobs:
-                                package = JobPackageSimpleWrapped([job])
-                            else:
-                                package = JobPackageSimple([job])
-                            packages_to_submit.append(package)
-                            max_jobs_to_submit = max_jobs_to_submit - 1
-                continue
             # The only policy where it matters if an innerjob has failed or not is the "strict" one
             if p.wrapper_policy == "strict":
                 for job in p.jobs:
@@ -585,19 +542,10 @@ class JobPackager:
         :return: list of jobs ready to be built, boolean indicating if there are underlying blocking errors.
         """
         Log.info(f"Calculating possible ready jobs for {self._platform.name}")
-        jobs_ready = []
-        if len(self._jobs_list.jobs_to_run_first) > 0:
-            jobs_ready = [
-                job
-                for job in self._jobs_list.jobs_to_run_first
-                if (self._platform is None or job.platform.name.upper() == self._platform.name.upper())
-                   and job.status == Status.READY
-            ]
-        if not jobs_ready:
-            if self.hold:
-                jobs_ready = self._jobs_list.get_prepared(self._platform)
-            else:
-                jobs_ready = self._jobs_list.get_ready(self._platform)
+        if self.hold:
+            jobs_ready = self._jobs_list.get_prepared(self._platform)
+        else:
+            jobs_ready = self._jobs_list.get_ready(self._platform)
 
         jobs_ready = [
             job for job in jobs_ready
@@ -803,9 +751,6 @@ class JobPackager:
                     continue
             elif max_jobs_to_submit <= 0:
                 break
-            if len(self._jobs_list.jobs_to_run_first) > 0:  # if user wants to run first some jobs, submit them first
-                if job not in self._jobs_list.jobs_to_run_first:
-                    continue
             if job.type in [Language.PYTHON3, Language.PYTHON,
                             Language.PYTHON2] and not self._platform.allow_python_jobs:
                 package = JobPackageSimpleWrapped([job])
@@ -892,15 +837,12 @@ class JobPackager:
 
         return packages
 
-    def _build_vertical_packages(self, section_list, wrapper_limits, wrapper_info={}):
+    def _build_vertical_packages(self, section_list: list, wrapper_limits: dict, wrapper_info: dict={}) -> list[JobPackageVertical]:
         """Builds Vertical-Mixed or Vertical
 
-        :param section_list: Jobs defined as wrappable belonging to a common section.\n
-        :type section_list: List() of Job Objects. \n
-        :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical). \n
-        :type wrapper_limits: Dict. \n
-        :return: List of Wrapper Packages, Dictionary that details dependencies. \n
-        :rtype: List() of JobPackageVertical(), Dictionary Key: String, Value: (Dictionary Key: Variable Name, Value: String/Int)
+        :param section_list: Jobs defined as wrappable belonging to a common section.
+        :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical).
+        :return: List of Wrapper Packages, Dictionary that details dependencies.
         """
         packages = []
         dict_jobs = self._jobs_list.get_ordered_jobs_by_date_member(self.current_wrapper_section)
@@ -940,7 +882,7 @@ class JobPackager:
         total_wallclock = '00:00'
         horizontal_package = horizontal_packager.build_horizontal_package(wrapper_info=wrapper_info)
         horizontal_packager.create_sections_order(job_sections)
-        horizontal_packager.add_sectioncombo_processors(
+        horizontal_packager.add_section_combo_processors(
             horizontal_packager.total_processors)
         horizontal_package.sort(
             key=lambda job: horizontal_packager.sort_by_expression(job.section))
@@ -1010,20 +952,15 @@ class JobPackagerVertical:
     """
     Vertical Packager Parent Class
 
-    :param jobs_list: Usually there is only 1 job in this list. \n
-    :type jobs_list: List() of Job Objects \n
-    :param total_wallclock: Wallclock per object. \n
-    :type total_wallclock: String  \n
-    :param max_jobs: Maximum number of jobs per platform. \n
-    :type max_jobs: Integer \n
-    :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical). \n
-    :type wrapper_limits: Dict. \n
-    :param max_wallclock: Value from Platform. \n
-    :type max_wallclock: Integer
-
+    :param jobs_list: Usually there is only 1 job in this list.
+    :param total_wallclock: wallclock per object.
+    :param max_jobs: Maximum number of jobs per platform.
+    :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical).
+    :param max_wallclock: Value from Platform
     """
 
-    def __init__(self, jobs_list, total_wallclock, max_jobs, wrapper_limits, max_wallclock, wrapper_info):
+    def __init__(self, jobs_list: list[Job], total_wallclock: dict, max_jobs: int, wrapper_limits: dict,
+                 max_wallclock: int, wrapper_info: dict):
         self.jobs_list = jobs_list
         self.total_wallclock = total_wallclock
         self.max_jobs = max_jobs
@@ -1031,23 +968,21 @@ class JobPackagerVertical:
         self.max_wallclock = max_wallclock
         self.wrapper_info = wrapper_info
 
-    def build_vertical_package(self, job, wrapper_info):
-        """
-        Goes through the job and all the related jobs (children, or part of the same date member ordered group), finds those suitable
-        and groups them together into a wrapper. (iterative-version)
+    def build_vertical_package(self, job: Job, wrapper_info: list) -> list[Job]:
+        """Group a job and its wrappable descendants into a vertical wrapper. (iterative version)
 
         :param job: Job to be wrapped.
-        :type job: Job Object
+        :param wrapper_info: Wrapper parameters (type, policy, method, jobs in wrapper,
+            extensible wallclock and configuration).
         :return: List of jobs that are wrapped together.
-        :rtype: List() of Job Object
         """
         self.total_wallclock = job.wallclock  # reset total wallclock for package
         stack = [(job, 0)]
         while stack:
-            job, level = stack.pop()
+            job, scan_index = stack.pop()
             # Less verbose
-            if level % 50 == 0 and level > 0:
-                Log.info(f"Wrapper package creation is still ongoing. So far {level} jobs have been wrapped.")
+            if scan_index % 50 == 0 and scan_index > 0:
+                Log.info(f"Wrapper package creation is still ongoing. So far {scan_index} jobs have been scanned.")
                 for event in job.platform.worker_events:  # keep alive log retrieval workers.
                     if not event.is_set():
                         event.set()
@@ -1056,7 +991,7 @@ class JobPackagerVertical:
                     self.wrapper_limits["max_by_section"][job.section] or len(self.jobs_list) >= self.wrapper_limits[
                 "max"]:
                 continue
-            child, level = self.get_wrappable_child(job, level)
+            child, scan_index = self.get_wrappable_child(job, scan_index)
             if child is not None and len(str(child)) > 0:
                 child.update_parameters(wrapper_info[-1], set_attributes=True)
 
@@ -1064,21 +999,21 @@ class JobPackagerVertical:
                 # Local jobs could not have a wallclock defined
                 if self.total_wallclock <= self.max_wallclock or not self.max_wallclock:
                     child.packed_during_building = True
-                    child.level = level
                     self.jobs_list.append(child)
-                    stack.append((child, level))
+                    stack.append((child, scan_index))
         return self.jobs_list
 
-    def get_wrappable_child(self, job: Job, level: int) -> Job:
-        """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
+    def get_wrappable_child(self, job: Job, scan_index: int) -> tuple[Job | None, int]:
+        """Return the first job after ``scan_index`` that is wrappable together with ``job``.
 
         :param job: Job to be evaluated.
-        :return: Job that is wrappable, or None if no such job is found.
+        :param scan_index: Position in ``sorted_jobs`` from which to start looking.
+        :return: The wrappable job (or ``None``) and the next scan position.
         """
         sorted_jobs = self.sorted_jobs
         child = None
-        index = level
-        for index in range(level, len(sorted_jobs)):
+        index = scan_index
+        for index in range(scan_index, len(sorted_jobs)):
             child_ = sorted_jobs[index]
             if child_.name != job.name and self._is_wrappable(child_):
                 child = child_
@@ -1113,24 +1048,26 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
     """
     Vertical Mixed Class. First statement of the constructor builds JobPackagerVertical.
 
-    :param dict_jobs: Jobs sorted by date, member, RUNNING, and chunk number. Only those relevant to the wrapper. \n
-    :type dict_jobs: Dictionary Key: date, Value: (Dictionary Key: Member, Value: List of jobs sorted) \n
-    :param ready_job: Job to be wrapped. \n
-    :type ready_job: Job Object \n
-    :param jobs_list: ready_job as a list. \n
-    :type jobs_list: List() of Job Object \n
-    :param total_wallclock: wallclock time per job. \n
-    :type total_wallclock: String \n
-    :param max_jobs: Maximum number of jobs per platform. \n
-    :type max_jobs: Integer \n
-    :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical). \n
-    :type wrapper_limits: Dict. \n
-    :param max_wallclock: Value from Platform. \n
-    :type max_wallclock: String \n
+    :param dict_jobs: Jobs sorted by date, member, RUNNING, and chunk number. Only those relevant to the wrapper.
+    :param ready_job: Job to be wrapped.
+    :param jobs_list: ready_job as a list.
+    :param total_wallclock: wallclock time per job.
+    :param max_jobs: Maximum number of jobs per platform.
+    :param wrapper_limits: All wrapper limitations are inside this dictionary ( min,max,by_section,horizontal and vertical).
+    :param max_wallclock: Value from Platform.
     """
 
-    def __init__(self, dict_jobs, ready_job, jobs_list, total_wallclock, max_jobs, wrapper_limits, max_wallclock,
-                 wrapper_info={}):
+    def __init__(
+        self,
+        dict_jobs: dict,
+        ready_job: Job,
+        jobs_list: list[Job],
+        total_wallclock: str,
+        max_jobs: int,
+        wrapper_limits: dict,
+        max_wallclock: str,
+        wrapper_info: dict | None = {},
+    ):
         super().__init__(
             jobs_list, total_wallclock, max_jobs, wrapper_limits, max_wallclock, wrapper_info)
         self.ready_job = ready_job
@@ -1149,17 +1086,17 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
         # sort by chunk number
         self.index = 0
 
-    def get_wrappable_child(self, job: Job, level: int) -> tuple[Job | None, int]:
-        """Goes through the jobs with the same date and member as the input job, and returns the first that satisfies self._is_wrappable().
+    def get_wrappable_child(self, job: Job, scan_index: int) -> tuple[Job | None, int]:
+        """Return the first job after ``scan_index`` that is wrappable together with ``job``.
 
         :param job: Job to be evaluated.
-        :param level: Job level.
-        :return: A tuple with a job that is wrappable (or ``None`` if no such job is found) and its level.
+        :param scan_index: Position in ``sorted_jobs`` from which to start looking.
+        :return: The wrappable job (or ``None``) and the next scan position.
         """
         sorted_jobs = self.sorted_jobs
         child = None
-        index = level
-        for index in range(level, len(sorted_jobs)):
+        index = scan_index
+        for index in range(scan_index, len(sorted_jobs)):
             child_ = sorted_jobs[index]
             if child_.name != job.name:
                 if self._is_wrappable(child_):
@@ -1167,7 +1104,7 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
                     break
         return child, index + 1
 
-    def _is_wrappable(self, job):
+    def _is_wrappable(self, job: "Job") -> bool:
         """Check if a job can be added to the current mixed wrapper chain.
 
         Unlike the parent class version, this does not enforce chunk boundaries
@@ -1189,7 +1126,8 @@ class JobPackagerVerticalMixed(JobPackagerVertical):
 
 
 class JobPackagerHorizontal:
-    def __init__(self, job_list, max_processors, wrapper_limits, max_jobs, processors_node, method="ASThread"):
+    def __init__(self, job_list: 'JobList', max_processors: int, wrapper_limits: dict, max_jobs: int,
+                 processors_node: int, method: str="ASThread"):
         self.processors_node = processors_node
         self.max_processors = max_processors
         self.wrapper_limits = wrapper_limits
@@ -1206,7 +1144,7 @@ class JobPackagerHorizontal:
         self._package_sections = {}
         self.wrapper_info = []
 
-    def build_horizontal_package(self, horizontal_vertical=False, wrapper_info=[]):
+    def build_horizontal_package(self, horizontal_vertical: bool = False, wrapper_info: list | None = None):
         self.wrapper_info = wrapper_info
         current_package = []
         current_package_by_section = {}
@@ -1266,17 +1204,17 @@ class JobPackagerHorizontal:
             self._sort_order_dict[section] = i
 
     # EXIT FALSE IF A SECTION EXIST AND HAVE LESS PROCESSORS
-    def add_sectioncombo_processors(self, total_processors_section):
-        keySection = ""
+    def add_section_combo_processors(self, total_processors_section: int) -> bool:
+        key_section = ""
 
         self._sectionList.sort()
         for section in self._sectionList:
-            keySection += str(section)
-        if keySection in self._package_sections:
-            if self._package_sections[keySection] < total_processors_section:
+            key_section += str(section)
+        if key_section in self._package_sections:
+            if self._package_sections[key_section] < total_processors_section:
                 return False
         else:
-            self._package_sections[keySection] = total_processors_section
+            self._package_sections[key_section] = total_processors_section
         self._maxTotalProcessors = max(
             max(self._package_sections.values()), self._maxTotalProcessors)
         return True
@@ -1284,7 +1222,7 @@ class JobPackagerHorizontal:
     def sort_by_expression(self, section):
         return self._sort_order_dict[section]
 
-    def get_next_packages(self, jobs_sections, max_wallclock=None, horizontal_vertical=False, max_procs=0):
+    def get_next_packages(self, jobs_sections: dict[str], max_wallclock: dict | None = None, horizontal_vertical: bool=False, max_procs: int=0):
         packages = []
         job = max(self.job_list, key=attrgetter('total_wallclock'))
         wallclock = job.wallclock

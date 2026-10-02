@@ -2,48 +2,33 @@
 Installation
 ############
 
-How to install
-==============
+Autosubmit is free software, licensed under |license|.
 
-The Autosubmit code is hosted in GitHub. The Autosubmit Python package is available through PyPI, the primary source for Python packages.
+.. admonition:: Prerequisites
+   :class: tip
 
-- Pre-requisites: bash, python >= 3.9, sqlite3, git-scm >= 2.32, subversion, pip >= 24.0, dialog, curl, python-tk(tkinter in centOS), graphviz >= 2.41, rsync
+   **Python** |python_min| – |python_max| — enforced by the installed package, and ``pip`` ≥ 24.0 (check with ``pip -V``).
 
-.. important:: (SYSTEM) Python version has to be at least 3.9 and at most 3.12.
-.. important:: (SYSTEM) Graphviz version must be >= 2.38 except 2.40 (not working). You can check the version using dot -v.
-.. important:: (SYSTEM) Pip version must be >= 24.0. You can check the version using pip -V.
+   These must be available on the host machine:
 
-- Python dependencies: configobj>=5.0.6, argparse>=1.4.0 , python-dateutil>=2.8.2, matplotlib==3.4.3, numpy==1.21.6, py3dotplus>=1.1.0, pyparsing>=3.0.7, paramiko>=2.9.2, mock>=4.0.3, six>=1.10, portalocker>=2.3.2, networkx==2.6.3, requests>=2.27.1, bscearth.utils>=0.5.2, cryptography>=36.0.1, setuptools>=60.8.2, xlib>=0.21, pip>=22.0.3, ruamel.yaml, pythondialog, pytest, nose, coverage, PyNaCl==1.4.0, six>=1.10.0, requests, xlib, Pygments, packaging==19, typing>=3.7
+   .. system_dependencies::
 
-.. important:: ``dot -v`` command should contain "dot", pdf, png, SVG, Xlib in the device section.
+.. note:: The ``dot -v`` command should list ``dot``, ``pdf``, ``png``, ``SVG`` and ``Xlib`` in the device section.
 
-.. important:: The host machine has to be able to access HPCs/Clusters via password-less ssh. Ensure that the ssh key is in PEM format ``ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM``.
+.. important:: The host machine must be able to reach HPCs and clusters via password-less SSH. Generate a PEM-format key with ``ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM``.
 
-To install autosubmit, execute the following:
-::
+Install Autosubmit
+==================
 
-    pip install autosubmit
+Autosubmit is distributed via `PyPI`_ and as source on `GitHub`_. Choose one of the methods below.
+The commands use ``apt`` and assume Ubuntu 22.04 LTS or 24.04 LTS, whose default ``python3`` falls within the supported range; adjust for other distributions.
 
-Or download, unpack and:
-::
+.. _install-with-pip:
 
-    pip install .
+Install with pip
+----------------
 
-.. hint::
-    To check if Autosubmit is installed, run ``autosubmit -v`` This command will print Autosubmit's current version
-
-.. runcmd:: autosubmit -v
-
-.. hint::
-    To read Autosubmit's readme file, run ``autosubmit readme``
-
-.. hint::
-    To see the changelog, use ``autosubmit changelog``
-
-The sequence of instructions to install Autosubmit and its dependencies with pip.
----------------------------------------------------------------------------------
-
-.. warning:: The following instructions are for Ubuntu 20.04 LTS. The instructions may vary for other UNIX distributions.
+Install system packages and the Autosubmit Python package:
 
 .. code-block:: bash
 
@@ -53,108 +38,83 @@ The sequence of instructions to install Autosubmit and its dependencies with pip
     # Avoid interactive stuff
     export DEBIAN_FRONTEND=noninteractive
 
-    # Dependencies
-    apt install wget curl python3.9 python3.9-tk python3.9-dev graphviz -y -q
+    # System dependencies
+    # This example is for Debian-based distributions. On Suse, RHEL, Alpine,
+    # Rocky and others, install the equivalent packages for your package manager.
+    apt install --yes --quiet \
+        git \
+        graphviz \
+        python3 \
+        python3-pip \
+        rsync \
+        sqlite3 \
+        subversion
 
-    # Additional dependencies related with pycrypto
-    apt install build-essential libssl-dev libffi-dev -y -q
-
-    # Install Autosubmit using pip
+    # Install Autosubmit from PyPI
     pip3 install autosubmit
 
-    # Check that we can execute autosubmit commands
+    # Verify the CLI works
     autosubmit -h
 
-For a very quick test, you can follow the next instructions to configure and run Autosubmit at the user level. Otherwise, please go directly to `How to configure Autosubmit <https://autosubmit.readthedocs.io/en/master/installation/index.html#how-to-configure-autosubmit>`_ .
+Then proceed to :ref:`quick-setup` or :ref:`full-setup`.
+
+Build from source
+-----------------
+
+Clone the source from `GitHub`_ and install with ``pip`` from a working copy.
 
 .. code-block:: bash
 
-    # Quick-configure ( user-level database)
-    autosubmit configure
-
-    # Create Autosubmit directories and database
-    autosubmit install
-
-    # Quick-start
-
-    # Get <EXPID>
-    autosubmit a000 -H "local" -d "Test exp in local."
-
-    # Create with
-    # Since it was a new install, the <EXPID> will be a000
-    autosubmit create a000
-
-    # In case you want to use a remote platform
-
-    # Generate a key pair for password-less ssh. PEM format is recommended as others can cause problems
-    ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM
-
-    # Copy the public key to the remote machine
-    ssh-copy-id -i ~/.ssh/id_rsa.pub user@remotehost
-
-
-    # Add your key to the ssh-agent ( if encrypted )
-
-    # If not initialized, initialize it
-    eval `ssh-agent -s`
-
-    # Add the key
-    ssh-add ~/.ssh/id_rsa
-    # Where ~/.ssh/id_rsa is the path to your private key
-
-    # run
-    autosubmit run a000
-
-
-The sequence of instructions to install Autosubmit and its dependencies with conda.
------------------------------------------------------------------------------------
-
-.. warning:: The following instructions are for Ubuntu 20.04 LTS. The instructions may vary for other UNIX distributions.
-
-.. warning:: This procedure is still WIP. You can follow the process at `issue #864 <https://earth.bsc.es/gitlab/es/autosubmit/-/issues/886>`_. We strongly recommend using the pip procedure.
-
-If you don't have conda installed yet, we recommend following `Installing Miniconda <https://docs.conda.io/projects/miniconda/en/latest/index.html>`_.
-
-.. code-block:: bash
-
-    # Download git
-    apt install git -y -q
-
-    # Download autosubmit
-    git clone https://github.com/BSC-ES/autosubmit.git -b v4.0.0b
+    git clone https://github.com/BSC-ES/autosubmit.git
     cd autosubmit
+    pip install .
 
-    # Create a Conda environment from YAML with autosubmit dependencies
-    conda env create -f environment.yml -n autosubmitenv
+Then proceed to :ref:`quick-setup` or :ref:`full-setup`.
 
-    # Activate env
-    conda activate autosubmitenv
+Verify the install
+------------------
 
-    # Install autosubmit
-    pip install autosubmit
+.. runcmd:: autosubmit -v
 
-    # Test autosubmit
-    autosubmit -v
+.. _quick-setup:
 
-For a very quick test, you can follow the next instructions to configure and run Autosubmit at the user level. Otherwise, please go directly to `How to configure Autosubmit <https://autosubmit.readthedocs.io/en/master/installation/index.html#how-to-configure-autosubmit>`_
+Quick setup
+===========
+
+For a personal test with a user-level database. This creates ``$HOME/.autosubmitrc`` and puts everything under ``$HOME/autosubmit/``.
 
 .. code-block:: bash
 
-    # Quick-configure ( user-level database)
+    # Quick-configure (user-level database)
     autosubmit configure
 
     # Create Autosubmit directories and database
     autosubmit install
 
-    # Quick-start
-    # Get <EXPID>
-    autosubmit <EXPID> -H "local" -d "Test exp in local."
+    # Generate a new <EXPID>
+    autosubmit expid -H "local" -d "Test exp in local."
 
-    # Create with
+    # Create the experiment structure
     # Since it was a new install, the <EXPID> will be a000
     autosubmit create a000
 
-    # In case you want to use a remote platform
+    # Run the experiment
+    autosubmit run a000
+
+.. hint::
+    The ``dialog`` (GUI) library is optional. Without it, ``autosubmit configure`` prompts on the CLI. Use ``autosubmit configure -h`` to see all options.
+
+You can pass ``--advanced`` to ``autosubmit configure`` to choose different paths:
+
+* Experiments path (``$HOME/autosubmit/`` by default) and database filename (``autosubmit.db`` by default).
+* Global logs — those not belonging to any experiment (default ``$HOME/autosubmit/logs``).
+* Autosubmit metadata (default ``$HOME/autosubmit/metadata/``).
+
+You can also configure an SMTP server and email address for notifications.
+
+To run on a remote platform, first set up password-less SSH:
+
+.. code-block:: bash
 
     # Generate a key pair for password-less ssh. PEM format is recommended as others can cause problems
     ssh-keygen -t rsa -b 4096 -C "email@email.com" -m PEM
@@ -162,109 +122,64 @@ For a very quick test, you can follow the next instructions to configure and run
     # Copy the public key to the remote machine
     ssh-copy-id -i ~/.ssh/id_rsa.pub user@remotehost
 
-    # Add your key to ssh agent ( if encrypted )
+    # Add your key to the ssh-agent (if encrypted)
     # If not initialized, initialize it
     eval `ssh-agent -s`
     # Add the key
     ssh-add ~/.ssh/id_rsa
     # Where ~/.ssh/id_rsa is the path to your private key
 
-    # run
-    autosubmit run a000
-
-.. hint::
-    After installing the Conda, you may need to close the terminal and re-open it so the installation takes effect.
-
-
-How to configure Autosubmit
-===========================
-
-There are two methods of configuring the Autosubmit main paths.
-
-* ``autosubmit configure`` is suited for a personal/single user who wants to test Autosubmit in the scope of ``$HOME``. It will generate an ``$HOME/.autosubmitrc`` file that overrides the machine configuration.
-
-Manually generate an ``autosubmitrc`` file in one of these locations, which is the recommended method for a production environment with a shared database in a manner that multiple users can share and view others' experiments.
-
-* ``/etc/autosubmitrc``, System level configuration.
-
-* Set the environment variable ``AUTOSUBMIT_CONFIGURATION`` to the path of the ``autosubmitrc`` file. This will override all other configuration files.
-
-.. important::  ``.autosubmitrc`` user level precedes system configuration unless the environment variable is set. ``AUTOSUBMIT_CONFIGURATION`` > ``$HOME/.autosubmitrc`` > ``/etc/autosubmitrc``
-
-Quick Installation - Non-shared database (user level)
-------------------------------------------------------
-
-After the package installation, set up Autosubmit with the following sequence of commands:
-
-::
-
-    autosubmit configure
-    autosubmit install
-
-When running ``autosubmit configure``, you have to configure at least the database and path for Autosubmit.
-
-``autosubmit configure`` will always generate a file called ``.autosubmitrc`` in your ``$HOME``.
-``autosubmit install`` creates the directories defined in that file (experiments path, logs, metadata) and initialises the database.
-
-.. important::
-    In Autosubmit ``<= 4.1.16``, ``autosubmit configure`` created the directories itself.
-    From the next release onwards, directory creation is the responsibility of ``autosubmit install``.
-    If you are upgrading, make sure to run ``autosubmit install`` after ``autosubmit configure``.
-
-
-You can add ``--advanced`` to the configure command for advanced options.
-
-::
-
-    autosubmit configure --advanced
-
-It will allow you to choose different directories:
-
-* Experiments path and database name (``$HOME/autosubmit/`` by default) and database name (``$HOME/autosubmit/autosubmit.db`` by default)
-* Path for the global logs (those not belonging to any experiment). Default is ``$HOME/autosubmit/logs``.
-* Autosubmit metadata. Default is ``$HOME/autosubmit/metadata/``
-
-Additionally, it also provides the possibility of configuring an SMTP server and an email account to use the email notifications feature.
-
-.. hint::
-    The ``dialog`` (GUI) library is optional. Otherwise, the configuration parameters will be prompted (CLI). Use ``autosubmit configure -h`` to see all the allowed options.
-
-Example - Local - .autosubmitrc skeleton
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example: user-level ``.autosubmitrc``
+-------------------------------------
 
 .. code-block:: ini
 
    [database]
-   path = /home/dbeltran/autosubmit
+   path = /home/<user>/autosubmit
    filename = autosubmit.db
 
    [local]
-   path = /home/dbeltran/autosubmit
+   path = /home/<user>/autosubmit
 
    [globallogs]
-   path = /home/dbeltran/autosubmit/logs
+   path = /home/<user>/autosubmit/logs
 
    [structures]
-   path = /home/dbeltran/autosubmit/metadata/structures
+   path = /home/<user>/autosubmit/metadata/structures
 
    [historicdb]
-   path = /home/dbeltran/autosubmit/metadata/data
+   path = /home/<user>/autosubmit/metadata/data
 
    [historiclog]
-   path = /home/dbeltran/autosubmit/metadata/logs
+   path = /home/<user>/autosubmit/metadata/logs
 
-
-Production environment installation - Shared-Filesystem database
-----------------------------------------------------------------
+.. _full-setup:
 
 .. _Shared-Filesystem:
 
-.. warning:: Keep in mind the .autosubmitrc precedence. If you, as a user, have a .autosubmitrc generated in the quick-installation, you have to delete or rename it before using the production environment installation.
+Full setup
+==========
 
-Create an ``/etc/autosubmitrc`` file or move it from ``$HOME/.autosubmitrc`` to ``/etc/autosubmitrc`` with the information as follows:
+Use this setup for production. Configuration goes in ``/etc/autosubmitrc``, which points every user on the machine at the same experiment database, so they can see and work with each other's experiments.
 
-Mandatory parameters of /etc/autosubmit
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Priority order of configuration files:
+
+``AUTOSUBMIT_CONFIGURATION`` > ``$HOME/.autosubmitrc`` > ``/etc/autosubmitrc``
+
+Set the ``AUTOSUBMIT_CONFIGURATION`` environment variable to the path of an ``autosubmitrc`` file to override everything else.
+
+.. warning:: If you already have ``$HOME/.autosubmitrc`` from :ref:`quick-setup`, delete or rename it before doing the full setup, or it will shadow ``/etc/autosubmitrc``.
+
+.. _configure-autosubmit:
+
+``autosubmit configure``
+------------------------
+
+Create ``/etc/autosubmitrc`` with the sections below, or move an existing ``$HOME/.autosubmitrc`` there.
+Any of the locations listed above will do — ``/etc/autosubmitrc`` is the usual choice for a shared installation because every user on the machine picks it up.
+
+Mandatory parameters
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: ini
 
@@ -280,41 +195,41 @@ Mandatory parameters of /etc/autosubmit
 
     # Global logs, logs without <EXPID> associated.
     [globallogs]
-    path = /home/dbeltran/autosubmit/logs
+    path = /home/<user>/autosubmit/logs
 
     # This depends on your email server and can be left empty if not applicable
     [mail]
     smtp_server = mail.bsc.es
     mail_from = automail@bsc.es
 
-Recommendable parameters of /etc/autosubmit
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recommended parameters
+~~~~~~~~~~~~~~~~~~~~~~
 
-The following parameters are the Autosubmit metadata, it is not mandatory, but it is recommendable to have them set up as some of them can positively affect the Autosubmit performance.
+The following parameters are the Autosubmit metadata. They are not mandatory, but it is recommended to have them set up, as some of them can positively affect the Autosubmit performance.
 
 .. code-block:: ini
 
    [structures]
-   path = /home/dbeltran/autosubmit/metadata/structures
+   path = /home/<user>/autosubmit/metadata/structures
 
    [historicdb]
-   path = /home/dbeltran/autosubmit/metadata/data
+   path = /home/<user>/autosubmit/metadata/data
 
    [historiclog]
-   path = /home/dbeltran/autosubmit/metadata/logs
+   path = /home/<user>/autosubmit/metadata/logs
 
-Optional parameters of /etc/autosubmit
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Optional parameters
+~~~~~~~~~~~~~~~~~~~
 
 These parameters provide extra functionalities to Autosubmit.
 
 .. code-block:: ini
 
     [conf]
-    # Allows using a different jobs_<EXPID>.yml default template on `autosubmit expid ``
+    # Allows using a different jobs_<EXPID>.yml default template on `autosubmit expid`
     jobs = <path_jobs>/jobs_<EXPID>.yml
-    # Allows using a different platforms_<EXPID>.yml default template on `autosubmit expid `
-    platforms = <path_platforms>platforms_<EXPID>.yml> path to any jobs.yml
+    # Allows using a different platforms_<EXPID>.yml default template on `autosubmit expid`
+    platforms = <path_platforms>/platforms_<EXPID>.yml
 
     # Autosubmit API includes extra information for some Autosubmit functions. It is optional to have access to it to use Autosubmit.
     [autosubmitapi]
@@ -323,18 +238,18 @@ These parameters provide extra functionalities to Autosubmit.
 
     # Used for controlling the traffic that comes from Autosubmit.
     [hosts]
-    authorized =  [<command1,commandN> <machine1,machineN>]
-    forbidden =   [<command1,commandN> <machine1,machineN>]
+    authorized = [<command1,commandN> <machine1,machineN>]
+    forbidden = [<command1,commandN> <machine1,machineN>]
 
 About hosts parameters:
 
-From 3.14+ onwards, the users can tailor Autosubmit commands to run on specific machines. Previously, only the run was affected by the deprecated whitelist parameter.
+From ``3.14+`` onwards, the users can tailor Autosubmit commands to run on specific machines. Previously, only the run was affected by the deprecated ``whitelist`` parameter.
 
-* authorized =  [<command1,commandN> <machine1,machineN>] list of machines that can run given autosubmit commands. If the list is empty, all machines are allowed.
-* forbidden =   [<command1,commandN> <machine1,machineN>] list of machines that cannot run given autosubmit commands. If the list is empty, no machine is forbidden.
+* ``authorized = [<command1,commandN> <machine1,machineN>]`` list of machines that can run given autosubmit commands. If the list is empty, all machines are allowed.
+* ``forbidden = [<command1,commandN> <machine1,machineN>]`` list of machines that cannot run given autosubmit commands. If the list is empty, no machine is forbidden.
 
-Example - BSC - /etc/autosubmitrc skeleton
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example: BSC ``/etc/autosubmitrc``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: ini
 
@@ -354,26 +269,27 @@ Example - BSC - /etc/autosubmitrc skeleton
    mail_from = automail@bsc.es
 
    [hosts]
-        authorized =  [run bscearth000,bscesautosubmit01,bscesautosubmit02] [stats, clean, describe, check, report,dbfix,pklfix, upgrade,updateversion all]
-        forbidden =  [expìd, create, recovery, delete, inspect, monitor, recovery, configure,setstatus,testcase, test, refresh, archive, unarchive bscearth000,bscesautosubmit01,bscesautosubmit02]
+   authorized = [run bscearth000,bscesautosubmit01,bscesautosubmit02] [stats, clean, describe, check, report,dbfix,pklfix, upgrade,updateversion all]
+   forbidden = [expid, create, recovery, delete, inspect, monitor, recovery, configure,setstatus,testcase, test, refresh, archive, unarchive bscearth000,bscesautosubmit01,bscesautosubmit02]
 
-Experiments database and directories installation
-===================================================
+``autosubmit install``
+----------------------
 
-As the last step, ensure to install the Autosubmit database. To do so, execute  ``autosubmit install``.
+Finally, create the directories defined in ``/etc/autosubmitrc`` and initialise a blank database:
 
 .. code-block:: bash
 
     autosubmit install
 
-This creates the Autosubmit directories and generates a blank database at the configured path.
-
-.. note::
-    In versions ``<= 4.1.16``, directory creation was done by ``autosubmit configure``.
-
 Dependencies and licenses
 =========================
 
-The list below includes the runtime software used by Autosubmit and their licenses.
+.. dropdown:: Python dependencies and licenses
+   :icon: package
 
-.. dependencies_licenses::
+   Generated at build time from ``pyproject.toml``.
+
+   .. dependencies_licenses::
+
+.. _PyPI: https://pypi.org/project/autosubmit/
+.. _GitHub: https://github.com/BSC-ES/autosubmit

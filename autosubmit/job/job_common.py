@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -16,6 +16,57 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
+import re
+from collections.abc import Iterable
+
+__all__ = [
+    "Status",
+    "Type",
+    "bcolors",
+    "get_job_status",
+    "increase_wallclock_by_chunk",
+    "max_wallclock_seconds",
+    "parse_output_number",
+    "separate_section_entries",
+    "wallclock_to_seconds",
+]
+
+_WALLCLOCK_RE = re.compile(r"(((?P<hours>\d+):)((?P<minutes>\d+)))(:(?P<seconds>\d+))?")
+
+
+def wallclock_to_seconds(wallclock: str | None) -> int | None:
+    """Convert a ``HH:MM[:SS]`` wallclock to seconds.
+
+    :param wallclock: Wallclock to convert, e.g. ``'07:30'`` or ``'07:30:00'``.
+    :return: The wallclock in seconds, or ``None`` if it is empty, not a string or cannot be parsed.
+    """
+    if not wallclock or not isinstance(wallclock, str):
+        return None
+    match = _WALLCLOCK_RE.match(wallclock)
+    if not match:
+        return None
+    parts = match.groupdict()
+    hours = int(parts["hours"])
+    minutes = int(parts["minutes"]) if parts["minutes"] else 0
+    seconds = int(parts["seconds"]) if parts["seconds"] else 0
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def max_wallclock_seconds(wallclocks: Iterable[str], platform_max_wallclock: str | None = None,
+                          fallback: int = 0) -> int:
+    """Return the longest wallclock (seconds) among the given ones.
+
+    Entries without a wallclock (empty, unparseable or ``'00:00'``) fall back to the platform
+    maximum wallclock. If no wallclock is available at all, ``fallback`` is returned.
+
+    :param wallclocks: Wallclocks to evaluate.
+    :param platform_max_wallclock: Platform maximum wallclock to use as fallback.
+    :param fallback: Value returned when no wallclock is available.
+    :return: The longest wallclock in seconds.
+    """
+    platform_max = wallclock_to_seconds(platform_max_wallclock) or 0
+    longest = max((wallclock_to_seconds(wallclock) or platform_max for wallclock in wallclocks), default=0)
+    return longest or fallback
 
 
 class Status:
@@ -44,6 +95,10 @@ class Status:
     LOGICAL_ORDER = ["SUSPENDED", "WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED",
                      "FAILED", "UNKNOWN", "COMPLETED"]
     LOGICAL_ORDER_SUCCESS_WORKFLOW = ["WAITING", "DELAYED", "PREPARED", "READY", "SUBMITTED", "HELD", "QUEUING", "RUNNING", "SKIPPED", "COMPLETED"]
+    # Statuses with a job running on the platform that must be cancelled before leaving them.
+    ACTIVE = (SUBMITTED, QUEUING, RUNNING)
+    # Statuses that will be scheduled again: per-attempt state must be reset when entering them.
+    RE_RUNNABLE = (WAITING, READY, DELAYED, PREPARED, SUSPENDED)
 
     def retval(self, value):
         return getattr(self, value)
@@ -92,14 +147,12 @@ class Type:
 
 # TODO: Statistics classes refactor proposal: replace tailer by footer
 
-def parse_output_number(string_number):
+def parse_output_number(string_number: str) -> float:
     """
     Parses number in format 1.0K 1.0M 1.0G
 
     :param string_number: String representation of number
-    :type string_number: str
-    :return: number in float format
-    :rtype: float
+    :return: convertion to float format
     """
     number = 0.0
     if string_number:
@@ -122,20 +175,16 @@ def parse_output_number(string_number):
             number = 0.0
     return number
 
-def increase_wallclock_by_chunk(current, increase, chunk):
+def increase_wallclock_by_chunk(current: str, increase: str, chunk: int) -> str:
     """
     Receives the wallclock times an increases it according to a quantity times the number of the current chunk.
     The result cannot be larger than the platform max_wallclock.
     If Chunk = 0 then no increment.
 
     :param current: WALLCLOCK HH:MM
-    :type current: str
     :param increase: WCHUNKINC HH:MM
-    :type increase: str
     :param chunk: chunk number
-    :type chunk: int
     :return: HH:MM wallclock
-    :rtype: str
     """
     # Pipeline is not testing this since mock is not well-made
     try:
@@ -157,3 +206,52 @@ def increase_wallclock_by_chunk(current, increase, chunk):
     except Exception:
         # print(exp)
         return current
+
+
+def separate_section_entries(filter_entries: str) -> list[str]:
+    """Separate section entries with optional splits separated by comma into a list.
+
+    :param filter_entries: string with the entries separated by comma
+    :return: list of entries
+    """
+    text = filter_entries.strip()
+    if not text:
+        return []
+
+    entries = []
+    for entry in text.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        entries.append(entry.upper())
+    return entries
+
+
+def get_job_status(status: str) -> int | None:
+    """Convert job status from text to integer code.
+
+    :param status: Status text.
+    :return: The integer status value.
+    """
+    status = status.upper()
+    if status == "READY":
+        return Status.READY
+    elif status == "COMPLETED":
+        return Status.COMPLETED
+    elif status == "WAITING":
+        return Status.WAITING
+    elif status == "HELD":
+        return Status.HELD
+    elif status == "SUSPENDED":
+        return Status.SUSPENDED
+    elif status == "FAILED":
+        return Status.FAILED
+    elif status == "RUNNING":
+        return Status.RUNNING
+    elif status == "QUEUING":
+        return Status.QUEUING
+    elif status == "SUBMITTED":
+        return Status.SUBMITTED
+    elif status == "UNKNOWN":
+        return Status.UNKNOWN
+    return None

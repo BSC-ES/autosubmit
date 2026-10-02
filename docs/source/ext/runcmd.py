@@ -14,7 +14,6 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 from docutils import nodes
 from docutils.nodes import Node

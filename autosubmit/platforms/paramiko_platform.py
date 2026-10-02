@@ -23,7 +23,6 @@ import os
 import random
 import re
 import select
-import socket
 import sys
 from contextlib import suppress
 from io import BufferedReader
@@ -35,7 +34,7 @@ from typing import TYPE_CHECKING
 import paramiko
 import Xlib.support.connect as xlib_connect
 from bscearth.utils.date import date2str
-from paramiko import ProxyCommand
+from paramiko import ProxyCommand, SFTPError
 from paramiko.agent import Agent
 from paramiko.ssh_exception import SSHException
 
@@ -372,6 +371,13 @@ class ParamikoPlatform(Platform):
         try:
             self._init_local_x11_display()
 
+            # How long to wait for a key (re)negotiation to finish before giving
+            # up. Busy OpenSSH login nodes can take longer than paramiko's
+            # hard-coded default (30s) to complete a rekey, which raises
+            # ``SSHException: Key-exchange timed out waiting for key negotiation``.
+            clear_to_send_timeout = float(
+                self.config.get('PLATFORMS', {}).get(self.name.upper(), {}).get('CLEAR_TO_SEND_TIMEOUT', 180))
+
             is_current_real_user_owner = True if not as_conf else as_conf.is_current_real_user_owner
 
             ssh_config_path: Path = _get_user_config_file(
@@ -424,6 +430,7 @@ class ParamikoPlatform(Platform):
                                               disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                 self.transport = self._ssh.get_transport()
                 self.transport.banner_timeout = 60
+                self.transport.clear_to_send_timeout = clear_to_send_timeout
             else:
                 Log.warning("2FA is enabled, this is an experimental feature and it may not work as expected")
                 Log.warning("nohup can't be used as the password will be asked")
@@ -443,6 +450,7 @@ class ParamikoPlatform(Platform):
                 if self.transport.is_authenticated():
                     self._ssh._transport = self.transport
                     self.transport.banner_timeout = 60
+                    self.transport.clear_to_send_timeout = clear_to_send_timeout
                 else:
                     self.transport.close()
                     raise SSHException
@@ -596,7 +604,7 @@ class ParamikoPlatform(Platform):
                     Log.printlog(f"File {filename} seems to no exists (skipping)", 5004)
             if must_exist:
                 if not ignore_log:
-                    Log.printlog(f"File {filename} does not exists", 6004)
+                    Log.printlog(f"File {filename} does not exist", 6004)
             else:
                 if not ignore_log:
                     Log.printlog(f"Log file couldn't be retrieved: {filename}", 5000)
@@ -651,18 +659,18 @@ class ParamikoPlatform(Platform):
             return True
         except OSError as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(path_root, src)} does not exists, something went '
+                raise AutosubmitError(f'File {os.path.join(path_root, src)} does not exist, something went '
                                       f'wrong with the platform', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exists", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(path_root, src)} does not exist", 6004, str(e))
             else:
-                Log.debug(f"File {path_root} doesn't exists ")
+                Log.debug(f"File {path_root} does not exist ")
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exists', 6004, str(e))
+                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exist', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exists", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exist", 6004, str(e))
             else:
                 Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
                 return False
@@ -687,13 +695,11 @@ class ParamikoPlatform(Platform):
 
         :param script_names: Script filenames to submit on the remote
             platform.
-        :type script_names: list[str]
         :raises AutosubmitError: If the submission command fails or no submit
             output can be parsed.
         :raises AutosubmitCritical: If Slurm reports a critical submission
             failure.
         :return: Submitted Slurm job identifiers in submission order.
-        :rtype: list[int]
         """
 
         if not script_names:
@@ -706,7 +712,7 @@ class ParamikoPlatform(Platform):
         self.send_command(cmd)
         jobs_ids = None
 
-        # If it is is a critical, no jobs will be submitted at all, stop autosubmit
+        # If it is a critical, no jobs will be submitted at all, stop autosubmit
         with suppress(AutosubmitError):
             jobs_ids = self.get_submitted_job_id(self.get_ssh_output())
 
@@ -817,9 +823,11 @@ class ParamikoPlatform(Platform):
 
             if cancel and job_status is Status.FAILED:
                 try:
-                    if self.cancel_cmd is not None:
+                    if self.cancel_cmd is not None and job.id:
                         Log.warning(f"Job {job.id} is over wallclock, cancelling job")
                         job.platform.send_command(self.cancel_cmd + " " + str(job.id))
+                    elif not job.id:
+                        Log.warning(f"Skipping cancellation of job with invalid ID: {job.id}")
                 except Exception as e:
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
@@ -1309,8 +1317,28 @@ class ParamikoPlatform(Platform):
                 return stdin, stdout, stderr
             except (OSError, paramiko.SSHException, ConnectionError) as e:
                 Log.warning(f'A networking error occurred while executing command [{command}]: {str(e)}')
-                if not self.connected or not self.transport or not self.transport.active:
-                    self.restore_connection(None)
+                # A transport stuck in key negotiation (e.g. "Key-exchange timed out
+                # waiting for key negotiation") still reports ``active=True`` but can
+                # never complete the command; the only reliable recovery is to rebuild
+                # the connection.
+                transport_stuck = (
+                    isinstance(e, paramiko.SSHException)
+                    or not self.connected
+                    or not self.transport
+                    or not self.transport.active
+                )
+                if transport_stuck:
+                    try:
+                        self.restore_connection(None)
+                    except (
+                        AutosubmitError,
+                        AutosubmitCritical,
+                        OSError,
+                        paramiko.SSHException,
+                    ) as reconnect_error:
+                        Log.warning(
+                            f'Failed to restore SSH connection after error: {reconnect_error}'
+                        )
                     if self.transport and self.transport.active:
                         continue
                 else:
@@ -1433,6 +1461,8 @@ class ParamikoPlatform(Platform):
             return True
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
+        except (paramiko.SSHException, ConnectionError, TimeoutError) as e:
+            raise AutosubmitError(f"SSH transport error: {str(e)}", 6005)
         except OSError as e:
             raise AutosubmitError(f"I/O issues: {str(e)}", 6016)
 
@@ -1787,6 +1817,50 @@ class ParamikoPlatform(Platform):
                 parsed_job_names[job_name.strip()] = [ids]
 
         return parsed_job_names
+
+    def check_file_exists(
+        self,
+        src: str,
+        wrapper_failed: bool = False,
+        sleeptime: int = 5,
+        max_retries: int = 3,
+        show_logs: bool = True,
+    ):
+        """Checks if a file exists on the FTP server.
+
+        :param src: The name of the file to check.
+        :param wrapper_failed: Whether the wrapper has failed. Defaults to False.
+        :param sleeptime: Time to sleep between retries in seconds. Defaults to 5.
+        :param max_retries: Maximum number of retries. Defaults to 3.
+        :param show_logs: Whether to show logs if the file does not exist. Defaults to True.
+        :return: True if the file exists, False otherwise
+        """
+
+        file_exist = False
+        retries = 0
+
+        while not file_exist and retries < max_retries:
+            try:
+                # This return IOError if path does not exist
+                self._ftpChannel.stat(str(Path(self.get_files_path(), src)))
+                file_exist = True
+            except OSError:  # File does not exist, retry in sleeptime
+                if not wrapper_failed:
+                    sleep(sleeptime)
+                    retries = retries + 1
+                else:
+                    sleep(2)
+                    retries = retries + 1
+            except SFTPError as e:  # Unrecoverable error
+                if "garbage" in str(e).lower() and not wrapper_failed:
+                    sleep(sleeptime)
+                    sleeptime = sleeptime + 5
+                    retries = retries + 1
+                else:
+                    raise
+        if not file_exist and show_logs:
+            Log.warning(f"File {src} couldn't be found")
+        return file_exist
 
     def _get_job_names_cmd(self, job_names: list) -> str:
         """Return a command that groups job IDs by job name.

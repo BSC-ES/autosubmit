@@ -15,14 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Integration tests for argument behavior."""
+
 from pathlib import Path
 
 import pytest
 from bscearth.utils.date import date2str
 
 from autosubmit.config.basicconfig import BasicConfig
-
-"""Integration tests for argument behavior."""
+from autosubmit.job.job_list import load_job_list
+from autosubmit.workflow.manage import inspect
 
 
 @pytest.fixture(scope="function")
@@ -46,22 +48,6 @@ def cleanup_cmds(templates_dir: Path) -> None:
                 pass
 
 
-# TODO: this will not be necessary once the lock file is deleted correctly
-def cleanup_lock(as_exp) -> None:
-    """Remove the inspect lock file if the fixture created one."""
-    lock_file = (
-        Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
-        / as_exp.expid
-        / BasicConfig.LOCAL_TMP_DIR
-        / "autosubmit.lock"
-    )
-    if lock_file.exists():
-        try:
-            lock_file.unlink()
-        except Exception:
-            pass
-
-
 def do_inspect(
     as_exp, fl=None, fc=None, fs=None, ft=None, quick=False, check_wrapper=False
 ):
@@ -73,9 +59,8 @@ def do_inspect(
         / BasicConfig.LOCAL_TMP_DIR
     )
     cleanup_cmds(templates)
-    cleanup_lock(as_exp)
 
-    as_exp.autosubmit.inspect(
+    inspect(
         expid=as_exp.expid,
         lst=fl,
         filter_chunks=fc,
@@ -91,7 +76,7 @@ def do_inspect(
 
 def test_inspect_combined_filters(as_exp, mocker, templates_dir):
     """Test that when inspect and multiple filters are used, selected jobs must match the intersecion of the filters."""
-    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
 
     target = next(
         job
@@ -116,7 +101,7 @@ def test_inspect_combined_filters(as_exp, mocker, templates_dir):
         captured_jobs["names"] = [job.name for job in jobs] if jobs else []
 
     mocker.patch(
-        "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers",
+        "autosubmit.workflow.manage.generate_scripts_andor_wrappers",
         side_effect=capture_generate_scripts,
     )
 
@@ -133,7 +118,7 @@ def test_inspect_combined_filters(as_exp, mocker, templates_dir):
 
 def test_inpect_no_filters_selects_all_jobs(as_exp, mocker):
     """Test that when inspect is called without filters, all jobs are selected."""
-    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
     all_job_names = [job.name for job in job_list.get_job_list()]
 
     captured_jobs = {}
@@ -144,7 +129,7 @@ def test_inpect_no_filters_selects_all_jobs(as_exp, mocker):
         captured_jobs["names"] = [job.name for job in jobs] if jobs else []
 
     mocker.patch(
-        "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers",
+        "autosubmit.workflow.manage.generate_scripts_andor_wrappers",
         side_effect=capture_generate_scripts,
     )
 
@@ -155,7 +140,7 @@ def test_inpect_no_filters_selects_all_jobs(as_exp, mocker):
 
 def test_check_wrappers_selects_uncompleted_jobs(as_exp, mocker):
     """Test that when inspect is called with check_wrapper=True, the uncompleted jobs are selected."""
-    job_list = as_exp.autosubmit.load_job_list(as_exp.expid, as_exp.as_conf, new=False)
+    job_list = load_job_list(as_exp.expid, as_exp.as_conf, new=False)
     expected_jobs = {job.name for job in job_list.get_uncompleted()}
 
     captured_jobs = {}
@@ -166,7 +151,7 @@ def test_check_wrappers_selects_uncompleted_jobs(as_exp, mocker):
         captured_jobs["names"] = [job.name for job in jobs] if jobs else []
 
     mocker.patch(
-        "autosubmit.autosubmit.Autosubmit.generate_scripts_andor_wrappers",
+        "autosubmit.workflow.manage.generate_scripts_andor_wrappers",
         side_effect=capture_generate_scripts,
     )
 

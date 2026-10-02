@@ -22,32 +22,29 @@ from time import sleep, time
 
 from psutil import Process
 
-from autosubmit.scripts.autosubmit import main
+# noinspection PyProtectedMember
+from autosubmit.scripts.autosubmit import _autosubmit
+from autosubmit.workflow.manage import run
 
 
-def test_autosubmit_commands_help(autosubmit_exp, mocker):
+def test_autosubmit_commands_help(autosubmit_exp):
     """Test that the monitor is called for stats with a simple job list.
 
     It must produce three PNG files. One with the job summary, one with the
     section summary, and one with the general statistics.
     """
-    exp = autosubmit_exp(experiment_data={
-        'JOBS': {
-            'SIM': {
-                'RUNNING': 'once',
-                'PLATFORM': 'local',
-                'SCRIPT': 'echo "OK"'
+    exp = autosubmit_exp(
+        experiment_data={
+            "JOBS": {
+                "SIM": {"RUNNING": "once", "PLATFORM": "local", "SCRIPT": 'echo "OK"'}
             }
         }
-    })
-    exp.autosubmit._check_ownership_and_set_last_command(
-        exp.as_conf,
-        exp.expid,
-        'run')
-    assert 0 == exp.autosubmit.run_experiment(exp.expid)
+    )
+    exp.as_conf.set_last_as_command("run")
+    assert 0 == run(exp.expid)
 
     processes_before_run = Process().children(recursive=True)
-    assert 0 == exp.autosubmit.run_experiment(exp.expid)
+    assert 0 == run(exp.expid)
     processes_after_run = Process().children(recursive=True)
 
     before = time()
@@ -60,17 +57,20 @@ def test_autosubmit_commands_help(autosubmit_exp, mocker):
         # data copied, and ``autosubmit stats`` can run and use those files.
         sleep(1)
 
-    mocker.patch('sys.argv', ['autosubmit', 'stats', '-o', 'png', '--section_summary',
-                              '--jobs_summary', '--hide', exp.expid])
-    assert 0 == main()
+    args = [
+        "stats",
+        "-o",
+        "png",
+        "--section_summary",
+        "--jobs_summary",
+        "--hide",
+        exp.expid,
+    ]
+    assert 0 == _autosubmit(args)
 
-    stats_folder = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, 'stats')
+    stats_folder = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, "stats")
     stats_files = list(stats_folder.iterdir())
 
     assert len(stats_files) == 3
 
-    assert all(
-        [
-            stat_file.name.endswith('.png') for stat_file in stats_files
-        ]
-    )
+    assert all(stat_file.name.endswith(".png") for stat_file in stats_files)

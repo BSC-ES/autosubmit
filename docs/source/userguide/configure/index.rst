@@ -114,26 +114,13 @@ For jobs running in HPC platforms, usually you have to provide information about
     * - ``QUEUE``
       - If given, Autosubmit will add jobs to the given queue instead of platform's default queue
     * - ``RETRIALS``
-      - Number of retries if a job fails. Defaults to the value given on experiment's autosubmit_<EXPID>.yml
+      - Number of retries if a job fails. Default: ``0``. See :ref:`job_retries` for details, including per-job overrides.
     * - ``DELAY_RETRY_TIME``
-      - Allows to put a delay between retries. Autosubmit will retry the job as soon as possible.
-        Accepted formats are:
-
-        #. plain number (specify a constant delay between retries),
-
-        #. plus (+) sign followed by a number (the delay will steadily increase by the addition of these number of seconds)
-
-        #. multiplication (*) sign follows by a number (the delay after n retries will be the number multiplied by 10*n).
-
-        Having this in mind, the ideal scenario is to use +(number) or plain(number) in case that the HPC has little
-        issues or the experiment will run for a little time. Otherwise, is better to use the \*(number) approach.
-
-
-.. code-block:: yaml
-
-    #DELAY_RETRY_TIME: 11
-    #DELAY_RETRY_TIME: +11 # will wait 11 + number specified
-    #DELAY_RETRY_TIME:*11 # will wait 11,110,1110,11110...* by 10 to prevent a too big number
+      - Delay in seconds between retries. Accepts three formats:
+        plain ``N`` (constant), 
+        ``+N`` (linear: ``N × retry``),or 
+        ``*N`` (exponential: ``N × 10^(retry-1)``). 
+        Default: ``-1`` (no delay). See :ref:`job_retries` for worked examples.
 
 
 There are also other, less used features that you can use:
@@ -369,7 +356,7 @@ To add a new platform, open the ``platforms_<EXPID>.yml`` file and add:
             HOST: <host_name>
             PROJECT: <project>
             USER: <user>
-            SCRATCH: <scratch_dir>
+            SCRATCH_DIR: <scratch_dir>
             MAX_WALLCLOCK: <HH:MM>
             QUEUE: <hpc_queue>
             # OPTIONAL
@@ -474,6 +461,9 @@ There are some other parameters that you may need to specify:
     * - ``LOG_RECOVERY_QUEUE_SIZE``
       - A memory-consumption optimization for the recovery of logs.
          Default: ``max(100,TOTAL_JOBS) * 2``, in case of issues with the recovery of logs, you can increase this value.
+    * - ``CLEAR_TO_SEND_TIMEOUT``
+      - How long Autosubmit waits for the login server when it is busy. Raise it if you see "key-exchange timed out" errors.
+         Default: ``180``.
 
 .. _request-exclusivity-reservation:
 
@@ -653,16 +643,3 @@ The necessary changes have been implemented in the API so you can correctly visu
 
 .. important::
     Wrappers are correctly formed considering the resulting jobs.
-
-Remote Dependencies - Presubmission feature
--------------------------------------------
-
-There is also the possibility of setting the option ``PRESUBMISSION`` to True in the config directive. This allows more
-than one package containing simple or wrapped jobs to be submitted at the same time, even when the dependencies between
-jobs aren't yet satisfied.
-
-This is only useful for cases when the job scheduler considers the time a job has been queuing to determine the job's
-priority (and the scheduler understands the dependencies set between the submitted packages). New packages can be
-created as long as the total number of jobs are below than the number defined in the ``TOTALJOBS`` variable.
-
-The jobs that are waiting in the remote platform, will be marked as ``HOLD``.

@@ -19,7 +19,6 @@
 
 from pathlib import Path
 from time import sleep, time
-from typing import TYPE_CHECKING
 
 from portalocker import AlreadyLocked, Lock, LockException
 
@@ -62,6 +61,9 @@ def wait_locker(file_lock: Path, expect_locked: bool, timeout: int, interval=0.0
                                f"({timeout}s timeout, {elapsed:.2f}s elapsed)")
 
         if not file_lock.exists():
+            if not expect_locked:
+                return
+            sleep(interval)
             continue
 
         if expect_locked:

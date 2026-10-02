@@ -16,40 +16,41 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from pathlib import Path
 
-from autosubmit.autosubmit import Autosubmit
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.experiment.manage import create, expid_fn
+from autosubmit.experiment.utils import create_required_folders
+from autosubmit.install import install
 
 
 def create_database(env):
     os.environ['AUTOSUBMIT_CONFIGURATION'] = env
     BasicConfig.read()
-    Autosubmit.install()
+    install()
 
 
 def init_expid(env, platform="local", expid=None, full_load=True, test_type="normal", plot=False):
     os.environ['AUTOSUBMIT_CONFIGURATION'] = env
     if not expid:
         if test_type == "normal":
-            expid = Autosubmit.expid("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
+            expid = expid_fn("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
                                      git_repo="", git_branch="", git_as_conf="", operational=False, testcase=False,
                                      evaluation=False, use_local_minimal=False)
         elif test_type == "test":
-            expid = Autosubmit.expid("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
+            expid = expid_fn("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
                                      git_repo="", git_branch="", git_as_conf="", operational=False, testcase=True,
                                      evaluation=False, use_local_minimal=False)
         elif test_type == "operational":
-            expid = Autosubmit.expid("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
+            expid = expid_fn("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
                                      git_repo="", git_branch="", git_as_conf="", operational=True, testcase=False,
                                      evaluation=False, use_local_minimal=False)
         elif test_type == "evaluation":
-            expid = Autosubmit.expid("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
+            expid = expid_fn("pytest", hpc=platform, copy_id='', dummy=True, minimal_configuration=False,
                                      git_repo="", git_branch="", git_as_conf="", operational=False, testcase=False,
                                      evaluation=True, use_local_minimal=False)
     if full_load:
-        as_conf = AutosubmitConfig(expid)
-        Autosubmit._check_folders(expid, as_conf)
-        Autosubmit.create(expid, not plot, False, force=True, detail=True)
+        create_required_folders(expid, Path(BasicConfig.LOCAL_ROOT_DIR, expid),)
+        create(expid, not plot, False, force=True, detail=True)
 
     return expid

@@ -17,26 +17,31 @@
 
 import pytest
 
+from autosubmit.experiment.manage import archive, create, unarchive
 
-@pytest.mark.parametrize("noclean,uncompress", [
-    (True, True),
-    (True, False),
-    (False, False),
-])
+
+@pytest.mark.parametrize(
+    "noclean,uncompress",
+    [
+        (True, True),
+        (True, False),
+        (False, False),
+    ],
+)
 def test_archive_and_unarchive(as_exp, mocker, noclean, uncompress):
-    as_exp.autosubmit.create(
+    create(
         as_exp.expid,
         noplot=True,
         hide=True,
     )
 
-    assert as_exp.autosubmit.archive(as_exp.expid, noclean, uncompress)
-    assert as_exp.autosubmit.unarchive(as_exp.expid, uncompress)
+    assert archive(as_exp.expid, noclean, uncompress)
+    assert unarchive(as_exp.expid, uncompress)
 
 
 def test_archive_noncreated_experiment(as_exp):
-    assert as_exp.autosubmit.archive(as_exp.expid)
+    assert archive(as_exp.expid)
 
 
 def test_unarchive_nonarchived_experiment(as_exp):
-    assert not as_exp.autosubmit.unarchive(as_exp.expid)
+    assert not unarchive(as_exp.expid)

@@ -168,7 +168,7 @@ class TestJob:
         assert initial_fail_count + 1 == incremented_fail_count
 
     @patch('autosubmit.config.basicconfig.BasicConfig')
-    def test_header_tailer(self, mocked_global_basic_config: Mock, mocker):
+    def test_header_tailer(self, mocked_global_basic_config: Mock, experiment_config_fixture):
         """Test if header and tailer are being properly substituted onto the final .cmd file without
         a bunch of mocks
 
@@ -431,7 +431,7 @@ CONFIG:
                                                f"Extended tailer script: script {tailer_file_name} seems " \
                                                f"{extended_type} but job t000_A.cmd isn't\n"
                         else:  # extended_position == "neither"
-                            # assert it doesn't exist
+                            # assert it does not exist
                             # load the parameters
                             job.check_script(config, parameters)
                             # create the script
@@ -683,6 +683,54 @@ def test_reset_logs(autosubmit_config):
     assert job.workflow_commit == ""
     assert job.updated_log == 0
     assert job.packed_during_building is False
+
+
+@pytest.mark.parametrize(
+    "new_status",
+    list(Status.RE_RUNNABLE),
+    ids=lambda s: Status.VALUE_TO_KEY[s].lower(),
+)
+def test_apply_status_resets_attempt_state_for_rerunnable(new_status):
+    """Test that a re-runnable status clears the per-attempt state of the job."""
+    job = Job("job1", "42", Status.COMPLETED, 0)
+    job.fail_count = 3
+    job.updated_log = 2
+    job.prev_status = None
+
+    job.apply_status(new_status)
+
+    assert job.status == new_status
+    assert job.prev_status == Status.COMPLETED
+    assert job.fail_count == 0
+    assert job.updated_log == 0
+    assert job.log_recovery_call_count == 0
+    assert job.wrapper_type is None
+    assert job.id is None
+
+
+@pytest.mark.parametrize(
+    "new_status",
+    [Status.COMPLETED, Status.FAILED, Status.SKIPPED, Status.QUEUING],
+    ids=lambda s: Status.VALUE_TO_KEY[s].lower(),
+)
+def test_apply_status_keeps_attempt_state_for_non_rerunnable(new_status):
+    """Test that a non re-runnable status preserves the per-attempt state of the job."""
+    job = Job("job1", "42", Status.WAITING, 0)
+    job.fail_count = 3
+    job.updated_log = 2
+    job.log_recovery_call_count = 5
+    job.wrapper_type = "vertical"
+    job.prev_status = None
+
+    job.apply_status(new_status)
+
+    assert job.status == new_status
+    assert job.prev_status == Status.WAITING
+    assert job.fail_count == 3
+    assert job.updated_log == 2
+    assert job.log_recovery_call_count == 5
+    assert job.wrapper_type == "vertical"
+    assert job.id == "42"
 
 
 def test_pytest_that_check_script_returns_false_when_there_is_an_unbound_template_variable(mocker, autosubmit_config):
@@ -1266,7 +1314,6 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
 
     It ignores what happens to the experiment history object."""
     mocker.patch('autosubmit.job.job.ExperimentHistory')
-    mocker.patch('autosubmit.job.job.Job._get_submit_data_dc_from_db', return_value=None)
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
     tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
@@ -1771,7 +1818,7 @@ def test_job_parameters_resolves_all_placeholders(autosubmit_config, monkeypatch
     }
     as_conf.experiment_data = as_conf.experiment_data | additional_experiment_data
     as_conf.set_default_parameters()
-    # Needed to monkeypatch reload to avoid overwriting experiment_data ( the files doesn't exist in a unit-test)
+    # Needed to monkeypatch reload to avoid overwriting experiment_data ( the files does not exist in a unit-test)
     monkeypatch.setattr(as_conf, 'reload', lambda: None)
     job = Job(_EXPID, '1', Status.WAITING, 0)
     job.section = 'TEST_JOB_2'
@@ -2376,32 +2423,6 @@ def test_datestr_to_epoch():
     result = Job._datestr_to_epoch("20250101120000")
     expected = int(datetime(2025, 1, 1, 12, 0, 0).timestamp())
     assert result == expected
-
-
-
-
-
-
-def test_get_submit_data_dc_from_db(mocker):
-    mock_job_data = mocker.MagicMock()
-    mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    mock_exp_hist.return_value.get_submit_data_dc.return_value = mock_job_data
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.expid = "t000"
-    result = job._get_submit_data_dc_from_db(2)
-    assert result == mock_job_data
-    mock_exp_hist.return_value.get_submit_data_dc.assert_called_once_with("dummy", 2)
-
-
-def test_get_finish_time_from_db(mocker):
-    mock_job_data = mocker.MagicMock()
-    mock_exp_hist = mocker.patch('autosubmit.job.job.ExperimentHistory')
-    mock_exp_hist.return_value.get_finish_data_dc.return_value = mock_job_data
-    job = Job("dummy", 1, Status.WAITING, 0)
-    job.expid = "t000"
-    result = job._get_finish_time_from_db(2)
-    assert result == mock_job_data
-    mock_exp_hist.return_value.get_finish_data_dc.assert_called_once_with("dummy", 2)
 
 
 @pytest.mark.parametrize(

@@ -20,7 +20,8 @@
 import pytest
 from pytest_mock import MockerFixture
 
-from autosubmit.scripts.autosubmit import main
+# noinspection PyProtectedMember
+from autosubmit.scripts.autosubmit import _autosubmit
 
 
 @pytest.mark.parametrize("force_yes", [True, False])
@@ -33,12 +34,11 @@ def test_stop_bypass_prompt_confirmation(
     exp = autosubmit_exp(experiment_data={})
 
     # Mock command line arguments
-    passed_args = ["autosubmit", "stop"] + (["-y"] if force_yes else []) + [exp.expid]
-    mocker.patch("sys.argv", passed_args)
+    passed_args = ["stop"] + (["-y"] if force_yes else []) + [exp.expid]
 
-    mock_input = mocker.patch("autosubmit.autosubmit.input")
+    mock_input = mocker.patch("autosubmit.workflow.manage.input")
     mock_input.return_value = "no"
 
-    assert main() == 0
+    assert _autosubmit(passed_args) == 0
 
     assert mock_input.call_count == (0 if force_yes else 1)

@@ -14,6 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
+
 import collections
 import copy
 import json
@@ -29,19 +30,22 @@ from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any
 
-from bscearth.utils.date import parse_date
+from bscearth.utils.date import date2str, parse_date
 from pyparsing import nested_expr
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
-from autosubmit.database.db_common import get_experiment_description
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.job.job_utils import calendar_chunk_section
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
 from autosubmit.platforms.platform_type import PlatformType
+
+if TYPE_CHECKING:
+    from autosubmit.job.job_list import JobList
+    from autosubmit.platforms.platform import Platform
 
 
 class AutosubmitConfig:
@@ -1178,7 +1182,7 @@ class AutosubmitConfig:
                 return result
         except AutosubmitCritical as e:
             # In case that there are critical errors in the configuration, Autosubmit won't continue.
-            if running_time is True:
+            if running_time:
                 raise
             else:
                 if not no_log:
@@ -1263,7 +1267,7 @@ class AutosubmitConfig:
         """
         parser_data = self.experiment_data
         if parser_data.get("CONFIG", "") == "":
-            self.wrong_config["Autosubmit"] += [['CONFIG', "Mandatory AUTOSUBMIT section doesn't exists"]]
+            self.wrong_config["Autosubmit"] += [['CONFIG', "Mandatory AUTOSUBMIT section does not exist"]]
         else:
             if parser_data["CONFIG"].get('AUTOSUBMIT_VERSION', -1.1) == -1.1:
                 self.wrong_config["Autosubmit"] += [['config',
@@ -1405,9 +1409,9 @@ class AutosubmitConfig:
                                     if check_value not in "on_submission":
                                         self.wrong_config["Jobs"] += [
                                             [section,
-                                             f"FILE {section_file_path} doesn't exist and check parameter is not set on_submission value"]]
+                                             f"FILE {section_file_path} does not exist and check parameter is not set on_submission value"]]
                                 else:
-                                    self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} doesn't exist"]]
+                                    self.wrong_config["Jobs"] += [[section, f"FILE {os.path.join(self.get_project_dir(), section_file_path)} does not exist"]]
 
             dependencies = section_data.get('DEPENDENCIES', '')
             if dependencies != "":
@@ -1458,7 +1462,7 @@ class AutosubmitConfig:
         parser = self.experiment_data
         self.hpcarch = ""
         if parser.get('DEFAULT', "") == "":
-            self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT section doesn't exists"]]
+            self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT section does not exist"]]
         else:
             if not parser.get('DEFAULT').get('EXPID', ""):
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT.EXPID parameter is invalid"]]
@@ -1467,7 +1471,7 @@ class AutosubmitConfig:
             if not self.hpcarch:
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory DEFAULT.HPCARCH parameter is invalid"]]
         if parser.get('EXPERIMENT', "") == "":
-            self.wrong_config["Expdef"] += [['EXPERIMENT', "Mandatory EXPERIMENT section doesn't exists"]]
+            self.wrong_config["Expdef"] += [['EXPERIMENT', "Mandatory EXPERIMENT section does not exist"]]
         else:
             if not parser['EXPERIMENT'].get('DATELIST', ""):
                 self.wrong_config["Expdef"] += [['DEFAULT', "Mandatory EXPERIMENT.DATELIST parameter is invalid"]]
@@ -1486,7 +1490,7 @@ class AutosubmitConfig:
             if parser['EXPERIMENT'].get('CALENDAR', "standard").lower() not in ['standard', 'noleap']:
                 self.wrong_config["Expdef"] += [['experiment', "Mandatory EXPERIMENT.CALENDAR choice is invalid"]]
         if parser.get('PROJECT', "") == "":
-            self.wrong_config["Expdef"] += [['PROJECT', "Mandatory PROJECT section doesn't exists"]]
+            self.wrong_config["Expdef"] += [['PROJECT', "Mandatory PROJECT section does not exist"]]
             project_type = ""
         else:
             project_type = parser['PROJECT'].get('PROJECT_TYPE', "")
@@ -1495,14 +1499,14 @@ class AutosubmitConfig:
         else:
             if project_type == 'git':
                 if parser.get('GIT', "") == "":
-                    self.wrong_config["Expdef"] += [['GIT', "Mandatory GIT section doesn't exists"]]
+                    self.wrong_config["Expdef"] += [['GIT', "Mandatory GIT section does not exist"]]
                 else:
                     if not parser['GIT'].get('PROJECT_ORIGIN', ""):
                         self.wrong_config["Expdef"] += [['git',
                                                          "PROJECT_ORIGIN parameter is invalid"]]
             elif project_type == 'svn':
                 if parser.get('SVN', "") == "":
-                    self.wrong_config["Expdef"] += [['SVN', "Mandatory SVN section doesn't exists"]]
+                    self.wrong_config["Expdef"] += [['SVN', "Mandatory SVN section does not exist"]]
                 else:
                     if not parser['SVN'].get('PROJECT_URL', ""):
                         self.wrong_config["Expdef"] += [['svn',
@@ -1512,7 +1516,7 @@ class AutosubmitConfig:
                                                          "PROJECT_REVISION parameter is invalid"]]
             elif project_type == 'local':
                 if parser.get('LOCAL', "") == "":
-                    self.wrong_config["Expdef"] += [['LOCAL', "Mandatory LOCAL section doesn't exists"]]
+                    self.wrong_config["Expdef"] += [['LOCAL', "Mandatory LOCAL section does not exist"]]
                 else:
 
                     if not parser['LOCAL'].get('PROJECT_PATH', ""):
@@ -1833,6 +1837,7 @@ class AutosubmitConfig:
             Log.result('YAML configuration loaded:')
             for f in self.current_loaded_files:
                 Log.result(f'  {f}')
+            Log.result('')
 
     def set_default_parameters(self) -> None:
         """Sets the default parameters for the experiment."""
@@ -2044,9 +2049,10 @@ class AutosubmitConfig:
         return parameters_dict
 
     def _load_database_parameters(self) -> dict:
+        from autosubmit.database.db_common import get_experiment_description
         """Load data from the database to be exported in the parameters for jobs."""
         # NOTE: at the moment this is the only bit of data loaded. If we need to load more,
-        #       it might be a good idea to think about a. better organizing the data layout,
+        #       it might be a good idea to think about a. better organising the data layout,
         #       b. using a single query instead of multiple, c. caching.
         experiment_description: str | list[list[str]] = get_experiment_description(self.expid)
         if experiment_description and experiment_description[0] and experiment_description[0][0]:
@@ -2079,14 +2085,6 @@ class AutosubmitConfig:
         :rtype: str
         """
         return self.get_section(["project", "project_type"], "none", must_exists=False).lower()
-
-    def get_parse_two_step_start(self) -> str:
-        """Returns two-step start jobs
-
-        :return: jobs_list
-        :rtype: str
-        """
-        return self.get_section(['EXPERIMENT', 'TWO_STEP_START'], "")
 
     def get_rerun_jobs(self) -> str:
         """Returns rerun jobs
@@ -2226,7 +2224,7 @@ class AutosubmitConfig:
         return self.get_section(['SVN', 'PROJECT_REVISION'])
 
     def get_local_project_path(self) -> Path:
-        """Gets path to origin for local project
+        """Gets path to origin for local project, expanding a user-home prefix.
 
         :return: path to local project
         :rtype: Path
@@ -2235,7 +2233,7 @@ class AutosubmitConfig:
         if not path:
             raise AutosubmitCritical(
                 "Empty project path! Please change this parameter to a valid one.", 7014)
-        return Path(path)
+        return Path(path).expanduser()
 
     def get_date_list(self):
         """
@@ -2822,3 +2820,36 @@ class AutosubmitConfig:
         if isinstance(thresholds, dict):
             return thresholds
         return {}
+
+
+    def set_platform_parameters(self, job_list: "JobList", platforms: dict[str, "Platform"]) -> None:
+        """Sets parameters for the platforms and job list.
+
+        The default platform of the experiment is used to create the
+        parameters prefixed by ``HPC``.
+
+        It will update the STARTDATES value using the job list format.
+
+        Logs a warning if the main platform is not defined.
+
+        :param job_list: The job list.
+        :param platforms: Dictionary of platforms related to the experiment.
+        """
+        Log.debug("Loading HPC parameters...")
+        # Platform = from DEFAULT.HPCARCH, e.g. marenostrum4
+        if self.get_platform() not in platforms:
+            # TODO: What if you have a minimal configuration experiment?
+            #       https://github.com/BSC-ES/autosubmit/issues/3201
+            Log.warning("Main platform is not defined in platforms.yml")
+        else:
+            platform = platforms[self.get_platform()]
+            # TODO: Giving self/AutosubmitConfig to platform in the add_parameters below
+            #       creates a tight dependency between both, as now Platform is calling
+            #       functions from AutosubmitConfig. It'd be better to do that here, so
+            #       platform doesn't need to know about the AutosubmitConfig API unnecessarily.
+            platform.add_parameters(self)
+
+        # Attach parameters to JobList
+        self.experiment_data['STARTDATES'] = []
+        for date in job_list.get_date_list():
+            self.experiment_data['STARTDATES'].append(date2str(date, job_list.get_date_format()))

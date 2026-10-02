@@ -15,17 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Fixtures for regression tests."""
+"""Unit tests for the ``autosubmit.scripts.expid`` module."""
 
-import pytest
+from autosubmit.scripts.expid import args_parser
 
 
-@pytest.fixture(scope='session', autouse=True)
-def experiment_config_fixture(session_mocker):
-    # TODO: There are unit tests that fail without this fixture. Those unit tests are good candidates
-    #       to be rewritten or made into integration tests without mocks.
-    session_mocker.patch(
-        'autosubmit.config.configcommon.get_experiment_description',
-        return_value=[['test experiment']]
-    )
+def test_expid_does_not_accept_filter_status():
+    """The expid command must not expose the unrelated job-status filter."""
+    option_strings = {
+        option for action in args_parser()._actions for option in action.option_strings
+    }
 
+    assert "-fs" not in option_strings
+    assert "--filter_status" not in option_strings

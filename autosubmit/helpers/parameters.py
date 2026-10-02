@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -21,7 +21,6 @@ from collections import defaultdict
 from typing import Any, TypeVar
 
 _C = TypeVar("_C")
-
 
 PARAMETERS: dict[str, Any] = defaultdict(defaultdict)
 """Global default dictionary holding a multi-level dictionary with the Autosubmit
@@ -77,10 +76,9 @@ def autosubmit_parameter(func=None, *, name, group: str | None = None):
 
     Used to annotate properties of classes
 
-    Attributes:
-        func (Callable): wrapped function. Always ``None`` due to how we call the decorator.
-        name (Union[str, List[str]]): parameter name.
-        group (str): group name. Default to caller module name.
+    :param func: wrapped function. Always ``None`` due to how we call the decorator.
+    :param name: parameter name.
+    :param group: group name. Default to caller module name.
     """
     if group is None:
         stack = inspect.stack()

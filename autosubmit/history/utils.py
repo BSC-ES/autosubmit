@@ -19,7 +19,7 @@
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S%z'

@@ -6,10 +6,11 @@
 # the Common Workflow Language project, and, where practical,
 # linking to https://www.commonwl.org/ ),...
 # Ref: https://github.com/common-workflow-language/user_guide/blob/8abf537144d7b63c3561c1ff2b660543effd0eb0/LICENSE.md
+
 from html import escape
 from pathlib import Path
 from shutil import copy, move
-from typing import Optional, cast
+from typing import cast
 
 from docutils import nodes
 from docutils.nodes import Element, Node

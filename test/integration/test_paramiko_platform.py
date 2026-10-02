@@ -20,12 +20,11 @@
 Note that tests will start and destroy an SSH server. For unit tests, see ``test_paramiko_platform.py``
 in the ``test/unit`` directory."""
 
-import socket
 from collections.abc import Callable
 from dataclasses import dataclass
 from getpass import getuser
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, Union, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import paramiko
 import pytest

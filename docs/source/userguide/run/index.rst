@@ -187,7 +187,7 @@ How to profile Autosubmit while running an experiment
 -----------------------------------------------------
 
 Autosubmit offers the possibility to profile an experiment execution. To enable the profiler, just
-add the ``--profile`` (or ``-p``) flag to your ``autosubmit run`` command, as in the following example:
+add the ``--profile`` flag to your ``autosubmit run`` command, as in the following example:
 
 .. code-block:: bash
 
@@ -197,75 +197,16 @@ add the ``--profile`` (or ``-p``) flag to your ``autosubmit run`` command, as in
 
 .. _run_modes:
 
-How to prepare an experiment to run in two independent job_list. (Priority jobs, Two-step-run) (OLD METHOD)
------------------------------------------------------------------------------------------------------------
-
-This feature allows to run an experiment in two separated steps without the need of do anything manually.
-
-To achieve this, you will have to use an special parameter called TWO_STEP_START in which you will put the list of the jobs that you want to run in an exclusive mode. These jobs will run until all of them finishes and once it finishes, the rest of the jobs will begun the execution.
-
-It can be activated through TWO_STEP_START and it is set on expdef_<EXPID>.yml, under the experiment: section.
-
-.. code-block:: ini
-
-    experiment:
-        DATELIST: 20120101 20120201
-        MEMBERS: fc00[0-3]
-        CHUNKSIZEUNIT: day
-        CHUNKSIZE: 1
-        NUMCHUNKS: 10
-        CHUNKINI :
-        CALENDAR: standard
-        # To run before the rest of experiment:
-        TWO_STEP_START: <job_names&section,dates,member_or_chunk(M/C),chunk_or_member(C/M)>
-
-In order to be easier to use, there are Three  modes for use this feature: job_names and section,dates,member_or_chunk(M/C),chunk_or_member(C/M).
-
-* By using job_names alone, you will need to put all jobs names one by one divided by the char , .
-* By using section,dates,member_or_chunk(M/C),chunk_or_member(C/M). You will be able to select multiple jobs at once combining these filters.
-* Use both options, job_names and section,dates,member_or_chunk(M/C),chunk_or_member(C/M). You will have to put & between the two modes.
-
-There are 5 fields on TWO_STEP_START, all of them are optional but there are certain limitations:
-
-* **Job_name**: [Independent] List of job names, separated by ',' char. Optional, doesn't depend on any field. Separated from the rest of fields by '&' must be the first field if specified
-* **Section**:  [Independent] List of sections, separated by  ',' char. Optional, can be used alone. Separated from the rest of fields by ';'
-* **Dates**: [Depends on section] List of dates, separated by ',' char. Optional, but depends on Section field. Separated from the rest of fields by ';'
-* **member_or_chunk**: [Depends on Dates(OR)]  List of chunk or member, must start with C or M to indicate the filter type. Jobs are selected by [1,2,3..] or by a range [0-9] Optional, but depends on Dates field. Separated from the rest of fields by ';'
-* **chunk_or_member**: [Depends on Dates(OR)]  List of member or chunk, must start with M or C to indicate the filter type. Jobs are selected by [1,2,3..] or by a range [0-9] Optional, but depends on Dates field. Separated from the rest of fields by ';'
-
-Example using the old method
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Guess the expdef configuration as follow:
-
-.. code-block:: yaml
-
-    experiment:
-        DATELIST: 20120101
-        MEMBERS: 00[0-1]
-        CHUNKSIZEUNIT: day
-        CHUNKSIZE: 1
-        NUMCHUNKS: 2
-        TWO_STEP_START: a02n_20120101_000_1_REDUCE&COMPILE_DA,SIM;20120101;c[1]
-
-Given this job_list ( jobs_conf has REMOTE_COMPILE(once),DA,SIM,REDUCE)
-
-['a02n_REMOTE_COMPILE', 'a02n_20120101_000_1_SIM', 'a02n_20120101_000_2_SIM', 'a02n_20120101_001_1_SIM', 'a02n_20120101_001_2_SIM', 'a02n_COMPILE_DA', 'a02n_20120101_1_DA', 'a02n_20120101_2_DA', 'a02n_20120101_000_1_REDUCE', 'a02n_20120101_000_2_REDUCE', 'a02n_20120101_001_1_REDUCE', 'a02n_20120101_001_2_REDUCE']
-
-The priority jobs will be ( check TWO_STEP_START from expdef conf):
-
-['a02n_20120101_000_1_SIM', 'a02n_20120101_001_1_SIM', 'a02n_COMPILE_DA', 'a02n_20120101_000_1_REDUCE']
-
-How to prepare an experiment to run in two independent job_list. (New method)
+How to prepare an experiment to run in two independent job_list.
 -----------------------------------------------------------------------------
 
 From AS4, TWO_STEP_START is not longer needed since the users can now specify exactly which tasks of a job are needed to run the current task in the DEPENDENCIES parameter.
 
 
-Simplified example using the new method
+Simplified example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This example is based on the previous one, but using the new method and without the reduce job.
+The following example uses the DEPENDENCIES parameter.
 
 .. code-block:: yaml
 
@@ -448,41 +389,10 @@ To stop immediately experiment <EXPID>:
     :ref:`workflow_recovery` procedure, explained below, in order to properly resynchronize all completed jobs.
 
 
-Retries
--------
+See :ref:`job_retries` for how Autosubmit retries failed jobs, and
+:ref:`ssh_retries` for SSH-connection and remote-command retries.
 
-For remote platforms, there are at least two parts where retries happen
-(if you use wrappers you may have others), when Autosubmit **connects** to
-the remote platform, and when Autosubmit **executes** a command.
+.. toctree::
+   :hidden:
 
-When Autosubmit **connects** to a remote platform, it will use the ``host``
-value of the platform configuration. This value can contain a single
-host name, or a list of host names using commas (*,*) as separators.
-
-Right now Autosubmit has a hard-coded number of retries for connecting
-to remote platforms. It will try to connect to the platform, without
-interval, **retrying connecting twice (``2``)**. It will write to logs in
-``INFO`` and ``WARNING`` levels information about the retries, like
-whether it is retrying to connect, and what is the current retry number.
-
-When Autosubmit retries connecting to a platform with multiple hosts
-separated by comma, the first connection uses the first host name. If it
-retries the connection, the next executions will exclude the first host,
-and then randomly select one of the remaining host names.
-
-For **executing** commands on remote platforms, Autosubmit uses another
-hard-coded value of ``3`` retries, without interval between each retry.
-Autosubmit will submit the command to be executed via SSH. If the command
-fails on the remote platform, **Autosubmit will not retry** the command.
-
-As an example, if you try to run an executable such as ``Rscript``, but this
-executable does not exist on the remote platform, Autosubmit will log the error,
-and mark the job as ``FAILED``.
-
-However, if you have a networking issue between Autosubmit and your remote
-platform, then Autosubmit will log in ``INFO`` and ``WARNING`` and **will
-retry executing the command up to hard-coded ``3`` retries**.
-
-.. note::
-  We already have an issue created to make these retry settings configurable
-  by users and site admins.
+   retries
