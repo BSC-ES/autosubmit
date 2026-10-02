@@ -122,8 +122,8 @@ job logs.
     The monitoring output and the job statuses are covered in
     :doc:`/userguide/monitor_and_check/index`.
 
-View the logs
-=============
+Accessing the logs
+==================
 
 The ``autosubmit`` commands such as ``expid``, ``run``, ``monitor``, all may produce
 log files on the user's file system. To save the user from having to navigate to the

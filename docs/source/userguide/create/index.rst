@@ -59,9 +59,6 @@ To copy an existing experiment with a new unique identifier:
     # Copy experiment with default configuration
     autosubmit expid -y <EXPID> -H <HPCname> -d "<Description>"
 
-    # Copy experiment with custom configuration path
-    autosubmit expid -y <EXPID> -c <PATH> -H <HPCname> -d "<Description>"
-
 Where:
 
 * ``EXPID`` - The experiment identifier to copy from

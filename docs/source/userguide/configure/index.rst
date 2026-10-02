@@ -178,7 +178,7 @@ Adding a heterogeneous job
     parameter is a yaml list
 
 An heterogeneous job or hetjob is a job for which each component has virtually all job options available 
-including partition, account and QOS (Quality Of Service). For example, part of a job might require 
+including partition, account and Quality Of Service. For example, part of a job might require 
 four cores and 4 GB for each of 128 tasks while another part of the job would require 16 GB of memory and one CPU.
 
 
@@ -672,15 +672,3 @@ setting in **Autosubmit GUI**.
 .. important::
     Wrappers are correctly formed considering the resulting jobs.
 
-Remote dependencies (presubmission)
------------------------------------
-
-There is also the possibility of setting the option ``PRESUBMISSION`` to True in the config directive. This allows more
-than one package containing simple or wrapped jobs to be submitted at the same time, even when the dependencies between
-jobs aren't yet satisfied.
-
-This is only useful for cases when the job scheduler considers the time a job has been queuing to determine the job's
-priority (and the scheduler understands the dependencies set between the submitted packages). New packages can be
-created as long as the total number of jobs are below than the number defined in the ``TOTALJOBS`` variable.
-
-The jobs that are waiting in the remote platform, will be marked as ``HOLD``.
