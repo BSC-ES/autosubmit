@@ -171,6 +171,7 @@ class JobList:
     def expid(self):
         """Returns the experiment identifier
 
+        :autosubmit-group: DEFAULT
         :return: experiment's identifier
         """
         return self._expid
