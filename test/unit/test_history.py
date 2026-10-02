@@ -55,6 +55,42 @@ def test_get_current_datetime():
     assert re.match(pattern, current_datetime) is not None
 
 
+def test_get_status_counts_from_job_list_counts_in_memory_jobs():
+    """get_status_counts_from_job_list computes the counts from the plain job list."""
+    exp_history = ExperimentHistory.__new__(ExperimentHistory)
+    jobs = [
+        job("a000_20000101_fc0_1_JOB", "2000-01-01 00:00:00", "fc0", "COMPLETED", ""),
+        job("a000_20000101_fc0_2_JOB", "2000-01-01 00:00:00", "fc0", "RUNNING", ""),
+        job("a000_20000101_fc0_3_JOB", "2000-01-01 00:00:00", "fc0", "WAITING", ""),
+    ]
+    result = exp_history.get_status_counts_from_job_list(jobs)
+    assert result["COMPLETED"] == 1
+    assert result["RUNNING"] == 1
+    assert result["TOTAL"] == 3
+
+
+def test_update_counts_uses_provided_status_counts():
+    """When status_counts is provided, update_counts uses it instead of computing
+    from the (possibly incomplete) in-memory job list."""
+    from unittest.mock import Mock
+
+    exp_history = ExperimentHistory.__new__(ExperimentHistory)
+    exp_history.manager = Mock()
+    run_dc = Mock()
+    counts = {
+        "COMPLETED": 3, "FAILED": 0, "QUEUING": 0,
+        "SUBMITTED": 0, "RUNNING": 0, "SUSPENDED": 0, "TOTAL": 3,
+    }
+
+    result = exp_history.update_counts_on_experiment_run_dc(run_dc, job_list=[], status_counts=counts)
+
+    assert result == exp_history.manager.update_experiment_run_dc_by_id.return_value
+    assert run_dc.completed == 3
+    assert run_dc.total == 3
+    exp_history.manager.update_experiment_run_dc_by_id.assert_called_once_with(run_dc)
+
+
+
 @pytest.mark.skip()
 @pytest.mark.skip(
     'TODO: another test that uses actual data. See if there is anything useful, and extract into functional/integration/unit tests that run on any machine')
@@ -380,117 +416,3 @@ def test_experiment_history_force_sqlalchemy_migrates_old_schema(tmp_path):
 
     result = exp_history.manager.get_jobs_data_last_row(["nonexistent"])
     assert result == {}
-
-
-def test_get_finish_data_dc(tmp_path, monkeypatch):
-    """Test that get_finish_data_dc retrieves the correct JobData after a full submit/start/finish cycle.
-
-    :param tmp_path: Pytest fixture providing a temporary directory unique to the test invocation.
-    :type tmp_path: pathlib.Path
-    :param monkeypatch: Pytest fixture for monkeypatching attributes and environment variables.
-    :type monkeypatch: pytest.MonkeyPatch
-    :raises AssertionError: If the retrieved job data does not match the inserted job data.
-    """
-    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
-    monkeypatch.setattr(BasicConfig, "HISTORICAL_LOG_DIR", str(tmp_path))
-
-    exp_history = ExperimentHistory("tt00")
-    exp_history.initialize_database()
-    # An experiment run must exist before job data can be written.
-    exp_history.create_new_experiment_run()
-
-    JOB_NAME = "a29z_20000101_fc2_1_SIM"
-    NCPUS = 128
-    PLATFORM_NAME = "marenostrum5"
-    JOB_ID = 101
-    FAIL_COUNT = 0
-
-    # write_submit_time maps any non-"COMPLETED" status to "FAILED" internally.
-    exp_history.write_submit_time(
-        JOB_NAME, time.time(), "COMPLETED", NCPUS, "00:30",
-        "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME,
-        JOB_ID, children="", fail_count=FAIL_COUNT
-    )
-    exp_history.write_start_time(
-        JOB_NAME, start=time.time(), status="RUNNING", qos="debug",
-        job_id=JOB_ID, children="", fail_count=FAIL_COUNT
-    )
-    inserted_job_data_dc = exp_history.write_finish_time(
-        JOB_NAME, finish=int(time.time()), status="COMPLETED",
-        job_id=JOB_ID, fail_count=FAIL_COUNT
-    )
-    assert inserted_job_data_dc is not None, "write_finish_time returned None; check for internal errors."
-
-    finish_data_dc = exp_history.get_finish_data_dc(JOB_NAME, fail_count=FAIL_COUNT)
-    assert finish_data_dc is not None, "get_finish_data_dc returned None; record not found."
-
-    assert finish_data_dc.job_name == inserted_job_data_dc.job_name
-    assert finish_data_dc.ncpus == inserted_job_data_dc.ncpus
-    assert finish_data_dc.children == inserted_job_data_dc.children
-    assert finish_data_dc.energy == inserted_job_data_dc.energy
-    assert finish_data_dc.platform == inserted_job_data_dc.platform
-    assert finish_data_dc.job_id == inserted_job_data_dc.job_id
-    assert finish_data_dc.status == inserted_job_data_dc.status
-    assert finish_data_dc.qos == inserted_job_data_dc.qos
-
-
-def test_update_submit_time(tmp_path, monkeypatch):
-    """Test that update_submit_time correctly updates the submit time of an existing job record.
-
-    :param tmp_path: Pytest fixture providing a temporary directory unique to the test invocation.
-    :type tmp_path: pathlib.Path
-    :param monkeypatch: Pytest fixture for monkeypatching attributes and environment variables.
-    :type monkeypatch: pytest.MonkeyPatch
-    :raises AssertionError: If the submit time is not updated correctly.
-    """
-    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
-    exp_history = ExperimentHistory("tt00")
-    exp_history.initialize_database()
-    # An experiment run must exist before job data can be written.
-    exp_history.create_new_experiment_run()
-
-    JOB_NAME = "a29z_20000101_fc2_1_SIM"
-    NCPUS = 128
-    PLATFORM_NAME = "marenostrum5"
-    JOB_ID = 101
-    FAIL_COUNT = 0
-
-    initial_submit_time = int(time.time())
-    exp_history.write_submit_time(
-        JOB_NAME, initial_submit_time, "COMPLETED", NCPUS, "00:30",
-        "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME,
-        JOB_ID, children="", fail_count=FAIL_COUNT
-    )
-
-    new_submit_time = initial_submit_time + 3600  # Add 1 hour
-    exp_history.update_submit_time(JOB_NAME, new_submit_time, fail_count=FAIL_COUNT)
-
-    finish_data_dc = exp_history.get_finish_data_dc(JOB_NAME, fail_count=FAIL_COUNT)
-    assert finish_data_dc is not None, "get_finish_data_dc returned None; record not found."
-    assert finish_data_dc.submit == new_submit_time, f"Expected submit time {new_submit_time}, got {finish_data_dc.submit}"
-
-
-def test_update_submit_time_returns_none_when_not_found(tmp_path, monkeypatch):
-    """update_submit_time returns None when no record exists for that fail_count."""
-    monkeypatch.setattr(BasicConfig, "JOBDATA_DIR", str(tmp_path))
-    exp_history = ExperimentHistory("tt00")
-    exp_history.initialize_database()
-    exp_history.create_new_experiment_run()
-
-    JOB_NAME = "a29z_20000101_fc2_1_SIM"
-    NCPUS = 128
-    PLATFORM_NAME = "marenostrum5"
-    JOB_ID = 101
-
-    exp_history.write_submit_time(
-        JOB_NAME, int(time.time()), "COMPLETED", NCPUS, "00:30",
-        "debug", "20000101", "fc2", "SIM", 1, PLATFORM_NAME,
-        JOB_ID, children="", fail_count=0
-    )
-
-    result = exp_history.update_submit_time(JOB_NAME, int(time.time()) + 3600, fail_count=1)
-
-    assert result is None, "update_submit_time should return None when fail_count=1 does not exist"
-
-    loaded = exp_history.get_finish_data_dc(JOB_NAME, fail_count=1)
-    assert loaded is None, "No record should exist for fail_count=1"

@@ -17,6 +17,9 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
 - Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295 (thanks @elliot1377)
 - Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
+- Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
+- Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
+- Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
 
 **New Features:**
 
@@ -30,6 +33,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Allow recovery to update current running/ready jobs #1251
 - `autosubmit` Bash autocomplete #1227 #3171
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
+- Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
 
 **Migration from `job_list.pkl` to Database**
 
@@ -72,6 +76,11 @@ several bug fixes and enhancements to improve the overall user experience.
 - Jobs not in memory (finished in a prior run) are resolved from the DB and persisted directly
   (with edge-completion reconciliation), never loaded into the graph. #3231
 - Remove two-step start code, tests, and docs #3313 (thanks @CodeByPeace)
+- Optimized RO-Crate construction and ZIP generation.
+  Combined, these improvements reduced total generation time from over 36 hours to approximately
+  5 minutes in tests with an operational experiment containing over 500,000 files.
+  ZIP archives are now written without compression. #3307
+- Removed `PRESUBMISSION` from documentation, removed in 4.x #3320 (thanks @vansh-nagar)
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 

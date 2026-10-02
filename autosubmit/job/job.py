@@ -41,7 +41,6 @@ from bscearth.utils.date import (
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
-from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
 )
@@ -3039,24 +3038,6 @@ class Job:
                                          args=(job_data_dc, self.platform))
             thread_write_finish.name = f"JOB_data_{self.name}"
             thread_write_finish.start()
-
-    def _get_submit_data_dc_from_db(self, attempt: int) -> "JobData | None":
-        """Retrieve submit data from the experiment history database for a given attempt.
-
-        :param attempt: The attempt (fail_count) to look up.
-        :return: The JobData for the submit record, or None if not found.
-        """
-        exp_history = ExperimentHistory(self.expid)
-        return exp_history.get_submit_data_dc(self.name, attempt)
-
-    def _get_finish_time_from_db(self, attempt: int) -> "JobData | None":
-        """Retrieve finish data from the experiment history database for a given attempt.
-
-        :param attempt: The attempt (fail_count) to look up.
-        :return: The JobData for the finish record, or None if not found.
-        """
-        exp_history = ExperimentHistory(self.expid)
-        return exp_history.get_finish_data_dc(self.name, attempt)
 
     def stat_registered(self, attempt: int) -> bool:
         """Check if submit/start/finish are registered in the historical DB for this job_id and attempt.

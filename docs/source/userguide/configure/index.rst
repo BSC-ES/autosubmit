@@ -671,4 +671,3 @@ setting in **Autosubmit GUI**.
 
 .. important::
     Wrappers are correctly formed considering the resulting jobs.
-
