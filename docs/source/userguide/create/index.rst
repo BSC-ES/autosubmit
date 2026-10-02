@@ -66,19 +66,6 @@ Where:
 * ``Description`` - A brief description of the new experiment
 * ``PATH`` - (Optional) Path to custom configuration directory
 
-Examples:
-
-.. code-block:: bash
-
-    # Copy experiment to Ithaca platform
-    autosubmit expid -y a0b1 -H ithaca -d "Copy of experiment a0b1"
-
-    # Copy with custom configuration path
-    autosubmit expid -y a0b1 -c "/esarchive/autosubmit/genericFiles/conf" \
-                     -H marenostrum4 -d "Modified copy of a0b1"
-
-.. warning:: You can only copy experiments created with Autosubmit 3.11 or above.
-
 .. tip::
    You can configure default platforms in your ``autosubmitrc`` file:
 
