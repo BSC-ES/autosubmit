@@ -74,6 +74,42 @@ your target platform. For instance, to set the number of GPU's in a Slurm
 job, you can use ``CUSTOM_DIRECTIVES=--gpus-per-node=10``.
 
 
+Runtime template variables
+==========================
+
+The ``%VARIABLE%`` substitutions described above are resolved before the job
+script is submitted. Some values, however, are only known once the job is
+actually running on the platform. Autosubmit injects those values directly
+into the generated script, so they are available from your template code at
+runtime, but they **cannot** be used with the ``%VARIABLE%`` syntax.
+
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
+
+    * - Variable
+      - Description
+    * - ``AS_JOB_ID``
+      - Identifier assigned by the batch scheduler to the running job.
+
+Example:
+
+.. code-block:: bash
+    :caption: Bash
+
+    echo "This job runs with AS_JOB_ID=$AS_JOB_ID"
+
+.. code-block:: python
+    :caption: Python
+
+    print(f"This job runs with AS_JOB_ID={AS_JOB_ID}")
+
+.. code-block:: r
+    :caption: R
+
+    cat("This job runs with AS_JOB_ID=", AS_JOB_ID, "\n", sep = "")
+
+
 Platform variables
 ==================
 
