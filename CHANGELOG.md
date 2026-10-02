@@ -15,7 +15,8 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fix timeout guard is silently disabled for login/local jobs #3081
 - Fix CI ruff lint job failing on deleted files or single-commited branches #3166
 - Fix `clean` command to correctly delete files with `--stats` and `--plots` #3254 (thanks @Ha1baraA11)
-- Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295 (thanks @elliot1377)
+- Fix `RERUN` failing with `TypeError` on `get_job_related()` during `create` #3295
+- Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
 - Removed a duplicate Subversion checkout #3310 (thanks @ShivanshShukla)
 - Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
 - Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
@@ -33,6 +34,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Allow recovery to update current running/ready jobs #1251
 - `autosubmit` Bash autocomplete #1227 #3171
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
+- Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
 - Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
 
 **Migration from `job_list.pkl` to Database**
