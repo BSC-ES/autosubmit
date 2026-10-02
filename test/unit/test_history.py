@@ -55,6 +55,42 @@ def test_get_current_datetime():
     assert re.match(pattern, current_datetime) is not None
 
 
+def test_get_status_counts_from_job_list_counts_in_memory_jobs():
+    """get_status_counts_from_job_list computes the counts from the plain job list."""
+    exp_history = ExperimentHistory.__new__(ExperimentHistory)
+    jobs = [
+        job("a000_20000101_fc0_1_JOB", "2000-01-01 00:00:00", "fc0", "COMPLETED", ""),
+        job("a000_20000101_fc0_2_JOB", "2000-01-01 00:00:00", "fc0", "RUNNING", ""),
+        job("a000_20000101_fc0_3_JOB", "2000-01-01 00:00:00", "fc0", "WAITING", ""),
+    ]
+    result = exp_history.get_status_counts_from_job_list(jobs)
+    assert result["COMPLETED"] == 1
+    assert result["RUNNING"] == 1
+    assert result["TOTAL"] == 3
+
+
+def test_update_counts_uses_provided_status_counts():
+    """When status_counts is provided, update_counts uses it instead of computing
+    from the (possibly incomplete) in-memory job list."""
+    from unittest.mock import Mock
+
+    exp_history = ExperimentHistory.__new__(ExperimentHistory)
+    exp_history.manager = Mock()
+    run_dc = Mock()
+    counts = {
+        "COMPLETED": 3, "FAILED": 0, "QUEUING": 0,
+        "SUBMITTED": 0, "RUNNING": 0, "SUSPENDED": 0, "TOTAL": 3,
+    }
+
+    result = exp_history.update_counts_on_experiment_run_dc(run_dc, job_list=[], status_counts=counts)
+
+    assert result == exp_history.manager.update_experiment_run_dc_by_id.return_value
+    assert run_dc.completed == 3
+    assert run_dc.total == 3
+    exp_history.manager.update_experiment_run_dc_by_id.assert_called_once_with(run_dc)
+
+
+
 @pytest.mark.skip()
 @pytest.mark.skip(
     'TODO: another test that uses actual data. See if there is anything useful, and extract into functional/integration/unit tests that run on any machine')
