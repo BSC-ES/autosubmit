@@ -31,11 +31,12 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.registry import load_config
 from autosubmit.database.db_common import update_experiment_description_version
-from autosubmit.experiment.utils import check_ownership
+from autosubmit.experiment.utils import check_ownership, create_required_folders
 from autosubmit.helpers.version import get_version
 from autosubmit.log.log import Log
 
 __all__ = ["ini_to_yaml", "upgrade_scripts"]
+
 
 _LISTS_REGEX = re.compile(
     r"""
@@ -171,7 +172,7 @@ def upgrade_scripts(expid: str, files: list[str] | None) -> bool:
     as_conf.check_conf_files()
     as_conf.load_parameters()
 
-    exp_conf_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf"
+    exp_conf_dir = BasicConfig.expid_dir(expid) / "conf"
     conf_files = {
         f
         for pattern in files_or_extension_patterns
@@ -244,6 +245,9 @@ def upgrade_scripts(expid: str, files: list[str] | None) -> bool:
         Log.printlog("\n".join(substituted), Log.RESULT)
     if warnings:
         Log.error("\n".join(warnings))
+
+    Log.info("Creating required folders...")
+    create_required_folders(expid)
 
     # Commit.
     as_version = get_version()

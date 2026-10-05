@@ -283,10 +283,9 @@ def expid_fn(
     # Create the experiment structure
     Log.info("Generating folder structure...")
 
-    exp_folder = root_folder / Path(exp_id)
     try:
-        Log.info(f"Experiment folder: {exp_folder}")
-        create_required_folders(exp_id, exp_folder)
+        Log.info(f"Experiment folder: {BasicConfig.expid_dir(exp_id)}")
+        create_required_folders(exp_id)
     except OSError as e:
         with suppress(Exception):
             delete_experiment(exp_id, True)
@@ -1478,24 +1477,35 @@ def report(
         )
 
 
-def update_version(expid: str) -> bool:
+def update_version(expid: str) -> None:
     """Refresh the experiment version with the current Autosubmit version.
 
+    Creates any missing folders and files for the new version of Autosubmit chosen.
+
     :param expid: experiment identifier
-    :return: True if successful, False otherwise
     """
     as_conf = load_config(expid)
     as_conf.reload(force_load=True)
     as_conf.check_expdef_conf()
 
     autosubmit_version = get_version()
+    current_version = as_conf.get_version()
+
+    if current_version == autosubmit_version:
+        Log.info(
+            f"Experiment {expid} is already using Autosubmit version {autosubmit_version}. No changes needed."
+        )
+        return
+
     Log.info(
-        f"Changing {expid} experiment version from {as_conf.get_version()} to {autosubmit_version}"
+        f"Changing experiment {expid} version from {as_conf.get_version()} to {autosubmit_version}..."
     )
     as_conf.set_version(autosubmit_version)
+    Log.debug(f"Updating the experiment {expid} version in the database...")
     update_experiment_description_version(expid, version=autosubmit_version)
 
-    return True
+    Log.info(f"Creating required folders for experiment {expid}...")
+    create_required_folders(expid)
 
 
 def describe(

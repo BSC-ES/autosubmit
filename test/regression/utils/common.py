@@ -16,7 +16,6 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from pathlib import Path
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.experiment.manage import create, expid_fn
@@ -50,7 +49,7 @@ def init_expid(env, platform="local", expid=None, full_load=True, test_type="nor
                                      git_repo="", git_branch="", git_as_conf="", operational=False, testcase=False,
                                      evaluation=True, use_local_minimal=False)
     if full_load:
-        create_required_folders(expid, Path(BasicConfig.LOCAL_ROOT_DIR, expid),)
+        create_required_folders(expid)
         create(expid, not plot, False, force=True, detail=True)
 
     return expid

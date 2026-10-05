@@ -207,7 +207,7 @@ def test_upgrade_scripts_as_3_conf_causes_error(
         "autosubmit.config.upgrade_scripts.ini_to_yaml", side_effect=ValueError("test")
     )
     mocked_log = mocker.patch("autosubmit.config.upgrade_scripts.Log")
-    upgrade_scripts(as_exp.expid, files="")
+    upgrade_scripts(as_exp.expid, files=[])
     assert mocked_log.warning.called
     assert "Failed to upgrade AS3 conf file" in mocked_log.warning.call_args[0][0]
 
@@ -262,7 +262,7 @@ def test_upgrade_scripts_as_3_yaml_placeholders_cause_error(
     )
     mocked_log = mocker.patch("autosubmit.config.upgrade_scripts.Log")
 
-    upgrade_scripts(as_exp.expid, files="")
+    upgrade_scripts(as_exp.expid, files=[])
 
     assert mocked_fix.call_count == 4
     assert mocked_log.warning.called
@@ -307,7 +307,7 @@ def test_upgrade_scripts(
 
     mocked_log = mocker.patch("autosubmit.config.upgrade_scripts.Log")
 
-    assert upgrade_scripts(as_exp.expid, files="")
+    assert upgrade_scripts(as_exp.expid, files=[])
 
     assert create(as_exp.expid, force=True, noplot=True, hide=True) == 0
     assert inspect(
@@ -347,3 +347,27 @@ def test_upgrade_scripts(
     assert "%ROOTDIR%" in new_local_script_content, (
         "The %rootdir% variable was not upgraded/upper-cased!"
     )
+
+
+def test_upgrade_creates_db_folder(
+    autosubmit_exp, tmp_path: "LocalPath", as3_ini_files: list[Path], mocker
+):
+    """Test that the upgrade script creates the required folders.
+
+    This is necessary as a user could be coming from AS 3.15.x, where the ``db`` folder was not created.
+    Without the ``db`` folder, the upgrade would succeed, but the experiment would not be able to run.
+    """
+    as_exp = autosubmit_exp(experiment_data={}, create=False)
+
+    exp_dir = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
+    # Copy fixture INI files into the experiment path
+    for ini_file in as3_ini_files:
+        shutil.copy(ini_file, exp_dir / "conf")
+
+    exp_path = BasicConfig.expid_dir(as_exp.expid)
+    db_path = exp_path / "db"
+    shutil.rmtree(db_path)
+
+    upgrade_scripts(as_exp.expid, files=[])
+
+    assert db_path.exists()

@@ -6,6 +6,12 @@ introduction of a new database backend for the joblist using SQLAlchemy, which
 allows for better scalability in handling large workflows. This release also includes
 several bug fixes and enhancements to improve the overall user experience.
 
+> [!WARNING]
+> Downgrading experiment versions is not recommended, in general, unless really needed.
+> If you try to downgrade experiments from 4.2.0 to an older version, you will need to
+> recreate the workflow jobs (e.g., `autosubmit create -f`) as this version drops the
+> Pickle `pkl` file.
+
 **Bug fixes:**
 
 - Fix `autosubmit.lock` not being deleted after `create` and `run`; `archive` and `delete` now acquire it too #3033 #3055
@@ -87,6 +93,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Removed `PRESUBMISSION` from documentation, removed in 4.x #3320 (thanks @vansh-nagar)
 - The ``AutosubmitConfig`` instances are now centralised in a registry, to avoid re-loading the YAML files
   multiple times, partially addressing #3326. #3327
+- Updating the Autosubmit version of an experiment (e.g., `create -v`) now creates the `db` folder #3293
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 
