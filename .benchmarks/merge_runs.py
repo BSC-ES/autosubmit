@@ -58,7 +58,7 @@ def load_runs(input_dir: Path) -> list[dict]:
             with open(file, encoding="UTF-8") as fh:
                 runs.append(json.load(fh))
         except (OSError, json.JSONDecodeError) as exc:
-            print(f"[WARNING] Skipping unreadable benchmark file {file}: {exc}")
+            print(f"[WARNING] Skipping unreadable benchmark file {str(file)!r}: {exc}")
     if not runs:
         print("[ERROR] No readable benchmark run files found", file=sys.stderr)
         sys.exit(1)
@@ -184,7 +184,7 @@ def main() -> int:
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(merged, indent=2), encoding="UTF-8")
-    print(f"Merged {len(runs)} run(s) ({len(merged['benchmarks'])} scenarios) into {out}")
+    print(f"Merged {len(runs)} run(s) ({len(merged['benchmarks'])} scenarios) into {str(out)!r}")
     return 0
 
 

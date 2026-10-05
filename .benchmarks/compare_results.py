@@ -177,7 +177,7 @@ def _load_runs(files: list[Path]) -> list[dict]:
             with open(file, encoding="UTF-8") as fh:
                 runs.append(json.load(fh))
         except (OSError, json.JSONDecodeError) as exc:
-            print(f"[WARNING] Skipping unreadable benchmark file {file}: {exc}")
+            print(f"[WARNING] Skipping unreadable benchmark file {str(file)!r}: {exc}")
     return runs
 
 
@@ -909,7 +909,7 @@ def main() -> int:
     if previous_runs and current_cpu:
         baseline_cpu = _current_cpu(previous_runs)
         if baseline_cpu and baseline_cpu != current_cpu:
-            print(f"[WARNING] Baseline CPU `{baseline_cpu}` differs from current `{current_cpu}`; "
+            print(f"[WARNING] Baseline CPU {baseline_cpu!r} differs from current {current_cpu!r}; "
                   f"ignoring baseline.")
             previous_runs = []
 

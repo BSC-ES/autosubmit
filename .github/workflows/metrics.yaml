@@ -4,30 +4,54 @@ name: metrics
 # "last known good" results on the `benchmark-reference` branch.
 #
 # Trigger modes:
-#   * PR gate: on every pull_request the `metrics` job runs as a REQUIRED
+#   * PR check: on every pull_request the `metrics` job runs as a REQUIRED
 #     status check. It is a cheap no-op unless the PR has the
 #     `perf-benchmark` label (which needs write/triage access to add), in which
-#     case it runs the FULL suite (`profilelong`) against the baseline and greys
-#     the merge button until the check completes. While the label is on, every
+#     case it runs the FULL suite (`profilelong`) against the baseline and keeps
+#     the merge button disabled until the check completes. While the label is on, every
 #     push triggers a full run (~20 min) and the `benchmark` concurrency group
 #     serializes them, so remove the label once the check passes to avoid
-#     queueing extra runs.
-#   * Manual: a maintainer (member of the BSC-ES/autosubmit team, or listed in
-#     .benchmarks/allowed-users.txt on the default branch) comments on a PR:
+#     queuing extra runs. Fork and bot PRs always run as a no-op: their
+#     read-only token cannot push a baseline or post comments.
+#   * Manual: a maintainer comments on a PR whose head branch lives in
+#     this repository:
 #       - `/metrics`          quick suite
-#       - `/metrics_full`     full suite (adds the 4m/2c/4s and 4m/2c/8s run scenarios)
+#       - `/metrics_full`     full suite (adds the 10members_2chunks_75splits run scenario)
 #       - `/metrics_promote`  promote the last completed run as the new
 #                             baseline.
+#     Authorized commenters are the repository owner, organization members, or
+#     collaborators with write access. Fork PRs are rejected even for authorized
+#     commenters: the write-token jobs must never execute untrusted code.
 #
-# Baseline promotion is GUARDED: a run that regresses vs the current baseline
-# is never promoted, so the baseline cannot ratchet downward. Set up branch
+# Baseline promotion is GUARDED for automatic runs: a run that regresses vs the
+# current baseline is never auto-promoted, so the baseline cannot drift
+# down. `/metrics_promote` is an explicit maintainer override that
+# re-baselines the last completed run even if it regressed. Set up branch
 # protection on the default branch to require the `performance-benchmark` check
 # (Settings > Branches > Require status checks).
 #
-# NOTE: `issue_comment` workflows run the version of this file on the DEFAULT
-# branch, not the PR head. Changes here only take effect after merging.
-# NOTE: the authorization allowlist is read from .benchmarks/allowed-users.txt on the
-# default branch (currently `master`) on purpose, so PRs cannot self-authorize.
+# SECURITY: `issue_comment` runs the version of this file on the DEFAULT branch
+# (not the PR head), so a PR cannot self-authorize by editing this workflow.
+#
+# CONVENTION: all actions (including first-party actions/*) are pinned to a
+# full commit SHA.
+#
+# CAVEATS:
+#   * `metrics` runs PR code and keeps `issues: write` only for the status
+#     notices. Fork PRs never reach it (should_run=false), and same-repo PRs
+#     come from authors who already have write access, so this does not grant
+#     extra privileges. It deliberately has no `contents: write`.
+#   * `report` runs the PR-head `compare_results.py`, so `regressions_detected`
+#     is PR-controlled; baseline promotion can be manipulated for same-repo
+#     PRs and relies on review.
+#   * `report` installs the comparison script's dependencies explicitly; if
+#     `.benchmarks/compare_results.py` gains a dependency, add it there.
+#   * On `pull_request`, GitHub runs this workflow from the PR merge ref, so a
+#     same-repo PR could edit this file (including `concurrency`). Cross-run
+#     serialization is therefore only a soft guarantee; the hard protection is a
+#     branch ruleset on `benchmark-reference` limiting who can push it. Such a
+#     ruleset must allow the Actions bot, otherwise the workflow's own writes
+#     (createRef/commit/push) to the baseline will be rejected.
 
 on:
   pull_request:
@@ -35,11 +59,9 @@ on:
   issue_comment:
     types: [created]
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  actions: write
+# Workflow-level default: no permissions. Each job requests only what it needs,
+# so a job that executes untrusted (PR) code never inherits write access.
+permissions: {}
 
 # Only one benchmark workflow at a time: concurrent runs would race when
 # pushing the baseline branch.
@@ -57,57 +79,61 @@ env:
 jobs:
   authorize:
     runs-on: ubuntu-latest
+    # Only manual comment commands need this check, and only on PRs: a comment
+    # on a plain issue would make pulls.get 404 and fail the run.
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       allowed: ${{ steps.auth.outputs.allowed }}
+      is_fork: ${{ steps.auth.outputs.is_fork }}
     steps:
       - name: Check the comment author is allowed
         id: auth
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           ACT: ${{ env.ACT }}
         with:
           script: |
-            // PR-gate runs are authorized by the label itself; only the manual
+            // Labeled runs are authorized by the label itself; only the manual
             // comment commands need this check.
             if (context.eventName !== 'issue_comment') {
               core.setOutput('allowed', 'true');
+              core.setOutput('is_fork', 'false');
               return;
             }
-            // Local `act` runs must not hit the org-level APIs.
+            // Local `act` runs must not hit the GitHub APIs.
             if (process.env.ACT) {
               core.setOutput('allowed', 'true');
+              core.setOutput('is_fork', 'false');
               return;
             }
-            const username = context.payload.comment.user.login;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            // A missing head repo (e.g. a deleted fork) is treated as a fork.
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number: context.issue.number,
+            });
+            const headFullName = (pr.head.repo && pr.head.repo.full_name) || '';
+            const isFork = headFullName !== `${owner}/${repo}`;
+            core.setOutput('is_fork', String(isFork));
+            // Only same-repository PRs are eligible; fork code must never run
+            // with the write token.
             let allowed = false;
-            // (1) Members of the BSC-ES/autosubmit team are allowed.
-            try {
-              await github.rest.teams.getMembershipForUserInOrg({
-                org: 'BSC-ES',
-                team_slug: 'autosubmit',
-                username,
-              });
-              allowed = true;
-            } catch (e) {
-              if (e.status !== 404) throw e;
-            }
-            // (2) Users listed in .benchmarks/allowed-users.txt on the default branch.
-            if (!allowed) {
-              try {
-                const { data: repoInfo } = await github.rest.repos.get({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                });
-                const { data } = await github.rest.repos.getContent({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  path: '.benchmarks/allowed-users.txt',
-                  ref: repoInfo.default_branch,
-                });
-                const text = Buffer.from(data.content, 'base64').toString();
-                allowed = new RegExp(`@${username}\\b`).test(text);
-              } catch (e) {
-                if (e.status !== 404) throw e;
+            if (!isFork) {
+              const association = context.payload.comment.author_association;
+              allowed = association === 'OWNER' || association === 'MEMBER';
+              // COLLABORATOR may be read-only; require write access for those.
+              if (!allowed && association === 'COLLABORATOR') {
+                try {
+                  const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                    owner, repo, username: context.payload.comment.user.login,
+                  });
+                  allowed = data.permission === 'admin' || data.permission === 'write';
+                } catch (e) {
+                  if (e.status !== 404) throw e;
+                }
               }
             }
             core.setOutput('allowed', String(allowed));
@@ -120,14 +146,18 @@ jobs:
       (
         github.event_name == 'issue_comment' &&
         github.event.issue.pull_request &&
-        needs.authorize.outputs.allowed == 'true'
+        needs.authorize.outputs.allowed == 'true' &&
+        needs.authorize.outputs.is_fork == 'false'
       )
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
     timeout-minutes: 360
     outputs:
       version: ${{ steps.as_version.outputs.version }}
       head_repo: ${{ steps.pr.outputs.head_repo }}
-      head_ref: ${{ steps.pr.outputs.head_ref }}
       head_sha: ${{ steps.pr.outputs.head_sha }}
       issue_number: ${{ steps.pr.outputs.issue_number }}
       test_type: ${{ steps.scope.outputs.test_type }}
@@ -137,7 +167,7 @@ jobs:
     steps:
       - name: Check for the perf-benchmark label
         id: label
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             // Fetch the live label state from the API instead of trusting the
@@ -158,34 +188,51 @@ jobs:
 
       - name: Get PR / commit info
         id: pr
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
+            let headRepo, headSha, issueNumber, prAuthor;
             if (context.eventName === 'issue_comment') {
-              const pr = await github.rest.pulls.get({
+              const { data: pr } = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: context.issue.number,
               });
-              core.setOutput('head_repo', pr.data.head.repo.full_name);
-              core.setOutput('head_ref', pr.data.head.ref);
-              core.setOutput('head_sha', pr.data.head.sha);
-              core.setOutput('issue_number', String(context.issue.number));
+              headRepo = (pr.head.repo && pr.head.repo.full_name) || '';
+              headSha = pr.head.sha;
+              issueNumber = String(context.issue.number);
+              prAuthor = (pr.user && pr.user.login) || '';
             } else {
-              core.setOutput('head_repo', context.payload.pull_request.head.repo.full_name);
-              core.setOutput('head_ref', context.payload.pull_request.head.ref);
-              core.setOutput('head_sha', context.payload.pull_request.head.sha);
-              core.setOutput('issue_number', String(context.payload.pull_request.number));
+              const pr = context.payload.pull_request;
+              headRepo = (pr.head.repo && pr.head.repo.full_name) || '';
+              headSha = pr.head.sha;
+              issueNumber = String(pr.number);
+              prAuthor = (pr.user && pr.user.login) || '';
             }
+            // A missing head repo (e.g. a deleted fork) is treated as a fork.
+            // Bot-authored PRs (e.g. Dependabot) also get a read-only token, so
+            // treat them the same: running as a no-op avoids 403s when posting
+            // the status comments.
+            const isFork = headRepo !== `${context.repo.owner}/${context.repo.repo}` || /\[bot\]$/.test(prAuthor);
+            core.setOutput('head_repo', headRepo);
+            core.setOutput('head_sha', headSha);
+            core.setOutput('issue_number', issueNumber);
+            core.setOutput('is_fork', String(isFork));
 
       - name: Determine benchmark scope
         id: scope
+        env:
+          # Passed through the environment so the (untrusted) comment body is
+          # never interpolated into the shell script source.
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK: ${{ steps.pr.outputs.is_fork }}
+          LABEL_PRESENT: ${{ steps.label.outputs.label_present }}
         run: |
-          # Exact command parsing
+          # Exact command parsing.
           cmd=""
-          if [ "${{ github.event_name }}" == "issue_comment" ]; then
-            body='${{ github.event.comment.body }}'
-            for tok in $body; do
+          if [ "$EVENT_NAME" == "issue_comment" ]; then
+            for tok in $COMMENT_BODY; do
               case "$tok" in
                 "/metrics_full")    cmd="metrics_full" ;;
                 "/metrics_promote") cmd="metrics_promote" ;;
@@ -194,10 +241,8 @@ jobs:
               [ -n "$cmd" ] && break
             done
           fi
-          # Suite: full on the PR label gate and /metrics_full, quick on /metrics.
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "test_type=profilelong" >> "$GITHUB_OUTPUT"
-          elif [ "$cmd" == "metrics_full" ]; then
+          # Suite: full on labeled PRs and /metrics_full, quick on /metrics.
+          if [ "$EVENT_NAME" == "pull_request" ] || [ "$cmd" == "metrics_full" ]; then
             echo "test_type=profilelong" >> "$GITHUB_OUTPUT"
           else
             echo "test_type=profile" >> "$GITHUB_OUTPUT"
@@ -209,13 +254,16 @@ jobs:
             echo "promote_last=false" >> "$GITHUB_OUTPUT"
           fi
           # Run the benchmark for labeled PRs and for manual commands, except
-          # /metrics_promote which only re-baselines the last run.
-          if [ "$cmd" == "metrics_promote" ]; then
+          # /metrics_promote which only re-baselines the last run. Fork PRs run
+          # as a no-op success: the read-only token cannot push a baseline or
+          # post comments, and untrusted code must not run with the write token.
+          if [ "$IS_FORK" == "true" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          elif [ "$cmd" == "metrics_promote" ]; then
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           elif [ "$cmd" == "metrics" ] || [ "$cmd" == "metrics_full" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" == "pull_request" ] && \
-               [ "${{ steps.label.outputs.label_present }}" == "true" ]; then
+          elif [ "$EVENT_NAME" == "pull_request" ] && [ "$LABEL_PRESENT" == "true" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
@@ -224,18 +272,22 @@ jobs:
       - name: Post benchmark started
         id: started
         if: steps.scope.outputs.should_run == 'true' && !env.ACT
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          # Untrusted context values never reach the script source: they are
+          # passed as environment variables instead.
+          ISSUE_NUMBER: ${{ steps.pr.outputs.issue_number }}
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const issue_number = Number('${{ steps.pr.outputs.issue_number }}');
-            // Remove any leftover progress notices from previous runs so they
-            // never accumulate (self-heal after failed or interrupted runs).
+            const issue_number = Number(process.env.ISSUE_NUMBER);
+            // Remove any leftover progress notices from previous runs so stale
+            // notices are removed automatically.
             const stale = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number,
             });
-            for (const c of stale.filter((c) => c.body.startsWith('> **Benchmark status:**'))) {
+            for (const c of stale.filter((c) => c.user.login === 'github-actions[bot]' && c.body.startsWith('> **Benchmark status:**'))) {
               await github.rest.issues.deleteComment({ owner, repo, comment_id: c.id });
             }
             const runUrl = `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${context.runId}`;
@@ -247,21 +299,35 @@ jobs:
 
       - name: Checkout code
         if: steps.scope.outputs.should_run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ steps.pr.outputs.head_repo }}
-          ref: ${{ steps.pr.outputs.head_ref }}
+          # Pin to the exact commit that was authorized, not the mutable branch
+          # ref (avoids a force-push race between the check and the checkout).
+          ref: ${{ steps.pr.outputs.head_sha }}
           fetch-depth: 0
+          # This job runs PR code and never pushes, so do not leave the token
+          # in .git/config where it could be leaked.
+          persist-credentials: false
 
       - name: Get Autosubmit version
         id: as_version
         if: steps.scope.outputs.should_run == 'true'
         run: |
-          echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+          # The VERSION file comes from the PR checkout, so sanitize it before
+          # it is propagated to other jobs (shell/JS/artifact-name injection).
+          version="$(head -n1 VERSION | tr -d '\r')"
+          if [[ ! "$version" =~ ^[0-9A-Za-z][0-9A-Za-z._+-]*$ ]]; then
+            # Do not echo the raw value: it may contain workflow-command
+            # metacharacters.
+            echo "::error::VERSION file contains disallowed characters"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         if: steps.scope.outputs.should_run == 'true'
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
@@ -273,9 +339,11 @@ jobs:
           pip install -e .[all]
 
       - name: Fetch baseline results
-        id: baseline
         if: steps.scope.outputs.should_run == 'true'
         run: |
+          # Populated only so the artifact keeps its `data/`+`reference/`
+          # layout; the trusted `report` job overwrites it from the branch
+          # before comparing, so this copy is never trusted.
           git remote add base "https://github.com/${{ github.repository }}.git"
           git fetch base benchmark-reference --depth 1 || echo "no baseline branch yet"
           if git cat-file -e refs/remotes/base/benchmark-reference:.benchmarks/reference 2>/dev/null; then
@@ -288,14 +356,18 @@ jobs:
 
       - name: Run benchmarks
         if: steps.scope.outputs.should_run == 'true'
+        env:
+          AS_VERSION: ${{ steps.as_version.outputs.version }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          TEST_TYPE: ${{ steps.scope.outputs.test_type }}
         run: |
-          short_sha=$(echo "${{ steps.pr.outputs.head_sha }}" | cut -c1-7)
+          short_sha=$(echo "$HEAD_SHA" | cut -c1-7)
           for i in $(seq 1 "${BENCHMARK_RUNS:-3}"); do
             args=(
-              -m "${{ steps.scope.outputs.test_type }}"
+              -m "$TEST_TYPE"
               -n 0
               --benchmark-storage=file://.benchmarks/data
-              --benchmark-save="${{ steps.as_version.outputs.version }}-${short_sha}-run${i}"
+              --benchmark-save="${AS_VERSION}-${short_sha}-run${i}"
               test/integration/commands/test_performance.py
             )
             # BENCHMARK_K is only set when running the workflow locally with act
@@ -311,13 +383,13 @@ jobs:
           # holds exactly one file per run.
           python .benchmarks/merge_runs.py \
             --input .benchmarks/data \
-            --output ".benchmarks/data/${{ steps.as_version.outputs.version }}-${short_sha}.json"
+            --output ".benchmarks/data/${AS_VERSION}-${short_sha}.json"
           find .benchmarks/data -name '*.json' \
-            ! -name "${{ steps.as_version.outputs.version }}-${short_sha}.json" -delete
+            ! -name "${AS_VERSION}-${short_sha}.json" -delete
 
       - name: Upload benchmark artifacts
         if: steps.scope.outputs.should_run == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: performance-metrics-${{ steps.as_version.outputs.version }}
           path: |
@@ -327,12 +399,14 @@ jobs:
 
       - name: Post benchmark failed
         if: always() && failure() && steps.started.outputs.comment_id && !env.ACT
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          COMMENT_ID: ${{ steps.started.outputs.comment_id }}
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const comment_id = Number('${{ steps.started.outputs.comment_id }}');
+            const comment_id = Number(process.env.COMMENT_ID);
             const runUrl = `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${context.runId}`;
             await github.rest.issues.updateComment({
               owner, repo, comment_id,
@@ -344,83 +418,179 @@ jobs:
     if: always() && needs.metrics.result == 'success' && needs.metrics.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # This job runs code from the PR head (the comparison script), so it is strictly read-only
+    permissions:
+      contents: read
     outputs:
       regressions_detected: ${{ steps.verdict.outputs.regressions_detected }}
       cpu_slug: ${{ steps.verdict.outputs.cpu_slug }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ needs.metrics.outputs.head_repo }}
-          ref: ${{ needs.metrics.outputs.head_ref }}
+          ref: ${{ needs.metrics.outputs.head_sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
       - name: Install dependencies
         run: |
+          # The comparison script is standalone (numpy/pandas/matplotlib +
+          # ruamel.yaml + tabulate, used by DataFrame.to_markdown)
           python -m pip install --upgrade pip
-          pip install -e .[all]
+          pip install numpy pandas matplotlib ruamel.yaml tabulate
 
       - name: Download benchmark artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: performance-metrics-${{ needs.metrics.outputs.version }}
           path: .benchmarks
 
+      - name: Fetch trusted baseline
+        run: |
+          # The baseline is a trust-critical input; fetch it straight from the
+          # `benchmark-reference` branch instead of trusting the PR-produced
+          # artifact.
+          git remote add base "https://github.com/${{ github.repository }}.git"
+          rm -rf .benchmarks/reference
+          mkdir -p .benchmarks/reference
+          # Distinguish "branch absent" (legitimate first run) from a fetch
+          # failure. `--exit-code` returns 2 when the ref does not exist; any
+          # other failure must abort, otherwise a transient error would be read
+          # as "no regressions" and silently auto-promote.
+          if git ls-remote --exit-code --heads base benchmark-reference >/dev/null 2>&1; then
+            git fetch base benchmark-reference --depth 1
+            if git cat-file -e refs/remotes/base/benchmark-reference:.benchmarks/reference 2>/dev/null; then
+              git checkout refs/remotes/base/benchmark-reference -- .benchmarks/reference
+              echo "Using baseline from benchmark-reference branch"
+            else
+              echo "Baseline branch has no .benchmarks/reference yet, running without comparison"
+            fi
+          else
+            rc=$?
+            if [ "$rc" -ne 2 ]; then
+              echo "::error::Could not check the baseline branch (git ls-remote exit $rc)"
+              exit 1
+            fi
+            echo "No baseline branch yet, running without comparison"
+          fi
+
       - name: Generate comparison report
+        env:
+          VERSION: ${{ needs.metrics.outputs.version }}
+          ISSUE_NUMBER: ${{ needs.metrics.outputs.issue_number }}
+          HEAD_SHA: ${{ needs.metrics.outputs.head_sha }}
         run: |
           python .benchmarks/compare_results.py \
             --current .benchmarks/data \
             --previous .benchmarks/reference \
             --thresholds .benchmarks/thresholds.yml \
-            --version "${{ needs.metrics.outputs.version }}" \
-            --current-label "PR #${{ needs.metrics.outputs.issue_number }} (${{ needs.metrics.outputs.head_sha }})" \
+            --version "$VERSION" \
+            --current-label "PR #${ISSUE_NUMBER} (${HEAD_SHA})" \
             --previous-label "master baseline" \
             --output-dir .benchmarks/artifacts
 
       - name: Read comparison verdict
         id: verdict
+        env:
+          VERSION: ${{ needs.metrics.outputs.version }}
         run: |
-          jq -r '.regressions_detected' \
-            .benchmarks/artifacts/report_${{ needs.metrics.outputs.version }}.json \
-            | { read v; echo "regressions_detected=$v" >> "$GITHUB_OUTPUT"; }
-          jq -r '.cpu_slug' \
-            .benchmarks/artifacts/report_${{ needs.metrics.outputs.version }}.json \
-            | { read v; echo "cpu_slug=$v" >> "$GITHUB_OUTPUT"; }
+          set -o pipefail
+          report=".benchmarks/artifacts/report_${VERSION}.json"
+          [ -f "$report" ] || { echo "::error::Missing report file"; exit 1; }
+          regressions=$(jq -r '.regressions_detected' "$report") \
+            || { echo "::error::Cannot read regressions_detected"; exit 1; }
+          [ -n "$regressions" ] || { echo "::error::Missing regressions_detected"; exit 1; }
+          cpu_slug=$(jq -r '.cpu_slug // empty' "$report") \
+            || { echo "::error::Cannot read cpu_slug"; exit 1; }
+          [ -n "$cpu_slug" ] || { echo "::error::Missing cpu_slug"; exit 1; }
+          # Restrict to a safe charset so a crafted JSON value cannot inject
+          # extra lines into $GITHUB_OUTPUT.
+          [[ "$regressions" =~ ^(true|false)$ ]] || { echo "::error::Invalid regressions_detected"; exit 1; }
+          [[ "$cpu_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "::error::Invalid cpu_slug"; exit 1; }
+          echo "regressions_detected=$regressions" >> "$GITHUB_OUTPUT"
+          echo "cpu_slug=$cpu_slug" >> "$GITHUB_OUTPUT"
 
       - name: Upload report artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: performance-report-${{ needs.metrics.outputs.version }}
           path: .benchmarks/artifacts
           retention-days: 7
 
-      - name: Comment results
-        uses: actions/github-script@v9
+      - name: Display results (ACT)
+        if: ${{ env.ACT }}
+        env:
+          VERSION: ${{ needs.metrics.outputs.version }}
+          TEST_TYPE: ${{ needs.metrics.outputs.test_type }}
+        run: |
+          echo "Benchmark Results (Local Run - ${TEST_TYPE})"
+          echo "================================"
+          cat ".benchmarks/artifacts/summary_${VERSION}.md"
+          echo ""
+          echo "Plots saved to .benchmarks/artifacts/summary_${VERSION}_run.png"
+          echo "             and .benchmarks/artifacts/summary_${VERSION}_create_recovery_setstatus.png"
+          echo "             and .benchmarks/artifacts/summary_${VERSION}_memory.png"
+
+  publish-plots:
+    needs: [report, metrics]
+    if: >
+      always() && needs.metrics.result == 'success' &&
+      needs.report.result == 'success' &&
+      needs.metrics.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      actions: read
+    steps:
+      - name: Download report artifacts
         if: ${{ !env.ACT }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: performance-report-${{ needs.metrics.outputs.version }}
+          path: .benchmarks/artifacts
+
+      - name: Publish plots and comment results
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        if: ${{ !env.ACT }}
+        env:
+          VERSION: ${{ needs.metrics.outputs.version }}
+          TEST_TYPE: ${{ needs.metrics.outputs.test_type }}
+          ISSUE_NUMBER: ${{ needs.metrics.outputs.issue_number }}
         with:
           script: |
             const fs = require('fs');
-            const version = '${{ needs.metrics.outputs.version }}';
+            const path = require('path');
+            const version = process.env.VERSION;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const branch = 'benchmark-reference';
             const dir = '.benchmarks/artifacts';
-            const plotNames = fs.readdirSync(dir)
-              .filter(f => f.startsWith('summary_') && f.endsWith('.png'))
+            const expectedPlots = [
+              `summary_${version}_run.png`,
+              `summary_${version}_create_recovery_setstatus.png`,
+              `summary_${version}_memory.png`,
+            ];
+            const plotNames = expectedPlots
+              .filter(f => path.basename(f) === f && fs.existsSync(`${dir}/${f}`))
               .sort();
             const plotAlts = {
-              [`summary_${version}_run.png`]: 'Run scenarios',
-              [`summary_${version}_create_recovery_setstatus.png`]: 'Create / Recovery / Setstatus',
-              [`summary_${version}_memory.png`]: 'Memory scenarios',
+              [expectedPlots[0]]: 'Run scenarios',
+              [expectedPlots[1]]: 'Create / Recovery / Setstatus',
+              [expectedPlots[2]]: 'Memory scenarios',
             };
 
-            const summary = fs.readFileSync(`${dir}/summary_${version}.md`, 'utf8');
+            const summary = fs.readFileSync(`${dir}/summary_${version}.md`, 'utf8')
+              .replace(/@/g, '@\u200b')
+              .replace(/<\/?[a-zA-Z][^>]*>/g, '');
 
             // GitHub strips data: URIs from comment images, so the plots are
             // pushed to the benchmark-reference branch and linked over https.
@@ -484,7 +654,7 @@ jobs:
             );
 
             const body = [
-              `## Benchmark Results (${{ needs.metrics.outputs.test_type }})`,
+              `## Benchmark Results (${process.env.TEST_TYPE})`,
               '',
               ...plotImages,
               '',
@@ -499,13 +669,13 @@ jobs:
               '',
               `[Download benchmark data](${dataUrl}) · [Download report (md, plots, json)](${reportUrl})`
             ].join('\n');
-            const issue_number = Number('${{ needs.metrics.outputs.issue_number }}');
+            const issue_number = Number(process.env.ISSUE_NUMBER);
             // Update the existing benchmark comment in place so every run edits
             // the first one instead of posting duplicates.
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number,
             });
-            const existing = comments.find((c) => c.body.startsWith('## Benchmark Results'));
+            const existing = comments.find((c) => c.user.login === 'github-actions[bot]' && c.body.startsWith('## Benchmark Results'));
             if (existing) {
               await github.rest.issues.updateComment({
                 owner, repo, comment_id: existing.id, body,
@@ -516,24 +686,13 @@ jobs:
               });
             }
             // Remove the progress notice(s) now that the results are in.
-            const progress = comments.filter((c) => c.body.startsWith('> **Benchmark status:**'));
+            const progress = comments.filter((c) => c.user.login === 'github-actions[bot]' && c.body.startsWith('> **Benchmark status:**'));
             for (const p of progress) {
               await github.rest.issues.deleteComment({ owner, repo, comment_id: p.id });
             }
 
-      - name: Display results (ACT)
-        if: ${{ env.ACT }}
-        run: |
-          echo "Benchmark Results (Local Run - ${{ needs.metrics.outputs.test_type }})"
-          echo "================================"
-          cat .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}.md
-          echo ""
-          echo "Plots saved to .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}_run.png"
-          echo "             and .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}_create_recovery_setstatus.png"
-          echo "             and .benchmarks/artifacts/summary_${{ needs.metrics.outputs.version }}_memory.png"
-
   update-baseline:
-    needs: [report, metrics]
+    needs: [report, metrics, publish-plots]
     if: >
       always() && needs.metrics.result == 'success' &&
       (
@@ -543,16 +702,20 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Find latest benchmark artifact
         id: latest
         if: needs.metrics.outputs.promote_last == 'true'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             let arts = [];
@@ -567,24 +730,44 @@ jobs:
               if (!(data.artifacts && data.artifacts.length === 100)) break;
             }
             const candidates = arts
-              .filter(a => a.name.startsWith('performance-metrics-') && a.expired === false)
+              .filter(a => a.name.startsWith('performance-metrics-') && a.expired === false && a.workflow_run && a.workflow_run.id)
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             if (!candidates.length) throw new Error('No benchmark artifact found to promote. Run /metrics first.');
-            const art = candidates[0];
+            // Prove the artifact came from THIS workflow
+            let art = null;
+            for (const a of candidates.slice(0, 20)) {
+              let run;
+              try {
+                const res = await github.rest.actions.getWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: a.workflow_run.id,
+                });
+                run = res.data;
+              } catch (e) {
+                if (e.status === 404) continue;
+                throw e;
+              }
+              const sameRepo = run.head_repository && run.head_repository.full_name === `${context.repo.owner}/${context.repo.repo}`;
+              const fromMetrics = run.path === '.github/workflows/metrics.yaml';
+              const validEvent = run.event === 'pull_request' || run.event === 'issue_comment';
+              if (sameRepo && fromMetrics && validEvent) { art = a; break; }
+            }
+            if (!art) throw new Error('No eligible benchmark artifact found to promote (origin check failed).');
             core.setOutput('artifact_name', art.name);
             core.setOutput('run_head_sha', (art.workflow_run && art.workflow_run.head_sha) || '');
             core.setOutput('run_id', (art.workflow_run && String(art.workflow_run.id)) || '');
 
       - name: Download benchmark artifacts
         if: needs.metrics.outputs.promote_last != 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: performance-metrics-${{ needs.metrics.outputs.version }}
           path: artifact
 
       - name: Download latest benchmark artifact
         if: needs.metrics.outputs.promote_last == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ steps.latest.outputs.artifact_name }}
           github-token: ${{ github.token }}
@@ -593,33 +776,45 @@ jobs:
 
       - name: Verify artifact belongs to this PR
         if: needs.metrics.outputs.promote_last == 'true'
+        env:
+          HEAD_SHA: ${{ needs.metrics.outputs.head_sha }}
         run: |
-          # Newest merged file: legacy artifacts may hold several run files.
-          file=$(find artifact/data -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)
-          short_expected=$(echo '${{ needs.metrics.outputs.head_sha }}' | cut -c1-7)
+          file=$(find artifact/data -type f -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)
+          short_expected=$(echo "$HEAD_SHA" | cut -c1-7)
           base=$(basename "$file")
-          if [[ "$base" != *"$short_expected"* ]]; then
-            echo "::error::Last benchmark artifact ($base) is not from the current PR head ($short_expected). Re-run /metrics (or /metrics_full) before /metrics_promote."
+          if [[ "$base" != *"-${short_expected}.json" ]]; then
+            echo "::error::Last benchmark artifact is not from the current PR head ($short_expected). Re-run /metrics (or /metrics_full) before /metrics_promote."
             exit 1
           fi
-          echo "Promoting artifact $base (matches PR head $short_expected)"
+          echo "Promoting artifact for PR head $short_expected"
 
       - name: Detect benchmark CPU
         id: cpu
+        env:
+          REPORT_CPU_SLUG: ${{ needs.report.outputs.cpu_slug }}
         run: |
-          # Prefer the CPU detected by the report job (single source of
-          # truth). Fall back to reading the artifact only for /metrics_promote,
-          # where the report job is skipped.
-          slug="${{ needs.report.outputs.cpu_slug }}"
+          # The report is produced by PR-head code, so its cpu_slug is untrusted:
+          # normalize it before it is used to build a filesystem path.
+          slug=$(printf '%s' "${REPORT_CPU_SLUG}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//')
           if [ -z "$slug" ]; then
-            file=$(find artifact/data -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)
+            file=$(find artifact/data -type f -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)
             brand=$(jq -r '.machine_info.cpu.brand_raw // ""' "$file" 2>/dev/null || true)
             slug=$(printf '%s' "$brand" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//')
-            [ -n "$slug" ] || slug=unknown-cpu
+          fi
+          # Defensive: never allow a slug that could escape the reference dir.
+          if [[ ! "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            slug=unknown-cpu
           fi
           echo "cpu_slug=$slug" >> "$GITHUB_OUTPUT"
 
       - name: Update the benchmark-reference branch
+        env:
+          CPU_SLUG: ${{ steps.cpu.outputs.cpu_slug }}
+          VERSION: ${{ needs.metrics.outputs.version }}
+          HEAD_SHA: ${{ needs.metrics.outputs.head_sha }}
+          PROMOTE_LAST: ${{ needs.metrics.outputs.promote_last }}
+          ART_NAME: ${{ steps.latest.outputs.artifact_name }}
+          ART_SHA: ${{ steps.latest.outputs.run_head_sha }}
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -632,34 +827,43 @@ jobs:
             git rm -rf . >/dev/null 2>&1 || true
           fi
           mkdir -p .benchmarks/reference
-          ref_dir=".benchmarks/reference/${{ steps.cpu.outputs.cpu_slug }}"
+          ref_dir=".benchmarks/reference/${CPU_SLUG}"
           mkdir -p "$ref_dir"
-          new_baseline=$(find artifact/data -name '*.json' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2- | xargs -r basename)
+          new_baseline=$(find artifact/data -type f -name '*.json' -printf '%T@ %p\0' | sort -zrn | head -z -n1 | cut -z -d' ' -f2- | xargs -0 -r basename)
           [ -n "$new_baseline" ] || { echo "::error::No benchmark file found in artifact/data"; exit 1; }
-          cp "artifact/data/$new_baseline" "$ref_dir/$new_baseline"
-          find "$ref_dir" -name '*.json' ! -name "$new_baseline" -delete
-          git add .benchmarks/reference
-          if [ "${{ needs.metrics.outputs.promote_last }}" == "true" ]; then
-            label="artifact ${{ steps.latest.outputs.artifact_name }} (${{ steps.latest.outputs.run_head_sha }}) [${{ steps.cpu.outputs.cpu_slug }}]"
-          else
-            label="${{ needs.metrics.outputs.version }} (${{ needs.metrics.outputs.head_sha }}) [${{ steps.cpu.outputs.cpu_slug }}]"
+          if [[ ! "$new_baseline" =~ ^[0-9A-Za-z][0-9A-Za-z._+-]*\.json$ ]]; then
+            echo "::error::Unexpected benchmark filename"
+            exit 1
           fi
-          git commit -m "Update benchmark baseline for ${label}" || {
+          cp --no-dereference "artifact/data/$new_baseline" "$ref_dir/$new_baseline"
+          find "$ref_dir" -name '*.json' ! -name "$new_baseline" -delete
+          git add -f -- "$ref_dir"
+          if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
-          }
-          git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" benchmark-reference
+          fi
+          if [ "$PROMOTE_LAST" == "true" ]; then
+            label="artifact ${ART_NAME} (${ART_SHA}) [${CPU_SLUG}]"
+          else
+            label="${VERSION} (${HEAD_SHA}) [${CPU_SLUG}]"
+          fi
+          git commit -m "Update benchmark baseline for ${label}"
+          git push origin benchmark-reference
 
       - name: Post promotion confirmation
         if: needs.metrics.outputs.promote_last == 'true'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          ART_NAME: ${{ steps.latest.outputs.artifact_name }}
+          ART_SHA: ${{ steps.latest.outputs.run_head_sha }}
+          ISSUE_NUMBER: ${{ needs.metrics.outputs.issue_number }}
         with:
           script: |
-            const name = '${{ steps.latest.outputs.artifact_name }}';
-            const sha = '${{ steps.latest.outputs.run_head_sha }}';
+            const name = String(process.env.ART_NAME || '').replace(/[`\r\n]/g, '');
+            const sha = String(process.env.ART_SHA || '').replace(/[^0-9a-f]/g, '');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: Number('${{ needs.metrics.outputs.issue_number }}'),
+              issue_number: Number(process.env.ISSUE_NUMBER),
               body: `Baseline promoted from the last completed benchmark run: \`${name}\`${sha ? ` (head ${sha})` : ''}.`
             });
