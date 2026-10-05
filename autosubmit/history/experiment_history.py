@@ -36,7 +36,7 @@ from autosubmit.history.strategies import (
     StraightWrapperAssociationStrategy,
     TwoDimWrapperDistributionStrategy,
 )
-from autosubmit.log.log import AutosubmitCritical, Log
+from autosubmit.log.log import Log
 
 if TYPE_CHECKING:
     from autosubmit.config.configcommon import AutosubmitConfig
@@ -65,11 +65,9 @@ class ExperimentHistory:
                 "jobdata_file": self._job_data_file,
                 "force_sql_alchemy": self.force_sql_alchemy,  # tmp, the idea is to move everything to sqlalchemy
             }
-            self.manager = create_experiment_history_db_manager(
-                BasicConfig.DATABASE_BACKEND, **options
-            )
+            self.manager = create_experiment_history_db_manager(BasicConfig.DATABASE_BACKEND, **options)
             self.initialize_database()
-        except (ValueError, OSError) as exp:
+        except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
             self.manager = None
@@ -78,10 +76,7 @@ class ExperimentHistory:
         """Initialize the database manager, creating tables and running schema migrations."""
         try:
             self.manager.initialize()
-        except (
-            OSError,
-            AttributeError, #Attribute missing
-        ) as exp:
+        except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
             self.manager = None
@@ -143,9 +138,7 @@ class ExperimentHistory:
                 fail_count=fail_count,
             )
             return self.manager.register_submitted_job_data_dc(job_data_dc)
-        except (ValueError, OSError, AutosubmitError, AttributeError) as error:
-            self._log.log(str(error), traceback.format_exc())
-        except (ValueError, OSError) as exp:
+        except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
             self.manager = None
@@ -252,8 +245,6 @@ class ExperimentHistory:
             job_data_dc.splits = splits
             job_data_dc.fail_count = fail_count
             return self.manager.update_job_data_dc_by_job_id_name(job_data_dc)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
@@ -285,17 +276,11 @@ class ExperimentHistory:
         :return: The result of updating the job data, or None if an exception occurs.
         """
         try:
-            job_data_dc_last = (
-                self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(
-                    job_name, fail_count
-                )
-            )
+            job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
             if not job_data_dc_last:
                 raise Exception(f"Job {job_name} has not been found in the database.")
             job_data_dc_last.start = start
-            job_data_dc_last.qos = self._get_defined_queue_name(
-                wrapper_queue, wrapper_code, qos
-            )
+            job_data_dc_last.qos = self._get_defined_queue_name(wrapper_queue, wrapper_code, qos)
             job_data_dc_last.status = status
             job_data_dc_last.rowtype = self._get_defined_rowtype(wrapper_code)
             job_data_dc_last.job_id = job_id
@@ -327,11 +312,7 @@ class ExperimentHistory:
         :return: The result of updating the job data, or None if an exception occurs.
         """
         try:
-            job_data_dc_last = (
-                self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(
-                    job_name, fail_count
-                )
-            )
+            job_data_dc_last = self.manager.get_last_job_data_dc_by_job_name_and_fail_counter(job_name, fail_count)
             if not job_data_dc_last:
                 raise Exception(f"Job {job_name} has not been found in the database.")
             job_data_dc_last.finish = finish if finish > 0 else int(time())
@@ -341,8 +322,7 @@ class ExperimentHistory:
             job_data_dc_last.out = out_file if out_file else ""
             job_data_dc_last.err = err_file if err_file else ""
             return self.manager.update_job_data_dc_by_job_id_name(job_data_dc_last)
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
+
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
@@ -353,15 +333,9 @@ class ExperimentHistory:
             ssh_output = platform_obj.check_job_energy(job_data_dc.job_id)
             slurm_monitor = SlurmMonitor(ssh_output)
             self._verify_slurm_monitor(slurm_monitor, job_data_dc)
-            job_data_dcs_in_wrapper = (
-                self.manager.get_job_data_dcs_last_by_wrapper_code(
-                    job_data_dc.wrapper_code
-                )
-            )
-            job_data_dcs_in_wrapper = sorted(
-                [job for job in job_data_dcs_in_wrapper if job.status == "COMPLETED"],
-                key=lambda x: x._id,
-            )
+            job_data_dcs_in_wrapper = self.manager.get_job_data_dcs_last_by_wrapper_code(job_data_dc.wrapper_code)
+            job_data_dcs_in_wrapper = sorted([job for job in job_data_dcs_in_wrapper if job.status == "COMPLETED"],
+                                             key=lambda x: x._id)
             if len(job_data_dcs_in_wrapper) > 0:
                 info_handler = PlatformInformationHandler(
                     StraightWrapperAssociationStrategy(self._historiclog_dir_path)
@@ -393,8 +367,6 @@ class ExperimentHistory:
             return self.manager.update_list_job_data_dc_by_each_id(
                 job_data_dcs_to_update
             )
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
@@ -412,8 +384,6 @@ class ExperimentHistory:
                     f"Historical Database error: Steps + extern != total energy for ID {slurm_monitor.header.name}."
                     f"Number of steps {slurm_monitor.step_count}."
                 )
-        except (ValueError, OSError, AutosubmitError, AttributeError):
-            AutosubmitCritical("The DB Manager couldn't be properly initialized")
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
@@ -552,12 +522,12 @@ class ExperimentHistory:
         """
         if status_counts is None:
             status_counts = self.get_status_counts_from_job_list(job_list)
-        current_experiment_run_dc.completed = status_counts[HUtils.SupportedStatus.COMPLETED]
-        current_experiment_run_dc.failed = status_counts[HUtils.SupportedStatus.FAILED]
-        current_experiment_run_dc.queuing = status_counts[HUtils.SupportedStatus.QUEUING]
-        current_experiment_run_dc.submitted = status_counts[HUtils.SupportedStatus.SUBMITTED]
-        current_experiment_run_dc.running = status_counts[HUtils.SupportedStatus.RUNNING]
-        current_experiment_run_dc.suspended = status_counts[HUtils.SupportedStatus.SUSPENDED]
+        current_experiment_run_dc.completed = status_counts[hutils.SupportedStatus.COMPLETED]
+        current_experiment_run_dc.failed = status_counts[hutils.SupportedStatus.FAILED]
+        current_experiment_run_dc.queuing = status_counts[hutils.SupportedStatus.QUEUING]
+        current_experiment_run_dc.submitted = status_counts[hutils.SupportedStatus.SUBMITTED]
+        current_experiment_run_dc.running = status_counts[hutils.SupportedStatus.RUNNING]
+        current_experiment_run_dc.suspended = status_counts[hutils.SupportedStatus.SUSPENDED]
         current_experiment_run_dc.total = status_counts["TOTAL"]
         return self.manager.update_experiment_run_dc_by_id(current_experiment_run_dc)
 
