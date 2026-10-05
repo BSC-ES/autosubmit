@@ -192,7 +192,7 @@ def test_initialise_command_missing_yaml_exits(mocker):
     config.set_last_as_command.assert_not_called()
 
 
-def test_initialise_command_updates_experiment_version(mocker):
+def test_initialise_command_updates_experiment_version(mocker, tmp_path):
     """Test updating an experiment version when requested."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
@@ -218,9 +218,16 @@ def test_initialise_command_updates_experiment_version(mocker):
     )
     log_info = mocker.patch("autosubmit.scripts._initialise.Log.info")
 
-    opts = mocker.Mock(expid="a000", update_version=True)
+    expid = "a000"
+    opts = mocker.Mock(expid=expid, update_version=True)
+    tmp_path.joinpath(expid).mkdir(parents=True)
+
+    db_path = tmp_path.joinpath(expid).joinpath("db")
+    assert not db_path.exists()
 
     initialise_command("run", opts)
+
+    assert db_path.exists()
 
     config.set_version.assert_called_once_with("4.0.0")
     update_description.assert_called_once_with(

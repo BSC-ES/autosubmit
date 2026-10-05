@@ -19,14 +19,17 @@
 
 import locale
 from contextlib import suppress
+from pathlib import Path
 from sys import exit
 from typing import TYPE_CHECKING
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.helpers.version import get_version
 from autosubmit.log.log import Log
 from autosubmit.scripts._args import parse_expids
 
 if TYPE_CHECKING:
+    from autosubmit.config.configcommon import AutosubmitConfig
     from autosubmit.scripts._args import AutosubmitOptions
 
 
@@ -64,6 +67,31 @@ def _set_locale() -> None:
     else:
         Log.info("UTF-8 locale not found, using 'C' as fallback.")
         locale.setlocale(locale.LC_ALL, "C")
+
+
+def _update_version(as_conf: "AutosubmitConfig", autosubmit_version: str, expid: str):
+    if as_conf.get_version() != autosubmit_version:
+        from autosubmit.database.db_common import (
+            update_experiment_description_version,
+        )
+
+        Log.info(
+            f"The {expid} experiment {as_conf.get_version()} version is being "
+            f"updated to {autosubmit_version} to match the "
+            "Autosubmit version."
+        )
+        as_conf.set_version(autosubmit_version)
+        update_experiment_description_version(
+            expid,
+            version=autosubmit_version,
+        )
+
+        db_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid, "db")
+        if not db_path.exists():
+            Log.info(
+                f"The experiment {expid} has no database folder, creating it at: {str(db_path)}"
+            )
+            db_path.mkdir(parents=False, exist_ok=True)
 
 
 def initialise_command(command: str, opts: "AutosubmitOptions") -> None:
@@ -113,21 +141,7 @@ def initialise_command(command: str, opts: "AutosubmitOptions") -> None:
         # Update the experiment version, except if the user is archiving or upgrading.
         if command not in _COMMANDS_NOT_UPDATABLE:
             if opts.update_version:
-                if as_conf.get_version() != autosubmit_version:
-                    from autosubmit.database.db_common import (
-                        update_experiment_description_version,
-                    )
-
-                    Log.info(
-                        f"The {expid} experiment {as_conf.get_version()} version is being "
-                        f"updated to {autosubmit_version} to match the "
-                        "Autosubmit version."
-                    )
-                    as_conf.set_version(autosubmit_version)
-                    update_experiment_description_version(
-                        expid,
-                        version=autosubmit_version,
-                    )
+                _update_version(as_conf, autosubmit_version, expid)
             elif (
                 as_conf.get_version() is not None
                 and as_conf.get_version() != autosubmit_version
