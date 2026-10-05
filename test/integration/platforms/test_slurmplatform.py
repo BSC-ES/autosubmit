@@ -788,8 +788,8 @@ def test_simple_workflow_compress_logs_slurm(
     run(exp.expid)
 
     # Check if the log files are compressed
-    logs_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(
-        exp.expid, exp.as_conf.basic_config.LOCAL_TMP_DIR, f"LOG_{exp.expid}"
+    logs_dir = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(
+        exp.expid, BasicConfig.LOCAL_TMP_DIR, f"LOG_{exp.expid}"
     )
     compression_type = (
         experiment_data.get("PLATFORMS", {})
@@ -888,8 +888,8 @@ def test_compress_log_missing_tool(
     run(exp.expid)
 
     # Check if the log files are compressed
-    logs_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR).joinpath(
-        exp.expid, exp.as_conf.basic_config.LOCAL_TMP_DIR, f"LOG_{exp.expid}"
+    logs_dir = Path(BasicConfig.LOCAL_ROOT_DIR).joinpath(
+        exp.expid, BasicConfig.LOCAL_TMP_DIR, f"LOG_{exp.expid}"
     )
 
     # Get all files in the logs directory
@@ -1063,9 +1063,9 @@ def test_remove_files_on_transfer_slurm(
 def test_check_if_packages_are_ready_to_build(autosubmit_exp):
     exp = autosubmit_exp(experiment_data={})
     platform_config = {
-        "LOCAL_ROOT_DIR": exp.as_conf.basic_config.LOCAL_ROOT_DIR,
-        "LOCAL_TMP_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'exp_tmp_dir'),
-        "LOCAL_ASLOG_DIR": str(exp.as_conf.basic_config.LOCAL_ROOT_DIR + 'aslogs_dir')
+        "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
+        "LOCAL_TMP_DIR": str(BasicConfig.LOCAL_ROOT_DIR + 'exp_tmp_dir'),
+        "LOCAL_ASLOG_DIR": str(BasicConfig.LOCAL_ROOT_DIR + 'aslogs_dir')
     }
     platform = SlurmPlatform(exp.expid, "wrappers_test", platform_config)
 

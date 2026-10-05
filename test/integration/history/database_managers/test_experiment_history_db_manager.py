@@ -26,6 +26,7 @@ import pytest
 from sqlalchemy import inspect, select, text
 from sqlalchemy.schema import CreateSchema
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.tables import get_table_with_schema
 from autosubmit.history.data_classes.experiment_run import ExperimentRun
 from autosubmit.history.data_classes.job_data import JobData
@@ -274,7 +275,7 @@ def test_get_job_data_by_job_id_name(as_db: str, autosubmit_exp):
         as_db,
         schema=exp.expid,
         expid=exp.expid,
-        jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
+        jobdata_dir_path=str(Path(BasicConfig.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
 
@@ -313,7 +314,7 @@ def test_get_job_data_max_counter(as_db: str, job_name: str, counters: list[int]
         as_db,
         schema=exp.expid,
         expid=exp.expid,
-        jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
+        jobdata_dir_path=str(Path(BasicConfig.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
 
@@ -348,7 +349,7 @@ def test_get_all_last_job_data_dcs(as_db: str, lasts: list[bool], request, autos
         as_db,
         schema=exp.expid,
         expid=exp.expid,
-        jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
+        jobdata_dir_path=str(Path(BasicConfig.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
 
@@ -384,7 +385,7 @@ def test_get_job_data_dcs_last_by_wrapper_code(as_db: str, wrapper_code: int, nu
         as_db,
         schema=exp.expid,
         expid=exp.expid,
-        jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
+        jobdata_dir_path=str(Path(BasicConfig.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
 
@@ -410,7 +411,7 @@ def test_get_job_data_dc_unique_latest_by_job_name(as_db: str, autosubmit_exp):
         as_db,
         schema=exp.expid,
         expid=exp.expid,
-        jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
+        jobdata_dir_path=str(Path(BasicConfig.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
 
@@ -438,7 +439,7 @@ def test_update_job_data_dc_by_job_id_name(as_db: str, autosubmit_exp):
         as_db,
         schema=exp.expid,
         expid=exp.expid,
-        jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
+        jobdata_dir_path=str(Path(BasicConfig.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
 
@@ -471,7 +472,7 @@ def test_update_list_job_data_dc_by_each_id(as_db: str, autosubmit_exp):
         as_db,
         schema=exp.expid,
         expid=exp.expid,
-        jobdata_dir_path=str(Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, 'metadata', 'data'))
+        jobdata_dir_path=str(Path(BasicConfig.LOCAL_ROOT_DIR, 'metadata', 'data'))
     ))
     db_manager.initialize()
 

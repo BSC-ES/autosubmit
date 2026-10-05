@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 from pathlib import Path
 
 import pytest
@@ -23,7 +22,7 @@ import pytest
 from autosubmit.config.basicconfig import BasicConfig
 
 
-def test_read_file_config(tmp_path):
+def test_read_file_config(tmp_path, monkeypatch):
     config_content = f"""
     [database]
     path = {tmp_path}
@@ -59,7 +58,7 @@ def test_read_file_config(tmp_path):
     """
     config_file = tmp_path / "autosubmitrc"
     config_file.write_text(config_content)
-    os.environ = {'AUTOSUBMIT_CONFIGURATION': str(config_file)}
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(config_file))
     BasicConfig.read()
     assert BasicConfig.ALLOWED_HOSTS == {'': ['3]]', ''], '1': ['3]]', '']}
     assert BasicConfig.AS_TIMES_DB == 'as_times.db'
@@ -91,7 +90,7 @@ def test_read_file_config(tmp_path):
 def test_invalid_expid_path():
     invalid_expids = ["", "12345", "123/", 1234]  # empty, more than 4 char, contains folder separator, not string
 
-    with pytest.raises(Exception):
+    with pytest.raises(TypeError):
         for expid in invalid_expids:
             BasicConfig.expid_dir(expid)
 
@@ -110,8 +109,7 @@ root_dirs = [
 
 @pytest.mark.parametrize("foo, dir_func", zip(functions_expid, root_dirs))
 def test_expid_dir_structure(foo, dir_func, autosubmit_config):
-    exp_id = 'a000'
-    root_path = autosubmit_config(expid=exp_id, experiment_data={}).basic_config.LOCAL_ROOT_DIR
-    expected_path = dir_func(root_path, exp_id)
-    result = foo(exp_id)
+    as_conf = autosubmit_config(expid='a000', experiment_data={})
+    expected_path = dir_func(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid)
+    result = foo(as_conf.expid)
     assert result == expected_path

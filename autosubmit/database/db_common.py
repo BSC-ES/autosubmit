@@ -42,12 +42,11 @@ TIMEOUT = 15
 _SQLITE_MAX_VARIABLES = 999
 
 
-def create_db(qry):
-    """
-    Creates a new database for autosubmit
+def create_db(qry: str):
+    """Creates a new database for autosubmit.
 
     :param qry: query to create the new database
-    :type qry: str    """
+    """
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         return _create_db_pg()
 
@@ -77,13 +76,10 @@ def check_db() -> None:
 
 
 def open_conn(check_version=True):
-    """
-    Opens a connection to database
+    """Opens a connection to database.
 
     :param check_version: If true, check if the database is compatible with this autosubmit version
-    :type check_version: bool
     :return: connection object, cursor object
-    :rtype: sqlite3.Connection, sqlite3.Cursor
     """
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         raise AutosubmitCritical('For Postgres databases, connections must be open and managed with SQLAlchemy!')
@@ -114,14 +110,12 @@ def open_conn(check_version=True):
     return conn, cursor
 
 
-def close_conn(conn, cursor):
+def close_conn(conn: sqlite3.Connection, cursor: sqlite3.Cursor) -> None:
     """
     Commits changes and close connection to database
 
     :param conn: connection to close
-    :type conn: sqlite3.Connection
     :param cursor: cursor to close
-    :type cursor: sqlite3.Cursor
     """
     conn.commit()
     cursor.close()
@@ -135,16 +129,12 @@ def fn_wrapper(database_fn, queue, *args):
     queue.close()
 
 
-def save_experiment(name: str, description: str | None, version: str | None):
-    """
-    Stores experiment in database. Anti-lock version.
+def save_experiment(name: str, description: str | None, version: str | None) -> Any:
+    """Stores experiment in database. Anti-lock version.
 
     :param version:
-    :type version: str
     :param name: experiment's name
-    :type name: str
     :param description: experiment's description
-    :type description: str
     """
     fn = _save_experiment
     if BasicConfig.DATABASE_BACKEND == 'postgres':
@@ -165,14 +155,12 @@ def save_experiment(name: str, description: str | None, version: str | None):
 
 
 def get_experiment_expids(expids: list[str] | None = None) -> set[str]:
-    """
-    Get the expids of all experiments in the database, or only the requested ones.
+    """Get the expids of all experiments in the database, or only the requested ones.
 
     :param expids: optional list of expids to look up. When provided,
         only those that exist in the database are returned.
         When ``None`` (default), all expids in the database are returned.
     :return: a set of experiment expids.
-    :rtype: set[str]
     """
     if BasicConfig.DATABASE_BACKEND == 'postgres':
         return _get_experiment_expids_sqlalchemy(expids)
@@ -207,16 +195,12 @@ def get_experiment_expids(expids: list[str] | None = None) -> set[str]:
     return result
 
 
-def check_experiment_exists(name, error_on_inexistence=True):
-    """
-    Checks if exist an experiment with the given name. Anti-lock version.
+def check_experiment_exists(name: str, error_on_inexistence=True) -> bool:
+    """Checks if exist an experiment with the given name. Anti-lock version.
 
     :param error_on_inexistence: if True, adds an error log if experiment does not exist
-    :type error_on_inexistence: bool
     :param name: Experiment name
-    :type name: str
     :return: If experiment exists returns true, if not returns false
-    :rtype: bool
     """
     fn = _check_experiment_exists
     if BasicConfig.DATABASE_BACKEND == 'postgres':
@@ -287,18 +271,14 @@ def get_autosubmit_version(expid: str) -> str | None:
     return result
 
 
-def last_name_used(test=False, operational=False, evaluation=False):
+def last_name_used(test=False, operational=False, evaluation=False) -> str:
     """
     Gets last experiment identifier used. Anti-lock version.
 
     :param test: flag for test experiments
-    :type test: bool
     :param operational: flag for operational experiments
-    :type test: bool
     :param evaluation: flag for evaluation experiments
-    :type test: bool
     :return: last experiment identifier used, 'empty' if there is none
-    :rtype: str
     """
     fn = _last_name_used
     if BasicConfig.DATABASE_BACKEND == 'postgres':
@@ -318,14 +298,12 @@ def last_name_used(test=False, operational=False, evaluation=False):
     return result
 
 
-def delete_experiment(experiment_id):
+def delete_experiment(experiment_id: str) -> bool:
     """
     Removes experiment from database. Anti-lock version.
 
     :param experiment_id: experiment identifier
-    :type experiment_id: str
     :return: True if delete is successful
-    :rtype: bool
     """
     fn = _delete_experiment
     if BasicConfig.DATABASE_BACKEND == 'postgres':
@@ -372,16 +350,13 @@ def get_experiment_id(name: str) -> int:
     return result
 
 
-def _save_experiment(name, description, version):
+def _save_experiment(name: str, description: str, version: str) -> bool:
     """
     Stores experiment in database
 
     :param version:
-    :type version: str
     :param name: experiment's name
-    :type name: str
     :param description: experiment's description
-    :type description: str
     """
     check_db()
 
@@ -411,16 +386,13 @@ def _get_experiment_expids_sqlalchemy(expids: list[str] | None = None) -> set[st
     return {row.name for row in rows}
 
 
-def _check_experiment_exists(name, error_on_inexistence=True):
+def _check_experiment_exists(name: str, error_on_inexistence=True) -> bool:
     """
     Checks if exist an experiment with the given name.
 
     :param error_on_inexistence: if True, adds an error log if experiment does not exist
-    :type error_on_inexistence: bool
     :param name: Experiment name
-    :type name: str
     :return: If experiment exists returns true, if not returns false
-    :rtype: bool
     """
     check_db()
 
@@ -468,18 +440,15 @@ def get_experiment_description(expid: str) -> list[list[str]]:
     return [row for row in cursor]
 
 
-def _update_experiment_description_version(name, description=None, version=None):
-    """
-    Updates the experiment's description and/or version
+def _update_experiment_description_version(
+    name: str, description: str | None = None, version: str | None = None
+) -> bool:
+    """Updates the experiment's description and/or version.
 
     :param name: experiment name (expid)
-    :rtype name: str
     :param description: experiment new description
-    :rtype description: str
     :param version: experiment autosubmit version
-    :rtype version: str
     :return: If description has been update, True; otherwise, False.
-    :rtype: bool
     """
     check_db()
 
@@ -510,14 +479,11 @@ def _update_experiment_description_version(name, description=None, version=None)
     return True
 
 
-def _get_autosubmit_version(expid):
-    """
-    Get the minimum autosubmit version needed for the experiment
+def _get_autosubmit_version(expid: str) -> str:
+    """Get the minimum autosubmit version needed for the experiment.
 
     :param expid: Experiment name
-    :type expid: str
     :return: If experiment exists returns the autosubmit version for it, if not returns None
-    :rtype: str
     """
     check_db()
 
@@ -539,18 +505,13 @@ def _get_autosubmit_version(expid):
     return row[0]
 
 
-def _last_name_used(test=False, operational=False, evaluation=False):
-    """
-    Gets last experiment identifier used
+def _last_name_used(test=False, operational=False, evaluation=False) -> str:
+    """Gets last experiment identifier used.
 
     :param test: flag for test experiments
-    :type test: bool
     :param operational: flag for operational experiments
-    :type test: bool
     :param evaluation: flag for evaluation experiments
-    :type test: bool
     :return: last experiment identifier used, 'empty' if there is none
-    :rtype: str
     """
     check_db()
 
@@ -595,14 +556,11 @@ def _last_name_used(test=False, operational=False, evaluation=False):
     return row[0]
 
 
-def _delete_experiment(experiment_id):
-    """
-    Removes experiment from database
+def _delete_experiment(experiment_id: str) -> bool:
+    """Removes experiment from database.
 
     :param experiment_id: experiment identifier
-    :type experiment_id: str
     :return: True if delete is successful
-    :rtype: bool
     """
     check_db()
 
@@ -621,7 +579,7 @@ def _delete_experiment(experiment_id):
     return True
 
 
-def _update_database(version, cursor):
+def _update_database(version: int, cursor) -> bool:
     Log.info("Autosubmit's database version is {0}. Current version is {1}. Updating...",
              version, CURRENT_DATABASE_VERSION)
     try:
@@ -653,8 +611,7 @@ def _update_database(version, cursor):
 
 
 def _get_experiment_id(name: str) -> int:
-    """
-    Gets the experiment id from the database
+    """Gets the experiment id from the database.
 
     :param name: experiment name
     :return: experiment numerical id
@@ -677,9 +634,7 @@ def _get_experiment_id(name: str) -> int:
 
 
 class DbException(Exception):
-    """
-    Exception class for database errors
-    """
+    """Exception class for database errors."""
 
     def __init__(self, message):
         self.message = message
@@ -690,6 +645,7 @@ class DbException(Exception):
 
 def _get_sqlalchemy_conn() -> "Connection":
     """Return the database connection.
+
     It captures any exception, returning an ``AutosubmitCritical``
     as in the previous SQLite-only code. With this function we
     can use a context-manager and keep the previous behaviour
@@ -805,7 +761,7 @@ def _update_experiment_description_version_sqlalchemy(
     return True
 
 
-def _get_autosubmit_version_sqlalchemy(expid) -> str:
+def _get_autosubmit_version_sqlalchemy(expid: str) -> str:
     with _get_sqlalchemy_conn() as conn:
         query = select(tables.ExperimentTable).where(
             tables.ExperimentTable.c.name == expid  # type: ignore
@@ -906,11 +862,10 @@ def check_db_path(db_path: Path | None, must_exists: bool = True) -> bool:
         raise ValueError(f'Database path not found {str(db_path)}!')
     elif db_path and not db_path.exists() and not must_exists:
         return False
-    else:
-        return True
+    return True
 
 
-def database_backup(expid):
+def database_backup(expid: str) -> None:
     if BasicConfig.DATABASE_BACKEND == "sqlite":
         try:
             database_path = os.path.join(
@@ -921,7 +876,7 @@ def database_backup(expid):
             Log.debug("Backing up jobs_data...")
             subprocess.call(command, shell=True)
             Log.debug("Jobs_data database backup completed.")
-        except BaseException:
+        except Exception:
             Log.debug("Jobs_data database backup failed.")
     elif BasicConfig.DATABASE_BACKEND == "postgres":
         # TODO: Implement Postgres backup

@@ -17,7 +17,6 @@
 
 """Code to manage Autosubmit platforms."""
 
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.notifications.notifier import Notifier
@@ -75,7 +74,7 @@ def restore_platforms(
                     email = as_conf.get_mails_to()
                     if "@" in email[0]:
                         Notifier.notify_experiment_status(
-                            MailNotifier(BasicConfig), expid, email, platform_to_test
+                            MailNotifier(), expid, email, platform_to_test
                         )
             except Exception as e2:
                 Log.debug(f"Unexpected exception sending email notification: {str(e2)}")

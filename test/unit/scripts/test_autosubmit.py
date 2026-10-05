@@ -18,6 +18,8 @@
 import pytest
 
 from autosubmit.helpers.version import get_version
+
+# noinspection PyProtectedMember
 from autosubmit.scripts.autosubmit import _autosubmit
 
 
@@ -41,8 +43,7 @@ def test_autosubmit_script_readme(mocker, autosubmit_config):
     will be fixed in the near future. This test can stay just to make
     sure the command is working (it was not when this test was written).
     """
-    as_conf = autosubmit_config("a000", {})
-    mocker.patch("autosubmit.config.basicconfig.BasicConfig", as_conf.basic_config)
+    autosubmit_config("a000", {})
     mock_log_info = mocker.patch("autosubmit.log.log.Log.info")
     args = ["readme"]
     exit_code = _autosubmit(args)
@@ -51,7 +52,7 @@ def test_autosubmit_script_readme(mocker, autosubmit_config):
     assert exit_code == 0
 
 
-def test_autosubmit_script_error_raised(mocker):
+def test_autosubmit_script_error_raised():
     command = "inspect"
     expid = "fail"
 

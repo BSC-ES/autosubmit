@@ -23,6 +23,7 @@ from subprocess import check_output
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical
 
 # noinspection PyProtectedMember
@@ -42,7 +43,7 @@ def test_clean_plots(autosubmit_exp):
     """
     exp = autosubmit_exp(experiment_data={})
 
-    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
+    plots_dir = Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
 
     for i, plot in enumerate(
         [
@@ -75,8 +76,8 @@ def test_clean_stats(autosubmit_exp):
     """
     exp = autosubmit_exp(experiment_data={})
 
-    stats_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/stats/")
-    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
+    stats_dir = Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp.expid}/stats/")
+    plots_dir = Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
     stats_dir.mkdir(parents=True, exist_ok=True)
     plots_dir.mkdir(parents=True, exist_ok=True)
     (plots_dir / "plot_a.pdf").touch()
@@ -113,11 +114,11 @@ def test_clean_dummy_project(autosubmit_exp, mocker):
     exp = autosubmit_exp(experiment_data={"PROJECT": {"PROJECT_TYPE": "none"}})
 
     Path(
-        exp.as_conf.basic_config.LOCAL_ROOT_DIR,
+        BasicConfig.LOCAL_ROOT_DIR,
         exp.expid,
     ).mkdir(exist_ok=True)
 
-    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
+    plots_dir = Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
 
     for i, plot in enumerate(
         [
@@ -192,11 +193,11 @@ def test_clean_git_project(
     )
 
     Path(
-        exp.as_conf.basic_config.LOCAL_ROOT_DIR,
+        BasicConfig.LOCAL_ROOT_DIR,
         exp.expid,
     ).mkdir(exist_ok=True)
 
-    plots_dir = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
+    plots_dir = Path(BasicConfig.LOCAL_ROOT_DIR, f"{exp.expid}/plot/")
 
     for i, plot in enumerate(
         [

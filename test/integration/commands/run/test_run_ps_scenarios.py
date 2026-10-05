@@ -105,7 +105,7 @@ def test_run_uninterrupted(
     _assert_exit_code(final_status, exit_code)
 
     # Check and display results
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+    run_tmpdir = Path(BasicConfig.LOCAL_ROOT_DIR)
 
     db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
     e_msg = f"Current folder: {str(run_tmpdir)}\n"
@@ -197,7 +197,7 @@ def test_run_interrupted(
     exit_code = run(expid=as_exp.expid)
 
     # Check and display results
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+    run_tmpdir = Path(BasicConfig.LOCAL_ROOT_DIR)
 
     db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
     _assert_db_fields(db_check_list)

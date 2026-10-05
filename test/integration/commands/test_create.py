@@ -160,7 +160,7 @@ def test_create_cw_totaljobs_cases(
             "CALENDAR": "standard",
         },
         "CONFIG": {
-            "SAFETYSLEEPTIME": 0,
+            "SAFETYSLEEPTIME": 3,
             "MAXWAITINGJOBS": 20,
             "TOTALJOBS": autosubmit_totaljobs,
         },

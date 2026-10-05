@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from ruamel.yaml import YAML
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.upgrade_scripts import ini_to_yaml, upgrade_scripts
 from autosubmit.experiment.manage import create
 from autosubmit.workflow.manage import inspect
@@ -197,7 +198,7 @@ def test_upgrade_scripts_as_3_conf_causes_error(
     """Test that the upgrade script fails if the AS3 configuration file upgrade fails."""
     as_exp = autosubmit_exp(experiment_data={}, create=False)
 
-    exp_dir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR, as_exp.expid)
+    exp_dir = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     # Copy fixture INI files into the experiment path
     for ini_file in as3_ini_files:
         shutil.copy(ini_file, exp_dir / "conf")
@@ -241,7 +242,7 @@ def test_upgrade_scripts_as_3_yaml_placeholders_cause_error(
     """
     as_exp = autosubmit_exp(experiment_data={}, create=False)
 
-    exp_dir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR, as_exp.expid)
+    exp_dir = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
 
     for ini_file in as3_ini_files:
         shutil.copy(ini_file, exp_dir / "conf")
@@ -286,7 +287,7 @@ def test_upgrade_scripts(
     )
 
     as_conf = as_exp.as_conf
-    exp_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR, as_exp.expid)
+    exp_dir = Path(BasicConfig.LOCAL_ROOT_DIR, as_exp.expid)
     # Copy fixture INI files into the experiment path
     for ini_file in as3_ini_files:
         shutil.copy(ini_file, exp_dir / "conf")
@@ -337,7 +338,7 @@ def test_upgrade_scripts(
 
     # The %rootdir% variable will have been found and replaced by %ROOTDIR%.
     upgraded_local_script = Path(
-        as_conf.basic_config.LOCAL_ROOT_DIR,
+        BasicConfig.LOCAL_ROOT_DIR,
         as_conf.expid,
         "proj/local_project/templates/local_setup.sh",
     )
