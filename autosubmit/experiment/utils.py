@@ -115,7 +115,7 @@ def base36decode(number: str) -> int:
     return int(number, 36)
 
 
-def create_required_folders(exp_id: str, exp_folder: Path) -> None:
+def create_required_folders(exp_id: str) -> None:
     """Create the required folders for an Autosubmit experiment.
 
     The plot and status directories are created with group-writable permissions (775),
@@ -125,7 +125,6 @@ def create_required_folders(exp_id: str, exp_folder: Path) -> None:
     the remaining directory structure more restrictive.
 
     :param exp_id: Experiment identifier.
-    :param exp_folder: Experiment folder.
     :raises OSError: If a folder cannot be created or its permissions cannot
         be set.
     """
@@ -138,6 +137,8 @@ def create_required_folders(exp_id: str, exp_folder: Path) -> None:
         "plot": 0o775,
         "status": 0o775,
     }
+
+    exp_folder = BasicConfig.expid_dir(exp_id)
 
     exp_folder.mkdir(
         mode=0o755,
