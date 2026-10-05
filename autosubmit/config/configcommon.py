@@ -2548,7 +2548,7 @@ class AutosubmitConfig:
             wrapper = {}
         return int(wrapper.get('EXTEND_WALLCLOCK', 0))
 
-    def get_wrapper_queue(self, wrapper=None):
+    def get_wrapper_queue(self, wrapper=None) -> str:
         """Returns the wrapper queue if not defined, will be the one of the first job wrapped.
 
         :return: expression (or none)

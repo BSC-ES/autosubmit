@@ -21,7 +21,7 @@ from collections.abc import Callable
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from random import choice, randint, randrange, seed
+from random import choice, randint, seed
 from time import time
 from typing import Any, Protocol
 
@@ -158,9 +158,7 @@ def autosubmit_config(
 
         if not config.experiment_data.get("CONFIG").get("AUTOSUBMIT_VERSION", ""):
             try:
-                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = version(
-                    "autosubmit"
-                )
+                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = version("autosubmit")
             except PackageNotFoundError:
                 config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = ""
 
@@ -222,9 +220,7 @@ def create_jobs(mocker, request) -> list[Job]:
             job_aux.nodes = str(i)
             job_aux.exclusive = "example_exclusive_" + str(i)
 
-            num_retrials = randint(
-                1, max_num_retrials_per_job
-            )  # random number of retrials, grater than 0
+            num_retrials = randint(1, max_num_retrials_per_job)  # random number of retrials, grater than 0
             retrials = []
 
             for j in range(num_retrials):
@@ -244,9 +240,7 @@ def create_jobs(mocker, request) -> list[Job]:
                         else:
                             retrial[3] = job_aux.status
                 retrials.append(retrial)
-            mock.patch(
-                "autosubmit.job.job.Job.get_last_retrials", return_value=retrials
-            )
+            mock.patch("autosubmit.job.job.Job.get_last_retrials", return_value=retrials)
             jobs.append(job_aux)
 
         return jobs
@@ -401,9 +395,9 @@ class FakePlatform:
 @pytest.fixture
 def fake_platform(mocker) -> FakePlatform:
     """Return a :class:`FakePlatform` with mocker-backed method stubs.
+
     :param mocker: pytest-mock mocker fixture.
     :return: Configured :class:`FakePlatform` instance.
-    :rtype: FakePlatform
     """
     fp = FakePlatform()
     fp.check_all_jobs = mocker.MagicMock()
@@ -414,12 +408,12 @@ def fake_platform(mocker) -> FakePlatform:
 @pytest.fixture
 def fake_job_list(mocker) -> JobList:
     """Return a minimal :class:`JobList` for wrapper/job-check unit tests.
+
     :param mocker: pytest-mock mocker fixture.
     :return: Configured :class:`JobList` instance.
-    :rtype: JobList
     """
     as_conf = mocker.MagicMock()
     as_conf.experiment_data = {}
-    job_list = JobList('a000', as_conf, YAMLParserFactory())
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
     job_list.dbmanager = mocker.MagicMock()
     return job_list
