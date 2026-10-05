@@ -19,7 +19,6 @@
 """Unit tests for the ``autosubmit.scripts._validation`` module."""
 
 import os
-from pathlib import Path
 
 import pytest
 
@@ -411,10 +410,7 @@ def test_validate_expid_not_found_non_sqlite(mocker):
         validators.validate_expid("run", opts)
 
     assert error.value.code == 1
-    create_folders.assert_called_once_with(
-        "a001",
-        Path("/tmp/autosubmit", "a001"),
-    )
+    create_folders.assert_called_once_with("a001")
 
 
 def test_validate_expid_different_owner(mocker):
