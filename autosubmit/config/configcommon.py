@@ -51,20 +51,21 @@ if TYPE_CHECKING:
 class AutosubmitConfig:
     """Class to handle experiment configuration coming from a file or database.
 
-    :param expid: experiment identifier
-    :type expid: str
+    :param expid: The experiment identifier.
     """
 
-    def __init__(self, expid, basic_config=BasicConfig, parser_factory=YAMLParserFactory()):
+    def __init__(self, expid: str):
         self.data_changed = False
         self.ignore_undefined_platforms = False
         self.ignore_file_path = False
         self.expid = expid
-        self.basic_config = basic_config
-        self.basic_config.read()
+        # TODO: Remove once anyone has time to update the tests.
+        #       No other code should be using this property now, only (at lof ot) tests.
+        self.basic_config = BasicConfig
+        BasicConfig.read()
         if not Path(BasicConfig.LOCAL_ROOT_DIR, expid).exists():
             raise OSError(f"Experiment {expid} does not exist")
-        self.parser_factory = parser_factory
+        self.parser_factory = YAMLParserFactory()
         self.experiment_data = {}
         self.last_experiment_data = {}
         self.data_loops = set()
@@ -173,7 +174,7 @@ class AutosubmitConfig:
         :rtype: str
         """
         dir_templates = Path(
-            self.basic_config.LOCAL_ROOT_DIR,
+            BasicConfig.LOCAL_ROOT_DIR,
             self.expid,
             BasicConfig.LOCAL_PROJ_DIR,
             self.get_project_destination()

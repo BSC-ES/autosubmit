@@ -53,7 +53,7 @@ class CreateOptions(ExpidOptions):
     output: str
     group_by: str
     expand: list | None
-    expand_status: str
+    expand_status: list | None
     check_wrapper: bool
     detail: bool
     force: bool

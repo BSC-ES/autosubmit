@@ -27,8 +27,7 @@ from typing import Any
 from sqlalchemy import Table, delete, insert, select
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.config.registry import load_config
 from autosubmit.database.db_common import get_experiment_id
 from autosubmit.database.session import get_engine
 from autosubmit.database.tables import TableRegistry
@@ -260,7 +259,7 @@ class ExperimentDetails:
         self.exp_id: int = get_experiment_id(self.expid)
 
         # Get experiment config
-        self.as_conf = AutosubmitConfig(self.expid, BasicConfig, YAMLParserFactory())
+        self.as_conf = load_config(self.expid)
         self.as_conf.reload()
 
     def save_update_details(self):
