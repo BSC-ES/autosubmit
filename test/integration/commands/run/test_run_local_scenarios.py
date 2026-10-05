@@ -202,7 +202,7 @@ def test_run_uninterrupted(
     _assert_exit_code(final_status, exit_code)
 
     # Check and display results
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+    run_tmpdir = Path(BasicConfig.LOCAL_ROOT_DIR)
 
     db_check_list = _check_db_fields(
         run_tmpdir,
@@ -333,7 +333,7 @@ def test_run_interrupted(
     exit_code = run(expid=as_exp.expid)
 
     # Check and display results
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+    run_tmpdir = Path(BasicConfig.LOCAL_ROOT_DIR)
 
     db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
     _assert_db_fields(db_check_list)
@@ -873,7 +873,7 @@ def test_run_uninterrupted_get_call_options(
     exit_code = run(expid=as_exp.expid)
     _assert_exit_code(final_status, exit_code)
 
-    run_tmpdir = Path(as_conf.basic_config.LOCAL_ROOT_DIR)
+    run_tmpdir = Path(BasicConfig.LOCAL_ROOT_DIR)
     db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
     files_check_list = _check_files_recovered(
         as_conf, log_dir, expected_files=expected_db_entries * 2
@@ -1003,7 +1003,7 @@ def test_run_with_run_modes(
         raise AssertionError(f"Unknown run_mode: {run_mode}")
 
     # Check and display results
-    run_tmpdir = Path(as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+    run_tmpdir = Path(BasicConfig.LOCAL_ROOT_DIR)
     db_check_list = _check_db_fields(run_tmpdir, expected_db_entries, as_exp.expid)
     _assert_db_fields(db_check_list)
 
@@ -1295,7 +1295,7 @@ def test_start_after_inexistent_experiment(autosubmit_exp, general_data, prepare
         (
             dedent("""\
     CONFIG:
-        SAFETYSLEEPTIME: 0
+        SAFETYSLEEPTIME: 3
     EXPERIMENT:
         NUMCHUNKS: '2'
     JOBS:

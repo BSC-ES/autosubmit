@@ -76,7 +76,7 @@ def test_svn_submodules_dirty(
     experiment_data['CUSTOM_CONFIG']['USER'] = 'svnadmin'
     experiment_data['CUSTOM_CONFIG']['PASSWORD'] = 'test'
 
-    as_exp = autosubmit_exp('t001', experiment_data=experiment_data)
+    as_exp = autosubmit_exp(experiment_data=experiment_data)
     proj_dir = Path(as_exp.as_conf.get_project_dir())
 
     assert proj_dir.parts[-1] == 'svn-project'

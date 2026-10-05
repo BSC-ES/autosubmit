@@ -85,6 +85,8 @@ several bug fixes and enhancements to improve the overall user experience.
   5 minutes in tests with an operational experiment containing over 500,000 files.
   ZIP archives are now written without compression. #3307
 - Removed `PRESUBMISSION` from documentation, removed in 4.x #3320 (thanks @vansh-nagar)
+- The ``AutosubmitConfig`` instances are now centralised in a registry, to avoid re-loading the YAML files
+  multiple times, partially addressing #3326. #3327
 
 ### 4.1.17.1: Bug fixes and enhancements (#3181)
 

@@ -29,7 +29,7 @@ from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
+from autosubmit.config.registry import load_config
 from autosubmit.database.db_common import update_experiment_description_version
 from autosubmit.experiment.utils import check_ownership
 from autosubmit.helpers.version import get_version
@@ -166,7 +166,7 @@ def upgrade_scripts(expid: str, files: list[str] | None) -> bool:
 
     Log.info("Checking if experiment exists...")
     check_ownership(expid)
-    as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+    as_conf = load_config(expid)
     as_conf.reload(force_load=True)
     as_conf.check_conf_files()
     as_conf.load_parameters()
@@ -196,7 +196,7 @@ def upgrade_scripts(expid: str, files: list[str] | None) -> bool:
     substituted = []
 
     # Adjust placeholders.
-    exp_conf_dir = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / expid / "conf"
+    exp_conf_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / expid / "conf"
     Log.info(
         f"Fixing placeholder variables (%_%) inside the new {len(yaml_files)} YAML files"
     )

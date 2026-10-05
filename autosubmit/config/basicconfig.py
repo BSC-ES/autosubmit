@@ -25,10 +25,6 @@ class BasicConfig:
     """
     Class to manage configuration for Autosubmit path, database and default values for new experiments
     """
-
-    def __init__(self):
-        pass
-
     def props(self) -> dict:
         pr = {}
         for name in dir(self):
@@ -64,6 +60,7 @@ class BasicConfig:
     CONFIG_FILE_FOUND = False
     DATABASE_BACKEND = "sqlite"
     DATABASE_CONN_URL = ""
+    LOG_RECOVERY_TIMEOUT: int = 60 * 5
 
     @staticmethod
     def expid_dir(exp_id):
