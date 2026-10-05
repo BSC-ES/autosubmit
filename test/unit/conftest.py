@@ -21,7 +21,7 @@ from collections.abc import Callable
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from random import choice, randint, randrange, seed
+from random import choice, randint, seed
 from time import time
 from typing import Any, Protocol
 
@@ -45,12 +45,12 @@ from autosubmit.platforms.slurmplatform import SlurmPlatform
 # Copied from the autosubmit config parser, that I believe is a revised one from the create_as_conf
 class AutosubmitConfigFactory(Protocol):
     def __call__(
-            self,
-            expid: str,
-            experiment_data: dict | None = None,
-            include_basic_config: bool = True,
-            *args: Any,
-            **kwargs: Any
+        self,
+        expid: str,
+        experiment_data: dict | None = None,
+        include_basic_config: bool = True,
+        *args: Any,
+        **kwargs: Any,
     ) -> AutosubmitConfig: ...
 
 
@@ -132,10 +132,7 @@ def autosubmit_config(
         job_data_dir = Path(BasicConfig.JOBDATA_DIR)
         job_data_dir.mkdir(parents=True, exist_ok=True)
 
-        config = AutosubmitConfig(
-            expid=expid,
-            basic_config=BasicConfig
-        )
+        config = AutosubmitConfig(expid=expid, basic_config=BasicConfig)
 
         config.experiment_data = {**config.experiment_data, **experiment_data}
         # Populate the configuration object's ``experiment_data`` dictionary with the values
@@ -156,9 +153,7 @@ def autosubmit_config(
 
         if not config.experiment_data.get("CONFIG").get("AUTOSUBMIT_VERSION", ""):
             try:
-                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = version(
-                    "autosubmit"
-                )
+                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = version("autosubmit")
             except PackageNotFoundError:
                 config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = ""
 
@@ -220,9 +215,7 @@ def create_jobs(mocker, request) -> list[Job]:
             job_aux.nodes = str(i)
             job_aux.exclusive = "example_exclusive_" + str(i)
 
-            num_retrials = randint(
-                1, max_num_retrials_per_job
-            )  # random number of retrials, grater than 0
+            num_retrials = randint(1, max_num_retrials_per_job)  # random number of retrials, grater than 0
             retrials = []
 
             for j in range(num_retrials):
@@ -242,9 +235,7 @@ def create_jobs(mocker, request) -> list[Job]:
                         else:
                             retrial[3] = job_aux.status
                 retrials.append(retrial)
-            mock.patch(
-                "autosubmit.job.job.Job.get_last_retrials", return_value=retrials
-            )
+            mock.patch("autosubmit.job.job.Job.get_last_retrials", return_value=retrials)
             jobs.append(job_aux)
 
         return jobs
@@ -399,9 +390,9 @@ class FakePlatform:
 @pytest.fixture
 def fake_platform(mocker) -> FakePlatform:
     """Return a :class:`FakePlatform` with mocker-backed method stubs.
+
     :param mocker: pytest-mock mocker fixture.
     :return: Configured :class:`FakePlatform` instance.
-    :rtype: FakePlatform
     """
     fp = FakePlatform()
     fp.check_all_jobs = mocker.MagicMock()
@@ -412,71 +403,12 @@ def fake_platform(mocker) -> FakePlatform:
 @pytest.fixture
 def fake_job_list(mocker) -> JobList:
     """Return a minimal :class:`JobList` for wrapper/job-check unit tests.
+
     :param mocker: pytest-mock mocker fixture.
     :return: Configured :class:`JobList` instance.
-    :rtype: JobList
     """
     as_conf = mocker.MagicMock()
     as_conf.experiment_data = {}
-    job_list = JobList('a000', as_conf, YAMLParserFactory())
-    job_list._packages_persistence = mocker.MagicMock()
-    return job_list
-
-
-def _create_dummy_job_with_status(job_id: int, status: int) -> Job:
-    job_name = f"job_{job_id}"
-    job = Job(job_name, job_id, status, 0)
-    job.type = randrange(0, 2)
-    return job
-
-
-@pytest.fixture
-def jobs_as_dict(next_job_id):
-    return {
-        Status.COMPLETED: [
-            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
-            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
-            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
-            _create_dummy_job_with_status(next_job_id(), Status.COMPLETED),
-        ],
-        Status.SUBMITTED: [
-            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
-            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
-            _create_dummy_job_with_status(next_job_id(), Status.SUBMITTED),
-        ],
-        Status.RUNNING: [
-            _create_dummy_job_with_status(next_job_id(), Status.RUNNING),
-            _create_dummy_job_with_status(next_job_id(), Status.RUNNING),
-        ],
-        Status.QUEUING: [_create_dummy_job_with_status(next_job_id(), Status.QUEUING)],
-        Status.FAILED: [
-            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
-            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
-            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
-            _create_dummy_job_with_status(next_job_id(), Status.FAILED),
-        ],
-        Status.READY: [
-            _create_dummy_job_with_status(next_job_id(), Status.READY),
-            _create_dummy_job_with_status(next_job_id(), Status.READY),
-            _create_dummy_job_with_status(next_job_id(), Status.READY),
-        ],
-        Status.WAITING: [
-            _create_dummy_job_with_status(next_job_id(), Status.WAITING),
-            _create_dummy_job_with_status(next_job_id(), Status.WAITING),
-        ],
-        Status.UNKNOWN: [_create_dummy_job_with_status(next_job_id(), Status.UNKNOWN)],
-    }
-
-
-@pytest.fixture
-def job_list(autosubmit_config, mocker, jobs_as_dict):
-    parameters = {"fake-key": "fake-value", "fake-key2": "fake-value2"}
-    as_conf = autosubmit_config("a000", experiment_data={})
-    as_conf.load_parameters = mocker.Mock(return_value=parameters)
-    as_conf.default_parameters = {}
     job_list = JobList("a000", as_conf, YAMLParserFactory())
-
-    for jobs in jobs_as_dict.values():
-        # noinspection PyProtectedMember
-        job_list._job_list.extend(jobs)
+    job_list.dbmanager = mocker.MagicMock()
     return job_list
