@@ -170,8 +170,8 @@ The location where the user can find the generated plots with date and timestamp
 
     <experiments_directory>/<EXPID>/plot/<EXPID>_<DATE>_<TIME>.pdf
 
-The location where the user can find the txt output containing the status of each job and the path to out and err log
-files.
+The location where the user can find the txt output containing
+the status of each job and the path to out and err log files.
 
 ::
 

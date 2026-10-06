@@ -143,15 +143,15 @@ If a placeholder is defined as ``%model.version%`` in ``conf.yml``, the behavior
 
 1. **In-place ``%%`` Enclosing**:
 
-The placeholder's value will correspond to the key defined in the previously loaded file or the file currently being
-loaded.
+The placeholder's value will correspond to the key defined in the previously loaded file
+or the file currently being loaded.
 For example, ``%model.version%`` would resolve to ``"first"`` (from ``ca.yml``) when ``conf.yml`` is loaded.
 
 2. **Postloaded ``%^%`` Enclosing**:
 
 The placeholder's value will always correspond to the key defined in the last loaded file.
-For example, ``%^model.version%`` in ``conf.yml`` would resolve to ``"last"`` (from ``cz.yml``) after all files are
-loaded.
+For example, ``%^model.version%`` in ``conf.yml`` would resolve to ``"last"``
+(from ``cz.yml``) after all files are loaded.
 
 In this case, the value of ``test_in_place`` in ``conf.yml`` would resolve as: ``"something/first/something"``
 

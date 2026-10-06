@@ -3,8 +3,7 @@ Defining the workflow
 
 One of the most important steps that you have to do when planning to use autosubmit for an experiment is the definition
 of the workflow the experiment will use. In this section, you will learn about the workflow definition syntax so you
-will
-be able to exploit autosubmit's full potential.
+will be able to exploit autosubmit's full potential.
 
 .. warning::
    This section is NOT intended to show how to define your jobs. Please go to :doc:`/qstartguide/index` section for a comprehensive
@@ -16,8 +15,7 @@ Simple workflow
 
 The simplest workflow that can be defined is a sequence of two jobs, with the second one triggering at the end of
 the first. To define it, we define the two jobs and then add a ``DEPENDENCIES`` attribute to the second job referring to
-the
-first one.
+the first one.
 
 It is important to remember when defining workflows that ``DEPENDENCIES`` on autosubmit always refer to jobs that should
 be finished before launching the job that has the ``DEPENDENCIES`` attribute.
@@ -119,8 +117,8 @@ Dependencies with previous jobs
 
 Autosubmit can manage dependencies between jobs that are part of different chunks, members or startdates. The next
 example will show how to make a simulation job wait for the previous chunk of the simulation. To do that, we add
-``sim-1`` on the ``DEPENDENCIES`` attribute. As you can see, you can add as much dependencies as you like separated by
-spaces
+``sim-1`` on the ``DEPENDENCIES`` attribute. As you can see,
+you can add as much dependencies as you like separated by spaces
 
 .. code-block:: yaml
 
@@ -422,10 +420,9 @@ To select an specific task, you have to combine the ``STATUS`` and ``CHUNKS_TO``
 Job frequency
 ~~~~~~~~~~~~~
 
-Some times you just don't need a job to be run on every chunk or member. For example, you may want to launch the
-postprocessing
-job after various chunks have completed. This behaviour can be achieved using the ``FREQUENCY`` attribute. You can
-specify
+Some times you just don't need a job to be run on every chunk or member.
+For example, you may want to launch the postprocessing job after various chunks have completed.
+This behaviour can be achieved using the ``FREQUENCY`` attribute. You can specify
 an integer I for this attribute and the job will run only once for each I iterations on the running level.
 
 .. hint::
@@ -586,8 +583,8 @@ Job split
 For jobs running at any level (``once``, ``date``, ``member``, ``chunk``), you can split each logical task into
 multiple sub-tasks with the ``SPLITS`` attribute.
 
-This is useful when you want multiple tasks to be run in parallel (e.g. multiple independent ``APP`` instances for the
-same chunk).
+This is useful when you want multiple tasks to be run in parallel
+(e.g. multiple independent ``APP`` instances for the same chunk).
 
 Basic behavior
 ^^^^^^^^^^^^^^
@@ -1468,8 +1465,8 @@ Weak dependencies, work like this way:
 Example 4: Select a member
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In this workflow you can see an illustrated example of select member. Using 4 members 1 datelist and 4 different job
-sections.
+In this workflow you can see an illustrated example of select member.
+Using 4 members 1 datelist and 4 different job sections.
 
 .. code-block:: yaml
 
