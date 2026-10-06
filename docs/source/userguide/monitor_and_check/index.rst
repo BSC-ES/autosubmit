@@ -730,10 +730,10 @@ This will be understood by Autosubmit and the result would be similar to:
     EXPERIMENT.CALENDAR : standard
 
     === PLATFORMS ===
-    PLATFORMS.MARENOSTRUM4.TYPE : slurm
-    PLATFORMS.MARENOSTRUM4.HOST : mn1.bsc.es
-    PLATFORMS.MARENOSTRUM4.USER : None
-    PLATFORMS.MARENOSTRUM4.PROJECT : bsc32
+    PLATFORMS.MARENOSTRUM.TYPE : slurm
+    PLATFORMS.MARENOSTRUM.HOST : mn1.bsc.es
+    PLATFORMS.MARENOSTRUM.USER : None
+    PLATFORMS.MARENOSTRUM.PROJECT : bsc32
 
 Although it depends on the experiment.
 

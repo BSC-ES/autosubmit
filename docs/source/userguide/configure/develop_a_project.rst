@@ -27,7 +27,7 @@ Expdef configuration
         EXPID: cxxx
         # HPC name.
         # No need to change
-        HPCARCH: ithaca
+        HPCARCH: marenostrum
 
     experiment:
         # Supply the list of start dates. Available formats: YYYYMMDD YYYYMMDDhh YYYYMMDDhhmm
@@ -538,7 +538,7 @@ In this section, we describe the platform configuration using `-QOS` and also `P
             ADD_PROJECT_TO_HOST: false
             SCRATCH_DIR: /gpfs/scratch
 
-        marenostrum4:
+        marenostrum:
             # Queue type. Options: ps, SLURM, eceaccess
             TYPE: slurm
             HOST: mn1.bsc.es,mn2.bsc.es,mn3.bsc.es

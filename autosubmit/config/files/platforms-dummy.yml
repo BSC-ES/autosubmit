@@ -1,5 +1,5 @@
 PLATFORMS:
-  MARENOSTRUM4:
+  MARENOSTRUM:
     TYPE: slurm
     HOST: mn1.bsc.es
     PROJECT: bsc32

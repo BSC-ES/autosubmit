@@ -229,7 +229,7 @@ Model configuration is distributed at `git. <https://earth.bsc.es/gitlab/ces/aut
 .. code-block:: yaml
 
     Platforms:
-      MARENOSTRUM4:
+      MARENOSTRUM:
         USER: bsc32xxx
         QUEUE: debug
         MAX_WALLCLOCK: "02:00"

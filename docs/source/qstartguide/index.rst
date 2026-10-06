@@ -230,7 +230,7 @@ Final step: Modify and run
 
 .. runcmd:: cat /home/docs/autosubmit/a000/conf/expdef_a000.yml
 
-Now open platforms_<EXPID>.yml. Note: This will be an example for marenostrum4
+Now open platforms_<EXPID>.yml. Note: This will be an example for marenostrum
 
 .. runcmd:: cat /home/docs/autosubmit/a000/conf/platforms_a000.yml
 
