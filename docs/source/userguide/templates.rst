@@ -8,18 +8,16 @@ shell, R, or Python. By default, the ``TYPE`` property of a job is set
 to ``bash``. Template scripts can have any file extension,
 the generated script will have it replaced by ``.cmd``.
 
-.. tab-set-code::
+.. code-block:: yaml
+  :emphasize-lines: 3
+  :caption: Job ``JOB_1`` with template script ``print_expid.sh``
 
-    .. code-block:: yaml
-      :emphasize-lines: 3
-      :caption: Job ``JOB_1`` with template script ``print_expid.sh``
-
-      JOBS:
-        JOB_1:
-          FILE: print_expid.sh
-          PLATFORM: LOCAL
-          RUNNING: once
-          TYPE: bash # default
+  JOBS:
+    JOB_1:
+      FILE: print_expid.sh
+      PLATFORM: LOCAL
+      RUNNING: once
+      TYPE: bash # default
 
 In the example above, the script template ``print_expid.sh`` file must exist in the Autosubmit Project.
 When you run ``autosubmit create`` or ``autosubmit refresh``, Autosubmit will copy the Project files,
@@ -41,28 +39,24 @@ the YAML configuration file.
 
    Example:
 
-   .. tab-set-code::
+   .. code-block:: yaml
 
-       .. code-block:: yaml
-
-         CONFIG:
-           SAFE_PLACEHOLDERS:
-             - CURRENT_PROJECT
-             - ANOTHER_VAR
+     CONFIG:
+       SAFE_PLACEHOLDERS:
+         - CURRENT_PROJECT
+         - ANOTHER_VAR
 
 
 
 Assuming that one of the Autosubmit experiment configuration files
 contains the following:
 
-.. tab-set-code::
+.. code-block:: yaml
+  :caption: Autosubmit configuration
 
-    .. code-block:: yaml
-      :caption: Autosubmit configuration
-
-      DEFAULT:
-        EXPID: a000
-        # ... other settings
+  DEFAULT:
+    EXPID: a000
+    # ... other settings
 
 and a template script used in that experiment contains the following
 code:
@@ -124,32 +118,26 @@ For instance, consider the following YAML files loaded in alphabetical order (``
 
 **ca.yml**:
 
-.. tab-set-code::
+.. code-block:: yaml
 
-    .. code-block:: yaml
-
-      model:
-        version: "first"
+  model:
+    version: "first"
 
 **conf.yml**:
 
-.. tab-set-code::
+.. code-block:: yaml
 
-    .. code-block:: yaml
-
-      other_variable: "something"
-      test_in_place: "%other_variable%/%^model.version%/%another_other_variable%"
-      test_at_the_end: "%other_variable%/%model.version%/%another_other_variable%"
-      another_other_variable: "something"
+  other_variable: "something"
+  test_in_place: "%other_variable%/%^model.version%/%another_other_variable%"
+  test_at_the_end: "%other_variable%/%model.version%/%another_other_variable%"
+  another_other_variable: "something"
 
 **cz.yml**:
 
-.. tab-set-code::
+.. code-block:: yaml
 
-    .. code-block:: yaml
-
-      model:
-        version: "last"
+  model:
+    version: "last"
 
 If a placeholder is defined as ``%model.version%`` in ``conf.yml``, the behavior differs based on the enclosing format:
 
@@ -178,35 +166,31 @@ It is also possible to define a script directly in the yaml configuration file.
 
 If you wish to run only one liner script:
 
-.. tab-set-code::
+.. code-block:: yaml
+  :emphasize-lines: 6
+  :caption: Job ``JOB_IN_LINE_ONELINER`` that runs sleep 2
 
-    .. code-block:: yaml
-      :emphasize-lines: 6
-      :caption: Job ``JOB_IN_LINE_ONELINER`` that runs sleep 2
-
-      JOBS:
-        JOB_1:
-          PLATFORM: LOCAL
-          RUNNING: once
-          TYPE: bash # default
-          SCRIPT: sleep 2
+  JOBS:
+    JOB_1:
+      PLATFORM: LOCAL
+      RUNNING: once
+      TYPE: bash # default
+      SCRIPT: sleep 2
 
 In case that your script needs lines, the yaml specification allows to do so with the PIPE character (|).
 
-.. tab-set-code::
+.. code-block:: yaml
+  :emphasize-lines: 7,8
+  :caption: Job ``JOB_IN_LINE_MULTILINE`` that runs hello world and sleep
 
-    .. code-block:: yaml
-      :emphasize-lines: 7,8
-      :caption: Job ``JOB_IN_LINE_MULTILINE`` that runs hello world and sleep
-
-      JOBS:
-        JOB_1:
-          PLATFORM: LOCAL
-          RUNNING: once
-          TYPE: bash # default
-          SCRIPT: |
-            echo "hello world!"
-            sleep 2
+  JOBS:
+    JOB_1:
+      PLATFORM: LOCAL
+      RUNNING: once
+      TYPE: bash # default
+      SCRIPT: |
+        echo "hello world!"
+        sleep 2
 
 Also, for debugging purposes, if PROJECT_TYPE is set to NONE (see :ref:`develproject`), the SCRIPT directive will
 overwrite Autosubmit's self-contained dummy templates.
