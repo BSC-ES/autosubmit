@@ -140,22 +140,24 @@ To give a practical example, we will show an example using git. However, using a
 
 Edit or generate a ``minimal.yml`` with the following parameters, leaving the rest untouched.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    DEFAULT:
-        #ADD, note that %PROJDIR% is an special AS_PLACEHOLDER that points to the `$expid/proj/proj_destination` folder.
-        CUSTOM_CONFIG:
-            PRE: "%PROJDIR%/<path_to_model_as_conf>"
-            POST: <path_to_user_conf>
-    PROJECT:
-        PROJECT_TYPE: "git"
-        PROJECT_DESTINATION: "git_project"
-    GIT:
-        PROJECT_ORIGIN: "TO_FILL"
-        PROJECT_BRANCH: "TO_FILL"
-        PROJECT_COMMIT: "TO_FILL"
-        PROJECT_SUBMODULES: "TO_FILL"
-        FETCH_SINGLE_BRANCH: True
+  .. code-block:: yaml
+
+      DEFAULT:
+          #ADD, note that %PROJDIR% is an special AS_PLACEHOLDER that points to the `$expid/proj/proj_destination` folder.
+          CUSTOM_CONFIG:
+              PRE: "%PROJDIR%/<path_to_model_as_conf>"
+              POST: <path_to_user_conf>
+      PROJECT:
+          PROJECT_TYPE: "git"
+          PROJECT_DESTINATION: "git_project"
+      GIT:
+          PROJECT_ORIGIN: "TO_FILL"
+          PROJECT_BRANCH: "TO_FILL"
+          PROJECT_COMMIT: "TO_FILL"
+          PROJECT_SUBMODULES: "TO_FILL"
+          FETCH_SINGLE_BRANCH: True
 
 .. important:: The final configuration will be loaded in the following order: ``PRE``:``$expid/%PROJDIR%/$as_proj_config_path`` -> ``$expid/conf`` -> ``POST``, overwriting the parameters in the order they are loaded.
 
@@ -179,7 +181,7 @@ It has two different syntaxes:
 .. note:: If a list of paths is provided, the paths will be loaded in the order they are provided and in a recursive way. This means that if there are additional ``DEFAULT.CUSTOM_CONFIG`` parameters inside the files, they will also be loaded.
 
 
-.. code-block:: yaml
+.. code-block:: bash
 
    # Download the git project
    autosubmit create a002
@@ -203,24 +205,26 @@ Advanced configuration - Full dummy example (reproducible)
 
     cat ~/autosubmit/conf/minimal.yml
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    CONFIG:
-      AUTOSUBMIT_VERSION: "4.0.0b"
-    DEFAULT:
-        EXPID: "a04b"
-        HPCARCH: "local"
-        #ADD, note that %PROJDIR% is an special AS_PLACEHOLDER that points to the expid folder.
-        #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
-        CUSTOM_CONFIG: "%PROJDIR%/as_conf"
-    PROJECT:
-        PROJECT_TYPE: "git"
-        PROJECT_DESTINATION: "git_project"
-    GIT:
-        PROJECT_ORIGIN: "https://earth.bsc.es/gitlab/ces/auto-advanced_config_example"
-        PROJECT_BRANCH: "main"
-        PROJECT_COMMIT: ""
-        PROJECT_SUBMODULES: ""
+  .. code-block:: yaml
+
+      CONFIG:
+        AUTOSUBMIT_VERSION: "4.0.0b"
+      DEFAULT:
+          EXPID: "a04b"
+          HPCARCH: "local"
+          #ADD, note that %PROJDIR% is an special AS_PLACEHOLDER that points to the expid folder.
+          #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
+          CUSTOM_CONFIG: "%PROJDIR%/as_conf"
+      PROJECT:
+          PROJECT_TYPE: "git"
+          PROJECT_DESTINATION: "git_project"
+      GIT:
+          PROJECT_ORIGIN: "https://earth.bsc.es/gitlab/ces/auto-advanced_config_example"
+          PROJECT_BRANCH: "main"
+          PROJECT_COMMIT: ""
+          PROJECT_SUBMODULES: ""
 
 .. code-block:: bash
 
@@ -237,29 +241,31 @@ Model configuration is distributed at
 
     dbeltran@bsces107894:~/autosubmit/a04b$ cat ~/as_user_conf/platforms.yml
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    Platforms:
-      MARENOSTRUM4:
-        USER: bsc32xxx
-        QUEUE: debug
-        MAX_WALLCLOCK: "02:00"
-      marenostrum_archive:
-        USER: bsc32xxx
-      transfer_node:
-        USER: bsc32xxx
-      transfer_node_bscearth000:
-        USER: dbeltran
-      bscearth000:
-        USER: dbeltran
-      nord3:
-        USER: bsc32xxx
-      ecmwf-xc40:
-        USER: c3d
+  .. code-block:: yaml
+
+      Platforms:
+        MARENOSTRUM4:
+          USER: bsc32xxx
+          QUEUE: debug
+          MAX_WALLCLOCK: "02:00"
+        marenostrum_archive:
+          USER: bsc32xxx
+        transfer_node:
+          USER: bsc32xxx
+        transfer_node_bscearth000:
+          USER: dbeltran
+        bscearth000:
+          USER: dbeltran
+        nord3:
+          USER: bsc32xxx
+        ecmwf-xc40:
+          USER: c3d
 
 .. Note:: The user configuration is not distributed, it is a local file that must be edited by the user.
 
-.. code-block:: yaml
+.. code-block::
 
    # Create and run the experiment, since it contains all the info!
    autosubmit create a04b  # if $expid/proj does not exist

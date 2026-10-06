@@ -4,6 +4,7 @@ Inspect & Debug Tools
 .. contents::
    :local:
    :depth: 2
+   :backlinks: none
 
 
 Overview
@@ -124,11 +125,13 @@ job per section efficiently.
 
 To enable syntax validation for a job:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-   JOBS:
-       JOB:
-           VALIDATE: True
+   .. code-block:: yaml
+
+      JOBS:
+         JOB:
+            VALIDATE: True
 
 After running:
 
@@ -154,6 +157,8 @@ The recommended workflow to debug parameter issues before submission:
 
 1. **Edit** your jobs configuration (``conf/*.yml``). Add ``VALIDATE: True``
    to enable syntax checks in rendered scripts.
+
+.. tab-set-code::
 
    .. code-block:: yaml
 

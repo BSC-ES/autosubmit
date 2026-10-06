@@ -46,16 +46,18 @@ Defaults to: None
 
 (One time, all shared experiments): Has to have this defined in the $autosubmit_data/$expid/conf
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    ...
-    DEFAULT:
+    .. code-block:: yaml
+
         ...
-        CUSTOM_CONFIG:
+        DEFAULT:
             ...
-            POST: "%AS_ENV_PLATFORMS_PATH%"
+            CUSTOM_CONFIG:
+                ...
+                POST: "%AS_ENV_PLATFORMS_PATH%"
+            ...
         ...
-    ...
 
 
 * (OPTIONAL) ssh_config file that contains the ssh config for each platform
@@ -71,11 +73,13 @@ Activating user mapping
 
 * (once) Generate the platform_${SUDO_USER}.yml
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    Platforms:
-        Platform:
-            User: bscXXXXX
+    .. code-block:: yaml
+
+        Platforms:
+            Platform:
+                User: bscXXXXX
 
 * (once) Generate the ssh_config_${SUDO_USER}.yml
 
@@ -110,16 +114,18 @@ Tip: Add it to the shared account .bashrc file.
 
     cat $autosubmit_data/$expid/conf/minimal_<EXPID>.yml
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    ...
-    DEFAULT:
+    .. code-block:: yaml
+
         ...
-        CUSTOM_CONFIG:
+        DEFAULT:
             ...
-            POST: "%AS_ENV_PLATFORMS_PATH%"
+            CUSTOM_CONFIG:
+                ...
+                POST: "%AS_ENV_PLATFORMS_PATH%"
+            ...
         ...
-    ...
 
 4) Run the experiments.
 

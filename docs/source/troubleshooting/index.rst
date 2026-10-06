@@ -58,12 +58,14 @@ The error message will indicate the specific line and type of syntax error that 
 
 Example of how to enable validation for a job in your configuration:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    JOBS:
-        JOB:
-            FILE: <path_to_your_script>
-            VALIDATE: True
+    .. code-block:: yaml
+
+        JOBS:
+            JOB:
+                FILE: <path_to_your_script>
+                VALIDATE: True
 
 Example output of the command:
 

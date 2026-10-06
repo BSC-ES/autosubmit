@@ -172,43 +172,45 @@ Example:
 
     vi <experiments_directory>/<EXPID>/conf/expdef_<EXPID>.yml
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    ...
+    .. code-block:: yaml
 
-    rerun:
-        RERUN: TRUE
-        RERUN_JOBLIST: RERUN_TEST_INI;SIM[19600101[C:3]],RERUN_TEST_INI_chunks[19600101[C:3]]
-    ...
+        ...
 
-    vi <experiments_directory>/<EXPID>/conf/jobs_<EXPID>.yml
+        rerun:
+            RERUN: TRUE
+            RERUN_JOBLIST: RERUN_TEST_INI;SIM[19600101[C:3]],RERUN_TEST_INI_chunks[19600101[C:3]]
+        ...
 
-.. code-block:: yaml
+        vi <experiments_directory>/<EXPID>/conf/jobs_<EXPID>.yml
 
-    PREPROCVAR:
-        FILE: templates/04_preproc_var.sh
-        RUNNING: chunk
-        PROCESSORS: 8
+    .. code-block:: yaml
 
-    RERUN_TEST_INI_chunks:
-        FILE: templates/05b_sim.sh
-        RUNNING: chunk
-        RERUN_ONLY: true
+        PREPROCVAR:
+            FILE: templates/04_preproc_var.sh
+            RUNNING: chunk
+            PROCESSORS: 8
 
-    RERUN_TEST_INI:
-        FILE: templates/05b_sim.sh
-        RUNNING: once
-        RERUN_ONLY: true
+        RERUN_TEST_INI_chunks:
+            FILE: templates/05b_sim.sh
+            RUNNING: chunk
+            RERUN_ONLY: true
 
-    SIM:
-        DEPENDENCIES: RERUN_TEST_INI RERUN_TEST_INI_chunks PREPROCVAR SIM-1
-        RUNNING: chunk
-        PROCESSORS: 10
+        RERUN_TEST_INI:
+            FILE: templates/05b_sim.sh
+            RUNNING: once
+            RERUN_ONLY: true
 
-    .. figure:: fig/rerun.png
-       :name: rerun_result
-       :align: center
-       :alt: rerun_result
+        SIM:
+            DEPENDENCIES: RERUN_TEST_INI RERUN_TEST_INI_chunks PREPROCVAR SIM-1
+            RUNNING: chunk
+            PROCESSORS: 10
+
+        .. figure:: fig/rerun.png
+        :name: rerun_result
+        :align: center
+        :alt: rerun_result
 
 Run the command:
 

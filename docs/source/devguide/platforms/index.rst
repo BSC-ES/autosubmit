@@ -211,51 +211,57 @@ designed to execute a small job through Autosubmit, explaining how to configure 
 
 Open the file ``~/autosubmit/<expid>/config/minimal.yml`` and you'll find a file as shown below.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    CONFIG:
-        AUTOSUBMIT_VERSION: "4.1.12"
-        TOTALJOBS: 20
-        MAXWAITINGJOBS: 20
+    .. code-block:: yaml
 
-    DEFAULT:
-        EXPID: <EXPID> # ID of the experiment
-        HPCARCH: "MARENOSTRUM5" # This will be the default platform if a job doesn't contain a defined platform
-        #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
-        CUSTOM_CONFIG: "%PROJDIR%/"
+        CONFIG:
+            AUTOSUBMIT_VERSION: "4.1.12"
+            TOTALJOBS: 20
+            MAXWAITINGJOBS: 20
 
-    PROJECT:
-        PROJECT_TYPE: local
-        PROJECT_DESTINATION: local_project
+        DEFAULT:
+            EXPID: <EXPID> # ID of the experiment
+            HPCARCH: "MARENOSTRUM5" # This will be the default platform if a job doesn't contain a defined platform
+            #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
+            CUSTOM_CONFIG: "%PROJDIR%/"
 
-    GIT:
-        PROJECT_ORIGIN: ""
-        PROJECT_BRANCH: ""
-        PROJECT_COMMIT: ''
-        PROJECT_SUBMODULES: ''
-        FETCH_SINGLE_BRANCH: true
+        PROJECT:
+            PROJECT_TYPE: local
+            PROJECT_DESTINATION: local_project
+
+        GIT:
+            PROJECT_ORIGIN: ""
+            PROJECT_BRANCH: ""
+            PROJECT_COMMIT: ''
+            PROJECT_SUBMODULES: ''
+            FETCH_SINGLE_BRANCH: true
 
 Now we start configuring the experiment adding the additional ``PARAMETERS`` to create a simple executable experiment
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    EXPERIMENT:
-        DATELIST: 19900101
-        MEMBERS: fc0
-        CHUNKSIZEUNIT: month
-        SPLITSIZEUNIT: day
-        CHUNKSIZE: 1
-        NUMCHUNKS: 2
-        CALENDAR: standard
+    .. code-block:: yaml
+
+        EXPERIMENT:
+            DATELIST: 19900101
+            MEMBERS: fc0
+            CHUNKSIZEUNIT: month
+            SPLITSIZEUNIT: day
+            CHUNKSIZE: 1
+            NUMCHUNKS: 2
+            CALENDAR: standard
 
 
 Add the following PARAMETER which will point towards the folder containing all the scripts and instructions to be
 used to execute the experiment in the platform
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    LOCAL:
-        PROJECT_PATH: /home/user/experiment_example # path to your project sources
+    .. code-block:: yaml
+
+        LOCAL:
+            PROJECT_PATH: /home/user/experiment_example # path to your project sources
 
 
 Autosubmit will copy your sources to the ``$autosubmit_installation/$expid/proj/%PROJECT.PROJECT_DESTINATION%``.
@@ -266,19 +272,21 @@ You must input the information suitable for your project (e.g.: user, host, plat
 
 .. _TargetPlatform:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    PLATFORMS:
-        MARENOSTRUM5:
-            TYPE: <Scheduler> [slurm, ps, example]
-            HOST: <Host>
-            PROJECT: <Project_Name_Folder>
-            USER: <User>
-            scratch_dir: <location of project/user>
-            QUEUE: gp_debug [dummy, gp_debug, nf, hpc]
-            MAX_WALLCLOCK: <HH:MM>
-            MAX_PROCESSORS: <N> # This is to enable horizontal_wrappers
-            PROCESSORS_PER_NODE: 112 # Each HPC has their own number check the documentation of your platform
+    .. code-block:: yaml
+
+        PLATFORMS:
+            MARENOSTRUM5:
+                TYPE: <Scheduler> [slurm, ps, example]
+                HOST: <Host>
+                PROJECT: <Project_Name_Folder>
+                USER: <User>
+                scratch_dir: <location of project/user>
+                QUEUE: gp_debug [dummy, gp_debug, nf, hpc]
+                MAX_WALLCLOCK: <HH:MM>
+                MAX_PROCESSORS: <N> # This is to enable horizontal_wrappers
+                PROCESSORS_PER_NODE: 112 # Each HPC has their own number check the documentation of your platform
 
 .. warning::
     If you cannot connect, it may be because your user doesn't have access to the host, or the PARAMETER SCRATCH_DIR
@@ -561,72 +569,76 @@ if they exist.
 .. note::
     The files can also be R, python2, python3. By default it is bash and can be changed by setting the file type.
 
+    .. tab-set-code::
+
+        .. code-block:: yaml
+
+            JOBS:
+                LOCAL_SETUP:
+                    TYPE: Python # adding this
+
+
+.. tab-set-code::
+
     .. code-block:: yaml
 
         JOBS:
             LOCAL_SETUP:
-                TYPE: Python # adding this
+                FILE: LOCAL_SETUP.sh # ~/autosubmit/<expid>/proj/local_project/LOCAL_SETUP.sh
+                PLATFORM: Local
+                RUNNING: once
 
+            SYNCHRONIZE:
+                FILE: SYNCHRONIZE.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: LOCAL_SETUP
+                RUNNING: once
+                WALLCLOCK: 00:05
 
-.. code-block:: yaml
+            REMOTE_SETUP:
+                FILE: REMOTE_SETUP.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: SYNCHRONIZE
+                WALLCLOCK: 00:05
+                RUNNING: once
 
-    JOBS:
-        LOCAL_SETUP:
-            FILE: LOCAL_SETUP.sh # ~/autosubmit/<expid>/proj/local_project/LOCAL_SETUP.sh
-            PLATFORM: Local
-            RUNNING: once
+            INI:
+                FILE: INI.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: REMOTE_SETUP
+                RUNNING: once
+                WALLCLOCK: 00:05
 
-        SYNCHRONIZE:
-            FILE: SYNCHRONIZE.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: LOCAL_SETUP
-            RUNNING: once
-            WALLCLOCK: 00:05
+            DATA_NOTIFIER:
+                FILE: DATA_NOTIFIER.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: INI
+                RUNNING: chunk
 
-        REMOTE_SETUP:
-            FILE: REMOTE_SETUP.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: SYNCHRONIZE
-            WALLCLOCK: 00:05
-            RUNNING: once
+            SIM:
+                FILE: SIM.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: DATA_NOTIFIER
+                RUNNING: chunk
 
-        INI:
-            FILE: INI.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: REMOTE_SETUP
-            RUNNING: once
-            WALLCLOCK: 00:05
+            STATISTICS:
+                FILE: STATISTICS.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: SIM
+                RUNNING: chunk
 
-        DATA_NOTIFIER:
-            FILE: DATA_NOTIFIER.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: INI
-            RUNNING: chunk
+            APP:
+                FILE: APP.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: STATISTICS
+                RUNNING: chunk
 
-        SIM:
-            FILE: SIM.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: DATA_NOTIFIER
-            RUNNING: chunk
-
-        STATISTICS:
-            FILE: STATISTICS.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: SIM
-            RUNNING: chunk
-
-        APP:
-            FILE: APP.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: STATISTICS
-            RUNNING: chunk
-
-        CLEAN:
-            FILE: CLEAN.sh
-            # PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: APP SIM STATISTICS
-            RUNNING: once
-            WALLCLOCK: 00:05
+            CLEAN:
+                FILE: CLEAN.sh
+                # PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: APP SIM STATISTICS
+                RUNNING: once
+                WALLCLOCK: 00:05
 
 Once you finish setting up all the new configurations, you can run the following command to generate the experiment
 just created; we need to create a new folder to keep all the instructions for the experiment to be executed on the
@@ -641,24 +653,28 @@ platform.
 For the execution of this test, a few files will need to be created within the new folder;
 these files will contain proj-associated code that will be executed on the job-specified platform.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    LOCAL_SETUP.sh
-    SYNCHRONIZE.sh
-    REMOTE_SETUP.sh
-    INI.sh
-    DATA_NOTIFIER.sh
-    SIM.sh
-    STATISTICS.sh
-    APP.sh
-    CLEAN.sh
+    .. code-block:: yaml
+
+        LOCAL_SETUP.sh
+        SYNCHRONIZE.sh
+        REMOTE_SETUP.sh
+        INI.sh
+        DATA_NOTIFIER.sh
+        SIM.sh
+        STATISTICS.sh
+        APP.sh
+        CLEAN.sh
 
 To keep a concise and clear example of how Autosubmit works, a simple instruction can be executed as a test.
 So add the following the instruction below to one or more ``Bash`` files created in the previous steps.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    sleep 5
+    .. code-block:: yaml
+
+        sleep 5
 
 Running the experiment
 ----------------------
@@ -676,3 +692,4 @@ Once the experiment is generated, we can execute it and check the experiment by 
 .. note::
     For more examples on how to create and share configurations of experiments and platforms,
     you can visit the :ref:`page <create_and_share_config>`.
+

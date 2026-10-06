@@ -65,10 +65,12 @@ Adding a new job
 
 To add a new job from a template file, open the ``jobs_<EXPID>.yml`` file and add this text:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    new_job:
-        FILE: <new_job_template>
+    .. code-block:: yaml
+
+        new_job:
+            FILE: <new_job_template>
 
 This will create a new job named ``new_job`` that will be executed once at the default platform. This job will use the
 template located at ``<new_job_template>``. Note that path is relative to project folder.
@@ -185,23 +187,25 @@ four cores and 4 GB for each of 128 tasks while another part of the job would re
 
 To add a new hetjob, open the ``jobs_<EXPID>.yml``.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    JOBS:
-        new_hetjob:
-            FILE: <new_job_template>
-            PROCESSORS: # Determines the amount of components that will be created
-                - 4
-                - 1
-            MEMORY: # Determines the amount of memory that will be used by each component
-                - 4096
-                - 16384
-            WALLCLOCK: 00:30
-            PLATFORM: <platform_name> # Determines the platform where the job will be executed
-            PARTITION: # Determines the partition where the job will be executed
-                - <partition_name>
-                - <partition_name>
-            TASKS: 128 # Determines the amount of tasks that will be used by each component
+    .. code-block:: yaml
+
+        JOBS:
+            new_hetjob:
+                FILE: <new_job_template>
+                PROCESSORS: # Determines the amount of components that will be created
+                    - 4
+                    - 1
+                MEMORY: # Determines the amount of memory that will be used by each component
+                    - 4096
+                    - 16384
+                WALLCLOCK: 00:30
+                PLATFORM: <platform_name> # Determines the platform where the job will be executed
+                PARTITION: # Determines the partition where the job will be executed
+                    - <partition_name>
+                    - <partition_name>
+                TASKS: 128 # Determines the amount of tasks that will be used by each component
 
 This will create a new job named ``new_hetjob`` with two components that will be executed once.
 
@@ -213,19 +217,21 @@ Configuring email notifications
 
 Example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    mail:
-        # Enable mail notifications for remote_failures
-        # Default:True
-        NOTIFY_ON_REMOTE_FAIL: True
-        # Enable mail notifications
-        # Default: False
-        NOTIFICATIONS: True
-        # Mail address where notifications will be received
-        TO:
-            - jsmith@example.com
-            - rlewis@example.com
+    .. code-block:: yaml
+
+        mail:
+            # Enable mail notifications for remote_failures
+            # Default:True
+            NOTIFY_ON_REMOTE_FAIL: True
+            # Enable mail notifications
+            # Default: False
+            NOTIFICATIONS: True
+            # Mail address where notifications will be received
+            TO:
+                - jsmith@example.com
+                - rlewis@example.com
 
 
 **2.** Define for which jobs you want to be notified. Edit ``jobs_<EXPID>.yml``. You will be notified every time the job
@@ -234,23 +240,25 @@ status separated by a whitespace, a comma (``,``), or using a list.
 
 Example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    JOBS:
-        LOCAL_SETUP:
-            FILE: LOCAL_SETUP.sh
-            PLATFORM: LOCAL
-            NOTIFY_ON: FAILED COMPLETED
-        EXAMPLE_JOB:
-            FILE: EXAMPLE_JOB.sh
-            PLATFORM: LOCAL
-            NOTIFY_ON: FAILED, COMPLETED
-        EXAMPLE_JOB_2:
-            FILE: EXAMPLE_JOB_2.sh
-            PLATFORM: LOCAL
-            NOTIFY_ON:
-                - FAILED
-                - COMPLETED
+    .. code-block:: yaml
+
+        JOBS:
+            LOCAL_SETUP:
+                FILE: LOCAL_SETUP.sh
+                PLATFORM: LOCAL
+                NOTIFY_ON: FAILED COMPLETED
+            EXAMPLE_JOB:
+                FILE: EXAMPLE_JOB.sh
+                PLATFORM: LOCAL
+                NOTIFY_ON: FAILED, COMPLETED
+            EXAMPLE_JOB_2:
+                FILE: EXAMPLE_JOB_2.sh
+                PLATFORM: LOCAL
+                NOTIFY_ON:
+                    - FAILED
+                    - COMPLETED
 
 .. _cpmip-notifications-config:
 
@@ -261,26 +269,28 @@ Autosubmit can send email alerts when one or more :doc:`CPMIP performance metric
 fall outside the configured target range. This feature uses the same ``MAIL.NOTIFICATIONS`` and ``MAIL.TO``
 settings as job-status notifications, so make sure those are enabled first (see the previous section).
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    JOBS:
-        SIM:
-            RUNNING: chunk
-            PROCESSORS: 256
-            WALLCLOCK: 01:00
-            CPMIP_THRESHOLDS:
-                SYPD:
-                    THRESHOLD: 5.0           # target SYPD
-                    COMPARISON: greater_than # SYPD must be >= THRESHOLD
-                    "%_ACCEPTED_ERROR": 10   # allow 10% slack below the threshold
-                CHSY:
-                    THRESHOLD: 50000
-                    COMPARISON: less_than    # CHSY must be <= THRESHOLD
-                    "%_ACCEPTED_ERROR": 5
-                CORE_HOURS:
-                    THRESHOLD: 1000
-                    COMPARISON: less_than    # CORE_HOURS must be <= THRESHOLD
-                    "%_ACCEPTED_ERROR": 5
+    .. code-block:: yaml
+
+        JOBS:
+            SIM:
+                RUNNING: chunk
+                PROCESSORS: 256
+                WALLCLOCK: 01:00
+                CPMIP_THRESHOLDS:
+                    SYPD:
+                        THRESHOLD: 5.0           # target SYPD
+                        COMPARISON: greater_than # SYPD must be >= THRESHOLD
+                        "%_ACCEPTED_ERROR": 10   # allow 10% slack below the threshold
+                    CHSY:
+                        THRESHOLD: 50000
+                        COMPARISON: less_than    # CHSY must be <= THRESHOLD
+                        "%_ACCEPTED_ERROR": 5
+                    CORE_HOURS:
+                        THRESHOLD: 1000
+                        COMPARISON: less_than    # CORE_HOURS must be <= THRESHOLD
+                        "%_ACCEPTED_ERROR": 5
 
 The keys are:
 
@@ -366,34 +376,36 @@ Adding a new platform
 
 To add a new platform, open the ``platforms_<EXPID>.yml`` file and add:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    PLATFORMS:
-        new_platform:
-            # MANDATORY
-            TYPE: <platform_type>
-            HOST: <host_name>
-            PROJECT: <project>
-            USER: <user>
-            SCRATCH_DIR: <scratch_dir>
-            MAX_WALLCLOCK: <HH:MM>
-            QUEUE: <hpc_queue>
-            # OPTIONAL
-            ADD_PROJECT_TO_HOST: False
-            MAX_PROCESSORS: <N>
-            EC_QUEUE: <ec_queue> # only when type == ecaccess
-            ECACCESS_RETRIES: 100 # optional, only when type == ecaccess
-            VERSION: <version>
-            2FA: False
-            2FA_TIMEOUT: <timeout> # default 300
-            2FA_METHOD: <method>
-            SERIAL_PLATFORM: <platform_name>
-            SERIAL_QUEUE: <queue_name>
-            BUDGET: <budget>
-            TEST_SUITE: False
-            MAX_WAITING_JOBS: <N>
-            TOTAL_JOBS: <N>
-            CUSTOM_DIRECTIVES: "[ 'my_directive' ]"
+    .. code-block:: yaml
+
+        PLATFORMS:
+            new_platform:
+                # MANDATORY
+                TYPE: <platform_type>
+                HOST: <host_name>
+                PROJECT: <project>
+                USER: <user>
+                SCRATCH_DIR: <scratch_dir>
+                MAX_WALLCLOCK: <HH:MM>
+                QUEUE: <hpc_queue>
+                # OPTIONAL
+                ADD_PROJECT_TO_HOST: False
+                MAX_PROCESSORS: <N>
+                EC_QUEUE: <ec_queue> # only when type == ecaccess
+                ECACCESS_RETRIES: 100 # optional, only when type == ecaccess
+                VERSION: <version>
+                2FA: False
+                2FA_TIMEOUT: <timeout> # default 300
+                2FA_METHOD: <method>
+                SERIAL_PLATFORM: <platform_name>
+                SERIAL_QUEUE: <queue_name>
+                BUDGET: <budget>
+                TEST_SUITE: False
+                MAX_WAITING_JOBS: <N>
+                TOTAL_JOBS: <N>
+                CUSTOM_DIRECTIVES: "[ 'my_directive' ]"
 
 
 This will create a platform named ``new_platform``. The options specified are all required:
@@ -502,28 +514,32 @@ To request exclusivity or reservation for your jobs, you can configure two platf
 
 Example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    PLATFORMS:
-        marenostrum5:
-            TYPE: slurm
-            HOST: mn-bsc32
-            PROJECT: bsc32
-            ADD_PROJECT_TO_HOST: false
-            USER: bsc032XXX
-            SCRATCH_DIR: /gpfs/scratch
+    .. code-block:: yaml
+
+        PLATFORMS:
+            marenostrum5:
+                TYPE: slurm
+                HOST: mn-bsc32
+                PROJECT: bsc32
+                ADD_PROJECT_TO_HOST: false
+                USER: bsc032XXX
+                SCRATCH_DIR: /gpfs/scratch
 
 Of course, you can configure only one or both. For example, for reservation it would be:
 
 Example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    PLATFORMS:
-        marenostrum5:
-            TYPE: slurm
-            ...
-            RESERVATION: your-reservation-id
+    .. code-block:: yaml
+
+        PLATFORMS:
+            marenostrum5:
+                TYPE: slurm
+                ...
+                RESERVATION: your-reservation-id
 
 
 Setting a custom interpreter
@@ -593,15 +609,17 @@ provided.
 
 Example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    JOBS:
-        POST:
-            FILE:  POST.sh
-            DEPENDENCIES:  SIM
-            RUNNING:  chunk
-            WALLCLOCK:  00:05
-            EXECUTABLE:  /my_python_env/python3
+    .. code-block:: yaml
+
+        JOBS:
+            POST:
+                FILE:  POST.sh
+                DEPENDENCIES:  SIM
+                RUNNING:  chunk
+                WALLCLOCK:  00:05
+                EXECUTABLE:  /my_python_env/python3
 
 This job will use the python interpreter located in the relative path ``/my_python_env/python3/``
 
@@ -609,15 +627,17 @@ It is also possible to use variables in the ``EXECUTABLE`` path.
 
 Example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    JOBS:
-        POST:
-            FILE: POST.sh
-            DEPENDENCIES: SIM
-            RUNNING: chunk
-            WALLCLOCK: 00:05
-            EXECUTABLE: "%PROJDIR%/my_python_env/python3"
+    .. code-block:: yaml
+
+        JOBS:
+            POST:
+                FILE: POST.sh
+                DEPENDENCIES: SIM
+                RUNNING: chunk
+                WALLCLOCK: 00:05
+                EXECUTABLE: "%PROJDIR%/my_python_env/python3"
 
 The result is a ``shebang`` line ``#!/esarchive/autosubmit/my_python_env/python3``.
 
@@ -628,37 +648,39 @@ Your experiment is defined and correctly configured, but you want to create it o
 and also to avoid creating the whole experiment to run only the members you want. Then, you can do it by configuring the
 setting ``RUN_ONLY_MEMBERS`` in the ``expdef_<EXPID>.yml`` file:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    DEFAULT:
-        # Experiment identifier
-        # No need to change
-        EXPID: cxxx
-        # HPC name.
-        # No need to change
-        HPCARCH: ithaca
+    .. code-block:: yaml
 
-    experiment:
-        # Supply the list of start dates. Available formats: YYYYMMDD YYYYMMDDhh YYYYMMDDhhmm
-        # Also you can use an abbreviated syntax for multiple dates with common parts:
-        # 200001[01 15] <=> 20000101 20000115
-        # DATELIST: 19600101 19650101 19700101
-        # DATELIST: 1960[0101 0201 0301]
-        DATELIST: 19900101
-        # Supply the list of members. LIST: fc0 fc1 fc2 fc3 fc4
-        MEMBERS: fc0
-        # Chunk size unit. STRING: hour, day, month, year
-        CHUNKSIZEUNIT: month
-        # Chunk size. NUMERIC: 4, 6, 12
-        CHUNKSIZE: 1
-        # Total number of chunks in experiment. NUMERIC: 30, 15, 10
-        NUMCHUNKS: 2
-        # Calendar used. LIST: standard, noleap
-        CALENDAR: standard
-        # List of members that can be included in this run. Optional.
-        # RUN_ONLY_MEMBERS: fc0 fc1 fc2 fc3 fc4
-        # RUN_ONLY_MEMBERS: fc[0-4]
-        RUN_ONLY_MEMBERS:
+        DEFAULT:
+            # Experiment identifier
+            # No need to change
+            EXPID: cxxx
+            # HPC name.
+            # No need to change
+            HPCARCH: ithaca
+
+        experiment:
+            # Supply the list of start dates. Available formats: YYYYMMDD YYYYMMDDhh YYYYMMDDhhmm
+            # Also you can use an abbreviated syntax for multiple dates with common parts:
+            # 200001[01 15] <=> 20000101 20000115
+            # DATELIST: 19600101 19650101 19700101
+            # DATELIST: 1960[0101 0201 0301]
+            DATELIST: 19900101
+            # Supply the list of members. LIST: fc0 fc1 fc2 fc3 fc4
+            MEMBERS: fc0
+            # Chunk size unit. STRING: hour, day, month, year
+            CHUNKSIZEUNIT: month
+            # Chunk size. NUMERIC: 4, 6, 12
+            CHUNKSIZE: 1
+            # Total number of chunks in experiment. NUMERIC: 30, 15, 10
+            NUMCHUNKS: 2
+            # Calendar used. LIST: standard, noleap
+            CALENDAR: standard
+            # List of members that can be included in this run. Optional.
+            # RUN_ONLY_MEMBERS: fc0 fc1 fc2 fc3 fc4
+            # RUN_ONLY_MEMBERS: fc[0-4]
+            RUN_ONLY_MEMBERS:
 
 
 You can set the ``RUN_ONLY_MEMBERS`` value as shown in the format examples above it. Then, ``Job List`` generation is

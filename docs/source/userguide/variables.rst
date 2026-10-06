@@ -31,11 +31,13 @@ detailed in the next sections on this page.
     Custom configuration files (e.g. ``my-file.yml``) may contain
     configuration like this example:
 
-    .. code-block:: yaml
+    .. tab-set-code::
 
-        MYAPP:
-          MYPARAMETER: 42
-          ANOTHER_PARAMETER: 1984
+      .. code-block:: yaml
+
+          MYAPP:
+            MYPARAMETER: 42
+            ANOTHER_PARAMETER: 1984
 
     If you configure Autosubmit to include this file with the
     rest of your configuration, then those variables will be
@@ -126,46 +128,48 @@ Example configuration
 
 Consider the following experiment configuration:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    DEFAULT:
-      EXPID: a000
-      HPCARCH: PS
+  .. code-block:: yaml
 
-    PLATFORMS:
-      MARENOSTRUM5:
-        TYPE: slurm
-        HOST: glogin1.bsc.es, glogin2.bsc.es
-        USER: root
-        PROJECT: bsc32
-        SCRATCH_DIR: /gpfs/scratch
-      SLURM:
-        TYPE: slurm
-        HOST: slurm-test
-        USER: root
-        PROJECT: group
-        SCRATCH_DIR: /tmp/scratch
-      PS:
-        TYPE: pbs
-        HOST: ps-test
-        USER: root
-        PROJECT: bsc-es
-        SCRATCH_DIR: /tmp/scratch
+      DEFAULT:
+        EXPID: a000
+        HPCARCH: PS
+
+      PLATFORMS:
+        MARENOSTRUM5:
+          TYPE: slurm
+          HOST: glogin1.bsc.es, glogin2.bsc.es
+          USER: root
+          PROJECT: bsc32
+          SCRATCH_DIR: /gpfs/scratch
+        SLURM:
+          TYPE: slurm
+          HOST: slurm-test
+          USER: root
+          PROJECT: group
+          SCRATCH_DIR: /tmp/scratch
+        PS:
+          TYPE: pbs
+          HOST: ps-test
+          USER: root
+          PROJECT: bsc-es
+          SCRATCH_DIR: /tmp/scratch
 
 
-    JOBS:
-      SIM:
-        FILE: sim.sh
-        RUNNING: once
-        PLATFORM: MARENOSTRUM5
-      POST:
-        FILE: post.sh
-        RUNNING: once
-        PLATFORM: SLURM
-      LOCAL_JOB:
-        FILE: local_test.sh
-        RUNNING: once
-         # No PLATFORM key, uses DEFAULT.HPCARCH (PS)
+      JOBS:
+        SIM:
+          FILE: sim.sh
+          RUNNING: once
+          PLATFORM: MARENOSTRUM5
+        POST:
+          FILE: post.sh
+          RUNNING: once
+          PLATFORM: SLURM
+        LOCAL_JOB:
+          FILE: local_test.sh
+          RUNNING: once
+          # No PLATFORM key, uses DEFAULT.HPCARCH (PS)
 
 In this example:
 

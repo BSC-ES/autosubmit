@@ -11,20 +11,22 @@ Compressing logs from a remote job execution
 You can enable log compression for remote job executions by setting the following options in your platform
 configuration:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    PLATFORMS:
-      MN5:
-        TYPE: <platform_type>
-        HOST: <host_name>
-        PROJECT: <project>
-        USER: <user>
-        SCRATCH: <scratch_dir>
-        MAX_WALLCLOCK: <HH:MM>
-        QUEUE: <hpc_queue>
-        COMPRESS_REMOTE_LOGS: true
-        COMPRESSION_TYPE: gzip
-        COMPRESSION_LEVEL: 5
+  .. code-block:: yaml
+
+      PLATFORMS:
+        MN5:
+          TYPE: <platform_type>
+          HOST: <host_name>
+          PROJECT: <project>
+          USER: <user>
+          SCRATCH: <scratch_dir>
+          MAX_WALLCLOCK: <HH:MM>
+          QUEUE: <hpc_queue>
+          COMPRESS_REMOTE_LOGS: true
+          COMPRESSION_TYPE: gzip
+          COMPRESSION_LEVEL: 5
 
 In this example, log compression is enabled for the MN5 platform using gzip compression with a compression level of 5.
 
@@ -56,15 +58,17 @@ Removing log files after transfer
 You can configure Autosubmit to remove log files from the remote platform after they have been successfully transferred
 to the local machine.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    PLATFORMS:
-      MN5:
-        TYPE: <platform_type>
-        HOST: <host_name>
-        PROJECT: <project>
-        USER: <user>
-        SCRATCH: <scratch_dir>
-        MAX_WALLCLOCK: <HH:MM>
-        QUEUE: <hpc_queue>
-        REMOVE_LOG_FILES_ON_TRANSFER: true
+  .. code-block:: yaml
+
+      PLATFORMS:
+        MN5:
+          TYPE: <platform_type>
+          HOST: <host_name>
+          PROJECT: <project>
+          USER: <user>
+          SCRATCH: <scratch_dir>
+          MAX_WALLCLOCK: <HH:MM>
+          QUEUE: <hpc_queue>
+          REMOVE_LOG_FILES_ON_TRANSFER: true

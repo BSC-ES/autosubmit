@@ -20,20 +20,22 @@ For each job section, you need to add a ``METRICS`` section. This section should
 
 Example:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    JOBS:
-      SIM:
-        METRICS:
-          - NAME: metric1
-            FILENAME: my_metric.out
-            SELECTOR:
-              TYPE: TEXT
-          - NAME: metric2
-            FILENAME: output.json
-            SELECTOR:
-              TYPE: JSON
-              KEY: job
+  .. code-block:: yaml
+
+      JOBS:
+        SIM:
+          METRICS:
+            - NAME: metric1
+              FILENAME: my_metric.out
+              SELECTOR:
+                TYPE: TEXT
+            - NAME: metric2
+              FILENAME: output.json
+              SELECTOR:
+                TYPE: JSON
+                KEY: job
 
 
 
@@ -68,11 +70,13 @@ change this location by setting the ``CONFIG.METRIC_FOLDER`` variable in your ex
 the job name
 will be appended to it. This is useful if you want to store the metrics in a different location.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    CONFIG:
-      METRIC_FOLDER: /path/to/metrics/folder
-      # This will update CURRENT_METRIC_FOLDER=%CONFIG.METRIC_FOLDER%/%JOBNAME%
+  .. code-block:: yaml
+
+      CONFIG:
+        METRIC_FOLDER: /path/to/metrics/folder
+        # This will update CURRENT_METRIC_FOLDER=%CONFIG.METRIC_FOLDER%/%JOBNAME%
 
 .. important:: The ``%CURRENT_METRIC_FOLDER%`` will append the job name to the path. So, if you set the ``CONFIG.METRIC_FOLDER`` to
     ``/path/to/metrics/folder``, the metric files should be stored in ``/path/to/metrics/folder/%JOBNAME%``.

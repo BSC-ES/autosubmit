@@ -216,6 +216,11 @@ html[data-theme] .bd-header {
     font-weight: 700;
 }
 
+.bd-article a.toc-backref {
+    color: inherit;
+    text-decoration: none;
+}
+
 /* .bd-article div.literal-block-wrapper pre {
     padding-inline: var(--as-code-pad-x);
 }

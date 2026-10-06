@@ -52,6 +52,7 @@ covered at the end.
    :caption: Configuration and provenance
 
    /userguide/set_and_share_the_configuration/index
+   /userguide/configure/develop_a_project
    /userguide/user_mapping
    /userguide/provenance
    /userguide/traceability
