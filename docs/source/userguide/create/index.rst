@@ -64,7 +64,6 @@ Where:
 * ``EXPID`` - The experiment identifier to copy from
 * ``HPCname`` - The name of the main HPC platform for the new experiment
 * ``Description`` - A brief description of the new experiment
-* ``PATH`` - (Optional) Path to custom configuration directory
 
 .. tip::
    You can configure default platforms in your ``autosubmitrc`` file:
