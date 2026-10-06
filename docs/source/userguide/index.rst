@@ -12,28 +12,49 @@ managing it. Advanced topics such as provenance, metrics and debugging are
 covered at the end.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :caption: Setting up an experiment
 
    /userguide/create/index
    /userguide/configure/index
+   /userguide/expids
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Defining the workflow
+
    /userguide/defining_workflows/index
+   /userguide/templates
+   /userguide/variables
    /userguide/wrappers/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Running and managing
+
    /userguide/run/index
    /userguide/retries/retries.rst
    /userguide/modifying_workflow/index
    /userguide/manage/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Monitoring and output
+
    /userguide/monitor_and_check/index
-   /userguide/set_and_share_the_configuration/index
-   /userguide/variables
-   /userguide/expids
-   /userguide/provenance
-   /userguide/traceability
-   /userguide/user_mapping
-   /userguide/templates
+   /userguide/debug/index
+   /userguide/log_operations
    /userguide/user_metrics/index
    /userguide/performance/index
-   /userguide/log_operations
-   /userguide/debug/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Configuration and provenance
+
+   /userguide/set_and_share_the_configuration/index
+   /userguide/user_mapping
+   /userguide/provenance
+   /userguide/traceability
 
 Tutorials (How to)
 ------------------
