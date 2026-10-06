@@ -1,6 +1,11 @@
 :root {
-    --as-border-light: #d1d5da;
-    --as-border-dark: #48566b;
+    --as-border: #d1d5da;
+    --as-rule: #EE5B25;
+    --as-accent: #4E8490;
+    --as-accent-soft: rgba(78, 132, 144, .11);
+    --as-shadow: rgba(15, 33, 38, .10);
+    --as-hover: rgba(127, 127, 127, .08);
+    --as-active: rgba(127, 127, 127, .12);
 
     --as-header-height: 2.5rem;
     --as-logo-height: 2rem;
@@ -10,37 +15,43 @@
     --as-sidebar-width: 15rem;
     --as-sidebar-font: 0.88rem;
     --as-sidebar-title-font: 1rem;
-    --as-sidebar-link-pad: 0.18rem;
-    --as-sidebar-item-pad: 0.08rem;
+    --as-sidebar-link-pad: 0.3rem;
+    --as-sidebar-item-gap: 0.08rem;
     --as-sidebar-pad-x: 0.34rem;
+
+    --pst-header-height: var(--as-header-height);
 }
 
-#autosubmit-workflow-manager > h1 {
-    display: none;
+html[data-theme="dark"] {
+    --as-border: #48566b;
+    --as-rule: #7FB3BE;
+    --as-accent: #7FB3BE;
+    --as-accent-soft: rgba(127, 179, 190, .15);
+    --as-shadow: rgba(0, 0, 0, .45);
 }
 
 .bd-main .bd-content .bd-article-container,
 .bd-main .bd-content .bd-article {
     max-width: 100%;
-    margin-left: 0;
-    margin-right: auto;
+    margin-inline: 0 auto;
     min-width: 0;
 }
 
-:root {
-    --pst-header-height: var(--as-header-height);
+.bd-main .bd-content {
+    padding-inline: 1rem;
 }
 
-html[data-theme="light"] .bd-header {
-    border-bottom: 2px solid var(--as-border-light);
+.bd-container > .bd-container__inner.bd-page-width {
+    padding-top: 0;
+    padding-inline: 0;
+    margin-top: 0;
 }
 
-html[data-theme="dark"] .bd-header {
-    border-bottom: 2px solid var(--as-border-dark);
+html[data-theme] .bd-header {
+    border-bottom: 2px solid var(--as-border);
 }
 
-.bd-header .navbar-header-items,
-.bd-header .bd-header__inner {
+.bd-header :is(.navbar-header-items, .bd-header__inner) {
     padding: 0.25rem 0;
     min-height: 0;
 }
@@ -49,8 +60,7 @@ html[data-theme="dark"] .bd-header {
     padding: 0;
 }
 
-.bd-header .navbar-brand img,
-.bd-header .navbar-brand .logo__image {
+.bd-header .navbar-brand :is(img, .logo__image) {
     height: var(--as-logo-height);
 }
 
@@ -62,9 +72,8 @@ html[data-theme="dark"] .bd-header {
     font-size: var(--as-header-font);
 }
 
-.bd-container > .bd-container__inner.bd-page-width {
-    padding-top: 0;
-    margin-top: 0;
+#pst-collapse-sidebar-button {
+    display: none;
 }
 
 #pst-primary-sidebar {
@@ -92,40 +101,41 @@ html[data-theme="dark"] .bd-header {
     padding: 0;
 }
 
-#pst-primary-sidebar a.reference.internal:hover {
-    background: rgba(127,127,127,.08);
+#pst-primary-sidebar :is(ul, li) {
+    margin: 0;
+    list-style: none;
 }
 
-#pst-primary-sidebar li.current > a.reference.internal,
-#pst-primary-sidebar li.active > a.reference.internal,
-#pst-primary-sidebar .toctree-l1.current > a.reference.internal,
-#pst-primary-sidebar a.reference.internal.current,
-#pst-primary-sidebar a.reference.internal.active {
+#pst-primary-sidebar ul.bd-sidenav > li {
+    margin-bottom: var(--as-sidebar-item-gap);
+}
+
+#pst-primary-sidebar a.reference.internal {
+    padding: var(--as-sidebar-link-pad) 0;
+    line-height: 1.3;
+    border-radius: 4px;
+    transition: background-color .15s ease;
+}
+
+#pst-primary-sidebar a.reference.internal:hover {
+    background: var(--as-hover);
+}
+
+#pst-primary-sidebar :is(li.current, li.active) > a.reference.internal,
+#pst-primary-sidebar a.reference.internal:is(.current, .active) {
     border: 0 !important;
-    border-left: 0 !important;
-    border-inline-start: 0 !important;
     box-shadow: none !important;
-    background-image: none !important;
-    background-color: rgba(127,127,127,.12) !important;
+    background: var(--as-active) !important;
     padding-left: 0 !important;
 }
 
-#pst-primary-sidebar li.current > a::before,
-#pst-primary-sidebar li.current > a::after,
-#pst-primary-sidebar li.active > a::before,
-#pst-primary-sidebar li.active > a::after {
+#pst-primary-sidebar :is(li.current, li.active) > a::before,
+#pst-primary-sidebar :is(li.current, li.active) > a::after {
     content: none !important;
-    display: none !important;
-    background: none !important;
-    box-shadow: none !important;
-    width: 0 !important;
-    height: 0 !important;
 }
 
-#pst-primary-sidebar ul,
-#pst-primary-sidebar li {
-    margin: 0;
-    list-style: none;
+#pst-primary-sidebar .current > a {
+    font-weight: 600;
 }
 
 #pst-primary-sidebar li.has-children > details > summary {
@@ -147,296 +157,245 @@ html[data-theme="dark"] .bd-header {
     height: 1.5rem;
 }
 
-#pst-primary-sidebar a.reference.internal {
-    padding: 0.30rem 0;
-    line-height: 1.3;
-    border-radius: 4px;
-    transition: background-color .15s ease;
+.bd-article section > :is(h1, h2) {
+    display: table;
+    position: relative;
 }
 
-#pst-primary-sidebar ul.bd-sidenav > li {
-    margin-bottom: .08rem;
+.bd-article section > :is(h1, h2) > a.headerlink {
+    position: absolute;
 }
 
-#pst-primary-sidebar .current > a {
-    font-weight: 600;
+.bd-article section > :is(h1, h2)::after {
+    content: "";
+    display: block;
+    height: var(--as-rule-weight, 3px);
+    margin-top: var(--as-rule-gap, .7rem);
+    border-radius: 3px;
+    background: var(--as-rule);
 }
 
-#pst-collapse-sidebar-button {
-    display: none;
+.bd-article section > h1 {
+    --as-rule-weight: 4px;
 }
 
-.bd-main .bd-content {
-    padding-left: 1rem;
-    padding-right: 1rem;
+.as-lead {
+    max-width: 62rem;
+    margin: 3.75rem 0 0;
 }
 
-.bd-container__inner.bd-page-width {
-    padding-left: 0;
-    padding-right: 0;
+.as-lead::before {
+    content: "";
+    display: block;
+    width: 100%;
+    height: 3px;
+    margin-bottom: 1.75rem;
+    border-radius: 3px;
+    background: var(--as-rule);
+}
+
+.as-lead > p {
+    font-size: 1.15rem;
+    line-height: 1.8;
+    margin-bottom: 1.2rem;
+}
+
+.as-lead > p:last-child {
+    margin-bottom: 0;
+}
+
+.as-media {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .4rem 1rem;
+    margin: 0 0 3rem;
+}
+
+.as-media > p {
+    margin: 0;
+    font-size: .92rem;
+    line-height: 1.7;
+}
+
+.as-media a.reference.internal {
+    font-size: .92rem;
+    font-weight: 650;
+    color: var(--as-accent);
+    text-decoration: none;
+}
+
+.as-media a.reference.internal:hover {
+    text-decoration: underline;
 }
 
 html[data-theme="dark"] .hero-logo {
     filter: invert(100%) hue-rotate(-180deg);
 }
 
-:root {
---as-rule: #EE5B25;
---as-accent: #4E8490;
---as-accent-soft: rgba(78, 132, 144, .11);
-}
-
-html[data-theme="dark"] {
---as-rule: #7FB3BE;
---as-accent: #7FB3BE;
---as-accent-soft: rgba(127, 179, 190, .15);
-}
-
-.bd-article section > h1,
-.bd-article section > h2 {
-    display: table;
-    position: relative;
-}
-
-.bd-article section > h1 > a.headerlink,
-.bd-article section > h2 > a.headerlink {
-    position: absolute;
-}
-.bd-article section > h1::after,
-.bd-article section > h2::after {
-content: "";
-display: block;
-margin-top: .7rem;
-border-radius: 3px;
-background: var(--as-rule);
-}
-
-.bd-article section > h1::after {
-height: 4px;
-}
-
-.bd-article section > h2::after {
-height: 3px;
+#community-logos .community-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
 }
 
 #autosubmit-workflow-manager {
---sd-color-card-border: var(--as-border-light);
---sd-color-card-background: transparent;
---sd-color-shadow: rgba(15, 33, 38, .10);
-max-width: 1140px;
-margin-inline: auto;
-padding-inline: 1.25rem;
+    --sd-color-card-border: var(--as-border);
+    --sd-color-card-background: transparent;
+    --sd-color-shadow: var(--as-shadow);
+    max-width: 1140px;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
 }
 
-html[data-theme="dark"] #autosubmit-workflow-manager {
---sd-color-card-border: var(--as-border-dark);
---sd-color-shadow: rgba(0, 0, 0, .45);
+#autosubmit-workflow-manager > h1 {
+    display: none;
 }
 
 #autosubmit-workflow-manager > section > h2 {
-font-size: 1.85rem;
-font-weight: 700;
-letter-spacing: -.022em;
-line-height: 1.2;
-margin: 6rem 0 1.15rem;
+    font-size: 1.85rem;
+    font-weight: 700;
+    letter-spacing: -.022em;
+    line-height: 1.2;
+    margin: 6rem 0 1.15rem;
 }
 
 #autosubmit-workflow-manager > section > h2 + p {
-max-width: 68rem;
-margin-bottom: 2.75rem;
-line-height: 1.75;
+    max-width: 68rem;
+    margin-bottom: 2.75rem;
+    line-height: 1.75;
 }
 
-#autosubmit-workflow-manager > section#media-and-press-kit > h2 {
-font-size: 1.02rem;
-font-weight: 600;
-letter-spacing: 0;
-margin-top: 5rem;
-}
-
-#autosubmit-workflow-manager > section#media-and-press-kit > h2::after {
-height: 2px;
-margin-top: .4rem;
-}
-
-.as-lead {
-max-width: 62rem;
-margin: 3.75rem 0 0;
-}
-
-.as-lead::before {
-content: "";
-display: block;
-width: 100%;
-height: 3px;
-margin-bottom: 1.75rem;
-border-radius: 3px;
-background: var(--as-rule);
-}
-
-.as-lead > p {
-font-size: 1.15rem;
-line-height: 1.8;
-margin-bottom: 1.2rem;
-}
-
-.as-lead > p:last-child {
-margin-bottom: 0;
+#autosubmit-workflow-manager > #media-and-press-kit > h2 {
+    --as-rule-weight: 2px;
+    --as-rule-gap: .4rem;
+    font-size: 1.02rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    margin-top: 5rem;
 }
 
 #autosubmit-workflow-manager .sd-card {
-border-radius: 14px;
-transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+    border-radius: 14px;
+    transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
 }
 
 #autosubmit-workflow-manager .sd-card:hover {
-border-color: var(--as-accent);
-transform: translateY(-3px);
-box-shadow: 0 10px 28px var(--sd-color-shadow);
+    border-color: var(--as-accent);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px var(--sd-color-shadow);
 }
 
 #autosubmit-workflow-manager .sd-card-body {
-padding: 1.9rem 1.75rem;
-font-size: .95rem;
-line-height: 1.75;
+    padding: 1.9rem 1.75rem;
+    font-size: .95rem;
+    line-height: 1.75;
 }
 
 #autosubmit-workflow-manager .sd-card-title {
-display: flex;
-align-items: center;
-gap: .8rem;
-font-size: 1.06rem;
-font-weight: 650;
-letter-spacing: -.01em;
-margin-bottom: 1.05rem;
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    font-size: 1.06rem;
+    font-weight: 650;
+    letter-spacing: -.01em;
+    margin-bottom: 1.05rem;
 }
 
 #autosubmit-workflow-manager .sd-card-title svg {
-flex: none;
-box-sizing: content-box;
-width: 1.05rem;
-height: 1.05rem;
-padding: .58rem;
-border-radius: 11px;
-background: var(--as-accent-soft);
-color: var(--as-accent);
-transition: background-color .2s ease, color .2s ease;
+    flex: none;
+    box-sizing: content-box;
+    width: 1.05rem;
+    height: 1.05rem;
+    padding: .58rem;
+    border-radius: 11px;
+    background: var(--as-accent-soft);
+    color: var(--as-accent);
+    transition: background-color .2s ease, color .2s ease;
 }
 
 #autosubmit-workflow-manager .sd-card:hover .sd-card-title svg {
-background: var(--as-accent);
-color: #fff;
+    background: var(--as-accent);
+    color: #fff;
 }
 
 #autosubmit-workflow-manager .sd-card-footer {
-border-top: 0;
-padding: 0 1.75rem 1.9rem;
-font-size: .9rem;
-font-weight: 650;
-color: var(--as-accent);
-word-break: break-word;
+    border-top: 0;
+    padding: 0 1.75rem 1.9rem;
+    font-size: .9rem;
+    font-weight: 650;
+    color: var(--as-accent);
+    word-break: break-word;
 }
 
 #autosubmit-workflow-manager .as-eco .sd-card {
-display: block;
-position: relative;
-padding: 1.5rem 1.5rem 1.5rem 12rem;
-min-height: 10rem;
+    display: block;
+    position: relative;
+    padding: 1.5rem 1.5rem 1.5rem 12rem;
+    min-height: 10rem;
 }
 
 #autosubmit-workflow-manager .as-eco .sd-card > *:not(.sd-card-body) {
-position: absolute;
-top: 0;
-left: 0;
-bottom: 0;
-width: 12rem;
-display: flex;
-align-items: center;
-justify-content: center;
-margin: 0;
-padding: 1.5rem;
-background: none !important;
-background-color: transparent !important;
-filter: none !important;
-border-radius: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 12rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 1.5rem;
+    background: none !important;
+    filter: none !important;
+    border-radius: 0;
 }
 
 #autosubmit-workflow-manager .as-eco img.sd-card-img-top {
-display: block;
-width: 100%;
-height: auto;
-max-height: 7rem;
-object-fit: contain;
-margin: 0;
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 7rem;
+    object-fit: contain;
+    margin: 0;
 }
 
 #autosubmit-workflow-manager .as-eco .sd-card-body,
 #autosubmit-workflow-manager .as-eco .sd-card > *:has(> .sd-card-body) {
-display: block;
-width: auto;
-min-width: 0;
-padding: 0;
-background: none;
-}
-
-#community-logos .community-logo img {
-max-width: 100%;
-max-height: 100%;
-object-fit: contain;
-}
-
-.as-media {
-display: flex;
-flex-wrap: wrap;
-align-items: baseline;
-gap: .4rem 1rem;
-margin: 0 0 3rem;
-}
-
-.as-media > p {
-margin: 0;
-font-size: .92rem;
-line-height: 1.7;
-}
-
-.as-media a.reference.internal {
-font-size: .92rem;
-font-weight: 650;
-color: var(--as-accent);
-text-decoration: none;
-}
-
-.as-media a.reference.internal:hover {
-text-decoration: underline;
+    display: block;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    background: none;
 }
 
 @media (max-width: 700px) {
-#autosubmit-workflow-manager .as-eco .sd-card {
-padding: 1.5rem;
-min-height: 0;
-}
+    #autosubmit-workflow-manager .as-eco .sd-card {
+        padding: 1.5rem;
+        min-height: 0;
+    }
 
-#autosubmit-workflow-manager .as-eco .sd-card > *:not(.sd-card-body) {
-position: static;
-width: auto;
-padding: 0 0 1.25rem;
-justify-content: flex-start;
-}
+    #autosubmit-workflow-manager .as-eco .sd-card > *:not(.sd-card-body) {
+        position: static;
+        width: auto;
+        padding: 0 0 1.25rem;
+        justify-content: flex-start;
+    }
 
-#autosubmit-workflow-manager .as-eco img.sd-card-img-top {
-width: auto;
-max-height: 4rem;
-}
+    #autosubmit-workflow-manager .as-eco img.sd-card-img-top {
+        width: auto;
+        max-height: 4rem;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-#autosubmit-workflow-manager .sd-card,
-#autosubmit-workflow-manager .sd-card-title svg {
-transition: none;
-}
+    #autosubmit-workflow-manager .sd-card,
+    #autosubmit-workflow-manager .sd-card-title svg {
+        transition: none;
+    }
 
-#autosubmit-workflow-manager .sd-card:hover {
-transform: none;
-}
+    #autosubmit-workflow-manager .sd-card:hover {
+        transform: none;
+    }
 }
 
