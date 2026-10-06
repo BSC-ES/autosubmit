@@ -33,10 +33,10 @@ from autosubmit.platforms.locplatform import LocalPlatform
 
 # noinspection PyProtectedMember
 from autosubmit.platforms.paramiko_platform import (
-    ParamikoPlatform,
-    ParamikoPlatformException,
     _DEFAULT_MAX_TRANSPORT_RETRIALS,
     _DEFAULT_SSH_KEEPALIVE,
+    ParamikoPlatform,
+    ParamikoPlatformException,
     _get_user_config_file,
     _init_poller,
 )
