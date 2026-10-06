@@ -153,7 +153,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
     timeout-minutes: 360
     outputs:
       version: ${{ steps.as_version.outputs.version }}
@@ -549,6 +549,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      pull-requests: write
       actions: read
     steps:
       - name: Download report artifacts
@@ -705,6 +706,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      pull-requests: write
       actions: read
     steps:
       - name: Checkout
