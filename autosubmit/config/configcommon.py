@@ -59,10 +59,6 @@ class AutosubmitConfig:
         self.ignore_undefined_platforms = False
         self.ignore_file_path = False
         self.expid = expid
-        # TODO: Remove once anyone has time to update the tests.
-        #       No other code should be using this property now, only (at lof ot) tests.
-        self.basic_config = BasicConfig
-        BasicConfig.read()
         if not Path(BasicConfig.LOCAL_ROOT_DIR, expid).exists():
             raise OSError(f"Experiment {expid} does not exist")
         self.parser_factory = YAMLParserFactory()
@@ -1889,7 +1885,7 @@ class AutosubmitConfig:
         :param parameters: Dictionary to populate with HPC values. If None, use self.experiment_data.
         """
         platforms = self.experiment_data.get("PLATFORMS", {})
-        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", PlatformType.LOCAL)
+        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", PlatformType.LOCAL.upper())
         hpcarch_data: dict = platforms.get(hpcarch, {})
 
         target = parameters if parameters is not None else self.experiment_data

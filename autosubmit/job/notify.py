@@ -17,7 +17,6 @@
 
 """Job notification."""
 
-from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
@@ -30,7 +29,7 @@ def job_notify(as_conf, expid: str, job: Job):
         and Status.VALUE_TO_KEY[job.status] in job.notify_on
     ):
         Notifier.notify_status_change(
-            MailNotifier(BasicConfig),
+            MailNotifier(),
             expid,
             job.name,
             Status.VALUE_TO_KEY[job.prev_status],

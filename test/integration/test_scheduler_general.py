@@ -21,7 +21,7 @@ from textwrap import dedent
 
 import pytest
 
-from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.workflow.manage import inspect
 
 
@@ -197,11 +197,10 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit_exp: Callable) -> N
 
     exp = autosubmit_exp(include_jobs=True)
     expid = exp.expid
-    as_conf: AutosubmitConfig = exp.as_conf
 
-    _write_test_files(expid, Path(as_conf.basic_config.LOCAL_ROOT_DIR))
+    _write_test_files(expid, Path(BasicConfig.LOCAL_ROOT_DIR))
 
-    exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, expid)
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR, expid)
 
     inspect(
         expid,
@@ -231,7 +230,7 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit_exp: Callable) -> N
         expected_data = (Path(_get_script_files_path()) / Path(
             f"base_{job_type.lower()}_{scheduler.lower()}.cmd")).read_text()
     if not expected_data:
-        assert False, f"Could not find the expected data for {scheduler} and {job_type}"
+        pytest.fail(f"Could not find the expected data for {scheduler} and {job_type}")
 
     # Replace the expid
     expected_data = expected_data.replace('t000', expid)
@@ -246,7 +245,7 @@ def test_scheduler_job_types(scheduler, job_type, autosubmit_exp: Callable) -> N
             actual = asthread.read_text()
             break
         else:
-            assert False, f"Could not find the actual data for {scheduler} and {job_type}"
+            pytest.fail(f"Could not find the actual data for {scheduler} and {job_type}")
     # Remove all after # Autosubmit header
     # ###################
     # count number of lines in expected

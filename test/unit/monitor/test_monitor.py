@@ -29,6 +29,7 @@ import pytest
 # noinspection PyProtectedMember
 from _pytest._py.path import LocalPath
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
@@ -780,7 +781,7 @@ def test_generate_output_txt(jobs: list[Job], classictxt: bool, status_dir_exist
     mocker.patch('autosubmit.monitor.monitor.time.strftime', return_value=time_str)
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
-    status_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, 'status')
+    status_path = Path(BasicConfig.LOCAL_ROOT_DIR, _EXPID, 'status')
     if status_dir_exists:
         status_path.mkdir(parents=True, exist_ok=True)
     else:
@@ -808,16 +809,16 @@ def test_generate_output_txt(jobs: list[Job], classictxt: bool, status_dir_exist
     [Status.FAILED, Status.COMPLETED, Status.RUNNING],
     ids=["failed job", "completed job", "running job"],
 )
-def test_log_paths_in_outptut_txt(status, tmp_path, autosubmit_config, mocker):
+def test_log_paths_in_output_txt(status, tmp_path, autosubmit_config, mocker):
     """Test that the log paths are correctly written in the output txt file."""
     out_filename = f"{_EXPID}_ONLY_JOB.20250429120010.out"
     err_filename = f"{_EXPID}_ONLY_JOB.20250429120010.err"
     time_str = "20250429_120010"
     mocker.patch("autosubmit.monitor.monitor.time.strftime", return_value=time_str)
 
-    as_conf = autosubmit_config(_EXPID, experiment_data={})
-    exp_root = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID)
-    expected_log_root = exp_root / as_conf.basic_config.LOCAL_TMP_DIR / f"LOG_{_EXPID}"
+    autosubmit_config(_EXPID, experiment_data={})
+    exp_root = Path(BasicConfig.LOCAL_ROOT_DIR, _EXPID)
+    expected_log_root = exp_root / BasicConfig.LOCAL_TMP_DIR / f"LOG_{_EXPID}"
 
     # Create the log directory and log files
     expected_log_root.mkdir(parents=True, exist_ok=True)
@@ -861,8 +862,8 @@ def test_generate_output_txt_job_with_children(tmp_path, autosubmit_config, mock
     time_str = 20250429_1200
     mocker.patch('autosubmit.monitor.monitor.time.strftime', return_value=time_str)
 
-    as_conf = autosubmit_config(_EXPID, experiment_data={})
-    status_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, 'status')
+    autosubmit_config(_EXPID, experiment_data={})
+    status_path = Path(BasicConfig.LOCAL_ROOT_DIR, _EXPID, 'status')
     status_file = status_path / f'{_EXPID}_{time_str}.txt'
 
     parent_job = Job('parent', 1, Status.RUNNING)
@@ -919,7 +920,7 @@ def test_generate_output_stats(job_statuses: list[int], hide: bool, expected: bo
             }
         })
 
-    as_conf = autosubmit_config(_EXPID, experiment_data={'JOBS': conf_jobs})
+    autosubmit_config(_EXPID, experiment_data={'JOBS': conf_jobs})
 
     # We have to call this after ``autosubmit_config`` so ``BasicConfig`` values are mocked!
     jobs = []  # to be used in this test later
@@ -930,8 +931,7 @@ def test_generate_output_stats(job_statuses: list[int], hide: bool, expected: bo
         job.processors = '1'
         jobs.append(job)
 
-    basic_config = as_conf.basic_config
-    total_stats_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, basic_config.LOCAL_TMP_DIR)
+    total_stats_path = Path(BasicConfig.LOCAL_ROOT_DIR, _EXPID, BasicConfig.LOCAL_TMP_DIR)
 
     date_time1 = '20240101000000'
     date_time2 = '20240101010000'

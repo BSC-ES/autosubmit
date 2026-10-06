@@ -76,7 +76,7 @@ def prepare_yml(members, chunks, splits) -> dict:
         "CONFIG": {
             "MAXWAITINGJOBS": 1000,
             "TOTALJOBS": 1000,
-            "SAFETYSLEEPTIME": 0,
+            "SAFETYSLEEPTIME": 3,
         },
         "DEFAULT": {
             "HPCARCH": "TEST_SLURM",
@@ -343,6 +343,7 @@ def export_to_csv_by_iteration(test_type: str, run_id: str, profiler_text: str) 
     _write_csv(path, header, iteration_csv_lines)
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize(
     "members,chunks,splits",
     [
@@ -395,6 +396,7 @@ def test_autosubmit_create_profile_metrics(
     parse_metrics(as_exp, test_type=test_type, run_id=current_id, tmp_path=tmp_path)
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize(
     "members,chunks,splits,max_iterations,test_type",
     [
@@ -468,6 +470,7 @@ def test_autosubmit_run_profile_metrics(
     parse_metrics(as_exp, test_type=test_type, run_id=current_id, tmp_path=tmp_path)
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize(
     "members,chunks,splits",
     [

@@ -28,7 +28,6 @@ from unittest.mock import MagicMock, Mock  # type: ignore
 
 import pytest
 from bscearth.utils.date import date2str
-from mock.mock import patch  # type: ignore
 
 from autosubmit.config.configcommon import (
     AutosubmitConfig,
@@ -167,8 +166,7 @@ class TestJob:
 
         assert initial_fail_count + 1 == incremented_fail_count
 
-    @patch('autosubmit.config.basicconfig.BasicConfig')
-    def test_header_tailer(self, mocked_global_basic_config: Mock, experiment_config_fixture):
+    def test_header_tailer(self, experiment_config_fixture, monkeypatch):
         """Test if header and tailer are being properly substituted onto the final .cmd file without
         a bunch of mocks
 
@@ -335,16 +333,11 @@ CONFIG:
 
                             configuration.flush()
 
-                        mocked_basic_config = FakeBasicConfig
-                        mocked_basic_config.read = MagicMock()  # type: ignore
+                        monkeypatch.setattr(BasicConfig, 'LOCAL_ROOT_DIR', str(temp_dir))
+                        monkeypatch.setattr(BasicConfig, 'STRUCTURES_DIR', '/dummy/structures/dir')
+                        monkeypatch.setattr(BasicConfig, 'read', lambda: None)
 
-                        mocked_basic_config.LOCAL_ROOT_DIR = str(temp_dir)
-                        mocked_basic_config.STRUCTURES_DIR = '/dummy/structures/dir'
-
-                        mocked_global_basic_config.LOCAL_ROOT_DIR.return_value = str(temp_dir)
-
-                        config = AutosubmitConfig(expid, basic_config=mocked_basic_config,
-                                                  parser_factory=YAMLParserFactory())
+                        config = AutosubmitConfig(expid)
                         config.reload(True)
 
                         # act
@@ -1069,8 +1062,7 @@ def test_sub_job_instantiation(tmp_path, autosubmit_config):
 @pytest.fixture
 def load_wrapper(
         tmp_path: Path,
-        autosubmit_config,
-        mocker
+        autosubmit_config
 ):
     from autosubmit.job.job_packages import JobPackageVertical
     as_conf = autosubmit_config(
@@ -1315,8 +1307,8 @@ def test_write_submit_time_ignore_exp_history(total_stats_exists: bool, autosubm
     It ignores what happens to the experiment history object."""
     mocker.patch('autosubmit.job.job.ExperimentHistory')
 
-    as_conf = autosubmit_config(_EXPID, experiment_data={})
-    tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
+    autosubmit_config(_EXPID, experiment_data={})
+    tmp_path = Path(BasicConfig.LOCAL_ROOT_DIR, _EXPID, BasicConfig.LOCAL_TMP_DIR)
 
     job = Job(f'{_EXPID}_dummy', 1, Status.WAITING, 0)
     job.submit_time_timestamp = date2str(datetime.now(), 'S')
@@ -1362,8 +1354,8 @@ def test_write_end_time_ignore_exp_history(completed: bool, existing_lines: str,
     mocker.patch('autosubmit.job.job.ExperimentHistory')
     len(existing_lines.split('\n')) if existing_lines else 1
 
-    as_conf = autosubmit_config(_EXPID, experiment_data={})
-    tmp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR, _EXPID, as_conf.basic_config.LOCAL_TMP_DIR)
+    autosubmit_config(_EXPID, experiment_data={})
+    tmp_path = Path(BasicConfig.LOCAL_ROOT_DIR, _EXPID, BasicConfig.LOCAL_TMP_DIR)
 
     status = Status.COMPLETED if True else Status.WAITING
     job = Job(f'{_EXPID}_dummy', 1, status, 0)
@@ -2134,7 +2126,7 @@ def test_process_scheduler_parameters(local):
     job.custom_directives = "['#SBATCH --export=ALL',  #SBATCH --account=xxxxx']"
 
     with pytest.raises(AutosubmitCritical):
-        assert isinstance(job.process_scheduler_parameters(local, 0), AutosubmitCritical)
+        job.process_scheduler_parameters(local, 0)
 
 
 def test_write_time(tmp_path, local):
@@ -2262,7 +2254,7 @@ def test_check_remote_log_exists(tmp_path, show_logs: bool, exists, autosubmit_c
     ]
 )
 def test_update_and_write_time(count, with_stat_file, tmp_path):
-    """This test only tests that the functions run without errors. For a more detailled test look at the ones in the integration/run/*"""
+    """This test only tests that the functions run without errors. For a more detailed test look at the ones in the integration/run/*"""
     platform = SlurmPlatform(expid='a000', name='slurm', config={'LOCAL_ROOT_DIR': str(tmp_path), 'LOCAL_ASLOG_DIR': 'logs'})
 
     job = Job('some', 'job_id', status=Status.WAITING, priority=0, loaded_data=None)
@@ -2491,7 +2483,7 @@ def test_recover_log_attempt(mocker, remote_exists, compressed_exists, remote_ra
     assert job.updated_log == expected_updated_log
 
 
-def test_restore_previous_state(mocker):
+def test_restore_previous_state():
     job = Job("dummy", 1, Status.WAITING, 0)
     job.remote_logs = ("new_r", "new_r2")
     job.local_logs = ("new_l", "new_l2")

@@ -18,15 +18,15 @@
 """Fixtures for integration tests."""
 
 import configparser
+import fcntl
 import io
 import multiprocessing
 import os
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator
 from contextlib import suppress
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from time import time_ns
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -37,7 +37,7 @@ from testcontainers.community.postgres import PostgresContainer  # type: ignore
 from testcontainers.core.container import DockerContainer  # type: ignore
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.registry import clear_registry, load_config
 from autosubmit.experiment.manage import create as create_fn
 from autosubmit.experiment.manage import expid_fn
 from autosubmit.experiment.utils import next_experiment_id
@@ -71,16 +71,20 @@ if TYPE_CHECKING:
     from pytest import FixtureRequest
     from pytest_mock import MockerFixture
 
-_PG_USER = 'postgres'
-_PG_PASSWORD = 'postgres'
-_PG_DATABASE = 'autosubmit_test'
+    from autosubmit.config.configcommon import AutosubmitConfig
+
+
+_PG_USER = "postgres"
+_PG_PASSWORD = "postgres"
+_PG_DATABASE = "autosubmit_test"
 
 
 @dataclass
 class AutosubmitExperiment:
     """This holds information about an experiment created by Autosubmit."""
+
     expid: str
-    as_conf: AutosubmitConfig
+    as_conf: "AutosubmitConfig"
     exp_path: Path
     tmp_dir: Path
     aslogs_dir: Path
@@ -92,51 +96,73 @@ class AutosubmitExperimentFixture(Protocol):
     """Type for ``autosubmit_exp`` fixture."""
 
     def __call__(
-            self,
-            expid: str | None = None,
-            experiment_data: dict | None = None,
-            wrapper: bool | None = False,
-            create: bool | None = True,
-            include_jobs: bool | None = False,
-            *args: Any,
-            **kwargs: Any
-    ) -> AutosubmitExperiment:
-        ...
+        self,
+        expid: str | None = None,
+        experiment_data: dict | None = None,
+        wrapper: bool | None = False,
+        create: bool | None = True,
+        include_jobs: bool | None = False,
+        *args: Any,
+        **kwargs: Any,
+    ) -> AutosubmitExperiment: ...
 
 
-@pytest.fixture(scope='session')
-def get_next_expid(tmp_path_factory: "TempPathFactory") -> Callable[[], str]:
+@pytest.fixture(autouse=True)
+def clear_config_registry():
+    clear_registry()
+    yield
+    clear_registry()
+
+
+class GetNextExpid(Protocol):
+    def __call__(self, experiment_type: str = "t") -> str: ...
+
+
+@pytest.fixture(scope="session")
+def get_next_expid(tmp_path_factory: "TempPathFactory") -> GetNextExpid:
     """Returns a factory to retrieve the next Autosubmit experiment ID.
 
     The returned experiment ID by the factory function is guaranteed to
     be unique throughout the whole test session, even with multiple
     pytest-xdist processes.
     """
+    shared_tmp_dir = tmp_path_factory.getbasetemp().parent
 
-    shared_tmp_dir = tmp_path_factory.getbasetemp()
-    expid_file = shared_tmp_dir / "expid_current.txt"
-    if expid_file.exists():
-        expid_file.unlink()
+    expid_files = {
+        "t": shared_tmp_dir / "expid_current_test.txt",
+        "o": shared_tmp_dir / "expid_current_oper.txt",
+        "a": shared_tmp_dir / "expid_current.txt",
+    }
 
-    def _get_next_expid() -> str:
-        current_expid = 't000'
-        if expid_file.exists():
-            current_expid = expid_file.read_text()
+    def _get_next_expid(experiment_type="t"):
+        expid_file = expid_files[experiment_type]
+        lock_file = expid_file.with_suffix(".lock")
 
-        next_expid = next_experiment_id(current_id=current_expid)
-        expid_file.write_text(next_expid)
+        with lock_file.open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                current_expid = (
+                    expid_file.read_text()
+                    if expid_file.exists()
+                    else f"{experiment_type}000"
+                )
 
-        return next_expid
+                next_expid = next_experiment_id(current_id=current_expid)
+                expid_file.write_text(next_expid)
+
+                return next_expid
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
 
     return _get_next_expid
 
 
 @pytest.fixture
 def autosubmit_exp(
-        request: "FixtureRequest",
-        tmp_path: "LocalPath",
-        mocker: "MockerFixture",
-        get_next_expid: Callable[[], str]
+    request: "FixtureRequest",
+    tmp_path: "LocalPath",
+    mocker: "MockerFixture",
+    get_next_expid: Callable[[], str],
 ) -> AutosubmitExperimentFixture:
     """Create an instance of ``Autosubmit`` with an experiment.
 
@@ -157,18 +183,21 @@ def autosubmit_exp(
     """
 
     def _create_autosubmit_exp(
-            expid: str | None = None,
-            experiment_data: dict | None = None,
-            wrapper: bool | None = False,
-            create: bool | None = True,
-            include_jobs: bool | None = False,
-            *_,
-            **kwargs
+        expid: str | None = None,
+        experiment_data: dict | None = None,
+        wrapper: bool | None = False,
+        create: bool | None = True,
+        include_jobs: bool | None = False,
+        *_,
+        **kwargs,
     ) -> AutosubmitExperiment:
         if experiment_data is None:
             experiment_data = {}
 
-        is_postgres = hasattr(BasicConfig, 'DATABASE_BACKEND') and BasicConfig.DATABASE_BACKEND == 'postgres'
+        is_postgres = (
+            hasattr(BasicConfig, "DATABASE_BACKEND")
+            and BasicConfig.DATABASE_BACKEND == "postgres"
+        )
         configure(
             advanced=False,
             database_path=BasicConfig.DB_DIR if not is_postgres else "",  # type: ignore
@@ -181,7 +210,7 @@ def autosubmit_exp(
             machine=False,
             local=False,
             database_backend="postgres" if is_postgres else "sqlite",
-            database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else ""
+            database_conn_url=BasicConfig.DATABASE_CONN_URL if is_postgres else "",
         )
         if not Path(BasicConfig.DB_PATH).exists() and not is_postgres:
             install()
@@ -189,10 +218,12 @@ def autosubmit_exp(
         if not expid:
             expid = get_next_expid()
 
-        mocker.patch('autosubmit.experiment.manage.db_common.last_name_used', return_value=expid)
-        operational = expid.startswith('o')
-        evaluation = expid.startswith('e')
-        testcase = expid.startswith('t')
+        mocker.patch(
+            "autosubmit.experiment.manage.db_common.last_name_used", return_value=expid
+        )
+        operational = expid.startswith("o")
+        evaluation = expid.startswith("e")
+        testcase = expid.startswith("t")
 
         # Never reuse an experiment or reconfigure in tests for true test isolation.
         # - https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-best-
@@ -200,7 +231,9 @@ def autosubmit_exp(
         # - https://wiki.c2.com/?UnitTestIsolation
         # - https://www.thoughtworks.com/en-es/insights/blog/testing/ephemeral-testing-environments-kill-darlings
         if Path(tmp_path / expid).exists():
-            pytest.xfail(f'The test is trying to use {expid} as expid but its directory exists: {tmp_path!s}!')
+            pytest.xfail(
+                f"The test is trying to use {expid} as expid but its directory exists: {tmp_path!s}!"
+            )
 
         # setdefault will set the default if the user did not specify it.
         # This way, we can control via kwargs the arguments to expid. In the past, this fixture
@@ -228,73 +261,78 @@ def autosubmit_exp(
         Path(BasicConfig.STRUCTURES_DIR).mkdir(parents=True, exist_ok=True)
         exp_tmp_dir = exp_path / BasicConfig.LOCAL_TMP_DIR
         aslogs_dir = exp_tmp_dir / BasicConfig.LOCAL_ASLOG_DIR
-        status_dir = exp_path / 'status'
+        status_dir = exp_path / "status"
         job_data_dir = Path(BasicConfig.JOBDATA_DIR)
         job_data_dir.mkdir(parents=True, exist_ok=True)
 
-        config = AutosubmitConfig(
-            expid=expid,
-            basic_config=BasicConfig
-        )
-        config.reload(force_load=True)
+        config = load_config(expid)
+        # Here, the AutosubmitConfig has probably been already initialised by the
+        # ``expid`` command issued earlier. This should not happen in normal operations
+        # of Autosubmit, as the user will issue ``expid``, then ``create``, ``run ``...
+        # Hence, this reload forcing everything to be reloaded is an exception for tests!
+        config.reload(force_load=True, only_experiment_data=False)
 
         # Remove original files. So we can save a new file with all the memory modifications.
         for f in conf_dir.iterdir():
             if f.is_file():
                 f.unlink()
 
-        must_exists = ['DEFAULT', 'JOBS', 'PLATFORMS', 'CONFIG']
+        must_exists = ["DEFAULT", "JOBS", "PLATFORMS", "CONFIG"]
         # Default values for experiment data
         # TODO: This probably has a way to be initialized in config-parser?
         for must_exist in must_exists:
             if must_exist not in config.experiment_data:
                 config.experiment_data[must_exist] = {}
 
-        if not config.experiment_data.get('CONFIG', {}).get('AUTOSUBMIT_VERSION', ''):
+        if not config.experiment_data.get("CONFIG", {}).get("AUTOSUBMIT_VERSION", ""):
             try:
-                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = version('autosubmit')
+                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = version(
+                    "autosubmit"
+                )
             except PackageNotFoundError:
-                config.experiment_data['CONFIG']['AUTOSUBMIT_VERSION'] = ''
+                config.experiment_data["CONFIG"]["AUTOSUBMIT_VERSION"] = ""
 
-        config.experiment_data['CONFIG']['SAFETYSLEEPTIME'] = 0
-        config.experiment_data['DEFAULT']['EXPID'] = expid
+        config.experiment_data["CONFIG"]["SAFETYSLEEPTIME"] = 3
+        config.experiment_data["DEFAULT"]["EXPID"] = expid
 
         if not include_jobs:
-            config.experiment_data['JOBS'] = {}
+            config.experiment_data["JOBS"] = {}
 
         # ensure that it is always the first file loaded by Autosubmit
-        with open(conf_dir / 'aaaaaabasic_structure.yml', 'w') as fh:
+        with open(conf_dir / "aaaaaabasic_structure.yml", "w") as fh:
             YAML().dump(config.experiment_data, fh)
 
-        other_yaml = {
-            k: v for k, v in experiment_data.items()
-        }
+        other_yaml = {k: v for k, v in experiment_data.items()}
         if other_yaml:
-            with open(conf_dir / 'additional_data.yml', 'w') as fh:
+            with open(conf_dir / "additional_data.yml", "w") as fh:
                 YAML().dump(other_yaml, fh)
 
-        config.reload(force_load=True)
+        config.reload(force_load=True, only_experiment_data=False)
 
         platform_config = {
             "LOCAL_ROOT_DIR": BasicConfig.LOCAL_ROOT_DIR,
             "LOCAL_TMP_DIR": str(exp_tmp_dir),
-            "LOCAL_ASLOG_DIR": str(aslogs_dir)
+            "LOCAL_ASLOG_DIR": str(aslogs_dir),
         }
-        platform = SlurmPlatform(expid=expid, name='slurm_platform', config=platform_config)
+        platform = SlurmPlatform(
+            expid=expid, name="slurm_platform", config=platform_config
+        )
         platform.job_status = {
-            'COMPLETED': [],
-            'RUNNING': [],
-            'QUEUING': [],
-            'FAILED': []
+            "COMPLETED": [],
+            "RUNNING": [],
+            "QUEUING": [],
+            "FAILED": [],
         }
-        submit_platform_script = aslogs_dir.joinpath('submit_local.sh')
+        submit_platform_script = aslogs_dir.joinpath("submit_local.sh")
         submit_platform_script.touch(exist_ok=True)
 
         if create:
-            create_fn(expid, noplot=True, hide=False, force=True, check_wrappers=wrapper)
-            config.set_last_as_command('create')
+            create_fn(
+                expid, noplot=True, hide=False, force=True, check_wrappers=wrapper
+            )
+            config.set_last_as_command("create")
         else:
-            config.set_last_as_command('expid')
+            config.set_last_as_command("expid")
 
         return AutosubmitExperiment(
             expid=expid,
@@ -303,65 +341,51 @@ def autosubmit_exp(
             tmp_dir=exp_tmp_dir,
             aslogs_dir=aslogs_dir,
             status_dir=status_dir,
-            platform=platform
+            platform=platform,
         )
 
     return _create_autosubmit_exp
 
 
-@pytest.fixture
-def paramiko_platform() -> Iterator[ParamikoPlatform]:
-    local_root_dir = TemporaryDirectory()
-    config = {
-        "LOCAL_ROOT_DIR": local_root_dir.name,
-        "LOCAL_TMP_DIR": 'tmp'
-    }
-    platform = ParamikoPlatform(expid='a000', name='local', config=config)
-    platform.job_status = {
-        'COMPLETED': [],
-        'RUNNING': [],
-        'QUEUING': [],
-        'FAILED': []
-    }
-    yield platform
-    local_root_dir.cleanup()
-
-
 @pytest.fixture(scope="function")
-def git_server(request, tmp_path) -> Generator[tuple["DockerContainer", Path, str], Any, None]:
+def git_server(
+    request, tmp_path
+) -> Generator[tuple["DockerContainer", Path, str], Any, None]:
     # Start a container to serve it -- otherwise, we would have to use
     # `git -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
     # code design choices).
-    base_path = tmp_path / 'git_repos_base'
-    git_repos_path = base_path / 'git_repos'
+    base_path = tmp_path / "git_repos_base"
+    git_repos_path = base_path / "git_repos"
     git_repos_path.mkdir(exist_ok=True, parents=True)
 
     container, http_port = get_git_container(git_repos_path)
     # http_port = int(container.ports['80/tcp'][0]['HostPort'])  # type: ignore
 
-    repo_url = f'http://localhost:{http_port}/git'
+    repo_url = f"http://localhost:{http_port}/git"
 
     with container:
         prepare_and_test_git_container(container, http_port)
         yield container, git_repos_path, repo_url
-        copy_content_from_containers(request, 'git_server', '/opt/git-server')
+        copy_content_from_containers(request, "git_server", "/opt/git-server")
 
 
 @pytest.fixture(scope="function")
-def svn_server(request, tmp_path) -> Generator[tuple["DockerContainer", Path, str], Any, None]:
+def svn_server(
+    request, tmp_path
+) -> Generator[tuple["DockerContainer", Path, str], Any, None]:
     # Start a container to serve it -- otherwise, we would have to use
     # `svn -c protocol.file.allow=always submodule ...`, and we cannot
     # change how Autosubmit uses it in `autosubmit create` (due to bad
     # code design choices).
-    base_path = tmp_path / 'svn_repos_base'
-    svn_repos_path = base_path / 'svn_repos'
+    base_path = tmp_path / "svn_repos_base"
+    svn_repos_path = base_path / "svn_repos"
     svn_repos_path.mkdir(exist_ok=True, parents=True)
 
     container, http_port = get_svn_container(svn_repos_path)
     # http_port = int(container.ports['80/tcp'][0]['HostPort'])  # type: ignore
 
-    repo_url = f'http://localhost:{http_port}/svn'
+    repo_url = f"http://localhost:{http_port}/svn"
 
     with container:
         prepare_and_test_svn_container(container, http_port)
@@ -371,54 +395,77 @@ def svn_server(request, tmp_path) -> Generator[tuple["DockerContainer", Path, st
 
 @pytest.fixture
 def ps_platform() -> PsPlatform:
-    platform = PsPlatform(expid='a000', name='ps', config={})
+    platform = PsPlatform(expid="a000", name="ps", config={})
     return platform
 
 
-@pytest.fixture(scope='function')
-def ssh_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") -> Generator["Container", Any, None]:
+@pytest.fixture(scope="function")
+def ssh_server(
+    request, tmp_path: "LocalPath", mocker: "MockerFixture"
+) -> Generator["Container", Any, None]:
     """Start a single Docker container serving SSH for integration tests."""
     container, ssh_port = get_ssh_container(mfa=False, x11=False)
     with container:
-        prepare_and_test_ssh_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
+        prepare_and_test_ssh_container(
+            container, ssh_port, Path(tmp_path, "ssh/"), mocker
+        )
         yield container.get_wrapped_container()
-        copy_content_from_containers(request, 'ssh_server', 'app/')
-
-
-@pytest.fixture(scope='function')
-def ssh_x11_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") -> Generator["Container", Any, None]:
-    """Get a running SSH server with X11 enabled (no MFA)."""
-    container, ssh_port = get_ssh_container(mfa=False, x11=True)
-    with container:
-        prepare_and_test_ssh_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
-        yield container.get_wrapped_container()
-        copy_content_from_containers(request, 'ssh_server', 'app/')
-
-
-@pytest.fixture(scope='function')
-def ssh_x11_mfa_server(request, tmp_path: "LocalPath", mocker: "MockerFixture") -> Generator["Container", Any, None]:
-    """Get a running SSH server with X11 and MFA enabled."""
-    container, ssh_port = get_ssh_container(mfa=True, x11=True)
-    with container:
-        prepare_and_test_ssh_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
-        yield container.get_wrapped_container()
-        copy_content_from_containers(request, 'ssh_server', 'app/')
+        copy_content_from_containers(request, "ssh_server", "app/")
 
 
 @pytest.fixture(scope="function")
-def slurm_server(request, tmp_path, mocker: "MockerFixture") -> Generator["Container", Any, None]:
+def ssh_x11_server(
+    request, tmp_path: "LocalPath", mocker: "MockerFixture"
+) -> Generator["Container", Any, None]:
+    """Get a running SSH server with X11 enabled (no MFA)."""
+    container, ssh_port = get_ssh_container(mfa=False, x11=True)
+    with container:
+        prepare_and_test_ssh_container(
+            container, ssh_port, Path(tmp_path, "ssh/"), mocker
+        )
+        yield container.get_wrapped_container()
+        copy_content_from_containers(request, "ssh_server", "app/")
+
+
+@pytest.fixture(scope="function")
+def ssh_x11_mfa_server(
+    request, tmp_path: "LocalPath", mocker: "MockerFixture"
+) -> Generator["Container", Any, None]:
+    """Get a running SSH server with X11 and MFA enabled."""
+    container, ssh_port = get_ssh_container(mfa=True, x11=True)
+    with container:
+        prepare_and_test_ssh_container(
+            container, ssh_port, Path(tmp_path, "ssh/"), mocker
+        )
+        yield container.get_wrapped_container()
+        copy_content_from_containers(request, "ssh_server", "app/")
+
+
+@pytest.fixture(scope="function")
+def slurm_server(
+    request, tmp_path, mocker: "MockerFixture"
+) -> Generator["Container", Any, None]:
     """Function-scoped fixture that creates a Slurm server container per test."""
     # Patch multiprocessing start method to 'fork' in test environment so child worker processes
     # inherit active pytest fixtures, monkeypatches, and in-memory mock dispatchers (Platform defaults to 'spawn').
     mocker.patch(
-        'autosubmit.platforms.platform.Platform.get_mp_context',
-        return_value=multiprocessing.get_context('fork')
+        "autosubmit.platforms.platform.Platform.get_mp_context",
+        return_value=multiprocessing.get_context("fork"),
     )
+    from time import perf_counter
+
+    start = perf_counter()
     container, ssh_port = get_slurm_container()
+    print(f"get_slurm_container: {perf_counter() - start:.2f}s")
+
     with container:
-        prepare_and_test_slurm_container(container, ssh_port, Path(tmp_path, 'ssh/'), mocker)
+        start = perf_counter()
+        prepare_and_test_slurm_container(
+            container, ssh_port, Path(tmp_path, "ssh/"), mocker
+        )
+        print(f"prepare_and_test_slurm_container: {perf_counter() - start:.2f}s")
+
         yield container.get_wrapped_container()
-        copy_content_from_containers(request, 'slurm_server', '/tmp/scratch/group/root/')
 
 
 @pytest.fixture(autouse=True)
@@ -427,6 +474,7 @@ def clear_platform_worker_events() -> Generator[None, None, None]:
     yield
     with suppress(Exception):
         from autosubmit.platforms.platform import Platform
+
         Platform.worker_events.clear()
 
 
@@ -436,12 +484,15 @@ def ssh_fixture(request):
 
     See ``test_paramiko_platform.py`` for an example use case.
     """
-    if hasattr(request, 'param'):
+    if hasattr(request, "param"):
         return request.getfixturevalue(request.param)
     return None
 
-@pytest.fixture(scope='session', autouse=True)
-def postgres_server(request: "FixtureRequest") -> Generator[PostgresContainer | None, None, None]:
+
+@pytest.fixture(scope="session", autouse=True)
+def postgres_server(
+    request: "FixtureRequest",
+) -> Generator[PostgresContainer | None, None, None]:
     """Fixture to set up and tear down a Postgres database for testing.
 
     Enabled only if the mark 'postgres' was specified.
@@ -449,22 +500,25 @@ def postgres_server(request: "FixtureRequest") -> Generator[PostgresContainer | 
     The container is available throughout the whole testing session.
     """
     # ref: https://stackoverflow.com/a/58142403
-    has_postgres_marker = any(item.get_closest_marker('postgres') is not None for item in request.session.items)
+    has_postgres_marker = any(
+        item.get_closest_marker("postgres") is not None
+        for item in request.session.items
+    )
     if not has_postgres_marker:
         # print("Skipping Postgres setup because -m 'postgres' was not specified")
         yield None
     else:
         pg_random_port = get_free_port()
-        conn_url = f'postgresql://{_PG_USER}:{_PG_PASSWORD}@localhost:{pg_random_port}/{_PG_USER}'
+        conn_url = f"postgresql://{_PG_USER}:{_PG_PASSWORD}@localhost:{pg_random_port}/{_PG_USER}"
 
-        image = 'postgres:17'
+        image = "postgres:17"
         with PostgresContainer(
-                image=image,
-                port=5432,
-                username=_PG_USER,
-                password=_PG_PASSWORD,
-                dbname=_PG_DATABASE) \
-                .with_bind_ports(5432, pg_random_port) as container:
+            image=image,
+            port=5432,
+            username=_PG_USER,
+            password=_PG_PASSWORD,
+            dbname=_PG_DATABASE,
+        ).with_bind_ports(5432, pg_random_port) as container:
             # Setup database
             with create_engine(conn_url).connect() as conn:
                 setup_pg_db(conn)
@@ -478,9 +532,14 @@ def use_sqlalchemy(request):
     return request.param
 
 
-@pytest.fixture(params=['postgres', 'sqlite'])
-def as_db(request: "FixtureRequest", tmp_path: "LocalPath", postgres_server: "DockerContainer",
-          autosubmit_exp, monkeypatch):
+@pytest.fixture(params=["postgres", "sqlite"])
+def as_db(
+    request: "FixtureRequest",
+    tmp_path: "LocalPath",
+    postgres_server: "DockerContainer",
+    autosubmit_exp,
+    monkeypatch,
+):
     """A parametrised fixture that creates the autosubmitrc file for databases.
 
     Works with sqlite and postgres.
@@ -496,27 +555,30 @@ def as_db(request: "FixtureRequest", tmp_path: "LocalPath", postgres_server: "Do
     :return: The current database name.
     """
     backend = request.param
-    autosubmitrc_file = Path(tmp_path) / 'autosubmitrc'
+    autosubmitrc_file = Path(tmp_path) / "autosubmitrc"
     if not autosubmitrc_file.exists():
-        raise ValueError(f'Missing autosubmitrc file: {autosubmitrc_file}')
+        raise ValueError(f"Missing autosubmitrc file: {autosubmitrc_file}")
 
-    monkeypatch.setenv('AUTOSUBMIT_CONFIGURATION', str(autosubmitrc_file))
+    monkeypatch.setenv("AUTOSUBMIT_CONFIGURATION", str(autosubmitrc_file))
 
-    if backend == 'postgres':
+    if backend == "postgres":
         # Replace the backend with postgres (default is sqlite)
-        user = postgres_server.env['POSTGRES_USER']
-        password = postgres_server.env['POSTGRES_PASSWORD']
-        port: int = cast(int, postgres_server.ports['5432'])
+        user = postgres_server.env["POSTGRES_USER"]
+        password = postgres_server.env["POSTGRES_PASSWORD"]
+        port: int = cast(int, postgres_server.ports["5432"])
         db = request.node.name
-        if '[' in db:
-            db = db.split('[')[0]
-        db = f'{db}_{time_ns()}'
+        if "[" in db:
+            db = db.split("[")[0]
+        db = f"{db}_{time_ns()}"
 
         # Create a new DB to run the current test completely isolated from others.
         # We use the test name, minus the [params], appending the current nanoseconds
         # instead to distinguish parametrised tests too -- really isolated.
         from sqlalchemy import create_engine, text
-        engine = create_engine(f'postgresql://{user}:{password}@localhost:{port}/postgres')
+
+        engine = create_engine(
+            f"postgresql://{user}:{password}@localhost:{port}/postgres"
+        )
         with engine.connect() as conn:
             conn.execution_options(isolation_level="AUTOCOMMIT").execute(
                 text(f"CREATE DATABASE {db}")
@@ -525,19 +587,19 @@ def as_db(request: "FixtureRequest", tmp_path: "LocalPath", postgres_server: "Do
         # And now replace the INI settings that have the default value set to SQLite.
         config = configparser.ConfigParser()
         config.read(autosubmitrc_file)
-        to_delete = ['path', 'filename']
+        to_delete = ["path", "filename"]
         for to_del in to_delete:
-            if config.has_option('database', to_del):
-                config.remove_option('database', to_del)
-        config.set('database', 'backend', 'postgres')
-        connection_url = f'postgresql://{user}:{password}@localhost:{port}/{db}'
-        config.set('database', 'connection_url', connection_url)
-        with open(autosubmitrc_file, 'w') as f:
+            if config.has_option("database", to_del):
+                config.remove_option("database", to_del)
+        config.set("database", "backend", "postgres")
+        connection_url = f"postgresql://{user}:{password}@localhost:{port}/{db}"
+        config.set("database", "connection_url", connection_url)
+        with open(autosubmitrc_file, "w") as f:
             config.write(f)
-    elif backend == 'sqlite':
+    elif backend == "sqlite":
         ...
     else:
-        raise ValueError(f'Unsupported database backend: {backend}')
+        raise ValueError(f"Unsupported database backend: {backend}")
 
     BasicConfig.read()
     # TODO: check which functions call as_db twice or if this is used in
@@ -548,26 +610,13 @@ def as_db(request: "FixtureRequest", tmp_path: "LocalPath", postgres_server: "Do
     return backend
 
 
-@pytest.fixture(scope='function', autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def setup_as_logs_pytest(tmp_path: "LocalPath") -> None:
     """Sets up Autosubmit logs to redirect to a Pytest directory."""
-    Log.set_file(
-        str(Path(tmp_path, 'as_log_out.txt')),
-        'out',
-        level='STATUS'
-    )
-    Log.set_file(
-        str(Path(tmp_path, 'as_log_err.txt')),
-        'err'
-    )
-    Log.set_file(
-        str(Path(tmp_path, 'as_log_status.txt')),
-        'status'
-    )
-    Log.set_file(
-        str(Path(tmp_path, 'as_log_status_failed.txt')),
-        'status_failed'
-    )
+    Log.set_file(str(Path(tmp_path, "as_log_out.txt")), "out", level="STATUS")
+    Log.set_file(str(Path(tmp_path, "as_log_err.txt")), "err")
+    Log.set_file(str(Path(tmp_path, "as_log_status.txt")), "status")
+    Log.set_file(str(Path(tmp_path, "as_log_status_failed.txt")), "status_failed")
 
 
 def copy_content_from_containers(request, log_name, path_to_docker=""):
@@ -575,18 +624,20 @@ def copy_content_from_containers(request, log_name, path_to_docker=""):
 
     Only executed on GitHub Actions.
     """
-    if 'GITHUB_ACTIONS' not in os.environ:
+    if "GITHUB_ACTIONS" not in os.environ:
         return
     has_failures = request.session.testsfailed
     func_args = request.node.funcargs
     if has_failures and log_name in func_args and func_args[log_name]:
         container_in_use: Container
-        if log_name == 'git_server':
+        if log_name == "git_server":
             container_in_use = func_args[log_name][0].get_wrapped_container()
         else:
             container_in_use = func_args[log_name]
 
-        if "No such file" not in str(container_in_use.exec_run(f"ls {path_to_docker}").output):
+        if "No such file" not in str(
+            container_in_use.exec_run(f"ls {path_to_docker}").output
+        ):
             stream = (container_in_use.get_archive(path_to_docker))[0]
             file_object = io.BytesIO()
 
@@ -596,14 +647,14 @@ def copy_content_from_containers(request, log_name, path_to_docker=""):
 
             target_path = Path(f"../container_logs_{log_name}/")
             target_path.mkdir(parents=True, exist_ok=True)
-            with open(target_path/f"{request.node.name}.tar.gz",'w') as f:
+            with open(target_path / f"{request.node.name}.tar.gz", "w") as f:
                 f.buffer.write(file_object.read())
 
 
 @pytest.fixture
 def fake_smtp_server() -> Generator[tuple[int, str], None, None]:
     """Start a fake SMTP server container.
-    :return: A tuple with the SMTP port, and the SMTP test server API base URL """
+    :return: A tuple with the SMTP port, and the SMTP test server API base URL"""
     container, smtp_port, api_base = get_mail_container()
     with container:
         prepare_and_test_mail_container(container)
@@ -614,8 +665,8 @@ def fake_smtp_server() -> Generator[tuple[int, str], None, None]:
 
 @pytest.fixture
 def configured_mail(
-        fake_smtp_server: tuple[int, str]
-) -> Callable[['AutosubmitExperiment'], tuple[int, str]]:
+    fake_smtp_server: tuple[int, str], monkeypatch
+) -> Callable[["AutosubmitExperiment"], tuple[int, str]]:
     """Factory that points an experiment's ``BasicConfig`` at the fake SMTP server.
 
     Usage::
@@ -629,10 +680,9 @@ def configured_mail(
     """
     smtp_port, api_base = fake_smtp_server
 
-    def _configure(autosubmit_experiment: 'AutosubmitExperiment') -> tuple[int, str]:
-        basic_config = autosubmit_experiment.as_conf.basic_config
-        basic_config.MAIL_FROM = 'notifier@localhost'
-        basic_config.SMTP_SERVER = f'127.0.0.1:{smtp_port}'
+    def _configure(autosubmit_experiment: "AutosubmitExperiment") -> tuple[int, str]:
+        monkeypatch.setattr(BasicConfig, "MAIL_FROM", "notifier@localhost")
+        monkeypatch.setattr(BasicConfig, "SMTP_SERVER", f"127.0.0.1:{smtp_port}")
         return smtp_port, api_base
 
     return _configure

@@ -20,6 +20,7 @@
 
 from typing import cast
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
 from autosubmit.platforms.platform import Platform
@@ -31,12 +32,10 @@ SMTP_PORT = 1025
 EXPID = 'a000'
 JOB_NAME = 'SIM'
 
-config = type('', (), {
-    'MAIL_FROM': FROM_EMAIL,
-    'SMTP_SERVER': f'{SMTP_HOST}:{SMTP_PORT}'
-})()
+BasicConfig.MAIL_FROM = FROM_EMAIL
+BasicConfig.SMTP_SERVER = f'{SMTP_HOST}:{SMTP_PORT}'
 
-MAIL_NOTIFIER = MailNotifier(config)
+MAIL_NOTIFIER = MailNotifier()
 
 # Status change
 

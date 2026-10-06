@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
+
 
 @pytest.mark.parametrize(
     "force_load,current_loaded_files,expected_result",
@@ -68,7 +70,7 @@ def test_needs_reload(autosubmit_config, tmpdir, current_loaded_files, reload_wh
     as_conf = autosubmit_config(
         expid='a000',
         experiment_data={})
-    as_conf.conf_folder_yaml = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_conf.expid / 'conf'
+    as_conf.conf_folder_yaml = Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid / 'conf'
 
     # The fixture includes a file by default, to avoid reloading in tests.
     # So we reset it here.

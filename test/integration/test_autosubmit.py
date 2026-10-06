@@ -26,7 +26,6 @@ import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import (
     get_experiment_description,
     update_experiment_description_version,
@@ -177,26 +176,29 @@ def test__init_logs_sqlite_exp_path_does_not_exist(
 
 
 def test__init_logs_postgres_exp_path_does_not_exist_no_yaml_data(
-    autosubmit_exp, mocker, tmp_path
+    autosubmit_exp, mocker, tmp_path, monkeypatch
 ):
     """Test that a PostgreSQL experiment without YAML data logs an error."""
-    mocked_basic_config = mocker.patch("autosubmit.scripts._validation.BasicConfig")
-    mocked_basic_config.DATABASE_BACKEND = "postgres"
-    mocked_basic_config.DB_PATH = tmp_path / "database.db"
-    mocked_basic_config.DB_PATH.touch()
+    db_path = tmp_path / "database.db"
+    db_path.touch()
 
     mocker.patch("autosubmit.scripts._validation.validate_required_files")
     mocked_log = mocker.patch("autosubmit.scripts._initialise.Log")
 
-    as_exp = autosubmit_exp()
+    as_exp = autosubmit_exp(experiment_data={})
     args = ["-lc", "DEBUG", "-lf", "DEBUG", "clean", as_exp.expid]
 
     mocked_autosubmit_config = mocker.patch(
-        "autosubmit.config.configcommon.AutosubmitConfig"
+        "autosubmit.scripts._initialise.load_config"
     )
     as_conf = mocker.MagicMock()
     mocked_autosubmit_config.return_value = as_conf
     as_conf.experiment_data = {}
+
+    # After we have a valid experiment, then we mock the database and now run the
+    # command. It should complain about the experiment data (see above) being empty.
+    monkeypatch.setattr(BasicConfig, "DATABASE_BACKEND", "postgres")
+    monkeypatch.setattr(BasicConfig, "DB_PATH", str(db_path))
 
     with pytest.raises(SystemExit):
         _autosubmit(args)
@@ -339,11 +341,7 @@ def test_update_version(as_db: str, autosubmit_exp):
     assert update_experiment_description_version(exp.expid, version=new_version)
     exp.as_conf.set_version(new_version)
 
-    as_conf = AutosubmitConfig(
-        exp.expid,
-        BasicConfig,
-        YAMLParserFactory(),
-    )
+    as_conf = AutosubmitConfig(exp.expid)
     as_conf.reload(force_load=True)
 
     # TODO: We probably should test that the DB value is correct as well?
@@ -614,11 +612,7 @@ def test_monitor_with_check_wrapper(autosubmit_exp):
     """Test that ``monitor`` loads wrapper packages when requested."""
     exp = autosubmit_exp(include_jobs=True)
 
-    as_conf = AutosubmitConfig(
-        exp.expid,
-        BasicConfig,
-        YAMLParserFactory(),
-    )
+    as_conf = AutosubmitConfig(exp.expid)
     as_conf.check_conf_files(True)
 
     job_list = load_job_list(
@@ -647,11 +641,7 @@ def test_set_status_with_detail(autosubmit_exp):
     """Test that ``set_status`` prints the job list when detail is requested."""
     exp = autosubmit_exp(include_jobs=True)
 
-    as_conf = AutosubmitConfig(
-        exp.expid,
-        BasicConfig,
-        YAMLParserFactory(),
-    )
+    as_conf = AutosubmitConfig(exp.expid)
     as_conf.check_conf_files(True)
 
     job_list = load_job_list(

@@ -20,6 +20,8 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
+from autosubmit.config.basicconfig import BasicConfig
+
 FOR_CONF = {
     "TEST": "VARIABLEX",
     "TEST2": "VARIABLEY",
@@ -241,7 +243,7 @@ def test_substitute_placeholders_after_all_files_loaded(autosubmit_config, tmpdi
             "version": "last"
         }
     }
-    as_conf.conf_folder_yaml = Path(as_conf.basic_config.LOCAL_ROOT_DIR, as_conf.expid, 'conf')
+    as_conf.conf_folder_yaml = Path(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, 'conf')
     as_conf.conf_folder_yaml.mkdir(parents=True, exist_ok=True)
     ca_yaml_file = as_conf.conf_folder_yaml / "ca.yml"
     conf_yaml_file = as_conf.conf_folder_yaml / "conf.yml"

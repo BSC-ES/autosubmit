@@ -23,6 +23,7 @@ from subprocess import CalledProcessError, SubprocessError
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.job.job_list import JobList
 from autosubmit.log.log import AutosubmitCritical
@@ -53,7 +54,7 @@ def test_generate_output(
     mocked_log = mocker.patch('autosubmit.monitor.monitor.Log')
 
     exp = autosubmit_exp(experiment_data={})
-    exp_path = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / exp.expid
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / exp.expid
 
     job_list = JobList(exp.expid, exp.as_conf, YAMLParserFactory())
     date_list = exp.as_conf.get_date_list()

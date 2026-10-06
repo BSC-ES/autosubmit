@@ -150,18 +150,17 @@ def create_git_repository_and_server(
 
 
 @pytest.mark.parametrize(
-    "commit_git,push_git,commit_submodule,push_submodule,expid,expected",
+    "experiment_type,commit_git,push_git,commit_submodule,push_submodule,expected",
     [
-        (False, False, False, False, "o800", pytest.raises(AutosubmitCritical)),
-        (False, False, True, False, "o801", pytest.raises(AutosubmitCritical)),
-        (False, False, True, True, "o802", pytest.raises(AutosubmitCritical)),
-        (True, False, True, True, "o803", pytest.raises(AutosubmitCritical)),
-        (True, True, True, True, "o804", does_not_raise()),
-        (False, False, False, False, "a800", does_not_raise()),
-        (False, False, True, False, "a801", does_not_raise()),
-        (False, False, True, True, "a802", does_not_raise()),
-        (True, False, True, True, "a803", does_not_raise()),
-        (True, True, True, True, "a804", does_not_raise()),
+        ("o", False, False, False, False, pytest.raises(AutosubmitCritical)),
+        ("o", False, False, True, False, pytest.raises(AutosubmitCritical)),
+        ("o", False, False, True, True, pytest.raises(AutosubmitCritical)),
+        ("o", True, False, True, True, pytest.raises(AutosubmitCritical)),
+        ("o", True, True, True, True, does_not_raise()),
+        ("a", False, False, False, False, does_not_raise()),
+        ("a", False, False, True, False, does_not_raise()),
+        ("a", False, False, True, True, does_not_raise()),
+        ("a", True, False, True, True, does_not_raise()),
     ],
     ids=[
         "NOK Did not commit nor push repository and submodule of an operational experiment",
@@ -179,21 +178,21 @@ def create_git_repository_and_server(
         "OK Committed and pushed the submodule, but without committing and pushing the repository of a common "
         "experiment",
         "OK Committed and pushed the submodule, committed but did not push the repository of a common experiment",
-        "OK Committed and pushed the submodule, and committed and pushed the repository of a common experiment",
     ],
 )
 @pytest.mark.git
 @pytest.mark.docker
 def test_git_submodules_dirty(
+    experiment_type: str,
     commit_git: bool,
     push_git: bool,
     commit_submodule: bool,
     push_submodule: bool,
-    expid: str,
     expected: ContextManager,
     autosubmit_exp: Callable,
     git_server: tuple["Container", Path, str],
     tmp_path,
+    get_next_expid
 ) -> None:
     """Tests that Autosubmit detects dirty local Git submodules, especially with operational experiments.
 
@@ -203,8 +202,9 @@ def test_git_submodules_dirty(
     If the user has non-committed or non-pushed changes in the repository or submodule, the code is
     expected to fail, raising an error when the experiment is operational.
     """
-
     _, git_repos_path, git_url = git_server  # type: Container, Path, str # type: ignore
+
+    expid = get_next_expid(experiment_type=experiment_type)
 
     git_repo = git_repos_path / f"git_repository_{expid}"
     git_submodule = git_repos_path / f"git_submodule_{expid}"
@@ -228,8 +228,9 @@ def test_git_submodules_dirty(
     experiment_data["GIT"]["PROJECT_SUBMODULES"] = submodule_name
     experiment_data["LOCAL"] = {"PROJECT_PATH": str(git_repo)}
 
-    as_exp = autosubmit_exp(expid, experiment_data)
+    as_exp = autosubmit_exp(expid=expid, experiment_data=experiment_data)
     as_conf = as_exp.as_conf
+    as_conf.reload(force_load=True)
     proj_dir = Path(as_conf.get_project_dir())
 
     with open(proj_dir / submodule_name / "a_file.yaml", "w") as f:

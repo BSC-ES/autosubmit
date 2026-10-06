@@ -168,7 +168,7 @@ def test_custom_config_for(
     assert deep_check_all_keys_uppercase(as_conf.experiment_data)
 
 
-@pytest.fixture()
+@pytest.fixture
 def prepare_basic_config(temp_folder):
     basic_conf = BasicConfig()
     BasicConfig.DB_DIR = temp_folder / "DestinE_workflows"
@@ -221,7 +221,6 @@ def test_destine_workflows(
     monkeypatch.setenv("AS_ENV_PLATFORMS_PATH", "test")
     monkeypatch.setenv("AS_ENV_SSH_CONFIG_PATH", "test2")
     monkeypatch.setenv("SUDO_USER", "dummy")
-    expid = "a000"  # TODO parametrize
     mocker.patch.object(BasicConfig, "read", return_value=True)
     current_script_location = Path(__file__).resolve().parent
     experiments_root = Path(f"{current_script_location}/DestinE_workflows")
@@ -230,7 +229,7 @@ def test_destine_workflows(
     temp_folder_experiments_root.parent.mkdir(parents=True, exist_ok=True)
     # copy experiment files
     shutil.copytree(experiments_root, temp_folder_experiments_root)
-    as_conf = AutosubmitConfig(expid, prepare_basic_config)
+    as_conf = AutosubmitConfig("a000")
     if PROFILE:
         profiler.enable()
     as_conf.reload(True)
@@ -242,7 +241,7 @@ def test_destine_workflows(
     assert len(as_conf.current_loaded_files) > 1
     # Load reference files
     reference_experiment_data_path = Path(
-        f"{current_script_location}/DestinE_workflows/{expid}/ref/experiment_data.yml"
+        f"{current_script_location}/DestinE_workflows/{as_conf.expid}/ref/experiment_data.yml"
     )
 
     with reference_experiment_data_path.open("r") as f:

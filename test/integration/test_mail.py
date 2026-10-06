@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job_common import Status
 from autosubmit.notifications.mail_notifier import MailNotifier
 from test.integration.test_utils.docker_utils import get_mailhog_messages
@@ -45,7 +46,7 @@ def _find_email_by_subject(search_text: str, emails) -> Any:
 
 
 @pytest.fixture
-def create_mail_notifier() -> Callable[['AutosubmitExperiment', int], MailNotifier]:
+def create_mail_notifier(monkeypatch) -> Callable[['AutosubmitExperiment', int], MailNotifier]:
     """Factory fixture to create a MailNotifier instance."""
 
     def _create_mail_notifier(autosubmit_experiment: 'AutosubmitExperiment', smtp_port: int):
@@ -53,11 +54,10 @@ def create_mail_notifier() -> Callable[['AutosubmitExperiment', int], MailNotifi
         with (exp_path / 'dummy_run.log') as f:
             f.write_text("Log entry: simulation started.")
 
-        basic_config = autosubmit_experiment.as_conf.basic_config
-        basic_config.MAIL_FROM = 'notifier@localhost'
-        basic_config.SMTP_SERVER = f'127.0.0.1:{smtp_port}'
+        monkeypatch.setattr(BasicConfig, 'MAIL_FROM', 'notifier@localhost')
+        monkeypatch.setattr(BasicConfig, 'SMTP_SERVER', f'127.0.0.1:{smtp_port}')
 
-        return MailNotifier(basic_config)
+        return MailNotifier()
 
     return _create_mail_notifier
 

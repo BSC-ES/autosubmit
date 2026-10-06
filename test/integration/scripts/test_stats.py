@@ -22,6 +22,8 @@ from time import sleep, time
 
 from psutil import Process
 
+from autosubmit.config.basicconfig import BasicConfig
+
 # noinspection PyProtectedMember
 from autosubmit.scripts.autosubmit import _autosubmit
 from autosubmit.workflow.manage import run
@@ -68,7 +70,7 @@ def test_autosubmit_commands_help(autosubmit_exp):
     ]
     assert 0 == _autosubmit(args)
 
-    stats_folder = Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR, exp.expid, "stats")
+    stats_folder = Path(BasicConfig.LOCAL_ROOT_DIR, exp.expid, "stats")
     stats_files = list(stats_folder.iterdir())
 
     assert len(stats_files) == 3
