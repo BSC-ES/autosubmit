@@ -167,7 +167,7 @@ Edit or generate a ``minimal.yml`` with the following parameters, leaving the re
 
 CUSTOM_CONFIG: Syntax
 ^^^^^^^^^^^^^^^^^^^^^
-The ``DEFAULT.CUSTOM_CONFIG`` parameter is used to define the location of the model/project or user files. 
+The ``%DEFAULT.CUSTOM_CONFIG%`` parameter is used to define the location of the model/project or user files. 
 The paths can be absolute or relative to the ``%PROJDIR%``.
 
 It has two different syntaxes:
