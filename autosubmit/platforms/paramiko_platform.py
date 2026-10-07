@@ -663,7 +663,7 @@ class ParamikoPlatform(Platform):
     #       class, if not, then we probably need to review the type of the
     #       ``self.platform`` in ``job_package.py``.
     def remove_multiple_files(self, filenames):
-        log_dir = Path(self.tmp_path) / f"LOG_{self.expid}"
+        log_dir = self.tmp_path / f"LOG_{self.expid}"
         multiple_delete_previous_run = str(Path(log_dir) / "multiple_delete_previous_run.sh")
         if log_dir.exists():
             lang = locale.getlocale()[1]
@@ -685,7 +685,7 @@ class ParamikoPlatform(Platform):
         if check:
             self.check_remote_log_dir()
             self.delete_file(str(filename))
-        local_path = str(Path(self.tmp_path) / filename)
+        local_path = str(self.tmp_path / filename)
         remote_path = str(self.files_path / Path(filename).name)
         try:
             self._ftpChannel.put(local_path, remote_path)
