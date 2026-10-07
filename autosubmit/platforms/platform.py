@@ -216,15 +216,9 @@ class Platform(ABC):
         self._submit_cmd_x11 = None
         self._checkhost_cmd = None
         self.cancel_cmd = None
-        self.otp_timeout = (
-            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_TIMEOUT", 60 * 5)
-        )
-        self.two_factor_auth = (
-            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA", False)
-        )
-        self.two_factor_method = (
-            self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("2FA_METHOD", "token")
-        )
+        self.otp_timeout = self.platform_config.get("2FA_TIMEOUT", 60 * 5)
+        self.two_factor_auth = self.platform_config.get("2FA", False)
+        self.two_factor_method = self.platform_config.get("2FA_METHOD", "token")
         if auth_password is not None and self.two_factor_auth:
             if isinstance(auth_password, list):
                 self.pw: str | None = auth_password[0]
@@ -401,6 +395,11 @@ class Platform(ABC):
     def root_dir(self, value):
         self._root_dir = value
 
+    @property
+    def platform_config(self) -> dict:
+        """Defining the config of a platform as a property facilitating its use and reducing code."""
+        return self.config.get("PLATFORMS", {}).get(self.name.upper(), {})
+
     def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
                            packages_to_submit: list['JobPackageBase'], inspect: bool = False,
                            only_wrappers: bool = False) \
@@ -431,7 +430,7 @@ class Platform(ABC):
         scripts_to_submit_by_section: dict[str, dict[str, JobPackageBase]] = {}
         x11_scripts_to_submit_by_section: dict[str, dict[str, JobPackageBase]] = {}
         for package in packages_to_submit:
-            self.prepare_dry_run_if_applicable(job_list, package, only_wrappers, inspect, as_conf)
+            self.prepare_dry_run_if_applicable(package, only_wrappers, inspect)
             if not only_wrappers:
                 package.generate_scripts(as_conf, inspect)
             if not inspect and not only_wrappers:
@@ -445,8 +444,7 @@ class Platform(ABC):
         return scripts_to_submit_by_section, x11_scripts_to_submit_by_section
 
     @staticmethod
-    def prepare_dry_run_if_applicable(job_list: 'JobList', package: 'JobPackageBase', only_wrappers: bool,
-                                      inspect: bool, as_conf: 'AutosubmitConfig') -> None:
+    def prepare_dry_run_if_applicable(package: 'JobPackageBase', only_wrappers: bool, inspect: bool) -> None:
         """Dry-run preparation of a package to emulate that the package was submitted, without following the normal submission flow.
 
         :param package: Package being prepared for inspect or wrapper-only mode.
@@ -470,9 +468,7 @@ class Platform(ABC):
 
         :return: platform's object
         """
-        if self._serial_platform is None:
-            return self
-        return self._serial_platform
+        return self._serial_platform or self
 
     @serial_platform.setter
     def serial_platform(self, value: 'Platform'):
@@ -663,7 +659,7 @@ class Platform(ABC):
         if not job.max_checkpoint_step:
             job.max_checkpoint_step = 0
         if job.current_checkpoint_step < job.max_checkpoint_step:
-            remote_checkpoint_path = f'{self.get_files_path()}/CHECKPOINT_'
+            remote_checkpoint_path = f'{self.files_path}/CHECKPOINT_'
             self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
             while self.check_file_exists(
                     f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}') and job.current_checkpoint_step < job.max_checkpoint_step:
@@ -725,20 +721,17 @@ class Platform(ABC):
         Log.warning(f'{job.name}_STAT_{str(attempt)} file not found')
         return False
 
-    @autosubmit_parameter(name="current_logdir")
-    def get_files_path(self) -> Path:
+    @property
+    def files_path(self) -> str:
         """The platform's LOG directory.
 
-        :return: platform's LOG directory
-        :rtype: str
+        :autosubmit-group: JOB
         """
-        # Circular import -- bad class design, probably can be re-designed.
         if self.TYPE is PlatformType.LOCAL:
-            path = Path(
-                self.root_dir, self.config.get("LOCAL_TMP_DIR", ""), f"LOG_{self.expid}"
-            )
+            path = self.root_dir / self.config.get("LOCAL_TMP_DIR", "") / f"LOG_{self.expid}"
         else:
-            path = Path(self.remote_log_dir)
+            path = self.remote_log_dir
+
         return path
 
     def check_all_jobs(self, job_list: list['Job'], as_conf: 'AutosubmitConfig', retries: int = 5):

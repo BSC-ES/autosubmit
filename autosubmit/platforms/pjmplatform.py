@@ -122,9 +122,7 @@ class PJMPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Update commands for platforms."""
-        self.root_dir = Path(
-            self.scratch, self.project_dir, self.user, self.expid
-        )
+        self.root_dir = Path(self.scratch) / self.project_dir / self.user / self.expid
         self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
         self.cancel_cmd = "pjdel"
         self._checkhost_cmd = "echo 1"
@@ -138,7 +136,7 @@ class PJMPlatform(ParamikoPlatform):
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
 
-    def get_remote_log_dir(self):
+    def get_remote_log_dir(self) -> Path:
         return self.remote_log_dir
 
     def parse_all_jobs_output(self, output, job_id):
