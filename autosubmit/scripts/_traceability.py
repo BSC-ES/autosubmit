@@ -97,5 +97,9 @@ def log_command_context(argv: Sequence[str]) -> None:
     Log.info(f"  Python: {platform.python_version()}")
     Log.info(f"  Platform: {platform.platform()}")
     Log.info(f"  Timezone: {timezone} (UTC{timezone_offset[:3]}:{timezone_offset[3:]})")
-    Log.info(f"  Working directory: {os.getcwd()}")
+    try:
+        working_directory = os.getcwd()
+    except FileNotFoundError:
+        working_directory = "<deleted>"
+    Log.info(f"  Working directory: {working_directory}")
     Log.info("")
