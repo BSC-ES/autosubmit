@@ -53,6 +53,26 @@ if TYPE_CHECKING:
     from paramiko.channel import Channel
     from autosubmit.job.job_packages import JobPackageBase
 
+_TRANSPORT_ERRORS = (
+    paramiko.SSHException,
+    EOFError,
+    OSError,
+    ConnectionError,
+    TimeoutError,
+)
+"""Exceptions that signal the SSH transport/session is no longer usable. When one
+of these is raised Autosubmit can rebuild the connection instead of aborting.
+``EOFError`` is raised by Paramiko's packetizer when the remote end closes the
+socket, and it is not an ``OSError`` subclass, so it must be listed explicitly."""
+
+_DEFAULT_SSH_KEEPALIVE = 30
+"""Default number of seconds of inactivity after which Paramiko sends a keepalive
+packet to keep idle timeouts from silently dropping the session."""
+
+_DEFAULT_MAX_TRANSPORT_RETRIALS = 3
+"""Default number of consecutive transport failures tolerated before Autosubmit
+stops the run instead of looping through the global recovery forever."""
+
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -174,6 +194,10 @@ class ParamikoPlatform(Platform):
                 "REMOVE_LOG_FILES_ON_TRANSFER", False
             )
         self._uses_local_api: bool = False
+        # Number of consecutive transport failures for this platform. It is only
+        # reset when a command completes successfully, so repeated drops that
+        # survive reconnection can be detected and stop the run.
+        self._consecutive_transport_failures = 0
         # Pre-submission snapshot used by get_submitted_jobs_by_name to exclude
         # stale processes from previous runs on process-based platforms.
         self._pre_submission_pids: dict[str, set[int]] = {}
@@ -213,9 +237,103 @@ class ParamikoPlatform(Platform):
             self.poller = select.poll()
         self._init_local_x11_display()
 
-    def test_connection(self, as_conf: Optional['AutosubmitConfig']) -> Optional[str]:
-        """Test if the connection is still alive, reconnect if not."""
+    def _get_platform_option(self, key: str, default):
+        """Return a platform configuration option, falling back to ``default``.
+
+        The value is read from ``PLATFORMS.<NAME>``, so it is resolved at call
+        time and reflects configuration reloads.
+
+        :param key: Name of the platform option.
+        :param default: Value returned when the option is not set.
+        :return: The configured value, or ``default``.
+        """
+        return (
+            self.config.get("PLATFORMS", {})
+            .get(self.name.upper(), {})
+            .get(key, default)
+        )
+
+    def _transport_stuck(self, error: BaseException) -> bool:
+        """Return whether the current transport must be rebuilt after ``error``.
+
+        A ``paramiko.SSHException`` or ``EOFError`` always means the session is
+        unusable (the peer closed it, or the transport is stuck in key
+        negotiation). For the other transport errors the state of the connection
+        is inspected, since some I/O errors can be transient.
+
+        :param error: Exception raised while talking to the remote platform.
+        :return: True if Autosubmit should reconnect before retrying.
+        """
+        if isinstance(error, (paramiko.SSHException, EOFError)):
+            return True
+        return not self.connected or not self.transport or not self.transport.is_active()
+
+    def _is_connection_alive(self) -> bool:
+        """Return whether the current SSH transport is still usable.
+
+        The ``connected`` flag can be stale: Paramiko may keep it as ``True``
+        after the remote host closed the socket. This probe sends a lightweight
+        ignore message so a dead transport is detected before a command is sent.
+
+        :return: True if the transport responded, False otherwise.
+        """
+        if not self.transport or not self.transport.is_active():
+            return False
         try:
+            self.transport.send_ignore()
+        except Exception as e:
+            Log.debug(f'[{self.name}] SSH keepalive probe failed: {str(e)}')
+            return False
+        return True
+
+    def _record_transport_failure(self) -> None:
+        """Account for a transport failure and stop the run if it keeps failing.
+
+        The counter is only reset when a command completes successfully, so a
+        platform that keeps dropping the connection after each reconnection
+        eventually aborts the run instead of looping through the global recovery
+        until ``CONFIG.RECOVERY_RETRIALS`` is exhausted.
+
+        :raises AutosubmitCritical: When the consecutive failure threshold is reached.
+        """
+        self._consecutive_transport_failures += 1
+        max_retrials = int(
+            self._get_platform_option(
+                "MAX_TRANSPORT_RETRIALS", _DEFAULT_MAX_TRANSPORT_RETRIALS
+            )
+        )
+        if (
+            max_retrials > 0
+            and self._consecutive_transport_failures >= max_retrials
+        ):
+            # TODO(#1448): this abort should be configurable per platform so that
+            # only the primary platform stops the run while secondary platforms
+            # can be skipped. See https://github.com/BSC-ES/autosubmit/issues/1448
+            raise AutosubmitCritical(
+                f"[{self.name}] The SSH connection failed "
+                f"{self._consecutive_transport_failures} consecutive times. "
+                f"Stopping the run to avoid an endless recovery loop.",
+                6005,
+                f"Last host used: {self.host}",
+            )
+
+    def _reset_transport_failures(self) -> None:
+        """Reset the consecutive transport failure counter after a success."""
+        self._consecutive_transport_failures = 0
+
+    def test_connection(self, as_conf: Optional['AutosubmitConfig']) -> Optional[str]:
+        """Test if the connection is still alive, reconnect if not.
+
+        :param as_conf: Autosubmit configuration.
+        :return: ``None`` when the connection is healthy, otherwise a message
+            describing the problem.
+        """
+        try:
+            if self.connected and not self._is_connection_alive():
+                Log.warning(
+                    f'[{self.name}] SSH transport is no longer active, reconnecting...'
+                )
+                self.connected = False
             if not self.connected:
                 self.reset()
                 try:
@@ -361,7 +479,13 @@ class ParamikoPlatform(Platform):
             # hard-coded default (30s) to complete a rekey, which raises
             # ``SSHException: Key-exchange timed out waiting for key negotiation``.
             clear_to_send_timeout = float(
-                self.config.get('PLATFORMS', {}).get(self.name.upper(), {}).get('CLEAR_TO_SEND_TIMEOUT', 180))
+                self._get_platform_option('CLEAR_TO_SEND_TIMEOUT', 180)
+            )
+            # Seconds of inactivity before Paramiko sends a keepalive packet.
+            # This is a period between packets, not a connection timeout.
+            ssh_keepalive = int(
+                self._get_platform_option('SSH_KEEPALIVE', _DEFAULT_SSH_KEEPALIVE)
+            )
 
             is_current_real_user_owner = True if not as_conf else as_conf.is_current_real_user_owner
 
@@ -439,6 +563,8 @@ class ParamikoPlatform(Platform):
                 else:
                     self.transport.close()
                     raise SSHException
+            if self.transport is not None:
+                self.transport.set_keepalive(ssh_keepalive)
             self._ftpChannel = paramiko.SFTPClient.from_transport(self.transport, window_size=pow(4, 12),
                                                                   max_packet_size=pow(4, 12))
             self._ftpChannel.get_channel().settimeout(120)
@@ -1291,14 +1417,11 @@ class ParamikoPlatform(Platform):
         The command's input and output streams are returned as Python
         ``file``-like objects representing stdin, stdout, and stderr.
 
-        :param x11:
-        :param retries:
         :param command: the command to execute.
-        :type command: str
         :param bufsize: interpreted the same way as by the built-in ``file()`` function in Python.
-        :type bufsize: int
         :param timeout: set command's channel timeout. See ``Channel.settimeout``.
-        :type timeout: int
+        :param retries: number of attempts before giving up on transport errors.
+        :param x11: whether to forward the local X11 display for the command.
         :return: the stdin, stdout, and stderr of the executing command
         """
         for retry in range(retries):
@@ -1327,13 +1450,14 @@ class ParamikoPlatform(Platform):
                 stdout = chan.makefile('rb', bufsize)
                 stderr = chan.makefile_stderr('rb', bufsize)
                 return stdin, stdout, stderr
-            except (paramiko.SSHException, ConnectionError, socket.error, IOError) as e:
+            except _TRANSPORT_ERRORS as e:
                 Log.warning(f'A networking error occurred while executing command [{command}]: {str(e)}')
                 # A transport stuck in key negotiation (e.g. "Key-exchange timed out
                 # waiting for key negotiation") still reports ``active=True`` but can
                 # never complete the command; the only reliable recovery is to rebuild
                 # the connection.
-                if isinstance(e, paramiko.SSHException) or not self.connected or not self.transport or not self.transport.active:
+                if self._transport_stuck(e):
+                    self.connected = False
                     try:
                         self.restore_connection(None)
                     except (AutosubmitError, AutosubmitCritical, OSError, paramiko.SSHException) as reconnect_error:
@@ -1377,6 +1501,7 @@ class ParamikoPlatform(Platform):
             stdin, stdout, stderr = self.exec_command(command, x11=x11)
 
             if (False, False, False) == (stdin, stdout, stderr):
+                self._record_transport_failure()
                 raise AutosubmitError(f'Failed to send (with retries) SSH command {command}', 6005)
 
             channel = stdout.channel
@@ -1460,13 +1585,17 @@ class ParamikoPlatform(Platform):
 
             if not ignore_log and self._ssh_output_err:
                 Log.printlog(f'Command {command} in {self.host} warning: {self._ssh_output_err}', 6006)
+            self._reset_transport_failures()
             return True
         except AttributeError as e:
             raise AutosubmitError(f'Session not active: {str(e)}', 6005)
-        except (paramiko.SSHException, ConnectionError, TimeoutError) as e:
+        except (paramiko.SSHException, EOFError, ConnectionError, TimeoutError) as e:
+            self._record_transport_failure()
             raise AutosubmitError(
                 f"SSH transport issue while sending command '{command}' on {self.host}: {e}", 6005)
         except IOError as e:
+            # A plain ``IOError`` here is raised by the socket while reading the command output
+            self._record_transport_failure()
             raise AutosubmitError(f"I/O issues: {str(e)}", 6016)
 
     def parse_job_output(self, output):

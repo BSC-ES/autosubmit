@@ -1,3 +1,13 @@
+### 4.1.17.2: SSH transport recovery (port of #3309)
+
+**Bug fixes:**
+
+- Fix `autosubmit run` crashing with an unhandled `EOFError` when a platform drops the SSH session during job submission #3309
+
+**Enhancements:**
+
+- Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
+
 ### 4.1.17.1: Large experiments support: ssh-recovery and updated_list 
 
 **Bug fixes:**

@@ -30,7 +30,13 @@ from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitError, AutosubmitCritical
 from autosubmit.platforms.locplatform import LocalPlatform
 # noinspection PyProtectedMember
-from autosubmit.platforms.paramiko_platform import ParamikoPlatform, ParamikoPlatformException, _get_user_config_file
+from autosubmit.platforms.paramiko_platform import (
+    _DEFAULT_MAX_TRANSPORT_RETRIALS,
+    _DEFAULT_SSH_KEEPALIVE,
+    ParamikoPlatform,
+    ParamikoPlatformException,
+    _get_user_config_file,
+)
 from autosubmit.platforms.psplatform import PsPlatform
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
@@ -1221,3 +1227,202 @@ def test_connect_sets_clear_to_send_timeout(mocker, paramiko_platform, configure
     platform.connect(None)
 
     assert transport.clear_to_send_timeout == expected
+
+
+@pytest.mark.parametrize(
+    'configured_keepalive,expected',
+    [(None, _DEFAULT_SSH_KEEPALIVE), (0, 0), (120, 120)],
+    ids=['default', 'disabled', 'configured'],
+)
+def test_connect_sets_ssh_keepalive(mocker, paramiko_platform, configured_keepalive, expected):
+    """connect() sets the transport keepalive from the platform config, and 0 disables it."""
+    platform = paramiko_platform
+    if configured_keepalive is not None:
+        platform.config['PLATFORMS'] = {'LOCAL': {'SSH_KEEPALIVE': configured_keepalive}}
+    platform.host = 'localhost'
+    platform.user = getuser()
+    platform.two_factor_auth = False
+
+    mocker.patch.object(platform, '_init_local_x11_display')
+    mocker.patch('autosubmit.platforms.paramiko_platform._get_user_config_file',
+                 return_value=Path('/tmp/ssh_config'))
+    ssh_config = mocker.Mock()
+    ssh_config.lookup.return_value = {'hostname': 'localhost', 'port': 22}
+    mocker.patch('autosubmit.platforms.paramiko_platform._load_ssh_config', return_value=ssh_config)
+    transport = mocker.Mock()
+    ssh_client = mocker.Mock()
+    ssh_client.get_transport.return_value = transport
+    mocker.patch('autosubmit.platforms.paramiko_platform._create_ssh_client', return_value=ssh_client)
+    mocker.patch.object(platform, 'agent_auth', return_value=True)
+    sftp = mocker.Mock()
+    sftp.get_channel.return_value = mocker.Mock()
+    mocker.patch('autosubmit.platforms.paramiko_platform.paramiko.SFTPClient.from_transport', return_value=sftp)
+    mocker.patch.object(platform, 'spawn_log_retrieval_process')
+
+    platform.connect(None)
+
+    transport.set_keepalive.assert_called_once_with(expected)
+
+
+@pytest.mark.parametrize(
+    'error, transport_active, expect_reconnect',
+    [
+        (EOFError('connection closed by peer'), True, True),
+        (OSError('connection refused'), True, False),
+    ],
+    ids=['dead-transport-reconnects', 'active-transport-keeps'],
+)
+def test_exec_command_reconnects_on_transport_error(mocker, paramiko_platform, error, transport_active,
+                                                    expect_reconnect):
+    """exec_command rebuilds the connection when the transport is stuck or dead."""
+    platform = paramiko_platform
+    mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+
+    platform.connected = True
+    transport = mocker.MagicMock()
+    transport.active = transport_active
+    transport.is_active.return_value = transport_active
+    platform.transport = transport
+    transport.open_session.side_effect = error
+    mocked_restore = mocker.patch.object(platform, 'restore_connection', return_value=None)
+
+    result = platform.exec_command("find . -name '*_COMPLETED'")
+
+    assert result == (False, False, False)
+    if expect_reconnect:
+        # The connection is rebuilt on every attempt, and the platform is marked
+        # as disconnected so the next call does not trust the stale transport.
+        assert mocked_restore.call_count == 3
+        assert platform.connected is False
+    else:
+        mocked_restore.assert_not_called()
+        assert platform.connected is True
+
+
+@pytest.mark.parametrize(
+    'error, expected_code',
+    [
+        (paramiko.SSHException('key negotiation'), 6005),
+        (EOFError('connection lost'), 6005),
+        (ConnectionError('connection lost'), 6005),
+        (TimeoutError('timed out'), 6005),
+        (IOError('garbage'), 6016),
+    ],
+    ids=[
+        'ssh-exception-6005',
+        'eof-error-6005',
+        'connection-error-6005',
+        'timeout-error-6005',
+        'io-error-6016',
+    ],
+)
+def test_send_command_maps_transport_errors(mocker, paramiko_platform, error, expected_code):
+    """send_command maps transport errors to AutosubmitError and counts the failure."""
+    platform = paramiko_platform
+    # Disable the threshold so the mapping and counting are checked in isolation.
+    platform.config['PLATFORMS'] = {'LOCAL': {'MAX_TRANSPORT_RETRIALS': 0}}
+    mocker.patch('autosubmit.platforms.paramiko_platform.Log')
+    mocker.patch.object(platform, 'exec_command', side_effect=error)
+
+    with pytest.raises(AutosubmitError) as exc_info:
+        platform.send_command('dummy_command')
+
+    assert exc_info.value.code == expected_code
+    assert platform._consecutive_transport_failures == 1
+
+
+@pytest.mark.parametrize(
+    'error, connected, transport_present, transport_active, expected',
+    [
+        (paramiko.SSHException('boom'), True, True, True, True),
+        (EOFError('boom'), True, True, True, True),
+        (OSError('boom'), True, True, True, False),
+        (OSError('boom'), False, True, True, True),
+        (OSError('boom'), True, False, None, True),
+        (OSError('boom'), True, True, False, True),
+    ],
+    ids=[
+        'ssh-exception',
+        'eof-error',
+        'os-error-active-stays',
+        'os-error-disconnected',
+        'os-error-no-transport',
+        'os-error-inactive',
+    ],
+)
+def test_transport_stuck(paramiko_platform, mocker, error, connected, transport_present, transport_active, expected):
+    """A dead or stuck transport is always rebuilt, transient I/O errors depend on the state."""
+    platform = paramiko_platform
+    platform.connected = connected
+    if transport_present:
+        transport = mocker.MagicMock()
+        transport.is_active.return_value = transport_active
+        platform.transport = transport
+    else:
+        platform.transport = None
+
+    assert platform._transport_stuck(error) is expected
+
+
+@pytest.mark.parametrize(
+    'transport_present, active, send_ignore_error, expected',
+    [
+        (False, None, None, False),
+        (True, False, None, False),
+        (True, True, None, True),
+        (True, True, OSError('dead transport'), False),
+    ],
+    ids=['no-transport', 'inactive', 'alive', 'probe-fails'],
+)
+def test_is_connection_alive(paramiko_platform, mocker, transport_present, active, send_ignore_error, expected):
+    """The liveness probe reports a dead transport instead of trusting ``connected``."""
+    platform = paramiko_platform
+    if transport_present:
+        transport = mocker.MagicMock()
+        transport.is_active.return_value = active
+        transport.send_ignore.side_effect = send_ignore_error
+        platform.transport = transport
+    else:
+        platform.transport = None
+
+    assert platform._is_connection_alive() is expected
+
+
+@pytest.mark.parametrize(
+    'max_retrials, calls, expect_critical, expected_count',
+    [
+        (3, 2, False, 2),
+        (3, 3, True, 3),
+        (0, 5, False, 5),
+        (None, _DEFAULT_MAX_TRANSPORT_RETRIALS, True, _DEFAULT_MAX_TRANSPORT_RETRIALS),
+    ],
+    ids=['below-threshold', 'reaches-threshold', 'disabled', 'default-threshold'],
+)
+def test_record_transport_failure(paramiko_platform, max_retrials, calls, expect_critical, expected_count):
+    """Consecutive transport failures abort the run once the configured threshold is reached."""
+    platform = paramiko_platform
+    platform.config['PLATFORMS'] = {'LOCAL': {}}
+    if max_retrials is not None:
+        platform.config['PLATFORMS']['LOCAL']['MAX_TRANSPORT_RETRIALS'] = max_retrials
+    platform._consecutive_transport_failures = 0
+
+    if expect_critical:
+        with pytest.raises(AutosubmitCritical) as exc_info:
+            for _ in range(calls):
+                platform._record_transport_failure()
+        assert exc_info.value.code == 6005
+    else:
+        for _ in range(calls):
+            platform._record_transport_failure()
+
+    assert platform._consecutive_transport_failures == expected_count
+
+
+def test_reset_transport_failures(paramiko_platform):
+    """A successful command resets the consecutive transport failure counter."""
+    platform = paramiko_platform
+    platform._consecutive_transport_failures = 5
+
+    platform._reset_transport_failures()
+
+    assert platform._consecutive_transport_failures == 0

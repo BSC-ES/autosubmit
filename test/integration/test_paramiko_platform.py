@@ -35,6 +35,7 @@ from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.log.log import AutosubmitError
 from autosubmit.platforms.headers.slurm_header import SlurmHeader
+from autosubmit.platforms.paramiko_platform import _DEFAULT_MAX_TRANSPORT_RETRIALS
 from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.platforms.slurmplatform import SlurmPlatform
 
@@ -526,13 +527,15 @@ def test_exec_command_ssh_session_not_active(
         paramiko.ssh_exception.NoValidConnectionsError({'192.168.0.1': ValueError('failed')}),  # type: ignore
         ConnectionError('Someone unplugged the networking cable.'),
         socket.error('A random socket error occurred!'),
-        IOError('Someone plugged the cable off.')
+        IOError('Someone plugged the cable off.'),
+        EOFError('The remote end closed the connection.')
     ],
     ids=[
         'paramiko ssh exception',
         'connection error',
         'socket error',
-        'io error'
+        'io error',
+        'eof error'
     ]
 )
 @pytest.mark.ssh
@@ -743,6 +746,31 @@ def test_test_connection_already_connected(
 
         assert platform.connected
         assert platform.test_connection(as_conf) is None
+        assert platform.connected
+    finally:
+        platform.close_connection()
+
+
+@pytest.mark.ssh
+@pytest.mark.docker
+def test_test_connection_reconnects_when_connected_flag_is_stale(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server
+):
+    """``test_connection`` rebuilds a dead transport even when ``connected`` is still true."""
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+
+    try:
+        platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
+        assert platform.connected
+
+        # Drop the transport for real while leaving ``connected`` true
+        assert platform.transport is not None
+        platform.transport.close()
+
+        assert platform.test_connection(exp.as_conf) == "OK"
         assert platform.connected
     finally:
         platform.close_connection()
@@ -1000,3 +1028,40 @@ def test_failed_connection_raises_as_error(
     slurm_platform = SlurmPlatform(exp.expid, 'slurm_platform', platform_config, None)
     with pytest.raises(AutosubmitError):
         slurm_platform.restore_connection(None, log_recovery_process=False)
+
+
+@pytest.mark.parametrize("recoverable", [True, False], ids=["recovers", "aborts"])
+@pytest.mark.ssh
+@pytest.mark.docker
+def test_send_command_handles_real_transport_drop(
+        request: 'FixtureRequest',
+        get_experiment: Callable[['FixtureRequest'], 'AutosubmitExperiment'],
+        ssh_server,
+        mocker,
+        recoverable: bool
+):
+    """A real transport drop either recovers or aborts after ``MAX_TRANSPORT_RETRIALS``."""
+    exp = get_experiment(request)
+    platform = _get_platform(exp)
+
+    try:
+        platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
+
+        # Simulate the platform dropping the SSH session for real
+        assert platform.transport is not None
+        platform.transport.close()
+
+        if recoverable:
+            assert platform.send_command('whoami')
+            assert getuser() in platform.get_ssh_output()
+        else:
+            # The host stays unreachable, so every command fails and cannot recover.
+            mocker.patch.object(platform, 'restore_connection')
+
+            for _ in range(_DEFAULT_MAX_TRANSPORT_RETRIALS - 1):
+                with pytest.raises(AutosubmitError):
+                    platform.send_command('whoami')
+            with pytest.raises(AutosubmitCritical):
+                platform.send_command('whoami')
+    finally:
+        platform.close_connection()

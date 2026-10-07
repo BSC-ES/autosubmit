@@ -478,6 +478,12 @@ There are some other parameters that you may need to specify:
     * - ``CLEAR_TO_SEND_TIMEOUT``
       - How long Autosubmit waits for the login server when it is busy. Raise it if you see "key-exchange timed out" errors.
          Default: ``180``.
+    * - ``SSH_KEEPALIVE``
+      - Seconds of inactivity before Autosubmit sends a keepalive packet to keep the SSH session open.
+         Default: ``30``. Set to ``0`` to disable keepalives. This is the interval between packets, not a connection timeout.
+    * - ``MAX_TRANSPORT_RETRIALS``
+      - Number of consecutive SSH transport failures tolerated before Autosubmit stops the run instead of retrying the recovery.
+         Default: ``3``. Set to ``0`` to disable the limit.
 
 .. _request-exclusivity-reservation:
 
