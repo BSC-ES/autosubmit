@@ -42,9 +42,7 @@ def prepare_scratch(tmp_path: Path) -> Any:
     Create an isolated experiment using a temporary directory for each test.
 
     :param tmp_path: Temporary directory unique to the test.
-    :type tmp_path: Path
     :return: Configured experiment object.
-    :rtype: Any
     """
 
     def _prepare_scratch(expid: str) -> None:
@@ -115,25 +113,27 @@ def run_in_thread(target: Callable[..., Any], *args, **kwargs):
     return thread, result, stop_event
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, expid, run_type='simple') -> dict[
-    str, (bool, str)]:
+def _check_db_fields(run_tmpdir: Path, expected_entries, expid, run_type='simple') -> dict[str, Any]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.
-    job_data_db = run_tmpdir / f'metadata/data/job_data_{expid}.db'
+    run_tmpdir = run_tmpdir.resolve()
+
+    job_data_db = run_tmpdir / "metadata" / "data" / f"job_data_{expid}.db"
     autosubmit_db = Path(run_tmpdir, "tests.db")
-    db_check_list: dict = {
-        "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {str(job_data_db)} missing"),
-        "AUTOSUBMIT_DB_EXIST": (autosubmit_db.exists(), f"DB {str(autosubmit_db)} missing"),
-        "JOB_DATA_FIELDS": {}
+
+    db_check_list = {
+        "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {job_data_db} missing",),
+        "AUTOSUBMIT_DB_EXIST": (autosubmit_db.exists(), f"DB {autosubmit_db} missing",),
+        "JOB_DATA_FIELDS": {},
     }
 
     # Check job_data info
     with sqlite3.connect(job_data_db) as conn:
         conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT * FROM job_data ORDER BY job_name, counter")
-        rows = c.fetchall()
+        rows = conn.execute(
+            "SELECT * FROM job_data ORDER BY job_name, counter"
+        ).fetchall()
         db_check_list["JOB_DATA_ENTRIES"] = len(rows) == expected_entries, \
             f"Expected {expected_entries} entries, found {len(rows)}"
         # Convert rows to a list of dictionaries
@@ -470,15 +470,10 @@ def _build_failure_message(
     Build a human-readable failure message from DB and file check results.
 
     :param db_check_list: Result dict returned by :func:`_check_db_fields`.
-    :type db_check_list: dict
     :param files_check_list: Result dict returned by :func:`_check_files_recovered`.
-    :type files_check_list: dict
     :param run_tmpdir: Root directory of the experiment run.
-    :type run_tmpdir: Path
     :param expid: Experiment identifier.
-    :type expid: str
     :return: Multi-line string describing every failing check.
-    :rtype: str
     """
     from autosubmit.config.basicconfig import (
         BasicConfig,  # local import to avoid circular deps
@@ -536,13 +531,9 @@ def assert_run_results(
     :func:`_build_failure_message` into a single call so test bodies stay concise.
 
     :param db_check_list: Result dict returned by :func:`_check_db_fields`.
-    :type db_check_list: dict
     :param files_check_list: Result dict returned by :func:`_check_files_recovered`.
-    :type files_check_list: dict
     :param run_tmpdir: Root directory of the experiment run.
-    :type run_tmpdir: Path
     :param expid: Experiment identifier.
-    :type expid: str
     :raises pytest.fail: If any check fails, with a full diagnostic message.
     """
     import pytest as _pytest  # local import so conftest stays importable outside pytest

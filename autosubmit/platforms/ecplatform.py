@@ -476,12 +476,12 @@ class EcPlatform(ParamikoPlatform):
     def send_file(self, filename, check=True) -> bool:
         self.check_remote_log_dir()
         self.delete_file(filename)
-        command = f'{self.put_cmd} {os.path.join(self.tmp_path, filename)} {self.host}:{os.path.join(self.get_files_path(), os.path.basename(filename))}'
+        command = f'{self.put_cmd} {os.path.join(self.tmp_path, filename)} {self.host}:{os.path.join(self.files_path, os.path.basename(filename))}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError as e:
             raise AutosubmitError('Could not send file {0} to {1}'.format(os.path.join(self.tmp_path, filename),
-                                                                          os.path.join(self.get_files_path(),
+                                                                          os.path.join(self.files_path,
                                                                                        filename)), 6005, str(e))
         return True
 
@@ -519,7 +519,7 @@ class EcPlatform(ParamikoPlatform):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        command = f'{self.get_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)} {file_path}'
+        command = f'{self.get_cmd} {self.host}:{os.path.join(self.files_path, filename)} {file_path}'
         try:
             retries = 0
             sleeptime = 5
@@ -572,12 +572,12 @@ class EcPlatform(ParamikoPlatform):
         return None
 
     def delete_file(self, filename: str) -> bool:
-        command = f'{self.del_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)}'
+        command = f'{self.del_cmd} {self.host}:{os.path.join(self.files_path, filename)}'
         try:
             FNULL = open(os.devnull, 'w')
             subprocess.check_call(command, stdout=FNULL, stderr=FNULL, shell=True)
         except subprocess.CalledProcessError:
-            Log.debug('Could not remove file {0}', os.path.join(self.get_files_path(), filename))
+            Log.debug('Could not remove file {0}', os.path.join(self.files_path, filename))
             return False
         return True
 

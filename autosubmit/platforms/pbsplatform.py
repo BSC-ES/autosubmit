@@ -425,7 +425,7 @@ class PBSPlatform(ParamikoPlatform):
             try:
                 # This return IOError if a path does not exist
                 self._ftpChannel.stat(os.path.join(
-                    self.get_files_path(), src))
+                    self.files_path, src))
                 file_exist = True
             except OSError:  # File does not exist, retry in sleeptime
                 sleep(sleeptime)

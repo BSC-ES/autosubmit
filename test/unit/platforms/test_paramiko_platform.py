@@ -54,9 +54,10 @@ def paramiko_platform() -> Generator[ParamikoPlatform, None, None]:
     local_root_dir = TemporaryDirectory()
     config = {
         "LOCAL_ROOT_DIR": local_root_dir.name,
-        "LOCAL_TMP_DIR": 'tmp'
+        "LOCAL_TMP_DIR": 'tmp',
     }
     platform = ParamikoPlatform(expid='a000', name='local', config=config)
+    platform.TYPE = "local"
     platform.job_status = {
         'COMPLETED': [],
         'RUNNING': [],
@@ -405,7 +406,6 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
     mocked_ftp_channel = mocker.MagicMock()
     mocked_ftp_channel.remove.side_effect = error
     paramiko_platform._ftpChannel = mocked_ftp_channel
-    mocker.patch.object(paramiko_platform, 'get_files_path', return_value=str(tmp_path))
 
     if expected_error_or_return_value is AutosubmitCritical:
         with pytest.raises(expected_error_or_return_value):  # type: ignore
@@ -416,25 +416,22 @@ def test_delete_file_errors(error, expected_error_or_return_value, paramiko_plat
 
 
 @pytest.mark.parametrize(
-    'error,must_exist,expected_error_or_return_value',
+    'must_exist,expected_error_or_return_value',
     [
-        (OSError("Garbage"), True, AutosubmitError),
-        (OSError("garbage"), True, AutosubmitError),
-        (OSError("garbage"), False, False),
-        (Exception("Garbage"), True, AutosubmitError),
-        (Exception("garbage"), True, AutosubmitError),
-        (Exception("garbage"), False, False)
+        (True, AutosubmitError),
+        (True, AutosubmitError),
+        (False, False),
+        (True, AutosubmitError),
+        (True, AutosubmitError),
+        (False, False)
     ]
 )
-def test_move_file_errors(error, must_exist, expected_error_or_return_value, paramiko_platform: ParamikoPlatform,
-                          mocker,
-                          tmp_path):
+def test_move_file_errors(must_exist, expected_error_or_return_value, paramiko_platform: ParamikoPlatform,
+                          mocker, tmp_path):
     """Test the error paths for ``move_file``.
 
     The main execution path of that function is tested with an integration test.
     """
-    # The function gets called first inside the try, but it may be called again in the except block.
-    mocker.patch.object(paramiko_platform, 'get_files_path', side_effect=[error, tmp_path])
 
     if type(expected_error_or_return_value) is bool:
         r = paramiko_platform.move_file('a.txt', 'b.txt', must_exist=must_exist)

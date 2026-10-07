@@ -292,7 +292,7 @@ class LocalPlatform(ParamikoPlatform):
         # This function has a short sleep as the files are locally
         sleeptime = 1
         for i in range(max_retries):
-            if Path(self.get_files_path(), src).is_file():
+            if Path(self.files_path, src).is_file():
                 return True
             sleep(sleeptime)
         if show_logs:
@@ -324,7 +324,7 @@ class LocalPlatform(ParamikoPlatform):
         """
         path_root = ""
         try:
-            path_root = self.get_files_path()
+            path_root = self.files_path
             os.rename(os.path.join(path_root, src), os.path.join(path_root, dest))
             return True
         except OSError as e:
@@ -335,11 +335,11 @@ class LocalPlatform(ParamikoPlatform):
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exist', 6004, str(e))
+                raise AutosubmitError(f'File {os.path.join(self.files_path, src)} does not exist', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exist", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(self.files_path, src)} does not exist", 6004, str(e))
             else:
-                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
+                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.files_path, src)}", 5001)
                 return False
 
     def get_ssh_output(self):

@@ -624,7 +624,7 @@ class ParamikoPlatform(Platform):
             open(multiple_delete_previous_run, 'wb+').write(("rm -f" + filenames).encode(lang))
             os.chmod(multiple_delete_previous_run, 0o770)
             self.send_file(multiple_delete_previous_run, False)
-            command = os.path.join(self.get_files_path(),
+            command = os.path.join(self.files_path,
                                    "multiple_delete_previous_run.sh")
             if self.send_command(command, ignore_log=True):
                 return self._ssh_output
@@ -635,7 +635,7 @@ class ParamikoPlatform(Platform):
             self.check_remote_log_dir()
             self.delete_file(filename)
         local_path = os.path.join(self.tmp_path, filename)
-        remote_path = os.path.join(self.get_files_path(), os.path.basename(filename))
+        remote_path = os.path.join(self.files_path, os.path.basename(filename))
         try:
             self._ftpChannel.put(local_path, remote_path)
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
@@ -703,7 +703,7 @@ class ParamikoPlatform(Platform):
         file_path = os.path.join(local_path, filename)
         if os.path.exists(file_path):
             os.remove(file_path)
-        remote_path = os.path.join(self.get_files_path(), filename)
+        remote_path = os.path.join(self.files_path, filename)
         try:
             self._ftpChannel.get(remote_path, file_path)
 
@@ -744,7 +744,7 @@ class ParamikoPlatform(Platform):
         :return: True if successful or file does not exist
         :rtype: bool
         """
-        remote_file = Path(self.get_files_path()) / filename
+        remote_file = Path(self.files_path) / filename
         try:
             self._ftpChannel.remove(str(remote_file))
             return True
@@ -775,7 +775,7 @@ class ParamikoPlatform(Platform):
         """
         path_root = ""
         try:
-            path_root = self.get_files_path()
+            path_root = self.files_path
             src = os.path.join(path_root, src)
             dest = os.path.join(path_root, dest)
             try:
@@ -794,11 +794,11 @@ class ParamikoPlatform(Platform):
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exist', 6004, str(e))
+                raise AutosubmitError(f'File {os.path.join(self.files_path, src)} does not exist', 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exist", 6004, str(e))
+                raise AutosubmitError(f"File {os.path.join(self.files_path, src)} does not exist", 6004, str(e))
             else:
-                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
+                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.files_path, src)}", 5001)
                 return False
 
     def get_job_energy_cmd(self, job_id):
@@ -1965,7 +1965,7 @@ class ParamikoPlatform(Platform):
         while not file_exist and retries < max_retries:
             try:
                 # This return IOError if path does not exist
-                self._ftpChannel.stat(str(Path(self.get_files_path(), src)))
+                self._ftpChannel.stat(str(Path(self.files_path, src)))
                 file_exist = True
             except OSError:  # File does not exist, retry in sleeptime
                 if not wrapper_failed:
