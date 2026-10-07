@@ -164,7 +164,9 @@ The tests live in `test/integration/commands/test_performance.py` and are marked
 with `profile` (quick) and `profilelong`. They use [pytest-benchmark](https://pytest-benchmark.readthedocs.io)
 and the Autosubmit Profiler; the wall-clock time is measured by pytest-benchmark
 and the profiler metrics (memory, DB sizes, file descriptors, ...) are stored in
-each run's `extra_info`.
+each run's `extra_info`. The comparison subtracts the profiler's own resident
+memory (`PROFILER OVERHEAD(MiB)`) from the memory metrics, so they reflect a
+plain run rather than the profiling harness.
 
 The results are stored as pytest-benchmark JSON runs under `.benchmarks/data`
 and a comparison against the stored baseline is produced by
@@ -293,13 +295,15 @@ needs a small change in `.benchmarks/compare_results.py`:
 * **Test type**: add it to `_RUN_TEST_TYPES` (carries the profiler growth
   metrics) or `_OTHER_TEST_TYPES` (time/memory/DB metrics), or add a new plot
   entry in `render_heatmaps()`. If the new type should not carry the growth
-  metrics (`FD GROWTH`, `MEM GROWTH(MIB)`), also add it to
+  metrics (`FILE DESCRIPTORS GROWTH`, `MEMORY GROWTH(MiB)`), also add it to
   `_NO_GROWTH_TEST_TYPES`.
 * **Metric**: add it to `METRIC_COLUMNS` so `build_frame()` stores it (and it
   shows up in the markdown tables), then to the matching plot metric list
-  (`_RUN_PLOT_METRICS` or `_OTHER_PLOT_METRICS`) so the plot renders it. The
-  test must write it into `benchmark.extra_info` (see
-  `_collect_profiler_metrics` in `test/integration/commands/test_performance.py`).
+  (`_RUN_PLOT_METRICS` or `_OTHER_PLOT_METRICS`) so the plot renders it. A metric
+  can also be table-only by leaving it out of the plot lists, like
+  `PROFILER OVERHEAD(MiB)`. The test must write it into `benchmark.extra_info`
+  (see `_collect_profiler_metrics` in
+  `test/integration/commands/test_performance.py`).
 
 ## Test GitHub Actions locally
 

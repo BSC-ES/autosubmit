@@ -187,6 +187,12 @@ def _find(pattern: str, text: str, default: Any = None) -> Any:
     return match.group(1) if match else default
 
 
+def _match_mib(pattern: str, text: str) -> float | None:
+    """Return the matched ``<value> <unit>`` converted to MiB, or None."""
+    match = re.search(pattern, text)
+    return to_mib(match.group(1), match.group(2)) if match else None
+
+
 def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path: Path,
                               base_id: str | None = None) -> dict:
     """Extract the profiler metrics from the latest profile report.
@@ -215,8 +221,7 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
     total_dependencies = len(job_list.graph.edges)
     total_jobs = len(job_list.graph.nodes)
 
-    memory_match = re.search(r"FINAL MEMORY: (\d+\.\d+) ([A-Za-z]+)\.", text)
-    memory_consumption = to_mib(memory_match.group(1), memory_match.group(2)) if memory_match else None
+    memory_consumption = _match_mib(r"FINAL MEMORY: (\d+\.\d+) ([A-Za-z]+)\.", text)
 
     # Disk usage (sqlite only for now)
     db_path = Path(tmp_path / as_exp.expid / "db" / "job_list.db")
@@ -233,23 +238,21 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
         metadata_size = 0
 
     fd_growth = _find(r"FILE DESCRIPTORS GROWTH: (\d+)", text)
-    mem_grow_match = re.search(r"MEMORY GROWTH: (-?\d+\.\d+) ([A-Za-z]+)\.", text)
-    if mem_grow_match:
-        mem_growth = to_mib(mem_grow_match.group(1), mem_grow_match.group(2))
-    else:
-        mem_growth = None
+    mem_growth = _match_mib(r"MEMORY GROWTH: (-?\d+\.\d+) ([A-Za-z]+)\.", text)
+    profiler_overhead = _match_mib(r"PROFILER OVERHEAD: (\d+\.\d+) ([A-Za-z]+)\.", text)
 
     return {
         "test type": test_type,
         "ID": run_id,
         "base": base_id or run_id,
-        "Memory consumption(MiB)": float(memory_consumption) if memory_consumption else None,
+        "Memory consumption(MiB)": memory_consumption,
         "Historical DB Disk Usage(MiB)": float(metadata_size),
         "Job list DB Usage": float(db_size),
         "Total Jobs": total_jobs,
         "Total Dependencies": total_dependencies,
         "FILE DESCRIPTORS GROWTH": fd_growth,
         "MEMORY GROWTH(MiB)": mem_growth,
+        "PROFILER OVERHEAD(MiB)": profiler_overhead,
     }
 
 

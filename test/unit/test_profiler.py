@@ -17,6 +17,7 @@
 
 import gc
 import os
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -32,7 +33,6 @@ from autosubmit.profiler.profiler import (
     ProfilerState,
     _generate_title,
     _get_current_memory,
-    _get_current_object_count,
     _get_current_open_fds,
     _get_current_open_fds_names,
     _get_fd_connection_map,
@@ -107,14 +107,15 @@ def started_profiler(profiler, mocker):
 
 
 @pytest.fixture
-def checkpoint_mocks(mocker):
+def checkpoint_mocks(profiler, mocker):
     mocker.patch("gc.collect")
     mocker.patch(
         "autosubmit.profiler.profiler._get_current_memory",
         return_value=1000,
     )
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_object_count",
+    mocker.patch.object(
+        profiler,
+        "_capture_object_count",
         return_value=200,
     )
     mocker.patch(
@@ -415,8 +416,9 @@ def test_iteration_checkpoint_max_checkpoints(mocker):
         "autosubmit.profiler.profiler._get_current_memory",
         return_value=1000,
     )
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_object_count",
+    mocker.patch.object(
+        profiler,
+        "_capture_object_count",
         return_value=200,
     )
     mocker.patch(
@@ -449,8 +451,9 @@ def test_checkpoint_takes_snapshot(profiler, mocker):
         "autosubmit.profiler.profiler._get_current_memory",
         return_value=1000,
     )
-    mocker.patch(
-        "autosubmit.profiler.profiler._get_current_object_count",
+    mocker.patch.object(
+        profiler,
+        "_capture_object_count",
         return_value=200,
     )
     mocker.patch(
@@ -894,14 +897,22 @@ def test_get_current_memory(mocker):
     process.assert_called_once_with(os.getpid())
 
 
-def test_get_current_object_count(mocker):
+@pytest.mark.parametrize("objects_by_call, expected_overhead", [
+    pytest.param([[1, 2, 3]], sys.getsizeof([1, 2, 3]), id="single-call"),
+    pytest.param([[1] * 100, [1]], sys.getsizeof([1] * 100), id="keeps-largest"),
+])
+def test_capture_object_count_records_overhead(profiler, mocker, objects_by_call, expected_overhead):
+    """Each gc.get_objects() list is measured, and only the largest is kept."""
     objects = mocker.patch(
         "autosubmit.profiler.profiler.gc.get_objects",
-        return_value=[1, 2, 3],
+        side_effect=objects_by_call,
     )
 
-    assert _get_current_object_count() == 3
-    objects.assert_called_once()
+    counts = [profiler._capture_object_count() for _ in objects_by_call]
+
+    assert counts == [len(objs) for objs in objects_by_call]
+    assert profiler._profiler_overhead_bytes == expected_overhead
+    assert objects.call_count == len(objects_by_call)
 
 
 def _patch_process_with_num_fds(mocker):
@@ -1423,3 +1434,17 @@ def test_report_includes_all_sections(
     # tracemalloc/object traceback section
     assert "Unique object tracebacks between iterations:" in report
     assert str(traceback) in report
+
+
+def test_report_includes_profiler_overhead(profiled_profiler, report_setup):
+    """The report states the memory the profiler itself keeps resident."""
+    profiler = profiled_profiler
+    profiler._mem_init = 100
+    profiler._mem_final = 200
+    profiler._profiler_overhead_bytes = 2 * 1024 * 1024
+
+    profiler._report()
+
+    report = (report_setup / "profile.txt").read_text(encoding="UTF-8")
+
+    assert "PROFILER OVERHEAD: 2.00 MiB." in report

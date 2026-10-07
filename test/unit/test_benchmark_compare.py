@@ -454,3 +454,24 @@ def test_plot_order_includes_or_excludes_heavy_scenario(test_types, excluded, sc
     order = compare._plot_order(current, test_types, scenario_ids=scenario_ids,
                                 excluded_scenarios=excluded)
     assert {current.loc[(tt, rid), "base"] for tt, rid in order} == expected_bases
+
+
+@pytest.mark.parametrize("overhead, expected_mem, expected_growth", [
+    pytest.param(4.0, 96.0, 26.0, id="subtracts-overhead"),
+    pytest.param(None, 100.0, 30.0, id="no-overhead-unchanged"),
+])
+def test_build_frame_discards_profiler_overhead(overhead, expected_mem, expected_growth):
+    """The profiler's resident memory is removed from the memory metrics."""
+    extra = {**_baseline_entry(), "Memory consumption(MiB)": 100.0, "MEMORY GROWTH(MiB)": 30.0}
+    if overhead is not None:
+        extra["PROFILER OVERHEAD(MiB)"] = overhead
+
+    frame = compare.build_frame(_make_run(_make_entry("run", "run", "4m/2c/6s", 10.0, **extra)))
+
+    row = frame.loc[("run", "4m/2c/6s")]
+    assert row["Memory consumption(MiB)"] == expected_mem
+    assert row["MEMORY GROWTH(MiB)"] == expected_growth
+    if overhead is None:
+        assert pd.isna(row["PROFILER OVERHEAD(MiB)"])
+    else:
+        assert row["PROFILER OVERHEAD(MiB)"] == overhead

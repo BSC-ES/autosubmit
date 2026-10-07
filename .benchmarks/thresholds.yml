@@ -36,6 +36,11 @@ metrics:
   MEMORY GROWTH(MiB):
     threshold: 15.0
     floor: 2.0
+  # Informational: the profiler's own resident memory, already removed from the
+  # memory metrics. It tracks the workload, so it must never flag a regression.
+  PROFILER OVERHEAD(MiB):
+    threshold: 100.0
+    floor: 1000.0
 
 exact_metrics:
   - Total Jobs

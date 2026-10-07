@@ -84,6 +84,9 @@ class Profiler:
         self.max_checkpoints = max_checkpoints
         self.checkpoints = 0
 
+        # Memory the profiler itself keeps resident (see ``_capture_object_count``)
+        self._profiler_overhead_bytes = 0
+
         # Error handling
         self._state = ProfilerState.STOPPED
 
@@ -165,7 +168,7 @@ class Profiler:
         gc.collect()
 
         self._mem_iteration.append(_get_current_memory())
-        self._obj_iteration.append(_get_current_object_count())
+        self._obj_iteration.append(self._capture_object_count())
 
         self._fd_iteration.append(_get_current_open_fds())
         self._fd_names_iteration.append(_get_current_open_fds_names())
@@ -188,6 +191,20 @@ class Profiler:
                 # send signal so Autosubmit.exit is 1
                 return True
         return False
+
+    def _capture_object_count(self) -> int:
+        """Return the tracked-object count, recording the profiler's memory overhead.
+
+        Recording it lets the benchmark subtract the overhead and
+        report what a plain run would have used.
+
+        :return: The number of tracked Python objects.
+        """
+        objects = gc.get_objects()
+        self._profiler_overhead_bytes = max(
+            self._profiler_overhead_bytes, sys.getsizeof(objects)
+        )
+        return len(objects)
 
     def stop(self) -> None:
         """Finish the profiling process and generate reports.
@@ -394,6 +411,9 @@ class Profiler:
                 report += f"\nOBJECTS GROWTH: {self._obj_total_growth} objects."
                 report += f"\nFILE DESCRIPTORS GROWTH: {self._fd_total_growth} file descriptors.\n"
 
+            overhead_val, overhead_unit = bytes_to_unit(self._profiler_overhead_bytes)
+            report += f"\nPROFILER OVERHEAD: {overhead_val:.2f} {overhead_unit}."
+
             # final list of fds opened.
             fd_names = _get_current_open_fds_names()
             report += "\nFINAL OPEN FILE DESCRIPTORS:\n"
@@ -442,14 +462,6 @@ def _get_current_memory() -> int:
     :return: The current memory used by the process in Bytes.
     """
     return Process(os.getpid()).memory_info().rss
-
-
-def _get_current_object_count() -> int:
-    """Return total number of tracked Python objects.
-
-    :return: The count of all tracked objects.
-    """
-    return len(gc.get_objects())
 
 
 def _get_current_open_fds() -> int | None:

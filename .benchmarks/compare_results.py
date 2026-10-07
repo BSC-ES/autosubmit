@@ -68,9 +68,14 @@ METRIC_COLUMNS = [
     "Job list DB Usage",
     "FILE DESCRIPTORS GROWTH",
     "MEMORY GROWTH(MiB)",
+    "PROFILER OVERHEAD(MiB)",
 ] + EXACT_METRICS
 """Metric names from ``benchmark.extra_info`` plus the wall-clock time that
-pytest-benchmark records in ``stats.median``."""
+pytest-benchmark records in ``stats.median``.
+
+``PROFILER OVERHEAD(MiB)`` is the memory the profiling harness itself keeps
+resident. It is subtracted from the memory metrics so the report reflects a
+plain run (see ``build_frame``)."""
 
 _GROWTH_METRICS = {"FILE DESCRIPTORS GROWTH", "MEMORY GROWTH(MiB)"}
 """Profiler growth metrics, only meaningful for the ``run`` scenarios."""
@@ -101,6 +106,7 @@ _SHORT_METRICS = {
     "Time Taken(Seconds)": "Time (s)",
     "Memory consumption(MiB)": "Memory (MiB)",
     "MEMORY GROWTH(MiB)": "MEM growth (MiB)",
+    "PROFILER OVERHEAD(MiB)": "Profiler (MiB)",
     "FILE DESCRIPTORS GROWTH": "FD growth",
     "Historical DB Disk Usage(MiB)": "Hist DB (KiB)",
     "Job list DB Usage": "Job DB (KiB)",
@@ -282,6 +288,10 @@ def build_frame(run: dict) -> pd.DataFrame:
     for col in METRIC_COLUMNS:
         frame[col] = pd.to_numeric(frame[col], errors="coerce")
 
+    overhead = frame["PROFILER OVERHEAD(MiB)"].fillna(0)
+    frame["Memory consumption(MiB)"] = frame["Memory consumption(MiB)"] - overhead
+    frame["MEMORY GROWTH(MiB)"] = frame["MEMORY GROWTH(MiB)"] - overhead
+
     return frame.set_index(["test type", "ID"])
 
 
@@ -290,7 +300,7 @@ def _safe_pct(current: float | None, previous: float | None) -> float | None:
 
     Computed as ``(current - previous) / |previous|`` so the sign always
     reflects the direction of change of the metric itself: a release (e.g.
-    MEM GROWTH going -23 -> -27) is a negative delta, not a regression.
+    MEMORY GROWTH going -23 -> -27) is a negative delta, not a regression.
 
     :param current: Current value.
     :param previous: Baseline value.

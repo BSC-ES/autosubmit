@@ -35,7 +35,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Allow recovery to update current running/ready jobs #1251
 - `autosubmit` Bash autocomplete #1227 #3171
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
-- Introduced a performance benchmark suite and a `metrics` workflow that profiles `create`, `run`, `recovery` and `setstatus`, compares each run against a per-CPU baseline stored on the `benchmark-reference` branch, and posts a regression report (tables, heatmap plots and artifact download links) on PRs labeled `perf-benchmark`. Maintainers can also trigger it manually with `/metrics`, `/metrics_full` and `/metrics_promote`. #2696 #3162
+- Introduced a performance benchmark suite and a `metrics` workflow that profiles `create`, `run`, `recovery` and `setstatus`, compares each run against a per-CPU baseline stored on the `benchmark-reference` branch, and posts a regression report (tables, heatmap plots and artifact download links) on PRs labeled `perf-benchmark`. Maintainers can also trigger it manually with `/metrics`, `/metrics_full` and `/metrics_promote`. The report subtracts the profiler's own resident overhead from the memory metrics so they reflect a plain run. #2696 #3162
 - Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
 - Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
 
