@@ -4,10 +4,24 @@ Inspect & Debug Tools
 .. contents::
    :local:
    :depth: 2
+   :backlinks: none
 
 
-Inspect ( dry-run )
--------------------
+Overview
+--------
+
+Autosubmit provides debugging tools to help diagnose configuration and parameter
+substitution issues **before** submitting jobs to a platform. The primary tool
+for this is the ``inspect`` command, also known as **dry-run mode**.
+
+Dry-run mode generates job scripts locally without connecting to any remote
+platform, making it fast and safe for iterative debugging. The ``inspect``
+command renders the final job scripts as Autosubmit would submit them, so you
+can verify all your ``.cmd`` templates inexpensively.
+
+
+Inspect (dry-run)
+-----------------
 
 Generate all ``.cmd`` files for a given experiment without submitting jobs to
 any remote platform. This is the primary tool for debugging configuration and
@@ -44,29 +58,14 @@ template issues offline.
    * - ``-q``, ``--quick``
      - Only check one job per section.
 
-Overview
---------
-
-
-Autosubmit provides debugging tools to help diagnose configuration and parameter
-substitution issues **before** submitting jobs to a platform. The primary tool
-for this is the ``inspect`` command, also known as **dry-run mode**.
-
-Dry-run mode generates job scripts locally without connecting to any remote
-platform, making it fast and safe for iterative debugging.
-
-The ``inspect`` command renders the final job scripts as Autosubmit would
-submit them. When combined with the ``--quick`` flag, it only processes one job
-per section, allowing you to verify all your ``.cmd`` templates inexpensively.
-
 
 Filters
 -------
 
 You can limit the jobs to inspect using the same filters available to the
-`monitor`, `recovery` and `setstatus` commands: `-fl` (filter by job names), 
-`-fc` (filter by chunks), `-fs` (filter by status), and `-ft` (filter by section). 
-Concadenating multiple filters applies a logical AND (intersection), meaning a 
+``monitor``, ``recovery`` and ``setstatus`` commands: ``-fl`` (filter by job names),
+``-fc`` (filter by chunks), ``-fs`` (filter by status), and ``-ft`` (filter by section).
+Concatenating multiple filters applies a logical AND (intersection), meaning a
 job must match all provided filters to be selected.
 
 Example (combined filters):
@@ -79,8 +78,7 @@ Example (combined filters):
 What inspect checks
 -------------------
 
-
-Parameter Substitution
+Parameter substitution
 ^^^^^^^^^^^^^^^^^^^^^^
 
 Autosubmit replaces ``%VARIABLE%`` placeholders in templates with values
@@ -117,7 +115,7 @@ Use ``inspect`` to catch this before submission:
    autosubmit inspect a000 --quick
 
 
-CMD Syntax Validation
+CMD syntax validation
 ^^^^^^^^^^^^^^^^^^^^^
 
 When ``VALIDATE: True`` is set under a job in your configuration, the
@@ -127,11 +125,13 @@ job per section efficiently.
 
 To enable syntax validation for a job:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-   JOBS:
-       JOB:
-           VALIDATE: True
+   .. code-block:: yaml
+
+      JOBS:
+         JOB:
+            VALIDATE: True
 
 After running:
 
@@ -150,14 +150,15 @@ in the command output.
    ``autosubmit run``.
 
 
-
-Common Debugging Workflow
+Common debugging workflow
 -------------------------
 
 The recommended workflow to debug parameter issues before submission:
 
 1. **Edit** your jobs configuration (``conf/*.yml``). Add ``VALIDATE: True``
    to enable syntax checks in rendered scripts.
+
+.. tab-set-code::
 
    .. code-block:: yaml
 

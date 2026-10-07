@@ -103,8 +103,8 @@ benchmark = [
 ]
 docs = [
     "livereload",
-    "pydata-sphinx-theme>=0.16.1,<0.20",
-    "sphinx>=5,<10",
+    "pydata-sphinx-theme>=0.22,<0.23; python_version >= '3.11'",
+    "sphinx>=8.2,<10; python_version >= '3.11'",
     "sphinx-autobuild>=2021.3,<2025.9",
     "sphinx_rtd_theme",
     "sphinx-reredirects>=0.1,<1.2",

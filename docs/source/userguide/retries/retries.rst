@@ -97,20 +97,24 @@ for example when the platform may be under maintenance.
 Example
 -------
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    CONFIG:
-        RETRIALS: 3
-        DELAY_RETRY_TIME: +30    # wait 30, 60, 90 seconds between retries
+  .. code-block:: yaml
+
+      CONFIG:
+          RETRIALS: 3
+          DELAY_RETRY_TIME: +30    # wait 30, 60, 90 seconds between retries
 
 A per-job override on the retry count:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    JOBS:
-        POST:
-            FILE: templates/post.sh
-            RETRIALS: 5
+  .. code-block:: yaml
+
+      JOBS:
+          POST:
+              FILE: templates/post.sh
+              RETRIALS: 5
 
 Wrapper retries
 ---------------
