@@ -975,7 +975,7 @@ def test_get_completed_job_names(
     platform = _get_platform(exp)
     try:
         platform.connect(exp.as_conf, reconnect=False, log_recovery_process=False)
-        platform.remote_log_dir = f"/tmp/{platform.expid}/autosubmit_test_logs/"
+        platform.remote_log_dir = Path(f"/tmp/{platform.expid}/autosubmit_test_logs/")
         platform.send_command(f"mkdir -p {platform.remote_log_dir}", ignore_log=True)
         for job_name in real_completed_jobs:
             completed_file = Path(platform.remote_log_dir) / f"{job_name}_COMPLETED"
