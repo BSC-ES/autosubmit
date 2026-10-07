@@ -14,8 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
-
-import multiprocessing as mp
+import multiprocessing
 import os
 import pwd
 import time
@@ -83,12 +82,14 @@ def _create_recovery_files(tmp_path, platform: LocalPlatform, expid: str = "t000
     return job, log_dir
 
 
-def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
+def test_log_recovery_no_keep_alive(prepare_test, local, as_conf: 'AutosubmitConfig', mocker):
     # Exercise the production start method. Spawn starts a fresh interpreter,
     # which is also the path that needs separate coverage collection.
+    fork_context = multiprocessing.get_context("fork")
+
     mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("spawn"),
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
     )
     local.config["LOG_RECOVERY_TIMEOUT"] = 1
 
@@ -106,10 +107,12 @@ def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
     local.cleanup_event.set()
 
 
-def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
+def test_log_recovery_keep_alive(prepare_test, local, as_conf: 'AutosubmitConfig', mocker):
+    fork_context = multiprocessing.get_context("fork")
+
     mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
     )
     local.config["LOG_RECOVERY_TIMEOUT"] = 1
     local.spawn_log_retrieval_process(as_conf)
@@ -123,10 +126,12 @@ def test_log_recovery_keep_alive(prepare_test, local, mocker, as_conf):
     assert local.log_recovery_process.is_alive() is False
 
 
-def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
+def test_log_recovery_keep_alive_cleanup(prepare_test, local, as_conf: 'AutosubmitConfig', mocker):
+    fork_context = multiprocessing.get_context("fork")
+
     mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
     )
     local.config["LOG_RECOVERY_TIMEOUT"] = 0
     local.spawn_log_retrieval_process(as_conf)
@@ -283,16 +288,18 @@ def test_recovery_persisted_before_crash_is_not_requeued(
 def test_wait_for_work(
     prepare_test,
     local,
-    as_conf,
+    as_conf: 'AutosubmitConfig',
     mocker,
-    cleanup_event,
-    work_event,
-    recovery_queue_full,
-    result,
+    cleanup_event: bool,
+    work_event: bool,
+    recovery_queue_full: bool,
+    result: bool,
 ):
+    fork_context = multiprocessing.get_context("fork")
+
     mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
     )
     local.config["LOG_RECOVERY_TIMEOUT"] = 2
     # This is needed, because in this occasion we are testing the function from the main process
@@ -404,12 +411,8 @@ def test_create_a_new_copy(local, pjm, slurm, ps_platform, ecaccess):
     assert ecaccess.create_a_new_copy().name == ecaccess.name
 
 
-def test_worker_events_no_duplicates(local, mocker):
+def test_worker_events_no_duplicates(local):
     """Verify that update_workers() does not add the same event twice."""
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
     Platform.worker_events.clear()
     local.prepare_process()
     # prepare_process adds one event; verify adding the same one again doesn't duplicate
@@ -422,9 +425,11 @@ def test_worker_events_no_duplicates(local, mocker):
 
 def test_clean_log_recovery_process_removes_worker_event(local, mocker):
     """Cleaning the process must not leave stale worker events behind on respawn."""
+    fork_context = multiprocessing.get_context("fork")
+
     mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
     )
     Platform.worker_events.clear()
     local.prepare_process()
@@ -473,11 +478,13 @@ def test_add_job_returns_false_without_queueing(local, as_conf, job_id, disable_
     assert job.updated_log == 0
 
 
-def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
-    """Verify cleanup does not hang when child has crashed."""
+def test_clean_log_recovery_process_with_dead_child(local, as_conf: 'AutosubmitConfig', mocker):
+    """Verify clean-up does not hang when child has crashed."""
+    fork_context = multiprocessing.get_context("fork")
+
     mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
     )
     local.config["LOG_RECOVERY_TIMEOUT"] = 1
     local.spawn_log_retrieval_process(as_conf)

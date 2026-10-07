@@ -1470,7 +1470,7 @@ class Job:
         # Compress if enabled
         for idx, remote_log in enumerate(remote_logs):
             log_full_path = Path(
-                self.platform.get_files_path(), remote_log
+                self.platform.files_path, remote_log
             )
             if self.platform.compress_remote_logs:
                 compressed_path = self.platform.compress_file(str(log_full_path))
@@ -1577,7 +1577,7 @@ class Job:
                     result_local = self.local_logs
                     result_remote = self.remote_logs
             else:
-                remote_out = Path(self.platform.get_files_path(), self.remote_logs[0])
+                remote_out = Path(self.platform.files_path, self.remote_logs[0])
                 parsed_id = self.platform.read_jobid_from_remote_log(str(remote_out))
                 if parsed_id is not None:
                     self.id = parsed_id
@@ -1745,9 +1745,9 @@ class Job:
         # Check if the job platform is a subclass of ParamikoPlatform
         # TODO: Every platform is an instance of Paramiko, no?
         if isinstance(self.platform, ParamikoPlatform):
-            base_path = Path(self.platform.remote_log_dir)
+            base_path = self.platform.remote_log_dir
         else:
-            base_path = Path(self.platform.root_dir).joinpath(self.expid)
+            base_path = self.platform.root_dir.joinpath(self.expid)
 
         # Get the defined metric folder from the configuration if it exists
         try:
@@ -1784,9 +1784,9 @@ class Job:
         parameters['CURRENT_HYPERTHREADING'] = parameters.get('CURRENT_HYPERTHREADING', self.platform.hyperthreading)
         parameters['CURRENT_TYPE'] = parameters.get('CURRENT_TYPE', self.platform.TYPE.value)
         parameters['CURRENT_SCRATCH_DIR'] = parameters.get('CURRENT_SCRATCH_DIR', self.platform.scratch)
-        parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', self.platform.project_dir)
-        parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', self.platform.root_dir)
-        parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', self.platform.get_files_path())
+        parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', str(self.platform.project_dir))
+        parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', str(self.platform.root_dir))
+        parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', self.platform.files_path)
 
         for key, value in as_conf.jobs_data[self.section].items():
             parameters[f"CURRENT_{key.upper()}"] = value
@@ -3084,11 +3084,10 @@ class Job:
         """
         return job in self.parents
 
-    def is_ancestor(self, job):
+    def is_ancestor(self, job) -> bool:
         """Check if the given job is an ancestor
         :param job: job to be checked if is an ancestor
         :return: True if job is an ancestor, false otherwise
-        :rtype bool
         """
         for parent in list(self.parents):
             if parent.is_parent(job) or parent.is_ancestor(job):
