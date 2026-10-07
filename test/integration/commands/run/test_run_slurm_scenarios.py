@@ -722,20 +722,13 @@ def test_run_uninterrupted_multiple_vertical_wrappers(
     successful and failing jobs, verifying database entries and recovered log files.
 
     :param autosubmit_exp: Fixture that creates and manages an Autosubmit experiment.
-    :type autosubmit_exp: AutosubmitExperimentFixture
     :param jobs_data: YAML string with the experiment jobs/wrappers configuration.
-    :type jobs_data: str
     :param expected_db_entries: Expected total number of rows in ``job_data`` table.
-    :type expected_db_entries: int
     :param final_status: Expected final experiment status (``'COMPLETED'`` or ``'FAILED'``).
-    :type final_status: str
     :param wrapper_type: Wrapper type used in this scenario (e.g. ``'vertical'``).
-    :type wrapper_type: str
     :param slurm_server: Docker container running the Slurm scheduler.
-    :type slurm_server: Container
     :param prepare_scratch: Fixture that sets up the scratch directory for the experiment.
     :param general_data: Common experiment configuration shared across tests.
-    :type general_data: dict
     """
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
@@ -779,20 +772,13 @@ def test_run_interrupted_multiple_vertical_wrappers(
     recovered log files after the full run completes.
 
     :param autosubmit_exp: Fixture that creates and manages an Autosubmit experiment.
-    :type autosubmit_exp: AutosubmitExperimentFixture
     :param jobs_data: YAML string with the experiment jobs/wrappers configuration.
-    :type jobs_data: str
     :param expected_db_entries: Expected total number of rows in ``job_data`` table.
-    :type expected_db_entries: int
     :param final_status: Expected final experiment status (``'COMPLETED'`` or ``'FAILED'``).
-    :type final_status: str
     :param wrapper_type: Wrapper type used in this scenario (e.g. ``'vertical'``).
-    :type wrapper_type: str
     :param slurm_server: Docker container running the Slurm scheduler.
-    :type slurm_server: Container
     :param prepare_scratch: Fixture that sets up the scratch directory for the experiment.
     :param general_data: Common experiment configuration shared across tests.
-    :type general_data: dict
     """
     yaml = YAML(typ='rt')
     as_exp = autosubmit_exp(experiment_data=general_data | yaml.load(jobs_data), include_jobs=False, create=True)
@@ -1215,8 +1201,7 @@ def test_run_interrupted_destine_like(
         prepare_scratch,
         general_data: dict,
 ) -> None:
-    """
-    Test ``autosubmit run`` (interrupted mid-run then resumed) with a
+    """Test ``autosubmit run`` (interrupted mid-run then resumed) with a
     scaled-down DestinE-like workflow using vertical wrappers.
     """
     yaml = YAML(typ='rt')

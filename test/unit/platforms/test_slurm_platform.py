@@ -170,14 +170,6 @@ def test_get_submitted_job_id_x11(slurm_platform):
 
 @pytest.mark.parametrize("exists", [True, False])
 def test_check_file_exists(mocker, slurm_platform, monkeypatch, tmp_path, exists):
-
-    # mocks to avoid connect to a remote platform (unit test)
-    monkeypatch.setattr(
-        slurm_platform,
-        "get_files_path",
-        lambda: str(tmp_path)
-    )
-
     slurm_platform._ftpChannel = mocker.MagicMock()
     slurm_platform._ftpChannel.stat = mocker.MagicMock()
     if exists:
