@@ -24,7 +24,7 @@ Examples:
 .. code-block:: bash
 
     # Basic experiment creation
-    autosubmit expid --HPC marenostrum4 --description "experiment is about..."
+    autosubmit expid --HPC marenostrum --description "experiment is about..."
 
     # Create from repository with minimal configuration
     autosubmit expid -min -repo https://earth.bsc.es/gitlab/ces/auto-advanced_config_example \
@@ -72,12 +72,12 @@ Examples:
 
 .. code-block:: bash
 
-    # Copy experiment to Ithaca platform
-    autosubmit expid -y a0b1 -H ithaca -d "Copy of experiment a0b1"
+    # Copy experiment to the MareNostrum platform
+    autosubmit expid -y a0b1 -H marenostrum -d "Copy of experiment a0b1"
 
     # Copy with custom configuration path
     autosubmit expid -y a0b1 -p "/esarchive/autosubmit/genericFiles/conf" \
-                     -H marenostrum4 -d "Modified copy of a0b1"
+                     -H marenostrum -d "Modified copy of a0b1"
 
 .. warning:: You can only copy experiments created with Autosubmit 3.11 or above.
 
@@ -109,7 +109,7 @@ Example:
 
 .. code-block:: bash
 
-    autosubmit expid -H ithaca -dm -d "Testing Autosubmit configuration"
+    autosubmit expid -H marenostrum -dm -d "Testing Autosubmit configuration"
 
 Create a test case experiment
 ------------------------------

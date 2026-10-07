@@ -612,7 +612,7 @@ Your experiment is defined and correctly configured, but you want to create it o
         EXPID: cxxx
         # HPC name.
         # No need to change
-        HPCARCH: ithaca
+        HPCARCH: marenostrum
 
     experiment:
         # Supply the list of start dates. Available formats: YYYYMMDD YYYYMMDDhh YYYYMMDDhhmm
