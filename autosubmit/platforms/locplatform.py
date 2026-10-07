@@ -171,9 +171,7 @@ class LocalPlatform(ParamikoPlatform):
         """Restores the SSH connection to the platform.
 
         :param as_conf: The Autosubmit configuration object used to establish the connection.
-        :type as_conf: AutosubmitConfig
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
-        :type log_recovery_process: bool
         """
         self.connected = True
 
@@ -217,11 +215,8 @@ class LocalPlatform(ParamikoPlatform):
         """Sends a file to a specified location using a command.
 
         :param filename: The name of the file to send.
-        :type filename: str
         :param check: Unused in this platform.
-        :type check: bool
         :return: True if the file was sent successfully.
-        :rtype: bool
         """
         command = (f"{self.put_cmd} {self.tmp_path / Path(filename).name} "
                    f"{self.tmp_path / f'LOG_{self.expid}' / Path(filename).name}; "
@@ -291,7 +286,7 @@ class LocalPlatform(ParamikoPlatform):
         # This function has a short sleep as the files are locally
         sleeptime = 1
         for i in range(max_retries):
-            if Path(self.get_files_path(), src).is_file():
+            if (Path(self.files_path) / src).is_file():
                 return True
             sleep(sleeptime)
         return False
@@ -317,22 +312,22 @@ class LocalPlatform(ParamikoPlatform):
         :param must_exist: ignore if file exist or not.
         """
         try:
-            path_root = Path(self.get_files_path())
+            path_root = self.files_path
             (path_root / src).rename(path_root / dest)
             return True
         except OSError as e:
             if must_exist:
                 raise AutosubmitError(f"File {path_root / src} does not exist", 6004, str(e))
             else:
-                Log.debug(f"File {str(path_root)} does not exist ")
+                Log.debug(f"File {path_root} does not exist ")
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(self.get_files_path(), src)} does not exist', 6004, str(e))
+                raise AutosubmitError(f"File {self.files_path / src} does not exist", 6004, str(e))
             if must_exist:
-                raise AutosubmitError(f"File {os.path.join(self.get_files_path(), src)} does not exist", 6004, str(e))
+                raise AutosubmitError(f"File {self.files_path / src} does not exist", 6004, str(e))
             else:
-                Log.printlog(f"Log file couldn't be moved: {os.path.join(self.get_files_path(), src)}", 5001)
+                Log.printlog(f"Log file couldn't be moved: {self.files_path / src}", 5001)
                 return False
 
     def get_ssh_output(self):
