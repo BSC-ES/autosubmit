@@ -92,8 +92,10 @@ def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
     local.config["LOG_RECOVERY_TIMEOUT"] = 0
     local.spawn_log_retrieval_process(as_conf)
     local.cleanup_event.set()
-    # Some grace time to the process to detect the cleanup event
-    time.sleep(1)
+    # The child still has to load the configuration and open its connection before it reads
+    # the cleanup event, which can take longer than a second on a busy CI runner. join()
+    # returns as soon as the child exits, so the timeout only bounds a hang.
+    local.log_recovery_process.join(timeout=30)
     assert not local.log_recovery_process.is_alive()
 
 
