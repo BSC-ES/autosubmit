@@ -136,7 +136,7 @@ def _check_db_fields(
     job_data_db = run_tmpdir / "metadata" / "data" / f"job_data_{expid}.db"
     autosubmit_db = run_tmpdir / "tests.db"
 
-    db_check_list: dict = {
+    db_check_list = {
         "JOB_DATA_EXIST": (job_data_db.exists(), f"DB {job_data_db} missing",),
         "AUTOSUBMIT_DB_EXIST": (autosubmit_db.exists(), f"DB {autosubmit_db} missing",),
         "JOB_DATA_FIELDS": {},
@@ -145,9 +145,9 @@ def _check_db_fields(
     # Check job_data info
     with sqlite3.connect(job_data_db) as conn:
         conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT * FROM job_data ORDER BY job_name, counter")
-        rows = c.fetchall()
+        rows = conn.execute(
+            "SELECT * FROM job_data ORDER BY job_name, counter"
+        ).fetchall()
         db_check_list["JOB_DATA_ENTRIES"] = len(rows) == expected_entries, \
             f"Expected {expected_entries} entries, found {len(rows)}"
         # Convert rows to a list of dictionaries

@@ -670,7 +670,7 @@ class AutosubmitConfig:
         #       ``misc_files``. It might be simpler to have a separate function for this, or append directly.
         new_file.data = self._pin_immutable_variables(new_file.data)
         if new_file.data.get("AS_MISC", False) and not load_misc:
-            self.misc_files.append(yaml_file)
+            self.misc_files.append(str(yaml_file))
             new_file.data = {}
         self._delete_autosubmit_calculated_variables(new_file.data)
         return self.unify_conf(current_folder_data, new_file.data)
@@ -859,7 +859,7 @@ class AutosubmitConfig:
                 if matching_values:
                     dynamic_variables[key] = matching_values
             else:
-                match = re.search(pattern, dynamic_var, flags=re.IGNORECASE)
+                match = re.search(pattern, str(dynamic_var), flags=re.IGNORECASE)
                 if match is not None:
                     dynamic_variables[key] = dynamic_var
 
@@ -1017,6 +1017,7 @@ class AutosubmitConfig:
         :return: A tuple containing the updated processed dynamic variables and parameters.
         """
         for i, key in enumerate(filter(None, keys)):
+            key = str(key)
             matches = list(re.finditer(pattern, key, flags=re.IGNORECASE))[::-1]
             if in_the_end and "^" in key:
                 pattern_special_variables = r"%\^[a-zA-Z0-9_.-]*(\^\^|,,)?%"
