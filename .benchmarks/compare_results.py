@@ -58,43 +58,54 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# Deterministic metrics that must not change between runs.
 EXACT_METRICS = ["Total Jobs", "Total Dependencies"]
+"""Deterministic metrics that must not change between runs."""
 
-# Metric names as stored in ``benchmark.extra_info``, plus the wall-clock time
-# that pytest-benchmark records in ``stats.median``.
 METRIC_COLUMNS = [
     "Time Taken(Seconds)",
     "Memory consumption(MiB)",
     "Historical DB Disk Usage(MiB)",
     "Job list DB Usage",
-    "FD GROWTH",
-    "MEM GROWTH(MIB)",
+    "FILE DESCRIPTORS GROWTH",
+    "MEMORY GROWTH(MiB)",
 ] + EXACT_METRICS
+"""Metric names from ``benchmark.extra_info`` plus the wall-clock time that
+pytest-benchmark records in ``stats.median``."""
 
-# Profiler growth metrics are only meaningful for the `run` scenarios;
-# elsewhere they are absent or dominated by noise, so they are excluded.
-_GROWTH_METRICS = {"FD GROWTH", "MEM GROWTH(MIB)"}
+_GROWTH_METRICS = {"FILE DESCRIPTORS GROWTH", "MEMORY GROWTH(MiB)"}
+"""Profiler growth metrics, only meaningful for the ``run`` scenarios."""
+
 _NO_GROWTH_TEST_TYPES = {"create", "recovery", "setstatus"}
+"""Test types that do not carry the profiler growth metrics."""
 
-# The performance plots are split in two: the `run` scenarios carry the
-# profiler growth metrics, the create/recovery/setstatus scenarios only carry
-# time/memory/db.
 _RUN_TEST_TYPES = {"run"}
+"""Test types that carry the profiler growth metrics."""
+
 _OTHER_TEST_TYPES = {"create", "recovery", "setstatus"}
-_RUN_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)", "MEM GROWTH(MIB)", "FD GROWTH"]
+"""Test types that only carry time/memory/DB metrics."""
+
+_RUN_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)", "MEMORY GROWTH(MiB)", "FILE DESCRIPTORS GROWTH"]
+"""Metrics rendered in the ``run`` scenarios plot."""
+
 _OTHER_PLOT_METRICS = ["Time Taken(Seconds)", "Memory consumption(MiB)",
                        "Historical DB Disk Usage(MiB)", "Job list DB Usage"]
+"""Metrics rendered in the create/recovery/setstatus plot."""
+
 _MEMORY_TEST_TYPES = {"create", "recovery", "run", "setstatus"}
-_MEMORY_PLOT_METRICS = ["Memory consumption(MiB)", "MEM GROWTH(MIB)"]
+"""Test types included in the memory heatmap."""
+
+_MEMORY_PLOT_METRICS = ["Memory consumption(MiB)", "MEMORY GROWTH(MiB)"]
+"""Metrics rendered in the memory heatmap."""
+
 _SHORT_METRICS = {
     "Time Taken(Seconds)": "Time (s)",
     "Memory consumption(MiB)": "Memory (MiB)",
-    "MEM GROWTH(MIB)": "MEM growth (MiB)",
-    "FD GROWTH": "FD growth",
+    "MEMORY GROWTH(MiB)": "MEM growth (MiB)",
+    "FILE DESCRIPTORS GROWTH": "FD growth",
     "Historical DB Disk Usage(MiB)": "Hist DB (KiB)",
     "Job list DB Usage": "Job DB (KiB)",
 }
+"""Short metric labels used in the report tables and plots."""
 
 
 def _allowed_metrics(test_type: str) -> set[str]:
@@ -110,16 +121,22 @@ def _allowed_metrics(test_type: str) -> set[str]:
 
 
 _TABLE_COLUMNS = ["test type", "ID", "metric", "baseline", "current", "delta %", "verdict"]
+"""Columns of the markdown comparison tables."""
 
-# Cross-scenario sanity check: the run scenario must consume LESS memory than
-# its counterpart in the recovery scenario and in every setstatus variant of
-# the same experiment.
 _CROSS_CHECK_METRIC = "Memory consumption(MiB)"
+"""Metric checked across scenarios (run must use less memory)."""
+
 _CROSS_BASE = "run"
+"""Scenario that must consume less memory than its counterparts."""
+
 _CROSS_COUNTERPARTS = ["recovery", "setstatus"]
+"""Scenarios compared against the cross-check base."""
+
 _CROSS_COLUMNS = ["ID", "metric", "base value", "counterpart", "counterpart value", "verdict"]
+"""Columns of the cross-scenario check table."""
 
 _EXCLUDED_SCENARIOS = {"10m/2c/75s"}
+"""Scenario ids excluded from the comparison."""
 
 
 def _load_thresholds(path: Path) -> dict:
@@ -330,7 +347,7 @@ def _metric_verdict(test_type: str, run_id: str, metric: str, cur_val: float | N
             or prev_val == 0 and cur_float > 0) and abs(cur_float) >= floor:
         # Either the signed change exceeds the threshold or the value moved
         # away from an exact zero baseline into growth (no finite delta, e.g.
-        # FD GROWTH going 0 -> 1): any magnitude above the floor warns.
+        # FILE DESCRIPTORS GROWTH going 0 -> 1): any magnitude above the floor warns.
         # Moving 0 -> negative (a release) never warns.
         verdict = "WARN"
     return {"test type": test_type, "ID": run_id, "metric": metric,

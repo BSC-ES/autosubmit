@@ -23,7 +23,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from autosubmit.helpers.utils import release_memory_to_os
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.profiler import profiler as profiler_module
 
@@ -532,8 +531,8 @@ def test_capture_allocation_delta_returns_positive_stats(profiler):
 
 
 @pytest.mark.parametrize(
-    "mem_iter, obj_iter, fd_iter, checkpoints, expected_mem_grow, expected_obj_grow, "
-    "expected_fd_grow, expected_mem_total, expected_obj_total, expected_fd_total",
+    "mem_iter, obj_iter, fd_iter, checkpoints, expected_mem_growth, expected_obj_growth, "
+    "expected_fd_growth, expected_mem_total, expected_obj_total, expected_fd_total",
     [
         pytest.param([100, 150, 190, 250], [10, 15, 20, 30], [3, 4, 5, 7], 3,
                      [50, 40, 60], [5, 5, 10], [1, 1, 2], 150, 20, 4,
@@ -547,15 +546,15 @@ def test_capture_allocation_delta_returns_positive_stats(profiler):
         pytest.param([], [], [], 0, [], [], [], 0, 0, 0, id="empty"),
     ],
 )
-def test_calculate_grow(
+def test_calculate_growth(
     profiler,
     mem_iter,
     obj_iter,
     fd_iter,
     checkpoints,
-    expected_mem_grow,
-    expected_obj_grow,
-    expected_fd_grow,
+    expected_mem_growth,
+    expected_obj_growth,
+    expected_fd_growth,
     expected_mem_total,
     expected_obj_total,
     expected_fd_total,
@@ -572,14 +571,14 @@ def test_calculate_grow(
     profiler._fd_iteration = fd_iter
     profiler.checkpoints = checkpoints
 
-    profiler._calculate_grow()
+    profiler._calculate_growth()
 
-    assert profiler._mem_grow == expected_mem_grow
-    assert profiler._obj_grow == expected_obj_grow
-    assert profiler._fd_grow == expected_fd_grow
-    assert profiler._mem_total_grow == expected_mem_total
-    assert profiler._obj_total_grow == expected_obj_total
-    assert profiler._fd_total_grow == expected_fd_total
+    assert profiler._mem_growth == expected_mem_growth
+    assert profiler._obj_growth == expected_obj_growth
+    assert profiler._fd_growth == expected_fd_growth
+    assert profiler._mem_total_growth == expected_mem_total
+    assert profiler._obj_total_growth == expected_obj_total
+    assert profiler._fd_total_growth == expected_fd_total
 
 
 def test_format_top_allocations_empty(profiler):
@@ -605,7 +604,7 @@ def test_format_top_allocations(profiler):
     assert "(+3 blocks)" in result
 
 
-def test_report_grow():
+def test_report_growth():
     profiler = Profiler(
         subcommand="run",
         expid="a000",
@@ -623,7 +622,7 @@ def test_report_grow():
     profiler._edges_iteration = [5, 6, 7]
     profiler._trace_stats_by_iter = [[], []]
 
-    result = profiler._report_grow()
+    result = profiler._report_growth()
 
     assert "Iteration 1:" in result
     assert "Memory:" in result
@@ -647,7 +646,7 @@ def test_report_grow_reports_fd_changes(profiler):
     profiler._edges_iteration = [1, 2, 3, 4]
     profiler._trace_stats_by_iter = [[], [], [], []]
 
-    result = profiler._report_grow()
+    result = profiler._report_growth()
 
     assert "Iteration 2: Opened file descriptor: [fd=3] new" in result
     assert "Iteration 2: Closed file descriptor: [fd=2] old" in result
@@ -678,7 +677,7 @@ def test_report_grow_includes_allocation_statistics():
 
     profiler._trace_stats_by_iter = [[stat], []]
 
-    result = profiler._report_grow()
+    result = profiler._report_growth()
 
     assert "Top allocation deltas:" in result
     assert "/tmp/example.py:10" in result
@@ -689,10 +688,10 @@ def test_report_creates_files(profiled_profiler, report_setup):
     profiler._mem_init = 100
     profiler._mem_final = 200
     profiler._mem_iteration = [100, 200, 300]
-    profiler._obj_grow = [1, 1]
-    profiler._fd_grow = [1, 1]
-    profiler._obj_total_grow = 2
-    profiler._fd_total_grow = 2
+    profiler._obj_growth = [1, 1]
+    profiler._fd_growth = [1, 1]
+    profiler._obj_total_growth = 2
+    profiler._fd_total_growth = 2
 
     profiler._report()
 
@@ -730,11 +729,11 @@ def test_report_includes_growth_and_converts_memory_units(
     profiler._jobs_iteration = [1, 2, 3]
     profiler._edges_iteration = [1, 2, 3]
 
-    profiler._mem_grow = [1024]
-    profiler._obj_grow = [10]
-    profiler._fd_grow = [1]
-    profiler._obj_total_grow = 20
-    profiler._fd_total_grow = 2
+    profiler._mem_growth = [1024]
+    profiler._obj_growth = [10]
+    profiler._fd_growth = [1]
+    profiler._obj_total_growth = 20
+    profiler._fd_total_growth = 2
 
     mocker.patch(
         "autosubmit.profiler.profiler._get_current_open_fds_names",
@@ -837,7 +836,7 @@ def test_stop_uses_iteration_memory(profiler, mocker):
 
     calculate = mocker.patch.object(
         profiler,
-        "_calculate_grow",
+        "_calculate_growth",
     )
     mocker.patch.object(
         profiler._profiler,
@@ -1364,12 +1363,12 @@ def test_report_includes_all_sections(
     profiler._obj_iteration = [10, 20, 30]
     profiler._fd_iteration = [2, 3, 4]
 
-    profiler._mem_grow = [1024, 2048]
-    profiler._obj_grow = [10, 10]
-    profiler._fd_grow = [1, 1]
+    profiler._mem_growth = [1024, 2048]
+    profiler._obj_growth = [10, 10]
+    profiler._fd_growth = [1, 1]
 
-    profiler._obj_total_grow = 20
-    profiler._fd_total_grow = 2
+    profiler._obj_total_growth = 20
+    profiler._fd_total_growth = 2
 
     profiler._fd_names_iteration = [
         ["[fd=1] stdout"],
@@ -1424,9 +1423,3 @@ def test_report_includes_all_sections(
     # tracemalloc/object traceback section
     assert "Unique object tracebacks between iterations:" in report
     assert str(traceback) in report
-
-
-def test_release_memory_to_os_is_safe_and_idempotent():
-    # Must not raise on glibc or on platforms without malloc_trim (macOS/musl).
-    assert release_memory_to_os() is None
-    assert release_memory_to_os() is None

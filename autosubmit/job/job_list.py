@@ -35,7 +35,7 @@ from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.helpers.data_transfer import JobRow
 from autosubmit.helpers.enums import ChunkUnit
-from autosubmit.helpers.utils import release_memory_to_os
+from autosubmit.helpers.utils import memory_release_mode, release_memory_to_os
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job import Job, WrapperJob
 from autosubmit.job.job_common import Status, bcolors
@@ -2680,7 +2680,7 @@ class JobList:
             job.platform = None
             self.graph.remove_node(job.name)
 
-        if jobs_to_unload:
+        if jobs_to_unload and memory_release_mode(self._as_conf) == "on_unload":
             release_memory_to_os()
 
     def get_active(self, platform=None, wrapper=False):

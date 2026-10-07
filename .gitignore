@@ -15,9 +15,6 @@ dist/
 build/
 .cache
 
-# Benchmark files
-.benchmarks/artifacts
-
 # Coverage files
 coverage/
 .coverage
@@ -37,9 +34,8 @@ venv/
 .ipynb_checkpoints
 .atl
 
-# Benchmark ( reference lives in a separated branch )
+# Benchmark files (the reference lives on a separated branch)
 .actrc
-
 .benchmarks/data/
 .benchmarks/artifacts/
 .benchmarks/reference/

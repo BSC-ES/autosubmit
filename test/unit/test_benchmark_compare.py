@@ -76,8 +76,8 @@ def _baseline_entry(**overrides):
         "Job list DB Usage": 0.03,
         "Total Jobs": 7,
         "Total Dependencies": 7,
-        "FD GROWTH": None,
-        "MEM GROWTH(MIB)": 0,
+        "FILE DESCRIPTORS GROWTH": None,
+        "MEMORY GROWTH(MiB)": 0,
     }
     extra.update(overrides)
     return extra
@@ -154,19 +154,19 @@ def _check_delta(actual: float, expected_delta) -> None:
     pytest.param("Total Dependencies", "create", 7, 7, "PASS", None, id="total-deps-unchanged-passes"),
     pytest.param("Total Jobs", "create", 7.9, 7.1, "WARN", None, id="total-jobs-fractional-change-warns"),
     # Signed growth verdicts: a release is an improvement, never a regression.
-    pytest.param("MEM GROWTH(MIB)", "run", -15.0, 215.0, "WARN",
+    pytest.param("MEMORY GROWTH(MiB)", "run", -15.0, 215.0, "WARN",
                  pytest.approx((215.0 + 15.0) / 15.0 * 100.0), id="flip-to-leak-warns"),
-    pytest.param("MEM GROWTH(MIB)", "run", 215.0, -15.0, "PASS", None, id="flip-to-release-passes"),
-    pytest.param("MEM GROWTH(MIB)", "run", -215.62, -256.48, "PASS",
+    pytest.param("MEMORY GROWTH(MiB)", "run", 215.0, -15.0, "PASS", None, id="flip-to-release-passes"),
+    pytest.param("MEMORY GROWTH(MiB)", "run", -215.62, -256.48, "PASS",
                  pytest.approx(-(256.48 - 215.62) / 215.62 * 100.0), id="negative-more-negative-passes"),
-    pytest.param("MEM GROWTH(MIB)", "run", -215.0, -200.0, "PASS", None, id="negative-less-negative-passes"),
-    pytest.param("MEM GROWTH(MIB)", "run", 0.18, -0.8, "PASS", None, id="sub-floor-excluded"),
-    pytest.param("MEM GROWTH(MIB)", "run", -22.9, -26.98, "PASS",
+    pytest.param("MEMORY GROWTH(MiB)", "run", -215.0, -200.0, "PASS", None, id="negative-less-negative-passes"),
+    pytest.param("MEMORY GROWTH(MiB)", "run", 0.18, -0.8, "PASS", None, id="sub-floor-excluded"),
+    pytest.param("MEMORY GROWTH(MiB)", "run", -22.9, -26.98, "PASS",
                  pytest.approx(-(26.98 - 22.9) / 22.9 * 100.0), id="release-grows-passes"),
-    pytest.param("FD GROWTH", "run", 0, 1, "WARN", _NAN, id="zero-baseline-change-warns"),
-    pytest.param("FD GROWTH", "run", 1, 0, "PASS", None, id="released-to-zero-passes"),
-    pytest.param("MEM GROWTH(MIB)", "run", 0, 0.5, "PASS", _NAN, id="zero-baseline-sub-floor-passes"),
-    pytest.param("MEM GROWTH(MIB)", "run", 0, -3.0, "PASS", _NAN, id="zero-baseline-release-passes"),
+    pytest.param("FILE DESCRIPTORS GROWTH", "run", 0, 1, "WARN", _NAN, id="zero-baseline-change-warns"),
+    pytest.param("FILE DESCRIPTORS GROWTH", "run", 1, 0, "PASS", None, id="released-to-zero-passes"),
+    pytest.param("MEMORY GROWTH(MiB)", "run", 0, 0.5, "PASS", _NAN, id="zero-baseline-sub-floor-passes"),
+    pytest.param("MEMORY GROWTH(MiB)", "run", 0, -3.0, "PASS", _NAN, id="zero-baseline-release-passes"),
 ])
 def test_metric_verdicts(metric, test_type, baseline, current, expected, expected_delta):
     baseline_run, current_run = _single_scenario_runs(metric, test_type, baseline, current)
@@ -340,11 +340,11 @@ def test_render_heatmap_scenario_filter(tmp_path: Path):
 
 
 def _mem_growth_absval(current_val: float) -> np.ndarray:
-    """Absolute MEM GROWTH(MIB) values as a (1, 1) array, mirroring the heatmap input."""
+    """Absolute MEMORY GROWTH(MiB) values as a (1, 1) array, mirroring the heatmap input."""
     run = _make_run(_make_entry("run", "run", "4m/2c/6s", 10.0,
-                                **{**_baseline_entry(), "MEM GROWTH(MIB)": current_val}))
+                                **{**_baseline_entry(), "MEMORY GROWTH(MiB)": current_val}))
     frame = compare.build_frame(run)
-    return frame[["MEM GROWTH(MIB)"]].to_numpy(dtype=float)
+    return frame[["MEMORY GROWTH(MiB)"]].to_numpy(dtype=float)
 
 
 @pytest.mark.parametrize("value, expected_masked", [
@@ -353,7 +353,7 @@ def _mem_growth_absval(current_val: float) -> np.ndarray:
 ])
 def test_below_floor_mask(value, expected_masked):
     absval = _mem_growth_absval(value)
-    mask = compare._below_floor_mask(absval, ["MEM GROWTH(MIB)"], _thresholds())
+    mask = compare._below_floor_mask(absval, ["MEMORY GROWTH(MiB)"], _thresholds())
 
     assert mask.shape == (1, 1)
     assert bool(mask[0, 0]) is expected_masked
@@ -361,17 +361,17 @@ def test_below_floor_mask(value, expected_masked):
 
 def test_below_floor_change_is_masked_neutral(tmp_path: Path):
     baseline = _make_run(_make_entry("run", "run", "4m/2c/6s", 10.0,
-                                     **{**_baseline_entry(), "MEM GROWTH(MIB)": 0.22}))
+                                     **{**_baseline_entry(), "MEMORY GROWTH(MiB)": 0.22}))
     current = _make_run(_make_entry("run", "run", "4m/2c/6s", 10.0,
-                                    **{**_baseline_entry(), "MEM GROWTH(MIB)": 1.51}))
+                                    **{**_baseline_entry(), "MEMORY GROWTH(MiB)": 1.51}))
     cur_frame = compare.build_frame(current)
     report = compare.evaluate(cur_frame, compare.build_frame(baseline), _thresholds())
-    row = report[report["metric"] == "MEM GROWTH(MIB)"].iloc[0]
+    row = report[report["metric"] == "MEMORY GROWTH(MiB)"].iloc[0]
     assert row["verdict"] == "PASS"
 
     out = compare.render_heatmap(
         cur_frame, compare.build_frame(baseline), report, "4.2.0", tmp_path,
-        thresholds=_thresholds(), test_types={"run"}, metrics=["MEM GROWTH(MIB)"],
+        thresholds=_thresholds(), test_types={"run"}, metrics=["MEMORY GROWTH(MiB)"],
         out_name="test_below_floor.png",
     )
     assert out is not None and out.exists() and out.stat().st_size > 0

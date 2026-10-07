@@ -37,8 +37,8 @@ import statistics
 import sys
 from pathlib import Path
 
-# extra_info keys that identify the scenario and are never averaged.
 _STRING_KEYS = {"test type", "ID", "base"}
+"""``extra_info`` keys that identify the scenario and are never averaged."""
 
 
 def load_runs(input_dir: Path) -> list[dict]:

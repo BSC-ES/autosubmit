@@ -43,7 +43,12 @@ from autosubmit.experiment.manage import (
 )
 from autosubmit.experiment.utils import print_job_details
 from autosubmit.git.autosubmit_git import check_unpushed_changes
-from autosubmit.helpers.utils import release_memory_to_os
+from autosubmit.helpers.utils import (
+    memory_release_interval,
+    memory_release_mode,
+    release_memory_to_os,
+    should_release_memory,
+)
 from autosubmit.history.database_managers.experiment_history_db_manager import (
     get_last_run_id,
 )
@@ -678,12 +683,18 @@ def run(
     job_list.recover_logs(from_db=True)
     job_list.reset_updated_logs()
     job_list.load_wrappers()
-    # Compact the heap before entering the run loop: prepare_run
-    # and the setup above loaded config, job_list, wrappers and
-    # platforms into memory.
-    release_memory_to_os()
+    # Compact the heap before entering the run loop, but only when the
+    # experiment opted in via CONFIG.MEMORY_RELEASE_MODE.
+    if memory_release_mode(as_conf) != "off":
+        release_memory_to_os()
+    iteration = 0
     while job_list.continue_run():
         try:
+            iteration += 1
+            if should_release_memory(
+                memory_release_mode(as_conf), memory_release_interval(as_conf), iteration
+            ):
+                release_memory_to_os()
             if profiler is not None:
                 Scheduler.exit = profiler.iteration_checkpoint(
                     loaded_jobs, loaded_edges

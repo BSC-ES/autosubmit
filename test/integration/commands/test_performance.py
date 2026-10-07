@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 
 from autosubmit.experiment.manage import create
+from autosubmit.helpers.utils import to_mib
 from autosubmit.job.job_list import load_job_list
 from autosubmit.job.manage import set_status
 from autosubmit.profiler.profiler import Profiler
@@ -186,22 +187,6 @@ def _find(pattern: str, text: str, default: Any = None) -> Any:
     return match.group(1) if match else default
 
 
-def _to_mib(value: str, unit: str) -> float:
-    """Convert a profiler size value expressed in ``unit`` to MiB."""
-    amount = float(value)
-    if unit == "KiB":
-        return amount / 1024
-    if unit == "MiB":
-        return amount
-    if unit == "GiB":
-        return amount * 1024
-    if unit == "TiB":
-        return amount * 1024 * 1024
-    if unit == "PiB":
-        return amount * 1024 * 1024 * 1024
-    return amount / (1024 * 1024)  # B
-
-
 def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path: Path,
                               base_id: str | None = None) -> dict:
     """Extract the profiler metrics from the latest profile report.
@@ -231,7 +216,7 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
     total_jobs = len(job_list.graph.nodes)
 
     memory_match = re.search(r"FINAL MEMORY: (\d+\.\d+) ([A-Za-z]+)\.", text)
-    memory_consumption = _to_mib(memory_match.group(1), memory_match.group(2)) if memory_match else None
+    memory_consumption = to_mib(memory_match.group(1), memory_match.group(2)) if memory_match else None
 
     # Disk usage (sqlite only for now)
     db_path = Path(tmp_path / as_exp.expid / "db" / "job_list.db")
@@ -250,7 +235,7 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
     fd_growth = _find(r"FILE DESCRIPTORS GROWTH: (\d+)", text)
     mem_grow_match = re.search(r"MEMORY GROWTH: (-?\d+\.\d+) ([A-Za-z]+)\.", text)
     if mem_grow_match:
-        mem_growth = _to_mib(mem_grow_match.group(1), mem_grow_match.group(2))
+        mem_growth = to_mib(mem_grow_match.group(1), mem_grow_match.group(2))
     else:
         mem_growth = None
 
@@ -263,8 +248,8 @@ def _collect_profiler_metrics(as_exp: Any, test_type: str, run_id: str, tmp_path
         "Job list DB Usage": float(db_size),
         "Total Jobs": total_jobs,
         "Total Dependencies": total_dependencies,
-        "FD GROWTH": fd_growth,
-        "MEM GROWTH(MIB)": mem_growth,
+        "FILE DESCRIPTORS GROWTH": fd_growth,
+        "MEMORY GROWTH(MiB)": mem_growth,
     }
 
 

@@ -25,7 +25,7 @@ from collections.abc import Iterable
 from contextlib import suppress
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import AutosubmitCritical, Log
@@ -388,9 +388,12 @@ def build_and_connect_platform(platform_name: str, as_conf: 'AutosubmitConfig', 
     return plat
 
 
-# Resolved once at import; None on platforms without glibc's malloc_trim
-# (macOS), so the call becomes a safe no-op there.
 _malloc_trim = getattr(ctypes.CDLL(None, use_errno=True), "malloc_trim", None)
+"""glibc's ``malloc_trim`` if available, else ``None``.
+
+Resolved once at import, so ``release_memory_to_os`` becomes a safe no-op on
+platforms without ``malloc_trim`` (macOS/musl).
+"""
 
 
 def release_memory_to_os() -> None:
@@ -407,3 +410,99 @@ def release_memory_to_os() -> None:
     if _malloc_trim is not None:
         with suppress(OSError):
             _malloc_trim(0)
+
+
+_MEMORY_RELEASE_MODES = frozenset({"off", "on_unload", "interval"})
+"""Valid values for ``RUNTIME.MEMORY_RELEASE_MODE`` (``off`` by default)."""
+
+_DEFAULT_MEMORY_RELEASE_MODE = "off"
+"""Mode used when neither the experiment nor the autosubmitrc set one."""
+
+
+def memory_release_mode(as_conf: 'AutosubmitConfig') -> str:
+    """Return the configured memory-release mode.
+
+    Reads ``RUNTIME.MEMORY_RELEASE_MODE`` (``off`` by default, or ``on_unload``
+    or ``interval``). Unknown values fall back to ``off`` with a warning.
+
+    :param as_conf: Autosubmit configuration object (may be None).
+    :return: One of ``off``, ``on_unload`` or ``interval``.
+    """
+    raw: Any = None
+    if as_conf is not None:
+        raw = as_conf.experiment_data.get("RUNTIME", {}).get("MEMORY_RELEASE_MODE")
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        # No per-experiment value: fall back to the autosubmitrc [runtime] default.
+        raw = getattr(BasicConfig, "MEMORY_RELEASE_MODE", _DEFAULT_MEMORY_RELEASE_MODE)
+    mode = str(raw).strip().lower()
+    if mode not in _MEMORY_RELEASE_MODES:
+        Log.warning(f"Unknown memory release mode '{raw}', falling back to 'off'")
+        return _DEFAULT_MEMORY_RELEASE_MODE
+    return mode
+
+
+def memory_release_interval(as_conf: 'AutosubmitConfig') -> int:
+    """Return the iterations between releases for the ``interval`` mode.
+
+    Reads ``RUNTIME.MEMORY_RELEASE_INTERVAL`` (default 0, meaning disabled).
+
+    :param as_conf: Autosubmit configuration object (may be None).
+    :return: A non-negative interval, 0 when disabled or invalid.
+    """
+    raw: Any = None
+    if as_conf is not None:
+        raw = as_conf.experiment_data.get("RUNTIME", {}).get("MEMORY_RELEASE_INTERVAL")
+    if raw is None:
+        # No per-experiment value: fall back to the autosubmitrc [runtime] default.
+        raw = getattr(BasicConfig, "MEMORY_RELEASE_INTERVAL", 0)
+    try:
+        interval = int(raw)
+    except (TypeError, ValueError):
+        Log.warning(f"Invalid memory release interval '{raw}', ignoring")
+        return 0
+    return max(interval, 0)
+
+
+def should_release_memory(mode: str, interval: int, iteration: int) -> bool:
+    """Return True when a memory release is due in ``interval`` mode.
+
+    :param mode: The configured release mode.
+    :param interval: Iterations between releases (0 disables it).
+    :param iteration: Current run-loop iteration (1-based).
+    :return: True when the heap should be compacted this iteration.
+    """
+    return mode == "interval" and interval > 0 and iteration % interval == 0
+
+
+_BYTE_UNITS = ("B", "KiB", "MiB", "GiB", "TiB", "PiB")
+"""Binary file-size units, smallest first (MiB is at index 2)."""
+
+
+def bytes_to_unit(value: float) -> tuple[float, str]:
+    """Convert a byte value to the most appropriate binary unit.
+
+    :param value: Value in bytes.
+    :return: The converted value and its unit.
+    """
+    abs_value = abs(value)
+    unit = 0
+    while abs_value >= 1024 and unit < len(_BYTE_UNITS) - 1:
+        abs_value /= 1024
+        value /= 1024
+        unit += 1
+    return value, _BYTE_UNITS[unit]
+
+
+def to_mib(value: float | str, unit: str) -> float:
+    """Convert a size expressed in ``unit`` to MiB.
+
+    :param value: The size (numeric or string).
+    :param unit: The source unit (one of ``_BYTE_UNITS``).
+    :return: The size in MiB.
+    """
+    amount = float(value)
+    if unit not in _BYTE_UNITS:
+        # Unknown unit: assume bytes.
+        return amount / (1024 * 1024)
+    # MiB is at index 2, so shifting the exponent by -2 converts any unit to MiB.
+    return amount * (1024 ** (_BYTE_UNITS.index(unit) - 2))

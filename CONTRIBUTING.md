@@ -251,7 +251,7 @@ container are required for the `run`, `recovery` and `setstatus` scenarios; the
 
 ```bash
 $ pip install -e .[all]
-$ pytest -m profile -n 0 --benchmark-save=mylabel \
+$ pytest -m profile -n 0 --benchmark-storage=file://.benchmarks/data --benchmark-save=mylabel \
     test/integration/commands/test_performance.py
 ```
 

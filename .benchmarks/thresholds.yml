@@ -30,10 +30,10 @@ metrics:
   Job list DB Usage:
     threshold: 10.0
     floor: 1.0
-  FD GROWTH:
+  FILE DESCRIPTORS GROWTH:
     threshold: 15.0
     floor: 1.0
-  MEM GROWTH(MIB):
+  MEMORY GROWTH(MiB):
     threshold: 15.0
     floor: 2.0
 

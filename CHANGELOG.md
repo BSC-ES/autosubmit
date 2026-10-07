@@ -39,18 +39,19 @@ several bug fixes and enhancements to improve the overall user experience.
 - Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
 - Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
 
-**Migration from `job_list.pkl` to Database** 
+**Migration from `job_list.pkl` to Database**
 
 - All data has been migrated from the `job_list.pkl` file to a database, marking a system shift that resulted
   in significant changes to the code.
 
 **Memory and Performance Improvements**:
 
+- Returning free memory to the OS is now opt-in: set `RUNTIME.MEMORY_RELEASE_MODE` per experiment (or `[runtime] memory_release_mode` in the autosubmitrc) to `on_unload` or `interval` (with `MEMORY_RELEASE_INTERVAL`). It is `off` by default; previously it ran on every unload. #3162
 - Significant reduction in memory usage by loading only necessary jobs and dependencies for active employment.
 - Enhanced performance during autosubmit runs and ongoing improvements to the log process management
   through direct database interactions to reduce the communication with the main process.
 - Overall job management features have been improved to ensure better tracking and status updates,
-  removing redundant code to enhance the efficiency of a loop 
+  removing redundant code to enhance the efficiency of a loop
 - The recovery and set status commands have been improved for version 4.2.0 and later 4.1.16,
   resulting in faster operations.
 - Removal of _COMPLETED files to reduce the amount of inodes generated
@@ -149,7 +150,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `CPU per task` for new version of autosubmit #2897
 - Fixed issue overwriting expid config variables with the ones from the github repo #2877
 - Fixed inspect infinite loop when PLATFORMS.TOTALJOBS or PLATFORMS.MAX_WAITING_JOBS is set to 0 #2749
-- Fixed wrappers on Lumi platform #3059 
+- Fixed wrappers on Lumi platform #3059
 - Fixed HPC2020 platform #3059
 - Fixed submission of jobs for PJM platform #2977
 
