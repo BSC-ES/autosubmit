@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 from pathlib import Path
 
 from autosubmit.log.log import AutosubmitCritical, AutosubmitError, Log
@@ -94,13 +93,12 @@ class PsPlatform(ParamikoPlatform):
         self.put_cmd = "scp"
         self.get_cmd = "scp"
         self.mkdir_cmd = f"mkdir -p {self.remote_log_dir}"
-        self.remove_checker = "rm -rf " + os.path.join(self.scratch, self.project_dir, self.user,
-                                                       "ps_permission_checker_azxbyc")
-        self.mkdir_checker = "mkdir -p " + os.path.join(self.scratch, self.project_dir, self.user,
-                                                         "ps_permission_checker_azxbyc")
+        folder_checker = Path(self.scratch) / self.project_dir / self.user/ "ps_permission_checker_azxbyc"
+        self.remove_checker = f"rm -rf {folder_checker}"
+        self.mkdir_checker = f"mkdir -p {folder_checker}"
 
 
-    def get_remote_log_dir(self):
+    def get_remote_log_dir(self) -> Path:
         return self.remote_log_dir
 
     def get_mkdir_cmd(self):

@@ -17,10 +17,10 @@
 
 """Code for handling submitting jobs to platforms."""
 
-import os
 from collections import defaultdict
 from collections.abc import Callable
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
@@ -208,9 +208,9 @@ class ParamikoSubmitter:
         local_platform.max_processors = as_conf.get_max_processors()
         local_platform.max_waiting_jobs = as_conf.get_max_waiting_jobs()
         local_platform.total_jobs = as_conf.get_total_jobs()
-        local_platform.scratch = os.path.join(BasicConfig.LOCAL_ROOT_DIR, as_conf.expid, BasicConfig.LOCAL_TMP_DIR)
-        local_platform.temp_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, 'ASlogs')
-        local_platform.root_dir = os.path.join(BasicConfig.LOCAL_ROOT_DIR, local_platform.expid)
+        local_platform.scratch = Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid / BasicConfig.LOCAL_TMP_DIR
+        local_platform.temp_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / 'ASlogs'
+        local_platform.root_dir = Path(BasicConfig.LOCAL_ROOT_DIR) / local_platform.expid
         local_platform.host = 'localhost'
         # Add an object to entry in dictionary
         self.platforms = {
@@ -295,8 +295,8 @@ class ParamikoSubmitter:
             remote_platform.scratch_free_space = str(section_platform.get('SCRATCH_FREE_SPACE', False)).lower()
             _validate_platform_config(platform_used, remote_platform)
             try:
-                remote_platform.root_dir = os.path.join(remote_platform.scratch, remote_platform.project,
-                                                        remote_platform.user, remote_platform.expid)
+                remote_platform.root_dir = (Path(remote_platform.scratch) / remote_platform.project /
+                                            remote_platform.user / remote_platform.expid)
                 # FIXME: Why is ``update_cmds`` not in ``ParamikoPlatform``? Base classes have it defined...
                 #        Probably a bug (even if harmless).
                 remote_platform.update_cmds()
