@@ -150,6 +150,14 @@ Autosubmit configuration
             JOB_WALLCLOCK: 24:00  # Default max_wallclock for jobs before getting killed
             LOG_RECOVERY_CONSOLE_LEVEL: "DEBUG"  # Default log level for console output for the log recovery process.
             LOG_RECOVERY_FILE_LEVEL: "EVERYTHING"  # Default log level for file output for the log recovery process.
+        # runtime and performance tuning
+        runtime:
+            # When to return free memory to the OS. Options: off (default), on_unload, interval
+            # Default:off
+            MEMORY_RELEASE_MODE: "off"
+            # Iterations between memory releases when MEMORY_RELEASE_MODE is "interval"
+            # Default:0
+            MEMORY_RELEASE_INTERVAL: 0
         # wrapper definition
         wrappers:
             wrapper_1_v_example:

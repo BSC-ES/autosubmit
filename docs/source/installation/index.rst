@@ -247,6 +247,15 @@ These parameters provide extra functionalities to Autosubmit.
     authorized = [<command1,commandN> <machine1,machineN>]
     forbidden = [<command1,commandN> <machine1,machineN>]
 
+    # Runtime and performance tuning.
+    [runtime]
+    # When to return free memory to the OS. Options: off (default), on_unload, interval
+    memory_release_mode = off
+    # Iterations between memory releases when memory_release_mode is interval
+    memory_release_interval = 0
+    # Keep-alive timeout (seconds) for the log recovery process
+    log_recovery_timeout = 300
+
 About hosts parameters:
 
 From ``3.14+`` onwards, the users can tailor Autosubmit commands to run on specific machines. Previously, only the run
