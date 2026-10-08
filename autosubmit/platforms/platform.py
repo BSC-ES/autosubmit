@@ -34,7 +34,6 @@ import setproctitle
 
 from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.database.db_manager_job_list import JobsDbManager
-from autosubmit.helpers.parameters import autosubmit_parameter
 from autosubmit.job.job_common import Status
 from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.execution_mode import ExecutionMode
@@ -295,9 +294,11 @@ class Platform(ABC):
                 Log.warning(f"The event couldn't be removed, event has an invalid state: \n{str(e)}")
 
     @property
-    @autosubmit_parameter(name='current_arch')
     def name(self):
-        """Platform name. """
+        """Platform name.
+
+        :autosubmit-group: PLATFORM
+        """
         return self._name
 
     @name.setter
@@ -305,9 +306,11 @@ class Platform(ABC):
         self._name = value
 
     @property
-    @autosubmit_parameter(name='current_host')
     def host(self):
-        """Platform url. """
+        """Platform url.
+
+        :autosubmit-group: PLATFORM
+        """
         return self._host
 
     @host.setter
@@ -315,9 +318,11 @@ class Platform(ABC):
         self._host = value
 
     @property
-    @autosubmit_parameter(name='current_user')
     def user(self):
-        """Platform user. """
+        """Platform user.
+
+        :autosubmit-group: PLATFORM
+        """
         return self._user
 
     @user.setter
@@ -325,9 +330,11 @@ class Platform(ABC):
         self._user = value
 
     @property
-    @autosubmit_parameter(name='current_proj')
     def project(self):
-        """Platform project. """
+        """Platform project.
+
+        :autosubmit-group: PLATFORM
+        """
         return self._project
 
     @project.setter
@@ -335,9 +342,11 @@ class Platform(ABC):
         self._project = value
 
     @property
-    @autosubmit_parameter(name='current_budg')
     def budget(self):
-        """Platform budget. """
+        """Platform budget.
+
+        :autosubmit-group: PLATFORM
+        """
         return self._budget
 
     @budget.setter
@@ -345,9 +354,11 @@ class Platform(ABC):
         self._budget = value
 
     @property
-    @autosubmit_parameter(name='current_reservation')
     def reservation(self):
-        """You can configure your reservation id for the given platform. """
+        """You can configure your reservation id for the given platform.
+
+        :autosubmit-group: PLATFORM
+        """
         return self._reservation
 
     @reservation.setter
@@ -355,9 +366,11 @@ class Platform(ABC):
         self._reservation = value
 
     @property
-    @autosubmit_parameter(name='current_exclusivity')
     def exclusivity(self):
-        """True if you want to request exclusivity nodes. """
+        """True if you want to request exclusivity nodes.
+
+        :autosubmit-group: PLATFORM
+        """
         return self._exclusivity
 
     @exclusivity.setter
@@ -365,9 +378,11 @@ class Platform(ABC):
         self._exclusivity = value
 
     @property
-    @autosubmit_parameter(name='current_hyperthreading')
     def hyperthreading(self):
-        """True if hyperthreading is enabled on this platform. """
+        """True if hyperthreading is enabled on this platform.
+
+        :autosubmit-group: PLATFORM
+        """
         return self._hyperthreading
 
     @hyperthreading.setter
@@ -375,9 +390,11 @@ class Platform(ABC):
         self._hyperthreading = value
 
     @property
-    @autosubmit_parameter(name='current_scratch_dir')
     def scratch(self):
-        """Platform's scratch folder path. """
+        """Platform's scratch folder path.
+
+        :autosubmit-group: PLATFORM
+        """
         return self._scratch
 
     @scratch.setter
@@ -385,9 +402,11 @@ class Platform(ABC):
         self._scratch = value
 
     @property
-    @autosubmit_parameter(name='current_proj_dir')
     def project_dir(self):
-        """Platform's project folder path. """
+        """Platform's project folder path.
+
+        :autosubmit-group: JOB
+        """
         return self._project_dir
 
     @project_dir.setter
@@ -395,19 +414,27 @@ class Platform(ABC):
         self._project_dir = value
 
     @property
-    @autosubmit_parameter(name='current_rootdir')
     def root_dir(self):
-        """Platform's experiment folder path. """
+        """Platform's experiment folder path.
+
+        :autosubmit-group: JOB
+        """
         return self._root_dir
 
     @root_dir.setter
     def root_dir(self, value):
         self._root_dir = value
 
-    def prepare_submission(self, as_conf: 'AutosubmitConfig', job_list: 'JobList',
+    def prepare_submission(self,
+                           as_conf: 'AutosubmitConfig',
+                           job_list: 'JobList',
                            packages_to_submit: list['JobPackageBase'],
-                           inspect=False, only_wrappers=False) -> tuple[
-        dict[str, dict[str, 'JobPackageBase']], dict[str, dict[str, 'JobPackageBase']]]:
+                           inspect: bool= False,
+                           only_wrappers: bool= False
+        ) -> tuple[
+            dict[str, dict[str, 'JobPackageBase']],
+            dict[str, dict[str, 'JobPackageBase']]
+        ]:
         """Prepare job packages for submission on the current platform.
 
         Log the number of ready jobs, optionally initialize the platform submit
@@ -417,24 +444,17 @@ class Platform(ABC):
         collects the jobs prepared for later submission handling.
 
         :param as_conf: Autosubmit configuration for the current experiment.
-        :type as_conf: AutosubmitConfig
         :param job_list: Job container used to inspect ready jobs and register
             wrapper information.
-        :type job_list: JobList
         :param packages_to_submit: Packages built for this platform and ready to
-            be prepared.
-        :type packages_to_submit: list[JobPackageBase]
+            be prepared
         :param inspect: If ``True``, prepare packages for inspect mode without
             generating the platform submit script or sending files.
-        :type inspect: bool
         :param only_wrappers: If ``True``, prepare only wrapper-related metadata
             and skip the regular package submission flow.
-        :type only_wrappers: bool
         :raises Exception: Propagate any exception raised while preparing packages, generating scripts, or transferring files.
         :return: A list containing the jobs gathered while preparing the given
             packages for submission.
-        :rtype: list
-
         """
         Log.debug(f"\nJobs ready for {self.name}: {len(job_list.get_ready(self))}")
         # Submitting by sections allows to detect Scheduler misconfiguration derived from a bad configuration without submitting any job.
@@ -492,12 +512,11 @@ class Platform(ABC):
         self._serial_platform = value
 
     @property
-    @autosubmit_parameter(name='current_partition')
-    def partition(self):
+    def partition(self) -> str:
         """Partition to use for jobs.
 
+        :autosubmit-group: PLATFORM
         :return: queue's name
-        :rtype: str
         """
         if self._partition is None:
             return ''
@@ -508,11 +527,10 @@ class Platform(ABC):
         self._partition = value
 
     @property
-    def queue(self):
+    def queue(self) -> str:
         """Queue to use for jobs.
 
         :return: queue's name
-        :rtype: str
         """
         if self._default_queue is None or self._default_queue == "":
             return ''
@@ -523,11 +541,10 @@ class Platform(ABC):
         self._default_queue = value
 
     @property
-    def serial_partition(self):
+    def serial_partition(self) -> str:
         """Partition to use for serial jobs.
 
         :return: partition's name
-        :rtype: str
         """
         if self._serial_partition is None or self._serial_partition == "":
             return self.partition
@@ -538,11 +555,10 @@ class Platform(ABC):
         self._serial_partition = value
 
     @property
-    def serial_queue(self):
+    def serial_queue(self) -> str:
         """Queue to use for serial jobs.
 
         :return: queue's name
-        :rtype: str
         """
         if self._serial_queue is None or self._serial_queue == "":
             return self.queue
@@ -612,44 +628,39 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_file(self, filename, must_exist=True, relative_path='', ignore_log=False, wrapper_failed=False):
+    def get_file(self,
+                 filename: str,
+                 must_exist: bool = True,
+                 relative_path: str = '',
+                 ignore_log: bool = False,
+                 wrapper_failed: bool = False
+        ) -> bool:
         """Copies a file from the current platform to experiment's tmp folder
 
         :param wrapper_failed:
-        :param ignore_log:
         :param filename: file name
-        :type filename: str
         :param must_exist: If True, raises an exception if file can not be copied
-        :type must_exist: bool
         :param relative_path: relative path inside tmp folder
-        :type relative_path: str
         :return: True if file is copied successfully, false otherwise
-        :rtype: bool
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_files(self, files, must_exist=True, relative_path=''):
+    def get_files(self, files: list[str], must_exist: bool = True, relative_path: str = '') -> None:
         """Copies some files from the current platform to experiment's tmp folder.
 
         :param files: file names
-        :type files: [str]
         :param must_exist: If True, raises an exception if file can not be copied
-        :type must_exist: bool
         :param relative_path: relative path inside tmp folder
-        :type relative_path: str
         :return: True if file is copied successfully, false otherwise
-        :rtype: bool
         """
         for filename in files:
             self.get_file(filename, must_exist, relative_path)
 
-    def delete_file(self, filename: str):
+    def delete_file(self, filename: str) -> bool:
         """Deletes a file from this platform.
 
         :param filename: file name
-        :type filename: str
         :return: True if successful or file does not exist
-        :rtype: bool
         """
         raise NotImplementedError  # pragma: no cover
 
@@ -683,13 +694,11 @@ class Platform(ABC):
                 job.current_checkpoint_step += 1
                 self.get_file(f'{remote_checkpoint_path}{str(job.current_checkpoint_step)}', False, ignore_log=True)
 
-    def remove_stat_file(self, job: Any) -> bool:
+    def remove_stat_file(self, job: 'Job') -> bool:
         """Removes STAT files from remote.
 
         :param job: Job to check.
-        :type job: Job
         :return: True if the file was removed, False otherwise.
-        :rtype: bool
         """
         # TODO: After rebasing everything I noticed that sometimes the stat file ends with '_'
         if job.stat_file.endswith('_'):
@@ -701,13 +710,11 @@ class Platform(ABC):
             return True
         return False
 
-    def remove_completed_file(self, job_name):
+    def remove_completed_file(self, job_name: str) -> bool:
         """Removes *COMPLETED* files from remote.
 
         :param job_name: name of job to check
-        :type job_name: str
         :return: True if successful, False otherwise
-        :rtype: bool
         """
         filename = job_name + '_COMPLETED'
         if self.delete_file(filename):
@@ -741,12 +748,11 @@ class Platform(ABC):
         Log.warning(f'{job.name}_STAT_{str(attempt)} file not found')
         return False
 
-    @autosubmit_parameter(name='current_logdir')
     def get_files_path(self) -> str:
         """The platform's LOG directory.
 
+        :autosubmit-group: PLATFORM
         :return: platform's LOG directory
-        :rtype: str
         """
         # Circular import -- bad class design, probably can be re-designed.
         if self.TYPE is PlatformType.LOCAL:
