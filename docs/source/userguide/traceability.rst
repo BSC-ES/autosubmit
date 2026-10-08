@@ -40,6 +40,9 @@ the experiment workflow jobs are explained in the following sections.
 Logs
 ----
 
+Command traceability logs include the working directory. If that directory has
+been deleted, it is logged as ``<deleted>`` so logging does not stop the command.
+
 Most of the Autosubmit commands that take an ``expid`` argument (``autosubmit create``,
 ``autosubmit setstatus``, ``autosubmit run``, etc.) write to log
 files persisted in the computer where the command is issued, along with
