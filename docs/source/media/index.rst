@@ -70,8 +70,7 @@ Presentations
 .. raw:: html
 
     <iframe
-        src="https://docs.google.com/presentation/d/e/2PACX-1vSvfOhIr5bfWzjFgLjmN_
-        hySYNcF8tBpyyKeogcsVNWUVwohlnRyl4mtxLJYAxZxsKKjbmd2MMDE4-E/embed?start=false&loop=false&delayms=3000"
+        src="https://docs.google.com/presentation/d/e/2PACX-1vSvfOhIr5bfWzjFgLjmN_hySYNcF8tBpyyKeogcsVNWUVwohlnRyl4mtxLJYAxZxsKKjbmd2MMDE4-E/embed?start=false&loop=false&delayms=3000"
         frameborder="0"
         width="100%"
         height="450px"
@@ -80,5 +79,4 @@ Presentations
         webkitallowfullscreen="true"></iframe>
 
 
-`Full Screen <https://docs.google.com/presentation/d/e/2PACX-1vSvfOhIr5bfWzjFgLjmN_
-hySYNcF8tBpyyKeogcsVNWUVwohlnRyl4mtxLJYAxZxsKKjbmd2MMDE4-E/pub?output=pdf>`_
+`Full Screen <https://docs.google.com/presentation/d/e/2PACX-1vSvfOhIr5bfWzjFgLjmN_hySYNcF8tBpyyKeogcsVNWUVwohlnRyl4mtxLJYAxZxsKKjbmd2MMDE4-E/pub?output=pdf>`_
