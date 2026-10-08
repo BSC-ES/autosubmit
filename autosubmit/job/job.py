@@ -44,7 +44,6 @@ from autosubmit.database.managers.history import (
 )
 from autosubmit.helpers.enums import ChunkUnit
 from autosubmit.helpers.parameters import autosubmit_parameter, autosubmit_parameters
-from autosubmit.history.data_classes.job_data import JobData
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.job_common import (
     Status,

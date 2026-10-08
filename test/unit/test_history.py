@@ -79,7 +79,7 @@ def test_update_counts_uses_provided_status_counts():
     from unittest.mock import Mock
 
     exp_history = ExperimentHistory.__new__(ExperimentHistory)
-    exp_history.manager = Mock()
+    exp_history._manager = Mock()
     run_dc = Mock()
     counts = {
         "COMPLETED": 3, "FAILED": 0, "QUEUING": 0,
