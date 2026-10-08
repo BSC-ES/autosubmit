@@ -39,7 +39,10 @@ Composing the Extended Platform Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In this page we will be extending the SLURM
-platform - source file ``autosubmit/platforms/slurmplatform.py``, see in GitHub `slurmplatform.py <https://github.com/BSC-ES/autosubmit/blob/53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/slurmplatform.py#L35>`_ -, but any platform can be extended by following the same steps.
+platform - source file ``autosubmit/platforms/slurmplatform.py``, see in GitHub
+`slurmplatform.py <https://github.com/BSC-ES/autosubmit/blob/
+53b2a142fee5c8d8ac169547528c768c93e02a4a/autosubmit/platforms/slurmplatform.py#L35>`_
+-, but any platform can be extended by following the same steps.
 
 The platform will be transcribing the files and configurations you set manually to allow operations,
 and connection to SLURM and its commands, preparing your experiments to be executed transforming configuration
@@ -92,7 +95,8 @@ new parameters and/or behaviours, making it possible to add flexibility and rest
 
 The class ``submit_job`` is a existing class in ``SlurmPlatform`` that was overwritten to have a new behaviour.
 
-After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` class could look similar to the following example code.
+After all needed modifications and expansions, the ``Slurm_ExamplePlatform`` class could look similar to the following
+example code.
 
 .. code-block:: python
     :linenos:
@@ -135,7 +139,9 @@ to determine the scheduler.
     seen more as a reference
 
 
-``autosubmit/autosubmit.py`` in `line 2538 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py#L2537>`_  add a new ``string`` making sure the new platform type is considered
+``autosubmit/autosubmit.py`` in
+`line 2538 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/autosubmit.py#L2537>`_  add a new ``string``
+making sure the new platform type is considered
 the same as SLURM platform, as we expect a similar behaviour.
 
 .. code-block:: python
@@ -147,7 +153,8 @@ the same as SLURM platform, as we expect a similar behaviour.
                                                                                          failed_packages,
                                                                                          error_message="", hold=hold)
 
-``autosubmit/job/job.py`` in `line 2575 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2575>`_ ensure each job Job writes
+``autosubmit/job/job.py`` in
+`line 2575 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2575>`_ ensure each job Job writes
 the timestamp to TOTAL_STATS file and jobs_data.db properly.
 
 .. code-block:: python
@@ -158,7 +165,9 @@ the timestamp to TOTAL_STATS file and jobs_data.db properly.
         thread_write_finish.name = f"JOB_data_{self.name}"
         thread_write_finish.start()
 
-``autosubmit/job/job.py`` in `line 2817 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2817>`_ add a new validation for the validation of the queue
+``autosubmit/job/job.py`` in
+`line 2817 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/job/job.py#L2817>`_ add a new validation for
+the validation of the queue
 creation with the platform type
 
 .. code-block:: python
@@ -171,7 +180,9 @@ creation with the platform type
             self._platform._ssh_output, self.id)
 
 
-``autosubmit/platforms/paramiko_submitter.py`` in `line 143 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a new validation for the header command
+``autosubmit/platforms/paramiko_submitter.py`` in
+`line 143 <https://github.com/BSC-ES/autosubmit/blob/v4.1.13/autosubmit/platforms/paramiko_submitter.py#L143>`_ add a
+new validation for the header command
 creation where the platform type
 
 .. code-block:: python
@@ -182,8 +193,8 @@ creation where the platform type
             asconf.expid, section, exp_data, auth_password = auth_password)
 
 
-How to Configure a Platform
----------------------------
+Configuring a platform
+----------------------
 
 To set up your platform, you first have to create a new experiment by running the following command:
 |br| *Change the platform from MARENOSTRUM5 to whichever you will use*
@@ -194,56 +205,63 @@ To set up your platform, you first have to create a new experiment by running th
 
 This will generate a minimal version of an experiment.
 
-To change the configuration of your experiment to ensure it works properly, you can create a project and customize its parameters. The following instructions are
+To change the configuration of your experiment to ensure it works properly, you can create a project and customize its
+parameters. The following instructions are
 designed to execute a small job through Autosubmit, explaining how to configure a new platform.
 
 Open the file ``~/autosubmit/<expid>/config/minimal.yml`` and you'll find a file as shown below.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    CONFIG:
-        AUTOSUBMIT_VERSION: "4.1.12"
-        TOTALJOBS: 20
-        MAXWAITINGJOBS: 20
+    .. code-block:: yaml
 
-    DEFAULT:
-        EXPID: <EXPID> # ID of the experiment
-        HPCARCH: "MARENOSTRUM5" # This will be the default platform if a job doesn't contain a defined platform
-        #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
-        CUSTOM_CONFIG: "%PROJDIR%/"
+        CONFIG:
+            AUTOSUBMIT_VERSION: "4.1.12"
+            TOTALJOBS: 20
+            MAXWAITINGJOBS: 20
 
-    PROJECT:
-        PROJECT_TYPE: local
-        PROJECT_DESTINATION: local_project
+        DEFAULT:
+            EXPID: <EXPID> # ID of the experiment
+            HPCARCH: "MARENOSTRUM5" # This will be the default platform if a job doesn't contain a defined platform
+            #hint: use %PROJDIR% to point to the project folder (where the project is cloned)
+            CUSTOM_CONFIG: "%PROJDIR%/"
 
-    GIT:
-        PROJECT_ORIGIN: ""
-        PROJECT_BRANCH: ""
-        PROJECT_COMMIT: ''
-        PROJECT_SUBMODULES: ''
-        FETCH_SINGLE_BRANCH: true
+        PROJECT:
+            PROJECT_TYPE: local
+            PROJECT_DESTINATION: local_project
+
+        GIT:
+            PROJECT_ORIGIN: ""
+            PROJECT_BRANCH: ""
+            PROJECT_COMMIT: ''
+            PROJECT_SUBMODULES: ''
+            FETCH_SINGLE_BRANCH: true
 
 Now we start configuring the experiment adding the additional ``PARAMETERS`` to create a simple executable experiment
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    EXPERIMENT:
-        DATELIST: 19900101
-        MEMBERS: fc0
-        CHUNKSIZEUNIT: month
-        SPLITSIZEUNIT: day
-        CHUNKSIZE: 1
-        NUMCHUNKS: 2
-        CALENDAR: standard
+    .. code-block:: yaml
+
+        EXPERIMENT:
+            DATELIST: 19900101
+            MEMBERS: fc0
+            CHUNKSIZEUNIT: month
+            SPLITSIZEUNIT: day
+            CHUNKSIZE: 1
+            NUMCHUNKS: 2
+            CALENDAR: standard
 
 
 Add the following PARAMETER which will point towards the folder containing all the scripts and instructions to be
 used to execute the experiment in the platform
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    LOCAL:
-        PROJECT_PATH: /home/user/experiment_example # path to your project sources
+    .. code-block:: yaml
+
+        LOCAL:
+            PROJECT_PATH: /home/user/experiment_example # path to your project sources
 
 
 Autosubmit will copy your sources to the ``$autosubmit_installation/$expid/proj/%PROJECT.PROJECT_DESTINATION%``.
@@ -254,19 +272,21 @@ You must input the information suitable for your project (e.g.: user, host, plat
 
 .. _TargetPlatform:
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    PLATFORMS:
-        MARENOSTRUM5:
-            TYPE: <Scheduler> [slurm, ps, example]
-            HOST: <Host>
-            PROJECT: <Project_Name_Folder>
-            USER: <User>
-            scratch_dir: <location of project/user>
-            QUEUE: gp_debug [dummy, gp_debug, nf, hpc]
-            MAX_WALLCLOCK: <HH:MM>
-            MAX_PROCESSORS: <N> # This is to enable horizontal_wrappers
-            PROCESSORS_PER_NODE: 112 # Each HPC has their own number check the documentation of your platform
+    .. code-block:: yaml
+
+        PLATFORMS:
+            MARENOSTRUM5:
+                TYPE: <Scheduler> [slurm, ps, example]
+                HOST: <Host>
+                PROJECT: <Project_Name_Folder>
+                USER: <User>
+                scratch_dir: <location of project/user>
+                QUEUE: gp_debug [dummy, gp_debug, nf, hpc]
+                MAX_WALLCLOCK: <HH:MM>
+                MAX_PROCESSORS: <N> # This is to enable horizontal_wrappers
+                PROCESSORS_PER_NODE: 112 # Each HPC has their own number check the documentation of your platform
 
 .. warning::
     If you cannot connect, it may be because your user doesn't have access to the host, or the PARAMETER SCRATCH_DIR
@@ -289,7 +309,7 @@ to be re-established mid-run.
 The write-permission check
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Before relying on a remote platform, Autosubmit verifies that entries can be created and deleted, under the configured 
+Before relying on a remote platform, Autosubmit verifies that entries can be created and deleted, under the configured
 ``SCRATCH_DIR``. This is done by creating a small probe directory under
 ``<scratch_dir>/<project>/<user>/`` and immediately removing it. The probe is
 a directory, not a file; the name it uses depends on the platform type:
@@ -432,7 +452,11 @@ exposes at the workflow level.
 Filesystem operations during a run
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Beyond handling write-permission probes and SSH sessions, Autosubmit performs several file operations against the remote ``<SCRATCH_DIR>`` during each run. The exact number of these operations can vary based on the workflow's complexity, including factors such as the number of jobs, retries, wrapper usage, and recovery events. The table below outlines the types of operations performed at different stages, with descriptions provided in qualitative terms to reflect this variability.
+Beyond handling write-permission probes and SSH sessions, Autosubmit performs several file operations against the remote
+``<SCRATCH_DIR>`` during each run. The exact number of these operations can vary based on the workflow's complexity,
+including factors such as the number of jobs, retries, wrapper usage, and recovery events. The table below outlines the
+types of operations performed at different stages, with descriptions provided in qualitative terms to reflect this
+variability.
 
 .. list-table::
    :header-rows: 1
@@ -501,7 +525,7 @@ dummy workflow is deliberately small (7-8 jobs), so
 these numbers are an illustrative baseline, not a benchmark of what
 Autosubmit does in an operational context.
 
-.. list-table:: 
+.. list-table::
    :header-rows: 1
    :widths: 55 45
 
@@ -532,8 +556,8 @@ different workflow or platform, see the runbook at
 (``scripts/measure_platform_io.sh``) is included in the repository and
 uses ``bpftrace`` when available, falling back to ``strace`` otherwise.
 
-How to generate a new experiment
---------------------------------
+Generating a new experiment
+---------------------------
 
 Now you can add jobs at the end of the file to see the execution
 Each job will point to one of the ``Bash`` files that will be created in the next step, meaning that Autosubmit will
@@ -545,72 +569,76 @@ if they exist.
 .. note::
     The files can also be R, python2, python3. By default it is bash and can be changed by setting the file type.
 
+    .. tab-set-code::
+
+        .. code-block:: yaml
+
+            JOBS:
+                LOCAL_SETUP:
+                    TYPE: Python # adding this
+
+
+.. tab-set-code::
+
     .. code-block:: yaml
 
         JOBS:
             LOCAL_SETUP:
-                TYPE: Python # adding this
+                FILE: LOCAL_SETUP.sh # ~/autosubmit/<expid>/proj/local_project/LOCAL_SETUP.sh
+                PLATFORM: Local
+                RUNNING: once
 
+            SYNCHRONIZE:
+                FILE: SYNCHRONIZE.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: LOCAL_SETUP
+                RUNNING: once
+                WALLCLOCK: 00:05
 
-.. code-block:: yaml
+            REMOTE_SETUP:
+                FILE: REMOTE_SETUP.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: SYNCHRONIZE
+                WALLCLOCK: 00:05
+                RUNNING: once
 
-    JOBS:
-        LOCAL_SETUP:
-            FILE: LOCAL_SETUP.sh # ~/autosubmit/<expid>/proj/local_project/LOCAL_SETUP.sh
-            PLATFORM: Local
-            RUNNING: once
+            INI:
+                FILE: INI.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: REMOTE_SETUP
+                RUNNING: once
+                WALLCLOCK: 00:05
 
-        SYNCHRONIZE:
-            FILE: SYNCHRONIZE.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: LOCAL_SETUP
-            RUNNING: once
-            WALLCLOCK: 00:05
+            DATA_NOTIFIER:
+                FILE: DATA_NOTIFIER.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: INI
+                RUNNING: chunk
 
-        REMOTE_SETUP:
-            FILE: REMOTE_SETUP.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: SYNCHRONIZE
-            WALLCLOCK: 00:05
-            RUNNING: once
+            SIM:
+                FILE: SIM.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: DATA_NOTIFIER
+                RUNNING: chunk
 
-        INI:
-            FILE: INI.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: REMOTE_SETUP
-            RUNNING: once
-            WALLCLOCK: 00:05
+            STATISTICS:
+                FILE: STATISTICS.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: SIM
+                RUNNING: chunk
 
-        DATA_NOTIFIER:
-            FILE: DATA_NOTIFIER.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: INI
-            RUNNING: chunk
+            APP:
+                FILE: APP.sh
+                PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: STATISTICS
+                RUNNING: chunk
 
-        SIM:
-            FILE: SIM.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: DATA_NOTIFIER
-            RUNNING: chunk
-
-        STATISTICS:
-            FILE: STATISTICS.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: SIM
-            RUNNING: chunk
-
-        APP:
-            FILE: APP.sh
-            PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: STATISTICS
-            RUNNING: chunk
-
-        CLEAN:
-            FILE: CLEAN.sh
-            # PLATFORM: MARENOSTRUM5
-            DEPENDENCIES: APP SIM STATISTICS
-            RUNNING: once
-            WALLCLOCK: 00:05
+            CLEAN:
+                FILE: CLEAN.sh
+                # PLATFORM: MARENOSTRUM5
+                DEPENDENCIES: APP SIM STATISTICS
+                RUNNING: once
+                WALLCLOCK: 00:05
 
 Once you finish setting up all the new configurations, you can run the following command to generate the experiment
 just created; we need to create a new folder to keep all the instructions for the experiment to be executed on the
@@ -625,27 +653,31 @@ platform.
 For the execution of this test, a few files will need to be created within the new folder;
 these files will contain proj-associated code that will be executed on the job-specified platform.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    LOCAL_SETUP.sh
-    SYNCHRONIZE.sh
-    REMOTE_SETUP.sh
-    INI.sh
-    DATA_NOTIFIER.sh
-    SIM.sh
-    STATISTICS.sh
-    APP.sh
-    CLEAN.sh
+    .. code-block:: yaml
+
+        LOCAL_SETUP.sh
+        SYNCHRONIZE.sh
+        REMOTE_SETUP.sh
+        INI.sh
+        DATA_NOTIFIER.sh
+        SIM.sh
+        STATISTICS.sh
+        APP.sh
+        CLEAN.sh
 
 To keep a concise and clear example of how Autosubmit works, a simple instruction can be executed as a test.
 So add the following the instruction below to one or more ``Bash`` files created in the previous steps.
 
-.. code-block:: yaml
+.. tab-set-code::
 
-    sleep 5
+    .. code-block:: yaml
 
-How to run the experiment
--------------------------
+        sleep 5
+
+Running the experiment
+----------------------
 
 ``autosubmit create -f -v <EXPID>``
 
@@ -660,3 +692,4 @@ Once the experiment is generated, we can execute it and check the experiment by 
 .. note::
     For more examples on how to create and share configurations of experiments and platforms,
     you can visit the :ref:`page <create_and_share_config>`.
+

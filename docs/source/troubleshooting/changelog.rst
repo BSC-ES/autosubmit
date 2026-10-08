@@ -1,3 +1,5 @@
+:orphan:
+
 #########
 Changelog
 #########
@@ -9,11 +11,11 @@ Major changes:
 - Python version has changed to 3.7.3 instead of 2.7.
 - Configuration language has changed to YAML.
 
- - All parameters are now unified into a single dictionary.
- - All sections are now uppercase.
- - All parameters, except for job related ones, have now an hierarchy.
- - An special key, FOR:, has been added. This key allows to create multiple jobs with almost the same configuration.
- - The configuration of autosubmit is now more flexible.
+- All parameters are now unified into a single dictionary.
+- All sections are now uppercase.
+- All parameters, except for job related ones, have now an hierarchy.
+- An special key, FOR:, has been added. This key allows to create multiple jobs with almost the same configuration.
+- The configuration of autosubmit is now more flexible.
 
 - New command added, upgrade. This command will update all the scripts and autosubmit configuration.
 - Wrapper definition has changed.
@@ -37,20 +39,23 @@ Major changes:
 Configuration changes
 =====================
 
-Now autosubmit is composed of two kinds of YAML configurations: the default ones, which are the same as always, and the custom ones.
+Now autosubmit is composed of two kinds of YAML configurations: the default ones, which are the same as always, and the
+custom ones.
 
-The custom ones allow defining custom configurations that will override the default ones. In order to do this, you only have to put the key in the custom configuration file.
-These custom ones can be anywhere and have any name. By default, they're inside ``<EXPID>/conf``, but you can change this path in the expdef_<EXPID>.yml file using ``DEFAULT.CUSTOM_CONFIG``.
+The custom ones allow defining custom configurations that will override the default ones. In order to do this, you only
+have to put the key in the custom configuration file.
+These custom ones can be anywhere and have any name. By default, they're inside ``<EXPID>/conf``, but you can change
+this path in the ``expdef_<EXPID>.yml`` file using ``DEFAULT.CUSTOM_CONFIG``.
 
 Additionally, you must be aware of the following changes:
 
- - All section **keys** are normalized to **UPPERCASE**, while values remain as the user put them. Beware of scripts that rely on %CURRENT_HPCARCH% and variables that refer to a platform because they will always be in UPPERCASE. Normalize the script.
- - To define a job, you must put it under the key ``jobs`` in any custom configuration file.
- - To define a platform, you must put it under the key ``platforms`` in any custom configuration file.
- - To define a loop, you must put the key ``FOR`` as the first key of the section.
- - You can put any %placeholder% in the proj_<EXPID>.yml and custom files, and also you can put %ROOTDIR% in the expdef_<EXPID>.yml.
- - All configuration is now based in an hierarchical structure, so to export a var, you must use the following syntax: `%KEY.SUBKEY.SUBSUBKEY%`. The same goes for override them.
- - YAML has into account the type.
+- All section **keys** are normalized to **UPPERCASE**, while values remain as the user put them. Beware of scripts that rely on ``%CURRENT_HPCARCH%`` and variables that refer to a platform because they will always be in UPPERCASE. Normalize the script.
+- To define a job, you must put it under the key ``jobs`` in any custom configuration file.
+- To define a platform, you must put it under the key ``platforms`` in any custom configuration file.
+- To define a loop, you must put the key ``FOR`` as the first key of the section.
+- You can put any ``%placeholder%`` in the ``proj_<EXPID>.yml`` and custom files, and also you can put ``%ROOTDIR%`` in the ``expdef_<EXPID>.yml``.
+- All configuration is now based in an hierarchical structure, so to export a var, you must use the following syntax: ``%KEY.SUBKEY.SUBSUBKEY%``. The same goes for override them.
+- YAML has into account the type.
 
 Examples
 ========
@@ -424,7 +429,8 @@ The DEPENDENCIES key is used to define the dependencies of a job. It can be used
         - "all": Will link all selected tasks of the dependency with the current selected tasks. Example: SIM_FC00_CHUNK_1 -> DA_FC00_CHUNK_1, DA_FC00_CHUNK_2, DA_FC00_CHUNK_3...
         - "none": Will unlink selected tasks of the dependency from the current selected tasks.
 
-For the new format, consider that the priority is hierarchy and goes like this DATES_FROM -(includes)-> MEMBERS_FROM -(includes)-> CHUNKS_FROM.
+For the new format, consider that the priority is hierarchy and goes like this DATES_FROM -(includes)-> MEMBERS_FROM
+-(includes)-> CHUNKS_FROM.
 
 - You can define a DATES_FROM inside the DEPENDENCY.
 - You can define a MEMBERS_FROM inside the DEPENDENCY and DEPENDENCY.DATES_FROM.
@@ -540,7 +546,8 @@ Example 1: New format with specific dependencies
 ------------------------------------------------
 
 
-In the following example, we want to launch the next member SIM after the last SIM chunk of the previous member is finished.
+In the following example, we want to launch the next member SIM after the last SIM chunk of the previous member is
+finished.
 
 .. code-block:: yaml
 
