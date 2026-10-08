@@ -36,16 +36,16 @@ from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.config.configcommon import AutosubmitConfig
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database.db_common import database_backup
-from autosubmit.database.db_manager_historical import HistoricalDbManager
-from autosubmit.database.db_manager_job_list import JobsDbManager
+from autosubmit.database.managers.history import (
+    get_last_run_id,
+)
+from autosubmit.database.managers.history_edges import HistoricalDbManager
+from autosubmit.database.managers.job_list import JobsDbManager
 from autosubmit.experiment.manage import (
     provenance,
 )
 from autosubmit.experiment.utils import print_job_details
 from autosubmit.git.autosubmit_git import check_unpushed_changes
-from autosubmit.history.database_managers.experiment_history_db_manager import (
-    get_last_run_id,
-)
 from autosubmit.history.experiment_history import (
     ExperimentHistory,
     get_historical_database,
@@ -117,7 +117,7 @@ def _prepare_run(
     :param recover: a boolean to indicate if the experiment is recovering from a failure.
     :param check_scripts: Whether to check the scripts before submitting.
     :param submitter: the actual loaded platforms if any
-    :return: a Union
+    :return: A tuple with the job list, submitter, experiment history, host, config, platforms to test and the recovery flag.
     """
     host = platform.node()
     # Init the AutosubmitConfig and check that every file exists, and it is a valid configuration.
@@ -559,27 +559,29 @@ def _save_historical_edges(expid):
     exp_history.save_historical_edges()
 
 
-def _finish_current_experiment_run(expid):
+def _finish_current_experiment_run(expid: str, exp_history: ExperimentHistory):
     """Update the finish time of the current experiment run in the database.
 
-    :param expid: a string with the experiment id
-    :return: None
+    :param expid: a string with the experiment id.
+    :param exp_history: The ``ExperimentHistory`` instance to use.
     """
     _save_historical_edges(expid)
-    # TODO: Add all methods and functions to the new historical db manager
-    old_exp_history = ExperimentHistory(expid)
-    old_exp_history.finish_current_experiment_run()
+    exp_history.finish_current_experiment_run()
 
 
-def _process_historical_data_iteration(job_list, job_changes_tracker, expid):
+def _process_historical_data_iteration(
+    job_list: JobList,
+    job_changes_tracker: dict[str, tuple[str, str]],
+    expid: str,
+    exp_history: ExperimentHistory,
+):
     """Process the historical data for the current iteration.
 
     :param job_list: a JobList object.
     :param job_changes_tracker: a dictionary with the changes in the job status.
     :param expid: a string with the experiment id.
-    :return: an ExperimentHistory object.
+    :param exp_history: The ``ExperimentHistory`` instance to use.
     """
-    exp_history = ExperimentHistory(expid)
     if len(job_changes_tracker) > 0:
         exp_history.process_job_list_changes_to_experiment_totals(
             job_list.get_job_list(), status_counts=job_list.get_status_counts()
@@ -677,6 +679,7 @@ def run(
     job_list.recover_logs(from_db=True)
     job_list.reset_updated_logs()
     job_list.load_wrappers()
+    exp_history = ExperimentHistory(expid)
     while job_list.continue_run():
         try:
             if profiler is not None:
@@ -720,7 +723,7 @@ def run(
                         Status.VALUE_TO_KEY[job.status],
                     )
                 _process_historical_data_iteration(
-                    job_list, job_changes_tracker, expid
+                    job_list, job_changes_tracker, expid, exp_history
                 )
             except Exception:
                 Log.printlog(
@@ -854,7 +857,7 @@ def run(
     Log.info("Waiting for all logs to be updated")
     for p in platforms_to_test:
         p.clean_log_recovery_process()
-    _process_historical_data_iteration(job_list, job_changes_tracker, expid)
+    _process_historical_data_iteration(job_list, job_changes_tracker, expid, exp_history)
 
     for p in platforms_to_test:
         p.close_connection()
@@ -868,7 +871,7 @@ def run(
             )
         # Updating finish time for job data header
         try:
-            _finish_current_experiment_run(expid)
+            _finish_current_experiment_run(expid, exp_history)
         except Exception as e:
             Log.warning(f"Database is locked: {str(e)}")
     rocrate_data = as_conf.experiment_data.get("ROCRATE", None)

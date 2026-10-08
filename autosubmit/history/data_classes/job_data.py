@@ -19,7 +19,7 @@
 from datetime import datetime, timedelta
 from json import loads
 
-import autosubmit.history.database_managers.database_models as Models
+import autosubmit.database.models.records as Models
 import autosubmit.history.utils as HUtils
 
 
@@ -203,6 +203,10 @@ class JobData:
                 self.require_update = True
             self._energy = round(energy, 2)
 
+    # TODO #3306: ``delta_queue_time``, ``delta_running_time``, ``submit_datetime``,
+    #       ``start_datetime`` and ``finish_datetime`` are unused in this
+    #       repository; remove them once it is confirmed that no external consumer
+    #       (e.g. Autosubmit API) relies on them.
     @property
     def delta_queue_time(self):
         """
@@ -250,7 +254,6 @@ class JobData:
         Calculates and returns the running time of the job, in seconds.
 
         :return: Running time in seconds.   
-        :rtype: int
         """
         if self.status in ["RUNNING", "COMPLETED", "FAILED"]:
             return HUtils.calculate_run_time_in_seconds(self.start, self.finish)
@@ -262,7 +265,6 @@ class JobData:
         Calculates and returns the queuing time of the job, in seconds.
 
         :return: Queueing time in seconds.   
-        :rtype: int
         """
         if self.status in ["SUBMITTED", "QUEUING", "RUNNING", "COMPLETED", "HELD", "PREPARED", "FAILED", "SKIPPED"]:
             return HUtils.calculate_queue_time_in_seconds(self.submit, self.start)
