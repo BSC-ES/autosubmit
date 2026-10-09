@@ -664,7 +664,7 @@ class ParamikoPlatform(Platform):
     #       ``self.platform`` in ``job_package.py``.
     def remove_multiple_files(self, filenames):
         log_dir = self.tmp_path / f"LOG_{self.expid}"
-        multiple_delete_previous_run = str(Path(log_dir) / "multiple_delete_previous_run.sh")
+        multiple_delete_previous_run = str(log_dir / "multiple_delete_previous_run.sh")
         if log_dir.exists():
             lang = locale.getlocale()[1]
             if lang is None:
@@ -831,8 +831,8 @@ class ParamikoPlatform(Platform):
         path_root = Path("")
         try:
             path_root = self.files_path
-            src = str(path_root / src)
-            dest = str(path_root / dest)
+            src = path_root / src
+            dest = path_root / dest
             try:
                 self._ftpChannel.stat(dest)
             except OSError:
@@ -1974,7 +1974,7 @@ class ParamikoPlatform(Platform):
         :return: ``True`` on success, ``False`` otherwise.
         """
         try:
-            path = str(Path(self.scratch) / self.project_dir / self.user / "permission_checker_azxbyc")
+            path = Path(self.scratch) / self.project_dir / self.user / "permission_checker_azxbyc"
             try:
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
