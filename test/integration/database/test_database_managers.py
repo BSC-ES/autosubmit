@@ -42,7 +42,6 @@ JOBDATA_DIR = BasicConfig.JOBDATA_DIR
 LOCAL_ROOT_DIR = BasicConfig.LOCAL_ROOT_DIR
 
 
-@pytest.mark.skip()
 @pytest.mark.skip('TODO: looks like another test that used actual experiments data')
 class TestExperimentStatusDatabaseManager:
     """ Covers Experiment Status Database Manager """

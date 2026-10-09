@@ -32,13 +32,11 @@ from autosubmit.notifications.mail_notifier import MailNotifier
 
 
 @pytest.fixture
-def mock_basic_config(mocker):
-    mock_config = mocker.Mock()
-    mock_config.MAIL_FROM = "test@example.com"
-    mock_config.SMTP_SERVER = "smtp.example.com"
-    mock_config.expid_aslog_dir.side_effect = lambda exp_id: BasicConfig.expid_aslog_dir(
-        exp_id)
-    return mock_config
+def mock_basic_config(monkeypatch):
+    monkeypatch.setattr(BasicConfig, 'MAIL_FROM', 'test@example.com')
+    monkeypatch.setattr(BasicConfig, "SMTP_SERVER", "smtp.example.com")
+    monkeypatch.setattr(BasicConfig, 'expid_aslog_dir',lambda exp_id: BasicConfig.expid_aslog_dir(
+        exp_id))
 
 
 @pytest.fixture
@@ -55,11 +53,6 @@ def mock_platform(mocker):
     mock_platform.name = "Test Platform"
     mock_platform.host = "test.host.com"
     return mock_platform
-
-
-@pytest.fixture
-def mail_notifier(mock_basic_config):
-    return MailNotifier(mock_basic_config)
 
 
 def _normalize_mail_text(text: str) -> str:
@@ -105,7 +98,6 @@ def test_compress_file(
         mock_platform,
         mock_smtp,
         mocker,
-        mail_notifier,
         number_of_files: int,
         sendmail_error: Exception | None,
         compress_error: Exception | None,
@@ -140,7 +132,7 @@ def test_compress_file(
             'expid_aslog_dir',
             return_value=Path(temp_dir))
 
-        mail_notifier.notify_experiment_status('a000', ['recipient@example.com'], mock_platform)
+        MailNotifier().notify_experiment_status('a000', ['recipient@example.com'], mock_platform)
 
         if sendmail_error:
             mock_printlog.assert_called_once()
@@ -190,7 +182,6 @@ def test_notify_status_change(
         mock_basic_config,
         mock_smtp,
         mocker,
-        mail_notifier,
         sendmail_error: Exception | None,
         expected_log_message):
     exp_id = 'a123'
@@ -204,11 +195,11 @@ def test_notify_status_change(
         mock_smtp.side_effect = sendmail_error
     mock_printlog = mocker.patch.object(Log, 'printlog')
 
-    mail_notifier.notify_status_change(exp_id, job_name, prev_status, status, mail_to)
+    MailNotifier().notify_status_change(exp_id, job_name, prev_status, status, mail_to)
 
     message_text = "Generated message"
     message = MIMEText(message_text)
-    message['From'] = email.utils.formataddr(('Autosubmit', mail_notifier.config.MAIL_FROM))
+    message['From'] = email.utils.formataddr(('Autosubmit', BasicConfig.MAIL_FROM))
     message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {str(status)}'
     message['Date'] = email.utils.formatdate(localtime=True)
 
@@ -231,7 +222,7 @@ def test_notify_status_change(
     ]
 )
 def test_notify_cpmip_threshold_violations_errors(
-        mock_basic_config, mocker, mail_notifier,sendmail_error: Exception | None, expected_log_message):
+        mock_basic_config, mocker, sendmail_error: Exception | None, expected_log_message):
     """Test the possible errors in ``notify_cpmip_threshold_violations``.
 
     The success path is tested in integration tests.
@@ -254,7 +245,7 @@ def test_notify_cpmip_threshold_violations_errors(
         mock_smtp.side_effect = sendmail_error
     mock_printlog = mocker.patch.object(Log, 'printlog')
 
-    mail_notifier.notify_cpmip_threshold_violations(exp_id, job_name, violations, mail_to)
+    MailNotifier().notify_cpmip_threshold_violations(exp_id, job_name, violations, mail_to)
 
     mock_printlog.assert_called_once_with(expected_log_message, 6011)
     log_calls = [call[0][0] for call in mock_printlog.call_args_list]

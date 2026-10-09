@@ -19,13 +19,14 @@
 
 from pathlib import Path
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.experiment.lock import experiment_lock
 from autosubmit.log.log import AutosubmitCritical
 from autosubmit.scripts.create import main as create_main
 
 
 def _lock_file(exp) -> Path:
-    return Path(exp.as_conf.basic_config.LOCAL_ROOT_DIR) / exp.expid / "tmp" / "autosubmit.lock"
+    return Path(BasicConfig.LOCAL_ROOT_DIR) / exp.expid / "tmp" / "autosubmit.lock"
 
 
 def test_create_removes_lock_file(autosubmit_exp):

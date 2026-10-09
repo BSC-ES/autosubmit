@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.profiler.profiler import Profiler
 from autosubmit.workflow.manage import run
 
@@ -72,4 +73,4 @@ def test_run_profile(trace_enabled, max_checkpoints, autosubmit_exp, tmp_path):
         run(expid=as_exp.expid)
     finally:
         profiler.stop()
-    assert check_profile(as_exp.expid, as_exp.as_conf.basic_config.LOCAL_ROOT_DIR)
+    assert check_profile(as_exp.expid, BasicConfig.LOCAL_ROOT_DIR)

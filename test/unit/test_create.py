@@ -39,7 +39,7 @@ def test_create_git_clone_disables_remote_git_on_platform_error(mocker, tmp_path
 
     as_conf.check_conf_files.side_effect = AutosubmitCritical("stop test", 7014)
 
-    mocker.patch("autosubmit.experiment.manage.AutosubmitConfig", return_value=as_conf)
+    mocker.patch("autosubmit.experiment.manage.load_config", return_value=as_conf)
     as_conf.reload.return_value = None
 
     mocker.patch(
@@ -66,7 +66,7 @@ def test_create_git_clone_disables_remote_git_on_missing_platform(mocker, tmp_pa
 
     as_conf.check_conf_files.side_effect = AutosubmitCritical("stop test", 7014)
 
-    mocker.patch("autosubmit.experiment.manage.AutosubmitConfig", return_value=as_conf)
+    mocker.patch("autosubmit.experiment.manage.load_config", return_value=as_conf)
 
     as_conf.reload.return_value = None
 

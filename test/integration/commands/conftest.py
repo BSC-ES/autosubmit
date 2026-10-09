@@ -76,7 +76,7 @@ def general_data(tmp_path: Path) -> dict[str, Any]:
             'LOCAL_ROOT_DIR': str(tmp_path)  # Override root dir to tmp_path
         },
         'CONFIG': {
-            "SAFETYSLEEPTIME": 0,
+            "SAFETYSLEEPTIME": 3,
             "TOTALJOBS": 20,
             "MAXWAITINGJOBS": 20
         },

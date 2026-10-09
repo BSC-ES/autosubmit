@@ -52,7 +52,7 @@ class AutosubmitConfigFactory(Protocol):
             include_basic_config: bool = True,
             *args: Any,
             **kwargs: Any
-    ) -> AutosubmitConfig: ...
+    ) -> "AutosubmitConfig": ...
 
 
 @pytest.fixture(scope="function")
@@ -76,7 +76,7 @@ def autosubmit_config(
             include_basic_config: bool = True,
             *_,
             **kwargs
-    ) -> AutosubmitConfig:
+    ) -> "AutosubmitConfig":
         """Create an Autosubmit configuration object.
 
         The values in ``BasicConfig`` are configured to use a temporary directory as base,
@@ -127,10 +127,12 @@ def autosubmit_config(
         job_data_dir = Path(BasicConfig.JOBDATA_DIR)
         job_data_dir.mkdir(parents=True, exist_ok=True)
 
-        config = AutosubmitConfig(
-            expid=expid,
-            basic_config=BasicConfig
-        )
+        # In integration tests, the ``autosubmit_exp`` fixture uses ``load_config``. Here,
+        # however, we always create a new instance. That is because in unit testing we re-use
+        # expids a lot. This is because we do not really have experiments, it's a "fake" layer,
+        # and instead we only create a configuration instance here, and return it. Thus, the
+        # new instance is always created and used here, and not the configuration registry.
+        config = AutosubmitConfig(expid=expid)
 
         config.experiment_data = {**config.experiment_data, **experiment_data}
         # Populate the configuration object's ``experiment_data`` dictionary with the values

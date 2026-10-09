@@ -22,6 +22,7 @@ from contextlib import suppress
 from sys import exit
 from typing import TYPE_CHECKING
 
+from autosubmit.config.registry import load_config
 from autosubmit.helpers.version import get_version
 from autosubmit.log.log import Log
 from autosubmit.scripts._args import parse_expids
@@ -80,6 +81,8 @@ def initialise_command(command: str, opts: "AutosubmitOptions") -> None:
     * checks that the configuration contains YAML data where required;
     * records the command as the last command used.
 
+    NOTE: This functions logs then exists the program upon errors.
+
     :param command: The Autosubmit sub-command name.
     :param opts: Autosubmit options.
     """
@@ -96,11 +99,9 @@ def initialise_command(command: str, opts: "AutosubmitOptions") -> None:
 
     autosubmit_version = get_version()
 
-    from autosubmit.config.configcommon import AutosubmitConfig
-
     for expid in expids:
-        as_conf = AutosubmitConfig(expid)
-        as_conf.reload(force_load=True)
+        as_conf = load_config(expid)
+        as_conf.reload(force_load=True, only_experiment_data=True)
 
         # Check that the YAML data looks about right.
         if command not in ["expid", "upgrade"] and not as_conf.experiment_data:

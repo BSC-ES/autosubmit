@@ -20,6 +20,8 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
+from autosubmit.config.basicconfig import BasicConfig
+
 
 @pytest.mark.parametrize(
     "data,owner",
@@ -43,7 +45,7 @@ def test_save(autosubmit_config, tmpdir, mocker, data: dict, owner: str, monkeyp
     else:
         monkeypatch.setenv("USER", 'whatever')
     as_conf = autosubmit_config(expid='t000', experiment_data=data, include_basic_config=True)
-    data['ROOTDIR'] = str(Path(as_conf.basic_config.LOCAL_ROOT_DIR) / as_conf.expid)
+    data['ROOTDIR'] = str(Path(BasicConfig.LOCAL_ROOT_DIR) / as_conf.expid)
     # TODO: figure why some autosubmit_config conf_test( I hope ) is adding functions to experiment_data
     as_conf.experiment_data = {k: v for k, v in data.items() if not callable(v)}
     as_conf.load_common_parameters(as_conf.experiment_data)

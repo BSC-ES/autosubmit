@@ -51,20 +51,17 @@ if TYPE_CHECKING:
 class AutosubmitConfig:
     """Class to handle experiment configuration coming from a file or database.
 
-    :param expid: experiment identifier
-    :type expid: str
+    :param expid: The experiment identifier.
     """
 
-    def __init__(self, expid, basic_config=BasicConfig, parser_factory=YAMLParserFactory()):
+    def __init__(self, expid: str):
         self.data_changed = False
         self.ignore_undefined_platforms = False
         self.ignore_file_path = False
         self.expid = expid
-        self.basic_config = basic_config
-        self.basic_config.read()
         if not Path(BasicConfig.LOCAL_ROOT_DIR, expid).exists():
             raise OSError(f"Experiment {expid} does not exist")
-        self.parser_factory = parser_factory
+        self.parser_factory = YAMLParserFactory()
         self.experiment_data = {}
         self.last_experiment_data = {}
         self.data_loops = set()
@@ -173,7 +170,7 @@ class AutosubmitConfig:
         :rtype: str
         """
         dir_templates = Path(
-            self.basic_config.LOCAL_ROOT_DIR,
+            BasicConfig.LOCAL_ROOT_DIR,
             self.expid,
             BasicConfig.LOCAL_PROJ_DIR,
             self.get_project_destination()
@@ -1888,7 +1885,7 @@ class AutosubmitConfig:
         :param parameters: Dictionary to populate with HPC values. If None, use self.experiment_data.
         """
         platforms = self.experiment_data.get("PLATFORMS", {})
-        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", PlatformType.LOCAL)
+        hpcarch: str = self.experiment_data.get("DEFAULT", {}).get("HPCARCH", PlatformType.LOCAL.upper())
         hpcarch_data: dict = platforms.get(hpcarch, {})
 
         target = parameters if parameters is not None else self.experiment_data

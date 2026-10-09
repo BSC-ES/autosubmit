@@ -23,8 +23,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
-from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.history.experiment_history import ExperimentHistory
 from autosubmit.job.filters import (
     apply_job_filters,
@@ -126,7 +124,8 @@ def set_status(
         Log.debug(f"Status of jobs to change: {filter_status}")
         Log.debug(f"Sections to change: {filter_section}")
 
-        as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
+        from autosubmit.config.registry import load_config
+        as_conf = load_config(expid)
         as_conf.check_conf_files(True)
 
         # Getting output type from configuration

@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
 from autosubmit.platforms.locplatform import LocalPlatform
@@ -57,7 +58,7 @@ def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file
     """Test that ``get_stat_file`` uses the correct file name."""
 
     as_conf = autosubmit_config(_EXPID, experiment_data={})
-    exp_path = Path(as_conf.basic_config.LOCAL_ROOT_DIR) / _EXPID
+    exp_path = Path(BasicConfig.LOCAL_ROOT_DIR) / _EXPID
 
     local = LocalPlatform(_EXPID, __name__, as_conf.experiment_data)
 
@@ -65,11 +66,11 @@ def test_get_stat_file(stats_file_exists: bool, job_fail_count: int, remote_file
     job.fail_count = job_fail_count
 
     filename = f'{job.name}_STAT_{str(job.fail_count)}'
-    local_stat_path = Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, filename)
+    local_stat_path = Path(exp_path, BasicConfig.LOCAL_TMP_DIR, filename)
 
     if remote_file_exists:
         # Create fake remote stat file transferred.
-        Path(exp_path, as_conf.basic_config.LOCAL_TMP_DIR, f'LOG_{_EXPID}', filename).touch()
+        Path(exp_path, BasicConfig.LOCAL_TMP_DIR, f'LOG_{_EXPID}', filename).touch()
 
     if stats_file_exists:
         # Create fake local stat file, to be deleted before copying the remote file (created above).

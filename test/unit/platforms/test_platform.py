@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from autosubmit.config.basicconfig import BasicConfig
 from autosubmit.log.log import Log
 from autosubmit.platforms.locplatform import LocalPlatform
 from autosubmit.platforms.platform import recover_platform_job_logs_wrapper
@@ -102,7 +103,7 @@ def test_init_logs_log_process_with_root_dir(mocker, autosubmit_config):
     })
     # TODO: We need to create it first to get a ``BasicConfig``, with Dani's improvement
     #       that may not be necessary in the future!
-    as_conf.experiment_data['ROOTDIR'] = as_conf.basic_config.expid_dir(as_conf.expid)
+    as_conf.experiment_data['ROOTDIR'] = BasicConfig.expid_dir(as_conf.expid)
 
     platform = mocker.MagicMock()
     platform.name = 'parrot'

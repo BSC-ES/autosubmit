@@ -205,8 +205,6 @@ def _check_mail_address(mail_to: list[str]) -> None:
 
 
 class MailNotifier:
-    def __init__(self, basic_config):
-        self.config = basic_config
 
     def notify_experiment_status(
             self,
@@ -229,12 +227,12 @@ class MailNotifier:
         message_text = _generate_message_experiment_status(exp_id, platform)
         message = MIMEMultipart()
         message['From'] = email.utils.formataddr(
-            ('Autosubmit', self.config.MAIL_FROM))
+            ('Autosubmit', BasicConfig.MAIL_FROM))
         message['Subject'] = '[Autosubmit] Warning: a remote platform is malfunctioning'
         message['Date'] = email.utils.formatdate(localtime=True)
         message.attach(MIMEText(message_text))
 
-        run_log_files = [f for f in self.config.expid_aslog_dir(
+        run_log_files = [f for f in BasicConfig.expid_aslog_dir(
             exp_id).glob('*_run.log') if Path(f).is_file()]
         if run_log_files:
             latest_run_log: Path = max(run_log_files)
@@ -248,7 +246,7 @@ class MailNotifier:
                 if temp_dir:
                     temp_dir.cleanup()
 
-        self._send_message(mail_to, self.config.MAIL_FROM, message)
+        self._send_message(mail_to, BasicConfig.MAIL_FROM, message)
 
     def notify_status_change(
             self,
@@ -263,11 +261,11 @@ class MailNotifier:
             exp_id, job_name, prev_status, status)
         message = MIMEText(message_text)
         message['From'] = email.utils.formataddr(
-            ('Autosubmit', self.config.MAIL_FROM))
+            ('Autosubmit', BasicConfig.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] The job {job_name} status has changed to {status}'
         message['Date'] = email.utils.formatdate(localtime=True)
 
-        self._send_message(mail_to, self.config.MAIL_FROM, message)
+        self._send_message(mail_to, BasicConfig.MAIL_FROM, message)
 
     def notify_cpmip_threshold_violations(
             self,
@@ -279,11 +277,11 @@ class MailNotifier:
         message_text = _generate_message_cpmip_threshold_violations(exp_id, job_name, violations)
         message = MIMEText(message_text)
         message['From'] = email.utils.formataddr(
-            ('Autosubmit', self.config.MAIL_FROM))
+            ('Autosubmit', BasicConfig.MAIL_FROM))
         message['Subject'] = f'[Autosubmit] CPMIP Threshold Violation detected for {job_name}'
         message['Date'] = email.utils.formatdate(localtime=True)
 
-        self._send_message(mail_to, self.config.MAIL_FROM, message)
+        self._send_message(mail_to, BasicConfig.MAIL_FROM, message)
 
     def _send_message(self, mail_to: list[str], mail_from: str, message) -> None:
         formatted_addresses = [email.utils.formataddr((mail, mail)) for mail in mail_to]
@@ -295,6 +293,6 @@ class MailNotifier:
                     'about remote_platform', 6011)
 
     def _send_mail(self, mail_from, mail_to, message):
-        server = smtplib.SMTP(self.config.SMTP_SERVER, timeout=60)
+        server = smtplib.SMTP(BasicConfig.SMTP_SERVER, timeout=60)
         server.sendmail(mail_from, mail_to, message.as_string())
         server.quit()
