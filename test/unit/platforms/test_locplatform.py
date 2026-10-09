@@ -131,7 +131,7 @@ def test_check_all_jobs_stat_confirmation(
     platform = LocalPlatform(expid=_EXPID, name='local', config={})
     remote_log = tmp_path / f'LOG_{_EXPID}'
     remote_log.mkdir(parents=True)
-    platform.remote_log_dir = str(remote_log)
+    platform.remote_log_dir = remote_log
     platform.connected = True
 
     job = _make_simple_job('t001_INI', status=Status.RUNNING)
@@ -160,7 +160,7 @@ def test_check_all_jobs_save_flag_set_when_status_changes(
     platform = LocalPlatform(expid=_EXPID, name='local', config={})
     remote_log = tmp_path / f'LOG_{_EXPID}'
     remote_log.mkdir(parents=True)
-    platform.remote_log_dir = str(remote_log)
+    platform.remote_log_dir = remote_log
     platform.connected = True
 
     job = _make_simple_job('t001_INI', status=Status.RUNNING)
@@ -185,7 +185,7 @@ def test_check_all_jobs_no_change_returns_false(
     platform = LocalPlatform(expid=_EXPID, name='local', config={})
     remote_log = tmp_path / f'LOG_{_EXPID}'
     remote_log.mkdir(parents=True)
-    platform.remote_log_dir = str(remote_log)
+    platform.remote_log_dir = remote_log
     platform.connected = True
 
     job = _make_simple_job('t001_INI', status=Status.RUNNING)

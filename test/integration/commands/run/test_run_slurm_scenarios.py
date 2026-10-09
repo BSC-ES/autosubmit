@@ -816,28 +816,28 @@ def test_run_interrupted_multiple_vertical_wrappers(
 def test_inspect_wrappers(tmp_path, autosubmit_exp: 'AutosubmitExperimentFixture', general_data):
     """Test inspect with wrappers."""
     exp = autosubmit_exp(experiment_data={
-                                             'DEFAULT': {
-                                                 'HPCARCH': 'TEST_SLURM'
-                                             },
-                                             'EXPERIMENT': {
-                                                 'NUMCHUNKS': '2',
-                                             },
-                                             'JOBS': {
-                                                 'A': {
-                                                     'SCRIPT': 'echo "Hello World"',
-                                                     'RUNNING': 'chunk',
-                                                     'PLATFORM': 'TEST_SLURM',
-                                                     'DEPENDENCIES': 'A-1',
-                                                     'WALLCLOCK': '00:01'
-                                                 }
-                                             },
-                                             'WRAPPERS': {
-                                                 'TEST_WRAPPER': {
-                                                     'TYPE': 'vertical',
-                                                     'JOBS_IN_WRAPPER': 'A'
-                                                 }
-                                             }
-                                         } | general_data, include_jobs=False, create=True)
+            'DEFAULT': {
+                'HPCARCH': 'TEST_SLURM'
+            },
+            'EXPERIMENT': {
+                'NUMCHUNKS': '2',
+            },
+            'JOBS': {
+                'A': {
+                    'SCRIPT': 'echo "Hello World"',
+                    'RUNNING': 'chunk',
+                    'PLATFORM': 'TEST_SLURM',
+                    'DEPENDENCIES': 'A-1',
+                    'WALLCLOCK': '00:01'
+                }
+            },
+            'WRAPPERS': {
+                'TEST_WRAPPER': {
+                    'TYPE': 'vertical',
+                    'JOBS_IN_WRAPPER': 'A'
+                }
+            }
+        } | general_data, include_jobs=False, create=True)
     exp.as_conf.set_last_as_command('inspect')
 
     # Inspect

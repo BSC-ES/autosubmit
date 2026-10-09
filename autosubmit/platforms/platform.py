@@ -199,7 +199,7 @@ class Platform(ABC):
         self._scratch = ''
         self._project_dir = ''
         self.temp_dir = ''
-        self._root_dir = ''
+        self._root_dir: Path = Path("")
         self.service = None
         self.scheduler = None
         self.directory = None
@@ -599,7 +599,7 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def move_file(self, src: str, dest: str):
+    def move_file(self, src: str, dest: str) -> bool:
         """Moves a file on the platform.
 
         :param src: source name
@@ -607,7 +607,9 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_file(self, filename: str, must_exist: bool=True, relative_path: str='', ignore_log: bool=False, wrapper_failed: bool=False) -> bool:
+    def get_file(self,
+        filename: str, must_exist: bool=True, relative_path: str='', ignore_log: bool=False, wrapper_failed: bool=False
+    ) -> bool:
         """Copies a file from the current platform to experiment's tmp folder
 
         :param wrapper_failed:
@@ -619,7 +621,7 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_files(self, files: [str], must_exist: bool=True, relative_path: str='') -> bool:
+    def get_files(self, files: list[str], must_exist: bool=True, relative_path: str='') -> None:
         """Copies some files from the current platform to experiment's tmp folder.
 
         :param files: file names
@@ -726,13 +728,9 @@ class Platform(ABC):
         :autosubmit-group: JOB
         """
         if self.TYPE is PlatformType.LOCAL:
-            path = Path(
-                self.root_dir,
-                self.config.get("LOCAL_TMP_DIR", ""),
-                f"LOG_{self.expid}",
-            )
+            path = self.root_dir / self.config.get("LOCAL_TMP_DIR", "") / f"LOG_{self.expid}"
         else:
-            path = Path(self.remote_log_dir)
+            path = self.remote_log_dir
 
         return str(path)
 
