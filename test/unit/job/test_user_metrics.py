@@ -309,10 +309,10 @@ def test_get_current_metric_folder_placeholder(autosubmit_config, local: LocalPl
     parameters = job.update_parameters(as_conf)
 
     assert (
-        isinstance(parameters["CURRENT_ROOTDIR"], str)
-        and len(parameters["CURRENT_ROOTDIR"]) > 0
+        isinstance(parameters["CURRENT_ROOTDIR"], Path)
+        and parameters["CURRENT_ROOTDIR"] is not None
     )
 
     assert parameters["CURRENT_METRIC_FOLDER"] == str(
-        Path(parameters["CURRENT_ROOTDIR"]).joinpath("my_metrics_folder", job_name)
+        parameters["CURRENT_ROOTDIR"].joinpath("my_metrics_folder", job_name)
     )
