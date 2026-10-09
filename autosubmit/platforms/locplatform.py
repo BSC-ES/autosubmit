@@ -335,7 +335,7 @@ class LocalPlatform(ParamikoPlatform):
                 return False
         except Exception as e:
             if str(e) in "Garbage":
-                raise AutosubmitError(f'File {os.path.join(self.files_path, src)} does not exist', 6004, str(e))
+                raise AutosubmitError(f"File {Path(self.files_path) / src} does not exist", 6004, str(e))
             if must_exist:
                 raise AutosubmitError(f"File {os.path.join(self.files_path, src)} does not exist", 6004, str(e))
             else:
