@@ -663,8 +663,8 @@ class ParamikoPlatform(Platform):
     #       class, if not, then we probably need to review the type of the
     #       ``self.platform`` in ``job_package.py``.
     def remove_multiple_files(self, filenames):
-        log_dir = Path(self.tmp_path) / f'LOG_{self.expid}'
-        multiple_delete_previous_run = str(log_dir / "multiple_delete_previous_run.sh")
+        log_dir = Path(self.tmp_path) / f"LOG_{self.expid}"
+        multiple_delete_previous_run = Path(log_dir) / "multiple_delete_previous_run.sh")
         if log_dir.exists():
             lang = locale.getlocale()[1]
             if lang is None:
@@ -676,7 +676,7 @@ class ParamikoPlatform(Platform):
             )
             os.chmod(multiple_delete_previous_run, 0o770)
             self.send_file(multiple_delete_previous_run, False)
-            command = str(Path(self.files_path) / "multiple_delete_previous_run.sh")
+            command = Path(self.files_path) / "multiple_delete_previous_run.sh"
             if self.send_command(command, ignore_log=True):
                 return self._ssh_output
         return ""
@@ -685,8 +685,8 @@ class ParamikoPlatform(Platform):
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
-        local_path = str(Path(self.tmp_path) / filename)
-        remote_path = str(Path(self.files_path) / os.path.basename(filename))
+        local_path = Path(self.tmp_path) / filename
+        remote_path = Path(self.files_path) / Path(filename).name
         try:
             self._ftpChannel.put(local_path, remote_path)
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
@@ -754,14 +754,14 @@ class ParamikoPlatform(Platform):
         :param wrapper_failed:
         :return: True if file is copied successfully, false otherwise
         """
-        local_path = Path(self.tmp_path) / relative_path
+        local_path = self.tmp_path / relative_path
         if not local_path.exists():
-            os.makedirs(str(local_path))
+            local_path.mkdir(parents=True, exist_ok=True)
 
-        file_path = Path(local_path) / filename
+        file_path = local_path / filename
         if file_path.exists():
-            os.remove(str(file_path))
-        remote_path = str(Path(self.files_path) / filename)
+            file_path.unlink()
+        remote_path = Path(self.files_path) / filename
         try:
             self._ftpChannel.get(remote_path, file_path)
 
@@ -831,8 +831,8 @@ class ParamikoPlatform(Platform):
         path_root = ""
         try:
             path_root = Path(self.files_path)
-            src = str(path_root / src)
-            dest = str(path_root / dest)
+            src = path_root / src
+            dest = path_root / dest
             try:
                 self._ftpChannel.stat(dest)
             except OSError:
@@ -1974,7 +1974,7 @@ class ParamikoPlatform(Platform):
         :return: ``True`` on success, ``False`` otherwise.
         """
         try:
-            path = str(Path(self.scratch) / self.project_dir / self.user / "permission_checker_azxbyc")
+            path = Path(self.scratch) / self.project_dir / self.user / "permission_checker_azxbyc"
             try:
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
