@@ -16,6 +16,7 @@
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
 """Utilities for Docker."""
+
 import multiprocessing
 from getpass import getuser
 from os import environ
@@ -44,35 +45,35 @@ if TYPE_CHECKING:
     from requests import Response
 
 __all__ = [
-    'get_container_by_id',
-    'get_containers_by_filter',
-    'get_git_container',
-    'get_mail_container',
-    'get_mailhog_messages',
-    'get_slurm_container',
-    'get_ssh_container',
-    'get_svn_container',
-    'prepare_and_test_git_container',
-    'prepare_and_test_mail_container',
-    'prepare_and_test_slurm_container',
-    'prepare_and_test_ssh_container',
-    'prepare_and_test_svn_container',
-    'stop_test_containers'
+    "get_container_by_id",
+    "get_containers_by_filter",
+    "get_git_container",
+    "get_mail_container",
+    "get_mailhog_messages",
+    "get_slurm_container",
+    "get_ssh_container",
+    "get_svn_container",
+    "prepare_and_test_git_container",
+    "prepare_and_test_mail_container",
+    "prepare_and_test_slurm_container",
+    "prepare_and_test_ssh_container",
+    "prepare_and_test_svn_container",
+    "stop_test_containers",
 ]
 
-_SSH_DOCKER_IMAGE = 'lscr.io/linuxserver/openssh-server:latest'
+_SSH_DOCKER_IMAGE = "lscr.io/linuxserver/openssh-server:latest"
 """This is the vanilla image from LinuxServer.io, with OpenSSH. About 39MB."""
-_SSH_DOCKER_IMAGE_X11_MFA = 'autosubmit/linuxserverio-ssh-2fa-x11:latest'
+_SSH_DOCKER_IMAGE_X11_MFA = "autosubmit/linuxserverio-ssh-2fa-x11:latest"
 """This is our test image, built on top of LinuxServer.io's, but with MFA and X11. About 395MB."""
-_SSH_DOCKER_PASSWORD = 'password'
+_SSH_DOCKER_PASSWORD = "password"
 """Common password used in SSH containers; we mock the SSH Client of Paramiko to avoid hassle with keys."""
 
-_SLURM_DOCKER_IMAGE = 'giovtorres/slurm-docker:25.11.2-v0.1.7'
+_SLURM_DOCKER_IMAGE = "giovtorres/slurm-docker:25.11.2-v0.1.7"
 """The Slurm Docker image. About 600 MB. It contains 2 cores, 1 node."""
 
-_GIT_DOCKER_IMAGE = 'githttpd/githttpd:latest'
+_GIT_DOCKER_IMAGE = "githttpd/githttpd:latest"
 """The Git image used for tests where Autosubmit needs to clone a repository."""
-_SVN_DOCKER_IMAGE = 'elleflorio/svn-server:latest'
+_SVN_DOCKER_IMAGE = "elleflorio/svn-server:latest"
 """The SVN image used for tests where Autosubmit needs to clone a repository."""
 
 _AS_SLURM_CONTAINER_LABEL = "pytest.slurm.singleton"
@@ -91,7 +92,7 @@ _AS_SINGLETON_CONTAINER_VALUE = "true"
 """Docker container label value for singletons."""
 
 
-def get_container_by_id(container_id: str) -> 'Container':
+def get_container_by_id(container_id: str) -> "Container":
     """Gets a Docker container by its ID.
 
     :param: container_id: The ID of the container.
@@ -101,7 +102,7 @@ def get_container_by_id(container_id: str) -> 'Container':
     return client.containers.get(container_id)
 
 
-def get_containers_by_filter(filters: dict) -> list['Container']:
+def get_containers_by_filter(filters: dict) -> list["Container"]:
     """Gets Docker containers by a filter.
 
     The filter is passed down to ``.list(filters=*)``. Useful for
@@ -119,7 +120,6 @@ def get_containers_by_filter(filters: dict) -> list['Container']:
     return client.containers.list(filters=filters)
 
 
-
 def _create_git_container(git_repos_path: Path, http_port: int) -> DockerContainer:
     """Start a Docker container with Git.
 
@@ -127,20 +127,18 @@ def _create_git_container(git_repos_path: Path, http_port: int) -> DockerContain
     with the TCP/80 port mapped to the host ``http_port``.
     """
     docker_args = {
-        'labels': {
-            _AS_GIT_CONTAINER_LABEL: 'true',
+        "labels": {
+            _AS_GIT_CONTAINER_LABEL: "true",
         }
     }
 
     docker_container = DockerContainer(
-        image=_GIT_DOCKER_IMAGE,
-        auto_remove=True,
-        **docker_args
+        image=_GIT_DOCKER_IMAGE, auto_remove=True, **docker_args
     )
 
-    container = docker_container \
-        .with_bind_ports(80, http_port) \
-        .with_volume_mapping(str(git_repos_path), '/opt/git-server', mode='rw')
+    container = docker_container.with_bind_ports(80, http_port).with_volume_mapping(
+        str(git_repos_path), "/opt/git-server", mode="rw"
+    )
 
     # The docker image ``githttpd/githttpd`` creates an HTTP server for Git
     # repositories, using the volume bound onto ``/opt/git-server`` as base
@@ -151,9 +149,9 @@ def _create_git_container(git_repos_path: Path, http_port: int) -> DockerContain
 def prepare_and_test_git_container(container: DockerContainer, http_port: int) -> None:
     wait_for_logs(container, "Command line: 'httpd -D FOREGROUND'")
 
-    container.exec('whoami')
+    container.exec("whoami")
 
-    wait_for_tcp_port('localhost', http_port)
+    wait_for_tcp_port("localhost", http_port)
 
 
 def get_git_container(git_repos_path: Path) -> tuple[DockerContainer, int]:
@@ -171,20 +169,18 @@ def _create_svn_container(svn_repos_path: Path, http_port: int) -> DockerContain
     with the TCP/80 port mapped to the host ``http_port``.
     """
     docker_args = {
-        'labels': {
-            _AS_SVN_CONTAINER_LABEL: 'true',
+        "labels": {
+            _AS_SVN_CONTAINER_LABEL: "true",
         }
     }
 
     docker_container = DockerContainer(
-        image=_SVN_DOCKER_IMAGE,
-        auto_remove=True,
-        **docker_args
+        image=_SVN_DOCKER_IMAGE, auto_remove=True, **docker_args
     )
 
-    container = docker_container \
-        .with_bind_ports(80, http_port) \
-        .with_volume_mapping(str(svn_repos_path), '/home/svn', mode='rw')
+    container = docker_container.with_bind_ports(80, http_port).with_volume_mapping(
+        str(svn_repos_path), "/home/svn", mode="rw"
+    )
 
     # The docker image ``elleflorio/svn-server`` creates an HTTP server for SVN
     # repositories, using the volume bound onto ``<TBC>`` as base
@@ -204,9 +200,11 @@ def prepare_and_test_svn_container(container: DockerContainer, http_port: int) -
         "file:///home/svn/svn-project/tags "
         "-m 'init dirs'"
     )
-    container.exec("echo -e 'store-plaintext-passwords = yes' >> /home/.subversion/servers")
+    container.exec(
+        "echo -e 'store-plaintext-passwords = yes' >> /home/.subversion/servers"
+    )
 
-    wait_for_tcp_port('localhost', http_port)
+    wait_for_tcp_port("localhost", http_port)
 
 
 def get_svn_container(svn_repos_path: Path) -> tuple[DockerContainer, int]:
@@ -218,19 +216,31 @@ def get_svn_container(svn_repos_path: Path) -> tuple[DockerContainer, int]:
 
 
 def prepare_and_test_slurm_container(
-        container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: 'MockerFixture') -> None:
+    container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: "MockerFixture"
+) -> None:
     # TODO: or maybe wait for 'debug:  sched: Running job scheduler for full queue.'?
-    wait_for_logs(container, lambda logs: 'All services started' in logs)
+    wait_for_logs(container, lambda logs: "All services started" in logs)
 
-    container.exec('sinfo')
-    container.exec('mkdir -p /tmp/scratch/group/root')
+    container.exec("sinfo")
+    container.exec("mkdir -p /tmp/scratch/group/root")
 
     user = getuser()
-    container.exec(['bash', '-c', f'useradd -m {user} 2>/dev/null || true'])
-    container.exec(['bash', '-c', f'echo "{user}:{_SSH_DOCKER_PASSWORD}" | chpasswd'])
-    container.exec(['bash', '-c', f'mkdir -p /tmp/scratch/group/{user} && chmod -R 777 /tmp/scratch'])
-    container.exec(['bash', '-c',
-                    f'mkdir -p /home/{user}/.ssh && chmod 700 /home/{user}/.ssh && chown -R {user} /home/{user}/.ssh'])
+    container.exec(["bash", "-c", f"useradd -m {user} 2>/dev/null || true"])
+    container.exec(["bash", "-c", f'echo "{user}:{_SSH_DOCKER_PASSWORD}" | chpasswd'])
+    container.exec(
+        [
+            "bash",
+            "-c",
+            f"mkdir -p /tmp/scratch/group/{user} && chmod -R 777 /tmp/scratch",
+        ]
+    )
+    container.exec(
+        [
+            "bash",
+            "-c",
+            f"mkdir -p /home/{user}/.ssh && chmod 700 /home/{user}/.ssh && chown -R {user} /home/{user}/.ssh",
+        ]
+    )
 
     # sshd_config_text = dedent('''\
     #     Include /etc/ssh/sshd_config.d/*.conf
@@ -259,21 +269,30 @@ def prepare_and_test_slurm_container(
     #     "EOF"
     # ])
 
-    _, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config_slurm')
+    _, pubkey, ssh_config = create_ssh_keypair_and_config(
+        ssh_port, ssh_path, "config_slurm"
+    )
 
-    for authorized_keys_path in [Path('/root/.ssh/authorized_keys'), Path(f'/home/{user}/.ssh/authorized_keys')]:
+    for authorized_keys_path in [
+        Path("/root/.ssh/authorized_keys"),
+        Path(f"/home/{user}/.ssh/authorized_keys"),
+    ]:
         # noinspection PyProtectedMember
-        exec_result = _write_authorized_keys(container._container, pubkey, authorized_keys_path)
+        exec_result = _write_authorized_keys(
+            container._container, pubkey, authorized_keys_path
+        )
         exit_code = exec_result.exit_code
 
         if exit_code != 0:
             # noinspection PyProtectedMember
-            raise RuntimeError(f'Failed to write authorized_keys to test container {container._container.id}')
+            raise RuntimeError(
+                f"Failed to write authorized_keys to test container {container._container.id}"
+            )
 
     # container.exec('pkill sshd')
     # container.exec('/usr/sbin/sshd')
 
-    wait_for_ssh_port('localhost', ssh_port, timeout=30)
+    wait_for_ssh_port("localhost", ssh_port, timeout=30)
 
     mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, mocker)
 
@@ -299,34 +318,34 @@ def _create_slurm_container(ssh_port: int) -> DockerContainer:
         and the SSH configuration file path.
     """
     docker_args = {
-        'cgroupns': 'host',
-        'privileged': True,
-        'init': True,
-        'labels': {
-            _AS_SLURM_CONTAINER_LABEL: 'true',
-        }
+        "cgroupns": "host",
+        "privileged": True,
+        "init": True,
+        "labels": {
+            _AS_SLURM_CONTAINER_LABEL: "true",
+        },
     }
 
     docker_container = DockerContainer(
-        image=_SLURM_DOCKER_IMAGE,
-        auto_remove=True,
-        hostname='slurmctl',
-        **docker_args
+        image=_SLURM_DOCKER_IMAGE, auto_remove=True, hostname="slurmctl", **docker_args
     )
 
     # TODO: GH needs --volume /sys/fs/cgroup:/sys/fs/cgroup:rw
-    if 'GITHUB_ACTION' in environ:
-        docker_container = docker_container.with_volume_mapping('/sys/fs/cgroup', '/sys/fs/cgroup', mode='rw')
+    if "GITHUB_ACTION" in environ:
+        docker_container = docker_container.with_volume_mapping(
+            "/sys/fs/cgroup", "/sys/fs/cgroup", mode="rw"
+        )
 
-    container = docker_container \
-        .with_env('TZ', 'Etc/UTC') \
-        .with_env('MYSQL_USER', 'autosubmit') \
-        .with_env('MYSQL_PASSWORD', 'autosubmit') \
-        .with_env('ROOT_PASSWORD', 'autosubmit') \
-        .with_env('SSH_PORT', '2222') \
-        .with_env('SSH_PERMIT_ROOT_LOGIN', 'yes') \
-        .with_env('SSH_PASSWORD_AUTH', 'yes') \
+    container = (
+        docker_container.with_env("TZ", "Etc/UTC")
+        .with_env("MYSQL_USER", "autosubmit")
+        .with_env("MYSQL_PASSWORD", "autosubmit")
+        .with_env("ROOT_PASSWORD", "autosubmit")
+        .with_env("SSH_PORT", "2222")
+        .with_env("SSH_PERMIT_ROOT_LOGIN", "yes")
+        .with_env("SSH_PASSWORD_AUTH", "yes")
         .with_bind_ports(2222, ssh_port)
+    )
 
     return container
 
@@ -341,7 +360,9 @@ def get_slurm_container() -> tuple[DockerContainer, int]:
     return container_instance, ssh_port
 
 
-def _write_authorized_keys(container: 'Container', public_key: Path, authorized_keys: Path) -> 'ExecResult':
+def _write_authorized_keys(
+    container: "Container", public_key: Path, authorized_keys: Path
+) -> "ExecResult":
     """Write an SSH public key into an ``authorized_keys`` directory inside a container."""
     key_content = public_key.read_text()
     # escape single quotes for shell
@@ -352,28 +373,47 @@ def _write_authorized_keys(container: 'Container', public_key: Path, authorized_
 
 
 def prepare_and_test_ssh_container(
-        container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: 'MockerFixture') -> None:
-    exec_result = container.exec('whoami')
+    container: DockerContainer, ssh_port: int, ssh_path: Path, mocker: "MockerFixture"
+) -> None:
+    exec_result = container.exec("whoami")
     if exec_result.exit_code != 0:
-        raise RuntimeError(f'Failed to run whoami on test container {container.get_wrapped_container().id}')
+        raise RuntimeError(
+            f"Failed to run whoami on test container {container.get_wrapped_container().id}"
+        )
 
-    container.exec(['bash', '-c', f'mkdir -p /tmp/scratch/group/{getuser()} && chmod -R 777 /tmp/scratch'])
+    fork_context = multiprocessing.get_context("fork")
+
+    mocker.patch(
+        "autosubmit.platforms.platform.multiprocessing.get_context",
+        return_value=fork_context,
+    )
+
+    container.exec(
+        [
+            "bash",
+            "-c",
+            f"mkdir -p /tmp/scratch/group/{getuser()} && chmod -R 777 /tmp/scratch",
+        ]
+    )
 
     ssh_path.mkdir()
 
-    _priv, pubkey, ssh_config = create_ssh_keypair_and_config(ssh_port, ssh_path, 'config')
+    _priv, pubkey, ssh_config = create_ssh_keypair_and_config(
+        ssh_port, ssh_path, "config"
+    )
 
-    wait_for_ssh_port('localhost', ssh_port, timeout=30)
+    wait_for_ssh_port("localhost", ssh_port, timeout=30)
 
     exec_result = _write_authorized_keys(
-        container.get_wrapped_container(), pubkey, Path('/config/.ssh/authorized_keys'))
+        container.get_wrapped_container(), pubkey, Path("/config/.ssh/authorized_keys")
+    )
     exit_code = exec_result.exit_code
 
     if exit_code != 0:
-        raise RuntimeError(f'Failed to write authorized_keys to test container {container.get_wrapped_container().id}')
+        raise RuntimeError(
+            f"Failed to write authorized_keys to test container {container.get_wrapped_container().id}"
+        )
 
-    mocker.patch('autosubmit.platforms.platform.Platform.get_mp_context',
-                 return_value = multiprocessing.get_context('fork'))
     mock_ssh_config_and_client(ssh_config, ssh_port, _SSH_DOCKER_PASSWORD, mocker)
 
 
@@ -388,26 +428,26 @@ def _create_ssh_container(ssh_port: int, mfa=False, x11=False) -> DockerContaine
     label = _AS_SSH_X11_MFA_CONTAINER_LABEL if mfa or x11 else _AS_SSH_CONTAINER_LABEL
 
     docker_args = {
-        'labels': {
+        "labels": {
             label: _AS_SINGLETON_CONTAINER_VALUE,
         }
     }
 
-    docker_container = DockerContainer(
-        image=ssh_image,
-        auto_remove=True,
-        hostname='openssh-server',
-        **docker_args
-    ).with_env('TZ', 'Etc/UTC') \
-        .with_env('SUDO_ACCESS', 'false') \
-        .with_env('USER_NAME', user) \
-        .with_env('USER_PASSWORD', 'password') \
-        .with_env('PUID', str(uid)) \
-        .with_env('PGID', str(gid)) \
-        .with_env('UMASK', '000') \
-        .with_env('PASSWORD_ACCESS', 'true') \
-        .with_env('MFA', str(mfa).lower()) \
+    docker_container = (
+        DockerContainer(
+            image=ssh_image, auto_remove=True, hostname="openssh-server", **docker_args
+        )
+        .with_env("TZ", "Etc/UTC")
+        .with_env("SUDO_ACCESS", "false")
+        .with_env("USER_NAME", user)
+        .with_env("USER_PASSWORD", "password")
+        .with_env("PUID", str(uid))
+        .with_env("PGID", str(gid))
+        .with_env("UMASK", "000")
+        .with_env("PASSWORD_ACCESS", "true")
+        .with_env("MFA", str(mfa).lower())
         .with_bind_ports(2222, ssh_port)
+    )
 
     return docker_container
 
@@ -433,13 +473,15 @@ def get_ssh_container(mfa: bool, x11: bool) -> tuple[DockerContainer, int]:
 
 
 def prepare_and_test_mail_container(container: DockerContainer) -> None:
-    wait_for_logs(container, 'Serving under')
+    wait_for_logs(container, "Serving under")
 
 
 def _create_mail_container(smtp_port: int, api_port: int) -> DockerContainer:
-    docker_container = DockerContainer(image="mailhog/mailhog", auto_remove=True) \
-        .with_bind_ports(1025, smtp_port) \
+    docker_container = (
+        DockerContainer(image="mailhog/mailhog", auto_remove=True)
+        .with_bind_ports(1025, smtp_port)
         .with_bind_ports(8025, api_port)
+    )
     return docker_container
 
 
@@ -461,7 +503,7 @@ def get_mail_container() -> tuple[DockerContainer, int, str]:
     return container_instance, smtp_port, api_base
 
 
-def get_mailhog_messages(api_base: str) -> 'Response':
+def get_mailhog_messages(api_base: str) -> "Response":
     """Fetch the current MailHog inbox via its v2 API.
 
     :param api_base: API base URL returned by :func:`get_mail_container`.
@@ -494,7 +536,7 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
         _AS_SSH_X11_CONTAINER_LABEL,
         _AS_SSH_X11_MFA_CONTAINER_LABEL,
         _AS_GIT_CONTAINER_LABEL,
-        _AS_SLURM_CONTAINER_LABEL
+        _AS_SLURM_CONTAINER_LABEL,
     ]
 
     # Loop and call stop on all containers. Even with the timeout,
@@ -505,10 +547,7 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
             #     filters={"label": f"{label}={_AS_SINGLETON_CONTAINER_VALUE}"}
             # )
             containers = from_env().containers.list(
-                filters={
-                    "status": "running",
-                    "label": f"{label}=true"
-                }
+                filters={"status": "running", "label": f"{label}=true"}
             )
 
             if containers:
@@ -516,9 +555,9 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
                     try:
                         container.stop(timeout=stop_timeout)
                     except ContainerError as e:
-                        print(f'Failed to stop container {container.id}: {e!s}')
+                        print(f"Failed to stop container {container.id}: {e!s}")
         except ContainerError as e:
-            print(f'Failed to list containers with label {label}: {e!s}')
+            print(f"Failed to list containers with label {label}: {e!s}")
 
     # Loop to wait for all containers to have really stopped.
     start = time()
@@ -528,18 +567,17 @@ def stop_test_containers(stop_timeout=1, stop_all_timeout=30) -> None:
             #     filters={"label": f"{label}={_AS_SINGLETON_CONTAINER_VALUE}"}
             # )
             containers = from_env().containers.list(
-                filters={
-                    "status": "running",
-                    "label": f"{label}=true"
-                }
+                filters={"status": "running", "label": f"{label}=true"}
             )
             if not containers:
                 continue
 
             now = time()
             if now - start > stop_all_timeout:
-                raise RuntimeError(f'Failed to stop all Docker containers after {stop_all_timeout} seconds')
+                raise RuntimeError(
+                    f"Failed to stop all Docker containers after {stop_all_timeout} seconds"
+                )
 
             sleep(1)
         except ContainerError as e:
-            print(f'Failed to list containers with label {label}: {e!s}')
+            print(f"Failed to list containers with label {label}: {e!s}")

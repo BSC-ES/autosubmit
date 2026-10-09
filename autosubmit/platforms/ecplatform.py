@@ -60,9 +60,7 @@ class EcPlatform(ParamikoPlatform):
     Class to manage queues with ecaccess
 
     :param expid: experiment's identifier
-    :type expid: str
     :param scheduler: scheduler to use
-    :type scheduler: str (pbs, loadleveler)
     """
 
     EXECUTION_MODE = ExecutionMode.BATCH
@@ -142,8 +140,8 @@ class EcPlatform(ParamikoPlatform):
             self._ec_retry_count = 100
         self._ec_retry_flag = f"-retry {self._ec_retry_count}"
         self._allow_python_jobs = False
-        self.root_dir = ""
-        self.remote_log_dir = ""
+        self.root_dir: Path | None = None
+        self.remote_log_dir: Path | None = None
         self.cancel_cmd = ""
         self._checkjob_cmd = ""
         self._checkhost_cmd = ""
@@ -165,8 +163,8 @@ class EcPlatform(ParamikoPlatform):
 
     def update_cmds(self):
         """Updates commands for platforms"""
-        self.root_dir = os.path.join(self.scratch, self.project, self.user, self.expid)
-        self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
+        self.root_dir = Path(self.scratch) / self.project / self.user / self.expid
+        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
         self.cancel_cmd = f"ecaccess-job-delete {self._ec_retry_flag}"
         self._checkjob_cmd = f"ecaccess-job-list {self._ec_retry_flag} "
         self._checkhost_cmd = f"ecaccess-certificate-list {self._ec_retry_flag}"
@@ -175,17 +173,12 @@ class EcPlatform(ParamikoPlatform):
         self.put_cmd = f"ecaccess-file-put {self._ec_retry_flag}"
         self.get_cmd = f"ecaccess-file-get {self._ec_retry_flag}"
         self.del_cmd = f"ecaccess-file-delete {self._ec_retry_flag}"
-        self.mkdir_cmd = (f"ecaccess-file-mkdir {self._ec_retry_flag} " + self.host + ":" + self.scratch + "/" + self.project + "/" +
-                          self.user + "/" + self.expid + "; " + f"ecaccess-file-mkdir {self._ec_retry_flag} " + self.host + ":" +
-                          self.remote_log_dir)
-        self.check_remote_permissions_cmd = f"ecaccess-file-mkdir {self._ec_retry_flag} " + self.host + ":" + os.path.join(self.scratch,
-                                                                                                                          self.project,
-                                                                                                                          self.user,
-                                                                                                                          "_permission_checker_azxbyc")
-        self.check_remote_permissions_remove_cmd = f"ecaccess-file-rmdir {self._ec_retry_flag} " + self.host + ":" + os.path.join(self.scratch,
-                                                                                                                                 self.project,
-                                                                                                                                 self.user,
-                                                                                                                                 "_permission_checker_azxbyc")
+        self.mkdir_cmd = (f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.scratch}/{self.project}/{self.user}/{self.expid}; "
+                          f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:{self.remote_log_dir}")
+        self.check_remote_permissions_cmd = (f"ecaccess-file-mkdir {self._ec_retry_flag} {self.host}:"
+                            f"{Path(self.scratch) / self.project / self.user / '_permission_checker_azxbyc'}")
+        self.check_remote_permissions_remove_cmd = (f"ecaccess-file-rmdir {self._ec_retry_flag} {self.host}: "
+                                    f"{Path(self.scratch) / self.project / self.user / '_permission_checker_azxbyc'}")
 
     def get_remote_log_dir(self):
         return self.remote_log_dir
@@ -409,9 +402,7 @@ class EcPlatform(ParamikoPlatform):
         Restores the SSH connection to the platform.
 
         :param as_conf: The Autosubmit configuration object used to establish the connection.
-        :type as_conf: AutosubmitConfig
         :param log_recovery_process: Indicates that the call is made from the log retrieval process.
-        :type log_recovery_process: bool
         """
         output = subprocess.check_output(self._checkvalidcert_cmd, shell=True).decode(locale.getlocale()[1])
         if not output:
@@ -429,7 +420,6 @@ class EcPlatform(ParamikoPlatform):
         Tests the connection using the provided configuration.
 
         :param as_conf: The configuration to use for testing the connection.
-        :type as_conf: AutosubmitConfig
         """
         self.connect(as_conf)
 
@@ -476,12 +466,12 @@ class EcPlatform(ParamikoPlatform):
     def send_file(self, filename, check=True) -> bool:
         self.check_remote_log_dir()
         self.delete_file(filename)
-        command = f'{self.put_cmd} {os.path.join(self.tmp_path, filename)} {self.host}:{os.path.join(self.get_files_path(), os.path.basename(filename))}'
+        command = f'{self.put_cmd} {os.path.join(self.tmp_path, filename)} {self.host}:{os.path.join(self.files_path, os.path.basename(filename))}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError as e:
             raise AutosubmitError('Could not send file {0} to {1}'.format(os.path.join(self.tmp_path, filename),
-                                                                          os.path.join(self.get_files_path(),
+                                                                          os.path.join(self.files_path,
                                                                                        filename)), 6005, str(e))
         return True
 
@@ -519,7 +509,7 @@ class EcPlatform(ParamikoPlatform):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        command = f'{self.get_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)} {file_path}'
+        command = f'{self.get_cmd} {self.host}:{os.path.join(self.files_path, filename)} {file_path}'
         try:
             retries = 0
             sleeptime = 5
@@ -572,12 +562,12 @@ class EcPlatform(ParamikoPlatform):
         return None
 
     def delete_file(self, filename: str) -> bool:
-        command = f'{self.del_cmd} {self.host}:{os.path.join(self.get_files_path(), filename)}'
+        command = f'{self.del_cmd} {self.host}:{Path(self.files_path) / filename}'
         try:
             FNULL = open(os.devnull, 'w')
             subprocess.check_call(command, stdout=FNULL, stderr=FNULL, shell=True)
         except subprocess.CalledProcessError:
-            Log.debug('Could not remove file {0}', os.path.join(self.get_files_path(), filename))
+            Log.debug('Could not remove file {0}', os.path.join(self.files_path, filename))
             return False
         return True
 
@@ -701,7 +691,6 @@ class EcPlatform(ParamikoPlatform):
         """Cancel ecaccess jobs by their IDs.
 
         :param job_ids: List of ecaccess job IDs to cancel.
-        :type job_ids: list[str]
         """
         if not job_ids:
             return
@@ -712,7 +701,6 @@ class EcPlatform(ParamikoPlatform):
         """Check for duplicated job names in the submitted packages.
 
         :param scripts_to_submit: Package script names and their info.
-        :type scripts_to_submit: dict
         """
         # There isen't a reliable way to check for duplicated job names in ecaccess, as the job list command doesn't return all the information needed to identify them,
         # pragma: no cover
@@ -782,7 +770,6 @@ class EcPlatform(ParamikoPlatform):
         """Snapshot currently active ecaccess job IDs for the given script names.
 
         :param script_names: Script filenames about to be submitted.
-        :type script_names: list[str]
         """
 
         with suppress(Exception):
@@ -803,7 +790,6 @@ class EcPlatform(ParamikoPlatform):
         distinguish freshly submitted jobs from those of a previous run.
 
         :param script_names: Script filenames about to be submitted.
-        :type script_names: list[str]
         """
         self._pre_submission_ids = {}
         self._snapshot_job_ids_before_submission(script_names)
@@ -815,10 +801,8 @@ class EcPlatform(ParamikoPlatform):
         one recoverable job identifier per submitted script.
 
         :param script_names: Submitted script filenames.
-        :type script_names: list[str]
         :return: Matching ecaccess job IDs in submission order, one per script.
             Returns an empty list if any script name has no newly submitted job.
-        :rtype: list[int]
         """
         self.send_command(f"ecaccess-job-list {self._ec_retry_flag}")
         output = self.get_ssh_output()

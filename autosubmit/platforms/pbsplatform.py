@@ -44,14 +44,9 @@ class PBSPlatform(ParamikoPlatform):
         """Initialization of the Class PBSPlatform.
 
         :param expid: ID of the experiment which will instantiate the PBSPlatform.
-        :type expid: str
         :param name: Name of the platform to be instantiated.
-        :type name: str
         :param config: Configuration of the platform, PATHS to Files and DB.
-        :type config: dict
         :param auth_password: Authenticator's password.
-        :type auth_password: str
-        :rtype: None
         """
         ParamikoPlatform.__init__(self, expid, name, config, auth_password=auth_password)
         self.mkdir_cmd = None
@@ -77,7 +72,6 @@ class PBSPlatform(ParamikoPlatform):
         expid, name and config as the original.
 
         :return: A new platform type PBS
-        :rtype: PBSPlatform
         """
         return PBSPlatform(self.expid, self.name, self.config)
 
@@ -123,10 +117,7 @@ class PBSPlatform(ParamikoPlatform):
         return header
 
     def check_remote_log_dir(self) -> None:
-        """Creates log dir on remote host.
-
-        :rtype: None
-        """
+        """Creates log dir on remote host."""
 
         try:
             # Test if remote_path exists
@@ -144,21 +135,17 @@ class PBSPlatform(ParamikoPlatform):
                 raise AutosubmitError("SFTP session not active ", 6007, str(e)) from e
 
     def update_cmds(self) -> None:
-        """Updates commands for platforms.
-
-        :rtype: None
-        """
-        self.root_dir = os.path.join(
-            self.scratch, self.project_dir, self.user, self.expid)
-        self.remote_log_dir = os.path.join(self.root_dir, "LOG_" + self.expid)
+        """Updates commands for platforms."""
+        self.root_dir = Path(self.scratch) / self.project_dir / self.user / self.expid
+        self.remote_log_dir = self.root_dir / f"LOG_{self.expid}"
         self.cancel_cmd = "qdel"
         self._submit_cmd = 'qsub'
         self._submit_command_name = "qsub"
         self._submit_hold_cmd = 'qhold '  # Needs the JOB_ID to hold a JOB
         self.put_cmd = "scp"
         self.get_cmd = "scp"
-        self.mkdir_cmd = "mkdir -p " + self.remote_log_dir
-        self._submit_cmd_x11 = f'{self.remote_log_dir}'
+        self.mkdir_cmd = f"mkdir -p {self.remote_log_dir}"
+        self._submit_cmd_x11 = f"{self.remote_log_dir}"
 
     def _construct_final_call(self, script_name: str, pre: str, post: str, x11_options: str) -> str:
         """Build the PBS qsub submission command for a single script.
@@ -168,7 +155,6 @@ class PBSPlatform(ParamikoPlatform):
         :param post: Command suffix (e.g. output redirection).
         :param x11_options: X11 forwarding options; unused for PBS.
         :return: Complete qsub submission command.
-        :rtype: str
         """
         return f"{pre} {self._submit_cmd} {script_name} {post}"
 
@@ -222,7 +208,6 @@ class PBSPlatform(ParamikoPlatform):
         """Cancel PBS jobs by their IDs.
 
         :param job_ids: List of job IDs to cancel.
-        :type job_ids: list[str]
         """
         if job_ids:
             cancel_by_space = " ".join(str(job_id) for job_id in job_ids)
@@ -236,9 +221,7 @@ class PBSPlatform(ParamikoPlatform):
         process it for duplicate detection.
 
         :param job_names: Job names to query.
-        :type job_names: list[str]
         :return: Shell command that groups matching job IDs by job name.
-        :rtype: str
         """
         if not job_names:
             return ""
@@ -252,13 +235,10 @@ class PBSPlatform(ParamikoPlatform):
 
     def get_submitted_jobs_by_name(self, script_names: list[str]) -> list[int]:
         """Return submitted PBS job IDs by script name using a single scheduler query.
-
         All names are batched into one ``qstat``
 
         :param script_names: Submitted script filenames.
-        :type script_names: list[str]
         :return: Matching PBS job IDs in submission order.
-        :rtype: list[int]
         """
         job_names = [Path(s).stem for s in script_names]
         names_pattern = "|".join(job_names)
@@ -285,7 +265,6 @@ class PBSPlatform(ParamikoPlatform):
         """Get the variable mkdir_cmd that stores the mkdir command.
 
         :return: Mkdir command
-        :rtype: str
         """
         return self.mkdir_cmd
 
@@ -293,7 +272,6 @@ class PBSPlatform(ParamikoPlatform):
         """Get the variable remote_log_dir that stores the directory of the Log of the experiment.
 
         :return: The remote_log_dir variable.
-        :rtype: str
         """
         return self.remote_log_dir
 
@@ -301,11 +279,8 @@ class PBSPlatform(ParamikoPlatform):
         """Filter one or more status of a specific Job ID.
 
         :param output: Output of the status of the jobs.
-        :type output: str
         :param job_id: job ID.
-        :type job_id: int
         :return: All status related to a Job.
-        :rtype: str
         """
         with suppress(Exception):
             output_lines = output.lower().split('\n')
@@ -318,15 +293,12 @@ class PBSPlatform(ParamikoPlatform):
                     return status.upper()
         return ''
 
-    def get_submitted_job_id(self, output_lines: str, x11: bool = False) -> list[int]:
+    def get_submitted_job_id(self, output_lines: str, x11: bool = False) -> list[str]:
         """Iterate through jobs that didn't fail the submission and retrieve their ID.
 
         :param output_lines: Output of the ssh command.
-        :type output_lines: str
         :param x11: Enable x11 forwarding, to enable graphical jobs.
-        :type x11: bool
         :return: List of job ids that got submitted and had an output.
-        :rtype: list[int]
         """
         try:
             output_lines = output_lines.lower()
@@ -344,10 +316,7 @@ class PBSPlatform(ParamikoPlatform):
         """Generate qstat command for all the jobs passed down.
 
         :param jobs_id: ID of one or more jobs.
-        :param jobs_id: str
-
         :return: qstat command to all jobs.
-        :rtype: str
         """
         jobs_id = jobs_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat {jobs_id} | awk" + " '{print $1, $3}' && " + f"qstat -H {jobs_id} | awk" + " '{print $1, $3}'"
@@ -356,9 +325,7 @@ class PBSPlatform(ParamikoPlatform):
         """Get an estimated queue time to the job selected.
 
         :param job_id: ID of a job.
-        :param job_id: str
         :return: Gets estimated queue time.
-        :rtype: str
         """
         job_id = job_id.replace('{', '').replace('}', '').replace(',', ' ')
         return f"qstat -f {job_id} | grep 'eligible_time = [0-9:0-9:0-9]*' && echo \"BREAK\" && " + f"qstat -H -f {job_id} | grep 'eligible_time = [0-9:0-9:0-9]*'"
@@ -369,11 +336,8 @@ class PBSPlatform(ParamikoPlatform):
         """Parse the queue reason from the output of the command.
 
         :param output: output of the command.
-        :type output: str
         :param job_id: job id
-        :type job_id: str
         :return: queue reason.
-        :rtype: str
         """
         reason = [x.split(',')[1] for x in output.splitlines()
                   if x.split(',')[0] == str(job_id)]
@@ -383,14 +347,11 @@ class PBSPlatform(ParamikoPlatform):
         return reason
 
 
-
     def wrapper_header(self, **kwargs: dict) -> str:
         """Generate the header of the wrapper configuring it to execute the Experiment.
 
         :param kwargs: Key arguments associated to the Job/Experiment to configure the wrapper.
-        :type kwargs: Any
         :return: a sequence of PBS commands.
-        :rtype: str
         """
         return self._header.wrapper_header(**kwargs)
 
@@ -399,24 +360,25 @@ class PBSPlatform(ParamikoPlatform):
         """Set the allocated nodes of the wrapper.
 
         :return: A command that changes the num of Node per job
-        :rtype: str
         """
         Log.warning("Permission denied: Not enough permission to execute the command that sets the allocated nodes of the wrapper")
 
-    def check_file_exists(self, src: str, wrapper_failed: bool = False, sleeptime: int = 5,
-                          max_retries: int = 3) -> bool:
+    def check_file_exists(
+        self,
+        src: str,
+        wrapper_failed: bool = False,
+        sleeptime: int = 5,
+        max_retries: int = 3,
+        show_logs: bool = True,
+    ):
         """Check if a file exists on the FTP server.
 
         :param src: The name of the file to check.
-        :type src: str
         :param wrapper_failed: Whether the wrapper has failed. Defaults to False.
-        :type wrapper_failed: bool
         :param sleeptime: Time to sleep between retries in seconds. Defaults to 5.
-        :type sleeptime: int
         :param max_retries: Maximum number of retries. Defaults to 3.
-        :type max_retries: int
+        :param show_logs:
         :return: True if the file exists, False otherwise
-        :rtype: bool
         """
 
         file_exist = False
@@ -425,7 +387,7 @@ class PBSPlatform(ParamikoPlatform):
             try:
                 # This return IOError if a path does not exist
                 self._ftpChannel.stat(os.path.join(
-                    self.get_files_path(), src))
+                    self.files_path, src))
                 file_exist = True
             except OSError:  # File does not exist, retry in sleeptime
                 sleep(sleeptime)
