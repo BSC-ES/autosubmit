@@ -18,7 +18,7 @@
 """Integration tests for CPMIP threshold notifications via ``autosubmit run``."""
 
 from pathlib import Path
-from typing import Any, Container
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from ruamel.yaml import YAML
@@ -26,6 +26,9 @@ from ruamel.yaml import YAML
 from autosubmit.workflow.manage import run
 from test.integration.conftest import AutosubmitExperimentFixture
 from test.integration.test_utils.docker_utils import get_mailhog_messages
+
+if TYPE_CHECKING:
+    from docker.models.containers import Container
 
 # The experiment runs one SIM chunk of exactly one calendar year, so simulated
 # years equals 1.0. The Processors setting is fixed to keep CPU-hour metrics
@@ -179,7 +182,7 @@ def _assert_violation_email(email: dict[str, Any], expid: str, job_name: str,
 def test_cpmip_notification(
     autosubmit_exp: AutosubmitExperimentFixture,
     configured_mail,
-    slurm_server: Container,
+    slurm_server: 'Container',
     thresholds: dict[str, Any],
     notifications: str,
     expected_inbox_count: int,

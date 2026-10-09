@@ -2081,12 +2081,13 @@ def test_update_check_variables(autosubmit_config, experiment_data):
         assert job.check_warnings is True
 
 
-def test_update_parameters(autosubmit_config, experiment_data):
+def test_update_parameters(autosubmit_config, experiment_data, local, tmp_path):
     job = Job('test_job', 1, Status.READY, 0)
     job.section = 'TEST_JOB'
     job.chunk = 1
     job.member = "fc00"
     job.date = datetime.fromisoformat("2023-08-15T00:00:00")
+    job.platform = local
     as_conf = autosubmit_config(_EXPID, experiment_data=experiment_data)
     as_conf.experiment_data = as_conf.deep_normalize(as_conf.experiment_data)
     as_conf.experiment_data = as_conf.normalize_variables(as_conf.experiment_data, must_exists=True)
@@ -2095,21 +2096,17 @@ def test_update_parameters(autosubmit_config, experiment_data):
     as_conf.experiment_data = as_conf.parse_data_loops(as_conf.experiment_data)
 
     parameters = job.update_parameters(as_conf, set_attributes=True)
-    expected_current_only = {'CURRENT_ADDITIONAL_FILES': ['add.sh', 'add2.sh'], 'CURRENT_ARCH': 'DUMMY_PLATFORM',
-                             'CURRENT_BUDG': '',
-                             'CURRENT_CHECK': False, 'CURRENT_CHECK_WARNINGS': True,
-                             'CURRENT_DELETE_WHEN_EDGELESS': True,
-                             'CURRENT_DEPENDENCIES': {'TEST_SPLIT': {}}, 'CURRENT_EC_QUEUE': '',
-                             'CURRENT_EXCLUSIVITY': '',
-                             'CURRENT_EXTENDED_HEADER_PATH': 'bla', 'CURRENT_EXTENDED_TAILER_PATH': 'bla2',
-                             'CURRENT_FILE': 'test.sh', 'CURRENT_HOST': '', 'CURRENT_HYPERTHREADING': 'false',
-                             'CURRENT_LOGDIR': 't001/LOG_t001', 'CURRENT_METRIC_FOLDER': 't001/LOG_t001/test_job',
+    expected_current_only = {'CURRENT_ADDITIONAL_FILES': ['add.sh', 'add2.sh'], 'CURRENT_ARCH': 'local',
+                             'CURRENT_BUDG': '', 'CURRENT_CHECK': False, 'CURRENT_CHECK_WARNINGS': True,
+                             'CURRENT_DELETE_WHEN_EDGELESS': True, 'CURRENT_DEPENDENCIES': {'TEST_SPLIT': {}},
+                             'CURRENT_EC_QUEUE': '', 'CURRENT_EXCLUSIVITY': '', 'CURRENT_EXTENDED_HEADER_PATH': 'bla',
+                             'CURRENT_EXTENDED_TAILER_PATH': 'bla2', 'CURRENT_FILE': 'test.sh', 'CURRENT_HOST': '',
+                             'CURRENT_HYPERTHREADING': False, 'CURRENT_METRIC_FOLDER': f'{tmp_path.parent}/test_update_parameters0/scratch/t000/tmp/LOG_t000/test_job',
                              'CURRENT_PLATFORM': 'DUMMY_PLATFORM', 'CURRENT_PROJ': '', 'CURRENT_PROJ_DIR': '',
-                             'CURRENT_QUEUE': '',
-                             'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3, 'CURRENT_ROOTDIR': 't001',
-                             'CURRENT_RUNNING': 'chunk',
-                             'CURRENT_SCRATCH_DIR': '', 'CURRENT_TYPE': 'ps', 'CURRENT_USER': '', 'CURRENT_WRAPPER_TYPE': 'vertical',
-                             'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT'}
+                             'CURRENT_QUEUE': '', 'CURRENT_RESERVATION': '', 'CURRENT_RETRIALS': 3,
+                             'CURRENT_ROOTDIR': local.root_dir, 'CURRENT_RUNNING': 'chunk', 'CURRENT_SCRATCH_DIR': '',
+                             'CURRENT_TYPE': 'ps', 'CURRENT_USER': '', 'CURRENT_WRAPPER_TYPE': 'vertical',
+                             'CURRENT_WRAPPER_JOBS_IN_WRAPPER': 'TEST_JOB&TEST_SPLIT', 'CURRENT_LOGDIR': str(local.files_path)}
     for key, value in parameters.items():
         if key.startswith("CURRENT_"):
             assert value == expected_current_only[key]

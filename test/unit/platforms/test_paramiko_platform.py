@@ -54,7 +54,7 @@ def paramiko_platform() -> Generator[ParamikoPlatform, None, None]:
     local_root_dir = TemporaryDirectory()
     config = {
         "LOCAL_ROOT_DIR": local_root_dir.name,
-        "LOCAL_TMP_DIR": 'tmp',
+        "LOCAL_TMP_DIR": "tmp",
     }
     platform = ParamikoPlatform(expid='a000', name='local', config=config)
     platform.TYPE = "local"
@@ -74,7 +74,7 @@ def ps_platform(tmpdir) -> Generator[tuple[PsPlatform, Path], None, None]:
     tmpdir.owner = tmp_path.owner()
     config = {
         "LOCAL_ROOT_DIR": str(tmpdir),
-        "LOCAL_TMP_DIR": 'tmp',
+        "LOCAL_TMP_DIR": "tmp",
         "PLATFORMS": {
             "pytest-ps": {
                 "type": "ps",
@@ -165,7 +165,7 @@ def test_check_all_jobs_send_command2_raises_autosubmit_error(mocker, paramiko_p
 
 def test_ps_get_multi_submit_cmd(ps_platform):
     platform, _ = ps_platform
-    platform.remote_log_dir = str(platform.root_dir)
+    platform.remote_log_dir = platform.root_dir
 
     package = type("DummyPackage", (), {
         "export": "",
@@ -397,8 +397,7 @@ def test_parse_joblist(job_list: list, expected: str, paramiko_platform: Paramik
         (ValueError("There is a garbage truck over there"), AutosubmitCritical)
     ]
 )
-def test_delete_file_errors(error, expected_error_or_return_value, paramiko_platform: ParamikoPlatform, mocker,
-                            tmp_path):
+def test_delete_file_errors(error, expected_error_or_return_value, paramiko_platform: ParamikoPlatform, mocker):
     """Test the error paths for ``delete_file``.
 
     The main execution path of that function is tested with an integration test.
@@ -563,6 +562,7 @@ def test_get_file_errors(exception_message: bool, must_exist: bool, ignore_log: 
     #       or if that logic is not necessary -- after all, it is working fine without that? Or maybe not...
     #       To reproduce the bug, just change the first message from "Garbage" to "The Garbage", and
     #       now the test should fail.
+    # mocker.patch.object(paramiko_platform, "files_path", side_effect=tmp_path)
 
     paramiko_platform.tmp_path = tmp_path
     paramiko_platform.TYPE = PlatformType.SLURM

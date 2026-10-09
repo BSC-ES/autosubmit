@@ -3079,11 +3079,10 @@ class Job:
         """
         return job in self.parents
 
-    def is_ancestor(self, job):
+    def is_ancestor(self, job) -> bool:
         """Check if the given job is an ancestor
         :param job: job to be checked if is an ancestor
         :return: True if job is an ancestor, false otherwise
-        :rtype bool
         """
         for parent in list(self.parents):
             if parent.is_parent(job) or parent.is_ancestor(job):

@@ -314,11 +314,11 @@ def test_ps_check_all_jobs_stat_confirmation(
     :param stat_line: Last line written to the STAT file (empty = absent).
     :param expected_final_status: Expected status after check_all_jobs.
     """
-    ps_platform.remote_log_dir = str(tmp_path / 'LOG_a000')
+    ps_platform.remote_log_dir = tmp_path / 'LOG_a000'
 
     job = _make_ps_job('a000_INI', status=Status.RUNNING)
 
-    stat_path = str(Path(ps_platform.remote_log_dir) / f'{job.name}_STAT_{job.fail_count}')
+    stat_path = str(ps_platform.remote_log_dir / f"{job.name}_STAT_{job.fail_count}")
     stat_value = stat_line if stat_line else 'None'
     stat_output = f'{stat_path}: "{stat_value}"'
 
@@ -353,11 +353,11 @@ def test_ps_check_all_jobs_save_flag(
     :param tmp_path: Temporary directory.
     :param monkeypatch: Pytest monkeypatch fixture.
     """
-    ps_platform.remote_log_dir = str(tmp_path / 'LOG_a000')
+    ps_platform.remote_log_dir = tmp_path / 'LOG_a000'
 
     job = _make_ps_job('a000_SIM', status=Status.RUNNING)
 
-    stat_path = str(Path(ps_platform.remote_log_dir) / f'{job.name}_STAT_{job.fail_count}')
+    stat_path = str(ps_platform.remote_log_dir / f"{job.name}_STAT_{job.fail_count}")
     stat_output = f'{stat_path}: "COMPLETED"'
     ps_output = f'{job.id} 1'
 

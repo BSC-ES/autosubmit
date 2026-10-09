@@ -104,12 +104,12 @@ EXPERIMENT:
 
 
 @pytest.fixture
-def local(prepare_test):
+def local(tmp_path):
     # Init Local platform
     from autosubmit.platforms.locplatform import LocalPlatform
     config = {
-        'LOCAL_ROOT_DIR': f"{prepare_test}/scratch",
-        'LOCAL_TMP_DIR': f"{prepare_test}/scratch",
+        'LOCAL_ROOT_DIR': f"{tmp_path}/scratch",
+        'LOCAL_TMP_DIR': f"{tmp_path}/scratch",
     }
     local = LocalPlatform(expid='t000', name='local', config=config)
     return local
