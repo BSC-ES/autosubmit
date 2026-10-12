@@ -57,7 +57,7 @@ class JobGrouping:
             self.automatic = True
             jobs_group_dict = self._automatic_grouping(groups_map)
         else:
-            self.jobs = self._create_groups(jobs_group_dict, self.ungrouped_jobs)
+            self._create_groups(jobs_group_dict, self.ungrouped_jobs)
 
             for group, statuses in self.group_status_dict.items():
                 status = self._set_group_status(statuses)
@@ -258,7 +258,7 @@ class JobGrouping:
         self.group_status_dict = {}
         self.group_by = 'chunk'
 
-        self.jobs = self._create_groups(jobs_group_dict, blacklist)
+        remaining_jobs = self._create_groups(jobs_group_dict, blacklist)
 
         for group, statuses in self.group_status_dict.items():
             status = self._set_group_status(statuses)
@@ -268,12 +268,10 @@ class JobGrouping:
         self._fix_splits_automatic_grouping(split_groups, split_groups_status, jobs_group_dict)
 
         # check if remaining jobs can be grouped
-        for i in reversed(range(len(self.jobs))):
-            job = self.jobs[i]
+        for job in reversed(remaining_jobs):
             for group, status in self.group_status_dict.items():
                 if group in job.name and status == job.status:
                     jobs_group_dict[job.name] = [group]
-                    self.jobs.pop(i)
 
         return jobs_group_dict
 
