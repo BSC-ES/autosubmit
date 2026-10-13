@@ -276,9 +276,7 @@ class ParamikoPlatform(Platform):
         """
         if isinstance(error, (paramiko.SSHException, EOFError)):
             return True
-        return (
-            not self.connected or not self.transport or not self.transport.is_active()
-        )
+        return not self.connected or not self.transport or not self.transport.is_active()
 
     def _is_connection_alive(self) -> bool:
         """Return whether the current SSH transport is still usable.
@@ -424,11 +422,8 @@ class ParamikoPlatform(Platform):
                     #       code appears to do a random pick of the list of hosts, so it could use the exact same
                     #       host? It does a `[1:]`, so on the first retry it won't happen, but what
                     #       about the subsequent ones? https://github.com/BSC-ES/autosubmit/issues/2595
-                    Log.printlog(
-                        f"Connection Failed to {self.host.split(',')[0]}, "
-                        f"will test another host: {str(e)}",
-                        6002,
-                    )
+                    Log.printlog(f"Connection Failed to {self.host.split(',')[0]}, "
+                                 f"will test another host: {str(e)}", 6002)
 
         if not self.connected:
             trace = (
@@ -531,9 +526,7 @@ class ParamikoPlatform(Platform):
                 self._get_platform_option("SSH_KEEPALIVE", _DEFAULT_SSH_KEEPALIVE)
             )
 
-            is_current_real_user_owner = (
-                True if not as_conf else as_conf.is_current_real_user_owner
-            )
+            is_current_real_user_owner = True if not as_conf else as_conf.is_current_real_user_owner
 
             ssh_config_path: Path = _get_user_config_file(
                 is_current_real_user_owner,
@@ -577,22 +570,12 @@ class ParamikoPlatform(Platform):
                                 banner_timeout=60,
                             )
                         except Exception as e:
-                            Log.warning(
-                                "SSH connect failed, will try again disabling RSA algorithms"
-                                f"sha-256 and sha-512, error: {str(e)}"
-                            )
-                            self._ssh.connect(
-                                self._host_config["hostname"],
-                                port,
-                                username=self.user,
-                                key_filename=self._host_config_id,
-                                sock=self._proxy,
-                                timeout=60,
-                                banner_timeout=60,
-                                disabled_algorithms={
-                                    "pubkeys": ["rsa-sha2-256", "rsa-sha2-512"]
-                                },
-                            )
+                            Log.warning('SSH connect failed, will try again disabling RSA algorithms'
+                                        f'sha-256 and sha-512, error: {str(e)}')
+                            self._ssh.connect(self._host_config['hostname'], port, username=self.user,
+                                              key_filename=self._host_config_id, sock=self._proxy, timeout=60,
+                                              banner_timeout=60, disabled_algorithms={'pubkeys': ['rsa-sha2-256',
+                                                                                                  'rsa-sha2-512']})
                     else:
                         try:
                             self._ssh.connect(
@@ -604,31 +587,19 @@ class ParamikoPlatform(Platform):
                                 banner_timeout=60,
                             )
                         except Exception as e:
-                            Log.warning(
-                                f"SSH connection to {self.user}@{self._host_config['hostname']} -p {port} "
-                                f"failed (certificate: {self._host_config_id}), will try again "
-                                f"disabling RSA algorithms sha-256 and sha-512, error: {str(e)}"
-                            )
-                            self._ssh.connect(
-                                self._host_config["hostname"],
-                                port,
-                                username=self.user,
-                                key_filename=self._host_config_id,
-                                timeout=60,
-                                banner_timeout=60,
-                                disabled_algorithms={"pubkeys": ["rsa-sha2-256", "rsa-sha2-512"]},
-                            )
+                            Log.warning(f'SSH connection to {self.user}@{self._host_config["hostname"]} -p {port} '
+                                        f'failed (certificate: {self._host_config_id}), will try again '
+                                        f'disabling RSA algorithms sha-256 and sha-512, error: {str(e)}')
+                            self._ssh.connect(self._host_config['hostname'], port, username=self.user,
+                                              key_filename=self._host_config_id, timeout=60, banner_timeout=60,
+                                              disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
                 self.transport = self._ssh.get_transport()
                 self.transport.banner_timeout = 60
                 self.transport.clear_to_send_timeout = clear_to_send_timeout
             else:
-                Log.warning(
-                    "2FA is enabled, this is an experimental feature and it may not work as expected"
-                )
+                Log.warning("2FA is enabled, this is an experimental feature and it may not work as expected")
                 Log.warning("nohup can't be used as the password will be asked")
-                Log.warning(
-                    "If you are using a token, please type the token code when asked"
-                )
+                Log.warning("If you are using a token, please type the token code when asked")
 
                 self.transport = paramiko.Transport(
                     (self._host_config["hostname"], port)
@@ -668,19 +639,14 @@ class ParamikoPlatform(Platform):
             raise
         except OSError as e:
             self.connected = False
-            if (
-                "refused" in str(e.strerror).lower()
-                or "name or service not known" in str(e.strerror).lower()
-            ):
+            if "refused" in str(e.strerror).lower() or "name or service not known" in str(e.strerror).lower():
                 raise SSHException(f" {self.host} doesn't accept remote connections. "
                     f"Check if there is an typo in the hostname")
             else:
                 raise AutosubmitError("File can't be located due an slow or timeout connection", 6016, str(e))
         except Exception as e:
             self.connected = False
-            hostname = (
-                self._host_config.get("hostname", "") if self._host_config else ""
-            )
+            hostname = self._host_config.get("hostname", "") if self._host_config else ""
             if not reconnect and "," in hostname:
                 self.restore_connection(as_conf)
             else:
@@ -697,9 +663,9 @@ class ParamikoPlatform(Platform):
     #       class, if not, then we probably need to review the type of the
     #       ``self.platform`` in ``job_package.py``.
     def remove_multiple_files(self, filenames):
-        log_dir = Path(self.tmp_path) / f"LOG_{self.expid}"
-        multiple_delete_previous_run = Path(log_dir) / "multiple_delete_previous_run.sh"
-        if os.path.exists(log_dir):
+        log_dir = Path(self.tmp_path) / f'LOG_{self.expid}'
+        multiple_delete_previous_run = str(log_dir / "multiple_delete_previous_run.sh")
+        if log_dir.exists():
             lang = locale.getlocale()[1]
             if lang is None:
                 lang = locale.getdefaultlocale()[1]
@@ -710,7 +676,7 @@ class ParamikoPlatform(Platform):
             )
             os.chmod(multiple_delete_previous_run, 0o770)
             self.send_file(multiple_delete_previous_run, False)
-            command = Path(self.files_path) / "multiple_delete_previous_run.sh"
+            command = str(Path(self.files_path) / "multiple_delete_previous_run.sh")
             if self.send_command(command, ignore_log=True):
                 return self._ssh_output
         return ""
@@ -719,8 +685,8 @@ class ParamikoPlatform(Platform):
         if check:
             self.check_remote_log_dir()
             self.delete_file(filename)
-        local_path = Path(self.tmp_path) / filename
-        remote_path = Path(self.files_path) / Path(filename).name
+        local_path = str(Path(self.tmp_path) / filename)
+        remote_path = str(Path(self.files_path) / os.path.basename(filename))
         try:
             self._ftpChannel.put(local_path, remote_path)
             self._ftpChannel.chmod(remote_path, os.stat(local_path).st_mode)
@@ -788,16 +754,16 @@ class ParamikoPlatform(Platform):
         :param wrapper_failed:
         :return: True if file is copied successfully, false otherwise
         """
-        local_path = self.tmp_path / relative_path
+        local_path = Path(self.tmp_path) / relative_path
         if not local_path.exists():
-            local_path.mkdir(parents=True, exist_ok=True)
+            os.makedirs(str(local_path))
 
-        file_path = local_path / filename
+        file_path = Path(local_path) / filename
         if file_path.exists():
-            file_path.unlink()
-        remote_path = Path(self.files_path) / filename
+            os.remove(str(file_path))
+        remote_path = str(Path(self.files_path) / filename)
         try:
-            self._ftpChannel.get(str(remote_path), file_path)
+            self._ftpChannel.get(remote_path, file_path)
 
             # Remove file from remote if configured and checksum matches
             is_log_file = bool(re.match(r".*\.(out|err)(\.(xz|gz))?$", filename))
@@ -813,9 +779,7 @@ class ParamikoPlatform(Platform):
 
             return True
         except Exception as e:
-            Log.debug(
-                f"Could not retrieve file {filename} from platform {self.name}: {str(e)}"
-            )
+            Log.debug(f"Could not retrieve file {filename} from platform {self.name}: {str(e)}")
             with suppress(Exception):
                 os.remove(file_path)
             # FIXME: Huh, probably a bug here? See unit/test_paramiko_platform function test_get_file_errors
@@ -867,8 +831,8 @@ class ParamikoPlatform(Platform):
         path_root = ""
         try:
             path_root = Path(self.files_path)
-            src = path_root / src
-            dest = path_root / dest
+            src = str(path_root / src)
+            dest = str(path_root / dest)
             try:
                 self._ftpChannel.stat(dest)
             except OSError:
@@ -1047,9 +1011,7 @@ class ParamikoPlatform(Platform):
                 job_status = job.new_status
             except Exception as e:
                 job_status = Status.FAILED
-                Log.debug(
-                    f"Unexpected error checking completed files for a job over wallclock: {str(e)}"
-                )
+                Log.debug(f"Unexpected error checking completed files for a job over wallclock: {str(e)}")
 
             if cancel and job_status is Status.FAILED:
                 try:
@@ -1057,9 +1019,7 @@ class ParamikoPlatform(Platform):
                         Log.warning(f"Job {job.id} is over wallclock, cancelling job")
                         job.platform.send_command(self.cancel_cmd + " " + str(job.id))
                     elif not job.id:
-                        Log.warning(
-                            f"Skipping cancellation of job with invalid ID: {job.id}"
-                        )
+                        Log.warning(f"Skipping cancellation of job with invalid ID: {job.id}")
                 except Exception as e:
                     Log.debug(f"Error cancelling job {job.id}: {str(e)}")
         return job_status
@@ -1642,9 +1602,7 @@ class ParamikoPlatform(Platform):
 
             if (False, False, False) == (stdin, stdout, stderr):
                 self._record_transport_failure()
-                raise AutosubmitError(
-                    f"Failed to send (with retries) SSH command {command}", 6005
-                )
+                raise AutosubmitError(f'Failed to send (with retries) SSH command {command}', 6005)
 
             channel = stdout.channel
             if not x11:
@@ -2012,12 +1970,7 @@ class ParamikoPlatform(Platform):
         :return: ``True`` on success, ``False`` otherwise.
         """
         try:
-            path = (
-                Path(self.scratch)
-                / self.project_dir
-                / self.user
-                / "permission_checker_azxbyc"
-            )
+            path = str(Path(self.scratch) / self.project_dir / self.user / "permission_checker_azxbyc")
             try:
                 self._ftpChannel.mkdir(path)
                 self._ftpChannel.rmdir(path)
@@ -2060,7 +2013,7 @@ class ParamikoPlatform(Platform):
             return self._ftpChannel.stat(src)
         return False
 
-    def read_file(self, src: str, max_size: int | None = None) -> bytes | None:
+    def read_file(self, src: str, max_size: int | None=None) -> bytes | None:
         """Read file content as bytes. If max_size is set, only the first max_size bytes are read.
 
         :param src: file path
@@ -2116,7 +2069,7 @@ class ParamikoPlatform(Platform):
             self.local_x11_display = None
 
     def update_cmds(self):
-        """Updates commands for this platform."""
+        """Updates commands for this platform. """
         # pragma: no cover
 
     def _check_and_cancel_duplicated_job_names(self, scripts_to_submit: dict) -> None:

@@ -477,7 +477,7 @@ class JobPackageThread(JobPackageBase):
         if callable(self.platform.remove_multiple_files):
             filenames = ""
             for job in self.jobs:
-                filenames += " " + self.platform.remote_log_dir + "/" + job.name + ".cmd"
+                filenames += str(self.platform.remote_log_dir / f"{job.name}.cmd")
             self.platform.remove_multiple_files(filenames)
         tar_path = os.path.join(self._tmp_path, output_filepath)
         Log.debug("Compressing multiple_files")

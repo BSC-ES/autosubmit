@@ -1740,9 +1740,9 @@ class Job:
         # Check if the job platform is a subclass of ParamikoPlatform
         # TODO: Every platform is an instance of Paramiko, no?
         if isinstance(self.platform, ParamikoPlatform):
-            base_path = Path(self.platform.remote_log_dir)
+            base_path = self.platform.remote_log_dir
         else:
-            base_path = Path(self.platform.root_dir).joinpath(self.expid)
+            base_path = self.platform.root_dir.joinpath(self.expid)
 
         # Get the defined metric folder from the configuration if it exists
         try:
@@ -1779,8 +1779,8 @@ class Job:
         parameters['CURRENT_HYPERTHREADING'] = parameters.get('CURRENT_HYPERTHREADING', self.platform.hyperthreading)
         parameters['CURRENT_TYPE'] = parameters.get('CURRENT_TYPE', self.platform.TYPE.value)
         parameters['CURRENT_SCRATCH_DIR'] = parameters.get('CURRENT_SCRATCH_DIR', self.platform.scratch)
-        parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', self.platform.project_dir)
-        parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', self.platform.root_dir)
+        parameters['CURRENT_PROJ_DIR'] = parameters.get('CURRENT_PROJ_DIR', str(self.platform.project_dir))
+        parameters['CURRENT_ROOTDIR'] = parameters.get('CURRENT_ROOTDIR', str(self.platform.root_dir))
         parameters['CURRENT_LOGDIR'] = parameters.get('CURRENT_LOGDIR', self.platform.files_path)
 
         for key, value in as_conf.jobs_data[self.section].items():

@@ -20,7 +20,6 @@
 This file contains code that interfaces between Autosubmit and a Slurm Platform.
 """
 
-import os
 import re
 from contextlib import suppress
 from pathlib import Path
@@ -84,23 +83,18 @@ class SlurmPlatform(ParamikoPlatform):
         self.cancel_cmd = None
         self._header = SlurmHeader()
         self._wrapper = SlurmWrapperFactory(self)
-        self.job_status = {}
-        self.job_status['COMPLETED'] = ['COMPLETED']
-        self.job_status['RUNNING'] = ['RUNNING']
-        self.job_status['QUEUING'] = ['PENDING', 'CONFIGURING', 'RESIZING']
-        self.job_status['FAILED'] = ['FAILED', 'CANCELLED', 'CANCELLED+', 'NODE_FAIL',
-                                     'PREEMPTED', 'SUSPENDED', 'TIMEOUT', 'OUT_OF_MEMORY', 'OUT_OF_ME+', 'OUT_OF_ME']
+        self.job_status = {'COMPLETED': ['COMPLETED'], 'RUNNING': ['RUNNING'],
+                           'QUEUING': ['PENDING', 'CONFIGURING', 'RESIZING'],
+                           'FAILED': ['FAILED', 'CANCELLED', 'CANCELLED+', 'NODE_FAIL',
+                                      'PREEMPTED', 'SUSPENDED', 'TIMEOUT', 'OUT_OF_MEMORY', 'OUT_OF_ME+', 'OUT_OF_ME']}
         self._pathdir = f"$HOME/LOG_{self.expid}"
         self._allow_arrays = False
         self._allow_wrappers = True
         self.update_cmds()
         self.config = config
-        exp_id_path = os.path.join(self.config.get("LOCAL_ROOT_DIR"), self.expid)
-        tmp_path = os.path.join(exp_id_path, "tmp")
-        self._submit_script_path = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_" + self.name + ".sh")
-        self._submit_script_base_name = os.path.join(
-            tmp_path, self.config.get("LOCAL_ASLOG_DIR"), "submit_")
+        tmp_path = Path(self.config.get("LOCAL_ROOT_DIR")) / self.expid / "tmp"
+        self._submit_script_path = Path(tmp_path) / self.config.get("LOCAL_ASLOG_DIR") / f"submit_{self.name}.sh"
+        self._submit_script_base_name = Path(tmp_path) / self.config.get("LOCAL_ASLOG_DIR") / "submit_"
 
     def create_a_new_copy(self):
         """Return a copy of a SlurmPlatform object with the same expid, name and config as the original.
@@ -114,7 +108,7 @@ class SlurmPlatform(ParamikoPlatform):
 
         try:
             # Test if remote_path exists
-            self._ftpChannel.chdir(self.remote_log_dir)
+            self._ftpChannel.chdir(str(self.remote_log_dir))
         except OSError as io_err:
             try:
                 if self.send_command(self.get_mkdir_cmd()):
@@ -159,7 +153,7 @@ class SlurmPlatform(ParamikoPlatform):
         """
         return self.mkdir_cmd
 
-    def get_remote_log_dir(self) -> str:
+    def get_remote_log_dir(self) -> Path:
         """Get the variable remote_log_dir that stores the directory of the Log of the experiment.
 
         :return: The remote_log_dir variable.

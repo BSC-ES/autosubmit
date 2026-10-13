@@ -268,7 +268,7 @@ class PBSPlatform(ParamikoPlatform):
         """
         return self.mkdir_cmd
 
-    def get_remote_log_dir(self) -> str:
+    def get_remote_log_dir(self) -> Path:
         """Get the variable remote_log_dir that stores the directory of the Log of the experiment.
 
         :return: The remote_log_dir variable.

@@ -102,7 +102,7 @@ class LocalPlatform(ParamikoPlatform):
         self.mkdir_cmd = f"mkdir -p {self.remote_log_dir}"
 
 
-    def get_remote_log_dir(self):
+    def get_remote_log_dir(self) -> Path:
         return self.remote_log_dir
 
     def get_mkdir_cmd(self):

@@ -140,7 +140,7 @@ class PJMPlatform(ParamikoPlatform):
     def get_mkdir_cmd(self):
         return self.mkdir_cmd
 
-    def get_remote_log_dir(self):
+    def get_remote_log_dir(self) -> Path:
         return self.remote_log_dir
 
     def parse_all_jobs_output(self, output, job_id):

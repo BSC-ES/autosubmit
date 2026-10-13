@@ -253,7 +253,7 @@ class Platform(ABC):
             self.compression_level = self.platform_config.get("COMPRESSION_LEVEL", 9)
 
         self.log_queue_size = log_queue_size
-        self.remote_log_dir: str = ""
+        self.remote_log_dir: Path = Path("")
         self.has_scheduler = True
         self.IO_SAFE_WAIT = int(self.platform_config.get("IO_SAFE_WAIT", self.IO_SAFE_WAIT))
 
@@ -1081,7 +1081,7 @@ class Platform(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
-    def get_remote_log_dir(self) -> str:
+    def get_remote_log_dir(self) -> Path:
         """Get the variable remote_log_dir that stores the directory of the experiment's log.
 
         :return: The remote_log_dir variable.

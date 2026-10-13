@@ -141,7 +141,7 @@ class EcPlatform(ParamikoPlatform):
         self._ec_retry_flag = f"-retry {self._ec_retry_count}"
         self._allow_python_jobs = False
         self.root_dir: Path | None = None
-        self.remote_log_dir: Path | None = None
+        self.remote_log_dir: Path = Path("")
         self.cancel_cmd = ""
         self._checkjob_cmd = ""
         self._checkhost_cmd = ""
@@ -180,7 +180,7 @@ class EcPlatform(ParamikoPlatform):
         self.check_remote_permissions_remove_cmd = (f"ecaccess-file-rmdir {self._ec_retry_flag} {self.host}: "
                                     f"{Path(self.scratch) / self.project / self.user / '_permission_checker_azxbyc'}")
 
-    def get_remote_log_dir(self):
+    def get_remote_log_dir(self) -> Path:
         return self.remote_log_dir
 
     def check_remote_log_dir(self) -> None:
@@ -466,18 +466,16 @@ class EcPlatform(ParamikoPlatform):
     def send_file(self, filename, check=True) -> bool:
         self.check_remote_log_dir()
         self.delete_file(filename)
-        command = f'{self.put_cmd} {os.path.join(self.tmp_path, filename)} {self.host}:{os.path.join(self.files_path, os.path.basename(filename))}'
+        command = f'{self.put_cmd} {Path(self.tmp_path) / filename} {self.host}:{Path(self.files_path) / os.path.basename(filename)}'
         try:
             subprocess.check_call(command, shell=True)
         except subprocess.CalledProcessError as e:
-            raise AutosubmitError('Could not send file {0} to {1}'.format(os.path.join(self.tmp_path, filename),
-                                                                          os.path.join(self.files_path,
-                                                                                       filename)), 6005, str(e))
+            raise AutosubmitError(f"Could not send file {Path(self.tmp_path) / filename} to {Path(self.files_path) / filename}", 6005, str(e))
         return True
 
     def move_file(self, src, dest, must_exist=False):
-        command = (f"ecaccess-file-move {self._ec_retry_flag} {self.host}:{os.path.join(self.remote_log_dir, src)} "
-                   f"{self.host}:{os.path.join(self.remote_log_dir, dest)}")
+        command = (f"ecaccess-file-move {self._ec_retry_flag} {self.host}:{self.remote_log_dir / src} "
+                   f"{self.host}:{self.remote_log_dir / dest}")
         try:
             retries = 0
             sleeptime = 5
