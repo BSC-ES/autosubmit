@@ -436,7 +436,7 @@ class JobList:
         if differences:
             Log.info(
                 "Differences found in sections, the whole graph will be updated accordingly. This may take a while.")
-        return False if not differences else True
+        return bool(differences)
 
     def remove_outdated_information_from_database(self, differences: dict[str, Any]) -> None:
         """Removes outdated information from the database based on the differences found in sections.
@@ -2627,8 +2627,7 @@ class JobList:
         for job in self.job_list:
             if not job.updated:
                 job.submitter = self.submitter
-                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=False if job.status in (
-                        self._IN_SCHEDULER + self._FINAL_STATUSES) else True)
+                job.update_parameters(self._as_conf, set_attributes=True, reset_logs=not job.status in self._IN_SCHEDULER + self._FINAL_STATUSES)
         Log.debug(f"Jobs loaded: {len(self.job_list)}")
         for j in sorted(self.job_list, key=lambda j: j.name):
             Log.debug(f"  {j.name:50s} status={Status().VALUE_TO_KEY.get(j.status, j.status):12s} sec={j.section:15s} chunk={j.chunk} mem={j.member} date={j.date}")

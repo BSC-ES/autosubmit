@@ -18,10 +18,11 @@
 """Integration tests for ``autosubmit_git``."""
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from pathlib import Path
-from typing import TYPE_CHECKING, ContextManager
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -98,7 +99,7 @@ def test_git_local_dirty(
     commit: bool,
     push: bool,
     expid: str,
-    expected: ContextManager,
+    expected: AbstractContextManager,
     tmp_path: Path,
     autosubmit_exp: Callable,
 ) -> None:
@@ -190,7 +191,7 @@ def test_git_submodules_dirty(
     commit_submodule: bool,
     push_submodule: bool,
     expid: str,
-    expected: ContextManager,
+    expected: AbstractContextManager,
     autosubmit_exp: Callable,
     git_server: tuple["Container", Path, str],
     tmp_path,

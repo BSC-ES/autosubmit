@@ -377,7 +377,7 @@ class TableRegistry:
         """Return the MetaData instance for the given schema, creating it once."""
         return MetaData(schema=self._schema)
 
-    @cache
+    @cache  # noqa: B019
     def get(self, table_name: str) -> Table:
         """Return the Table for the given name and schema, creating it if needed.
 

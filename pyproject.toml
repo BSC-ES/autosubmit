@@ -144,6 +144,7 @@ namespaces = true
 mypy_path = ["."]
 namespace_packages = true
 explicit_package_bases = false
+exclude =  ["test","docs"]
 
 [[tool.mypy.overrides]]
 module = [
@@ -193,62 +194,41 @@ upgrade = "autosubmit.scripts.upgrade:main"
 
 [tool.ruff.lint]
 ignore = [
-    "B003",
-    "B005",
     "B006",
     "B008",
     "B017",
-    "B019",
-    "B025",
     "BLE001",
-    "C401",
-    "C403",
-    "C404",
-    "C417",
-    "C419",
-    "D419",
-    "DTZ001",
     "DTZ002",
-    "DTZ005",
-    "DTZ006",
-    "DTZ007",
+    "DTZ004",
     "EXE001",
+    "EXE002",
     "FLY002",
     "ISC004",
     "LOG001",
     "PERF102",
     "PERF402",
     "PLC0206",
-    "PLR0124",
+    "PLR1704",
     "PLR1722",
-    "PLW0127",
     "PLW1510",
     "PT014",
     "RUF010",
     "RUF012",
-    "RUF015",
-    "RUF034",
     "RUF046",
     "S102",
     "S110",
-    "SIM101",
     "SIM102",
     "SIM103",
     "SIM113",
     "SIM115",
     "SIM117",
     "SIM118",
-    "SIM201",
-    "SIM210",
-    "SIM211",
     "SIM401",
     "TRY002",
     "TRY004",
-    "TRY201",
     "TRY203",
     "UP030",
     "UP031",
-    "UP035",
     "UP037"
 ]
 

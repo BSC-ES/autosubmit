@@ -54,7 +54,7 @@ def test_header_default_executable_used_when_empty():
 
 def test_header_default_executable_used_when_none():
     """Use the default executable when ``None`` is given."""
-    header = as_header(platform_header='', executable=None)
+    header = as_header(platform_header='', executable="")
     assert _DEFAULT_EXECUTABLE.strip() in header.splitlines()[0]
 
 
