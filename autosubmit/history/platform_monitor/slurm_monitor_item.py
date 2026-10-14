@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 # This file is part of Autosubmit.
 
 # Autosubmit is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@ from . import platform_utils as utils
 
 
 class SlurmMonitorItem:
-    def __init__(self, name, status, ncpus, nnodes, submit, start, finish, energy="0", MaxRSS=0.0, AveRSS=0.0):
+    def __init__(self, name, status, ncpus, nnodes, submit, start, finish, energy="0", CPUTimeRAW="0", MaxRSS=0.0, AveRSS=0.0):
         self.name = str(name)
         self.status = str(status)
         self.ncpus = int(ncpus)
@@ -30,6 +30,7 @@ class SlurmMonitorItem:
         self.finish = utils.try_parse_time_to_timestamp(finish)
         self.energy_str = energy
         self.energy = utils.parse_output_number(energy)
+        self.CPUTimeRAW = int(CPUTimeRAW)
         self.MaxRSS = utils.parse_output_number(MaxRSS)
         self.AveRSS = utils.parse_output_number(AveRSS)
 
@@ -89,7 +90,8 @@ class SlurmMonitorItem:
                        str(line[6]) if len(line) > 6 else 0,
                        str(line[7]) if len(line) > 7 else 0,
                        str(line[8]) if len(line) > 8 else 0,
-                       str(line[9]) if len(line) > 9 else 0)
+                       str(line[9]) if len(line) > 9 else 0,
+                       str(line[10]) if len(line) > 10 else 0)
         return new_item
 
 
@@ -101,8 +103,9 @@ class SlurmMonitorItem:
                 "finish": self.finish,
                 "energy": self.energy,
                 "MaxRSS": self.MaxRSS,
-                "AveRSS": self.AveRSS}
+                "AveRSS": self.AveRSS,
+                "CPUTimeRAW": self.CPUTimeRAW}
 
 
     def __str__(self):
-        return f"Name {self.name}, Status {self.status}, NCpus {self.ncpus}, NNodes {self.nnodes}, Submit {self.submit}, Start {self.start}, Finish {self.finish}, Energy {self.energy}, MaxRSS {self.MaxRSS}, AveRSS {self.AveRSS} [Energy Str {self.energy_str}]"
+        return f"Name {self.name}, Status {self.status}, NCpus {self.ncpus}, NNodes {self.nnodes}, Submit {self.submit}, Start {self.start}, Finish {self.finish}, Energy {self.energy}, CPUTimeRAW {self.CPUTimeRAW}, MaxRSS {self.MaxRSS}, AveRSS {self.AveRSS}, [Energy Str {self.energy_str}]"

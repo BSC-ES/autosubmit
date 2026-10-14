@@ -36,6 +36,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
 - Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
 - Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
+- Now Autosubmit fetches the computational budget spent by individual jobs #3026
 
 **Migration from `job_list.pkl` to Database**
 

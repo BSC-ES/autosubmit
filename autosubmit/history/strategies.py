@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -84,6 +84,7 @@ class SingleAssociationStrategy(Strategy):
             job_data_dc.ncpus = slurm_monitor.header.ncpus
             job_data_dc.nnodes = slurm_monitor.header.nnodes
             job_data_dc.energy = slurm_monitor.header.energy
+            job_data_dc.CPUTimeRAW = slurm_monitor.header.CPUTimeRAW
             job_data_dc.MaxRSS = max(slurm_monitor.header.MaxRSS,
                                      slurm_monitor.batch.MaxRSS if slurm_monitor.batch else 0,
                                      slurm_monitor.extern.MaxRSS if slurm_monitor.extern else 0)  # TODO: Improve this rule
@@ -115,11 +116,14 @@ class StraightWrapperAssociationStrategy(Strategy):
             for job_dc, step in zip(job_data_dcs_in_wrapper, slurm_monitor.steps):
                 job_dc.energy = step.energy + computational_weights.get(job_dc.job_name,
                                                                         0) * slurm_monitor.extern.energy
+                job_dc.CPUTimeRAW = step.CPUTimeRAW + computational_weights.get(job_dc.job_name,
+                                                                                0) * slurm_monitor.extern.CPUTimeRAW
                 job_dc.AveRSS = step.AveRSS
                 job_dc.MaxRSS = step.MaxRSS
                 job_dc.platform_output = ""
                 if job_dc.job_name == job_data_dc.job_name:
                     job_data_dc.energy = job_dc.energy
+                    job_data_dc.CPUTimeRAW = job_dc.CPUTimeRAW
                     job_data_dc.AveRSS = job_dc.AveRSS
                     job_data_dc.MaxRSS = job_dc.MaxRSS
                 result.append(job_dc)
@@ -145,9 +149,11 @@ class GeneralizedWrapperDistributionStrategy(Strategy):
             computational_weights = self.get_calculated_weights_of_jobs_in_wrapper(job_data_dcs_in_wrapper)
             for job_dc in job_data_dcs_in_wrapper:
                 job_dc.energy = round(computational_weights.get(job_dc.job_name, 0) * slurm_monitor.total_energy, 2)
+                job_dc.CPUTimeRAW = round(computational_weights.get(job_dc.job_name, 0) * slurm_monitor.total_cpu_time_raw, 2)
                 job_dc.platform_output = ""
                 if job_dc.job_name == job_data_dc.job_name:
                     job_data_dc.energy = job_dc.energy
+                    job_data_dc.CPUTimeRAW = job_dc.CPUTimeRAW
                 result.append(job_dc)
             job_data_dc = self.set_job_data_dc_as_processed(job_data_dc, slurm_monitor.original_input)
             result.append(job_data_dc)
@@ -174,14 +180,18 @@ class TwoDimWrapperDistributionStrategy(Strategy):
                 return []
             comp_weight_per_level = self.get_comp_weight_per_level(self.jobs_per_level)
             level_energy = []
+            level_cpu_time_raw = []
             for i, step in enumerate(slurm_monitor.steps):
                 level_energy.append(step.energy + comp_weight_per_level[i] * slurm_monitor.extern.energy)
+                level_cpu_time_raw.append(step.CPUTimeRAW + comp_weight_per_level[i] * slurm_monitor.extern.CPUTimeRAW)
             for i, jobs in enumerate(self.jobs_per_level):
                 weights = self.get_comp_weight_per_group_of_job_dcs(jobs)
                 for j, job_dc in enumerate(jobs):
                     job_dc.energy = round(level_energy[i] * weights[j], 2)
+                    job_dc.CPUTimeRAW = round(level_cpu_time_raw[i] * weights[j], 2)
                     if job_dc.job_name == job_data_dc.job_name:
                         job_data_dc.energy = job_dc.energy
+                        job_data_dc.CPUTimeRAW = job_dc.CPUTimeRAW
                     result.append(job_dc)
             job_data_dc = self.set_job_data_dc_as_processed(job_data_dc, slurm_monitor.original_input)
             result.append(job_data_dc)

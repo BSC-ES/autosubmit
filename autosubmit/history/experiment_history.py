@@ -1,4 +1,4 @@
-# Copyright 2015-2025 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 #
 # This file is part of Autosubmit.
 #
@@ -210,7 +210,7 @@ class ExperimentHistory:
         Call it in a thread.
         """
         try:
-            ssh_output = platform_obj.check_job_energy(job_data_dc.job_id)
+            ssh_output = platform_obj.get_job_data(job_data_dc.job_id)
             slurm_monitor = SlurmMonitor(ssh_output)
             self._verify_slurm_monitor(slurm_monitor, job_data_dc)
             job_data_dcs_in_wrapper = self.manager.get_job_data_dcs_last_by_wrapper_code(job_data_dc.wrapper_code)
@@ -241,13 +241,14 @@ class ExperimentHistory:
     def _verify_slurm_monitor(self, slurm_monitor, job_data_dc):
         try:
             # Removed, if this happens it is because the job is an inner_job
-            if not slurm_monitor.steps_plus_extern_approximate_header_energy():
-                self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
-                              f"Steps + extern != total energy for ID {slurm_monitor.header.name}."
-                              f"Number of steps {slurm_monitor.step_count}.\n")
-                Log.debug(
-                    f'Historical Database error: Steps + extern != total energy for ID {slurm_monitor.header.name}.'
-                    f'Number of steps {slurm_monitor.step_count}.')
+            for attribute in ["energy", "CPUTimeRAW"]:
+                if not slurm_monitor.steps_plus_extern_approximate_header(attribute):
+                    self._log.log(f"Assertion Error on job {job_data_dc.job_name} with ssh_output {slurm_monitor.original_input}."
+                                f"Steps + extern != total {attribute} for ID {slurm_monitor.header.name}."
+                                f"Number of steps {slurm_monitor.step_count}.\n")
+                    Log.debug(
+                        f'Historical Database error: Steps + extern != total {attribute} for ID {slurm_monitor.header.name}.'
+                        f'Number of steps {slurm_monitor.step_count}.')
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f'Historical Database error: {str(exp)} {traceback.format_exc()}')

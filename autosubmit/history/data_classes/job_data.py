@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 # This file is part of Autosubmit.
 
 # Autosubmit is free software: you can redistribute it and/or modify
@@ -29,7 +29,7 @@ class JobData:
     """
 
     def __init__(self, _id, counter=1, job_name="None", created=None, modified=None, submit=0, start=0, finish=0,
-                 status="UNKNOWN", rowtype=0, ncpus=0, wallclock="00:00", qos="debug", energy=0, date="", section="",
+                 status="UNKNOWN", rowtype=0, ncpus=0, wallclock="00:00", qos="debug", energy=0, CPUTimeRAW=0, date="", section="",
                  member="", chunk=0, last=1, platform="NA", job_id=0, extra_data="", nnodes=0, run_id=None, MaxRSS=0.0,
                  AveRSS=0.0, out="", err="", rowstatus=Models.RowStatus.INITIAL, children="", platform_output="",
                  workflow_commit="", split=None, splits=None, fail_count=0):
@@ -79,6 +79,8 @@ class JobData:
         self.split = int(split) if split is not None else None
         self.splits = int(splits) if splits is not None else None
         self.fail_count = fail_count
+        # DB VERSION 21 attributes
+        self._CPUTimeRAW = CPUTimeRAW
 
     @classmethod
     def from_model(cls, row):
@@ -97,6 +99,7 @@ class JobData:
                        row.wallclock,
                        row.qos,
                        row.energy,
+                       row.CPUTimeRAW,
                        row.date,
                        row.section,
                        row.member,
@@ -166,6 +169,13 @@ class JobData:
         return self._energy
 
     @property
+    def CPUTimeRAW(self):
+        """
+        Returns the raw CPU time as an integer (seconds).
+        """
+        return self._CPUTimeRAW
+
+    @property
     def wrapper_code(self):
         """ 
         Another name for rowtype
@@ -202,6 +212,17 @@ class JobData:
                 #    energy, self._energy))
                 self.require_update = True
             self._energy = round(energy, 2)
+
+    @CPUTimeRAW.setter
+    def CPUTimeRAW(self, CPUTimeRAW):
+        """
+        Set the CPU time in raw format (seconds). If it is different from the current value, 
+        an update flag will be activated.
+        """
+        if CPUTimeRAW > 0:
+            if CPUTimeRAW != self._CPUTimeRAW:
+                self.require_update = True
+            self._CPUTimeRAW = CPUTimeRAW
 
     @property
     def delta_queue_time(self):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2015-2020 Earth Sciences Department, BSC-CNS
+# Copyright 2015-2026 Earth Sciences Department, BSC-CNS
 # This file is part of Autosubmit.
 
 # Autosubmit is free software: you can redistribute it and/or modify
@@ -21,6 +21,8 @@ from autosubmit.log.log import Log
 from .platform_monitor import PlatformMonitor
 from .slurm_monitor_item import SlurmMonitorItem
 
+HEADER_DIFF_TOLERANCE = 0.01
+
 
 class SlurmMonitor(PlatformMonitor):
     """ Manages Slurm commands interpretation. """
@@ -34,16 +36,20 @@ class SlurmMonitor(PlatformMonitor):
         return sum([step.energy for step in self.input_items if step.is_step])
 
     @property
+    def steps_cpu_time_raw(self):
+        return sum([step.CPUTimeRAW for step in self.input_items if step.is_step])
+
+    @property
     def total_energy(self):
         return max(self.header.energy, self.steps_energy + self.extern.energy)
 
     @property
+    def total_cpu_time_raw(self):
+        return max(self.header.CPUTimeRAW, self.steps_cpu_time_raw + self.extern.CPUTimeRAW)
+
+    @property
     def step_count(self):
         return len([step for step in self.input_items if step.is_step])
-
-    def _identify_input_rows(self):
-        lines = self.input.split("\n")
-        self.input_items = [SlurmMonitorItem.from_line(line) for line in lines]
 
     @property
     def steps(self):
@@ -76,17 +82,28 @@ class SlurmMonitor(PlatformMonitor):
         else:
             return None
 
-    def steps_plus_extern_approximate_header_energy(self) -> bool:
-        """Check if the sum of steps energy and extern energy approximately equals the header energy.
+    def _identify_input_rows(self):
+        lines = self.input.split("\n")
+        self.input_items = [SlurmMonitorItem.from_line(line) for line in lines]
 
-        :return: True if the sum of steps and extern energy is within 1% of the header energy, False otherwise.
+    def steps_plus_extern_approximate_header(self, attribute: str) -> bool:
+        """Check whether steps plus extern approximately match the header value.
+
+        :param attribute: The attribute to compare (e.g., "energy" or "CPUTimeRAW").
+        :type attribute: str
+
+        :return: True if the sum of steps and extern values is within HEADER_DIFF_TOLERANCE (%) 
+        of the header value, False otherwise.
         :rtype: bool
         """
         if not self.header:
-            Log.warning("Header information is missing. Cannot perform energy comparison.")
-            return 0
+            Log.warning(f"Header information is missing. Cannot perform comparison for {attribute}.")
+            return False
         elif not self.extern:
-            Log.warning("Extern information is missing. Cannot perform energy comparison.")
-            return 0
+            Log.warning(f"Extern information is missing. Cannot perform comparison for {attribute}.")
+            return False
 
-        return abs(self.steps_energy + self.extern.energy - self.header.energy) <= 0.01 * self.header.energy
+        steps_value = sum(getattr(step, attribute) for step in self.input_items if step.is_step)
+        extern_value = getattr(self.extern, attribute)
+        header_value = getattr(self.header, attribute)
+        return abs(steps_value + extern_value - header_value) <= HEADER_DIFF_TOLERANCE * header_value
