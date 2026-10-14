@@ -743,8 +743,7 @@ def test_recover_last_data_restores_and_marks_finished_jobs(as_conf, mocker):
     assert meaningful.id == "5"
     assert meaningful.updated_log == 0
     assert lost.id == 7
-    assert lost.local_logs == "out.log"
-    assert lost.remote_logs == "err.log"
+    assert lost.local_logs == ("out.log", "err.log")
     assert lost.has_valid_submit_time()
     assert lost.updated_log == lost.fail_count + 1
 
