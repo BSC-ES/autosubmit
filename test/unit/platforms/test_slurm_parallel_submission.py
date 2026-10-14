@@ -45,7 +45,7 @@ def slurm_platform(autosubmit_config: Callable) -> SlurmPlatform:
 @pytest.mark.parametrize(
     "output, expected_job_ids",
     [
-        ("Submitted batch job 123\nSubmitted batch job 456\n", [123, 456]),
+        ("123\n456\n", [123, 456]),
     ],
     ids=["multiple-submissions"],
 )
