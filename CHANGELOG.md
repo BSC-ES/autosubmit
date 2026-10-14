@@ -1,3 +1,10 @@
+### 4.1.17.3: Vertical wrapper fixes: script truncation and wallclock kill
+
+**Bug fixes:**
+
+- Fixed vertical wrappers silently reporting jobs as `COMPLETED` when the inner job script was truncated. The wrapper ran the script through `bash -s` on stdin, so any command in the job body that read stdin swallowed the rest of the script. The inner script now runs as a regular file, with its stdin detached from the wrapper. jira-external#1494
+- Fixed vertical wrappers not stopping an inner job that ignored `SIGTERM`, which could let the job outlive its wallclock inside the wrapper. The per-job `timeout` now also forces a `SIGKILL` after a grace period. jira-external#1494
+
 ### 4.1.17.2: SSH transport recovery (port of #3309)
 
 **Bug fixes:**
