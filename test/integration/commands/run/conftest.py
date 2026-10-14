@@ -26,9 +26,10 @@ an extra and not very well-tested)."""
 import os
 import pwd
 import sqlite3
+from getpass import getuser
 from pathlib import Path
 from threading import Thread, Event
-from typing import Any, Callable, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 import pytest
 
@@ -65,6 +66,20 @@ def prepare_scratch(tmp_path: Path) -> Any:
 
 
 # --- Internal utility functions.
+def _remote_log_dir(expid: str, user: Optional[str] = None) -> str:
+    """Return the LOG directory of an experiment inside the Slurm container.
+
+    :param expid: Experiment id.
+    :type expid: str
+    :param user: Remote user holding the experiment scratch directory. Defaults to the current user.
+    :type user: Optional[str]
+    :return: Absolute path of the experiment LOG directory on the remote.
+    :rtype: str
+    """
+    user = user if user is not None else getuser()
+    return f"/tmp/scratch/group/{user}/{expid}/LOG_{expid}"
+
+
 def _print_db_results(db_check_list, rows_as_dicts, run_tmpdir):
     """
     Print the database check results.

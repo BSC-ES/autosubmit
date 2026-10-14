@@ -593,10 +593,13 @@ class PythonVerticalWrapperBuilder(PythonWrapperBuilder):
                 print(f"Running job {{self.template}} with fail count {{self.fail_count}}")
                 if self.fail_count > 0:
                     filedata = filedata.replace('_STAT_0', f'_STAT_{{self.fail_count}}')
+                run_path = os.path.join(os.getcwd(), str(self.template) + ".run." + str(self.fail_count))
+                with open(run_path, 'w') as run_f:
+                    run_f.write(filedata)
                 with open(out_path, 'w') as out_f, open(err_path, 'w') as err_f:
                     proc = subprocess.run(
-                        ['timeout', '{str(self.wallclock_by_level)}', 'bash', '-s'],
-                        input=filedata,
+                        ['timeout', '-k', '30', '{str(self.wallclock_by_level)}', 'bash', run_path],
+                        stdin=subprocess.DEVNULL,
                         stdout=out_f,
                         stderr=err_f,
                         universal_newlines=True,

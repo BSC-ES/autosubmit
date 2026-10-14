@@ -2511,13 +2511,40 @@ def test_base_sequential_threads_launcher_has_completion_awareness() -> None:
     )
     assert 'COMPLETED' in launcher or 'FAILED' in launcher
 def test_vertical_job_thread_uses_fail_count(wrapper_builder: PythonVerticalWrapperBuilder) -> None:
-    """build_job_thread must generate a thread that tracks fail_count.
+    """build_job_thread must generate a thread that tracks fail_count, runs the
+    inner job script as a file (not through stdin) and force-kills it on timeout.
+
+    Feeding the script to ``bash -s`` on stdin lets any command in the job body
+    swallow the rest of the script. bash then reaches EOF, exits 0, and the
+    Autosubmit EXIT trap marks the job (and the wrapper) as ``COMPLETED`` although
+    the remaining commands never ran. See the integration test
+    ``test_vertical_wrapper_inner_job_reading_stdin_runs_to_end``.
+
+    ``timeout -k`` ensures the inner job is actually killed at its wallclock even
+    if the model ignores SIGTERM, mirroring how Slurm SIGKILLs a job that outlives
+    its time limit.
+
     :param wrapper_builder: Builder fixture.
     :type wrapper_builder: PythonVerticalWrapperBuilder
     """
     thread = wrapper_builder.build_job_thread()
     assert 'fail_count' in thread
     assert 'self.fail_count' in thread
+    assert "'bash', '-s'" not in thread, (
+        "The inner job script must not be fed through stdin (bash -s): a command "
+        "in the job body could swallow the rest of the script and truncate it."
+    )
+    assert 'input=filedata' not in thread, (
+        "The patched inner script must not be passed through stdin."
+    )
+    assert 'stdin=subprocess.DEVNULL' in thread, (
+        "The inner job must run with its stdin detached from the wrapper so no "
+        "command in the job body can swallow the script."
+    )
+    assert "'timeout', '-k'" in thread, (
+        "The inner job must be force-killed on timeout (timeout -k), otherwise a "
+        "model that ignores SIGTERM would outlive its wallclock."
+    )
 
 
 @pytest.mark.parametrize("policy", ["strict", "flexible", "mixed"],
