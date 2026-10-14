@@ -249,7 +249,7 @@ def clone_repository(as_conf: AutosubmitConfig, force: bool) -> bool:
     if force and os.path.exists(project_path):
         backup_enabled = as_conf.get_git_project_backup()
         if backup_enabled:
-            Log.info("Making a backup of your current proj folder at {0}".format(project_backup_path))
+            Log.info(f"Making a backup of your current proj folder at {project_backup_path}")
             shutil.move(project_path, project_backup_path)
         else:
             # Pre-flight: refuse to destroy uncommitted or unpushed work.
