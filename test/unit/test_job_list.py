@@ -1079,3 +1079,34 @@ def test_parse_jobs_by_filter(setup_job_list, unparsed_jobs, expected):
     job_list.parse_jobs_by_filter(unparsed_jobs)
 
     assert {job.name for job in job_list.rerun_job_list} == expected
+
+
+def test_finished_job_log_recovery_keeps_local_logs_in_db(as_conf, mocker, tmp_path):
+    """Restoring logs from job_data must keep an (out, err) tuple so save_jobs persists both (#3176)."""
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig.LOCAL_ROOT_DIR", str(tmp_path))
+    job_list = JobList("a000", as_conf, YAMLParserFactory())
+
+    job = Job("a000_SIM", 0, Status.COMPLETED, 0)
+    job.platform_name = "LOCAL"
+
+    history = mocker.patch("autosubmit.job.job_list.ExperimentHistory")
+    history.return_value.manager.get_jobs_data_last_row.return_value = {
+        "a000_SIM": {
+            "job_id": 123,
+            "out": "a000_SIM.20260101000000.out",
+            "err": "a000_SIM.20260101000000.err",
+            "submit": 0,
+        }
+    }
+
+    job_list.recover_last_data(finished_jobs=[job])
+
+    assert job.local_logs == ("a000_SIM.20260101000000.out", "a000_SIM.20260101000000.err")
+
+    job_list.dbmanager.save_jobs([job])
+    row = job_list.dbmanager.load_job_by_name("a000_SIM")
+
+    assert row["local_logs_out"] == "a000_SIM.20260101000000.out"
+    assert row["local_logs_err"] == "a000_SIM.20260101000000.err"
+    assert row["platform_name"] == "LOCAL"
+
