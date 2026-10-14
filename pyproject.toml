@@ -55,7 +55,7 @@ dependencies = [
     "psutil<=7.2.2",
     "py3dotplus==1.1.0",
     "numpy<3",
-    "rocrate==0.15.1",
+    "rocrate==0.16.0",
     "setproctitle",
     "invoke>=2.0",
     "SQLAlchemy~=2.0.23",
@@ -72,7 +72,7 @@ Documentation = "https://autosubmit.readthedocs.io/"
 [project.optional-dependencies]
 postgres = ["psycopg", "psycopg2"]
 lint = [
-    "ruff==0.16.10",
+    "ruff==0.17.0",
 ]
 tests = [
     # TODO: remove mock by pytest-mock, only test_wrappers is missing to be updated!
