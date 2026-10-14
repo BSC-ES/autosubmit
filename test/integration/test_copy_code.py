@@ -198,7 +198,7 @@ def test_copy_code_local_project_local_destination_exists_force(
     # And since the folder already exists, we should have informed the user nothing was synced.
     # There will be a few calls to ``Log.info``, but here we confirm that at least one is right.
     assert any(
-        ["will not sync" in call[0][0] for call in mocked_log.info.call_args_list]
+        "will not sync" in call[0][0] for call in mocked_log.info.call_args_list
     )
 
     # Refresh does.

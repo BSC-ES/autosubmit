@@ -109,7 +109,7 @@ class JobPackageBase:
         self.ec_queue = first_job.ec_queue if hasattr(first_job, "ec_queue") and first_job.ec_queue else None
         self.sections = "&".join(
             sorted(
-                set(job.section for job in jobs if job.section)
+                {job.section for job in jobs if job.section}
             ))
         self._wallclock = '00:00'
 
@@ -314,7 +314,7 @@ class JobPackageThread(JobPackageBase):
         # Seems like this one is not used at all in the class
         self._job_dependency = dependency
         self._common_script = None
-        self.executable = None
+        self.executable: str | None = ""
 
         self._wallclock = '00:00'
         # depends on the type of wrapper

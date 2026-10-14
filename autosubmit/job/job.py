@@ -353,7 +353,7 @@ class Job:
 
     def __getstate__(self):
         """Serialize the job state for persistence."""
-        job_data = dict([(k, getattr(self, k, None)) for k in PERSISTENT_ATTRIBUTES])
+        job_data = {k: getattr(self, k, None) for k in PERSISTENT_ATTRIBUTES}
         job_data["status"] = Status.VALUE_TO_KEY[self.status]
         # TODO why this is needed in the recovery test?
         if not isinstance(self.local_logs, tuple):
@@ -429,7 +429,7 @@ class Job:
         self.id = job_id
         self.file = None
         self.additional_files = []
-        self.executable = None
+        self.executable: str | None = None
         self._local_logs = ('', '')
         self._remote_logs = ('', '')
         self._status = None
@@ -533,7 +533,7 @@ class Job:
         self._memory = None
         self._memory_per_task = None
         self.undefined_variables = None
-        self.executable = None
+        self.executable: str | None = None
         self.packed = False
         self.hold = False
         self.export = None
@@ -1423,8 +1423,9 @@ class Job:
                     if already_completed:
                         break
                     already_completed = True
-                retrial_dates = list(map(lambda y: parse_date(y) if y != 'COMPLETED' and y != 'FAILED' else y,
-                                         retrial_fields))
+                retrial_dates = [
+                    (parse_date(y) if y != 'COMPLETED' and y != 'FAILED' else y) for y in retrial_fields
+                ]
                 # Inserting list [submit, start, finish] of datetime at the beginning of the list. Restores ordering.
                 retrials_list.insert(0, retrial_dates)
         return retrials_list
@@ -2355,7 +2356,7 @@ class Job:
             self.check_warnings = parameters.get("CURRENT_CHECK_WARNINGS", False)
             self.shape = parameters.get("CURRENT_SHAPE", "")
             self.script = parameters.get("CURRENT_SCRIPT", "")
-            self.x11 = False if str(parameters.get("CURRENT_X11", False)).lower() == "false" else True
+            self.x11 = str(parameters.get("CURRENT_X11", False)).lower() != "false"
             self.notify_on = parameters.get("CURRENT_NOTIFY_ON", [])
             self.update_stat_file()
             if self.checkpoint:  # To activate placeholder substitution per <empty> in the template
@@ -2748,7 +2749,7 @@ class Job:
         except AutosubmitCritical as e:
             if script_path:
                 e.message += f". Generated scripts are located in file://{script_path.parent} the current file is {script_path.name}"
-            raise e
+            raise AutosubmitCritical(e.message, 7014)
 
     @staticmethod
     def _substitute_placeholders(
