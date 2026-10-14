@@ -20,7 +20,7 @@ from autosubmit.job.job_list import load_job_list
 
 def test_auto_splits_dependency_creates(autosubmit_exp):
     config = {
-        "CONFIG": {"SAFETYSLEEPTIME": 0, "TOTALJOBS": 20, "MAXWAITINGJOBS": 20},
+        "CONFIG": {"SAFETYSLEEPTIME": 3, "TOTALJOBS": 20, "MAXWAITINGJOBS": 20},
         "DEFAULT": {"HPCARCH": "local"},
         "EXPERIMENT": {
             "DATELIST": "20200101",

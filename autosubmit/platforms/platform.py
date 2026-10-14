@@ -1073,9 +1073,8 @@ class Platform(ABC):
         identifier = f"{self.name.lower()}(log_recovery):"
         jobs_db_manager = JobsDbManager(schema=self.expid)
         try:
-            from autosubmit.config.configcommon import AutosubmitConfig
-            from autosubmit.config.yamlparser import YAMLParserFactory
-            self._as_conf = AutosubmitConfig(self.expid, BasicConfig, YAMLParserFactory())
+            from autosubmit.config.registry import load_config
+            self._as_conf = load_config(self.expid)
             self._as_conf.check_conf_files(running_time=False, force_load=True)
             Log.info(f"{identifier} Starting...")
             self.connected = False

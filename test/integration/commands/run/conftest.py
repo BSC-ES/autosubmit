@@ -115,8 +115,9 @@ def run_in_thread(target: Callable[..., Any], *args, **kwargs):
     return thread, result, stop_event
 
 
-def _check_db_fields(run_tmpdir: Path, expected_entries, expid, run_type='simple') -> dict[
-    str, (bool, str)]:
+def _check_db_fields(
+    run_tmpdir: Path, expected_entries, expid, run_type="simple"
+) -> dict[str, bool | str]:
     """Check that the database contains the expected number of entries,
     and that all fields contain data after a completed run."""
     # Test database exists.

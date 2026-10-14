@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.config.registry import load_config
 from autosubmit.config.utils import copy_as_config
 from autosubmit.config.yamlparser import YAMLParserFactory
 from autosubmit.database import db_common
@@ -71,14 +71,14 @@ from autosubmit.platforms.paramiko_submitter import ParamikoSubmitter
 from autosubmit.scheduler import (
     generate_scripts_andor_wrappers,
 )
-from autosubmit.utils import (
-    as_conf_default_values,
-)
+from autosubmit.utils import as_conf_default_values
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
     from rocrate.rocrate import ROCrate
+
+    from autosubmit.config.configcommon import AutosubmitConfig
 
 __all__ = [
     "archive",
@@ -128,7 +128,9 @@ def _generate_as_config(
                     if parameter_key in parameters:
                         comment = parameters[parameter_key]
                         yaml_data.yaml_set_comment_before_after_key(  # type: ignore[attr-defined]
-                            key, before=comment, indent=yaml_data.lc.col  # type: ignore[attr-defined]
+                            key,
+                            before=comment,
+                            indent=yaml_data.lc.col,  # type: ignore[attr-defined]
                         )
 
     def _recurse_into_parameters(
@@ -315,7 +317,6 @@ def expid_fn(
             autosubmit_version,
             exp_id,
             hpc,
-            minimal_configuration,
             git_repo,
             git_branch,
             git_as_conf,
@@ -629,8 +630,6 @@ def clean(expid: str, project: bool, plot: bool, stats: bool) -> bool:
     :return: ``True`` is the command ran successfully and ``False`` otherwise.
     :raises: AutosubmitCritical if anything goes wrong cleaning the experiment folders.
     """
-    from autosubmit.config.configcommon import AutosubmitConfig
-    from autosubmit.config.yamlparser import YAMLParserFactory
     from autosubmit.git.autosubmit_git import clean_git
     from autosubmit.monitor.monitor import clean_plot, clean_stats
 
@@ -638,10 +637,8 @@ def clean(expid: str, project: bool, plot: bool, stats: bool) -> bool:
 
     try:
         if project:
-            autosubmit_config = AutosubmitConfig(
-                expid, BasicConfig, YAMLParserFactory()
-            )
-            autosubmit_config.check_conf_files(False)
+            autosubmit_config = load_config(expid)
+            autosubmit_config.check_conf_files(running_time=False)
 
             project_type = autosubmit_config.get_project_type()
             if project_type == "git":
@@ -673,7 +670,7 @@ def clean(expid: str, project: bool, plot: bool, stats: bool) -> bool:
 
 
 def copy_code(
-    as_conf: AutosubmitConfig, expid: str, project_type: str, force: bool
+    as_conf: "AutosubmitConfig", expid: str, project_type: str, force: bool
 ) -> bool:
     """Method to copy code from experiment repository to project directory.
 
@@ -827,33 +824,34 @@ def create(
     hide: bool,
     output="pdf",
     group_by: str | None = None,
-    expand: list | None = [],
-    expand_status: list = [],
+    expand: list | None = None,
+    expand_status: list | None = None,
     check_wrappers=False,
     detail=False,
     force=False,
 ) -> int:
     """Creates job list for given experiment. Configuration files must be valid before executing this process.
 
-    :param detail: Show Job List view in terminal
-    :param check_wrappers: Generate possible wrapper in the current workflow
-    :param expand_status: Select the statuses to be expanded
-    :param expand: Supply the list of dates/members/chunks to filter the list of jobs.
-    :param group_by: Groups the jobs automatically by date, member, chunk or split
-    :param expid: Experiment identifier
+    :param detail: Show Job List view in terminal.
+    :param check_wrappers: Generate possible wrapper in the current workflow.
+    :param expand: Optional list of dates/members/chunks to filter the list of jobs.
+    :param expand_status: Optional statuses to be expanded.
+    :param group_by: Groups the jobs automatically by date, member, chunk or split.
+    :param expid: Experiment identifier.
     :param noplot: if True, method omits final plotting of the jobs list. Only needed on large experiments when
         plotting time can be much larger than creation time.
-    :return: True if successful, False if not
-    :param hide: hides plot window
-    :param hide: hides plot window
-    :param output: plot's file format. It can be pdf, png, ps or svg
+    :return: True if successful, False if not.
+    :param hide: hides plot window.
+    :param output: plot's file format. It can be "pdf", "png", "ps" or "svg".
     :param force: Whether to force the creation of a new job object or not.
     """
+    if not expand:
+        expand = []
+    if not expand_status:
+        expand_status = []
     exp_path = os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid)
     try:
-        as_conf = AutosubmitConfig(expid, BasicConfig, YAMLParserFactory())
-        # Get original configuration
-        as_conf.reload(force_load=True, only_experiment_data=True)
+        as_conf = load_config(expid)
         # Getting output type provided by the user in config, 'pdf' as default
         try:
             if not copy_code(as_conf, expid, as_conf.get_project_type(), False):
@@ -867,7 +865,7 @@ def create(
                 trace=str(e),
             )
         # Update configuration with the new config in the dist ( if any )
-        as_conf.check_conf_files(running_time=False, force_load=True, no_log=False)
+        as_conf.check_conf_files(running_time=False, force_load=False, no_log=False)
         if len(
             as_conf.experiment_data.get("JOBS", {})
         ) == 0 and "CUSTOM_CONFIG" in as_conf.experiment_data.get("DEFAULT", {}):
@@ -963,9 +961,7 @@ def create(
             )
             try:
                 # FIXME: https://github.com/BSC-ES/autosubmit/issues/3179
-                raise NotImplementedError(
-                    "Removed in 4.2.0 (joblist pull request)!"
-                )
+                raise NotImplementedError("Removed in 4.2.0 (joblist pull request)!")
             except Exception:
                 Log.warning(
                     "Couldn't recover the Historical database, AS will continue without it, GUI may be affected"
@@ -976,10 +972,7 @@ def create(
             noplot = False
         try:
             Log.info("\nPlotting the jobs list...")
-            if (
-                len(as_conf.experiment_data.get("WRAPPERS", {})) > 0
-                and check_wrappers
-            ):
+            if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
                 as_conf.check_conf_files(
                     running_time=True, force_load=True, no_log=False
                 )
@@ -994,7 +987,11 @@ def create(
             if group_by:
                 status = []
                 if expand_status:
-                    status_list = expand_status.split() if isinstance(expand_status, str) else expand_status
+                    status_list = (
+                        expand_status.split()
+                        if isinstance(expand_status, str)
+                        else expand_status
+                    )
                     for s in status_list:
                         status.append(get_job_status(s.upper()))
 
@@ -1011,9 +1008,7 @@ def create(
             monitor_exp.generate_output(
                 expid,
                 job_list.get_job_list(),
-                os.path.join(
-                    BasicConfig.LOCAL_ROOT_DIR, expid, "tmp", f"LOG_{expid}"
-                ),
+                os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "tmp", f"LOG_{expid}"),
                 output if output is not None else output_type,
                 list(job_list.job_package_map.values()),
                 not hide,
@@ -1207,9 +1202,9 @@ def rocrate(expid: str, path: Path) -> "ROCrate | None":
 
     from autosubmit.statistics.statistics import Statistics
 
-    as_conf = AutosubmitConfig(expid)
+    as_conf = load_config(expid)
     # ``.reload`` will call the function to unify the YAML configuration.
-    as_conf.reload(True)
+    as_conf.reload(force_load=True)
 
     workflow_configuration = as_conf.experiment_data
 
@@ -1337,9 +1332,9 @@ def report(
         if folder_path is not None and len(str(folder_path)) > 0:
             tmp_path = folder_path
         # Gather experiment info
-        as_conf = AutosubmitConfig(expid)
+        as_conf = load_config(expid)
         try:
-            as_conf.reload(True)
+            as_conf.reload(force_load=True)
             parameters = as_conf.load_parameters()
         except Exception:
             raise AutosubmitCritical(
@@ -1489,7 +1484,7 @@ def update_version(expid: str) -> bool:
     :param expid: experiment identifier
     :return: True if successful, False otherwise
     """
-    as_conf = AutosubmitConfig(expid)
+    as_conf = load_config(expid)
     as_conf.reload(force_load=True)
     as_conf.check_expdef_conf()
 
@@ -1573,7 +1568,7 @@ def describe(
 
 
 def _create_project_associated_conf(
-    as_conf: AutosubmitConfig, force_model_conf: bool, force_jobs_conf: bool
+    as_conf: "AutosubmitConfig", force_model_conf: bool, force_jobs_conf: bool
 ) -> None:
     project_destiny = as_conf.get_file_project_conf()
     jobs_destiny = as_conf.get_file_jobs_conf()
@@ -1624,7 +1619,7 @@ def refresh(expid: str, model_conf: bool, jobs_conf: bool):
     :param jobs_conf:
     """
     try:
-        as_conf = AutosubmitConfig(expid)
+        as_conf = load_config(expid)
         as_conf.reload(force_load=True)
     except (AutosubmitError, AutosubmitCritical):
         raise
