@@ -27,5 +27,5 @@ class PlatformMonitor(metaclass=ABCMeta):
   
   @abstractmethod
   def _identify_input_rows(self):
-    """ """
+    raise NotImplementedError
   

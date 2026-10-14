@@ -18,10 +18,11 @@
 """Integration tests for ``autosubmit_git``."""
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from contextlib import nullcontext as does_not_raise
 from getpass import getuser
 from pathlib import Path
-from typing import TYPE_CHECKING, ContextManager
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -98,7 +99,7 @@ def test_git_local_dirty(
     commit: bool,
     push: bool,
     expid: str,
-    expected: ContextManager,
+    expected: AbstractContextManager,
     tmp_path: Path,
     autosubmit_exp: Callable,
 ) -> None:
@@ -188,7 +189,7 @@ def test_git_submodules_dirty(
     push_git: bool,
     commit_submodule: bool,
     push_submodule: bool,
-    expected: ContextManager,
+    expected: AbstractContextManager,
     autosubmit_exp: Callable,
     git_server: tuple["Container", Path, str],
     tmp_path,
@@ -202,7 +203,7 @@ def test_git_submodules_dirty(
     If the user has non-committed or non-pushed changes in the repository or submodule, the code is
     expected to fail, raising an error when the experiment is operational.
     """
-    _, git_repos_path, git_url = git_server  # type: Container, Path, str # type: ignore
+    _, git_repos_path, git_url = git_server
 
     expid = get_next_expid(experiment_type=experiment_type)
 
