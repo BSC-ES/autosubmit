@@ -243,7 +243,7 @@ def _prepare_run(
         exp_history = get_historical_database(expid, job_list, as_conf)
         # establish the connection to all platforms
         # Restore is misleading, it is actually a "connect" function when the recover flag is not set.
-        restore_platforms(job_list.submitter.platforms_object, as_conf=as_conf)
+        restore_platforms(job_list.submitter.platforms_object, as_conf=as_conf, first_start=True)
         return (
             job_list,
             submitter,
@@ -701,6 +701,9 @@ def run(
                 save_jobs = job_list.update_list(as_conf)
                 if save_jobs:
                     job_list.save_jobs()
+
+            for platform in platforms_to_test:
+                platform.try_respawn_log_recovery_process(as_conf)
 
             # Check wrappers status and inner jobs
             _, _wrapper_job_changes = check_wrappers(as_conf, job_list, expid)

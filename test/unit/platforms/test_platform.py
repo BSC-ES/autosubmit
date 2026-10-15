@@ -22,9 +22,10 @@ from pathlib import Path
 import pytest
 
 from autosubmit.config.basicconfig import BasicConfig
-from autosubmit.log.log import Log
+from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.platform import recover_platform_job_logs_wrapper
+from autosubmit.platforms.manage import restore_platforms
+from autosubmit.platforms.platform import CopyQueue, recover_platform_job_logs_wrapper
 from test.unit.test_job import FakeBasicConfig, TestJob
 
 _EXPID = 't000'
@@ -122,3 +123,59 @@ def test_add_job_to_log_recover_signals_work_event(mocker):
     """add_job_to_log_recover signals work_event after queuing the job."""
     platform = LocalPlatform("t000", "test_platform", {})
     platform.recovery_queue = mocker.MagicMock()
+    platform.work_event = mocker.MagicMock()
+    platform.log_recovery_process = mocker.MagicMock()
+    platform.log_recovery_process.is_alive.return_value = True
+    as_conf = mocker.MagicMock()
+    as_conf.is_recovery_threads_disabled.return_value = False
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+
+    job = mocker.MagicMock()
+    job.id = 123
+    job.name = "test_job"
+    job.fail_count = 0
+
+    assert platform.add_job_to_log_recover(job, as_conf) is True
+    platform.recovery_queue.put_raw.assert_called_once_with(CopyQueue.job_data(job), timeout=30)
+    platform.work_event.set.assert_called_once_with()
+
+
+def _restore_platforms_mock(mocker, *, connected=True, should_run=True, process_alive=False):
+    platform = mocker.MagicMock()
+    platform.name = "local"
+    platform.host = "localhost"
+    platform.connected = connected
+    platform.test_connection.return_value = None
+    platform.check_remote_permissions.return_value = True
+    platform.should_run_log_recovery.return_value = should_run
+    platform.log_recovery_process = mocker.MagicMock()
+    platform.log_recovery_process.is_alive.return_value = process_alive
+    return platform
+
+
+@pytest.mark.parametrize(
+    "first_start,connected,should_run,process_alive,should_raise",
+    [
+        (True, True, True, False, True),
+        (True, True, True, True, False),
+        (False, True, True, False, False),
+        (True, True, False, False, False),
+        (True, False, True, False, False),
+    ],
+    ids=["first-start-missing", "first-start-running", "reconnect-missing", "recovery-disabled", "not-connected"],
+)
+def test_restore_platforms_enforces_log_recovery_on_first_start(
+    mocker, first_start, connected, should_run, process_alive, should_raise
+):
+    """Log recovery must be running after the initial connect when it is enabled."""
+    as_conf = mocker.MagicMock()
+    platform = _restore_platforms_mock(
+        mocker, connected=connected, should_run=should_run, process_alive=process_alive
+    )
+
+    if should_raise:
+        with pytest.raises(AutosubmitCritical):
+            restore_platforms([platform], as_conf=as_conf, first_start=first_start)
+    else:
+        restore_platforms([platform], as_conf=as_conf, first_start=first_start)
+

@@ -3105,13 +3105,13 @@ class Job:
         if self.log_recovery_call_count > self.fail_count:
             return
 
-        if str(as_conf.platforms_data.get(self.name, {}).get('DISABLE_RECOVERY_THREADS', "false")).lower() == "true":
-            self.retrieve_logfiles()
-            self.send_cpmip_notification(as_conf)
-        else:
-            self.platform.add_job_to_log_recover(self)
-
-        self.log_recovery_call_count += 1
+        platform = self.platform
+        platform_name = getattr(platform, "name", None) or self.platform_name
+        if as_conf.is_recovery_threads_disabled(platform_name):
+            if self.platform.recover_log_inline(self, as_conf):
+                self.log_recovery_call_count += 1
+        elif self.platform.add_job_to_log_recover(self, as_conf):
+            self.log_recovery_call_count += 1
 
     def recover_last_ready_date(self) -> None:
         """Recovers the last ready date for this job"""

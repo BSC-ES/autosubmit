@@ -24,13 +24,11 @@ from pathlib import Path
 import pytest
 
 from autosubmit.config.configcommon import AutosubmitConfig
+from autosubmit.database.db_manager_job_list import JobsDbManager
 from autosubmit.job.job import Job
 from autosubmit.job.job_common import Status
-from autosubmit.platforms.platform import CopyQueue, Platform
-
-
-def _get_script_files_path() -> Path:
-    return Path(__file__).resolve().parent / "files"
+from autosubmit.platforms.locplatform import LocalPlatform
+from autosubmit.platforms.platform import CopyQueue, LogRecoveryJobData, Platform
 
 
 @pytest.fixture
@@ -42,6 +40,46 @@ def as_conf(prepare_test, mocker):
     )
     as_conf.misc_data = {"AS_COMMAND": "run"}
     return as_conf
+
+
+@pytest.fixture
+def filesystem_as_conf(tmp_path):
+    """Configuration that does not mock the filesystem, so file assertions are real."""
+    (tmp_path / "test" / "conf").mkdir(parents=True)
+    as_conf = AutosubmitConfig("test")
+    as_conf.experiment_data = {"PLATFORMS": {}}
+    as_conf.misc_data = {"AS_COMMAND": "run"}
+    return as_conf
+
+
+@pytest.fixture
+def filesystem_recovery_platform(filesystem_as_conf, tmp_path, mocker):
+    """Filesystem-backed platform; only the external side effects are mocked."""
+    (tmp_path / "t000" / "db").mkdir(parents=True, exist_ok=True)
+    platform = LocalPlatform("t000", "local", {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"})
+    mocker.patch.object(Job, "stat_registered", return_value=False)
+    mocker.patch.object(Job, "write_stats")
+    mocker.patch.object(Job, "send_cpmip_notification")
+    return platform
+
+
+def _create_recovery_files(tmp_path, platform: LocalPlatform, expid: str = "t000", attempt: int = 0):
+    """Create the STAT and log files on disk and a job aligned with the platform's tmp layout."""
+    log_dir = tmp_path / expid / "tmp" / f"LOG_{expid}"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    (log_dir / f"{expid}_STAT_{attempt}").write_text("1700000000\n1700000001\n1700000002\nCOMPLETED\n")
+    (log_dir / f"{expid}.cmd.out.{attempt}").write_text("[INFO] JOBID=123\nout\n")
+    (log_dir / f"{expid}.cmd.err.{attempt}").write_text("err\n")
+
+    job = Job(expid, "123", Status.COMPLETED, 0)
+    job.platform = platform
+    job.platform_name = "local"
+    job.submit_time_timestamp = "20200101120000"
+    job.retrials = 0
+    job.updated_log = attempt
+    job.updated_stats = 0
+    job.id = 123
+    return job, log_dir
 
 
 def test_log_recovery_no_keep_alive(prepare_test, local, mocker, as_conf):
@@ -99,29 +137,126 @@ def test_log_recovery_keep_alive_cleanup(prepare_test, local, mocker, as_conf):
     assert not local.log_recovery_process.is_alive()
 
 
-def test_log_recovery_recover_log(prepare_test, local, mocker, as_conf):
-    print(prepare_test.strpath)
-    mocker.patch("autosubmit.platforms.platform.max", return_value=0)
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
-    local.config["LOG_RECOVERY_TIMEOUT"] = 1
-    mocker.patch("autosubmit.job.job.Job.write_stats")
-    local.spawn_log_retrieval_process(as_conf)
-    local.work_event.set()
+def test_recover_log_inline_moves_log_files(filesystem_as_conf, filesystem_recovery_platform, tmp_path):
+    """With DISABLE_RECOVERY_THREADS the logs are recovered in the main process and persisted.
+
+    The main process retrieves the logs of the in-memory job (no child process) and persists the
+    result in the jobs database.
+    """
+    filesystem_as_conf.experiment_data.setdefault("PLATFORMS", {})["local"] = {"DISABLE_RECOVERY_THREADS": True}
+    job, log_dir = _create_recovery_files(tmp_path, filesystem_recovery_platform)
+    db = JobsDbManager(schema="t000")
+    _persist_unrecovered_job(db, job)
+
+    job.recover_log(filesystem_as_conf)
+
+    assert filesystem_recovery_platform.log_recovery_process is None  # no separate process was started
+    assert job.updated_log == 1
+    assert (log_dir / "t000.20200101120000.out").exists()
+    assert (log_dir / "t000.20200101120000.err").exists()
+    # The raw attempt-0 logs were moved, not left behind.
+    assert not (log_dir / "t000.cmd.out.0").exists()
+    assert not (log_dir / "t000.cmd.err.0").exists()
+    assert db.load_job_by_name("t000")["updated_log"] == 1
+
+
+def test_recover_log_routes_inline_when_threads_disabled(local, as_conf, mocker):
+    """With DISABLE_RECOVERY_THREADS ``recover_log`` recovers inline instead of queuing for a process.
+
+    The real ``platforms_data`` lookup is exercised here (the option is keyed by the platform name),
+    which is what the fix for #3342 corrects in ``Job.recover_log``.
+    """
+    as_conf.experiment_data.setdefault("PLATFORMS", {})["local"] = {"DISABLE_RECOVERY_THREADS": True}
+    retrieve = mocker.patch.object(Job, "retrieve_logfiles")
+    mocker.patch.object(Job, "send_cpmip_notification")
+    add_to_recover = mocker.patch.object(local, "add_job_to_log_recover")
+
     job = Job("t000", "0000", Status.COMPLETED, 0)
     job.name = "test_job"
     job.platform = local
     job.platform_name = "local"
-    job.local_logs = ("t000.cmd.out.moved", "t000.cmd.err.moved")
-    local.work_event.set()
-    local.add_job_to_log_recover(job)
-    local.cleanup_event.set()
-    local.log_recovery_process.join(30)  # should exit earlier.
-    assert local.log_recovery_process.is_alive() is False
-    assert Path(f"{prepare_test.strpath}/scratch/LOG_t000/t000.cmd.out.moved").exists()
-    assert Path(f"{prepare_test.strpath}/scratch/LOG_t000/t000.cmd.err.moved").exists()
+
+    job.recover_log(as_conf)
+
+    retrieve.assert_called_once()  # recovered inline
+    add_to_recover.assert_not_called()  # nothing queued for a separate process
+    assert local.log_recovery_process is None
+    assert job.log_recovery_call_count == 1
+
+
+def test_recover_pending_from_db_moves_log_files(filesystem_as_conf, filesystem_recovery_platform, tmp_path):
+    """The inline fallback recovers pending logs from the database, without a child process.
+
+    The job is persisted and loaded from the database, the retrieval runs against real files, and
+    the moved logs plus the persisted ``updated_log`` are asserted.
+    """
+    job, log_dir = _create_recovery_files(tmp_path, filesystem_recovery_platform)
+
+    db = JobsDbManager(schema="t000")
+    db.save_jobs([job])
+    filesystem_recovery_platform._pending_recovery = {"t000": _job_payload("t000", 123)}
+
+    filesystem_recovery_platform._recover_pending_from_db(filesystem_as_conf)
+
+    assert filesystem_recovery_platform._pending_recovery == {}
+    assert (log_dir / "t000.20200101120000.out").exists()
+    assert (log_dir / "t000.20200101120000.err").exists()
+    assert not (log_dir / "t000.cmd.out.0").exists()
+    assert db.load_job_by_name("t000")["updated_log"] == 1
+
+
+def _persist_unrecovered_job(db, job):
+    """Insert the job and persist ``updated_log`` (the insert upsert excludes the log columns)."""
+    db.save_jobs([job])
+    db.save_job_log(job)
+
+
+def test_filter_pending_keeps_unrecovered_drops_recovered(tmp_path):
+    """The filter keeps jobs the DB still reports as needing recovery, and drops the recovered ones."""
+    Path(tmp_path, "t000", "db").mkdir(parents=True, exist_ok=True)
+    platform = LocalPlatform("t000", "local", {"LOCAL_ROOT_DIR": str(tmp_path), "LOCAL_TMP_DIR": "tmp"})
+
+    needing = Job("needing", "1", Status.COMPLETED, 0)
+    needing.fail_count = 0
+    needing.updated_log = 0
+    recovered = Job("recovered", "2", Status.COMPLETED, 0)
+    recovered.fail_count = 0
+    recovered.updated_log = 1
+    db = JobsDbManager(schema="t000")
+    db.save_jobs([needing, recovered])
+    db.save_job_log(needing)
+    db.save_job_log(recovered)
+
+    platform._pending_recovery = {
+        "needing": _job_payload("needing", 1),
+        "recovered": _job_payload("recovered", 2),
+    }
+
+    assert set(platform._pending_still_needing_recovery()) == {"needing"}
+
+
+def test_filter_pending_keeps_all_when_db_unavailable(local, mocker):
+    """When the database cannot be queried the filter keeps every pending job (fail-safe, no loss)."""
+    local._pending_recovery = {"a": _job_payload("a", 1), "b": _job_payload("b", 2)}
+    mocker.patch("autosubmit.platforms.platform.JobsDbManager", side_effect=Exception("db down"))
+
+    assert local._pending_still_needing_recovery() == local._pending_recovery
+
+
+def test_recovery_persisted_before_crash_is_not_requeued(
+    filesystem_as_conf, filesystem_recovery_platform, tmp_path
+):
+    """Once the recovery is persisted, the filter drops the job instead of re-queuing it (W3)."""
+    job, _ = _create_recovery_files(tmp_path, filesystem_recovery_platform)
+    db = JobsDbManager(schema="t000")
+    _persist_unrecovered_job(db, job)
+    job_data = _job_payload(job.name, job.id)
+
+    filesystem_recovery_platform._recover_single_log(job_data, db, filesystem_as_conf)
+    assert db.load_job_by_name(job.name)["updated_log"] == 1
+
+    filesystem_recovery_platform._pending_recovery = {job.name: job_data}
+    assert filesystem_recovery_platform._pending_still_needing_recovery() == {}
 
 
 @pytest.mark.parametrize(
@@ -169,23 +304,9 @@ def test_wait_for_work(
     local.work_event.set() if work_event else local.work_event.clear()
     if recovery_queue_full:
         for i in range(max_items):
-            local.recovery_queue.put(Job("t000", f"000{i}", Status.COMPLETED, 0))
+            local.recovery_queue.put_raw(CopyQueue.job_data(Job("t000", f"000{i}", Status.COMPLETED, 0)))
     process_log = local.wait_for_work()
     assert process_log == result
-
-
-def test_unique_elements(local, mocker):
-    mocker.patch(
-        "autosubmit.platforms.platform.Platform.get_mp_context",
-        return_value=mp.get_context("fork"),
-    )
-    max_items = 3
-    local.prepare_process()
-    local.recovery_queue = CopyQueue(ctx=local.ctx)
-    for i in range(max_items):
-        local.recovery_queue.put(Job(f"rng{i}", f"000{i}", Status.COMPLETED, 0))
-    for i in range(max_items):
-        local.recovery_queue.put(Job(f"rng2{i}", f"000{i}", Status.COMPLETED, 0))
 
 
 @pytest.fixture()
@@ -299,8 +420,25 @@ def test_worker_events_no_duplicates(local, mocker):
     Platform.worker_events.clear()
 
 
+def test_clean_log_recovery_process_removes_worker_event(local, mocker):
+    """Cleaning the process must not leave stale worker events behind on respawn."""
+    mocker.patch(
+        "autosubmit.platforms.platform.Platform.get_mp_context",
+        return_value=mp.get_context("fork"),
+    )
+    Platform.worker_events.clear()
+    local.prepare_process()
+    assert local.work_event in Platform.worker_events
+
+    local.clean_log_recovery_process(keep_pending=True)
+
+    assert local.work_event is None
+    assert Platform.worker_events == []
+    Platform.worker_events.clear()
+
+
 def test_add_job_to_log_recover_failure_does_not_increment_updated_log(local, mocker):
-    """Verify that when recovery_queue.put fails, updated_log is NOT incremented."""
+    """Verify that when recovery_queue.put_raw fails, updated_log is NOT incremented."""
     mocker.patch(
         "autosubmit.platforms.platform.Platform.get_mp_context",
         return_value=mp.get_context("fork"),
@@ -314,23 +452,24 @@ def test_add_job_to_log_recover_failure_does_not_increment_updated_log(local, mo
     local.log_recovery_process = mocker.MagicMock()
     local.log_recovery_process.is_alive.return_value = True
 
-    # Patch put to simulate a failure
+    # Patch put_raw to simulate a failure
     mocker.patch.object(
-        local.recovery_queue, "put", side_effect=Exception("Queue full")
+        local.recovery_queue, "put_raw", side_effect=Exception("Queue full")
     )
     local.add_job_to_log_recover(job)
     assert job.updated_log == 0
 
 
-def test_add_job_to_log_recover_no_queue(local):
-    """Verify graceful skip when recovery_queue is None."""
+def test_add_job_skips_when_log_recovery_is_disabled(local, as_conf):
+    """When recovery is disabled for the platform, ``add_job_to_log_recover`` is a no-op."""
+    as_conf.experiment_data.setdefault("PLATFORMS", {})["local"] = {"DISABLE_RECOVERY_THREADS": True}
     local.recovery_queue = None
     job = Job("t000", "0000", Status.COMPLETED, 0)
     job.name = "test_job"
     job.id = 123
     job.updated_log = 0
-    # Should not raise and should not increment updated_log
-    local.add_job_to_log_recover(job)
+
+    assert local.add_job_to_log_recover(job, as_conf) is False
     assert job.updated_log == 0
 
 
@@ -353,18 +492,136 @@ def test_clean_log_recovery_process_with_dead_child(local, as_conf, mocker):
     assert local.log_recovery_process is None
 
 
-def test_add_job_to_log_recover_signals_work_event(local, mocker):
-    """Verify work_event is set after adding a job to the recovery queue."""
-    local.prepare_process()
-    local.recovery_queue = CopyQueue(ctx=local.ctx)
-    local.log_recovery_process = mocker.MagicMock()
-    local.log_recovery_process.is_alive.return_value = True
+def test_add_job_to_log_recover_respawns_dead_process(local, as_conf, mocker):
+    """Issue #3342: a dead log recovery process must be respawned, not silently dropped."""
+    mocker.patch(
+        "autosubmit.platforms.platform.Platform.get_mp_context",
+        return_value=mp.get_context("fork"),
+    )
+    local.config["LOG_RECOVERY_TIMEOUT"] = 10
+    local.spawn_log_retrieval_process(as_conf)
+    assert local.log_recovery_process.is_alive()
+
+    # Simulate an unexpected crash of the recovery child.
+    local.log_recovery_process.kill()
+    local.log_recovery_process.join(timeout=5)
+    assert not local.log_recovery_process.is_alive()
+    dead_pid = local.log_recovery_process.pid
 
     job = Job("t000", "0000", Status.COMPLETED, 0)
     job.name = "test_job"
     job.id = 123
     job.updated_log = 0
-    job.updated_stats = 0
 
-    local.add_job_to_log_recover(job)
-    assert local.work_event.is_set()
+    local.add_job_to_log_recover(job, as_conf)
+
+    assert local.log_recovery_process is not None
+    assert local.log_recovery_process.is_alive()
+    assert local.log_recovery_process.pid != dead_pid
+
+    local.cleanup_event.set()
+    local.log_recovery_process.join(timeout=30)
+    assert not local.log_recovery_process.is_alive()
+
+
+def _job_payload(name: str, job_id: int = 1) -> LogRecoveryJobData:
+    return {
+        "id": job_id,
+        "name": name,
+    }
+
+
+def _set_runtime_log_recovery(as_conf, **options) -> None:
+    as_conf.experiment_data["RUNTIME"] = {"LOG_RECOVERY": options}
+
+
+@pytest.fixture
+def failing_spawn(local, mocker):
+    """Patch ``spawn_log_retrieval_process`` so restarting the recovery process always fails."""
+
+    def _failed_spawn(*_args, **_kwargs):
+        local.log_recovery_process = None
+        return False
+
+    return mocker.patch.object(local, "spawn_log_retrieval_process", side_effect=_failed_spawn)
+
+
+def test_respawn_requeues_pending_jobs_without_loss(local, as_conf, mocker):
+    """Jobs pending when the process dies are re-queued into the new process (issue #3342)."""
+    ctx = mp.get_context("fork")
+    local.ctx = ctx
+    local._recovery_consecutive_failures = 0
+    local.work_event = ctx.Event()
+    local.cleanup_event = ctx.Event()
+    local.recovery_queue = CopyQueue(ctx=ctx)
+    # A job that was enqueued but never confirmed as recovered.
+    local._pending_recovery = {"pending_job": _job_payload("pending_job", 42)}
+    local.log_recovery_process = mocker.MagicMock()
+    local.log_recovery_process.is_alive.return_value = False
+
+    # Avoid hitting the database: keep every pending job.
+    mocker.patch.object(
+        local, "_pending_still_needing_recovery",
+        side_effect=lambda: dict(local._pending_recovery),
+    )
+
+    def _fake_spawn(*_args, **_kwargs):
+        local.recovery_queue = CopyQueue(ctx=ctx)
+        local.log_recovery_process = mocker.MagicMock()
+        local.log_recovery_process.is_alive.return_value = True
+        return True
+
+    mocker.patch.object(local, "spawn_log_retrieval_process", side_effect=_fake_spawn)
+
+    assert local.try_respawn_log_recovery_process(as_conf) is True
+
+    assert "pending_job" in local._pending_recovery
+    requeued = local.recovery_queue.get(timeout=5)
+    assert requeued["name"] == "pending_job"
+
+
+@pytest.mark.usefixtures("failing_spawn")
+@pytest.mark.parametrize("inline_fallback", [True, False], ids=["inline_fallback_on", "inline_fallback_off"])
+def test_consecutive_failures_enter_retry_backoff(
+    local, as_conf, inline_fallback,
+):
+    """Exhausted retries enter the retry backoff; RETRY_DELAY applies with both inline modes."""
+    _set_runtime_log_recovery(
+        as_conf, CONSECUTIVE_MAX_RESTARTS=1, INLINE_FALLBACK=inline_fallback, RETRY_DELAY=123,
+    )
+    local._recovery_consecutive_failures = 0
+    local.ctx = mp.get_context("fork")
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    local.log_recovery_process = None
+
+    assert local.try_respawn_log_recovery_process(as_conf) is False
+    assert local._log_recovery_in_backoff is True
+    assert local._recovery_consecutive_failures == 0
+    assert local._log_recovery_retry_at > time.time()
+
+
+@pytest.mark.usefixtures("failing_spawn")
+@pytest.mark.parametrize("inline_fallback", [True, False], ids=["inline_fallback_on", "inline_fallback_off"])
+def test_add_job_inline_only_when_enabled(local, as_conf, mocker, inline_fallback):
+    """When the process cannot be started, the job is recovered inline only if enabled."""
+    _set_runtime_log_recovery(
+        as_conf, CONSECUTIVE_MAX_RESTARTS=1, INLINE_FALLBACK=inline_fallback,
+    )
+    local.ctx = mp.get_context("fork")
+    local.recovery_queue = CopyQueue(ctx=local.ctx)
+    local.log_recovery_process = None
+    recover_inline = mocker.patch.object(local, "recover_log_inline", return_value=True)
+    recover_pending = mocker.patch.object(local, "_recover_pending_from_db")
+
+    job = Job("t000", "0000", Status.COMPLETED, 0)
+    job.name = "test_job"
+    job.id = 123
+
+    assert local.add_job_to_log_recover(job, as_conf) is inline_fallback
+    if inline_fallback:
+        recover_inline.assert_called_once_with(job, as_conf)
+        recover_pending.assert_called_once_with(as_conf)
+    else:
+        recover_inline.assert_not_called()
+        recover_pending.assert_not_called()
+

@@ -723,6 +723,50 @@ def test_recover_logs_skips_jobs_without_valid_id_or_submit_time(as_conf, mocker
     mocked_save.assert_called_once()
 
 
+def test_recover_logs_wakes_only_platforms_with_recovery_threads(as_conf, mocker):
+    """Persisted jobs wake the separate recovery process only for enabled platforms."""
+    as_conf.experiment_data["PLATFORMS"] = {
+        "enabled": {},
+        "disabled": {"DISABLE_RECOVERY_THREADS": True},
+    }
+    job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
+    job_list.dbmanager = mocker.MagicMock()
+    job_list.dbmanager.select_finished_jobs_needing_log_recovery.return_value = [
+        {"name": "job_enabled", "platform_name": "enabled"},
+        {"name": "job_disabled", "platform_name": "disabled"},
+    ]
+
+    enabled_platform = mocker.MagicMock()
+    enabled_platform.serial_platform = enabled_platform
+    enabled_platform.work_event = mocker.MagicMock()
+    enabled_platform.recovery_queue = mocker.MagicMock()
+    enabled_platform.keep_alive_timeout = 60
+    disabled_platform = mocker.MagicMock()
+    disabled_platform.serial_platform = disabled_platform
+    disabled_platform.work_event = mocker.MagicMock()
+    disabled_platform.recovery_queue = mocker.MagicMock()
+    disabled_platform.keep_alive_timeout = 60
+
+    for name, platform, platform_name in (
+        ("job_enabled", enabled_platform, "enabled"),
+        ("job_disabled", disabled_platform, "disabled"),
+    ):
+        job = Job(name, "42", Status.COMPLETED, 0)
+        job.submit_time_timestamp = "20200101000000"
+        job.platform = platform
+        job.platform_name = platform_name
+        job_list.graph.add_node(name, job=job)
+
+    mocker.patch.object(job_list, "_add_job_node_with_platform")
+    mocker.patch.object(Job, "recover_log")
+    mocker.patch.object(job_list, "save_jobs")
+
+    assert job_list.recover_logs(from_db=True) is True
+
+    enabled_platform.work_event.set.assert_called_once()
+    disabled_platform.work_event.set.assert_not_called()
+
+
 def test_recover_last_data_restores_and_marks_finished_jobs(as_conf, mocker):
     """recover_last_data leaves meaningful jobs untouched and restores/marks the rest."""
     job_list = JobList("a000", as_conf, YAMLParserFactory(), disable_save=True)
