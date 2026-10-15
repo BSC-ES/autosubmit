@@ -22,9 +22,7 @@ from contextlib import suppress
 from sys import exit
 from typing import TYPE_CHECKING
 
-from autosubmit.helpers.version import get_version
 from autosubmit.log.log import Log
-from autosubmit.scripts._args import parse_expids
 
 if TYPE_CHECKING:
     from autosubmit.scripts._args import AutosubmitOptions
@@ -34,7 +32,12 @@ __all__ = ["initialise_command"]
 
 
 _COMMANDS_NOT_UPDATABLE = ["archive", "delete", "upgrade", "updateversion"]
-"""List of commands that do not require the common code that updates AS version."""
+"""List of commands that do not require the common code that updates AS version.
+
+In other words, list of commands that do not take the ``-v`` option. That is
+why ``updateversion`` is included, as the command sole responsibility is to
+update the Autosubmit version.
+"""
 
 _COMMANDS_SKIP_INITIALISATION = ["describe", "unarchive"]
 """Commands that are not 'initialised'.
@@ -83,6 +86,9 @@ def initialise_command(command: str, opts: "AutosubmitOptions") -> None:
     :param command: The Autosubmit sub-command name.
     :param opts: Autosubmit options.
     """
+    from autosubmit.helpers.version import get_version
+    from autosubmit.scripts._args import parse_expids
+
     _set_locale()
 
     if command in _COMMANDS_SKIP_INITIALISATION:
@@ -113,21 +119,8 @@ def initialise_command(command: str, opts: "AutosubmitOptions") -> None:
         # Update the experiment version, except if the user is archiving or upgrading.
         if command not in _COMMANDS_NOT_UPDATABLE:
             if opts.update_version:
-                if as_conf.get_version() != autosubmit_version:
-                    from autosubmit.database.db_common import (
-                        update_experiment_description_version,
-                    )
-
-                    Log.info(
-                        f"The {expid} experiment {as_conf.get_version()} version is being "
-                        f"updated to {autosubmit_version} to match the "
-                        "Autosubmit version."
-                    )
-                    as_conf.set_version(autosubmit_version)
-                    update_experiment_description_version(
-                        expid,
-                        version=autosubmit_version,
-                    )
+                from autosubmit.experiment.manage import update_version
+                update_version(expid)
             elif (
                 as_conf.get_version() is not None
                 and as_conf.get_version() != autosubmit_version

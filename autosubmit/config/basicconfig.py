@@ -65,9 +65,21 @@ class BasicConfig:
     DATABASE_BACKEND = "sqlite"
     DATABASE_CONN_URL = ""
 
+    # TODO: BasicConfig contains site configuration, but this function returns the experiment directory.
+    #       BasicConfig.read() loads the object, and this static function is completely unrelated; it is
+    #       used right now as it already existed, but it should be moved to a proper place later.
+    #       Validation of expids must also be centralised, as this is not the only place where it is done.
     @staticmethod
     def expid_dir(exp_id):
-        if not isinstance(exp_id, str) or len(exp_id) != 4 or "/" in exp_id:
+        """Return the experiment directory.
+
+        Fails if the experiment ID is not valid. The expid must be a string,
+        with at least 4 characters, and without the slash folder separator.
+
+        :param exp_id: Experiment ID.
+        :raises TypeError: If the experiment ID is not valid.
+        """
+        if not isinstance(exp_id, str) or len(exp_id) < 4 or "/" in exp_id:
             raise TypeError("Experiment ID must be a string of 4 characters without the folder separator symbol")
         return Path(BasicConfig.LOCAL_ROOT_DIR, exp_id)
 

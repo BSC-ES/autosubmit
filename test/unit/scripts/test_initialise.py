@@ -31,7 +31,7 @@ from autosubmit.scripts._initialise import (
 def test_initialise_command_skips_initialisation_commands(mocker, command):
     """Test that commands excluded from initialisation return."""
     set_locale = mocker.patch("autosubmit.scripts._initialise._set_locale")
-    parse_expids = mocker.patch("autosubmit.scripts._initialise.parse_expids")
+    parse_expids = mocker.patch("autosubmit.scripts._args.parse_expids")
 
     opts = mocker.Mock(expid="a000")
 
@@ -45,7 +45,7 @@ def test_initialise_command_skips_initialisation_commands(mocker, command):
 def test_initialise_command_without_expid_returns(mocker, expid):
     """Test that initialisation stops when no experiment ID is provided."""
     set_locale = mocker.patch("autosubmit.scripts._initialise._set_locale")
-    parse_expids = mocker.patch("autosubmit.scripts._initialise.parse_expids")
+    parse_expids = mocker.patch("autosubmit.scripts._args.parse_expids")
 
     opts = mocker.Mock()
     opts.expid = expid
@@ -60,11 +60,11 @@ def test_initialise_command(mocker):
     """Test normal command initialisation."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
-        "autosubmit.scripts._initialise.parse_expids",
+        "autosubmit.scripts._args.parse_expids",
         return_value=["a000"],
     )
     mocker.patch(
-        "autosubmit.scripts._initialise.get_version",
+        "autosubmit.helpers.version.get_version",
         return_value="4.0.0",
     )
 
@@ -92,11 +92,11 @@ def test_initialise_command_multiple_expids(mocker):
     """Test that every experiment is initialised."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
-        "autosubmit.scripts._initialise.parse_expids",
+        "autosubmit.scripts._args.parse_expids",
         return_value=["a000", "a001"],
     )
     mocker.patch(
-        "autosubmit.scripts._initialise.get_version",
+        "autosubmit.helpers.version.get_version",
         return_value="4.0.0",
     )
 
@@ -132,11 +132,11 @@ def test_initialise_command_allows_missing_yaml_for_special_commands(mocker, com
     """Test that expid and upgrade do not require YAML data."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
-        "autosubmit.scripts._initialise.parse_expids",
+        "autosubmit.scripts._args.parse_expids",
         return_value=["a000"],
     )
     mocker.patch(
-        "autosubmit.scripts._initialise.get_version",
+        "autosubmit.helpers.version.get_version",
         return_value="4.0.0",
     )
 
@@ -161,11 +161,11 @@ def test_initialise_command_missing_yaml_exits(mocker):
     """Test that commands requiring YAML fail when configuration is empty."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
-        "autosubmit.scripts._initialise.parse_expids",
+        "autosubmit.scripts._args.parse_expids",
         return_value=["a000"],
     )
     mocker.patch(
-        "autosubmit.scripts._initialise.get_version",
+        "autosubmit.helpers.version.get_version",
         return_value="4.0.0",
     )
     log_error = mocker.patch("autosubmit.scripts._initialise.Log.error")
@@ -192,15 +192,19 @@ def test_initialise_command_missing_yaml_exits(mocker):
     config.set_last_as_command.assert_not_called()
 
 
-def test_initialise_command_updates_experiment_version(mocker):
+def test_initialise_command_updates_experiment_version(mocker, tmp_path):
     """Test updating an experiment version when requested."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
-        "autosubmit.scripts._initialise.parse_expids",
+        "autosubmit.scripts._args.parse_expids",
         return_value=["a000"],
     )
     mocker.patch(
-        "autosubmit.scripts._initialise.get_version",
+        "autosubmit.helpers.version.get_version",
+        return_value="4.0.0",
+    )
+    mocker.patch(
+        "autosubmit.experiment.manage.get_version",
         return_value="4.0.0",
     )
 
@@ -212,15 +216,26 @@ def test_initialise_command_updates_experiment_version(mocker):
         "autosubmit.config.configcommon.AutosubmitConfig",
         return_value=config,
     )
+    mocker.patch(
+        "autosubmit.experiment.manage.AutosubmitConfig",
+        return_value=config,
+    )
 
     update_description = mocker.patch(
-        "autosubmit.database.db_common.update_experiment_description_version"
+        "autosubmit.experiment.manage.update_experiment_description_version"
     )
     log_info = mocker.patch("autosubmit.scripts._initialise.Log.info")
 
-    opts = mocker.Mock(expid="a000", update_version=True)
+    expid = "a000"
+    opts = mocker.Mock(expid=expid, update_version=True)
+    tmp_path.joinpath(expid).mkdir(parents=True)
+
+    db_path = tmp_path.joinpath(expid).joinpath("db")
+    assert not db_path.exists()
 
     initialise_command("run", opts)
+
+    assert db_path.exists()
 
     config.set_version.assert_called_once_with("4.0.0")
     update_description.assert_called_once_with(
@@ -239,11 +254,11 @@ def test_initialise_command_does_not_update_matching_version(mocker):
     """Test that an already matching version is not updated."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
-        "autosubmit.scripts._initialise.parse_expids",
+        "autosubmit.scripts._args.parse_expids",
         return_value=["a000"],
     )
     mocker.patch(
-        "autosubmit.scripts._initialise.get_version",
+        "autosubmit.helpers.version.get_version",
         return_value="4.0.0",
     )
 
@@ -256,16 +271,17 @@ def test_initialise_command_does_not_update_matching_version(mocker):
         return_value=config,
     )
 
-    update_description = mocker.patch(
-        "autosubmit.database.db_common.update_experiment_description_version"
+    update_version = mocker.patch(
+        "autosubmit.experiment.manage.update_version"
     )
 
     opts = mocker.Mock(expid="a000", update_version=True)
 
     initialise_command("run", opts)
 
+    # The ``update_version`` is called, but ``AutosubmitConfig.set_version`` is not.
+    update_version.assert_called()
     config.set_version.assert_not_called()
-    update_description.assert_not_called()
     config.set_last_as_command.assert_called_once_with("run")
 
 
@@ -273,11 +289,11 @@ def test_initialise_command_version_mismatch_exits(mocker):
     """Test that a version mismatch stops the command."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
-        "autosubmit.scripts._initialise.parse_expids",
+        "autosubmit.scripts._args.parse_expids",
         return_value=["a000"],
     )
     mocker.patch(
-        "autosubmit.scripts._initialise.get_version",
+        "autosubmit.helpers.version.get_version",
         return_value="4.0.0",
     )
     log_error = mocker.patch("autosubmit.scripts._initialise.Log.error")
@@ -311,11 +327,11 @@ def test_initialise_command_allows_missing_experiment_version(mocker):
     """Test that an experiment without a stored version is accepted."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
-        "autosubmit.scripts._initialise.parse_expids",
+        "autosubmit.scripts._args.parse_expids",
         return_value=["a000"],
     )
     mocker.patch(
-        "autosubmit.scripts._initialise.get_version",
+        "autosubmit.helpers.version.get_version",
         return_value="4.0.0",
     )
 
@@ -343,11 +359,11 @@ def test_initialise_command_does_not_update_non_updatable_commands(mocker, comma
     """Test that non-updatable commands skip version handling."""
     mocker.patch("autosubmit.scripts._initialise._set_locale")
     mocker.patch(
-        "autosubmit.scripts._initialise.parse_expids",
+        "autosubmit.scripts._args.parse_expids",
         return_value=["a000"],
     )
     mocker.patch(
-        "autosubmit.scripts._initialise.get_version",
+        "autosubmit.helpers.version.get_version",
         return_value="4.0.0",
     )
 

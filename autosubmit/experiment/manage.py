@@ -128,7 +128,9 @@ def _generate_as_config(
                     if parameter_key in parameters:
                         comment = parameters[parameter_key]
                         yaml_data.yaml_set_comment_before_after_key(  # type: ignore[attr-defined]
-                            key, before=comment, indent=yaml_data.lc.col  # type: ignore[attr-defined]
+                            key,
+                            before=comment,
+                            indent=yaml_data.lc.col,  # type: ignore[attr-defined]
                         )
 
     def _recurse_into_parameters(
@@ -281,10 +283,9 @@ def expid_fn(
     # Create the experiment structure
     Log.info("Generating folder structure...")
 
-    exp_folder = root_folder / Path(exp_id)
     try:
-        Log.info(f"Experiment folder: {exp_folder}")
-        create_required_folders(exp_id, exp_folder)
+        Log.info(f"Experiment folder: {BasicConfig.expid_dir(exp_id)}")
+        create_required_folders(exp_id)
     except OSError as e:
         with suppress(Exception):
             delete_experiment(exp_id, True)
@@ -963,9 +964,7 @@ def create(
             )
             try:
                 # FIXME: https://github.com/BSC-ES/autosubmit/issues/3179
-                raise NotImplementedError(
-                    "Removed in 4.2.0 (joblist pull request)!"
-                )
+                raise NotImplementedError("Removed in 4.2.0 (joblist pull request)!")
             except Exception:
                 Log.warning(
                     "Couldn't recover the Historical database, AS will continue without it, GUI may be affected"
@@ -976,10 +975,7 @@ def create(
             noplot = False
         try:
             Log.info("\nPlotting the jobs list...")
-            if (
-                len(as_conf.experiment_data.get("WRAPPERS", {})) > 0
-                and check_wrappers
-            ):
+            if len(as_conf.experiment_data.get("WRAPPERS", {})) > 0 and check_wrappers:
                 as_conf.check_conf_files(
                     running_time=True, force_load=True, no_log=False
                 )
@@ -994,7 +990,11 @@ def create(
             if group_by:
                 status = []
                 if expand_status:
-                    status_list = expand_status.split() if isinstance(expand_status, str) else expand_status
+                    status_list = (
+                        expand_status.split()
+                        if isinstance(expand_status, str)
+                        else expand_status
+                    )
                     for s in status_list:
                         status.append(get_job_status(s.upper()))
 
@@ -1011,9 +1011,7 @@ def create(
             monitor_exp.generate_output(
                 expid,
                 job_list.get_job_list(),
-                os.path.join(
-                    BasicConfig.LOCAL_ROOT_DIR, expid, "tmp", f"LOG_{expid}"
-                ),
+                os.path.join(BasicConfig.LOCAL_ROOT_DIR, expid, "tmp", f"LOG_{expid}"),
                 output if output is not None else output_type,
                 list(job_list.job_package_map.values()),
                 not hide,
@@ -1483,24 +1481,36 @@ def report(
         )
 
 
-def update_version(expid: str) -> bool:
+def update_version(expid: str) -> None:
     """Refresh the experiment version with the current Autosubmit version.
 
+    Creates any missing folders and files for the new version of Autosubmit chosen.
+
     :param expid: experiment identifier
-    :return: True if successful, False otherwise
+    :return: ``True`` if successful, ``False`` otherwise
     """
     as_conf = AutosubmitConfig(expid)
     as_conf.reload(force_load=True)
     as_conf.check_expdef_conf()
 
     autosubmit_version = get_version()
+    current_version = as_conf.get_version()
+
+    if current_version == autosubmit_version:
+        Log.info(
+            f"Experiment {expid} is already using Autosubmit version {autosubmit_version}. No changes needed."
+        )
+        return
+
     Log.info(
-        f"Changing {expid} experiment version from {as_conf.get_version()} to {autosubmit_version}"
+        f"Changing experiment {expid} version from {as_conf.get_version()} to {autosubmit_version}..."
     )
     as_conf.set_version(autosubmit_version)
+    Log.debug(f"Updating the experiment {expid} version in the database...")
     update_experiment_description_version(expid, version=autosubmit_version)
 
-    return True
+    Log.info(f"Creating required folders for experiment {expid}...")
+    create_required_folders(expid)
 
 
 def describe(
