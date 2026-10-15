@@ -343,14 +343,24 @@ class ExperimentHistory:
             update_these_changes = []
             # ("no runs")
         try:
-            should_create_new_run = self.should_we_create_a_new_run(
-                job_list,
-                len(update_these_changes),
-                current_experiment_run_dc,
-                chunk_unit,
-                chunk_size,
-                create,
-            )
+            should_create_new_run = False
+            if create:
+                should_create_new_run = True
+            elif (self.expid[0].lower() != "t"
+              and isinstance(current_experiment_run_dc, ExperimentRun)
+              and should_create_new_run
+            ):
+                if (len(job_list) != current_experiment_run_dc.total
+                  or len(update_these_changes) > int(self._get_date_member_completed_count(job_list))
+                  or not current_experiment_run_dc
+                ):
+                    should_create_new_run = True
+                elif should_create_new_run:
+                    should_create_new_run = (
+                        current_experiment_run_dc.chunk_unit != chunk_unit
+                        or current_experiment_run_dc.chunk_size != chunk_size
+                    )
+
             if len(update_these_changes) > 0 and not should_create_new_run:
                 self.manager.update_many_job_data_change_status(update_these_changes)
             if should_create_new_run:
@@ -401,33 +411,6 @@ class ExperimentHistory:
         except Exception as exp:
             self._log.log(str(exp), traceback.format_exc())
             Log.debug(f"Historical Database error: {str(exp)} {traceback.format_exc()}")
-
-    def should_we_create_a_new_run(
-        self,
-        job_list: "list[Job]",
-        changes_count: int,
-        current_experiment_run_dc: ExperimentRun,
-        new_chunk_unit: str,
-        new_chunk_size: int,
-        create: bool = False,
-    ) -> bool:
-        if create:
-            return True
-        elif (
-            not create
-            and self.expid[0].lower() != "t"
-            and isinstance(current_experiment_run_dc, ExperimentRun)
-        ):
-            if len(job_list) != current_experiment_run_dc.total:
-                return True
-            if changes_count > int(self._get_date_member_completed_count(job_list)):
-                return True
-        if not current_experiment_run_dc:
-            return True
-        return (
-                current_experiment_run_dc.chunk_unit != new_chunk_unit
-                or current_experiment_run_dc.chunk_size != new_chunk_size
-        )
 
 
     def update_counts_on_experiment_run_dc(

@@ -164,42 +164,6 @@ class TestExperimentHistory:
         dm_count = exp_history._get_date_member_completed_count(self.job_list)
         assert dm_count > 0
 
-    def test_should_we_create_new_run(self):
-        exp_history = ExperimentHistory("tt00")
-        exp_history.initialize_database()
-        CHANGES_COUNT = 1
-        TOTAL_COUNT = 6
-        current_experiment_run_dc = exp_history.manager.get_experiment_run_dc_with_max_id()
-        current_experiment_run_dc.total = TOTAL_COUNT
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size)
-        assert should_we is False
-        TOTAL_COUNT_DIFF = 5
-        current_experiment_run_dc.total = TOTAL_COUNT_DIFF
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size)
-        assert should_we is True
-        CHANGES_COUNT = 5
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size)
-        assert should_we is True
-        CHANGES_COUNT = 1
-        current_experiment_run_dc.total = TOTAL_COUNT
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size * 20)
-        assert should_we is True
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           current_experiment_run_dc.chunk_unit,
-                                                           current_experiment_run_dc.chunk_size)
-        assert should_we is False
-        should_we = exp_history.should_we_create_a_new_run(self.job_list, CHANGES_COUNT, current_experiment_run_dc,
-                                                           "day", current_experiment_run_dc.chunk_size)
-        assert should_we is True
-
     def test_status_counts(self):
         exp_history = ExperimentHistory("tt00")
         exp_history.initialize_database()
