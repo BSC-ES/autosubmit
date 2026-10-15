@@ -188,13 +188,16 @@ def test_create_job_creates_a_job_with_right_parameters(mocker, dictionary):
     chunk = 'ch0'
     # arrange
 
-    dictionary.experiment_data = {}
-    dictionary.experiment_data["DEFAULT"] = {}
-    dictionary.experiment_data["DEFAULT"]["EXPID"] = "random-id"
-    dictionary.experiment_data["JOBS"] = {}
-    dictionary.experiment_data["PLATFORMS"] = {}
-    dictionary.experiment_data["CONFIG"] = {}
-    dictionary.experiment_data["PLATFORMS"]["FAKE-PLATFORM"] = {}
+    dictionary.experiment_data = {
+        "DEFAULT": {
+            "EXPID": "random-id"
+        },
+        "JOBS": {},
+        "PLATFORMS": {
+            "FAKE-PLATFORM": {}
+        },
+        "CONFIG": {}
+    }
     job_list_mock = mocker.Mock()
     job_list_mock.append = mocker.Mock()
 
@@ -212,7 +215,7 @@ def test_create_job_creates_a_job_with_right_parameters(mocker, dictionary):
     assert chunk == created_job.chunk
     assert _DATE_FORMAT == created_job.date_format
     assert Language.BASH == created_job.type
-    assert None is created_job.executable
+    assert created_job.executable == ""
     assert created_job.check
     assert 0 == created_job.retrials
 

@@ -262,7 +262,7 @@ class Platform(ABC):
 
         self.log_queue_size = log_queue_size
         self.remote_log_dir: str = ""
-        self.has_scheduler = True
+        self.has_scheduler: bool = True
         self.IO_SAFE_WAIT = int(
             self.config.get("PLATFORMS", {}).get(self.name.upper(), {}).get("IO_SAFE_WAIT", self.IO_SAFE_WAIT))
 

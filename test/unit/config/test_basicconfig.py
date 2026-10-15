@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 from pathlib import Path
 
 import pytest
@@ -59,7 +58,6 @@ def test_read_file_config(tmp_path):
     """
     config_file = tmp_path / "autosubmitrc"
     config_file.write_text(config_content)
-    os.environ = {'AUTOSUBMIT_CONFIGURATION': str(config_file)}
     BasicConfig.read()
     assert BasicConfig.ALLOWED_HOSTS == {'': ['3]]', ''], '1': ['3]]', '']}
     assert BasicConfig.AS_TIMES_DB == 'as_times.db'
