@@ -368,3 +368,35 @@ def test_add_job_to_log_recover_signals_work_event(local, mocker):
 
     local.add_job_to_log_recover(job)
     assert local.work_event.is_set()
+
+
+def test_add_job_to_log_recover_respawns_dead_process(prepare_test, local, as_conf, mocker):
+    """Issue #3342: a dead log recovery process must be respawned, not silently dropped."""
+    mocker.patch(
+        "autosubmit.platforms.platform.Platform.get_mp_context",
+        return_value=mp.get_context("fork"),
+    )
+    local.config["LOG_RECOVERY_TIMEOUT"] = 10
+    local.spawn_log_retrieval_process(as_conf)
+    assert local.log_recovery_process.is_alive()
+
+    # Simulate an unexpected crash of the recovery child.
+    local.log_recovery_process.kill()
+    local.log_recovery_process.join(timeout=5)
+    assert not local.log_recovery_process.is_alive()
+    dead_pid = local.log_recovery_process.pid
+
+    job = Job("t000", "0000", Status.COMPLETED, 0)
+    job.name = "test_job"
+    job.id = 123
+    job.updated_log = 0
+
+    local.add_job_to_log_recover(job, as_conf)
+
+    assert local.log_recovery_process is not None
+    assert local.log_recovery_process.is_alive()
+    assert local.log_recovery_process.pid != dead_pid
+
+    local.cleanup_event.set()
+    local.log_recovery_process.join(timeout=30)
+    assert not local.log_recovery_process.is_alive()
