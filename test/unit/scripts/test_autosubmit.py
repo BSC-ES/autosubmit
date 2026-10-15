@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Autosubmit.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
+
 import pytest
 
 from autosubmit.helpers.version import get_version
@@ -48,6 +50,26 @@ def test_autosubmit_script_readme(mocker, autosubmit_config):
     exit_code = _autosubmit(args)
     logged_text = " ".join(str(call) for call in mock_log_info.call_args_list)
     assert "lightweight" in logged_text
+    assert exit_code == 0
+
+
+def test_autosubmit_script_readme_from_deleted_directory(mocker, autosubmit_config, tmp_path):
+    as_conf = autosubmit_config("a000", {})
+    mocker.patch("autosubmit.config.basicconfig.BasicConfig", as_conf.basic_config)
+    mock_log_info = mocker.patch("autosubmit.log.log.Log.info")
+    original_directory = os.getcwd()
+    working_directory = tmp_path / "deleted"
+    working_directory.mkdir()
+    try:
+        os.chdir(working_directory)
+        working_directory.rmdir()
+        exit_code = _autosubmit(["readme"])
+    finally:
+        os.chdir(original_directory)
+
+    logged_text = " ".join(str(call) for call in mock_log_info.call_args_list)
+    assert "lightweight" in logged_text
+    mock_log_info.assert_any_call("  Working directory: <deleted>")
     assert exit_code == 0
 
 

@@ -8,6 +8,7 @@ several bug fixes and enhancements to improve the overall user experience.
 
 **Bug fixes:**
 
+- Fix commands failing during traceability logging when the working directory has been deleted #3332
 - Fix `autosubmit.lock` not being deleted after `create` and `run`; `archive` and `delete` now acquire it too #3033 #3055
 - Fix multi-member PJM job lookup output parsing #3255 (thanks @1cbyc)
 - Remove the unrelated `--filter_status` option from `autosubmit expid` #3241 (thanks @1cbyc)
