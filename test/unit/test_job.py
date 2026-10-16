@@ -3135,7 +3135,7 @@ def test_recover_log_queues_recovery(mocker):
     as_conf.platforms_data.get.return_value = {}
     job.platform = mocker.MagicMock()
     job.recover_log(as_conf)
-    job.platform.add_job_to_log_recover.assert_called_once_with(job)
+    job.platform.add_job_to_log_recover.assert_called_once_with(job, as_conf)
     assert job.log_recovery_call_count == 1
 
 
@@ -3152,8 +3152,11 @@ def test_compute_inner_job_status_returns_stat_when_done(mocker):
 
 def test_recover_log_disabled_threads(mocker):
     job = Job("test", 1, Status.COMPLETED, 0)
+    job.platform = mocker.MagicMock()
+    job.platform.name = "pytest-ps"
+    job.platform_name = "PYTEST-PS"  # production uppercases the platform name
     as_conf = mocker.MagicMock()
-    as_conf.platforms_data.get.return_value = {"DISABLE_RECOVERY_THREADS": "true"}
+    as_conf.platforms_data = {"pytest-ps": {"DISABLE_RECOVERY_THREADS": "true"}}
     mock_retrieve = mocker.patch("autosubmit.job.job.Job.retrieve_logfiles")
     mock_notify = mocker.patch("autosubmit.job.job.Job.send_cpmip_notification")
     job.recover_log(as_conf)

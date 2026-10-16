@@ -72,3 +72,40 @@ to the local machine.
           MAX_WALLCLOCK: <HH:MM>
           QUEUE: <hpc_queue>
           REMOVE_LOG_FILES_ON_TRANSFER: true
+
+
+.. _log-recovery-resiliency:
+
+Log recovery resiliency
+-----------------------
+
+Autosubmit recovers the logs and stats of the finished jobs in a separate process.
+The options below control how that process is restarted when it dies unexpectedly,
+so that logs and stats are not silently lost. They live in the ``RUNTIME`` section of
+the experiment configuration.
+
+.. list-table::
+    :widths: 25 75
+    :header-rows: 1
+
+    * - Parameter
+      - Description
+    * - ``CONSECUTIVE_MAX_RESTARTS``
+      - Number of consecutive failures to restart the log recovery process before falling
+        back to inline recovery. Default: ``2``. Set to ``0`` to disable the limit.
+    * - ``RETRY_DELAY``
+      - Seconds to wait before retrying to download the still-pending logs with a separate
+        process after falling back to inline recovery. Default: ``600``.
+    * - ``INLINE_FALLBACK``
+      - If ``true``, pending logs are recovered in the main process when the separate process
+        cannot be started, so no logs or stats are lost. Default: ``true``.
+
+Example:
+
+.. code-block:: yaml
+
+    RUNTIME:
+        LOG_RECOVERY:
+            CONSECUTIVE_MAX_RESTARTS: 2
+            RETRY_DELAY: 600
+            INLINE_FALLBACK: true

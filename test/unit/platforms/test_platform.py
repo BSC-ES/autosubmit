@@ -23,7 +23,7 @@ import pytest
 
 from autosubmit.log.log import Log
 from autosubmit.platforms.locplatform import LocalPlatform
-from autosubmit.platforms.platform import recover_platform_job_logs_wrapper
+from autosubmit.platforms.platform import CopyQueue, recover_platform_job_logs_wrapper
 from test.unit.test_job import FakeBasicConfig, TestJob
 
 _EXPID = 't000'
@@ -121,3 +121,16 @@ def test_add_job_to_log_recover_signals_work_event(mocker):
     """add_job_to_log_recover signals work_event after queuing the job."""
     platform = LocalPlatform("t000", "test_platform", {})
     platform.recovery_queue = mocker.MagicMock()
+    platform.work_event = mocker.MagicMock()
+    platform.log_recovery_process = mocker.MagicMock()
+    platform.log_recovery_process.is_alive.return_value = True
+
+    job = mocker.MagicMock()
+    job.id = 123
+    job.name = "test_job"
+    job.fail_count = 0
+
+    assert platform.add_job_to_log_recover(job) is True
+    platform.recovery_queue.put_raw.assert_called_once_with(CopyQueue.job_data(job), timeout=30)
+    platform.work_event.set.assert_called_once_with()
+

@@ -502,6 +502,11 @@ There are some other parameters that you may need to specify:
       - Number of consecutive SSH transport failures tolerated before Autosubmit stops the run instead of retrying the recovery.
          Default: ``3``. Set to ``0`` to disable the limit.
 
+.. seealso::
+
+    Log recovery is resilient to the recovery process dying unexpectedly.
+    See :ref:`log-recovery-resiliency` in :doc:`../log_operations`.
+
 .. _request-exclusivity-reservation:
 
 Requesting exclusivity or reservation

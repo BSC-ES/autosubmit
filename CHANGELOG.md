@@ -21,6 +21,8 @@ several bug fixes and enhancements to improve the overall user experience.
 - Fixed `--start-after` not starting the experiment when the monitored experiment completed, because the run totals were wiped to zero at the end of the run #3151
 - Fixed `--start-after` with a non-existent experiment blocking the run; the trigger is now reported and ignored
 - Fixed `--run-only-members` (`-rom`) submitting jobs of all members instead of only the allowed ones
+- Fixed the log recovery process being silently skipped when it died, which lost the logs and stats of the affected jobs. Autosubmit now restarts it and re-queues the pending jobs #3342
+- Fixed `DISABLE_RECOVERY_THREADS` being ignored during log recovery because the option was looked up by job name instead of platform name #3342
 
 **New Features:**
 
@@ -36,6 +38,7 @@ several bug fixes and enhancements to improve the overall user experience.
 - Added "Did you mean 'run'" when an unknown sub-command is similar (e.g., "rum") to a valid one. #3194 #3171
 - Added platform options `SSH_KEEPALIVE` (seconds of inactivity before sending a keepalive packet, default `30`) and `MAX_TRANSPORT_RETRIALS` (consecutive SSH transport failures tolerated before stopping the run, default `3`) #3309
 - Expose the scheduler-assigned job id to job and wrapper scripts as the `AS_JOB_ID` runtime variable (Bash, Python 2/3, R) #3270
+- Added `RUNTIME.LOG_RECOVERY` options to configure log recovery resiliency: `CONSECUTIVE_MAX_RESTARTS` (consecutive failed restarts before falling back, default `2`, `0` disables the limit), `RETRY_DELAY` (seconds before retrying pending logs, default `600`) and `INLINE_FALLBACK` (recover logs in the main process when the separate process cannot start, default `true`) #3342
 
 **Migration from `job_list.pkl` to Database**
 
