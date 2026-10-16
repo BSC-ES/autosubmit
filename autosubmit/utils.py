@@ -22,7 +22,7 @@ from networkx import DiGraph
 from ruamel.yaml import YAML
 
 from autosubmit.config.basicconfig import REFERENCE_PATTERN, BasicConfig
-from autosubmit.log.log import AutosubmitCritical
+from autosubmit.log.log import AutosubmitCritical, Log
 from autosubmit.platforms.locplatform import LocalPlatform
 
 __all__ = [
@@ -276,19 +276,18 @@ def validate_dependencies(data) -> None:
     It'll create a graph and check it cycles itself or is a valid non-cyclical dependency.
 
     :param data: Dictionary containing the parameters to be substituted. If None, it will use self.experiment_data.
-    :return: None
     """
+    date_parameters: set = {"d", "dd", "D", "DD", "Y", "YY", "YYYY", "M", "MM", "m", "mm"}
     graph, unresolved = build_dependency_graph(data)
-    # Find cycles in the directed graph.
-    cycles = list(nx.simple_cycles(graph))
+    unresolved = [elem for elem in unresolved if elem[1] not in date_parameters]
+    if not nx.is_directed_acyclic_graph(graph):
+        cycle = nx.find_cycle(graph)
+        chain = " -> ".join([u for u, v, *_ in cycle] + [cycle[-1][1]])
+        raise AutosubmitCritical(
+            f"Recursion found validating the configuration files! Cycle: {chain}"
+        )
 
-    if unresolved:
-        for variable in unresolved:
-            path_normal = variable[1]
-            invalid_normal_path = resolve_path(data, path_normal)
-
-            if invalid_normal_path or cycles:
-                raise AutosubmitCritical(
-                    f"Recursion found validating the configuration files! \nPlease double check the following variable(s) {variable}."
-                    f"\nThe cyclical variable found: {cycles}.\n."
-                )
+    if len(unresolved) > 0:
+        Log.warning(
+            f"Configuration files has variables that point to nothing! \nPlease double check the following variable(s) {unresolved}."
+        )

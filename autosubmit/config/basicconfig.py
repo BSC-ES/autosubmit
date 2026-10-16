@@ -21,7 +21,7 @@ import re
 from configparser import ConfigParser
 from pathlib import Path
 
-REFERENCE_PATTERN = re.compile(r"%(.*?)%")
+REFERENCE_PATTERN = re.compile(r"(?<!%)%(?!%)([^%]+?)(?=%(?!%))")
 """This regex will be used to check and validate if the are strings in which the values are inbetween the percentage symbol"""
 
 class BasicConfig:
